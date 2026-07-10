@@ -1,0 +1,16 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OPTIONNEL — Génération de VIDÉO locale par IA (AnimateLCM sur GPU NVIDIA).
+# ⚠️ Lourd (~3-5 Go de téléchargement) et nécessite un GPU NVIDIA + CUDA.
+# Non requis pour tester l'agent : tous les autres outils marchent sans ça.
+#
+# Pour l'installer (depuis le dossier backend, venv activé) :
+#   1) PyTorch avec CUDA 12.8 :
+#      pip install torch>=2.4 --index-url https://download.pytorch.org/whl/cu128
+#   2) Puis le reste :
+#      pip install -r requirements-video.txt
+# ─────────────────────────────────────────────────────────────────────────────
+diffusers>=0.30.0
+transformers>=4.44.0
+accelerate>=0.33.0
+peft>=0.12.0
+safetensors>=0.4.0

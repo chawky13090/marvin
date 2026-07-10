@@ -1,0 +1,33 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Headset band -->
+  <path d="M22 58 Q24 24 60 20 Q96 24 98 58" stroke="#1a1a1a" stroke-width="7" fill="none" stroke-linecap="round"/>
+
+  <!-- Headset left cup -->
+  <rect x="8" y="49" width="16" height="22" rx="7" fill="#1a1a1a"/>
+  <!-- Headset right cup -->
+  <rect x="96" y="49" width="16" height="22" rx="7" fill="#1a1a1a"/>
+  <!-- Mic boom -->
+  <path d="M98 66 Q112 74 110 84" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <circle cx="110" cy="85" r="4.5" fill="#1a1a1a"/>
+
+  <!-- Head (white circle) -->
+  <circle cx="60" cy="64" r="44" fill="white"/>
+
+  <!-- Visor strip (black band) -->
+  <rect x="22" y="51" width="76" height="26" rx="9" fill="#0f0f0f"/>
+
+  <!-- Left eye (happy crescent) -->
+  <path d="M34 67 Q43 58 52 67" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Right eye (happy crescent) -->
+  <path d="M68 67 Q77 58 86 67" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Antenna stem -->
+  <rect x="57.5" y="16" width="5" height="12" rx="2.5" fill="#1a1a1a"/>
+  <!-- Antenna ball -->
+  <circle cx="60" cy="14" r="6.5" fill="#1a1a1a"/>
+  <!-- Antenna ball highlight -->
+  <circle cx="57.5" cy="11.5" r="2" fill="rgba(255,255,255,0.25)"/>
+
+  <!-- Smile arc (gold) -->
+  <path d="M40 96 Q60 109 80 96" stroke="#c9a84c" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>

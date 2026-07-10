@@ -1,0 +1,123 @@
+.wrapper {
+  padding: var(--space-md) var(--space-xl) var(--space-xl);
+  background: linear-gradient(to top, var(--bg-primary) 60%, transparent);
+}
+
+.inputContainer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  background: linear-gradient(180deg, rgba(20,18,14,0.55), rgba(12,12,16,0.78));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(79, 140, 255,0.22);
+  border-radius: 18px;
+  padding: 8px 8px 8px 14px;
+  transition: border-color .25s ease, box-shadow .35s ease, transform .2s ease;
+  position: relative;
+  overflow: hidden;
+}
+/* Liseré holographique animé en haut de la barre */
+.inputContainer::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
+  background: linear-gradient(90deg, transparent, #4f8cff, #38bdf8, #4f8cff, transparent);
+  background-size: 200% auto;
+  opacity: .5;
+  animation: holoShift 6s linear infinite;
+}
+.inputContainer:focus-within {
+  border-color: rgba(56, 189, 248,0.5);
+  box-shadow: 0 0 0 2px rgba(79, 140, 255,0.10), 0 0 26px rgba(56, 189, 248,0.18), 0 10px 40px rgba(0,0,0,0.5);
+  transform: translateY(-1px);
+}
+.inputContainer:focus-within::before { opacity: 1; }
+
+.textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  line-height: 1.5;
+  resize: none;
+  padding: 8px 0;
+  min-height: 24px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.micBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition-base);
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+}
+
+.micBtn:hover {
+  color: #38bdf8;
+  background: rgba(79, 140, 255,0.12);
+  box-shadow: 0 0 12px rgba(79, 140, 255,0.18);
+}
+
+.sendBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-gradient);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  flex-shrink: 0;
+  box-shadow: var(--accent-glow);
+}
+
+.sendBtn:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: 0 0 20px rgba(79, 140, 255,0.45), 0 0 30px rgba(56, 189, 248,0.2);
+}
+
+.sendBtn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.sendBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sendIcon {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--transition-base);
+}
+
+.sendBtn:hover:not(:disabled) .sendIcon {
+  transform: translateX(2px);
+}

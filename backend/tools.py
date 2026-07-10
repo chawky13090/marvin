@@ -1,0 +1,18192 @@
+"""
+SecretaryAI Backend — Registre de tous les outils disponibles pour l'agent.
+Chaque outil expose :
+  - Une entrée dans TOOLS_SPEC (format Ollama/OpenAI) pour que l'IA sache quoi appeler.
+  - Une fonction async execute_*(args) pour l'exécution réelle.
+  - Les outils « dangereux » vérifient args.get('confirmed') avant d'agir.
+"""
+import os
+import sys
+import json
+import shutil
+import asyncio
+import subprocess
+import time
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import psutil
+import database as db
+from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Couche réseau robuste partagée : pooling de connexions, cache TTL, hors-ligne
+# (rend tous les outils web plus rapides ET plus résistants aux coupures réseau)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_HTTP_CLIENT = None
+
+
+def _get_http_client():
+    """Client httpx PARTAGÉ (pool de connexions réutilisé) → évite le handshake
+    TCP/TLS à chaque appel = bien plus rapide. Recréé s'il a été fermé."""
+    global _HTTP_CLIENT
+    import httpx
+    if _HTTP_CLIENT is None or _HTTP_CLIENT.is_closed:
+        _HTTP_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(12.0, connect=4.0),
+            follow_redirects=True,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"},
+        )
+    return _HTTP_CLIENT
+
+
+def _is_offline_error(e) -> bool:
+    """Détecte une panne réseau / DNS / connexion (vs une vraie erreur applicative)."""
+    s = str(e).lower()
+    return any(k in s for k in (
+        "getaddrinfo", "name or service", "temporary failure", "connecterror",
+        "connection refused", "network is unreachable", "no address associated",
+        "timed out", "readtimeout", "connecttimeout", "[errno 11001]", "[errno -3]",
+        "failed to establish", "max retries", "nodename nor servname"))
+
+
+def _net_error(e, what="la ressource") -> dict:
+    """Erreur réseau lisible : distingue 'hors-ligne' d'une erreur applicative."""
+    if _is_offline_error(e):
+        return {"error": f"Pas de connexion internet (ou {what} injoignable). "
+                         f"Vérifiez votre réseau puis réessayez.", "offline": True}
+    return {"error": str(e)}
+
+
+# Cache TTL en mémoire pour les résultats web (évite les appels réseau redondants)
+_WEB_CACHE: dict = {}
+_WEB_CACHE_TTL = 600  # 10 minutes
+
+
+def _wcache_get(key):
+    v = _WEB_CACHE.get(key)
+    if v and (time.time() - v[0]) < _WEB_CACHE_TTL:
+        return v[1]
+    if v:
+        _WEB_CACHE.pop(key, None)
+    return None
+
+
+def _wcache_set(key, value):
+    if len(_WEB_CACHE) > 256:        # borne mémoire
+        for k in list(_WEB_CACHE)[:128]:
+            _WEB_CACHE.pop(k, None)
+    _WEB_CACHE[key] = (time.time(), value)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 1 — Fichiers & Documents
+# ══════════════════════════════════════════════════════════════════════════════
+
+import re as _re
+
+_HOME = os.path.expanduser("~")
+_REAL_USER = os.path.basename(_HOME)
+_DRIVE = os.path.splitdrive(_HOME)[0] or "C:"   # ex: "C:"
+
+# Tous les formats de chemins avec mauvais nom d'utilisateur que le modèle peut générer
+# Format 1: C:\Users\<wrong>\...   C:/Users/<wrong>/...
+_RE_WITH_DRIVE = _re.compile(
+    r'^[A-Za-z]:[/\\][Uu]sers[/\\](?!%s(?:[/\\]|$))([^/\\]+)([/\\].*)?$' % _re.escape(_REAL_USER),
+    _re.IGNORECASE,
+)
+# Format 2: \Users\<wrong>\...   ou  \\Users\<wrong>\...  (sans lettre de lecteur)
+_RE_NO_DRIVE = _re.compile(
+    r'^\\+[Uu]sers[/\\]([^/\\]+)([/\\].*)?$',
+    _re.IGNORECASE,
+)
+# Format 3: /Users/<wrong>/...  (style Unix)
+_RE_UNIX = _re.compile(
+    r'^/[Uu]sers/([^/]+)(/.*)?$',
+    _re.IGNORECASE,
+)
+
+_KNOWN_SUBFOLDERS = {
+    "desktop":         "Desktop",
+    "bureau":          "Desktop",
+    "documents":       "Documents",
+    "mes documents":   "Documents",
+    "downloads":       "Downloads",
+    "telechargements": "Downloads",
+    "téléchargements": "Downloads",
+    "pictures":        "Pictures",
+    "images":          "Pictures",
+    "photos":          "Pictures",
+    "music":           "Music",
+    "musique":         "Music",
+    "videos":          "Videos",
+    "vidéos":          "Videos",
+    "appdata":         "AppData",
+    "temp":            "AppData\\Local\\Temp",
+}
+
+# Noms génériques qu'un LLM invente souvent pour le nom d'utilisateur
+_PLACEHOLDER_USERS = {
+    "yourusername", "username", "yourname", "user", "utilisateur",
+    "youruser", "your_username", "your-username", "<username>",
+    "<user>", "nom_utilisateur", "nomdutilisateur", "exemple",
+    "example", "admin", "votrenom",
+}
+
+
+def _resolve_path(raw: str) -> str:
+    """
+    Correction universelle de chemin.
+    Intercepte TOUTES les variantes qu'un LLM peut générer :
+      C:/Users/YourUsername/Desktop  →  C:\\Users\\Chawb\\Desktop
+      \\Users\\username\\Desktop     →  C:\\Users\\Chawb\\Desktop
+      /Users/user/Desktop            →  C:\\Users\\Chawb\\Desktop
+      Desktop                        →  C:\\Users\\Chawb\\Desktop
+      ~\\Documents                   →  C:\\Users\\Chawb\\Documents
+    """
+    if not raw:
+        return _HOME
+
+    raw = raw.strip()
+
+    # 1. Expansion du tilde
+    if raw.startswith("~"):
+        rest = raw[1:].lstrip("/\\")
+        if rest:
+            return str(Path(_HOME) / rest.replace("/", "\\"))
+        return _HOME
+
+    # 2. Normaliser les séparateurs et supprimer les doublons de backslash
+    # (ex: \\Users\\username → \Users\username)
+    normalized = raw.replace("/", "\\")
+    # Réduire les séquences de backslashes à un seul — sauf au tout début (chemins UNC)
+    import re as _re2
+    # Préserver au max 1 backslash entre segments (sauf si le chemin commence par \\)
+    leading = len(normalized) - len(normalized.lstrip("\\"))
+    inner = _re2.sub(r'\\{2,}', r'\\', normalized[leading:])
+    normalized = "\\" * min(leading, 1) + inner  # garder au plus 1 backslash initial
+
+    # 3. Raccourcis simples — nom de dossier seul (ex: "Desktop", "Bureau")
+    lower = normalized.strip("\\").lower()
+    if lower in _KNOWN_SUBFOLDERS:
+        return str(Path(_HOME) / _KNOWN_SUBFOLDERS[lower])
+
+    def _fix_suffix(suffix: str) -> str:
+        """Retourne le chemin corrigé à partir du suffixe après le nom d'utilisateur."""
+        if not suffix:
+            return _HOME
+        suffix_norm = suffix.lstrip("\\")
+        suffix_lower = suffix_norm.lower()
+        # Vérifier les sous-dossiers connus
+        for key, folder in _KNOWN_SUBFOLDERS.items():
+            if suffix_lower.startswith(key) and (
+                len(suffix_lower) == len(key) or suffix_lower[len(key)] == "\\"
+            ):
+                rest_after = suffix_norm[len(key):].lstrip("\\")
+                base = str(Path(_HOME) / folder)
+                return str(Path(base) / rest_after) if rest_after else base
+        return str(Path(_HOME) / suffix_norm)
+
+    # 4. Format: C:\Users\wrong\...
+    m = _RE_WITH_DRIVE.match(normalized)
+    if m:
+        wrong_user = m.group(1)
+        suffix = m.group(2) or ""
+        if wrong_user.lower() in _PLACEHOLDER_USERS or wrong_user.lower() != _REAL_USER.lower():
+            return _fix_suffix(suffix)
+        # Bon utilisateur — mais le sous-dossier peut quand même être un alias non-anglais
+        # (ex: C:\Users\Chawb\Bureau au lieu de \Desktop) → _fix_suffix() le corrige aussi ;
+        # équivalent à `normalized` si le suffixe n'est pas un alias connu (pas de régression).
+        return _fix_suffix(suffix) if suffix else normalized
+
+    # 5. Format: \Users\wrong\... ou \\Users\wrong\...
+    m = _RE_NO_DRIVE.match(normalized)
+    if m:
+        wrong_user = m.group(1)
+        suffix = m.group(2) or ""
+        if wrong_user.lower() in _PLACEHOLDER_USERS or wrong_user.lower() != _REAL_USER.lower():
+            return _fix_suffix(suffix)
+        return _fix_suffix(suffix) if suffix else (_DRIVE + "\\Users\\" + wrong_user + suffix)
+
+    # 6. Format Unix: /Users/wrong/...
+    m = _RE_UNIX.match(raw)
+    if m:
+        wrong_user = m.group(1)
+        suffix = (m.group(2) or "").replace("/", "\\")
+        if wrong_user.lower() in _PLACEHOLDER_USERS or wrong_user.lower() != _REAL_USER.lower():
+            return _fix_suffix(suffix)
+        return _DRIVE + "\\Users\\" + wrong_user + suffix
+
+    # 7. Retourner le chemin normalisé tel quel
+    return normalized
+
+
+async def execute_file_list(args: dict) -> dict:
+    path = _resolve_path(args.get("path", os.path.expanduser("~")))
+    show_hidden = args.get("show_hidden", False)
+
+    def fmt_size(n: int) -> str:
+        for unit in ("o", "Ko", "Mo", "Go"):
+            if n < 1024:
+                return f"{n:.0f} {unit}"
+            n /= 1024
+        return f"{n:.1f} To"
+
+    def ext_category(name: str) -> str:
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        cats = {
+            "pdf": "PDF", "doc": "Word", "docx": "Word",
+            "xls": "Excel", "xlsx": "Excel", "ppt": "PPT", "pptx": "PPT",
+            "txt": "Texte", "md": "Markdown", "csv": "CSV",
+            "jpg": "Image", "jpeg": "Image", "png": "Image", "gif": "Image",
+            "webp": "Image", "bmp": "Image", "svg": "Image",
+            "mp3": "Audio", "wav": "Audio", "flac": "Audio",
+            "mp4": "Vidéo", "mkv": "Vidéo", "avi": "Vidéo",
+            "zip": "Archive", "rar": "Archive", "7z": "Archive",
+            "py": "Python", "js": "JavaScript", "ts": "TypeScript",
+            "html": "HTML", "css": "CSS", "json": "JSON", "xml": "XML",
+            "exe": "Exécutable", "bat": "Script", "ps1": "PowerShell",
+        }
+        return cats.get(ext, ext.upper() if ext else "—")
+
+    try:
+        p = Path(path)
+        if not p.exists():
+            return {"error": f"Chemin introuvable : {path}"}
+        if not p.is_dir():
+            return {"error": f"Ce n'est pas un répertoire : {path}"}
+
+        entries = []
+        try:
+            items = sorted(p.iterdir(), key=lambda x: (x.is_file(), x.name.lower()))
+        except PermissionError:
+            return {"error": f"Accès refusé par Windows : {path}. Ce dossier est protégé par le système."}
+
+        for item in items:
+            if not show_hidden and item.name.startswith("."):
+                continue
+            try:
+                stat = item.stat()
+                size = stat.st_size if item.is_file() else 0
+                entries.append({
+                    "name": item.name,
+                    "type": "fichier" if item.is_file() else "dossier",
+                    "category": ext_category(item.name) if item.is_file() else "Dossier",
+                    "size": fmt_size(size) if item.is_file() else "—",
+                    "size_bytes": size,
+                    "path": str(item),
+                    "modified": time.strftime("%d/%m/%Y %H:%M", time.localtime(stat.st_mtime)),
+                })
+            except (PermissionError, OSError):
+                entries.append({
+                    "name": item.name,
+                    "type": "fichier" if item.is_file() else "dossier",
+                    "category": "🔒 Accès refusé",
+                    "size": "—",
+                    "size_bytes": 0,
+                    "path": str(item),
+                    "modified": "",
+                })
+
+        return {"success": True, "currentDir": str(p), "count": len(entries), "files": entries}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_info(args: dict) -> dict:
+    """Retourne les métadonnées détaillées d'un fichier ou dossier."""
+    path = _resolve_path(args.get("path", ""))
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    include_hash = args.get("hash", False)
+    try:
+        p = Path(path)
+        if not p.exists():
+            return {"error": f"Introuvable : {path}"}
+        stat = p.stat()
+        info: dict = {
+            "success": True,
+            "path": str(p),
+            "name": p.name,
+            "type": "dossier" if p.is_dir() else "fichier",
+            "extension": p.suffix.lower() if p.is_file() else "",
+            "created": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_ctime)),
+            "modified": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_mtime)),
+            "accessed": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_atime)),
+        }
+        if p.is_file():
+            size = stat.st_size
+            for unit in ("o", "Ko", "Mo", "Go"):
+                if size < 1024:
+                    info["size"] = f"{size:.0f} {unit}"
+                    break
+                size /= 1024
+            else:
+                info["size"] = f"{size:.1f} To"
+            info["size_bytes"] = stat.st_size
+            if include_hash:
+                import hashlib
+                h = hashlib.md5()
+                with open(str(p), "rb") as f:
+                    for chunk in iter(lambda: f.read(65536), b""):
+                        h.update(chunk)
+                info["md5"] = h.hexdigest()
+        else:
+            # Dossier : compte les entrées
+            try:
+                items = list(p.iterdir())
+                info["children_count"] = len(items)
+                info["files_count"] = sum(1 for i in items if i.is_file())
+                info["folders_count"] = sum(1 for i in items if i.is_dir())
+            except PermissionError:
+                info["children_count"] = "accès refusé"
+        return info
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_read(args: dict) -> dict:
+    path = _resolve_path(args.get("path", ""))
+    try:
+        p = Path(path)
+        if not p.exists():
+            return {"error": f"Fichier introuvable : {path}"}
+        ext = p.suffix.lower()
+
+        # ── PDF ──
+        if ext == ".pdf":
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(str(p))
+                text = "\n".join(page.extract_text() or "" for page in reader.pages)
+                return {"success": True, "path": str(p), "content": text[:50000], "pages": len(reader.pages)}
+            except Exception as e:
+                return {"error": f"Erreur lecture PDF : {e}"}
+
+        # ── Word ──
+        if ext in (".docx", ".doc"):
+            try:
+                from docx import Document
+                doc = Document(str(p))
+                text = "\n".join(para.text for para in doc.paragraphs)
+                return {"success": True, "path": str(p), "content": text[:50000]}
+            except Exception as e:
+                return {"error": f"Erreur lecture Word : {e}"}
+
+        # ── Excel ──
+        if ext in (".xlsx", ".xls"):
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(str(p), read_only=True, data_only=True)
+                lines = []
+                for sheet in wb.sheetnames:
+                    ws = wb[sheet]
+                    lines.append(f"=== Feuille : {sheet} ===")
+                    for row in ws.iter_rows(values_only=True):
+                        if any(cell is not None for cell in row):
+                            lines.append("\t".join(str(c) if c is not None else "" for c in row))
+                wb.close()
+                content = "\n".join(lines)
+                return {"success": True, "path": str(p), "content": content[:50000], "sheets": wb.sheetnames}
+            except Exception as e:
+                return {"error": f"Erreur lecture Excel : {e}"}
+
+        # ── CSV ──
+        if ext == ".csv":
+            try:
+                import csv as _csv, io
+                for enc in ("utf-8", "latin-1", "cp1252"):
+                    try:
+                        raw = p.read_text(encoding=enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                else:
+                    raw = p.read_bytes().decode(errors="replace")
+                reader = _csv.reader(io.StringIO(raw))
+                lines = ["\t".join(row) for row in reader]
+                return {"success": True, "path": str(p), "content": "\n".join(lines)[:50000], "rows": len(lines)}
+            except Exception as e:
+                return {"error": f"Erreur lecture CSV : {e}"}
+
+        # ── Texte brut ──
+        for enc in ("utf-8", "latin-1", "cp1252"):
+            try:
+                content = p.read_text(encoding=enc)
+                return {"success": True, "path": str(p), "content": content[:50000]}
+            except UnicodeDecodeError:
+                continue
+        return {"error": "Encodage non supporté"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_write(args: dict) -> dict:
+    path = _resolve_path(args.get("path", ""))
+    content = args.get("content", "")
+    # UI envoie mode='append'|'overwrite'; l'agent envoie append=True|False
+    _mode = args.get("mode", "")
+    append = args.get("append", False) or (_mode == "append")
+    try:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        mode = "a" if append else "w"
+        with p.open(mode, encoding="utf-8") as fh:
+            fh.write(content)
+        return {"success": True, "message": f"Fichier {'complété' if append else 'écrit'} : {path}", "path": str(p)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_delete(args: dict) -> dict:
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Supprimer définitivement : {args.get('path', '')} ?"}
+    path = _resolve_path(args.get("path", ""))
+    try:
+        p = Path(path)
+        if not p.exists():
+            return {"error": f"Introuvable : {path}"}
+        if p.is_dir():
+            shutil.rmtree(str(p))
+        else:
+            p.unlink()
+        return {"success": True, "message": f"Supprimé : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_rename(args: dict) -> dict:
+    source = _resolve_path(args.get("source", ""))
+    # UI envoie 'new_name' (juste un nom), l'agent envoie 'destination' (chemin complet)
+    raw_dest = args.get("destination") or args.get("new_name") or ""
+    if not raw_dest:
+        return {"error": "Paramètre 'destination' ou 'new_name' requis."}
+    # Si c'est juste un nom de fichier (sans séparateur), on construit le chemin complet
+    if not any(c in raw_dest for c in ("/", "\\")):
+        destination = str(Path(source).parent / raw_dest)
+    else:
+        destination = _resolve_path(raw_dest)
+    try:
+        s = Path(source)
+        if not s.exists():
+            return {"error": f"Source introuvable : {source}"}
+        d = Path(destination)
+        if d.exists():
+            return {"error": f"Destination déjà existante : {destination}"}
+        s.rename(destination)
+        return {"success": True, "message": f"Renommé : {Path(source).name} → {Path(destination).name}",
+                "old_path": source, "new_path": destination}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _dedupe_path(dest: str) -> str:
+    """Si dest existe déjà, renvoie un chemin libre en ajoutant ' (2)', ' (3)'…
+    Préserve l'extension : 'a.txt' -> 'a (2).txt'."""
+    p = Path(dest)
+    if not p.exists():
+        return dest
+    parent, stem, suffix = p.parent, p.stem, p.suffix
+    n = 2
+    while True:
+        cand = parent / f"{stem} ({n}){suffix}"
+        if not cand.exists():
+            return str(cand)
+        n += 1
+
+
+def _normalize_dest(source: str, destination: str) -> str:
+    """Résout une destination conviviale :
+    - si destination est un dossier existant -> on y place source (même nom de fichier)
+    - crée les dossiers parents manquants (mkdir -p)."""
+    src = Path(source)
+    dst = Path(destination)
+    # Destination = dossier existant -> garder le nom de la source
+    if dst.is_dir():
+        dst = dst / src.name
+    # Heuristique : destination sans extension qui n'existe pas et source est un fichier
+    # -> on suppose un fichier de destination (pas un dossier) sauf si finit par séparateur
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    return str(dst)
+
+
+async def execute_file_move(args: dict) -> dict:
+    source = _resolve_path(args.get("source", ""))
+    destination = _resolve_path(args.get("destination", ""))
+    if not Path(source).exists():
+        return {"error": f"Source introuvable : {source}"}
+    try:
+        destination = _normalize_dest(source, destination)
+        if os.path.normcase(os.path.abspath(source)) == os.path.normcase(os.path.abspath(destination)):
+            return {"error": "La source et la destination sont identiques."}
+        if Path(destination).exists():
+            destination = _dedupe_path(destination)
+        shutil.move(source, destination)
+        return {"success": True, "message": f"Déplacé : {source} → {destination}", "destination": destination}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_copy(args: dict) -> dict:
+    source = _resolve_path(args.get("source", ""))
+    destination = _resolve_path(args.get("destination", ""))
+    if not Path(source).exists():
+        return {"error": f"Source introuvable : {source}"}
+    try:
+        s = Path(source)
+        destination = _normalize_dest(source, destination)
+        # Copier sur soi-même ou collision -> dédupliquer (' (2)') au lieu d'échouer
+        if Path(destination).exists() or (
+            os.path.normcase(os.path.abspath(source)) == os.path.normcase(os.path.abspath(destination))
+        ):
+            destination = _dedupe_path(destination)
+        if s.is_dir():
+            shutil.copytree(source, destination)
+        else:
+            shutil.copy2(source, destination)
+        return {"success": True, "message": f"Copié : {source} → {destination}", "destination": destination}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_create_folder(args: dict) -> dict:
+    path = _resolve_path(args.get("path", ""))
+    try:
+        Path(path).mkdir(parents=True, exist_ok=True)
+        return {"success": True, "message": f"Dossier créé : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _parse_md_blocks(content: str):
+    """Découpe un Markdown en blocs structurés pour le rendu (docx/pdf).
+    Yields (kind, payload) : h1/h2/h3, p, bullet, num, quote, hr, code, table, space."""
+    lines = (content or "").split("\n")
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        s = raw.strip()
+        # Tableau Markdown : ligne | ... | suivie d'une ligne de séparation |---|
+        if s.startswith("|") and i + 1 < len(lines) and _re.match(r"^\s*\|?[\s:|-]+\|?\s*$", lines[i + 1]):
+            rows = []
+            header = [c.strip() for c in s.strip("|").split("|")]
+            rows.append(header)
+            i += 2
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
+                i += 1
+            yield ("table", rows)
+            continue
+        # Bloc de code ``` ... ```
+        if s.startswith("```"):
+            code = []
+            i += 1
+            while i < len(lines) and not lines[i].strip().startswith("```"):
+                code.append(lines[i]); i += 1
+            i += 1
+            yield ("code", "\n".join(code))
+            continue
+        if s.startswith("### "):   yield ("h3", s[4:])
+        elif s.startswith("## "):  yield ("h2", s[3:])
+        elif s.startswith("# "):   yield ("h1", s[2:])
+        elif s.startswith(("> ",)): yield ("quote", s[2:])
+        elif s.startswith(("- ", "* ", "• ")): yield ("bullet", s[2:])
+        elif _re.match(r"^\d+\.\s", s): yield ("num", _re.sub(r"^\d+\.\s", "", s))
+        elif s in ("---", "***", "___", "==="): yield ("hr", None)
+        elif s == "": yield ("space", None)
+        else: yield ("p", s)
+        i += 1
+
+
+def _md_inline_to_rl(text: str) -> str:
+    """Markdown inline → balises reportlab (<b> <i> <font> <a>). Échappe le HTML."""
+    t = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    t = _re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r'<a href="\2" color="#2563eb"><u>\1</u></a>', t)
+    t = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+    t = _re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<i>\1</i>", t)
+    t = _re.sub(r"`([^`]+)`", r'<font face="Courier" backColor="#f0f0f0">\1</font>', t)
+    return t
+
+
+async def execute_file_create_docx(args: dict) -> dict:
+    path = _resolve_path(args.get("path", ""))
+    title = args.get("title", "Document")
+    subtitle = args.get("subtitle", "")
+    content = args.get("content", "")
+    author = args.get("author", "Marvin")
+    accent = args.get("accent", "#c9a84c").lstrip("#")
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor, Cm
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+        from datetime import datetime as _dt
+
+        ar, ag, ab = int(accent[0:2], 16), int(accent[2:4], 16), int(accent[4:6], 16)
+        ACCENT = RGBColor(ar, ag, ab)
+
+        doc = Document()
+        # Police par défaut professionnelle
+        normal = doc.styles["Normal"]
+        normal.font.name = "Calibri"
+        normal.font.size = Pt(11)
+        doc.core_properties.author = author
+        doc.core_properties.title = title
+
+        # ── En-tête PERSONNALISABLE (choisi par le rédacteur, sur toutes les pages) ──
+        lh = args.get("letterhead") or {}
+        if any(lh.get(k) for k in ("org", "address", "phone", "email", "website", "logo")):
+            try:
+                hdr = doc.sections[0].header
+                hp = hdr.paragraphs[0]
+                hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                logo = lh.get("logo")
+                if logo:
+                    lp = _resolve_path(logo)
+                    if os.path.exists(lp):
+                        try:
+                            hp.add_run().add_picture(lp, height=Cm(1.3))
+                        except Exception:
+                            pass
+                if lh.get("org"):
+                    r = hp.add_run(("   " if hp.runs else "") + lh["org"])
+                    r.bold = True; r.font.size = Pt(12); r.font.color.rgb = ACCENT
+                info = "  ·  ".join(x for x in [lh.get("address"), lh.get("phone"), lh.get("email"), lh.get("website")] if x)
+                if info:
+                    ip = hdr.add_paragraph(info)
+                    ip.runs[0].font.size = Pt(8); ip.runs[0].font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+            except Exception:
+                pass
+
+        # ── Page de titre soignée ────────────────────────────────────────────
+        h = doc.add_heading(title, level=0)
+        h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for run in h.runs:
+            run.font.color.rgb = ACCENT
+            run.font.size = Pt(26)
+        if subtitle:
+            sp = doc.add_paragraph(subtitle); sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            sp.runs[0].font.size = Pt(13); sp.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+        meta = doc.add_paragraph(f"{author}  ·  {_dt.now().strftime('%d/%m/%Y')}")
+        meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        meta.runs[0].font.size = Pt(9); meta.runs[0].font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+
+        # ── Références du document (client, référence) — choisies par le rédacteur ──
+        refs = args.get("references") or {}
+        ref_line = "      ".join(x for x in [
+            (f"Client : {refs['client']}" if refs.get("client") else None),
+            (f"Réf. : {refs['reference']}" if refs.get("reference") else None),
+        ] if x)
+        if ref_line:
+            rp = doc.add_paragraph(ref_line); rp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            rp.runs[0].font.size = Pt(9); rp.runs[0].font.color.rgb = RGBColor(0x77, 0x77, 0x77)
+
+        def _inline_runs(paragraph, text):
+            """Ajoute des runs en interprétant **gras** *italique* `code`."""
+            tokens = _re.split(r"(\*\*.+?\*\*|\*.+?\*|`[^`]+`)", text)
+            for tok in tokens:
+                if not tok:
+                    continue
+                if tok.startswith("**") and tok.endswith("**"):
+                    r = paragraph.add_run(tok[2:-2]); r.bold = True
+                elif tok.startswith("`") and tok.endswith("`"):
+                    r = paragraph.add_run(tok[1:-1]); r.font.name = "Consolas"; r.font.size = Pt(10)
+                elif tok.startswith("*") and tok.endswith("*"):
+                    r = paragraph.add_run(tok[1:-1]); r.italic = True
+                else:
+                    paragraph.add_run(tok)
+
+        for kind, payload in _parse_md_blocks(content):
+            if kind in ("h1", "h2", "h3"):
+                lvl = {"h1": 1, "h2": 2, "h3": 3}[kind]
+                hh = doc.add_heading("", level=lvl); _inline_runs(hh, payload)
+                for run in hh.runs:
+                    run.font.color.rgb = ACCENT
+            elif kind == "bullet":
+                _inline_runs(doc.add_paragraph(style="List Bullet"), payload)
+            elif kind == "num":
+                _inline_runs(doc.add_paragraph(style="List Number"), payload)
+            elif kind == "quote":
+                q = doc.add_paragraph(); q.paragraph_format.left_indent = Cm(0.8)
+                rr = q.add_run(payload); rr.italic = True; rr.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+            elif kind == "code":
+                cp = doc.add_paragraph(); rr = cp.add_run(payload)
+                rr.font.name = "Consolas"; rr.font.size = Pt(9)
+            elif kind == "hr":
+                doc.add_paragraph("─" * 50).runs[0].font.color.rgb = RGBColor(0xCC, 0xCC, 0xCC)
+            elif kind == "table" and payload:
+                cols = max(len(r) for r in payload)
+                tbl = doc.add_table(rows=0, cols=cols); tbl.style = "Light Grid Accent 1"
+                tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+                for ri, row in enumerate(payload):
+                    cells = tbl.add_row().cells
+                    for ci in range(cols):
+                        txt = row[ci] if ci < len(row) else ""
+                        cells[ci].text = ""
+                        _inline_runs(cells[ci].paragraphs[0], txt)
+                        if ri == 0:
+                            for rn in cells[ci].paragraphs[0].runs:
+                                rn.bold = True
+            elif kind == "space":
+                doc.add_paragraph("")
+            else:
+                _inline_runs(doc.add_paragraph(), payload)
+
+        # ── Bloc signature (choisi par le rédacteur) ─────────────────────────
+        sig = args.get("signature") or {}
+        if sig.get("name") or sig.get("lieu"):
+            doc.add_paragraph("")
+            if sig.get("lieu"):
+                lp = doc.add_paragraph(f"Fait à {sig['lieu']}, le {_dt.now().strftime('%d/%m/%Y')}.")
+                lp.alignment = WD_ALIGN_PARAGRAPH.RIGHT; lp.runs[0].font.size = Pt(10)
+            if sig.get("name"):
+                doc.add_paragraph("")
+                np = doc.add_paragraph(sig["name"]); np.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                np.runs[0].bold = True
+                if sig.get("title"):
+                    tp = doc.add_paragraph(sig["title"]); tp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    tp.runs[0].font.size = Pt(9); tp.runs[0].font.color.rgb = RGBColor(0x77, 0x77, 0x77)
+
+        # ── Numéro de page en pied ───────────────────────────────────────────
+        try:
+            footer = doc.sections[0].footer.paragraphs[0]
+            footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = footer.add_run()
+            fld1 = OxmlElement("w:fldSimple"); fld1.set(qn("w:instr"), "PAGE")
+            run._r.append(fld1)
+        except Exception:
+            pass
+
+        p = Path(path)
+        if not p.suffix:
+            p = p.with_suffix(".docx")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        doc.save(str(p))
+        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_convert_docx_to_pdf(args: dict) -> dict:
+    path = _resolve_path(args.get("path", ""))
+    output_dir = args.get("output_dir", None)
+    if output_dir:
+        output_dir = _resolve_path(output_dir)
+    p = Path(path)
+    if not p.exists():
+        return {"error": f"Fichier introuvable : {path}"}
+    out = Path(output_dir) if output_dir else p.parent
+
+    def _convert_sync():
+        # docx2pdf pilote Word via COM (win32com) — nécessite CoInitialize() sur LE THREAD
+        # qui l'exécute (sinon "CoInitialize n'a pas été appelé", même piège que system_search).
+        import pythoncom
+        from docx2pdf import convert
+        pythoncom.CoInitialize()
+        try:
+            convert(str(p), str(out))
+        finally:
+            pythoncom.CoUninitialize()
+
+    try:
+        # v2.138 — trouvé via le nouveau tableau de bord de fiabilité (100% d'échec récent,
+        # invisible dans l'audit précédent qui triait par VOLUME, pas par TAUX) : le
+        # CoInitialize() ci-dessus était déjà présent (fix v2.106) mais l'erreur persistait.
+        # Cause : `asyncio.to_thread` réutilise le pool de threads PARTAGÉ par défaut de
+        # FastAPI — un thread du pool peut avoir déjà servi un AUTRE appel COM (ex.
+        # system_search) dont l'appartement COM a été refermé (CoUninitialize) de façon
+        # incompatible avec une réutilisation ultérieure sur ce même thread. Corrigé : un
+        # ThreadPoolExecutor DÉDIÉ à usage unique (1 thread frais, jamais partagé/réutilisé)
+        # garantit un appartement COM propre à chaque conversion.
+        import concurrent.futures as _cf
+        loop = asyncio.get_running_loop()
+        with _cf.ThreadPoolExecutor(max_workers=1) as _executor:
+            await loop.run_in_executor(_executor, _convert_sync)
+        pdf_name = p.stem + ".pdf"
+        return {"success": True, "message": f"PDF créé : {out / pdf_name}", "path": str(out / pdf_name)}
+    except Exception as e:
+        return {"error": f"Erreur conversion PDF : {e}. Vérifiez que Microsoft Word est installé."}
+
+
+# ── Générateur de documentation IA (notes brutes → document Word complet) ───────
+_DOC_TEMPLATES = {
+    "rapport_intervention": {"name": "Rapport d'intervention IT", "icon": "🛠️",
+        "sections": ["Contexte et demande", "Diagnostic", "Actions réalisées", "Résultat et tests", "Recommandations"]},
+    "dossier_pro": {"name": "Dossier professionnel", "icon": "🎓",
+        "sections": ["Présentation et contexte", "Description de l'activité réalisée", "Compétences mises en œuvre", "Difficultés rencontrées et solutions", "Bilan et perspectives"]},
+    "procedure": {"name": "Procédure technique", "icon": "📋",
+        "sections": ["Objectif", "Prérequis", "Étapes détaillées", "Vérification", "Dépannage (FAQ)"]},
+    "cahier_charges": {"name": "Cahier des charges", "icon": "📐",
+        "sections": ["Contexte et objectifs", "Périmètre du projet", "Besoins fonctionnels", "Contraintes techniques", "Livrables et planning"]},
+    "compte_rendu": {"name": "Compte-rendu de réunion", "icon": "📝",
+        "sections": ["Informations (date, participants)", "Points abordés", "Décisions prises", "Actions à suivre"]},
+    "doc_technique": {"name": "Documentation technique", "icon": "🗂️",
+        "sections": ["Vue d'ensemble", "Architecture et fonctionnement", "Installation et configuration", "Utilisation", "Maintenance et annexes"]},
+    "devis_technique": {"name": "Devis technique", "icon": "💶",
+        "sections": ["Contexte du besoin", "Solution proposée", "Détail des prestations", "Matériel et licences", "Conditions et délais"]},
+    "pv_recette": {"name": "PV de recette", "icon": "✅",
+        "sections": ["Objet et périmètre", "Tests réalisés et résultats", "Réserves et anomalies", "Conclusion et validation"]},
+    "fiche_poste": {"name": "Fiche de poste", "icon": "👤",
+        "sections": ["Intitulé et rattachement", "Missions principales", "Activités et tâches", "Compétences requises", "Conditions d'exercice"]},
+    "libre": {"name": "Document professionnel", "icon": "📄",
+        "sections": ["Introduction", "Développement", "Conclusion"]},
+}
+
+
+def _doc_templates_list():
+    return [{"key": k, "name": v["name"], "icon": v["icon"], "sections": v["sections"]} for k, v in _DOC_TEMPLATES.items()]
+
+
+async def execute_document_generate(args: dict) -> dict:
+    """Génère un document professionnel COMPLET au format Word (.docx) à partir de notes
+    brutes, selon un modèle (rapport d'intervention, dossier pro, procédure...). Rédige
+    section par section pour un rendu complet et soigné. PDF optionnel."""
+    import re as _re
+    raw = (args.get("text") or args.get("raw") or args.get("notes") or "").strip()
+    tpl_key = (args.get("template") or "libre").strip()
+    tpl = _DOC_TEMPLATES.get(tpl_key, _DOC_TEMPLATES["libre"])
+    if not raw and not args.get("title"):
+        return {"error": "Fournis des notes (paramètre 'text') ou au moins un 'title'."}
+    title = (args.get("title") or "").strip() or (raw.split("\n")[0][:80] if raw else tpl["name"])
+
+    author = (args.get("author") or "").strip()
+    if not author:
+        try:
+            import learning
+            rec = await learning.recall("nom et prénom de l'utilisateur")
+            for f in rec.get("facts", []):
+                m = _re.search(r"appelle\s+([A-ZÀ-Ÿ][^\s,.;]+)", f)
+                if m:
+                    author = m.group(1)
+                    break
+        except Exception:
+            pass
+        author = author or "Marvin"
+
+    # Contexte optionnel depuis les documents indexés (RAG)
+    sources_ctx = ""
+    if args.get("use_documents"):
+        try:
+            import vector_store as vs
+            hits = await vs.search(raw or title, collections=["documents"], limit=4)
+            sources_ctx = "\n".join(f"- {h['text'][:400]}" for h in hits)
+        except Exception:
+            pass
+
+    sections = args.get("sections") or tpl["sections"]
+    # Mode par défaut piloté par le MODE de performance (rapide sur petite machine, detaille sur puissante)
+    mode = (args.get("mode") or db.get_setting("doc_default_mode") or "rapide").lower()
+    src_block = (f"\nCONTEXTE (extraits de documents) :\n{sources_ctx}\n" if sources_ctx else "")
+
+    if mode == "detaille":
+        # Section par section : plus complet/profond, mais plusieurs appels LLM (lent sur petit GPU).
+        md_parts = []
+        for section in sections[:8]:
+            prompt = (
+                f"Tu es un rédacteur professionnel francophone. Document de type « {tpl['name']} » "
+                f"intitulé « {title} ». Rédige UNIQUEMENT la section « {section} », COMPLÈTE et "
+                f"professionnelle, en français sans fautes. Commence par « ## {section} ». "
+                f"Sous-titres/listes/tableaux si utile, reste factuel.\n\n"
+                f"NOTES :\n{raw or '(peu d éléments — propose un contenu plausible)'}\n" + src_block + "\nRÉDACTION :"
+            )
+            try:
+                part = (await _ollama_generate(prompt, model=args.get("model"), timeout=180) or "").strip()
+            except Exception as e:
+                part = f"## {section}\n\n(génération échouée : {str(e)[:80]})"
+            if "##" not in part[:60]:
+                part = f"## {section}\n\n" + part
+            md_parts.append(part)
+        content = f"# {title}\n\n" + "\n\n".join(md_parts)
+    else:
+        # Une seule passe : génère tout le document d'un coup (rapide).
+        sec_list = "\n".join(f"## {s}" for s in sections)
+        prompt = (
+            f"Tu es un rédacteur professionnel francophone. Rédige un document COMPLET de type "
+            f"« {tpl['name']} » intitulé « {title} », en français impeccable (sans fautes), au format markdown.\n"
+            f"Respecte EXACTEMENT cette structure (une section « ## » par titre, dans l'ordre) :\n{sec_list}\n"
+            f"Chaque section doit être complète et professionnelle (sous-titres, listes ou tableaux si utile). "
+            f"Reste factuel, pas de remplissage.\n\n"
+            f"NOTES / ÉLÉMENTS FOURNIS :\n{raw or '(peu d éléments — propose un contenu plausible)'}\n"
+            + src_block + "\nDOCUMENT COMPLET (markdown) :"
+        )
+        try:
+            body = (await _ollama_generate(prompt, model=args.get("model"), timeout=240) or "").strip()
+        except Exception as e:
+            return {"error": f"Génération échouée : {str(e)[:120]}"}
+        content = body if body.lstrip().startswith("#") else f"# {title}\n\n{body}"
+
+    # ── En-tête / signature / références — CHOISIS par le rédacteur ──────────────
+    saved_lh = db.get_setting("doc_letterhead")
+    if isinstance(saved_lh, str):
+        try:
+            import json as _j; saved_lh = _j.loads(saved_lh)
+        except Exception:
+            saved_lh = {}
+    saved_lh = saved_lh if isinstance(saved_lh, dict) else {}
+    lh_arg = args.get("letterhead") if isinstance(args.get("letterhead"), dict) else {}
+    letterhead = {**saved_lh, **lh_arg} if args.get("include_header", True) else {}
+    references = {"client": (args.get("client") or "").strip(), "reference": (args.get("reference") or "").strip()}
+    signature = {}
+    if args.get("sign") or args.get("lieu"):
+        signature = {"name": (args.get("signataire") or saved_lh.get("signataire_name") or author),
+                     "title": (args.get("signataire_title") or saved_lh.get("signataire_title") or ""),
+                     "lieu": (args.get("lieu") or "").strip()}
+
+    safe = (_re.sub(r"[^\w\- ]", "", title)[:50].strip() or "document").replace(" ", "_")
+    out_dir = os.path.join(os.path.dirname(__file__), "..", "data", "documents_generes")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"{safe}.docx")
+    r = await execute_file_create_docx({"path": out_path, "title": title, "subtitle": tpl["name"],
+                                        "content": content, "author": author,
+                                        "letterhead": letterhead, "references": references, "signature": signature})
+    if r.get("error"):
+        return {"error": f"Rendu Word échoué : {r['error']}"}
+    docx_path = r.get("path", out_path)
+    # Sidecar : permet d'affiner une section plus tard (document_refine_section)
+    try:
+        import json as _json
+        meta = {"title": title, "subtitle": tpl["name"], "template": tpl_key, "author": author,
+                "letterhead": letterhead, "references": references, "signature": signature,
+                "sections": sections, "markdown": content}
+        with open(docx_path + ".meta.json", "w", encoding="utf-8") as _mf:
+            _json.dump(meta, _mf, ensure_ascii=False)
+    except Exception:
+        pass
+    result = {"success": True, "file": docx_path, "title": title, "template": tpl["name"],
+              "author": author, "sections": sections, "markdown": content[:4000],
+              "message": f"📄 Document « {title} » généré ({len(sections)} sections) → {os.path.basename(docx_path)}"}
+    if args.get("pdf"):
+        try:
+            pr = await execute_file_convert_docx_to_pdf({"path": docx_path})
+            if pr.get("success"):
+                result["pdf"] = pr.get("path")
+        except Exception:
+            pass
+    return result
+
+
+async def execute_file_search_text(args: dict) -> dict:
+    # Accept "directory" (agent) or "path" (UI) for the search root
+    _dir_raw = args.get("directory") or args.get("path") or os.path.expanduser("~")
+    directory = _resolve_path(_dir_raw)
+    query = args.get("query", "")
+    extensions = args.get("extensions", [".txt", ".md", ".pdf", ".docx", ".doc", ".csv", ".xlsx", ".json", ".py", ".js", ".ts", ".html", ".xml", ".log"])
+    case_sensitive = args.get("case_sensitive", False)
+    max_results = args.get("max_results", 20)
+
+    if not query:
+        return {"error": "Requête de recherche vide"}
+
+    results = []
+    search_term = query if case_sensitive else query.lower()
+
+    try:
+        for root, _, files in os.walk(directory):
+            if len(results) >= max_results:
+                break
+            for fname in files:
+                if len(results) >= max_results:
+                    break
+                fpath = Path(root) / fname
+                if fpath.suffix.lower() not in extensions:
+                    continue
+                try:
+                    content_result = await execute_file_read({"path": str(fpath)})
+                    text = content_result.get("content", "")
+                    if not text:
+                        continue
+                    haystack = text if case_sensitive else text.lower()
+                    if search_term in haystack:
+                        idx = haystack.find(search_term)
+                        start = max(0, idx - 80)
+                        end = min(len(text), idx + len(query) + 80)
+                        snippet = "..." + text[start:end].strip() + "..."
+                        results.append({
+                            "name": fname,
+                            "path": str(fpath),
+                            "snippet": snippet,
+                        })
+                except Exception:
+                    pass
+
+        return {
+            "success": True,
+            "query": query,
+            "directory": directory,
+            "count": len(results),
+            "results": results,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _normalize_windows_path(path: str) -> str:
+    """
+    Convert French Windows display names back to real folder names.
+    Windows Search Index returns the localized display names (Bureau, Documents)
+    but the actual folders on disk use English names (Desktop, Documents).
+    """
+    if not path:
+        return path
+    # Map French display names to real folder names
+    _FR_TO_EN = {
+        "\\Utilisateurs\\": "\\Users\\",
+        "\\Bureau\\":       "\\Desktop\\",
+        "\\Téléchargements\\": "\\Downloads\\",
+        "\\Telechargements\\": "\\Downloads\\",
+        "\\Mes Documents\\":   "\\Documents\\",
+        "\\Mes Images\\":      "\\Pictures\\",
+        "\\Mes Vidéos\\":      "\\Videos\\",
+        "\\Mes Videos\\":      "\\Videos\\",
+        "\\Ma Musique\\":      "\\Music\\",
+        "\\Favoris\\":         "\\Favorites\\",
+    }
+    # Also handle case where path ENDS with one of these
+    _FR_TO_EN_SUFFIX = {
+        "\\Bureau":       "\\Desktop",
+        "\\Téléchargements": "\\Downloads",
+        "\\Telechargements": "\\Downloads",
+        "\\Mes Documents":   "\\Documents",
+        "\\Mes Images":      "\\Pictures",
+        "\\Mes Vidéos":      "\\Videos",
+    }
+    result = path
+    for fr, en in _FR_TO_EN.items():
+        result = result.replace(fr, en)
+    for fr, en in _FR_TO_EN_SUFFIX.items():
+        if result.endswith(fr):
+            result = result[:-len(fr)] + en
+    # Verify the translated path exists; if not, fall back to original
+    import os as _os
+    if _os.path.exists(result):
+        return result
+    if _os.path.exists(path):
+        return path
+    return result   # Best guess
+
+
+def _search_windows_index(pattern: str, max_results: int = 100, path_filter: str = None) -> list[dict]:
+    """
+    Recherche ULTRA-RAPIDE via l'index Windows Search (utilisé par l'Explorateur).
+    Retourne en ~50ms même pour des recherches sur tout le PC.
+    Limite : seuls les dossiers indexés (Desktop, Documents, Downloads, etc.) sont trouvés.
+    """
+    try:
+        import win32com.client as _w32com
+        import pythoncom
+    except ImportError:
+        return None  # win32com pas disponible → fallback sur os.walk
+
+    # CoInitialize required when calling COM from a thread other than the main one
+    # (which is the case when called via asyncio.run_in_executor)
+    try:
+        pythoncom.CoInitialize()
+        com_inited = True
+    except Exception:
+        com_inited = False
+
+    # Convert glob pattern to SQL LIKE
+    # *.pdf → '%.pdf'  ;  rapport* → 'rapport%'  ;  *abdou* → '%abdou%'
+    sql_pattern = pattern.replace('*', '%').replace('?', '_')
+    if not sql_pattern.startswith('%') and not any(c in sql_pattern for c in '%_'):
+        # No wildcard given → search by contains
+        sql_pattern = f'%{sql_pattern}%'
+
+    # Escape single quotes in SQL
+    sql_pattern_safe = sql_pattern.replace("'", "''")
+
+    try:
+        conn = _w32com.Dispatch('ADODB.Connection')
+        conn.Open("Provider=Search.CollatorDSO;Extended Properties='Application=Windows';")
+        rs = _w32com.Dispatch('ADODB.Recordset')
+
+        # Build SQL query
+        where_parts = [f"System.FileName LIKE '{sql_pattern_safe}'"]
+        if path_filter:
+            path_safe = path_filter.replace("'", "''").replace("\\", "/")
+            where_parts.append(f"SCOPE='file:{path_safe}'")
+        where_clause = " AND ".join(where_parts)
+
+        sql = (
+            f"SELECT TOP {max_results} "
+            f"System.ItemPathDisplay, System.ItemName, System.Size, "
+            f"System.DateModified, System.ItemType "
+            f"FROM SystemIndex WHERE {where_clause}"
+        )
+        rs.Open(sql, conn)
+
+        results = []
+        while not rs.EOF:
+            path_val = rs.Fields("System.ItemPathDisplay").Value
+            name_val = rs.Fields("System.ItemName").Value
+            try:    size_val = int(rs.Fields("System.Size").Value or 0)
+            except: size_val = 0
+            try:    mod_val = rs.Fields("System.DateModified").Value
+            except: mod_val = None
+            try:    type_val = rs.Fields("System.ItemType").Value or ""
+            except: type_val = ""
+
+            # Normalize Windows path display ("C:\Utilisateurs\..." → "C:\Users\...")
+            if path_val:
+                path_val = str(path_val).replace("C:\\Utilisateurs\\", "C:\\Users\\")
+
+            results.append({
+                "name":     str(name_val) if name_val else "",
+                "path":     path_val or "",
+                "size":     size_val,
+                "modified": str(mod_val) if mod_val else "",
+                "type":     str(type_val),
+            })
+            rs.MoveNext()
+
+        rs.Close()
+        conn.Close()
+        return results
+    except Exception:
+        return None  # Index unavailable or query failed → fallback
+    finally:
+        if com_inited:
+            try: pythoncom.CoUninitialize()
+            except Exception: pass
+
+
+async def execute_file_find(args: dict) -> dict:
+    """Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (rapide)
+    ou os.walk en fallback. Pour une recherche sur TOUT le PC, utilisez 'path=all' ou omettez path."""
+    pattern  = args.get("pattern", "*").strip()
+    path     = args.get("path", "").strip()
+    max_results = int(args.get("max_results", 100))
+    include_dirs = args.get("include_dirs", False)
+    use_index = args.get("use_index", True)  # default: use Windows Search Index
+
+    if not pattern:
+        return {"error": "Paramètre 'pattern' requis. Ex: *.pdf, rapport*, *abdou*"}
+
+    # ── Mode rapide : index Windows Search ────────────────────────────────────
+    # Used by default when no specific path is given, or path is "all"
+    if use_index and (not path or path.lower() in ("all", "tout", "everywhere", "*")):
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: _search_windows_index(pattern, max_results, None)
+        )
+        if results is not None:
+            return {
+                "success": True,
+                "pattern": pattern,
+                "method":  "windows_search_index",
+                "scope":   "all indexed locations",
+                "count":   len(results),
+                "results": results,
+            }
+        # Fallback if index unavailable
+        path = "~"
+
+    # If a specific path is given, also try the index scoped to that path first
+    if not path:
+        path = "~"
+    resolved = Path(_resolve_path(path))
+    if not resolved.exists():
+        return {"error": f"Dossier introuvable : {resolved}"}
+
+    if use_index:
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: _search_windows_index(pattern, max_results, str(resolved))
+        )
+        if results:  # Index returned matches → use them
+            return {
+                "success": True,
+                "pattern": pattern,
+                "root":    str(resolved),
+                "method":  "windows_search_index",
+                "count":   len(results),
+                "results": results,
+            }
+
+    # ── Fallback : os.walk classique ──────────────────────────────────────────
+    try:
+        import fnmatch as _fn
+        results = []
+        total_scanned = 0
+        _SKIP_DIRS = {'$RECYCLE.BIN', 'System Volume Information', 'AppData',
+                      'node_modules', '__pycache__', '.git', '.venv',
+                      'Windows.old', 'Windows', 'Program Files', 'Program Files (x86)'}
+        for root, dirs, files in os.walk(str(resolved)):
+            # Skip hidden/system/heavy dirs
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in _SKIP_DIRS]
+            entries = files + (dirs if include_dirs else [])
+            for name in entries:
+                if _fn.fnmatch(name.lower(), pattern.lower()):
+                    full = os.path.join(root, name)
+                    try:
+                        stat = os.stat(full)
+                        results.append({
+                            "name":     name,
+                            "path":     full,
+                            "size":     stat.st_size,
+                            "modified": stat.st_mtime,
+                        })
+                    except Exception:
+                        results.append({"name": name, "path": full})
+                    if len(results) >= max_results:
+                        break
+                total_scanned += 1
+            if len(results) >= max_results:
+                break
+        return {
+            "success":  True,
+            "pattern":  pattern,
+            "root":     str(resolved),
+            "method":   "os.walk",
+            "count":    len(results),
+            "scanned":  total_scanned,
+            "results":  results,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_system_search(args: dict) -> dict:
+    """
+    Recherche ULTRA-RAPIDE sur TOUT le PC via l'index Windows Search.
+    Idéal pour trouver un fichier/dossier dont on connaît une partie du nom.
+    Limites : seuls les dossiers indexés (Desktop, Documents, Downloads, Pictures, etc.)
+    Pour les autres emplacements, utilisez file_find avec un path spécifique.
+    """
+    query = args.get("query", "").strip()
+    file_type = args.get("file_type", "").strip().lower()  # all | folder | file | pdf | docx | xlsx | image
+    max_results = int(args.get("max_results", 30))
+
+    if not query and not file_type:
+        return {"error": "Paramètre 'query' requis. Ex: 'abdou', 'rapport', 'photo' (ou un 'file_type' pour tout lister d'un type)."}
+
+    # Convert query to SQL LIKE pattern (auto-add wildcards)
+    # Sans terme mais avec un type (ex: « tous mes PDF ») → on liste tout le type.
+    pattern = '%' if not query else (query if any(c in query for c in '*?%') else f'%{query}%')
+
+    try:
+        import win32com.client as _w32com
+        import pythoncom
+
+        def _run_query():
+            # CoInitialize is required for COM access from non-main threads
+            try:
+                pythoncom.CoInitialize()
+                com_inited = True
+            except Exception:
+                com_inited = False
+
+            try:
+                sql_pattern = pattern.replace('*', '%').replace('?', '_').replace("'", "''")
+
+                conn = _w32com.Dispatch('ADODB.Connection')
+                conn.Open("Provider=Search.CollatorDSO;Extended Properties='Application=Windows';")
+                rs = _w32com.Dispatch('ADODB.Recordset')
+
+                where_parts = [f"System.FileName LIKE '{sql_pattern}'"]
+
+                # Filter by type
+                if file_type == "folder":
+                    where_parts.append("System.ItemType = 'Directory'")
+                elif file_type == "pdf":
+                    where_parts.append("System.FileExtension = '.pdf'")
+                elif file_type == "docx":
+                    where_parts.append("(System.FileExtension = '.docx' OR System.FileExtension = '.doc')")
+                elif file_type == "xlsx":
+                    where_parts.append("(System.FileExtension = '.xlsx' OR System.FileExtension = '.xls' OR System.FileExtension = '.csv')")
+                elif file_type == "image":
+                    where_parts.append("(System.FileExtension = '.jpg' OR System.FileExtension = '.jpeg' OR System.FileExtension = '.png' OR System.FileExtension = '.gif' OR System.FileExtension = '.webp')")
+                elif file_type == "file":
+                    where_parts.append("System.ItemType <> 'Directory'")
+
+                sql = (
+                    f"SELECT TOP {max_results} "
+                    f"System.ItemPathDisplay, System.ItemName, System.Size, "
+                    f"System.DateModified, System.ItemType, System.FileExtension "
+                    f"FROM SystemIndex WHERE {' AND '.join(where_parts)} "
+                    f"ORDER BY System.DateModified DESC"
+                )
+                rs.Open(sql, conn)
+
+                results = []
+                while not rs.EOF:
+                    path_val = rs.Fields("System.ItemPathDisplay").Value
+                    if path_val:
+                        path_val = _normalize_windows_path(str(path_val))
+                    name_val = rs.Fields("System.ItemName").Value
+                    try:    size_val = int(rs.Fields("System.Size").Value or 0)
+                    except: size_val = 0
+                    try:    mod_val = rs.Fields("System.DateModified").Value
+                    except: mod_val = None
+                    try:    type_val = rs.Fields("System.ItemType").Value or ""
+                    except: type_val = ""
+                    try:    ext_val = rs.Fields("System.FileExtension").Value or ""
+                    except: ext_val = ""
+
+                    is_dir = (str(type_val) == "Directory")
+                    results.append({
+                        "name":     str(name_val) if name_val else "",
+                        "path":     path_val or "",
+                        "is_dir":   is_dir,
+                        "size":     size_val,
+                        "size_kb":  round(size_val / 1024, 1) if size_val else 0,
+                        "extension": str(ext_val),
+                        "modified": str(mod_val) if mod_val else "",
+                    })
+                    rs.MoveNext()
+
+                rs.Close()
+                conn.Close()
+                return results
+            finally:
+                if com_inited:
+                    try: pythoncom.CoUninitialize()
+                    except Exception: pass
+
+        import time as _t
+        loop = asyncio.get_running_loop()
+        t0 = _t.time()
+        results = await loop.run_in_executor(None, _run_query)
+        elapsed_ms = int((_t.time() - t0) * 1000)
+
+        return {
+            "success":     True,
+            "query":       query,
+            "file_type":   file_type or "all",
+            "count":       len(results),
+            "elapsed_ms":  elapsed_ms,
+            "method":      "windows_search_index",
+            "results":     results,
+            "hint":        ("Pour voir le contenu d'un dossier trouvé, utilisez file_list avec son chemin."
+                            if results else
+                            "Aucun résultat. Vérifiez que le dossier est indexé par Windows Search (Panneau de configuration > Options d'indexation)."),
+        }
+
+    except ImportError:
+        return {"error": "win32com indisponible. Installez avec : pip install pywin32"}
+    except Exception as e:
+        return {"error": f"Erreur Windows Search : {str(e)[:200]}. Vérifiez que le service 'Windows Search' est démarré."}
+
+
+async def execute_system_search_content(args: dict) -> dict:
+    """
+    Recherche par CONTENU sur TOUT le PC via l'index plein-texte de Windows Search.
+    Trouve les documents d'après ce qu'ils CONTIENNENT (pas seulement leur nom).
+    Idéal pour « retrouve le document qui parle de X », « où est le contrat avec Y ».
+    Renvoie un extrait (AutoSummary) du passage. Seuls les dossiers indexés sont couverts.
+    """
+    query = (args.get("query") or "").strip()
+    file_type = (args.get("file_type") or "").strip().lower()
+    max_results = int(args.get("max_results", 25))
+    if not query:
+        return {"error": "Paramètre 'query' requis (ex: 'clause de résiliation', 'facture Dupont')."}
+
+    try:
+        import win32com.client as _w32com
+        import pythoncom
+        import re as _re
+
+        def _run_query():
+            try:
+                pythoncom.CoInitialize(); com_inited = True
+            except Exception:
+                com_inited = False
+            try:
+                conn = _w32com.Dispatch('ADODB.Connection')
+                conn.Open("Provider=Search.CollatorDSO;Extended Properties='Application=Windows';")
+                rs = _w32com.Dispatch('ADODB.Recordset')
+
+                # CONTAINS plein-texte : chaque mot en préfixe, tous requis (AND).
+                words = [w for w in _re.findall(r"\w+", query, _re.UNICODE) if len(w) > 1]
+                if words:
+                    terms = " AND ".join(f'"{w}*"' for w in words)
+                else:
+                    terms = f'"{query}"'
+                where_parts = [f"CONTAINS(System.Search.Contents, '{terms}')"]
+
+                if file_type == "pdf":
+                    where_parts.append("System.FileExtension = '.pdf'")
+                elif file_type == "docx":
+                    where_parts.append("(System.FileExtension = '.docx' OR System.FileExtension = '.doc')")
+                elif file_type == "xlsx":
+                    where_parts.append("(System.FileExtension = '.xlsx' OR System.FileExtension = '.xls' OR System.FileExtension = '.csv')")
+                elif file_type == "text":
+                    where_parts.append("(System.FileExtension = '.txt' OR System.FileExtension = '.md' OR System.FileExtension = '.log')")
+
+                sql = (
+                    f"SELECT TOP {max_results} "
+                    f"System.ItemPathDisplay, System.ItemName, System.Size, "
+                    f"System.DateModified, System.FileExtension, System.Search.AutoSummary "
+                    f"FROM SystemIndex WHERE {' AND '.join(where_parts)} "
+                    f"ORDER BY System.DateModified DESC"
+                )
+                rs.Open(sql, conn)
+
+                results = []
+                while not rs.EOF:
+                    path_val = rs.Fields("System.ItemPathDisplay").Value
+                    if path_val:
+                        path_val = _normalize_windows_path(str(path_val))
+                    name_val = rs.Fields("System.ItemName").Value
+                    try:    size_val = int(rs.Fields("System.Size").Value or 0)
+                    except: size_val = 0
+                    try:    mod_val = rs.Fields("System.DateModified").Value
+                    except: mod_val = None
+                    try:    ext_val = rs.Fields("System.FileExtension").Value or ""
+                    except: ext_val = ""
+                    try:    snippet = rs.Fields("System.Search.AutoSummary").Value or ""
+                    except: snippet = ""
+                    snippet = " ".join(str(snippet).split())[:280]
+                    results.append({
+                        "name":      str(name_val) if name_val else "",
+                        "path":      path_val or "",
+                        "size":      size_val,
+                        "size_kb":   round(size_val / 1024, 1) if size_val else 0,
+                        "extension": str(ext_val),
+                        "modified":  str(mod_val) if mod_val else "",
+                        "snippet":   snippet,
+                    })
+                    rs.MoveNext()
+                rs.Close(); conn.Close()
+                return results
+            finally:
+                if com_inited:
+                    try: pythoncom.CoUninitialize()
+                    except Exception: pass
+
+        import time as _t
+        loop = asyncio.get_running_loop()
+        t0 = _t.time()
+        results = await loop.run_in_executor(None, _run_query)
+        elapsed_ms = int((_t.time() - t0) * 1000)
+        return {
+            "success":    True,
+            "query":      query,
+            "file_type":  file_type or "all",
+            "count":      len(results),
+            "elapsed_ms": elapsed_ms,
+            "method":     "windows_search_content",
+            "results":    results,
+            "hint":       ("Tu peux indexer un résultat (document_index) pour interroger son contenu ensuite."
+                           if results else
+                           "Aucun document ne contient ces termes (ou l'emplacement n'est pas indexé par Windows Search)."),
+        }
+    except ImportError:
+        return {"error": "win32com indisponible. Installez avec : pip install pywin32"}
+    except Exception as e:
+        return {"error": f"Erreur Windows Search (contenu) : {str(e)[:200]}. Le service 'Windows Search' doit être démarré."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 2 — PC & Système
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_pc_get_real_paths(args: dict) -> dict:
+    """Retourne tous les vrais chemins du PC courant — à appeler si incertain sur les chemins."""
+    import platform, winreg
+    home = _HOME
+    username = _REAL_USER
+    drive = _DRIVE
+
+    # Chemins standards
+    paths = {
+        "username":       username,
+        "home":           home,
+        "drive":          drive,
+        "desktop":        str(Path(home) / "Desktop"),
+        "documents":      str(Path(home) / "Documents"),
+        "downloads":      str(Path(home) / "Downloads"),
+        "pictures":       str(Path(home) / "Pictures"),
+        "music":          str(Path(home) / "Music"),
+        "videos":         str(Path(home) / "Videos"),
+        "appdata_roaming":str(Path(home) / "AppData" / "Roaming"),
+        "appdata_local":  str(Path(home) / "AppData" / "Local"),
+        "temp":           str(Path(home) / "AppData" / "Local" / "Temp"),
+        "startup":        str(Path(home) / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"),
+    }
+
+    # Essayer de lire les chemins via le registre Windows (OneDrive, etc.)
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") as key:
+            for reg_name, our_name in [
+                ("Desktop", "desktop"),
+                ("Personal", "documents"),
+                ("{374DE290-123F-4565-9164-39C4925E467B}", "downloads"),
+                ("My Pictures", "pictures"),
+                ("My Music", "music"),
+                ("My Video", "videos"),
+            ]:
+                try:
+                    val, _ = winreg.QueryValueEx(key, reg_name)
+                    if val:
+                        paths[our_name] = val
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Lister les dossiers existants sur le bureau, documents et téléchargements
+    desktop_items, docs_items, downloads_items = [], [], []
+    try:
+        desktop_items = [f.name for f in Path(paths["desktop"]).iterdir()
+                         if not f.name.startswith(".")][:20]
+    except Exception:
+        pass
+    try:
+        docs_items = [f.name for f in Path(paths["documents"]).iterdir()
+                      if not f.name.startswith(".")][:20]
+    except Exception:
+        pass
+    try:
+        downloads_items = [f.name for f in Path(paths["downloads"]).iterdir()
+                           if not f.name.startswith(".")][:20]
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "paths": paths,
+        "desktop_contents": desktop_items,
+        "documents_contents": docs_items,
+        "downloads_contents": downloads_items,
+        "instruction": (
+            f"CHEMINS RÉELS : bureau={paths['desktop']}, "
+            f"documents={paths['documents']}, "
+            f"téléchargements={paths['downloads']}, "
+            f"utilisateur={username}. "
+            f"N'UTILISE JAMAIS d'autres noms d'utilisateur que '{username}'."
+        ),
+    }
+
+
+def _drive_list():
+    """Liste les lecteurs Windows présents (C:\\, D:\\…)."""
+    import string, ctypes
+    out = []
+    try:
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        for i, letter in enumerate(string.ascii_uppercase):
+            if bitmask & (1 << i):
+                out.append(f"{letter}:\\")
+    except Exception:
+        out = ["C:\\"]
+    return out
+
+
+def _quick_access():
+    """Accès rapides (dossiers utilisateur + lecteurs) pour l'explorateur."""
+    home = _HOME
+    qa = []
+    for label, sub, icon in [
+        ("Accueil", "", "🏠"), ("Bureau", "Desktop", "🖥️"), ("Documents", "Documents", "📄"),
+        ("Téléchargements", "Downloads", "⬇️"), ("Images", "Pictures", "🖼️"),
+        ("Musique", "Music", "🎵"), ("Vidéos", "Videos", "🎬"),
+    ]:
+        p = str(Path(home) / sub) if sub else home
+        if os.path.isdir(p):
+            qa.append({"label": label, "path": p, "icon": icon, "type": "folder"})
+    for d in _drive_list():
+        qa.append({"label": d.rstrip("\\"), "path": d, "icon": "💽", "type": "drive"})
+    return qa
+
+
+async def execute_pc_browse(args: dict) -> dict:
+    """
+    🗂️ Explore un dossier Windows : sous-dossiers + fichiers avec métadonnées
+    (taille, date, type), + accès rapides (dossiers utilisateur, lecteurs).
+    Permet de NAVIGUER l'arborescence sans taper les chemins.
+    """
+    from datetime import datetime as _dt
+    raw = (args.get("path") or "").strip()
+    show_hidden = bool(args.get("show_hidden", False))
+
+    path = _HOME if (not raw or raw.lower() in ("home", "roots", "quick", "~")) else _resolve_path(raw)
+
+    # Si on pointe sur un fichier → on explore son dossier parent (et on le signale)
+    selected_file = None
+    if os.path.isfile(path):
+        selected_file = path
+        path = os.path.dirname(path)
+
+    if not os.path.isdir(path):
+        return {"error": f"Dossier introuvable : {path}", "roots": _quick_access()}
+
+    entries = []
+    try:
+        with os.scandir(path) as it:
+            for e in it:
+                name = e.name
+                try:
+                    is_dir = e.is_dir()
+                    # Filtre des éléments cachés/système sauf si demandé
+                    if not show_hidden:
+                        if name.startswith("."):
+                            continue
+                        try:
+                            attrs = os.stat(e.path).st_file_attributes
+                            if attrs & 0x2 or attrs & 0x4:   # HIDDEN ou SYSTEM
+                                continue
+                        except Exception:
+                            pass
+                    st = e.stat()
+                    entries.append({
+                        "name": name,
+                        "path": e.path,
+                        "is_dir": is_dir,
+                        "size": 0 if is_dir else st.st_size,
+                        "size_human": "" if is_dir else _fmt_bytes(st.st_size),
+                        "modified": _dt.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                        "ext": "" if is_dir else os.path.splitext(name)[1].lower().lstrip("."),
+                    })
+                except (PermissionError, OSError):
+                    continue
+    except PermissionError:
+        return {"error": f"Accès refusé : {path}", "roots": _quick_access()}
+    except Exception as e:
+        return {"error": str(e), "roots": _quick_access()}
+
+    entries.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
+    parent = os.path.dirname(path.rstrip("\\/"))
+    if not parent or parent == path:
+        parent = None
+
+    return {
+        "success": True,
+        "path": path,
+        "parent": parent,
+        "roots": _quick_access(),
+        "count": len(entries),
+        "folders": sum(1 for e in entries if e["is_dir"]),
+        "files": sum(1 for e in entries if not e["is_dir"]),
+        "selected_file": selected_file,
+        "entries": entries[:2000],
+    }
+
+
+def _fmt_bytes(n):
+    try:
+        n = float(n)
+    except Exception:
+        return ""
+    for unit in ("o", "Ko", "Mo", "Go", "To"):
+        if n < 1024:
+            return f"{n:.0f} {unit}" if unit == "o" else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} Po"
+
+
+async def execute_pc_open_file(args: dict) -> dict:
+    raw = args.get("path", "")
+    path = _resolve_path(raw)
+    if not os.path.exists(path):
+        # Repli : ce n'est peut-être pas un fichier mais un nom d'application
+        # (ex. "firefox", "teraterm") — le modèle confond parfois file_open/app_launch.
+        # Heuristique : pas de séparateur de chemin ni d'extension → probablement une appli.
+        looks_like_app = "\\" not in raw and "/" not in raw and "." not in os.path.basename(raw or "")
+        if looks_like_app and raw.strip():
+            result = await execute_pc_app_launch({"app_name": raw.strip()})
+            if result.get("success"):
+                return result
+        return {"error": f"Introuvable : {path}"}
+    try:
+        os.startfile(path)
+        return {"success": True, "message": f"Ouvert : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_reveal(args: dict) -> dict:
+    """Ouvre l'Explorateur Windows sur l'emplacement d'un fichier/dossier (sélectionné)."""
+    path = _resolve_path(args.get("path", ""))
+    if not os.path.exists(path):
+        return {"error": f"Introuvable : {path}"}
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        if os.path.isdir(path):
+            os.startfile(path)
+        else:
+            # /select met le fichier en surbrillance dans son dossier
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(path)], creationflags=flags)
+        return {"success": True, "message": f"Révélé dans l'Explorateur : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _find_app_target(name: str):
+    """
+    Résout le chemin d'une application Windows par son nom, dans l'ordre :
+      1. PATH (shutil.which)
+      2. App Paths du registre (chrome, spotify, code… s'y enregistrent)
+      3. Raccourcis du menu Démarrer (.lnk) — couvre quasiment tout ce qui est installé
+      4. Emplacements Program Files courants
+    Retourne (kind, path) avec kind ∈ {'exe','lnk',None}.
+    """
+    import shutil
+    n = (name or "").strip()
+    if not n:
+        return (None, None)
+    low = n.lower()
+    base = low[:-4] if low.endswith(".exe") else low
+
+    # 1. PATH
+    for cand in (n, n + ".exe"):
+        w = shutil.which(cand)
+        if w:
+            return ("exe", w)
+
+    # 1b. Alias d'exécution des apps du Store (Spotify, WhatsApp…)
+    wa = os.path.join(os.environ.get("LOCALAPPDATA", ""), r"Microsoft\WindowsApps")
+    if os.path.isdir(wa):
+        for cand in (base + ".exe", n + ".exe"):
+            p = os.path.join(wa, cand)
+            if os.path.exists(p):
+                return ("exe", p)
+
+    # 2. App Paths (HKCU puis HKLM, vues 64 et 32 bits)
+    try:
+        import winreg
+        for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            for flag in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
+                for sub in (n, n + ".exe", base + ".exe"):
+                    try:
+                        k = winreg.OpenKey(hive,
+                                rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{sub}",
+                                0, winreg.KEY_READ | flag)
+                        val, _ = winreg.QueryValueEx(k, None)
+                        winreg.CloseKey(k)
+                        if val and os.path.exists(val.strip('"')):
+                            return ("exe", val.strip('"'))
+                    except OSError:
+                        pass
+    except Exception:
+        pass
+
+    # 3. Raccourcis du menu Démarrer (.lnk) — recherche floue par nom
+    start_dirs = [
+        os.path.join(os.environ.get("ProgramData", r"C:\ProgramData"),
+                     r"Microsoft\Windows\Start Menu\Programs"),
+        os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
+    ]
+    best, best_score = None, 0.0
+    for d in start_dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        for root, _dirs, files in os.walk(d):
+            for f in files:
+                if not f.lower().endswith((".lnk", ".url")):
+                    continue
+                stem = f.rsplit(".", 1)[0].lower()
+                if stem == base:
+                    return ("lnk", os.path.join(root, f))           # correspondance exacte
+                if base in stem or stem in base:
+                    score = len(base) / max(len(stem), 1)
+                    if score > best_score:
+                        best_score, best = score, os.path.join(root, f)
+    if best:
+        return ("lnk", best)
+
+    # 4. Emplacements d'installation courants
+    for pf in (os.environ.get("ProgramFiles", r"C:\Program Files"),
+               os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+               os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs")):
+        if not pf or not os.path.isdir(pf):
+            continue
+        try:
+            for entry in os.listdir(pf):
+                if base.replace(" ", "") in entry.lower().replace(" ", ""):
+                    exe = os.path.join(pf, entry, base + ".exe")
+                    if os.path.exists(exe):
+                        return ("exe", exe)
+        except Exception:
+            pass
+    return (None, None)
+
+
+async def execute_pc_app_launch(args: dict) -> dict:
+    app_name = args.get("app_name", "")
+    aliases = {
+        # Navigateurs
+        "chrome": "chrome", "google chrome": "chrome",
+        "firefox": "firefox",
+        "edge": "msedge", "microsoft edge": "msedge",
+        "brave": "brave",
+        "opera": "opera",
+        # Microsoft Office
+        "word": "winword", "microsoft word": "winword",
+        "excel": "excel", "microsoft excel": "excel",
+        "powerpoint": "powerpnt", "microsoft powerpoint": "powerpnt",
+        "access": "msaccess", "publisher": "mspub",
+        "outlook": "outlook", "microsoft outlook": "outlook",
+        "onenote": "onenote",
+        "teams": "teams", "microsoft teams": "teams",
+        # Windows intégrés
+        "notepad": "notepad", "bloc-notes": "notepad",
+        "notepad++": "notepad++",
+        "explorer": "explorer", "file explorer": "explorer",
+        "gestionnaire de fichiers": "explorer",
+        "calculator": "calc", "calculatrice": "calc",
+        "paint": "mspaint",
+        "wordpad": "wordpad",
+        "task manager": "taskmgr", "gestionnaire des tâches": "taskmgr",
+        "settings": "ms-settings:", "paramètres": "ms-settings:",
+        "control panel": "control", "panneau de configuration": "control",
+        "registry": "regedit", "registre": "regedit",
+        "event viewer": "eventvwr", "journal d'événements": "eventvwr",
+        "device manager": "devmgmt.msc", "gestionnaire de périphériques": "devmgmt.msc",
+        "disk management": "diskmgmt.msc", "gestion des disques": "diskmgmt.msc",
+        "services": "services.msc",
+        # Terminaux
+        "terminal": "wt", "windows terminal": "wt",
+        "cmd": "cmd", "invite de commandes": "cmd",
+        "powershell": "powershell",
+        # Développement
+        "vscode": "code", "visual studio code": "code", "vs code": "code",
+        "git": "git-gui",
+        # Médias & Autres
+        "vlc": "vlc",
+        "spotify": "spotify",
+        "discord": "discord",
+        "slack": "slack",
+        "zoom": "zoom",
+        "skype": "skype",
+        "steam": "steam",
+        "winrar": "winrar",
+        "7zip": "7zFM", "7-zip": "7zFM",
+        "obs": "obs64", "obs studio": "obs64",
+    }
+    if not app_name.strip():
+        return {"error": "Paramètre 'app_name' requis."}
+    key = app_name.lower().strip()
+    cmd = aliases.get(key, app_name).strip()
+
+    try:
+        # Protocoles / URL Windows (ms-settings:, shell:, http://…)
+        if cmd.startswith(("ms-", "shell:")) or "://" in cmd:
+            os.startfile(cmd)
+            return {"success": True, "message": f"Ouvert : {app_name}", "method": "protocol"}
+
+        # Snap-ins MMC (.msc)
+        if cmd.lower().endswith(".msc"):
+            subprocess.Popen(["mmc", cmd], shell=False)
+            return {"success": True, "message": f"Console ouverte : {app_name}", "method": "mmc"}
+
+        # Chemin absolu fourni directement
+        if os.path.isabs(cmd) and os.path.exists(cmd):
+            os.startfile(cmd)
+            return {"success": True, "message": f"Lancé : {app_name}", "method": "path", "resolved": cmd}
+
+        # ── Résolution robuste : PATH → App Paths → menu Démarrer → Program Files ──
+        kind, target = _find_app_target(cmd)
+        if kind:
+            # os.startfile lance fiablement les .exe ET les .lnk (apps graphiques)
+            os.startfile(target)
+            return {"success": True, "message": f"Application lancée : {app_name}",
+                    "method": kind, "resolved": target}
+
+        # Dernier recours : laisser Windows tenter (alias UWP, commandes intégrées)
+        try:
+            os.startfile(cmd)
+            return {"success": True, "message": f"Lancé : {app_name}", "method": "startfile"}
+        except Exception:
+            pass
+
+        return {"error": f"Application « {app_name} » introuvable. "
+                         f"Vérifiez le nom exact ou qu'elle est bien installée. "
+                         f"Astuce : essayez le nom du raccourci tel qu'il apparaît dans le menu Démarrer."}
+    except Exception as e:
+        return {"error": f"Impossible de lancer « {app_name} » : {e}"}
+
+
+def _looks_like_powershell(command: str) -> bool:
+    """Détecte une commande qui est en réalité du PowerShell (cmdlets Verb-Noun,
+    opérateurs/pipelines PS, variables $_). Évite l'erreur classique « Get-ChildItem
+    n'est pas reconnu » quand on l'exécute par erreur dans cmd.exe."""
+    c = (command or "")
+    cl = c.lower()
+    # Cmdlet Verb-Noun (Get-NetFirewallProfile, Get-MpComputerStatus, Get-LocalUser…)
+    if _re.search(r"\b(get|set|new|remove|add|start|stop|restart|test|select|where|"
+                  r"foreach|out|write|read|import|export|convertto|convertfrom|measure|"
+                  r"sort|group|format|enable|disable|invoke|clear|copy|move|rename|update|"
+                  r"install|uninstall|find|search|resolve|show|join|split|compare|tee)-[a-z][a-z0-9]+",
+                  cl):
+        return True
+    # Opérateurs / éléments propres à PowerShell
+    ps_markers = ("select-object", "where-object", "foreach-object", "$_", "$psitem",
+                  "| select", "| where", "| foreach", "| sort", "| measure", "| format-",
+                  "[pscustomobject]", "-executionpolicy", "get-content", "write-host",
+                  "-erroraction", "$env:", ".count", "out-string")
+    return any(m in cl for m in ps_markers)
+
+
+async def execute_pc_run_command(args: dict) -> dict:
+    command = args.get("command", "")
+    import security as _sec                      # 🛡️ garde-fou : bloque le catastrophique
+    _blk = _sec.guard_result(command)
+    if _blk:
+        return _blk
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Exécuter la commande : {command} ?"}
+    timeout = args.get("timeout", 30)
+    # Auto-routage : si la commande est en fait du PowerShell, on l'exécute via PowerShell
+    # (sinon cmd.exe renvoie « commande introuvable »). Rend les compétences robustes.
+    if _looks_like_powershell(command):
+        ps_res = await execute_pc_run_powershell({"script": command, "timeout": timeout, "confirmed": True})
+        if isinstance(ps_res, dict):
+            ps_res["shell"] = "powershell (auto)"
+        return ps_res
+    try:
+        # Use CREATE_NO_WINDOW to avoid antivirus triggering on visible console windows
+        flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+        # asyncio.to_thread : subprocess.run bloque, sinon toute l'event loop FastAPI se
+        # fige (chat, /api/health…) pendant la durée de la commande (jusqu'à `timeout`).
+        result = await asyncio.to_thread(
+            subprocess.run,
+            command, shell=True, capture_output=True, text=True,
+            timeout=timeout, encoding="utf-8", errors="replace",
+            creationflags=flags,
+        )
+        return {
+            "success": result.returncode == 0,
+            "returncode": result.returncode,
+            "stdout": result.stdout.strip() or "Aucune sortie standard.",
+            "stderr": result.stderr.strip() or "",
+        }
+    except subprocess.TimeoutExpired:
+        return {"error": f"Délai dépassé ({timeout}s)"}
+    except PermissionError:
+        return {"error": "Permission refusée — votre antivirus bloque cette commande."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_run_powershell(args: dict) -> dict:
+    """Exécute un script ou commande PowerShell et retourne la sortie."""
+    script  = args.get("script", "")
+    timeout = int(args.get("timeout", 30))
+    if not script:
+        return {"error": "Paramètre 'script' requis."}
+    import security as _sec                      # 🛡️ garde-fou : bloque le catastrophique
+    _blk = _sec.guard_result(script)
+    if _blk:
+        return _blk
+    if not args.get("confirmed"):
+        preview = script[:120] + ("…" if len(script) > 120 else "")
+        return {"requiresConfirmation": True, "message": f"Exécuter ce script PowerShell ?\n{preview}"}
+    import base64 as _b64
+    # Use EncodedCommand to avoid antivirus string-matching on the script content.
+    # UTF-16-LE is required by PowerShell's -EncodedCommand parameter.
+    # Forcer la sortie en UTF-8 → les accents (é, è, à…) ne sont plus mojibake côté Python.
+    script = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$OutputEncoding=[System.Text.Encoding]::UTF8;" + script
+    encoded = _b64.b64encode(script.encode("utf-16-le")).decode("ascii")
+
+    # Prefer the full system32 path to avoid antivirus blocking "powershell" in PATH
+    ps_candidates = [
+        r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+        r"C:\Windows\SysWow64\WindowsPowerShell\v1.0\powershell.exe",
+        "powershell.exe",
+        "powershell",
+    ]
+    ps_exe = next((p for p in ps_candidates if os.path.exists(p) if "\\" in p), "powershell.exe")
+
+    try:
+        # v2.135 — trouvé en corrigeant le hang signalé sur le diagnostic PC complet (pas le
+        # hang lui-même — les outils individuels répondaient tous en 1-2s, la lenteur perçue
+        # était juste la somme normale de ~8 appels d'outils+LLM en chaîne — mais un VRAI bug
+        # trouvé au passage) : capturé en `text=True, encoding="utf-8"` avec `errors="replace"`,
+        # silencieux — malgré le `[Console]::OutputEncoding=UTF8` injecté en tête de script, la
+        # sortie de PowerShell en mode `-EncodedCommand` + stdout redirigé reste en pratique
+        # encodée en Windows-1252 (confirmé : l'apostrophe typographique "'" de Windows, octet
+        # 0x92 en cp1252, décodée comme UTF-8 invalide → "�" — observé sur `win_event_log` ET
+        # le nouveau `pc_event_log_errors`, donc préexistant, pas introduit par les outils
+        # v2.134). Capture désormais les OCTETS bruts et essaie UTF-8 strict d'abord (certains
+        # scripts/outils l'émettent réellement) — n'échoue silencieusement sur cp1252 QUE si le
+        # décodage UTF-8 échoue vraiment, au lieu de toujours forcer UTF-8 avec des caractères
+        # perdus.
+        result = await asyncio.to_thread(
+            subprocess.run,
+            [ps_exe, "-NoProfile", "-NonInteractive",
+             "-ExecutionPolicy", "Bypass",
+             "-EncodedCommand", encoded],
+            capture_output=True, text=False, timeout=timeout,
+            # Avoid spawning a visible window (antivirus sometimes intercepts this)
+            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+        )
+
+        def _decode(raw: bytes) -> str:
+            try:
+                return raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return raw.decode("cp1252", errors="replace")
+
+        stdout_text = _decode(result.stdout)
+        stderr_text = _decode(result.stderr)
+        # Filtrer le bruit CLIXML de PowerShell (progress/info streams en XML)
+        stderr_clean = stderr_text.strip()
+        if stderr_clean.startswith("#< CLIXML"):
+            stderr_clean = ""
+        return {
+            "success":    result.returncode == 0,
+            "returncode": result.returncode,
+            "stdout":     stdout_text.strip() or "(aucune sortie)",
+            "stderr":     stderr_clean,
+        }
+    except FileNotFoundError:
+        return {"error": "PowerShell introuvable. Vérifiez qu'il est installé et accessible."}
+    except subprocess.TimeoutExpired:
+        return {"error": f"Délai dépassé ({timeout}s)"}
+    except PermissionError:
+        return {"error": "Permission refusée — votre antivirus bloque l'exécution. Ajoutez le dossier backend à la liste blanche."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Exécution ÉLEVÉE (pattern sidecar) — délègue au démon admin séparé
+#  (backend/elevated_daemon.py) au lieu de faire tourner tout le backend en admin.
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_pc_run_elevated(args: dict) -> dict:
+    """Exécute une commande AVEC DROITS ADMINISTRATEUR, via le démon élevé séparé
+    (le backend principal reste en utilisateur normal). Nécessite confirmation."""
+    command = (args.get("command") or "").strip()
+    script = (args.get("script") or "").strip()
+    if not command and not script:
+        return {"error": "Paramètre 'command' (cmd) ou 'script' (PowerShell) requis."}
+    payload = script or command
+    action = "run_powershell" if script else "run_command"
+
+    import security as _sec   # 🛡️ garde-fou côté demandeur AUSSI (défense en profondeur ;
+    _blk = _sec.guard_result(payload)   # le démon la revérifie de toute façon côté élevé.
+    if _blk:
+        return _blk
+
+    if not args.get("confirmed"):
+        preview = payload[:140] + ("…" if len(payload) > 140 else "")
+        return {"requiresConfirmation": True,
+                "message": f"⚠️ Exécuter EN ADMINISTRATEUR : {preview} ?"}
+
+    import elevated_client as _ec
+    if not _ec.is_daemon_available():
+        return {"error": "🔒 Démon élevé non lancé. Lance `backend/launch_elevated_daemon.ps1` "
+                         "(une invite Windows apparaît une fois), puis réessaie.",
+                "daemon_unavailable": True}
+    timeout = max(5, min(int(args.get("timeout", 30)), 300))
+    kwarg = {"command": payload} if action == "run_command" else {"script": payload}
+    return await _ec.call_elevated(action, timeout=timeout, **kwarg)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  EMPORIUM — Gestionnaire de paquets universel (Winget)
+#  Recherche / installation silencieuse / mise à jour / désinstallation.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _winget_exe() -> str | None:
+    """Chemin de winget.exe (résout le souci de PATH des apps WindowsApps)."""
+    import shutil as _sh
+    p = _sh.which("winget")
+    if p:
+        return p
+    # Repli : emplacement réel des alias WindowsApps
+    base = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WindowsApps\winget.exe")
+    return base if os.path.exists(base) else None
+
+
+def _winget_run(args: list, timeout: int = 90) -> dict:
+    """Exécute winget avec les drapeaux non-interactifs et renvoie {ok, stdout, stderr, code}."""
+    exe = _winget_exe()
+    if not exe:
+        return {"ok": False, "error": "winget introuvable. Installe « App Installer » depuis le Microsoft Store."}
+    flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+    try:
+        r = subprocess.run(
+            [exe] + args + ["--disable-interactivity"],
+            capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace", creationflags=flags,
+        )
+        return {"ok": r.returncode == 0, "code": r.returncode,
+                "stdout": r.stdout or "", "stderr": (r.stderr or "").strip()}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"Délai dépassé ({timeout}s) — opération winget trop longue."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def _parse_winget_table(text: str, available_col: bool = False) -> list:
+    """Parse la sortie tabulaire de winget de façon ROBUSTE, par POSITIONS DE COLONNES
+    fixes (et non par espaces — un nom long laisse parfois 1 seul espace avant l'ID).
+    Étapes : 1) `split('\\r')[-1]` retire le spinner de progression et réaligne l'en-tête
+    sur la colonne 0 ; 2) les débuts de mots de l'en-tête donnent les bornes de colonnes ;
+    3) chaque ligne de données est découpée à ces bornes (Nom, ID, Version, [Disponible], …, Source)."""
+    rows = []
+    lines = [ln.split("\r")[-1] for ln in (text or "").split("\n")]
+    # En-tête = 1re ligne où 'ID' apparaît comme token isolé.
+    hi = -1
+    for i, l in enumerate(lines):
+        if _re.search(r"(?<!\S)(?:ID|Id)(?!\S)", l):
+            hi = i
+            break
+    if hi < 0:
+        return rows
+    header = lines[hi]
+    words = list(_re.finditer(r"\S+", header))
+    if len(words) < 2:
+        return rows
+    starts = [m.start() for m in words]
+    head_lc = [m.group(0).lower() for m in words]
+    bounds = [(starts[k], starts[k + 1] if k + 1 < len(starts) else None) for k in range(len(starts))]
+    # Index de la colonne « Disponible/Available » (pour les mises à jour).
+    avail_idx = next((k for k, w in enumerate(head_lc) if w.startswith(("dispo", "avail"))), None)
+
+    def _cell(l, b):
+        a, e = b
+        if a >= len(l):
+            return ""
+        return (l[a:e] if e is not None else l[a:]).strip()
+
+    for l in lines[hi + 1:]:
+        s = l.strip()
+        if not s or set(s) <= set("-—– "):               # vide / ligne de tirets
+            continue
+        low = s.lower()
+        if any(k in low for k in ("mises à niveau", "mises a niveau", "package(s)",
+                                  "upgrades available", "disponible.", "aucun ", "no installed",
+                                  "--include-unknown", "ne peuvent pas", "no applicable")):
+            continue                                     # lignes de résumé / notes
+        vals = [_cell(l, b) for b in bounds]
+        pid = vals[1] if len(vals) > 1 else ""
+        if not pid or " " in pid:                        # ligne non alignée / parasite
+            continue
+        item = {"name": vals[0], "id": pid, "version": vals[2] if len(vals) > 2 else "",
+                "source": vals[-1]}
+        if available_col:
+            if avail_idx is not None and avail_idx < len(vals):
+                item["available"] = vals[avail_idx]
+            elif len(vals) >= 4:
+                item["available"] = vals[-2]
+        rows.append(item)
+    return rows
+
+
+async def execute_winget_search(args: dict) -> dict:
+    """Recherche des paquets disponibles via winget."""
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    cmd = ["search", query, "--accept-source-agreements", "--count", str(int(args.get("limit", 20)))]
+    if args.get("source"):
+        cmd += ["--source", str(args["source"])]
+    r = await asyncio.to_thread(_winget_run, cmd, timeout=70)
+    if not r.get("ok") and not r.get("stdout"):
+        return {"error": r.get("error") or r.get("stderr") or "Échec winget search."}
+    results = _parse_winget_table(r.get("stdout", ""))
+    return {"success": True, "query": query, "count": len(results), "results": results}
+
+
+async def execute_winget_list_upgrades(args: dict) -> dict:
+    """Liste les paquets installés ayant une mise à jour disponible."""
+    r = await asyncio.to_thread(_winget_run, ["upgrade", "--include-unknown", "--accept-source-agreements"], timeout=90)
+    if not r.get("ok") and not r.get("stdout"):
+        return {"error": r.get("error") or r.get("stderr") or "Échec winget upgrade (liste)."}
+    upgrades = _parse_winget_table(r.get("stdout", ""), available_col=True)
+    return {"success": True, "count": len(upgrades), "upgrades": upgrades}
+
+
+async def execute_winget_list_installed(args: dict) -> dict:
+    """Liste les logiciels INSTALLÉS (filtrable), pour les voir et les désinstaller."""
+    cmd = ["list", "--accept-source-agreements"]
+    q = (args.get("query") or "").strip()
+    if q:
+        cmd += ["--query", q]
+    r = await asyncio.to_thread(_winget_run, cmd, timeout=90)
+    if not r.get("ok") and not r.get("stdout"):
+        return {"error": r.get("error") or r.get("stderr") or "Échec winget list."}
+    apps = _parse_winget_table(r.get("stdout", ""))
+    # On ne garde que les entrées avec un vrai ID winget (désinstallables proprement).
+    apps = [a for a in apps if a.get("id") and a["id"].lower() not in ("id",)]
+    return {"success": True, "count": len(apps), "apps": apps}
+
+
+async def execute_winget_install(args: dict) -> dict:
+    """Installe un paquet en mode SILENCIEUX (nécessite confirmation)."""
+    explicit_id = (args.get("id") or "").strip()
+    query = (args.get("query") or "").strip()
+    if not explicit_id and not query:
+        return {"error": "Paramètre 'id' (ou 'query') requis."}
+
+    resolved_id = explicit_id
+    # v2.113 — bug réel constaté : le LLM appelle parfois avec 'query' (nom flou, ex.
+    # "Victoria") au lieu du 'id' exact renvoyé par un winget_search précédent (ex.
+    # "Victoria.Victoria") → winget refuse tout net ("Plusieurs packages correspondent")
+    # même si un SEUL paquet porte exactement ce nom. On résout nous-mêmes AVANT de
+    # demander confirmation, plutôt que de dépendre du LLM pour rejouer avec le bon id.
+    if not resolved_id:
+        search = await execute_winget_search({"query": query, "limit": 20})
+        candidates = search.get("results", []) if search.get("success") else []
+        exact = [c for c in candidates if c.get("name", "").strip().lower() == query.lower()]
+        if len(exact) == 1:
+            resolved_id = exact[0]["id"]
+        elif len(candidates) == 1:
+            resolved_id = candidates[0]["id"]
+        elif len(candidates) > 1:
+            options = ", ".join(f"{c.get('name')} ({c.get('id')})" for c in candidates[:8])
+            return {"error": f"Plusieurs paquets correspondent à « {query} » — précise avec le paramètre 'id' : {options}"}
+        else:
+            return {"error": f"Aucun paquet trouvé pour « {query} »."}
+
+    pkg_label = resolved_id or query
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Installer le paquet « {pkg_label} » via winget ?"}
+    selector = ["--id", resolved_id, "-e"] if resolved_id else [query]
+    r = await asyncio.to_thread(_winget_run, ["install"] + selector + ["--silent", "--accept-package-agreements",
+                     "--accept-source-agreements"], timeout=900)
+    return {"success": r.get("ok", False), "package": pkg_label, "code": r.get("code"),
+            "message": ("✅ Installé." if r.get("ok") else "❌ Échec de l'installation."),
+            "output": (r.get("stdout", "")[-600:] if r.get("stdout") else r.get("error") or r.get("stderr"))}
+
+
+async def execute_winget_upgrade(args: dict) -> dict:
+    """Met à jour un paquet précis, ou TOUT (`all=true`). Nécessite confirmation."""
+    do_all = bool(args.get("all"))
+    pkg = (args.get("id") or "").strip()
+    if not do_all and not pkg:
+        return {"error": "Fournis 'id' (un paquet) ou all=true (tout mettre à jour)."}
+    target = "TOUS les paquets" if do_all else f"« {pkg} »"
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Mettre à jour {target} via winget ?"}
+    if do_all:
+        cmd = ["upgrade", "--all", "--silent", "--accept-package-agreements",
+               "--accept-source-agreements", "--include-unknown"]
+    else:
+        cmd = ["upgrade", "--id", pkg, "-e", "--silent", "--accept-package-agreements",
+               "--accept-source-agreements"]
+    r = await asyncio.to_thread(_winget_run, cmd, timeout=1800)
+    return {"success": r.get("ok", False), "target": target, "code": r.get("code"),
+            "message": ("✅ Mise à jour terminée." if r.get("ok") else "❌ Échec (certains paquets ont pu échouer)."),
+            "output": (r.get("stdout", "")[-800:] if r.get("stdout") else r.get("error") or r.get("stderr"))}
+
+
+async def execute_winget_uninstall(args: dict) -> dict:
+    """Désinstalle un paquet en mode silencieux (nécessite confirmation)."""
+    pkg = (args.get("id") or args.get("query") or "").strip()
+    if not pkg:
+        return {"error": "Paramètre 'id' (ou 'query') requis."}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"⚠️ Désinstaller « {pkg} » ? (action sortante)"}
+    selector = ["--id", pkg, "-e"] if args.get("id") else [pkg]
+    r = await asyncio.to_thread(_winget_run, ["uninstall"] + selector + ["--silent"], timeout=600)
+    return {"success": r.get("ok", False), "package": pkg, "code": r.get("code"),
+            "message": ("✅ Désinstallé." if r.get("ok") else "❌ Échec de la désinstallation."),
+            "output": (r.get("stdout", "")[-600:] if r.get("stdout") else r.get("error") or r.get("stderr"))}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PANTHEON — Optimisation & durcissement Windows (tweaks SÛRS).
+#  Règle d'or : toute modification crée d'ABORD une sauvegarde (.reg / point de
+#  restauration) et exige une confirmation. Tout est RÉVERSIBLE.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_REG_BACKUP_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "registry_backups")
+_TELEMETRY_KEY = r"HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"
+_BLOATWARE = [
+    "Microsoft.BingNews", "Microsoft.BingWeather", "Microsoft.GamingApp", "Microsoft.GetHelp",
+    "Microsoft.Getstarted", "Microsoft.MicrosoftSolitaireCollection", "Microsoft.People",
+    "Microsoft.PowerAutomateDesktop", "Microsoft.Todos", "Microsoft.WindowsFeedbackHub",
+    "Microsoft.WindowsMaps", "Microsoft.Xbox.TCUI", "Microsoft.XboxGameOverlay",
+    "Microsoft.XboxGamingOverlay", "Microsoft.XboxIdentityProvider", "Microsoft.XboxSpeechToTextOverlay",
+    "Microsoft.ZuneMusic", "Microsoft.ZuneVideo", "Microsoft.YourPhone", "Clipchamp.Clipchamp",
+    "Microsoft.549981C3F5F10", "MicrosoftTeams", "Microsoft.MicrosoftStickyNotes",
+]
+
+
+def _ps_reg_to_native(path: str) -> str:
+    """HKLM:\\SOFTWARE\\... → HKLM\\SOFTWARE\\... (format attendu par reg.exe)."""
+    p = (path or "").strip()
+    for k, v in (("HKLM:", "HKLM"), ("HKCU:", "HKCU"), ("HKCR:", "HKCR"), ("HKU:", "HKU"), ("HKCC:", "HKCC")):
+        if p.upper().startswith(k):
+            return v + p[len(k):]
+    return p.replace(":", "")
+
+
+async def _reg_backup(ps_path: str) -> str | None:
+    """Exporte une clé de registre en .reg (sauvegarde de secours)."""
+    import time as _t
+    try:
+        os.makedirs(_REG_BACKUP_DIR, exist_ok=True)
+        native = _ps_reg_to_native(ps_path)
+        safe = _re.sub(r"[^A-Za-z0-9]+", "_", native)[:60]
+        out = os.path.join(_REG_BACKUP_DIR, f"{safe}_{_t.strftime('%Y%m%d-%H%M%S')}.reg")
+        flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+        p = await asyncio.to_thread(subprocess.run, ["reg", "export", native, out, "/y"], capture_output=True, text=True,
+                           timeout=30, creationflags=flags, encoding="utf-8", errors="replace")
+        if p.returncode == 0 and os.path.exists(out):
+            return os.path.abspath(out)
+    except Exception:
+        pass
+    return None
+
+
+async def execute_system_restore_point(args: dict) -> dict:
+    """Crée un point de restauration système (filet de sécurité avant optimisation)."""
+    desc = (args.get("description") or "Marvin — avant optimisation").replace("'", "")
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Créer un point de restauration « {desc} » ?"}
+    ps = ("try { Enable-ComputerRestore -Drive 'C:\\' -EA SilentlyContinue } catch {};"
+          f"Checkpoint-Computer -Description '{desc}' -RestorePointType 'MODIFY_SETTINGS'; 'OK'")
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 120})
+    ok = "OK" in (r.get("stdout") or "") and not r.get("error")
+    return {"success": ok,
+            "message": ("✅ Point de restauration créé." if ok else
+                        "❌ Échec — Restauration système désactivée, droits ADMIN manquants, "
+                        "ou limite d'1 point / 24 h atteinte."),
+            "detail": (r.get("stderr") or r.get("error") or "")[:300]}
+
+
+async def execute_registry_get(args: dict) -> dict:
+    """Lit une valeur (ou toutes les valeurs) d'une clé de registre (lecture seule)."""
+    path = (args.get("path") or "").strip()
+    name = args.get("name")
+    if not path:
+        return {"error": "Paramètre 'path' requis (ex: HKLM:\\SOFTWARE\\Microsoft\\Windows)."}
+    if name:
+        ps = f"(Get-ItemProperty -Path '{path}' -Name '{name}' -EA Stop).'{name}'"
+    else:
+        ps = f"Get-ItemProperty -Path '{path}' -EA Stop | Format-List *"
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 20})
+    out = (r.get("stdout") or "").strip()
+    if r.get("returncode") != 0 or not out or out == "(aucune sortie)":
+        return {"success": False, "path": path, "message": "Clé ou valeur introuvable.",
+                "detail": (r.get("stderr") or "")[:200]}
+    return {"success": True, "path": path, "name": name, "value": out[:1500]}
+
+
+async def execute_registry_backup(args: dict) -> dict:
+    """Exporte une clé de registre dans un fichier .reg de secours."""
+    path = (args.get("path") or "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    out = await _reg_backup(path)
+    return ({"success": True, "backup": out, "message": f"✅ Sauvegarde : {out}"} if out
+            else {"success": False, "message": "❌ Export du registre échoué (droits ?)."})
+
+
+async def execute_registry_set(args: dict) -> dict:
+    """Écrit une valeur de registre — SAUVEGARDE AUTO de la clé d'abord + confirmation."""
+    path = (args.get("path") or "").strip()
+    name = (args.get("name") or "").strip()
+    value = args.get("value")
+    rtype = (args.get("type") or "DWord")
+    if not path or not name or value is None:
+        return {"error": "Paramètres 'path', 'name' et 'value' requis."}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": f"Modifier le registre {path}\\{name} = {value} ({rtype}) ? "
+                           f"(une sauvegarde .reg est faite automatiquement)"}
+    backup = await _reg_backup(path)
+    val = value if str(rtype).lower() in ("dword", "qword") else f"'{value}'"
+    ps = (f"if(-not (Test-Path '{path}')){{ New-Item -Path '{path}' -Force | Out-Null }};"
+          f"New-ItemProperty -Path '{path}' -Name '{name}' -Value {val} -PropertyType {rtype} -Force | Out-Null; 'OK'")
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 30})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "path": path, "name": name, "backup": backup,
+            "message": ("✅ Registre modifié (sauvegarde effectuée)." if ok else
+                        "❌ Échec — droits ADMINISTRATEUR probablement requis."),
+            "detail": (r.get("stderr") or "")[:250]}
+
+
+async def execute_tweak_telemetry(args: dict) -> dict:
+    """Statut / désactivation / réactivation de la télémétrie Windows (DiagTrack + AllowTelemetry)."""
+    action = (args.get("action") or "status").lower()
+    if action in ("status", "query", "get"):
+        svc = await execute_pc_run_powershell({"script": "(Get-Service DiagTrack -EA SilentlyContinue).Status",
+                                               "confirmed": True, "timeout": 15})
+        key = await execute_registry_get({"path": _TELEMETRY_KEY, "name": "AllowTelemetry"})
+        return {"success": True, "action": "status",
+                "diagtrack": (svc.get("stdout") or "").strip() or "inconnu",
+                "allow_telemetry": (key.get("value") if key.get("success") else "non défini (défaut : activé)")}
+    if action not in ("disable", "enable"):
+        return {"error": "action attendue : status | disable | enable"}
+    if not args.get("confirmed"):
+        verb = "Désactiver" if action == "disable" else "Réactiver"
+        return {"requiresConfirmation": True,
+                "message": f"{verb} la télémétrie Windows (service DiagTrack + clé AllowTelemetry) ? "
+                           f"(sauvegarde auto, totalement réversible)"}
+    backup = await _reg_backup(_TELEMETRY_KEY)
+    if action == "disable":
+        ps = (f"if(-not (Test-Path '{_TELEMETRY_KEY}')){{New-Item -Path '{_TELEMETRY_KEY}' -Force|Out-Null}};"
+              f"New-ItemProperty -Path '{_TELEMETRY_KEY}' -Name AllowTelemetry -Value 0 -PropertyType DWord -Force|Out-Null;"
+              "Stop-Service DiagTrack -Force -EA SilentlyContinue;"
+              "Set-Service DiagTrack -StartupType Disabled -EA SilentlyContinue;"
+              "Stop-Service dmwappushservice -Force -EA SilentlyContinue;"
+              "Set-Service dmwappushservice -StartupType Disabled -EA SilentlyContinue; 'OK'")
+    else:
+        ps = (f"New-ItemProperty -Path '{_TELEMETRY_KEY}' -Name AllowTelemetry -Value 1 -PropertyType DWord -Force -EA SilentlyContinue|Out-Null;"
+              "Set-Service DiagTrack -StartupType Automatic -EA SilentlyContinue; Start-Service DiagTrack -EA SilentlyContinue;"
+              "Set-Service dmwappushservice -StartupType Manual -EA SilentlyContinue; 'OK'")
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 45})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "action": action, "backup": backup,
+            "message": (f"✅ Télémétrie {'désactivée' if action == 'disable' else 'réactivée'}." if ok else
+                        "❌ Échec — droits ADMINISTRATEUR requis."),
+            "detail": (r.get("stderr") or "")[:250]}
+
+
+async def execute_tweak_debloat_list(args: dict) -> dict:
+    """Liste les bloatwares d'usine (UWP) présents et désinstallables (lecture seule)."""
+    r = await execute_pc_run_powershell({"script": "Get-AppxPackage | Select-Object -ExpandProperty Name",
+                                         "confirmed": True, "timeout": 45})
+    installed = [i.strip() for i in (r.get("stdout") or "").splitlines() if i.strip()]
+    inst_lc = {i.lower() for i in installed}
+    present = [b for b in _BLOATWARE if b.lower() in inst_lc or any(i.startswith(b.lower()) for i in inst_lc)]
+    return {"success": True, "removable": present, "count": len(present),
+            "note": "Applications d'usine non essentielles détectées (réinstallables via le Microsoft Store)."}
+
+
+async def execute_tweak_debloat_remove(args: dict) -> dict:
+    """Désinstalle des applications UWP (bloatware). Nécessite confirmation."""
+    pkgs = args.get("packages") or ([args["package"]] if args.get("package") else [])
+    pkgs = [p for p in pkgs if isinstance(p, str) and p.strip()][:30]
+    if not pkgs:
+        return {"error": "Paramètre 'packages' (liste de noms UWP) requis."}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": f"Désinstaller {len(pkgs)} application(s) : {', '.join(pkgs)} ?"}
+    removed, failed = [], []
+    for p in pkgs:
+        safe = p.replace("'", "")
+        ps = f"Get-AppxPackage -Name '{safe}*' | Remove-AppxPackage -EA SilentlyContinue; 'done'"
+        r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 60})
+        (removed if r.get("returncode") == 0 else failed).append(p)
+    return {"success": bool(removed) or not failed, "removed": removed, "failed": failed,
+            "message": f"✅ {len(removed)} application(s) retirée(s)" + (f", {len(failed)} échec(s)" if failed else "")}
+
+
+async def execute_tweak_network_harden(args: dict) -> dict:
+    """Statut / application d'optimisations réseau légères (cache DNS, auto-tuning TCP)."""
+    action = (args.get("action") or "status").lower()
+    if action in ("status", "query", "get"):
+        ps = ("Get-DnsClientCache -EA SilentlyContinue | Measure-Object | "
+              "ForEach-Object { 'Entrees cache DNS: ' + $_.Count };"
+              "netsh int tcp show global")
+        r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 20})
+        return {"success": True, "action": "status", "output": (r.get("stdout") or "").strip()[:800]}
+    if action != "apply":
+        return {"error": "action attendue : status | apply"}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": "Appliquer un durcissement réseau léger (vider le cache DNS + ajuster l'auto-tuning TCP) ?"}
+    ps = ("Clear-DnsClientCache -EA SilentlyContinue;"
+          "netsh int tcp set global autotuninglevel=normal | Out-Null;"
+          "netsh int tcp set heuristics disabled | Out-Null; 'OK'")
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 40})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "action": "apply",
+            "message": ("✅ Réseau optimisé (cache DNS vidé, TCP ajusté)." if ok else
+                        "❌ Échec — droits ADMINISTRATEUR requis pour netsh."),
+            "detail": (r.get("stderr") or "")[:200]}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CATHARSIS — Moteur de purge (style CCleaner) : SCAN d'abord (taille récupérable),
+#  puis CLEAN confirmé. Ne touche QUE des dossiers temporaires/caches connus.
+# ══════════════════════════════════════════════════════════════════════════════
+
+#  (id) -> (libellé, [chemins PowerShell], groupe)   — groupe = tuile dans l'UI
+_CLEAN_CATS = {
+    # ── Windows ──
+    "temp_user":     ("Fichiers temporaires (utilisateur)", [r"$env:TEMP\*"], "Windows"),
+    "temp_windows":  ("Fichiers temporaires (Windows)",     [r"C:\Windows\Temp\*"], "Windows"),
+    "thumbnails":    ("Cache des vignettes",                [r"$env:LOCALAPPDATA\Microsoft\Windows\Explorer\thumbcache_*.db"], "Windows"),
+    "prefetch":      ("Prefetch (préchargement)",           [r"C:\Windows\Prefetch\*"], "Windows"),
+    "recent":        ("Documents récents (raccourcis)",     [r"$env:APPDATA\Microsoft\Windows\Recent\*"], "Windows"),
+    "error_reports": ("Rapports d'erreurs (WER)",           [r"$env:LOCALAPPDATA\Microsoft\Windows\WER\*", r"$env:ProgramData\Microsoft\Windows\WER\*"], "Windows"),
+    "delivery_opt":  ("Cache Windows Update",               [r"C:\Windows\SoftwareDistribution\DeliveryOptimization\*"], "Windows"),
+    # ── Système ──
+    "crash_dumps":   ("Rapports de plantage (.dmp)",        [r"C:\Windows\Minidump\*", r"$env:LOCALAPPDATA\CrashDumps\*"], "Système"),
+    "dx_cache":      ("Cache shaders DirectX / GPU",        [r"$env:LOCALAPPDATA\D3DSCache\*", r"$env:LOCALAPPDATA\NVIDIA\DXCache\*"], "Système"),
+    "font_cache":    ("Cache des polices (logs)",           [r"$env:LOCALAPPDATA\FontCache\*"], "Système"),
+    # ── Navigateurs ──
+    "edge_cache":    ("Cache Microsoft Edge",               [r"$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache\*"], "Navigateurs"),
+    "chrome_cache":  ("Cache Google Chrome",                [r"$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache\*"], "Navigateurs"),
+    "firefox_cache": ("Cache Mozilla Firefox",              [r"$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*\cache2\*"], "Navigateurs"),
+}
+# Groupe d'affichage de la corbeille (catégorie spéciale, hors _CLEAN_CATS)
+_RECYCLE_GROUP = "Windows"
+
+
+async def execute_catharsis_scan(args: dict) -> dict:
+    """Analyse l'espace récupérable par catégorie (NE SUPPRIME RIEN)."""
+    lines = ["$o=@{}"]
+    for cid, (_label, paths, _grp) in _CLEAN_CATS.items():
+        # double quotes → PowerShell développe bien $env:TEMP, $env:LOCALAPPDATA, etc.
+        ps_paths = ",".join('"' + p + '"' for p in paths)
+        lines.append(
+            f"$s=0; foreach($p in @({ps_paths})){{ "
+            f"Get-ChildItem -Path $p -Recurse -Force -EA SilentlyContinue | "
+            f"ForEach-Object {{ $s += $_.Length }} }}; $o['{cid}']=[int64]$s")
+    lines.append("try{ $rb=((New-Object -ComObject Shell.Application).Namespace(10).Items() | "
+                 "ForEach-Object { $_.Size } | Measure-Object -Sum).Sum; $o['recycle_bin']=[int64]$rb }"
+                 "catch{ $o['recycle_bin']=0 }")
+    lines.append("$o | ConvertTo-Json -Compress")
+    r = await execute_pc_run_powershell({"script": ";".join(lines), "confirmed": True, "timeout": 150})
+    import json as _j
+    try:
+        data = _j.loads((r.get("stdout") or "{}").strip())
+    except Exception:
+        data = {}
+    labels = {cid: lbl for cid, (lbl, _p, _g) in _CLEAN_CATS.items()}
+    groups = {cid: g for cid, (_l, _p, g) in _CLEAN_CATS.items()}
+    labels["recycle_bin"] = "Corbeille"; groups["recycle_bin"] = _RECYCLE_GROUP
+    cats, total = [], 0
+    for cid, by in (data or {}).items():
+        by = int(by or 0)
+        total += by
+        cats.append({"id": cid, "label": labels.get(cid, cid), "group": groups.get(cid, "Autres"),
+                     "bytes": by, "mb": round(by / 1048576, 1)})
+    cats.sort(key=lambda c: -c["bytes"])
+    return {"success": True, "categories": cats, "total_mb": round(total / 1048576, 1)}
+
+
+async def execute_catharsis_clean(args: dict) -> dict:
+    """Purge les catégories choisies (ids issus de catharsis_scan). Demande confirmation."""
+    cats = [c for c in (args.get("categories") or []) if c in _CLEAN_CATS or c == "recycle_bin"]
+    if not cats:
+        return {"error": "Paramètre 'categories' requis (ids depuis catharsis_scan)."}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": f"Vider {len(cats)} catégorie(s) : {', '.join(cats)} ? "
+                           f"(suppression définitive de fichiers temporaires/caches)"}
+    lines = []
+    for cid in cats:
+        if cid == "recycle_bin":
+            lines.append("Clear-RecycleBin -Force -EA SilentlyContinue")
+            continue
+        for p in _CLEAN_CATS[cid][1]:
+            lines.append(f'Get-ChildItem -Path "{p}" -Force -EA SilentlyContinue | '
+                         f'Remove-Item -Recurse -Force -EA SilentlyContinue')
+    lines.append("'OK'")
+    r = await execute_pc_run_powershell({"script": ";".join(lines), "confirmed": True, "timeout": 240})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "cleaned": cats,
+            "message": (f"✅ {len(cats)} catégorie(s) nettoyée(s)." if ok else
+                        "⚠️ Nettoyage partiel (certains fichiers étaient verrouillés/en usage).")}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CODEX — Paramètres OS exposés en fonctions (remplace ms-settings:).
+#  Lecture libre ; écriture confirmée. Plan d'alim, mode sombre, pare-feu, réseau…
+# ══════════════════════════════════════════════════════════════════════════════
+
+_POWER_PLANS = {
+    "balanced":    "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "performance": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+    "powersaver":  "a1841308-3541-4fab-bc81-f71556f20b4a",
+}
+_DARK_KEY = r"HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+
+
+async def execute_os_power_plan(args: dict) -> dict:
+    """Lit ou change le plan d'alimentation Windows (équilibré / performances / économie)."""
+    action = (args.get("action") or "get").lower()
+    if action in ("get", "status"):
+        r = await execute_pc_run_powershell({"script": "powercfg /getactivescheme", "confirmed": True, "timeout": 15})
+        out = (r.get("stdout") or "").strip()
+        active = "performance" if "8c5e7fda" in out.lower() else "powersaver" if "a1841308" in out.lower() else "balanced" if "381b4222" in out.lower() else "personnalisé"
+        return {"success": True, "active_plan": active, "raw": out[:200]}
+    if action != "set":
+        return {"error": "action attendue : get | set"}
+    plan = (args.get("plan") or "").lower()
+    if plan not in _POWER_PLANS:
+        return {"error": "plan attendu : balanced | performance | powersaver"}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Activer le plan d'alimentation « {plan} » ?"}
+    r = await execute_pc_run_powershell({"script": f"powercfg /setactive {_POWER_PLANS[plan]}; 'OK'", "confirmed": True, "timeout": 20})
+    ok = "OK" in (r.get("stdout") or "") and r.get("returncode") == 0
+    return {"success": ok, "plan": plan, "message": (f"✅ Plan « {plan} » activé." if ok else "❌ Échec.")}
+
+
+async def execute_os_dark_mode(args: dict) -> dict:
+    """Lit ou bascule le mode sombre/clair de Windows (apps + système). Sans droits admin."""
+    action = (args.get("action") or "get").lower()
+    if action in ("get", "status"):
+        k = await execute_registry_get({"path": _DARK_KEY, "name": "AppsUseLightTheme"})
+        light = str(k.get("value", "1")).strip() == "1" if k.get("success") else True
+        return {"success": True, "mode": "clair" if light else "sombre"}
+    if action not in ("enable", "disable", "dark", "light", "toggle"):
+        return {"error": "action : get | dark | light"}
+    if action == "toggle":
+        cur = await execute_os_dark_mode({"action": "get"})
+        action = "light" if cur.get("mode") == "sombre" else "dark"
+    val = 0 if action in ("enable", "dark") else 1   # 0 = sombre, 1 = clair
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Passer Windows en mode {'sombre' if val == 0 else 'clair'} ?"}
+    ps = (f"New-ItemProperty -Path '{_DARK_KEY}' -Name AppsUseLightTheme -Value {val} -PropertyType DWord -Force | Out-Null;"
+          f"New-ItemProperty -Path '{_DARK_KEY}' -Name SystemUsesLightTheme -Value {val} -PropertyType DWord -Force | Out-Null; 'OK'")
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 20})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "mode": "sombre" if val == 0 else "clair",
+            "message": (f"✅ Mode {'sombre' if val == 0 else 'clair'} appliqué." if ok else "❌ Échec.")}
+
+
+async def execute_os_firewall(args: dict) -> dict:
+    """Statut / activation / désactivation du pare-feu Windows Defender (tous profils)."""
+    action = (args.get("action") or "status").lower()
+    if action in ("status", "get"):
+        r = await execute_pc_run_powershell({"script": "Get-NetFirewallProfile | Select-Object Name,Enabled | Format-Table -HideTableHeaders | Out-String", "confirmed": True, "timeout": 20})
+        return {"success": True, "status": (r.get("stdout") or "").strip()[:300]}
+    if action not in ("on", "off", "enable", "disable"):
+        return {"error": "action : status | on | off"}
+    enable = action in ("on", "enable")
+    if not args.get("confirmed"):
+        warn = "" if enable else " ⚠️ Désactiver le pare-feu réduit votre sécurité."
+        return {"requiresConfirmation": True, "message": f"{'Activer' if enable else 'Désactiver'} le pare-feu Windows (tous profils) ?{warn}"}
+    ps = f"Set-NetFirewallProfile -All -Enabled {'True' if enable else 'False'}; 'OK'"
+    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 25})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "message": (f"✅ Pare-feu {'activé' if enable else 'désactivé'}." if ok else "❌ Échec — droits ADMIN requis."),
+            "detail": (r.get("stderr") or "")[:200]}
+
+
+async def execute_os_network_adapters(args: dict) -> dict:
+    """Liste / active / désactive les cartes réseau."""
+    action = (args.get("action") or "list").lower()
+    if action in ("list", "get", "status"):
+        r = await execute_pc_run_powershell({"script": "Get-NetAdapter | Select-Object Name,InterfaceDescription,Status,LinkSpeed | ConvertTo-Json -Compress", "confirmed": True, "timeout": 20})
+        import json as _j
+        try:
+            data = _j.loads((r.get("stdout") or "[]").strip())
+            if isinstance(data, dict):
+                data = [data]
+        except Exception:
+            data = []
+        return {"success": True, "adapters": data}
+    name = (args.get("name") or "").strip()
+    if not name or action not in ("enable", "disable"):
+        return {"error": "action : list | enable | disable (+ 'name')"}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"{'Activer' if action == 'enable' else 'Désactiver'} la carte réseau « {name} » ?"}
+    verb = "Enable-NetAdapter" if action == "enable" else "Disable-NetAdapter"
+    r = await execute_pc_run_powershell({"script": f"{verb} -Name '{name}' -Confirm:$false; 'OK'", "confirmed": True, "timeout": 25})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "message": (f"✅ Carte « {name} » {'activée' if action == 'enable' else 'désactivée'}." if ok else "❌ Échec — droits ADMIN requis."),
+            "detail": (r.get("stderr") or "")[:200]}
+
+
+async def execute_os_hibernation(args: dict) -> dict:
+    """Statut / activation / désactivation de l'hibernation (libère hiberfil.sys)."""
+    action = (args.get("action") or "status").lower()
+    if action in ("status", "get"):
+        r = await execute_pc_run_powershell({"script": "powercfg /a", "confirmed": True, "timeout": 15})
+        out = (r.get("stdout") or "")
+        on = "hibernation" in out.lower() and "non disponible" not in out.lower().split("hibernation")[-1][:60]
+        return {"success": True, "raw": out.strip()[:400]}
+    if action not in ("on", "off", "enable", "disable"):
+        return {"error": "action : status | on | off"}
+    enable = action in ("on", "enable")
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"{'Activer' if enable else 'Désactiver'} l'hibernation ? {'(désactiver libère plusieurs Go : hiberfil.sys)' if not enable else ''}"}
+    r = await execute_pc_run_powershell({"script": f"powercfg /hibernate {'on' if enable else 'off'}; 'OK'", "confirmed": True, "timeout": 20})
+    ok = "OK" in (r.get("stdout") or "")
+    return {"success": ok, "message": (f"✅ Hibernation {'activée' if enable else 'désactivée'}." if ok else "❌ Échec — droits ADMIN requis.")}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CATALOGUE « Windows+ » — raccourcis d'ouverture directe vers les panneaux Windows
+# (God Mode, ms-settings:*, panneaux legacy .cpl, outils admin .msc, dossiers utiles).
+# Porté du même fork que Réseau Pro/hardware (catalogue de NAVIGATION seulement — leur
+# système de tweaks/registre séparé n'est PAS repris, il chevauche mon Pantheon existant
+# tweak_telemetry/tweak_debloat_*/tweak_network_harden/registry_*). Risque quasi nul :
+# ouvre des panneaux Windows natifs, ne modifie rien (sauf God Mode qui crée un dossier
+# vide standard). Aucune confirmation requise pour la même raison.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_WIN_SHORTCUTS = [
+    {"id": "god_mode",         "group": "God Mode",         "label": "Dossier God Mode (tous les panneaux Windows)", "kind": "god_mode"},
+    {"id": "settings_apps",             "group": "Paramètres Windows", "label": "Applications",                    "uri": "ms-settings:appsfeatures"},
+    {"id": "settings_startup",          "group": "Paramètres Windows", "label": "Applications au démarrage",       "uri": "ms-settings:startupapps"},
+    {"id": "settings_update",           "group": "Paramètres Windows", "label": "Windows Update",                  "uri": "ms-settings:windowsupdate"},
+    {"id": "settings_defender",         "group": "Paramètres Windows", "label": "Sécurité Windows (Defender)",     "uri": "windowsdefender:"},
+    {"id": "settings_privacy",          "group": "Paramètres Windows", "label": "Confidentialité",                 "uri": "ms-settings:privacy"},
+    {"id": "settings_optional_features","group": "Paramètres Windows", "label": "Fonctionnalités facultatives",    "uri": "ms-settings:optionalfeatures"},
+    {"id": "settings_power",            "group": "Paramètres Windows", "label": "Alimentation",                    "uri": "ms-settings:powersleep"},
+    {"id": "settings_storage",          "group": "Paramètres Windows", "label": "Stockage",                        "uri": "ms-settings:storagesense"},
+    {"id": "settings_activation",       "group": "Paramètres Windows", "label": "Activation",                      "uri": "ms-settings:activation"},
+    {"id": "settings_developers",       "group": "Paramètres Windows", "label": "Espace développeurs",             "uri": "ms-settings:developers"},
+    {"id": "control_programs", "group": "Panneaux legacy", "label": "Programmes et fonctionnalités", "cmd": ["control.exe", "appwiz.cpl"]},
+    {"id": "control_network",  "group": "Panneaux legacy", "label": "Connexions réseau",             "cmd": ["control.exe", "ncpa.cpl"]},
+    {"id": "control_system",   "group": "Panneaux legacy", "label": "Propriétés système",            "cmd": ["sysdm.cpl"]},
+    {"id": "control_power",    "group": "Panneaux legacy", "label": "Options d'alimentation avancées", "cmd": ["control.exe", "powercfg.cpl"]},
+    {"id": "control_firewall", "group": "Panneaux legacy", "label": "Pare-feu avancé",               "cmd": ["wf.msc"], "admin": True},
+    {"id": "tools_services",       "group": "Outils admin", "label": "Services",                        "cmd": ["services.msc"], "admin": True},
+    {"id": "tools_eventvwr",       "group": "Outils admin", "label": "Observateur d'événements",        "cmd": ["eventvwr.msc"]},
+    {"id": "tools_taskschd",       "group": "Outils admin", "label": "Planificateur de tâches",         "cmd": ["taskschd.msc"]},
+    {"id": "tools_diskmgmt",       "group": "Outils admin", "label": "Gestion des disques",             "cmd": ["diskmgmt.msc"], "admin": True},
+    {"id": "tools_device_manager", "group": "Outils admin", "label": "Gestionnaire de périphériques",   "cmd": ["devmgmt.msc"], "admin": True},
+    {"id": "tools_computer_mgmt",  "group": "Outils admin", "label": "Gestion de l'ordinateur",         "cmd": ["compmgmt.msc"], "admin": True},
+    {"id": "tools_msconfig",       "group": "Outils admin", "label": "Configuration système (msconfig)", "cmd": ["msconfig.exe"], "admin": True},
+    {"id": "tools_taskmgr", "group": "Performance", "label": "Gestionnaire des tâches",       "cmd": ["taskmgr.exe"]},
+    {"id": "tools_resmon",  "group": "Performance", "label": "Moniteur de ressources",        "cmd": ["resmon.exe"]},
+    {"id": "tools_perfmon", "group": "Performance", "label": "Analyseur de performances",     "cmd": ["perfmon.exe"]},
+    {"id": "tools_cleanmgr", "group": "Maintenance", "label": "Nettoyage de disque Windows",  "cmd": ["cleanmgr.exe"]},
+    {"id": "folder_temp",    "group": "Dossiers utiles", "label": "Dossier Temp utilisateur",     "path_env": "TEMP"},
+    {"id": "folder_startup", "group": "Dossiers utiles", "label": "Dossier Démarrage utilisateur", "path": r"%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"},
+]
+
+
+def _win_is_admin() -> bool:
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def _win_open_target(target: str) -> dict:
+    """Ouvre un fichier/URI/raccourci Windows : os.startfile (rapide, natif), avec repli
+    `cmd /c start` si indisponible (ex. certains contextes de session)."""
+    import subprocess as _sp
+    try:
+        os.startfile(target)
+        return {"ok": True, "target": target}
+    except Exception as e:
+        try:
+            flags = _sp.CREATE_NO_WINDOW if hasattr(_sp, "CREATE_NO_WINDOW") else 0
+            r = _sp.run(["cmd.exe", "/c", "start", "", target], capture_output=True, timeout=15, creationflags=flags)
+            return {"ok": r.returncode == 0, "target": target}
+        except Exception as e2:
+            return {"ok": False, "target": target, "error": f"{e} / repli: {e2}"}
+
+
+async def execute_win_quick_launch_list(args: dict) -> dict:
+    """Liste les raccourcis Windows disponibles (catalogue « Windows+ »), groupés."""
+    admin_now = _win_is_admin()
+    items = [{**o, "requires_admin": bool(o.get("admin", False))} for o in _WIN_SHORTCUTS]
+    groups = {}
+    for it in items:
+        groups.setdefault(it["group"], []).append({"id": it["id"], "label": it["label"], "requires_admin": it["requires_admin"]})
+    return {"success": True, "count": len(items), "groups": groups, "currently_admin": admin_now}
+
+
+async def execute_win_quick_launch(args: dict) -> dict:
+    """Ouvre directement un panneau/outil Windows (God Mode, ms-settings, panneaux legacy,
+    outils admin .msc, dossiers utiles) par son id. Utiliser win_quick_launch_list pour voir
+    les id disponibles. N'écrit/ne modifie rien (sauf God Mode : crée un dossier vide standard)."""
+    action_id = (args.get("id") or args.get("action_id") or "").strip()
+    if not action_id:
+        return {"error": "Paramètre 'id' requis. Utilise win_quick_launch_list pour voir les options."}
+    item = next((x for x in _WIN_SHORTCUTS if x["id"] == action_id), None)
+    if not item:
+        return {"error": f"Raccourci inconnu : {action_id!r}. Utilise win_quick_launch_list."}
+
+    if item.get("kind") == "god_mode":
+        desktop = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+        god = desktop / "Marvin God Mode.{ED7BA470-8E54-465E-825C-99712043E01C}"
+        god.mkdir(exist_ok=True)
+        res = _win_open_target(str(god))
+        return {"success": res["ok"], "path": str(god), "opened": res}
+
+    if item.get("path_env") or item.get("path"):
+        target = os.environ.get(item.get("path_env", ""), "") if item.get("path_env") else os.path.expandvars(item.get("path", ""))
+        if not target:
+            return {"error": "Chemin indisponible sur ce PC."}
+        Path(target).mkdir(parents=True, exist_ok=True)
+        res = _win_open_target(target)
+        return {"success": res["ok"], "path": target, "opened": res}
+
+    if item.get("uri"):
+        res = _win_open_target(item["uri"])
+        note = "Droits admin conseillés pour ce panneau." if item.get("admin") and not _win_is_admin() else None
+        return {"success": res["ok"], "opened": res, "note": note}
+
+    cmd = item.get("cmd") or []
+    if not cmd:
+        return {"error": "Raccourci mal configuré (aucune cible)."}
+    target = cmd[0] if len(cmd) == 1 and cmd[0].lower().endswith((".msc", ".cpl", ".exe")) else None
+    if target:
+        res = _win_open_target(target)
+    else:
+        import subprocess as _sp
+        flags = _sp.CREATE_NO_WINDOW if hasattr(_sp, "CREATE_NO_WINDOW") else 0
+        try:
+            r = _sp.run(cmd, capture_output=True, timeout=15, creationflags=flags)
+            res = {"ok": r.returncode == 0, "target": " ".join(cmd)}
+        except Exception as e:
+            res = {"ok": False, "target": " ".join(cmd), "error": str(e)}
+    return {"success": res["ok"], "opened": res}
+
+
+async def execute_pc_system_info(args: dict) -> dict:
+    try:
+        mem = psutil.virtual_memory()
+        cpu_pct = psutil.cpu_percent(interval=0.5)
+        disks = []
+        for dp in psutil.disk_partitions(all=False):
+            try:
+                usage = psutil.disk_usage(dp.mountpoint)
+                disks.append({
+                    "device": dp.device,
+                    "mountpoint": dp.mountpoint,
+                    "total_gb": round(usage.total / 1024**3, 1),
+                    "used_gb": round(usage.used / 1024**3, 1),
+                    "free_gb": round(usage.free / 1024**3, 1),
+                    "percent": usage.percent,
+                })
+            except Exception:
+                pass
+
+        import platform
+        uname = platform.uname()
+        boot_time = psutil.boot_time()
+        uptime_s = int(time.time() - boot_time)
+        uptime_str = f"{uptime_s // 3600}h {(uptime_s % 3600) // 60}m"
+
+        def fmt(n): return f"{n / 1024**3:.1f} Go"
+
+        # Batterie (laptops uniquement)
+        battery_info = None
+        try:
+            bat = psutil.sensors_battery()
+            if bat is not None:
+                battery_info = {
+                    "percent": round(bat.percent, 1),
+                    "plugged": bat.power_plugged,
+                    "status": "En charge" if bat.power_plugged else "Sur batterie",
+                }
+                if bat.secsleft and bat.secsleft != psutil.POWER_TIME_UNLIMITED and bat.secsleft > 0:
+                    h = bat.secsleft // 3600
+                    m = (bat.secsleft % 3600) // 60
+                    battery_info["time_left"] = f"{h}h {m}m"
+        except Exception:
+            pass
+
+        # Réseau — interfaces actives
+        net_ifaces = []
+        try:
+            addrs = psutil.net_if_addrs()
+            stats = psutil.net_if_stats()
+            for iface, addr_list in addrs.items():
+                st = stats.get(iface)
+                if st and st.isup:
+                    ipv4 = next((a.address for a in addr_list if a.family.name == "AF_INET"), "")
+                    if ipv4 and not ipv4.startswith("127."):
+                        net_ifaces.append({"name": iface, "ip": ipv4, "speed_mbps": st.speed})
+        except Exception:
+            pass
+
+        info = {
+            "success": True,
+            "platform": uname.system,
+            "release": uname.release,
+            "arch": uname.machine,
+            "uptime": uptime_str,
+            "cpu_percent": cpu_pct,
+            "cpu_count_logical": psutil.cpu_count(logical=True),
+            "cpu_count_physical": psutil.cpu_count(logical=False),
+            "memory": {
+                "total": fmt(mem.total),
+                "used": fmt(mem.used),
+                "free": fmt(mem.available),
+                "percent": mem.percent,
+            },
+            "disks": disks,
+            "network_interfaces": net_ifaces,
+            "home": os.path.expanduser("~"),
+        }
+        if battery_info:
+            info["battery"] = battery_info
+        return info
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_screenshot(args: dict) -> dict:
+    # Accepte "path" (UI outils) ou "output_path" (agent)
+    output_path = args.get("output_path") or args.get("path") or None
+    embed = args.get("embed", False)  # True → retourner base64 au lieu de sauvegarder
+    if output_path:
+        output_path = _resolve_path(output_path)
+    else:
+        desktop = Path(os.path.expanduser("~")) / "Desktop"
+        output_path = str(desktop / f"screenshot_{int(time.time())}.png")
+    try:
+        from PIL import ImageGrab
+        import io, base64
+        screenshot = ImageGrab.grab()
+        if embed:
+            buf = io.BytesIO()
+            screenshot.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+            return {
+                "success": True,
+                "message": "Capture d'écran prise",
+                "image": f"data:image/png;base64,{b64}",
+            }
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        screenshot.save(output_path)
+        return {"success": True, "message": f"Capture d'écran sauvegardée : {output_path}", "path": output_path}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_window_list(args: dict) -> dict:
+    try:
+        import win32gui
+        windows = []
+
+        def cb(hwnd, _):
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if title and title.strip():
+                    windows.append({"hwnd": hwnd, "title": title})
+
+        win32gui.EnumWindows(cb, None)
+        return {"success": True, "count": len(windows), "windows": windows}
+    except ImportError:
+        # Fallback: use tasklist
+        result = await asyncio.to_thread(
+            subprocess.run,
+            "tasklist /FO CSV /NH", shell=True, capture_output=True, text=True, timeout=10
+        )
+        lines = [l.strip().strip('"') for l in result.stdout.splitlines() if l.strip()]
+        windows = [{"title": l.split('","')[0]} for l in lines[:50]]
+        return {"success": True, "count": len(windows), "windows": windows}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_window_focus(args: dict) -> dict:
+    search = args.get("search", "")
+    try:
+        import win32gui
+        import win32con
+
+        target = None
+
+        def cb(hwnd, _):
+            nonlocal target
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if search.lower() in title.lower():
+                    target = (hwnd, title)
+
+        win32gui.EnumWindows(cb, None)
+        if target:
+            hwnd, title = target
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
+            return {"success": True, "message": f"Fenêtre mise au premier plan : {title}"}
+        return {"error": f"Aucune fenêtre contenant « {search} » trouvée"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_notify(args: dict) -> dict:
+    title = args.get("title", "SecretaryAI")
+    message = args.get("message", "")
+    try:
+        from plyer import notification
+        notification.notify(
+            title=title,
+            message=message,
+            app_name="Marvin",
+            timeout=10,
+        )
+        return {"success": True, "message": "Notification envoyée"}
+    except Exception:
+        # Fallback via PowerShell toast (use -EncodedCommand to avoid injection)
+        try:
+            import base64
+            # Escape backtick then double-quote for PS double-quoted strings
+            safe_title   = title.replace("`", "``").replace('"', '`"')
+            safe_message = message.replace("`", "``").replace('"', '`"')
+            ps = (
+                f'[Windows.UI.Notifications.ToastNotificationManager,'
+                f'Windows.UI.Notifications,ContentType=WindowsRuntime] | Out-Null;'
+                f'$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent('
+                f'[Windows.UI.Notifications.ToastTemplateType]::ToastText02);'
+                f'$xml.GetElementsByTagName("text")[0].AppendChild($xml.CreateTextNode("{safe_title}")) | Out-Null;'
+                f'$xml.GetElementsByTagName("text")[1].AppendChild($xml.CreateTextNode("{safe_message}")) | Out-Null;'
+                f'$toast = [Windows.UI.Notifications.ToastNotification]::new($xml);'
+                f'[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("SecretaryAI").Show($toast);'
+            )
+            encoded = base64.b64encode(ps.encode("utf-16-le")).decode("ascii")
+            await asyncio.to_thread(subprocess.run, ["powershell", "-NoProfile", "-EncodedCommand", encoded], timeout=5, capture_output=True)
+            return {"success": True, "message": "Notification envoyée"}
+        except Exception as e2:
+            return {"error": str(e2)}
+
+
+async def execute_pc_pull_ollama_model(args: dict) -> dict:
+    model = args.get("model", "llama3.2:3b")
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=600.0) as client:
+            resp = await client.post(
+                f"{OLLAMA_URL}/api/pull",
+                json={"name": model},
+                timeout=600.0,
+            )
+            resp.raise_for_status()
+        return {"success": True, "message": f"Modèle téléchargé : {model}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_clipboard_get(args: dict) -> dict:
+    # 1. win32clipboard (rapide, fiable) — vérifie le format AVANT de lire pour
+    #    éviter l'exception sur presse-papiers vide / non-texte, et ferme toujours.
+    try:
+        import win32clipboard
+        win32clipboard.OpenClipboard()
+        try:
+            if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_UNICODETEXT):
+                text = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT) or ""
+            elif win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_TEXT):
+                raw = win32clipboard.GetClipboardData(win32clipboard.CF_TEXT) or b""
+                text = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)
+            else:
+                # Détecte les contenus non-texte (image, fichiers) pour informer l'utilisateur
+                has_img = win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_DIB)
+                has_files = win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_HDROP)
+                kind = "image" if has_img else "fichier(s)" if has_files else "vide"
+                return {"success": True, "text": "", "empty": True, "content_type": kind,
+                        "message": f"Le presse-papiers ne contient pas de texte ({kind})."}
+        finally:
+            win32clipboard.CloseClipboard()
+        return {"success": True, "text": text, "length": len(text), "empty": text == ""}
+    except Exception:
+        pass
+    # 2. Fallback PowerShell (décodage binaire sûr pour éviter le crash cp1252)
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw"],
+            capture_output=True, timeout=8,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        text = (result.stdout or b"").decode("utf-8", "replace").rstrip("\r\n")
+        return {"success": True, "text": text, "length": len(text), "empty": text == ""}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_clipboard_set(args: dict) -> dict:
+    text = args.get("text", "")
+    try:
+        import win32clipboard
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, text)
+        win32clipboard.CloseClipboard()
+        return {"success": True, "message": "Texte copié dans le presse-papiers"}
+    except Exception:
+        try:
+            import base64
+            # Use -EncodedCommand to avoid shell injection with special characters/quotes
+            ps_script = f"Set-Clipboard -Value '{text.replace(chr(39), chr(39)+chr(39))}'"
+            encoded = base64.b64encode(ps_script.encode('utf-16-le')).decode('ascii')
+            await asyncio.to_thread(
+                subprocess.run,
+                f'powershell -NoProfile -EncodedCommand {encoded}', shell=True, timeout=5
+            )
+            return {"success": True, "message": "Texte copié dans le presse-papiers"}
+        except Exception as e:
+            return {"error": str(e)}
+
+
+async def execute_pc_process_list(args: dict) -> dict:
+    sort_by = args.get("sort_by", "memory")  # cpu | memory | name
+    try:
+        procs = []
+        for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_info", "status"]):
+            try:
+                info = p.info
+                procs.append({
+                    "pid": info["pid"],
+                    "name": info["name"],
+                    "cpu_percent": info["cpu_percent"] or 0.0,
+                    "memory_mb": round(info["memory_info"].rss / 1024**2, 1) if info["memory_info"] else 0,
+                    "status": info["status"],
+                })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        if sort_by == "cpu":
+            procs.sort(key=lambda x: x["cpu_percent"], reverse=True)
+        elif sort_by == "name":
+            procs.sort(key=lambda x: x["name"].lower())
+        else:  # memory (défaut)
+            procs.sort(key=lambda x: x["memory_mb"], reverse=True)
+        return {"success": True, "count": len(procs), "processes": procs[:50]}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_process_kill(args: dict) -> dict:
+    if not args.get("confirmed"):
+        pid = args.get("pid")
+        name = args.get("name", "")
+        return {"requiresConfirmation": True, "message": f"Arrêter le processus {name or ''} (PID {pid}) ?"}
+    pid = args.get("pid")
+    name = args.get("name", "")
+    try:
+        if pid:
+            proc = psutil.Process(int(pid))
+            proc.terminate()
+            return {"success": True, "message": f"Processus {pid} terminé"}
+        elif name:
+            killed = 0
+            for p in psutil.process_iter(["pid", "name"]):
+                if name.lower() in p.info["name"].lower():
+                    p.terminate()
+                    killed += 1
+            return {"success": True, "message": f"{killed} processus '{name}' terminés"}
+        return {"error": "PID ou nom de processus requis"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3 — Tâches
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _parse_tags(raw) -> list[str]:
+    """Normalise les tags : str 'a, b, c' → ['a','b','c'] ou list → list."""
+    if isinstance(raw, list):
+        return [str(t).strip() for t in raw if str(t).strip()]
+    if isinstance(raw, str) and raw.strip():
+        return [t.strip() for t in raw.split(",") if t.strip()]
+    return []
+
+
+async def execute_task_create(args: dict) -> dict:
+    try:
+        task = db.create_task(
+            title=args["title"],
+            description=args.get("description", ""),
+            priority=args.get("priority", "medium"),
+            due_date=args.get("due_date", None),
+            tags=_parse_tags(args.get("tags", [])),
+        )
+        return {"success": True, "message": f"Tâche créée : « {task['title']} »", "task": task}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_task_list(args: dict) -> dict:
+    try:
+        status = args.get("status") or None
+        # L'UI envoie "all" pour "toutes les tâches" → pas de filtre
+        if status == "all":
+            status = None
+        tasks = db.list_tasks(
+            status=status,
+            priority=args.get("priority"),
+        )
+        return {"success": True, "count": len(tasks), "tasks": tasks}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_task_update(args: dict) -> dict:
+    tid = args.get("id", "")
+    if not tid:
+        return {"error": "ID de tâche requis"}
+    # Normalize status: the LLM sometimes says 'completed' — map to 'done'
+    _STATUS_ALIASES = {
+        "completed": "done", "terminé": "done", "termine": "done", "fini": "done",
+        "wip": "in_progress", "en cours": "in_progress", "started": "in_progress",
+        "todo": "pending", "à faire": "pending", "a faire": "pending",
+        "annulé": "cancelled", "annule": "cancelled", "canceled": "cancelled",
+    }
+    if "status" in args:
+        args = dict(args)
+        args["status"] = _STATUS_ALIASES.get(args["status"].lower().strip(), args["status"])
+    try:
+        task = db.update_task(tid, args)
+        if not task:
+            return {"error": f"Tâche introuvable : {tid}"}
+        return {"success": True, "message": "Tâche mise à jour", "task": task}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_task_delete(args: dict) -> dict:
+    tid = args.get("id", "")
+    if not tid:
+        return {"error": "ID de tâche requis"}
+    # Charger le titre pour un message de confirmation lisible
+    if not args.get("confirmed"):
+        try:
+            task_preview = db.get_task(tid)
+            label = f"« {task_preview['title']} »" if task_preview else f"ID {tid}"
+        except Exception:
+            label = f"ID {tid}"
+        return {"requiresConfirmation": True, "message": f"Supprimer définitivement la tâche {label} ?"}
+    try:
+        task = db.get_task(tid)
+        if not task:
+            return {"error": f"Tâche introuvable : {tid}"}
+        db.delete_task(tid)
+        return {"success": True, "message": f"Tâche « {task['title']} » supprimée"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4 — Notes
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_note_create(args: dict) -> dict:
+    try:
+        note = db.create_note(
+            title=args["title"],
+            content=args.get("content", ""),
+            tags=_parse_tags(args.get("tags", [])),
+            pinned=args.get("pinned", False),
+        )
+        # Indexer dans Qdrant
+        try:
+            from vector_store import index_note
+            await index_note(note["id"], note["title"], note["content"], note.get("tags", []))
+        except Exception:
+            pass
+        return {"success": True, "message": f"Note créée : « {note['title']} »", "note": note}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_note_list(args: dict) -> dict:
+    try:
+        # "tag" vient de l'interface outils, "search" vient de l'agent
+        search = args.get("search") or args.get("tag") or None
+        notes = db.list_notes(
+            search=search,
+            pinned=args.get("pinned"),
+        )
+        return {"success": True, "count": len(notes), "notes": notes}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_note_update(args: dict) -> dict:
+    nid = args.get("id", "")
+    if not nid:
+        return {"error": "ID de note requis"}
+    try:
+        # Normaliser les tags si fournis comme string
+        update_args = dict(args)
+        if "tags" in update_args:
+            update_args["tags"] = _parse_tags(update_args["tags"])
+        note = db.update_note(nid, update_args)
+        if not note:
+            return {"error": f"Note introuvable : {nid}"}
+        # Ré-indexer
+        try:
+            from vector_store import index_note
+            await index_note(note["id"], note["title"], note["content"], note.get("tags", []))
+        except Exception:
+            pass
+        return {"success": True, "message": "Note mise à jour", "note": note}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_note_delete(args: dict) -> dict:
+    nid = args.get("id", "")
+    if not nid:
+        return {"error": "ID de note requis"}
+    if not args.get("confirmed"):
+        try:
+            note_preview = db.get_note(nid)
+            label = f"« {note_preview['title']} »" if note_preview else f"ID {nid}"
+        except Exception:
+            label = f"ID {nid}"
+        return {"requiresConfirmation": True, "message": f"Supprimer définitivement la note {label} ?"}
+    nid = args.get("id", "")
+    try:
+        note = db.get_note(nid)
+        if not note:
+            return {"error": f"Note introuvable : {nid}"}
+        db.delete_note(nid)
+        try:
+            from vector_store import delete_document
+            await delete_document("notes", nid)
+        except Exception:
+            pass
+        return {"success": True, "message": f"Note « {note['title']} » supprimée"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 5 — Mémoire
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_memory_save(args: dict) -> dict:
+    content = args.get("content", "")
+    category = args.get("category", "fact")
+    if not content:
+        return {"error": "Contenu requis"}
+    try:
+        # Deduplication: don't save if a very similar memory already exists
+        # Check against existing memories of same category
+        try:
+            existing = db.get_memories()
+            content_norm = content.strip().lower()
+            for mem in existing:
+                if mem.get("category") != category:
+                    continue
+                existing_norm = (mem.get("content") or "").strip().lower()
+                # Exact match or one is a substring of the other (with >80% overlap)
+                if existing_norm == content_norm:
+                    return {
+                        "success": True,
+                        "message": "Souvenir déjà enregistré (dédoublonnage)",
+                        "memory": mem,
+                        "duplicate": True,
+                    }
+                if len(content_norm) > 20 and len(existing_norm) > 20:
+                    # Check substring overlap
+                    if content_norm in existing_norm or existing_norm in content_norm:
+                        # Keep the longer one; update existing if new is longer
+                        if len(content_norm) > len(existing_norm):
+                            try:
+                                db.update_memory(mem["id"], content)
+                                return {
+                                    "success": True,
+                                    "message": "Souvenir existant mis à jour avec plus de détails",
+                                    "memory": {**mem, "content": content},
+                                    "updated": True,
+                                }
+                            except Exception:
+                                pass
+                        return {
+                            "success": True,
+                            "message": "Souvenir similaire déjà enregistré",
+                            "memory": mem,
+                            "duplicate": True,
+                        }
+        except Exception:
+            pass  # Continue with normal save if dedup check fails
+
+        memory = db.create_memory(content, category)
+        try:
+            from vector_store import index_memory
+            await index_memory(memory["id"], content, category)
+        except Exception:
+            pass
+        return {"success": True, "message": "Souvenir enregistré", "memory": memory}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_memory_list(args: dict) -> dict:
+    try:
+        memories = db.get_memories()
+        return {"success": True, "count": len(memories), "memories": memories}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_memory_delete(args: dict) -> dict:
+    mid = args.get("id", "")
+    if not mid:
+        return {"error": "ID de souvenir requis"}
+    if not args.get("confirmed"):
+        try:
+            all_mems = db.get_memories()
+            mem_preview = next((m for m in all_mems if m["id"] == mid), None)
+            if mem_preview:
+                preview = mem_preview["content"][:80] + ("…" if len(mem_preview["content"]) > 80 else "")
+                label = f"« {preview} »"
+            else:
+                label = f"ID {mid}"
+        except Exception:
+            label = f"ID {mid}"
+        return {"requiresConfirmation": True, "message": f"Oublier définitivement le souvenir {label} ?"}
+    try:
+        db.delete_memory(mid)
+        try:
+            from vector_store import delete_document
+            await delete_document("memories", mid)
+        except Exception:
+            pass
+        return {"success": True, "message": f"Souvenir oublié : {mid}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_memory_search(args: dict) -> dict:
+    """Recherche dans les souvenirs — sémantique via Qdrant ou filtre texte en fallback."""
+    query = args.get("query", "").strip()
+    limit = max(1, min(int(args.get("limit", 5)), 20))
+    if not query:
+        return {"error": "Requête vide"}
+    # 1) Recherche sémantique dans la collection Qdrant "memories"
+    try:
+        from vector_store import search
+        results = await search(query, collections=["memories"], limit=limit)
+        if results:
+            return {"success": True, "query": query, "count": len(results), "results": results, "mode": "semantic"}
+    except Exception:
+        pass
+    # 2) Fallback : filtre textuel simple sur les mémoires SQLite
+    try:
+        all_memories = db.get_memories()
+        q_lower = query.lower()
+        matched = [m for m in all_memories if q_lower in m.get("content", "").lower()][:limit]
+        return {"success": True, "query": query, "count": len(matched), "results": matched, "mode": "text_filter"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 6 — Recherche sémantique (Qdrant)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_search_semantic(args: dict) -> dict:
+    query = args.get("query", "")
+    collections = args.get("collections", None)
+    limit = args.get("limit", 5)
+    if not query:
+        return {"error": "Requête vide"}
+    try:
+        from vector_store import search
+        results = await search(query, collections, limit)
+        return {"success": True, "query": query, "count": len(results), "results": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 7 — Recherche Web
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_web_search(args: dict) -> dict:
+    """Recherche web multi-provider : DuckDuckGo (gratuit) + Brave/Google/SerpAPI si clé dispo."""
+    query = args.get("query", "")
+    provider = args.get("provider", "auto")  # auto, duckduckgo, brave, google, serpapi
+    max_results = args.get("max_results", 8)
+    if not query:
+        return {"error": "Requête vide"}
+
+    # ── Cache TTL : une requête identique récente est servie instantanément ────
+    _ck = ("ws", provider, query.strip().lower(), int(max_results))
+    _cached = _wcache_get(_ck)
+    if _cached is not None:
+        return {**_cached, "cached": True}
+
+    import credentials_manager as cm
+
+    # ── DuckDuckGo (aucune clé requise) ───────────────────────────────────────
+    def _parse_ddg(html_text):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_text, "lxml")
+        out = []
+        for r in soup.select(".result__body")[:max_results]:
+            title_el = r.select_one(".result__a")
+            snippet_el = r.select_one(".result__snippet")
+            if title_el:
+                out.append({"title": title_el.get_text(strip=True),
+                            "url": title_el.get("href", ""),
+                            "snippet": snippet_el.get_text(strip=True) if snippet_el else ""})
+        return out
+
+    def _parse_ddg_lite(html_text):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_text, "lxml")
+        links = soup.select("a.result-link")
+        snips = soup.select("td.result-snippet")
+        out = []
+        for i, a in enumerate(links[:max_results]):
+            out.append({"title": a.get_text(strip=True), "url": a.get("href", ""),
+                        "snippet": snips[i].get_text(strip=True) if i < len(snips) else ""})
+        return out
+
+    async def _ddg(retry=True):
+        try:
+            client = _get_http_client()                       # client partagé (pooling)
+            # endpoint principal puis 'lite' (profil anti-bot différent) en secours
+            results = []
+            for endpoint, parser in (("https://html.duckduckgo.com/html/", _parse_ddg),
+                                     ("https://lite.duckduckgo.com/lite/", _parse_ddg_lite)):
+                resp = await client.post(endpoint, data={"q": query})
+                resp.raise_for_status()
+                results = parser(resp.text)
+                if results:
+                    break
+            if not results and retry:
+                # 0 résultat sur une requête non vide → souvent une limite anti-bot
+                # temporaire → une seule nouvelle tentative espacée.
+                await asyncio.sleep(1.6)
+                return await _ddg(retry=False)
+            if not results:
+                return {"success": False, "provider": "DuckDuckGo", "query": query,
+                        "count": 0, "results": [], "rate_limited": True,
+                        "error": "Recherche web temporairement limitée (anti-bot). Réessayez dans un instant."}
+            return {"success": True, "provider": "DuckDuckGo", "query": query,
+                    "count": len(results), "results": results}
+        except Exception as e:
+            return _net_error(e, "DuckDuckGo")
+
+    # ── Brave Search ──────────────────────────────────────────────────────────
+    async def _brave():
+        api_key = cm.get_credential("brave_search_api_key")
+        if not api_key:
+            return None
+        try:
+            import httpx
+            headers = {"Accept": "application/json", "Accept-Encoding": "gzip", "X-Subscription-Token": api_key}
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    "https://api.search.brave.com/res/v1/web/search",
+                    params={"q": query, "count": max_results},
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            results = []
+            for item in data.get("web", {}).get("results", [])[:max_results]:
+                results.append({"title": item.get("title", ""), "url": item.get("url", ""), "snippet": item.get("description", "")})
+            return {"success": True, "provider": "Brave Search", "query": query, "count": len(results), "results": results}
+        except Exception as e:
+            return {"error": f"Brave: {e}"}
+
+    # ── Google Custom Search ──────────────────────────────────────────────────
+    async def _google():
+        api_key = cm.get_credential("google_search_api_key")
+        cx = cm.get_credential("google_search_cx")
+        if not api_key or not cx:
+            return None
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    "https://www.googleapis.com/customsearch/v1",
+                    params={"key": api_key, "cx": cx, "q": query, "num": min(max_results, 10)},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            results = []
+            for item in data.get("items", [])[:max_results]:
+                results.append({"title": item.get("title", ""), "url": item.get("link", ""), "snippet": item.get("snippet", "")})
+            return {"success": True, "provider": "Google", "query": query, "count": len(results), "results": results}
+        except Exception as e:
+            return {"error": f"Google: {e}"}
+
+    # ── SerpAPI ───────────────────────────────────────────────────────────────
+    async def _serpapi():
+        api_key = cm.get_credential("serpapi_key")
+        if not api_key:
+            return None
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    "https://serpapi.com/search",
+                    params={"q": query, "api_key": api_key, "num": max_results},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            results = []
+            for item in data.get("organic_results", [])[:max_results]:
+                results.append({"title": item.get("title", ""), "url": item.get("link", ""), "snippet": item.get("snippet", "")})
+            return {"success": True, "provider": "SerpAPI", "query": query, "count": len(results), "results": results}
+        except Exception as e:
+            return {"error": f"SerpAPI: {e}"}
+
+    # ── Sélection du provider ─────────────────────────────────────────────────
+    if provider == "brave":
+        result = await _brave()
+        return result or {"error": "Clé Brave Search non configurée"}
+    if provider == "google":
+        result = await _google()
+        return result or {"error": "Clés Google Search non configurées"}
+    if provider == "serpapi":
+        result = await _serpapi()
+        return result or {"error": "Clé SerpAPI non configurée"}
+    if provider == "duckduckgo":
+        r = await _ddg()
+        if r.get("success"):
+            _wcache_set(_ck, r)
+        return r
+
+    # Auto: essayer dans l'ordre brave → google → serpapi → duckduckgo
+    for fn in (_brave, _google, _serpapi):
+        r = await fn()
+        if r and r.get("success"):
+            _wcache_set(_ck, r)
+            return r
+    r = await _ddg()
+    if r.get("success"):
+        _wcache_set(_ck, r)
+    return r
+
+
+async def execute_web_browse(args: dict) -> dict:
+    """Récupère et extrait le texte d'une page web."""
+    url = args.get("url", "")
+    # v2.125 — plafond abaissé (25000/60000 → 12000/20000). Trouvé en conditions réelles :
+    # une conversation avec ~15 appels `web_browse` en rafale cumulait jusqu'à 118 000
+    # caractères réinjectés au modèle à CHAQUE tour suivant (chaque résultat reste dans
+    # l'historique pour tout le reste de la boucle d'outils) — l'appel au modèle cloud
+    # devenait de plus en plus lourd et lent à chaque itération, jusqu'à plusieurs minutes
+    # sans rien afficher côté utilisateur ("Marvin reste à réfléchir"). 12k caractères
+    # suffisent largement pour un résumé/Q&A — un extrait plus long peut toujours être
+    # redemandé explicitement via `max_chars` si un cas précis le justifie.
+    max_chars = max(1000, min(int(args.get("max_chars", 12000)), 20000))
+    if not url:
+        return {"error": "URL requise"}
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+        final_url = str(resp.url)  # URL après redirections
+        # Don't raise_for_status — instead report the status in the result
+        if resp.status_code >= 400:
+            return {
+                "success": False,
+                "url": final_url,
+                "status": resp.status_code,
+                "error": f"HTTP {resp.status_code} pour {final_url}",
+                "content": "",
+            }
+        soup = BeautifulSoup(resp.text, "lxml")
+
+        # Extraire le titre et la description
+        title = (soup.title.string or "").strip() if soup.title else url
+        description = ""
+        meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+        if meta_desc:
+            description = meta_desc.get("content", "").strip()
+
+        # Supprimer les éléments non-contenu
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form",
+                          "iframe", "noscript", "svg", "button", "input", "select"]):
+            tag.decompose()
+
+        # Extraire le texte principal (préférer article > main > body)
+        main = (soup.find("article") or soup.find("main") or
+                soup.find(id="content") or soup.find(class_=["content", "article", "post", "main-content"]) or
+                soup.find("body"))
+        if main:
+            text = main.get_text(separator="\n", strip=True)
+        else:
+            text = soup.get_text(separator="\n", strip=True)
+
+        # Nettoyer les lignes vides consécutives
+        lines = [l for l in text.splitlines() if l.strip()]
+        cleaned = "\n".join(lines)[:max_chars]
+
+        return {
+            "success": True,
+            "url": final_url,
+            "title": title,
+            "description": description,
+            "content": cleaned,
+            "length": len(cleaned),
+            "truncated": len(cleaned) >= max_chars,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 8 — Infographies & Images
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_infographic_create(args: dict) -> dict:
+    """Crée une infographie/graphique matplotlib et la sauvegarde en PNG."""
+    chart_type = args.get("chart_type", "bar")   # bar, pie, line, horizontal_bar
+    title = args.get("title", "Graphique")
+    labels = args.get("labels", [])
+    values = args.get("values", [])
+    _op_raw = args.get("output_path", "")
+    if _op_raw:
+        output_path = _resolve_path(_op_raw)
+    else:
+        output_path = str(Path(os.path.expanduser("~")) / "Desktop" / f"infographie_{int(time.time())}.png")
+    colors = args.get("colors", None)
+    subtitle = args.get("subtitle", "")
+
+    _series = args.get("series") or []
+    if not labels:
+        return {"error": "Labels (étiquettes) requis"}
+    if not values and not _series:
+        return {"error": "Fournir 'values' (mono-série) ou 'series' (multi-série : [{name, values}])"}
+    if values and len(labels) != len(values):
+        return {"error": "Le nombre de labels doit correspondre au nombre de valeurs"}
+
+    # Run the blocking matplotlib operation in a thread pool to avoid blocking the event loop
+    def _render_chart():
+      try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        import numpy as np
+
+        # Thème (sombre par défaut, clair optionnel)
+        theme = (args.get("theme") or "dark").lower()
+        GOLD = "#c9a84c"
+        if theme == "light":
+            BG, TEXT_COLOR, GRID_COLOR = "#ffffff", "#222222", "#dddddd"
+        else:
+            BG, TEXT_COLOR, GRID_COLOR = "#111111", "#c3c3c3", "#2a2a2a"
+        default_colors = [GOLD, "#e8c96d", "#5b9bd5", "#70ad47", "#ed7d31", "#a07830",
+                          "#d4b060", "#7030a0", "#c0504d", "#4bacc6"]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        fig.patch.set_facecolor(BG)
+        ax.set_facecolor(BG)
+
+        used_colors = colors or (default_colors * 4)[:max(len(labels), 1)]
+        vals = [float(v) for v in values] if values else []
+        # Multi-séries : [{"name":..., "values":[...]}, ...]
+        series = args.get("series") or []
+        x = np.arange(len(labels))
+
+        def _style_axes(grid_axis="y"):
+            ax.set_xticks(x); ax.set_xticklabels(labels, color=TEXT_COLOR, fontsize=9, rotation=0)
+            ax.tick_params(colors=TEXT_COLOR)
+            ax.grid(axis=grid_axis, color=GRID_COLOR, linewidth=0.7)
+            for s in ax.spines.values():
+                s.set_color(GRID_COLOR)
+
+        ct = chart_type
+        if ct in ("pie", "donut"):
+            wedges, texts, autotexts = ax.pie(
+                vals, labels=labels, colors=used_colors, autopct="%1.1f%%", startangle=140,
+                pctdistance=0.8, textprops={"color": TEXT_COLOR, "fontsize": 10},
+                wedgeprops=dict(width=0.42) if ct == "donut" else None)
+            for at in autotexts:
+                at.set_color(BG if theme == "dark" else "#ffffff"); at.set_fontweight("bold")
+            if ct == "donut":
+                ax.text(0, 0, f"{sum(vals):g}", ha="center", va="center", color=GOLD, fontsize=16, fontweight="bold")
+        elif ct in ("line", "area", "multi_line"):
+            sset = series if series else [{"name": "", "values": vals}]
+            for idx, s in enumerate(sset):
+                c = used_colors[idx % len(used_colors)]
+                sv = [float(v) for v in s["values"]]
+                ax.plot(x, sv, color=c, linewidth=2.5, marker="o", markersize=6,
+                        markerfacecolor=BG, markeredgewidth=2, label=s.get("name", ""))
+                if ct == "area":
+                    ax.fill_between(x, sv, alpha=0.18, color=c)
+            _style_axes("y")
+            if series:
+                ax.legend(facecolor=BG, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR, fontsize=9)
+        elif ct == "scatter":
+            xv = [float(v) for v in (args.get("x_values") or x)]
+            ax.scatter(xv, vals, color=GOLD, s=80, alpha=0.8, edgecolors=BG, linewidths=1)
+            ax.tick_params(colors=TEXT_COLOR); ax.grid(color=GRID_COLOR, linewidth=0.7)
+            for sp in ax.spines.values():
+                sp.set_color(GRID_COLOR)
+        elif ct == "radar":
+            ax.remove()
+            ax = fig.add_subplot(111, polar=True); ax.set_facecolor(BG)
+            ang = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+            sset = series if series else [{"name": "", "values": vals}]
+            for idx, s in enumerate(sset):
+                sv = [float(v) for v in s["values"]]; sv += sv[:1]
+                aa = ang + ang[:1]; c = used_colors[idx % len(used_colors)]
+                ax.plot(aa, sv, color=c, linewidth=2, label=s.get("name", ""))
+                ax.fill(aa, sv, color=c, alpha=0.15)
+            ax.set_xticks(ang); ax.set_xticklabels(labels, color=TEXT_COLOR, fontsize=9)
+            ax.tick_params(colors=TEXT_COLOR)
+            if series:
+                ax.legend(facecolor=BG, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR, fontsize=8, loc="upper right")
+        elif ct in ("grouped_bar", "stacked_bar") and series:
+            n = len(series); w = 0.8 / max(n, 1)
+            bottom = np.zeros(len(labels))
+            for idx, s in enumerate(series):
+                sv = np.array([float(v) for v in s["values"]]); c = used_colors[idx % len(used_colors)]
+                if ct == "stacked_bar":
+                    ax.bar(x, sv, bottom=bottom, color=c, width=0.55, label=s.get("name", "")); bottom += sv
+                else:
+                    ax.bar(x + idx * w - 0.4 + w / 2, sv, color=c, width=w, label=s.get("name", ""))
+            _style_axes("y")
+            ax.legend(facecolor=BG, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR, fontsize=9)
+        elif ct == "horizontal_bar":
+            y = np.arange(len(labels))
+            bars = ax.barh(y, vals, color=used_colors, edgecolor="none", height=0.55)
+            ax.set_yticks(y); ax.set_yticklabels(labels, color=TEXT_COLOR, fontsize=9)
+            ax.tick_params(colors=TEXT_COLOR); ax.grid(axis="x", color=GRID_COLOR, linewidth=0.7)
+            for sp in ax.spines.values():
+                sp.set_color(GRID_COLOR)
+            for bar, val in zip(bars, vals):
+                ax.text(bar.get_width() + max(vals) * 0.01, bar.get_y() + bar.get_height() / 2,
+                        f"{val:g}", va="center", color=TEXT_COLOR, fontsize=8)
+        else:  # bar (défaut)
+            bars = ax.bar(x, vals, color=used_colors, edgecolor="none", width=0.55)
+            _style_axes("y")
+            for bar, val in zip(bars, vals):
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(vals) * 0.01,
+                        f"{val:g}", ha="center", va="bottom", color=TEXT_COLOR, fontsize=8)
+
+        ax.set_title(title, color=GOLD, fontsize=14, fontweight="bold", pad=16)
+        if subtitle:
+            fig.text(0.5, 0.93, subtitle, ha="center", color=TEXT_COLOR, fontsize=9)
+
+        plt.tight_layout()
+        out = Path(output_path)
+        if not out.suffix:
+            out = out.with_suffix(".png")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(str(out), dpi=150, bbox_inches="tight", facecolor=BG)
+        plt.close(fig)
+        return {"success": True, "message": f"Infographie créée : {out}", "path": str(out)}
+      except Exception as e:
+        return {"error": str(e)}
+
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _render_chart)
+
+
+async def execute_file_create_xlsx(args: dict) -> dict:
+    """Crée un fichier Excel (.xlsx) avec des données."""
+    _path_raw = args.get("path", "")
+    path = _resolve_path(_path_raw) if _path_raw else str(Path(os.path.expanduser("~")) / "Desktop" / f"tableau_{int(time.time())}.xlsx")
+    title = args.get("title", "Données")
+    headers = args.get("headers", [])
+    rows = args.get("rows", [])
+    sheet_name = args.get("sheet_name", "Feuille1")
+
+    try:
+        import openpyxl
+        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = sheet_name
+
+        GOLD = "C9A84C"
+        DARK = "111111"
+        LIGHT_GRAY = "1E1E1E"
+
+        # En-tête
+        if title:
+            ws.merge_cells(f"A1:{chr(64 + max(len(headers), 1))}1")
+            cell = ws.cell(row=1, column=1, value=title)
+            cell.font = Font(bold=True, color="FFFFFF", size=13)
+            cell.fill = PatternFill("solid", fgColor=GOLD)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.row_dimensions[1].height = 26
+            start_row = 2
+        else:
+            start_row = 1
+
+        # Headers
+        if headers:
+            for col_idx, h in enumerate(headers, 1):
+                cell = ws.cell(row=start_row, column=col_idx, value=h)
+                cell.font = Font(bold=True, color="FFFFFF", size=10)
+                cell.fill = PatternFill("solid", fgColor="2A2A2A")
+                cell.alignment = Alignment(horizontal="center")
+            start_row += 1
+
+        # Données
+        for row_idx, row in enumerate(rows):
+            fill_color = "181818" if row_idx % 2 == 0 else DARK
+            for col_idx, val in enumerate(row, 1):
+                cell = ws.cell(row=start_row + row_idx, column=col_idx, value=val)
+                cell.fill = PatternFill("solid", fgColor=fill_color)
+                cell.font = Font(color="C3C3C3", size=10)
+                cell.alignment = Alignment(horizontal="left")
+
+        # Auto-width
+        for col in ws.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=8)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+        out = Path(path)
+        if not out.suffix:
+            out = out.with_suffix(".xlsx")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        wb.save(str(out))
+        return {"success": True, "message": f"Fichier Excel créé : {out}", "path": str(out)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_create_pdf(args: dict) -> dict:
+    """Crée un fichier PDF avec du texte formaté (sans Word requis)."""
+    _path_raw = args.get("path", "")
+    path = _resolve_path(_path_raw) if _path_raw else str(Path(os.path.expanduser("~")) / "Desktop" / f"document_{int(time.time())}.pdf")
+    title = args.get("title", "Document")
+    content = args.get("content", "")
+    author = args.get("author", "Marvin")
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+        GOLD_COLOR = colors.HexColor("#c9a84c")
+        TEXT_COLOR = colors.HexColor("#1a1a1a")
+        LIGHT_COLOR = colors.HexColor("#555555")
+
+        out = Path(path)
+        if not out.suffix:
+            out = out.with_suffix(".pdf")
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        doc = SimpleDocTemplate(
+            str(out), pagesize=A4,
+            rightMargin=2.5*cm, leftMargin=2.5*cm,
+            topMargin=2.5*cm, bottomMargin=2.5*cm,
+            title=title, author=author,
+        )
+
+        from reportlab.platypus import Table, TableStyle, ListFlowable, ListItem
+        from datetime import datetime as _dt
+        accent = args.get("accent")
+        if accent:
+            try: GOLD_COLOR = colors.HexColor(accent if accent.startswith("#") else "#" + accent)
+            except Exception: pass
+        subtitle = args.get("subtitle", "")
+
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Styles personnalisés
+        h0_style = ParagraphStyle("h0", parent=styles["Title"], textColor=GOLD_COLOR, fontSize=24, spaceAfter=6, alignment=TA_CENTER)
+        sub_style = ParagraphStyle("sub", parent=styles["Normal"], textColor=LIGHT_COLOR, fontSize=12, alignment=TA_CENTER, spaceAfter=2)
+        meta_style = ParagraphStyle("meta", parent=styles["Normal"], textColor=colors.HexColor("#999999"), fontSize=9, alignment=TA_CENTER, spaceAfter=12)
+        h1_style = ParagraphStyle("h1", parent=styles["Heading1"], textColor=GOLD_COLOR, fontSize=16, spaceAfter=6, spaceBefore=16)
+        h2_style = ParagraphStyle("h2", parent=styles["Heading2"], textColor=GOLD_COLOR, fontSize=13, spaceAfter=5, spaceBefore=12)
+        h3_style = ParagraphStyle("h3", parent=styles["Heading3"], textColor=TEXT_COLOR, fontSize=11, spaceAfter=4, spaceBefore=8)
+        body_style = ParagraphStyle("body", parent=styles["Normal"], textColor=TEXT_COLOR, fontSize=10.5, leading=15, spaceAfter=5)
+        bullet_style = ParagraphStyle("bullet", parent=body_style, leftIndent=16, spaceAfter=2)
+        quote_style = ParagraphStyle("quote", parent=body_style, leftIndent=16, textColor=LIGHT_COLOR, fontName="Helvetica-Oblique", borderPadding=4)
+        code_style = ParagraphStyle("code", parent=styles["Code"], fontSize=9, backColor=colors.HexColor("#f5f5f5"), borderPadding=6, leading=12)
+        hmap = {"h1": h1_style, "h2": h2_style, "h3": h3_style}
+
+        # ── Bloc de titre ────────────────────────────────────────────────────
+        story.append(Paragraph(title, h0_style))
+        if subtitle:
+            story.append(Paragraph(_md_inline_to_rl(subtitle), sub_style))
+        story.append(Paragraph(f"{author} &nbsp;·&nbsp; {_dt.now().strftime('%d/%m/%Y')}", meta_style))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD_COLOR, spaceAfter=14))
+
+        for kind, payload in _parse_md_blocks(content):
+            if kind in hmap:
+                story.append(Paragraph(_md_inline_to_rl(payload), hmap[kind]))
+            elif kind == "bullet":
+                story.append(Paragraph("• " + _md_inline_to_rl(payload), bullet_style))
+            elif kind == "num":
+                story.append(Paragraph(_md_inline_to_rl(payload), bullet_style))
+            elif kind == "quote":
+                story.append(Paragraph(_md_inline_to_rl(payload), quote_style))
+            elif kind == "code":
+                story.append(Paragraph(payload.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>"), code_style))
+            elif kind == "hr":
+                story.append(HRFlowable(width="100%", thickness=0.5, color=LIGHT_COLOR, spaceBefore=6, spaceAfter=6))
+            elif kind == "table" and payload:
+                cols = max(len(r) for r in payload)
+                data = [[Paragraph(_md_inline_to_rl(c if c else ""),
+                                   ParagraphStyle("tc", parent=body_style, fontSize=9.5, textColor=(colors.white if ri == 0 else TEXT_COLOR)))
+                         for c in (row + [""] * (cols - len(row)))]
+                        for ri, row in enumerate(payload)]
+                t = Table(data, hAlign="LEFT")
+                t.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), GOLD_COLOR),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#faf8f2")]),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dddddd")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]))
+                story.append(Spacer(1, 4)); story.append(t); story.append(Spacer(1, 8))
+            elif kind == "space":
+                story.append(Spacer(1, 6))
+            else:
+                story.append(Paragraph(_md_inline_to_rl(payload), body_style))
+
+        # ── Numéro de page en pied ───────────────────────────────────────────
+        def _footer(canvas, docu):
+            canvas.saveState()
+            canvas.setFont("Helvetica", 8)
+            canvas.setFillColor(colors.HexColor("#999999"))
+            canvas.drawCentredString(A4[0] / 2, 1.2 * cm, f"{docu.page}")
+            canvas.drawRightString(A4[0] - 2.5 * cm, 1.2 * cm, title[:50])
+            canvas.restoreState()
+
+        doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
+        return {"success": True, "message": f"PDF créé : {out}", "path": str(out)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 9A — Google Calendar
+# ══════════════════════════════════════════════════════════════════════════════
+
+_GOOGLE_SA_PATH = os.path.join(os.path.dirname(__file__), "data", "google_service_account.json")
+
+
+def _google_sa_email() -> str | None:
+    """Email du compte de service si une clé est présente (pour partager l'agenda)."""
+    try:
+        if os.path.exists(_GOOGLE_SA_PATH):
+            import json as _j
+            with open(_GOOGLE_SA_PATH, encoding="utf-8") as f:
+                return _j.load(f).get("client_email")
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_calendar_id(requested: str | None) -> str:
+    """Avec un compte de service, « primary » = l'agenda VIDE du robot.
+    On cible donc l'agenda partagé configuré (google_calendar_id = ton email)."""
+    requested = (requested or "primary").strip()
+    if requested == "primary" and os.path.exists(_GOOGLE_SA_PATH):
+        cid = db.get_setting("google_calendar_id")
+        if cid:
+            return str(cid)
+    return requested
+
+
+def _norm_google_dt(s: str) -> str:
+    """Google exige un RFC3339 complet avec secondes (sinon 400). 'YYYY-MM-DD HH:MM' →
+    'YYYY-MM-DDTHH:MM:SS'. Laisse les dates (toute-journée, sans 'T') intactes."""
+    if not s:
+        return s
+    s = str(s).replace(" ", "T")
+    if "T" not in s:
+        return s
+    try:
+        from datetime import datetime as _dt
+        return _dt.fromisoformat(s).strftime("%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        return s
+
+
+def _google_calendar_ready() -> bool:
+    """Vrai si l'agenda Google est configuré (sans appel réseau) : compte de service + agenda
+    cible défini, OU tokens OAuth présents (backend credentials ou table frontend oauth_tokens)."""
+    try:
+        if os.path.exists(_GOOGLE_SA_PATH) and db.get_setting("google_calendar_id"):
+            return True
+        import credentials_manager as cm
+        if cm.get_credential("google_access_token") or cm.get_credential("google_refresh_token"):
+            return True
+        row = db.get_conn().execute("SELECT access_token FROM oauth_tokens WHERE provider='google'").fetchone()
+        return bool(row and row["access_token"])
+    except Exception:
+        return False
+
+
+def _get_google_calendar_service(prefer_oauth: bool = False):
+    """Construit le service Google Calendar. Priorité au COMPTE DE SERVICE (permanent,
+    sans expiration) si une clé JSON est présente ; sinon OAuth (tokens utilisateur).
+    v2.137 — `prefer_oauth=True` force le repli OAuth même si le compte de service est
+    configuré : utilisé quand le compte de service renvoie 404 sur l'agenda ciblé (le
+    calendrier personnel n'a pas été partagé avec l'e-mail du compte de service — cas
+    fréquent, corrigible soit en partageant l'agenda, soit en retombant sur OAuth qui a
+    directement accès aux agendas de l'utilisateur connecté)."""
+    from googleapiclient.discovery import build
+
+    # 1) Compte de service (recommandé pour un agenda perso permanent)
+    if os.path.exists(_GOOGLE_SA_PATH) and not prefer_oauth:
+        from google.oauth2 import service_account
+        creds = service_account.Credentials.from_service_account_file(
+            _GOOGLE_SA_PATH, scopes=["https://www.googleapis.com/auth/calendar"])
+        return build("calendar", "v3", credentials=creds)
+
+    # 2) OAuth utilisateur (tokens)
+    import credentials_manager as cm
+    from google.oauth2.credentials import Credentials
+
+    access_token = cm.get_credential("google_access_token")
+    refresh_token = cm.get_credential("google_refresh_token")
+    client_id = cm.get_credential("google_client_id")
+    client_secret = cm.get_credential("google_client_secret")
+
+    # Pont : si le flux backend n'a pas de tokens, réutilise ceux du flux frontend
+    # (table oauth_tokens, provider='google'). Le client_id/secret backend sert au refresh.
+    if not access_token and not refresh_token:
+        try:
+            row = db.get_conn().execute(
+                "SELECT access_token, refresh_token FROM oauth_tokens WHERE provider='google'"
+            ).fetchone()
+            if row:
+                access_token = row["access_token"]
+                refresh_token = row["refresh_token"]
+        except Exception:
+            pass
+
+    if not access_token and not refresh_token:
+        raise ValueError("Google non connecté. Configurez OAuth dans Paramètres > Connexions.")
+
+    creds = Credentials(
+        token=access_token,
+        refresh_token=refresh_token,
+        client_id=client_id,
+        client_secret=client_secret,
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=["https://www.googleapis.com/auth/calendar"],
+    )
+    return build("calendar", "v3", credentials=creds)
+
+
+async def execute_calendar_list(args: dict) -> dict:
+    """Liste les événements Google Calendar pour une période donnée."""
+    from datetime import datetime, timezone, timedelta
+    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
+    days_ahead  = max(1, min(int(args.get("days", 7)), 90))
+    max_results = max(1, min(int(args.get("max_results", 20)), 50))
+
+    now = datetime.now(timezone.utc)
+
+    # Support time_min custom (ex. 1er du mois envoyé par le calendrier frontend)
+    raw_min = args.get("time_min", "")
+    if raw_min:
+        try:
+            from dateutil import parser as dtparser
+            time_min = dtparser.parse(raw_min).astimezone(timezone.utc).isoformat()
+        except Exception:
+            time_min = now.isoformat()
+    else:
+        time_min = now.isoformat()
+
+    time_max = (now + timedelta(days=days_ahead)).isoformat()
+
+    def _list_events(service):
+        events_result = service.events().list(
+            calendarId=calendar_id,
+            timeMin=time_min,
+            timeMax=time_max,
+            maxResults=max_results,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+        events = []
+        for e in events_result.get("items", []):
+            start = e["start"].get("dateTime") or e["start"].get("date", "")
+            end   = e["end"].get("dateTime")   or e["end"].get("date", "")
+            events.append({
+                "id":          e.get("id", ""),
+                "title":       e.get("summary", "(Sans titre)"),
+                "start":       start,
+                "end":         end,
+                "location":    e.get("location", ""),
+                "description": (e.get("description", "") or "")[:300],
+                "organizer":   e.get("organizer", {}).get("email", ""),
+                "status":      e.get("status", ""),
+                "colorId":     e.get("colorId", ""),
+                "link":        e.get("htmlLink", ""),
+            })
+        return events
+
+    def _fetch():
+        # v2.137 — repli OAuth quand le compte de service renvoie 404 (l'agenda ciblé n'est
+        # pas partagé avec l'e-mail du compte de service) : trouvé en auditant 60 échecs
+        # historiques de calendar_list, tous ce même 404 sur calendars/<email>/events.
+        # Sans repli, un utilisateur dont l'agenda n'a jamais été partagé avec le compte de
+        # service voit TOUJOURS échouer calendar_list, alors qu'OAuth (s'il est configuré)
+        # a un accès direct à ses propres agendas sans configuration supplémentaire.
+        try:
+            return _list_events(_get_google_calendar_service())
+        except Exception as e:
+            from googleapiclient.errors import HttpError
+            _status = getattr(getattr(e, "resp", None), "status", None)
+            if isinstance(e, HttpError) and _status == 404:
+                try:
+                    return _list_events(_get_google_calendar_service(prefer_oauth=True))
+                except Exception:
+                    pass
+            raise
+
+    try:
+        loop = asyncio.get_running_loop()
+        events = await loop.run_in_executor(None, _fetch)
+        return {
+            "success":     True,
+            "calendar_id": calendar_id,
+            "period_days": days_ahead,
+            "count":       len(events),
+            "events":      events,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_calendar_create(args: dict) -> dict:
+    """Crée un événement dans Google Calendar."""
+    title = args.get("title", "").strip()
+    start = args.get("start", "").strip()    # ISO 8601 ou date YYYY-MM-DD
+    end   = args.get("end",   "").strip()
+    if not title:
+        return {"error": "Paramètre 'title' requis."}
+    if not start:
+        return {"error": "Paramètre 'start' requis. Format : YYYY-MM-DDTHH:MM:SS ou YYYY-MM-DD."}
+
+    location    = args.get("location", "")
+    description = args.get("description", "")
+    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
+
+    # Déterminer si c'est un événement toute-journée ou avec heure précise
+    all_day = "T" not in start
+    if not end:
+        if all_day:
+            # Toute la journée → fin = jour suivant
+            from datetime import datetime, timedelta
+            d = datetime.strptime(start, "%Y-%m-%d")
+            end = (d + timedelta(days=1)).strftime("%Y-%m-%d")
+        else:
+            # 1 heure par défaut
+            from datetime import datetime, timedelta
+            d = datetime.fromisoformat(start)
+            end = (d + timedelta(hours=1)).isoformat()
+
+    def _create():
+        service = _get_google_calendar_service()
+        if all_day:
+            event_body = {
+                "summary": title,
+                "start": {"date": start},
+                "end": {"date": end},
+            }
+        else:
+            event_body = {
+                "summary": title,
+                "start": {"dateTime": _norm_google_dt(start), "timeZone": "Europe/Paris"},
+                "end":   {"dateTime": _norm_google_dt(end),   "timeZone": "Europe/Paris"},
+            }
+        if location:
+            event_body["location"] = location
+        if description:
+            event_body["description"] = description
+        # Rappel Google natif → notifie aussi sur le téléphone
+        _rem = args.get("reminder_minutes")
+        if _rem not in (None, ""):
+            try:
+                event_body["reminders"] = {"useDefault": False,
+                                           "overrides": [{"method": "popup", "minutes": int(_rem)}]}
+            except Exception:
+                pass
+
+        created = service.events().insert(calendarId=calendar_id, body=event_body).execute()
+        s_raw = created.get("start", {})
+        e_raw = created.get("end",   {})
+        return {
+            "success":     True,
+            "message":     f"Événement créé : « {title} »",
+            "id":          created.get("id", ""),
+            "event_id":    created.get("id", ""),
+            "summary":     created.get("summary", title),
+            "start":       {"dateTime": s_raw.get("dateTime"), "date": s_raw.get("date")} if s_raw else {"dateTime": start},
+            "end":         {"dateTime": e_raw.get("dateTime"), "date": e_raw.get("date")} if e_raw else {"dateTime": end},
+            "location":    created.get("location", location),
+            "description": created.get("description", description),
+            "htmlLink":    created.get("htmlLink", ""),
+        }
+
+    try:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _create)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_calendar_delete(args: dict) -> dict:
+    """Supprime un événement Google Calendar par son ID."""
+    event_id    = args.get("event_id", "").strip()
+    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
+    if not event_id:
+        return {"error": "Paramètre 'event_id' requis."}
+
+    confirmed = args.get("confirmed", False)
+    if not confirmed:
+        return {
+            "requiresConfirmation": True,
+            "message": f"Supprimer l'événement Google Calendar ID «{event_id}» ?\n⚠️ Cette action est irréversible.",
+        }
+
+    def _delete():
+        service = _get_google_calendar_service()
+        service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+        return {"success": True, "message": f"Événement {event_id} supprimé du calendrier."}
+
+    try:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _delete)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_calendar_update(args: dict) -> dict:
+    """Met à jour un événement Google Calendar existant."""
+    event_id    = args.get("event_id", "").strip()
+    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
+    if not event_id:
+        return {"error": "Paramètre 'event_id' requis."}
+
+    # Champs optionnels à mettre à jour
+    title       = args.get("title")
+    start       = args.get("start")
+    end         = args.get("end")
+    description = args.get("description")
+    location    = args.get("location")
+
+    def _update():
+        service = _get_google_calendar_service()
+        # Récupérer l'événement existant
+        existing = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+
+        if title       is not None: existing["summary"]     = title
+        if description is not None: existing["description"] = description
+        if location    is not None: existing["location"]    = location
+
+        if start is not None:
+            if "T" in str(start).replace(" ", "T"):
+                existing["start"] = {"dateTime": _norm_google_dt(start), "timeZone": "Europe/Paris"}
+            else:
+                existing["start"] = {"date": start}
+        if end is not None:
+            if "T" in str(end).replace(" ", "T"):
+                existing["end"] = {"dateTime": _norm_google_dt(end), "timeZone": "Europe/Paris"}
+            else:
+                existing["end"] = {"date": end}
+
+        updated = service.events().update(
+            calendarId=calendar_id, eventId=event_id, body=existing
+        ).execute()
+
+        return {
+            "id":          updated.get("id"),
+            "title":       updated.get("summary", ""),
+            "start":       updated.get("start", {}),
+            "end":         updated.get("end", {}),
+            "description": updated.get("description", ""),
+            "location":    updated.get("location", ""),
+            "colorId":     updated.get("colorId"),
+            "success":     True,
+            "message":     f"Événement «{updated.get('summary')}» mis à jour.",
+        }
+
+    try:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _update)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 9B — Google Drive
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_google_drive_service():
+    """Construit le service Google Drive depuis les credentials stockés."""
+    import credentials_manager as cm
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    access_token = cm.get_credential("google_access_token")
+    refresh_token = cm.get_credential("google_refresh_token")
+    client_id = cm.get_credential("google_client_id")
+    client_secret = cm.get_credential("google_client_secret")
+
+    if not access_token and not refresh_token:
+        raise ValueError("Google non connecté. Configurez OAuth dans Paramètres > Connexions.")
+
+    creds = Credentials(
+        token=access_token,
+        refresh_token=refresh_token,
+        client_id=client_id,
+        client_secret=client_secret,
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=["https://www.googleapis.com/auth/drive"],
+    )
+    return build("drive", "v3", credentials=creds)
+
+
+async def execute_google_drive_list(args: dict) -> dict:
+    """Liste les fichiers Google Drive."""
+    folder_id = args.get("folder_id", "root")
+    max_results = args.get("max_results", 30)
+    query = args.get("query", "")
+    try:
+        service = _get_google_drive_service()
+        q = f"'{folder_id}' in parents and trashed=false"
+        if query:
+            # Escape single quotes in query for Google Drive API query language
+            safe_query = query.replace("\\", "\\\\").replace("'", "\\'")
+            q += f" and name contains '{safe_query}'"
+        results = service.files().list(
+            q=q,
+            pageSize=max_results,
+            fields="files(id, name, mimeType, size, modifiedTime, parents)",
+        ).execute()
+        files = results.get("files", [])
+        for f in files:
+            f["type"] = "dossier" if f["mimeType"] == "application/vnd.google-apps.folder" else "fichier"
+        return {"success": True, "count": len(files), "files": files}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_google_drive_read(args: dict) -> dict:
+    """Lit le contenu d'un fichier Google Drive (Docs → texte, autres → téléchargement)."""
+    file_id = args.get("file_id", "")
+    if not file_id:
+        return {"error": "file_id requis"}
+    try:
+        service = _get_google_drive_service()
+        meta = service.files().get(fileId=file_id, fields="name,mimeType").execute()
+        mime = meta.get("mimeType", "")
+        name = meta.get("name", "")
+        if mime == "application/vnd.google-apps.document":
+            resp = service.files().export(fileId=file_id, mimeType="text/plain").execute()
+            return {"success": True, "name": name, "content": resp.decode("utf-8", errors="replace")[:50000]}
+        elif mime == "application/vnd.google-apps.spreadsheet":
+            resp = service.files().export(fileId=file_id, mimeType="text/csv").execute()
+            return {"success": True, "name": name, "content": resp.decode("utf-8", errors="replace")[:50000]}
+        else:
+            return {"error": f"Type de fichier non supporté pour la lecture directe : {mime}. Utilisez le téléchargement."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_google_drive_upload(args: dict) -> dict:
+    """Téléverse un fichier local vers Google Drive."""
+    local_path = _resolve_path(args.get("local_path", ""))
+    folder_id = args.get("folder_id", "root")
+    file_name = args.get("file_name", "")
+    if not local_path:
+        return {"error": "local_path requis"}
+    try:
+        from googleapiclient.http import MediaFileUpload
+        service = _get_google_drive_service()
+        p = Path(local_path)
+        if not p.exists():
+            return {"error": f"Fichier introuvable : {local_path}"}
+        name = file_name or p.name
+        media = MediaFileUpload(str(p), resumable=True)
+        meta = {"name": name, "parents": [folder_id]}
+        result = service.files().create(body=meta, media_body=media, fields="id,name,webViewLink").execute()
+        return {"success": True, "message": f"Fichier téléversé : {name}", "file_id": result["id"], "link": result.get("webViewLink", "")}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 10 — Microsoft OneDrive
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def _get_ms_token() -> str:
+    """Obtient un access token Microsoft valide (refresh si nécessaire)."""
+    import credentials_manager as cm
+    import httpx
+
+    access_token = cm.get_credential("ms_access_token")
+    refresh_token = cm.get_credential("ms_refresh_token")
+    client_id = cm.get_credential("ms_client_id")
+    client_secret = cm.get_credential("ms_client_secret")
+    tenant_id = cm.get_credential("ms_tenant_id") or "common"
+
+    if not access_token and not refresh_token:
+        raise ValueError("Microsoft non connecté. Configurez OAuth dans Paramètres > Connexions.")
+
+    # Si access_token disponible, l'utiliser directement
+    if access_token:
+        return access_token
+
+    # Rafraîchir le token
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+                "client_secret": client_secret or "",
+                "scope": "https://graph.microsoft.com/.default",
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        new_token = data["access_token"]
+        cm.set_credential("ms_access_token", new_token)
+        if "refresh_token" in data:
+            cm.set_credential("ms_refresh_token", data["refresh_token"])
+        return new_token
+
+
+async def execute_onedrive_list(args: dict) -> dict:
+    """Liste les fichiers OneDrive."""
+    folder_id = args.get("folder_id", "root")
+    max_results = args.get("max_results", 30)
+    query = args.get("query", "")
+    try:
+        import httpx
+        token = await _get_ms_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        if query:
+            from urllib.parse import quote
+            url = f"https://graph.microsoft.com/v1.0/me/drive/root/search(q='{quote(query, safe='')}')"
+            params = {"$top": max_results}
+        else:
+            url = f"https://graph.microsoft.com/v1.0/me/drive/items/{folder_id}/children"
+            params = {"$top": max_results}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        items = data.get("value", [])
+        result = []
+        for item in items:
+            result.append({
+                "id": item["id"],
+                "name": item["name"],
+                "type": "dossier" if "folder" in item else "fichier",
+                "size": item.get("size", 0),
+                "modified": item.get("lastModifiedDateTime", ""),
+                "web_url": item.get("webUrl", ""),
+            })
+        return {"success": True, "count": len(result), "files": result}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_onedrive_read(args: dict) -> dict:
+    """Lit le contenu d'un fichier OneDrive texte."""
+    file_id = args.get("file_id", "")
+    if not file_id:
+        return {"error": "file_id requis"}
+    try:
+        import httpx
+        token = await _get_ms_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(
+                f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/content",
+                headers=headers, follow_redirects=True,
+            )
+            resp.raise_for_status()
+        content = resp.text[:50000] if resp.headers.get("content-type", "").startswith("text/") else None
+        if content is None:
+            return {"error": "Contenu binaire non supporté pour lecture directe."}
+        return {"success": True, "content": content}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_onedrive_upload(args: dict) -> dict:
+    """Téléverse un fichier local vers OneDrive."""
+    local_path = _resolve_path(args.get("local_path", ""))
+    dest_path = args.get("dest_path", "")  # ex: "Documents/rapport.pdf"
+    if not local_path:
+        return {"error": "local_path requis"}
+    try:
+        import httpx
+        token = await _get_ms_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        p = Path(local_path)
+        if not p.exists():
+            return {"error": f"Fichier introuvable : {local_path}"}
+        name = dest_path or p.name
+        with open(str(p), "rb") as f:
+            data = f.read()
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.put(
+                f"https://graph.microsoft.com/v1.0/me/drive/root:/{name}:/content",
+                headers={**headers, "Content-Type": "application/octet-stream"},
+                content=data,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+        return {"success": True, "message": f"Fichier téléversé : {name}", "file_id": result.get("id", ""), "web_url": result.get("webUrl", "")}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION R — Réseau & Connectivité
+# ══════════════════════════════════════════════════════════════════════════════
+
+import socket as _socket
+import ipaddress as _ipaddress
+
+async def execute_net_ping(args: dict) -> dict:
+    """Ping une adresse IP ou un nom d'hôte."""
+    # 'target'/'ip' acceptés en alias de 'host' : le LLM emploie parfois ces noms courants,
+    # mieux vaut être tolérant que de faire échouer l'appel pour un mauvais nom de paramètre.
+    host = (args.get("host") or args.get("target") or args.get("ip") or "").strip()
+    count = max(1, min(int(args.get("count", 4)), 20))
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    def _do_ping():
+        flag = "-n" if sys.platform == "win32" else "-c"
+        result = subprocess.run(
+            ["ping", flag, str(count), host],
+            capture_output=True, timeout=30,
+        )
+        enc = "cp1252" if sys.platform == "win32" else "utf-8"
+        output = result.stdout.decode(enc, errors="replace")
+        lines = [l for l in output.splitlines() if l.strip()]
+        return {
+            "host": host,
+            "success": result.returncode == 0,
+            "output": output.strip(),
+            "summary": lines[-1] if lines else "",
+        }
+    try:
+        return await asyncio.get_running_loop().run_in_executor(None, _do_ping)
+    except subprocess.TimeoutExpired:
+        return {"error": f"Timeout en pingant {host}"}
+    except Exception as e:
+        return {"error": repr(e)}
+
+
+async def execute_net_port_scan(args: dict) -> dict:
+    """Scanne les ports ouverts sur un hôte."""
+    host = args.get("host", "").strip()
+    ports_raw = args.get("ports", "22,80,443,3389,8080,8443,21,25,53,110,143,3306,5432,6379,27017")
+    timeout = float(args.get("timeout", 1.0))
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+
+    # Parse ports: "80,443" ou "20-25" ou mix
+    port_list = []
+    for part in str(ports_raw).split(","):
+        part = part.strip()
+        if "-" in part:
+            a, b = part.split("-", 1)
+            port_list.extend(range(int(a), int(b) + 1))
+        else:
+            port_list.append(int(part))
+    port_list = list(set(port_list))[:100]  # max 100 ports
+
+    open_ports = []
+    closed_ports = []
+
+    async def check_port(port: int):
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port), timeout=timeout
+            )
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            open_ports.append(port)
+        except Exception:
+            closed_ports.append(port)
+
+    await asyncio.gather(*[check_port(p) for p in port_list])
+    open_ports.sort()
+    return {
+        "host": host,
+        "open_ports": open_ports,
+        "closed_count": len(closed_ports),
+        "scanned": len(port_list),
+        "summary": f"{len(open_ports)} port(s) ouvert(s) sur {len(port_list)} scannés",
+    }
+
+
+async def execute_net_dns_lookup(args: dict) -> dict:
+    """Résolution DNS d'un nom d'hôte ou reverse lookup d'une IP."""
+    host = (args.get("host") or args.get("domain") or args.get("hostname") or "").strip()
+    record_type = args.get("type", "A").upper()
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    try:
+        results = {}
+        # Forward lookup
+        try:
+            addrs = _socket.getaddrinfo(host, None)
+            results["addresses"] = list(set(a[4][0] for a in addrs))
+        except Exception as e:
+            results["forward_error"] = str(e)
+
+        # Reverse lookup if IP
+        try:
+            _ipaddress.ip_address(host)
+            hostname, _, _ = _socket.gethostbyaddr(host)
+            results["hostname"] = hostname
+        except (ValueError, _socket.herror):
+            pass
+
+        # nslookup for more details
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "nslookup", host,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+            results["nslookup"] = stdout.decode("cp850", errors="replace").strip()
+        except Exception:
+            pass
+
+        return {"host": host, **results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_net_traceroute(args: dict) -> dict:
+    """Traceroute vers une adresse IP ou un nom d'hôte."""
+    host = args.get("host", "").strip()
+    max_hops = max(1, min(int(args.get("max_hops", 15)), 30))
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    def _do_trace():
+        if sys.platform == "win32":
+            cmd = ["tracert", "-h", str(max_hops), "-d", host]
+        else:
+            cmd = ["traceroute", "-m", str(max_hops), host]
+        result = subprocess.run(cmd, capture_output=True, timeout=60)
+        enc = "cp1252" if sys.platform == "win32" else "utf-8"
+        output = result.stdout.decode(enc, errors="replace")
+        return {"host": host, "output": output.strip(), "success": result.returncode == 0}
+    try:
+        return await asyncio.get_running_loop().run_in_executor(None, _do_trace)
+    except subprocess.TimeoutExpired:
+        return {"error": f"Timeout traceroute vers {host}"}
+    except Exception as e:
+        return {"error": repr(e)}
+
+
+async def execute_net_scan_local(args: dict) -> dict:
+    """Scanne le réseau local pour détecter les appareils connectés (ARP scan via arp -a)."""
+    try:
+        result = await asyncio.to_thread(subprocess.run, ["arp", "-a"], capture_output=True, timeout=15)
+        enc = "cp1252" if sys.platform == "win32" else "utf-8"
+        output = result.stdout.decode(enc, errors="replace")
+
+        # Parse ARP table
+        devices = []
+        for line in output.splitlines():
+            # Windows: "  192.168.1.1   aa-bb-cc-dd-ee-ff   dynamic"
+            parts = line.split()
+            if len(parts) >= 2:
+                ip = parts[0].strip()
+                mac = parts[1].strip() if len(parts) > 1 else ""
+                type_ = parts[2].strip() if len(parts) > 2 else ""
+                try:
+                    _ipaddress.ip_address(ip)
+                    if not ip.startswith("224.") and not ip.startswith("239.") and ip != "255.255.255.255":
+                        devices.append({"ip": ip, "mac": mac, "type": type_})
+                except ValueError:
+                    pass
+
+        return {
+            "devices": devices,
+            "count": len(devices),
+            "raw": output.strip(),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_net_whois(args: dict) -> dict:
+    """Informations WHOIS sur un domaine ou une IP (via whois CLI ou service web)."""
+    host = args.get("host", "").strip()
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    try:
+        # Essaie d'abord whois CLI
+        proc = await asyncio.create_subprocess_exec(
+            "whois", host,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+        output = stdout.decode(errors="replace").strip()
+        if output:
+            # Limiter à 3000 chars
+            return {"host": host, "whois": output[:3000], "truncated": len(output) > 3000}
+    except Exception:
+        pass
+    # Fallback: requête HTTP vers un service whois public
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"https://www.whois.com/whois/{host}")
+            # Extraction simple du texte
+            text = resp.text
+            start = text.find("Registrant")
+            if start == -1:
+                start = text.find("Domain Name")
+            snippet = text[max(0, start):start + 2000] if start != -1 else text[:2000]
+            return {"host": host, "whois": snippet, "source": "whois.com"}
+    except Exception as e2:
+        return {"error": f"whois CLI indisponible et fallback HTTP échoué: {e2}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION RÉSEAU PRO — diagnostic avancé (nmap optionnel, TLS, HTTP, sweep, routage).
+# Porté depuis un fork parallèle du même projet (secretary-ai-codex-groky-alpha) après
+# audit : code propre, garde-fous existants (scans larges → confirmation obligatoire,
+# limites de ports/hôtes). Adapté aux imports/conventions de ce fichier.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_NET_PROFILE_PORTS = {
+    "quick": "22,53,80,135,139,443,445,3389,5985,8000,8080,8443",
+    "web": "80,443,8000,8080,8081,8443,3000,5000,5173,9000,9443",
+    "windows": "53,88,135,139,389,445,464,593,636,3389,5985,5986",
+    "remote": "21,22,23,25,53,80,110,143,443,465,587,993,995,3389,5900,8080",
+    "top100": (
+        "7,9,13,21,22,23,25,26,37,53,79,80,81,88,106,110,111,113,119,135,139,143,"
+        "144,179,199,389,427,443,444,445,465,513,514,515,543,544,548,554,587,631,"
+        "646,873,990,993,995,1025,1026,1027,1028,1029,1110,1433,1720,1723,1755,"
+        "1900,2000,2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,"
+        "5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000,6001,6646,7070,"
+        "8000,8008,8009,8080,8081,8443,8888,9100,9999,10000,32768,49152,49153,49154"
+    ),
+}
+
+
+def _net_parse_ports(ports_raw: Any, *, limit: int = 256) -> list[int]:
+    raw = str(ports_raw or "").strip() or _NET_PROFILE_PORTS["quick"]
+    ports: list[int] = []
+    for part in raw.replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            a, b = part.split("-", 1)
+            start, end = int(a.strip()), int(b.strip())
+            if start > end:
+                start, end = end, start
+            ports.extend(range(max(1, start), min(65535, end) + 1))
+        else:
+            p = int(part)
+            if 1 <= p <= 65535:
+                ports.append(p)
+    return sorted(set(ports))[:limit]
+
+
+def _net_targets(target: str, *, confirmed: bool, max_hosts: int = 64) -> tuple[list[str], dict | None]:
+    """Résout une cible (IP unique OU CIDR) en liste d'hôtes. Un CIDR trop large sans
+    confirmation renvoie une demande de confirmation plutôt que de scanner en silence."""
+    target = str(target or "").strip()
+    if not target:
+        return [], {"error": "Paramètre 'target' requis."}
+    if "/" not in target:
+        return [target], None
+    try:
+        net = _ipaddress.ip_network(target, strict=False)
+    except Exception as e:
+        return [], {"error": f"CIDR invalide : {e}"}
+    hard_limit = max_hosts if confirmed else min(max_hosts, 64)
+    if net.num_addresses > hard_limit and not confirmed:
+        return [], {
+            "requiresConfirmation": True,
+            "message": f"Scan large bloqué : {target} contient {net.num_addresses} adresses. "
+                      f"Relance avec confirmed=true si c'est voulu.",
+            "suggested_args": {"target": target, "confirmed": True},
+        }
+    hosts = [str(ip) for ip in net.hosts()]
+    if not hosts and net.num_addresses == 1:
+        hosts = [str(net.network_address)]
+    return hosts[:hard_limit], None
+
+
+async def _net_tcp_probe(host: str, port: int, timeout: float = 0.8) -> dict:
+    started = time.perf_counter()
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=timeout)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return {"host": host, "port": port, "open": True, "latency_ms": round((time.perf_counter() - started) * 1000, 1)}
+    except Exception as e:
+        return {"host": host, "port": port, "open": False, "error": str(e)[:120]}
+
+
+def _net_parse_nmap_xml(xml_text: str) -> list[dict]:
+    import xml.etree.ElementTree as _ET
+    hosts: list[dict] = []
+    try:
+        root = _ET.fromstring(xml_text)
+    except Exception:
+        return hosts
+    for h in root.findall("host"):
+        status_el = h.find("status")
+        status = (status_el.attrib if status_el is not None else {}).get("state", "")
+        addrs = [a.attrib.get("addr") for a in h.findall("address") if a.attrib.get("addr")]
+        hostnames = [n.attrib.get("name") for n in h.findall("./hostnames/hostname") if n.attrib.get("name")]
+        ports = []
+        for p in h.findall("./ports/port"):
+            state = p.find("state")
+            service = p.find("service")
+            sattr = service.attrib if service is not None else {}
+            ports.append({
+                "port": int(p.attrib.get("portid", 0)),
+                "protocol": p.attrib.get("protocol", "tcp"),
+                "state": (state.attrib if state is not None else {}).get("state", ""),
+                "service": sattr.get("name", ""),
+                "product": sattr.get("product", ""),
+                "version": sattr.get("version", ""),
+            })
+        hosts.append({"addresses": addrs, "hostnames": hostnames, "status": status, "ports": ports})
+    return hosts
+
+
+async def execute_net_nmap_scan(args: dict) -> dict:
+    """Scan de ports façon Nmap. Utilise nmap.exe si présent dans le PATH, sinon repli par
+    sondage TCP asynchrone interne (aucune installation requise dans les deux cas)."""
+    target = (args.get("target") or args.get("host") or "").strip()
+    profile = str(args.get("profile") or "quick").lower()
+    confirmed = bool(args.get("confirmed", False))
+    timeout = max(0.2, min(float(args.get("timeout", 0.8)), 5.0))
+    port_limit = 1024 if confirmed else 256
+    ports_raw = args.get("ports") or _NET_PROFILE_PORTS.get(profile, _NET_PROFILE_PORTS["quick"])
+    try:
+        ports = _net_parse_ports(ports_raw, limit=port_limit)
+    except Exception as e:
+        return {"error": f"Ports invalides : {e}"}
+    if not ports:
+        return {"error": "Aucun port valide à scanner."}
+    targets, blocked = _net_targets(target, confirmed=confirmed, max_hosts=256 if confirmed else 64)
+    if blocked:
+        return blocked
+    if len(targets) * len(ports) > (12000 if confirmed else 1200):
+        return {
+            "requiresConfirmation": True,
+            "message": "Scan trop large pour une exécution directe. Réduis ports/cible ou relance avec confirmed=true.",
+            "target_count": len(targets),
+            "port_count": len(ports),
+        }
+
+    nmap_path = shutil.which("nmap")
+    if nmap_path:
+        cmd = [
+            nmap_path, "-Pn", "-T3", "--max-retries", "2", "--host-timeout", "75s",
+            "-oX", "-", "-p", ",".join(map(str, ports)), target,
+        ]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            xml_text = stdout.decode("utf-8", errors="replace")
+            err_text = stderr.decode("utf-8", errors="replace").strip()
+            hosts = _net_parse_nmap_xml(xml_text)
+            open_ports = [
+                {"host": (h.get("addresses") or [""])[0], **p}
+                for h in hosts for p in h.get("ports", []) if p.get("state") == "open"
+            ]
+            return {
+                "target": target,
+                "profile": profile,
+                "used_nmap": True,
+                "nmap_path": nmap_path,
+                "hosts": hosts,
+                "open_ports": open_ports,
+                "scanned_hosts": len(hosts),
+                "scanned_ports": len(ports),
+                "stderr": err_text[:1000],
+                "summary": f"{len(open_ports)} port(s) ouvert(s) via Nmap sur {len(hosts) or len(targets)} hôte(s)",
+            }
+        except Exception as e:
+            nmap_error = str(e)
+    else:
+        nmap_error = "nmap.exe non trouvé dans le PATH (utilisation du repli TCP intégré)"
+
+    sem = asyncio.Semaphore(160)
+
+    async def bounded(host: str, port: int):
+        async with sem:
+            return await _net_tcp_probe(host, port, timeout=timeout)
+
+    probes = await asyncio.gather(*[bounded(h, p) for h in targets for p in ports])
+    by_host: dict[str, list[dict]] = {}
+    for r in probes:
+        if r.get("open"):
+            by_host.setdefault(r["host"], []).append({"port": r["port"], "state": "open", "latency_ms": r.get("latency_ms")})
+    hosts = [{"addresses": [h], "status": "up" if ports_ else "unknown", "ports": ports_} for h, ports_ in by_host.items()]
+    open_ports = [{"host": h, **p} for h, ports_ in by_host.items() for p in ports_]
+    return {
+        "target": target,
+        "profile": profile,
+        "used_nmap": False,
+        "nmap_error": nmap_error,
+        "hosts": hosts,
+        "open_ports": open_ports,
+        "scanned_hosts": len(targets),
+        "scanned_ports": len(ports),
+        "summary": f"{len(open_ports)} port(s) ouvert(s) via repli TCP sur {len(targets)} hôte(s)",
+    }
+
+
+async def execute_net_service_detect(args: dict) -> dict:
+    """Détecte les services et bannières TCP sans scan agressif (une seule sonde/port)."""
+    host = (args.get("host") or "").strip()
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    try:
+        ports = _net_parse_ports(args.get("ports") or _NET_PROFILE_PORTS["quick"], limit=80)
+    except Exception as e:
+        return {"error": f"Ports invalides : {e}"}
+    timeout = max(0.3, min(float(args.get("timeout", 1.5)), 8.0))
+
+    async def grab(port: int) -> dict:
+        item = {"host": host, "port": port, "open": False, "banner": "", "service_hint": ""}
+        try:
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=timeout)
+            item["open"] = True
+            if port in (80, 8080, 8000, 8081):
+                writer.write(f"HEAD / HTTP/1.0\r\nHost: {host}\r\n\r\n".encode("ascii", errors="ignore"))
+                item["service_hint"] = "http"
+            elif port in (443, 8443, 9443):
+                item["service_hint"] = "https"
+            else:
+                writer.write(b"\r\n")
+            await writer.drain()
+            try:
+                data = await asyncio.wait_for(reader.read(512), timeout=timeout)
+                item["banner"] = data.decode("utf-8", errors="replace").strip()[:500]
+            except Exception:
+                pass
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+        except Exception as e:
+            item["error"] = str(e)[:120]
+        return item
+
+    services = await asyncio.gather(*[grab(p) for p in ports])
+    open_services = [s for s in services if s.get("open")]
+    return {
+        "host": host,
+        "services": open_services,
+        "scanned": len(ports),
+        "summary": f"{len(open_services)} service(s) TCP détecté(s) sur {len(ports)} port(s)",
+    }
+
+
+async def execute_net_http_probe(args: dict) -> dict:
+    """Analyse rapide HTTP/HTTPS : statut, redirections, en-têtes, titre, sécurité."""
+    url = str(args.get("url") or args.get("host") or "").strip()
+    if not url:
+        return {"error": "Paramètre 'url' requis."}
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    timeout = max(2.0, min(float(args.get("timeout", 8.0)), 20.0))
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"User-Agent": "Marvin-Network-Probe/1.0"})
+        text = resp.text[:200000]
+        title = ""
+        m = _re.search(r"<title[^>]*>(.*?)</title>", text, _re.I | _re.S)
+        if m:
+            title = _re.sub(r"\s+", " ", m.group(1)).strip()[:160]
+        headers = {k.lower(): v for k, v in resp.headers.items()}
+        security_headers = {
+            "https": str(resp.url).startswith("https://"),
+            "hsts": "strict-transport-security" in headers,
+            "csp": "content-security-policy" in headers,
+            "x_frame_options": "x-frame-options" in headers,
+            "x_content_type_options": "x-content-type-options" in headers,
+            "referrer_policy": "referrer-policy" in headers,
+        }
+        return {
+            "url": str(resp.url),
+            "status_code": resp.status_code,
+            "reason": resp.reason_phrase,
+            "title": title,
+            "headers": dict(list(headers.items())[:60]),
+            "security": security_headers,
+            "redirects": [str(r.url) for r in resp.history],
+            "server": headers.get("server", ""),
+            "content_type": headers.get("content-type", ""),
+            "summary": f"HTTP {resp.status_code} {resp.reason_phrase} - {title or resp.url.host}",
+        }
+    except Exception as e:
+        return _net_error(e, url)
+
+
+async def execute_net_tls_check(args: dict) -> dict:
+    """Contrôle TLS/certificat : émetteur, SAN, expiration, protocole et cipher."""
+    host = (args.get("host") or "").strip()
+    port = int(args.get("port") or 443)
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    host = host.replace("https://", "").replace("http://", "").split("/")[0].split(":")[0]
+    timeout = max(2.0, min(float(args.get("timeout", 5.0)), 15.0))
+
+    def check() -> dict:
+        import ssl as _ssl
+        import datetime as _dt
+        ctx = _ssl.create_default_context()
+        with _socket.create_connection((host, port), timeout=timeout) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+                not_after = cert.get("notAfter", "")
+                expires_ts = _ssl.cert_time_to_seconds(not_after) if not_after else 0
+                expires = _dt.datetime.fromtimestamp(expires_ts, tz=_dt.timezone.utc) if expires_ts else None
+                days_left = (expires - _dt.datetime.now(_dt.timezone.utc)).days if expires else None
+                subject = dict(x[0] for x in cert.get("subject", []) if x)
+                issuer = dict(x[0] for x in cert.get("issuer", []) if x)
+                san = [v for k, v in cert.get("subjectAltName", []) if k.lower() == "dns"]
+                return {
+                    "host": host,
+                    "port": port,
+                    "subject": subject,
+                    "issuer": issuer,
+                    "san": san[:80],
+                    "not_before": cert.get("notBefore", ""),
+                    "not_after": not_after,
+                    "expires_at": expires.isoformat() if expires else "",
+                    "days_left": days_left,
+                    "protocol": ssock.version(),
+                    "cipher": ssock.cipher(),
+                    "summary": f"TLS {ssock.version()} - certificat expire dans {days_left} jour(s)" if days_left is not None else "TLS OK",
+                }
+
+    try:
+        return await asyncio.get_running_loop().run_in_executor(None, check)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_net_subnet_sweep(args: dict) -> dict:
+    """Sweep TCP borné d'un CIDR pour repérer les hôtes actifs sur ports courants."""
+    cidr = (args.get("cidr") or args.get("target") or "").strip()
+    confirmed = bool(args.get("confirmed", False))
+    ports_raw = args.get("ports") or "22,80,443,445,3389,5985,8080"
+    try:
+        ports = _net_parse_ports(ports_raw, limit=32)
+    except Exception as e:
+        return {"error": f"Ports invalides : {e}"}
+    targets, blocked = _net_targets(cidr, confirmed=confirmed, max_hosts=512 if confirmed else 128)
+    if blocked:
+        return blocked
+    timeout = max(0.15, min(float(args.get("timeout", 0.45)), 2.0))
+    sem = asyncio.Semaphore(220)
+
+    async def scan_host(host: str):
+        async with sem:
+            probes = await asyncio.gather(*[_net_tcp_probe(host, p, timeout=timeout) for p in ports])
+        opened = [p["port"] for p in probes if p.get("open")]
+        return {"host": host, "open_ports": opened, "alive": bool(opened)}
+
+    results = await asyncio.gather(*[scan_host(h) for h in targets])
+    alive = [r for r in results if r["alive"]]
+    return {
+        "cidr": cidr,
+        "ports": ports,
+        "hosts": alive,
+        "scanned_hosts": len(targets),
+        "summary": f"{len(alive)} hôte(s) actif(s) repéré(s) sur {len(targets)} testé(s)",
+    }
+
+
+async def execute_net_route_diagnostics(args: dict) -> dict:
+    """Diagnostic de connectivité complet : IP locale, DNS, ping internet, route."""
+    target = (args.get("target") or "1.1.1.1").strip()
+    include_trace = bool(args.get("include_trace", False))
+    diagnostics: dict[str, Any] = {"target": target}
+    try:
+        diagnostics["local_config"] = await execute_win_network_config({}) if sys.platform == "win32" else {}
+    except Exception as e:
+        diagnostics["local_config_error"] = str(e)
+    diagnostics["target_dns"] = await execute_net_dns_lookup({"host": target})
+    diagnostics["target_ping"] = await execute_net_ping({"host": target, "count": 3})
+    diagnostics["dns_ping"] = await execute_net_ping({"host": "1.1.1.1", "count": 2})
+    if include_trace:
+        diagnostics["traceroute"] = await execute_net_traceroute({"host": target, "max_hops": 15})
+    ok = bool(diagnostics.get("target_ping", {}).get("success") or diagnostics.get("dns_ping", {}).get("success"))
+    diagnostics["success"] = ok
+    diagnostics["summary"] = "Connexion OK" if ok else "Connexion instable ou cible injoignable"
+    return diagnostics
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INVENTAIRE MATÉRIEL + liens officiels constructeur — porté du même fork que la
+# section réseau. Utile pour un technicien : identifie la machine (marque/modèle/
+# n° série) et propose les bons liens support/pilotes selon le fabricant détecté.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _hw_vendor_key(value: str) -> str:
+    s = str(value or "").strip().lower()
+    aliases = {
+        "hewlett-packard": "hp", "hp inc.": "hp", "hp": "hp",
+        "dell inc.": "dell", "dell": "dell",
+        "lenovo": "lenovo",
+        "asus": "asus", "asustek computer inc.": "asus", "asustek": "asus",
+        "acer": "acer",
+        "microsoft corporation": "microsoft", "microsoft": "microsoft",
+        "micro-star international co., ltd.": "msi", "micro-star international": "msi", "msi": "msi",
+        "gigabyte technology co., ltd.": "gigabyte", "gigabyte": "gigabyte",
+        "asrock": "asrock",
+        "intel": "intel",
+        "advanced micro devices": "amd", "amd": "amd",
+        "nvidia": "nvidia",
+    }
+    for needle, key in aliases.items():
+        if needle in s:
+            return key
+    return s.split()[0] if s else ""
+
+
+def _hw_link(label: str, url: str, kind: str = "support", confidence: str = "official") -> dict:
+    return {"label": label, "url": url, "kind": kind, "confidence": confidence}
+
+
+def _hw_manufacturer_links(manufacturer: str, model: str = "", serial: str = "") -> list:
+    from urllib.parse import quote_plus
+    key = _hw_vendor_key(manufacturer)
+    q_model, q_serial = quote_plus(model or ""), quote_plus(serial or "")
+    links = []
+    if key == "dell":
+        links.append(_hw_link("Dell Support", f"https://www.dell.com/support/home/fr-fr/product-support/servicetag/{q_serial}/overview" if serial else "https://www.dell.com/support/home/fr-fr"))
+        links.append(_hw_link("Dell Pilotes et diagnostics", "https://www.dell.com/support/home/fr-fr?app=drivers"))
+    elif key == "hp":
+        links.append(_hw_link("HP Support", "https://support.hp.com/fr-fr"))
+        links.append(_hw_link("HP Pilotes", f"https://support.hp.com/fr-fr/drivers/selfservice/{q_model}" if model else "https://support.hp.com/fr-fr/drivers"))
+    elif key == "lenovo":
+        links.append(_hw_link("Lenovo PC Support", "https://pcsupport.lenovo.com/fr/fr"))
+        if serial:
+            links.append(_hw_link("Lenovo recherche par n° de série", f"https://pcsupport.lenovo.com/fr/fr/search?query={q_serial}"))
+    elif key == "asus":
+        links.append(_hw_link("ASUS Support", "https://www.asus.com/fr/support/"))
+        if model:
+            links.append(_hw_link("ASUS recherche support modèle", f"https://www.asus.com/fr/support/search-result?keyword={q_model}", confidence="official-search"))
+    elif key == "acer":
+        links.append(_hw_link("Acer Support", "https://www.acer.com/fr-fr/support"))
+    elif key == "microsoft":
+        links.append(_hw_link("Microsoft Surface Support", "https://support.microsoft.com/fr-fr/surface"))
+    elif key == "msi":
+        links.append(_hw_link("MSI Support", "https://fr.msi.com/support"))
+        if model:
+            links.append(_hw_link("MSI recherche support modèle", f"https://fr.msi.com/search/{q_model}", confidence="official-search"))
+    elif key == "gigabyte":
+        links.append(_hw_link("GIGABYTE Support", "https://www.gigabyte.com/fr/Support"))
+        if model:
+            links.append(_hw_link("GIGABYTE recherche modèle", f"https://www.gigabyte.com/fr/Search?kw={q_model}", confidence="official-search"))
+    elif key == "asrock":
+        links.append(_hw_link("ASRock Support", "https://www.asrock.com/support/index.fr.asp"))
+    return links
+
+
+def _hw_component_links(kind: str, name: str, manufacturer: str = "") -> list:
+    from urllib.parse import quote_plus
+    text = f"{manufacturer} {name}".strip()
+    key = _hw_vendor_key(text)
+    q = quote_plus(name or "")
+    links = []
+    low = text.lower()
+    if kind == "cpu":
+        if "intel" in low:
+            links.append(_hw_link("Intel ARK / recherche CPU", f"https://www.intel.com/content/www/us/en/search.html?ws=text#q={q}", "specs", "official-search"))
+            links.append(_hw_link("Intel Driver & Support Assistant", "https://www.intel.com/content/www/fr/fr/support/detect.html", "drivers"))
+        elif "amd" in low or "ryzen" in low:
+            links.append(_hw_link("AMD Support CPU", f"https://www.amd.com/fr/search?keyword={q}", "specs", "official-search"))
+            links.append(_hw_link("AMD Auto-Detect Drivers", "https://www.amd.com/fr/support/download/drivers.html", "drivers"))
+    elif kind == "gpu":
+        if key == "nvidia" or "geforce" in low or "rtx" in low or "gtx" in low:
+            links.append(_hw_link("NVIDIA Pilotes", "https://www.nvidia.com/fr-fr/geforce/drivers/", "drivers"))
+            links.append(_hw_link("NVIDIA recherche", f"https://www.nvidia.com/fr-fr/search/?q={q}", "specs", "official-search"))
+        elif key == "amd" or "radeon" in low:
+            links.append(_hw_link("AMD Radeon Pilotes", "https://www.amd.com/fr/support/download/drivers.html", "drivers"))
+        elif key == "intel" or "iris" in low or "uhd graphics" in low:
+            links.append(_hw_link("Intel Graphics Pilotes", "https://www.intel.com/content/www/fr/fr/support/products/80939/graphics.html", "drivers"))
+    elif kind == "motherboard":
+        links.extend(_hw_manufacturer_links(manufacturer, name))
+    elif kind == "disk":
+        if "samsung" in low:
+            links.append(_hw_link("Samsung Memory & Storage Support", "https://semiconductor.samsung.com/consumer-storage/support/"))
+        elif "western digital" in low or " wd " in f" {low} ":
+            links.append(_hw_link("Western Digital Support", "https://support-fr.wd.com/"))
+        elif "seagate" in low:
+            links.append(_hw_link("Seagate Support", "https://www.seagate.com/fr/fr/support/"))
+        elif "crucial" in low or "micron" in low:
+            links.append(_hw_link("Crucial Support", "https://www.crucial.fr/support"))
+    return links
+
+
+def _hw_bytes(n) -> str:
+    if not n:
+        return "0 B"
+    size = float(n)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024 or unit == "TB":
+            return f"{int(size)} B" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
+async def execute_pc_hardware_specs(args: dict) -> dict:
+    """Inventaire matériel complet (fabricant/modèle/n° série, CPU, RAM, disques, GPU,
+    cartes réseau) + liens officiels support/pilotes selon le fabricant détecté."""
+    script = (
+        "$cs = Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer,Model,SystemType,TotalPhysicalMemory; "
+        "$csp = Get-CimInstance Win32_ComputerSystemProduct | Select-Object Name,Vendor,Version,IdentifyingNumber,UUID; "
+        "$bb = Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer,Product,Version,SerialNumber; "
+        "$bios = Get-CimInstance Win32_BIOS | Select-Object Manufacturer,SMBIOSBIOSVersion,SerialNumber,ReleaseDate; "
+        "$cpu = Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed,L2CacheSize,L3CacheSize,SocketDesignation; "
+        "$ram = Get-CimInstance Win32_PhysicalMemory | Select-Object Manufacturer,PartNumber,SerialNumber,Capacity,Speed,ConfiguredClockSpeed,DeviceLocator,BankLabel; "
+        "$disks = Get-CimInstance Win32_DiskDrive | Select-Object Model,Manufacturer,SerialNumber,Size,MediaType,InterfaceType,FirmwareRevision,Status; "
+        "$gpu = Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion,VideoProcessor,PNPDeviceID; "
+        "$net = Get-CimInstance Win32_NetworkAdapter | Where-Object {$_.PhysicalAdapter -eq $true} | Select-Object Name,Manufacturer,MACAddress,Speed,NetConnectionStatus; "
+        "[pscustomobject]@{computer=$cs; product=$csp; baseboard=$bb; bios=$bios; cpu=$cpu; ram=$ram; disks=$disks; gpu=$gpu; network=$net} | ConvertTo-Json -Depth 4 -Compress"
+    )
+    r = await execute_pc_run_powershell({"script": script, "confirmed": True, "timeout": 40})
+    import json as _j
+    try:
+        raw = _j.loads((r.get("stdout") or "{}").strip())
+    except Exception as e:
+        return {"error": f"Impossible de lire l'inventaire matériel : {e}", "raw_output": (r.get("stdout") or "")[:500]}
+    if not isinstance(raw, dict):
+        return {"error": "Réponse PowerShell inattendue.", "raw_output": str(raw)[:500]}
+
+    def _as_list(v):
+        if v is None:
+            return []
+        return v if isinstance(v, list) else [v]
+
+    def _clean(v) -> str:
+        return str(v or "").strip()
+
+    computer = raw.get("computer") or {}
+    product = raw.get("product") or {}
+    baseboard = raw.get("baseboard") or {}
+    bios = raw.get("bios") or {}
+    manufacturer = _clean(computer.get("Manufacturer") or product.get("Vendor") or baseboard.get("Manufacturer"))
+    model = _clean(computer.get("Model") or product.get("Name") or baseboard.get("Product"))
+    serial = _clean(product.get("IdentifyingNumber") or bios.get("SerialNumber") or baseboard.get("SerialNumber"))
+    generic = {"system manufacturer", "system product name", "to be filled by o.e.m.", "default string", "system serial number"}
+    if manufacturer.lower() in generic:
+        manufacturer = _clean(baseboard.get("Manufacturer") or product.get("Vendor"))
+    if model.lower() in generic:
+        model = _clean(baseboard.get("Product") or product.get("Name"))
+    if serial.lower() in generic:
+        serial = _clean(baseboard.get("SerialNumber") or bios.get("SerialNumber"))
+
+    cpus = _as_list(raw.get("cpu"))
+    gpus = _as_list(raw.get("gpu"))
+    disks = _as_list(raw.get("disks"))
+    ram_modules = _as_list(raw.get("ram"))
+    network = _as_list(raw.get("network"))
+    total_ram = sum(int(x.get("Capacity") or 0) for x in ram_modules if isinstance(x, dict))
+
+    links = []
+    links.extend(_hw_manufacturer_links(manufacturer, model, serial))
+    links.extend(_hw_manufacturer_links(baseboard.get("Manufacturer", ""), baseboard.get("Product", "")))
+    for c in cpus:
+        if isinstance(c, dict):
+            links.extend(_hw_component_links("cpu", c.get("Name", ""), c.get("Manufacturer", "")))
+    for g in gpus:
+        if isinstance(g, dict):
+            links.extend(_hw_component_links("gpu", g.get("Name", ""), g.get("VideoProcessor", "")))
+    for d in disks:
+        if isinstance(d, dict):
+            links.extend(_hw_component_links("disk", d.get("Model", ""), d.get("Manufacturer", "")))
+    seen, deduped = set(), []
+    for link in links:
+        u = link.get("url")
+        if u and u not in seen:
+            seen.add(u)
+            deduped.append(link)
+
+    import socket as _sock
+    return {
+        "success": True,
+        "host": _sock.gethostname(),
+        "summary": {
+            "manufacturer": manufacturer, "model": model, "serial": serial,
+            "cpu": _clean((cpus[0] or {}).get("Name")) if cpus else "",
+            "gpu": [_clean(g.get("Name")) for g in gpus if isinstance(g, dict) and g.get("Name")],
+            "ram_total_human": _hw_bytes(total_ram) if total_ram else _hw_bytes(psutil.virtual_memory().total),
+            "disk_count": len(disks),
+            "network_adapter_count": len(network),
+        },
+        "official_links": deduped,
+        "components": {
+            "cpu": cpus,
+            "memory": {"total_human": _hw_bytes(total_ram or psutil.virtual_memory().total), "modules": ram_modules},
+            "disks": disks, "gpu": gpus, "network": network,
+        },
+    }
+
+
+async def execute_pc_gpu_status(args: dict) -> dict:
+    """État du GPU utilisé pour l'IA locale (vidéo…) : marque, VRAM, backend de calcul
+    (CUDA NVIDIA / DirectML AMD-Intel / CPU). Détection à rafraîchissement automatique
+    (20s) — utilise refresh=true pour forcer une redétection immédiate après un
+    changement de carte graphique (utile si tu testes plusieurs cartes)."""
+    import local_video as _lv
+    force = bool(args.get("refresh", False))
+    info = _lv.refresh_device_info() if force else _lv.get_device_info()
+    msg = f"{info['device_name']} ({info['vendor'].upper()}) — {info['vram_gb']} Go VRAM — calcul via {info['backend']}"
+    if info["backend"] == "cpu":
+        msg += " (aucun GPU utilisable détecté, tout tourne sur CPU — lent)"
+    elif info["vendor"] == "amd" and not info.get("amd_compute_native"):
+        msg += " — carte AMD détectée mais pas de backend de calcul (DirectML indisponible dans cet environnement Python) → génération vidéo locale désactivée"
+    return {"success": True, "refreshed": force, "message": msg, **info}
+
+
+# v2.134 — 3 outils de diagnostic matériel/logiciel RÉEL, ajoutés suite à un audit d'une vraie
+# conversation : le rapport de diagnostic PC affirmait "aucune alerte de surchauffe détectée"
+# alors qu'AUCUN outil existant ne lit jamais de capteur de température — une hallucination
+# (règle d'or #3) rendue possible par l'absence de la donnée elle-même. Ces 3 outils lisent des
+# capteurs/journaux RÉELS plutôt que de laisser le modèle deviner.
+
+async def execute_pc_hardware_temps(args: dict) -> dict:
+    """Températures matérielles RÉELLES (CPU via capteur ACPI si exposé par la carte mère, GPU
+    NVIDIA via nvidia-smi). Contrairement à une estimation, ceci lit un vrai capteur — si aucun
+    n'est accessible (fréquent sur cartes mères desktop, l'ACPI thermal zone n'est souvent
+    exposée que sur les portables), le renvoie explicitement plutôt que de deviner. À utiliser
+    AVANT d'affirmer quoi que ce soit sur une éventuelle surchauffe."""
+    out = {"success": True, "cpu_temp_c": None, "cpu_temp_available": False,
+           "gpu_temp_c": None, "gpu_temp_available": False, "warnings": []}
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "try { "
+                "$t = Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop; "
+                "if ($t) { $c = [math]::Round((($t[0].CurrentTemperature) / 10.0) - 273.15, 1); "
+                "@{available=$true; temp=$c} | ConvertTo-Json -Compress } "
+                "else { @{available=$false} | ConvertTo-Json -Compress } "
+                "} catch { @{available=$false} | ConvertTo-Json -Compress }"
+            ),
+            "confirmed": True, "timeout": 10,
+        })
+        if not result.get("error") and result.get("returncode") == 0:
+            data = json.loads(result.get("stdout", "{}") or "{}")
+            if data.get("available"):
+                out["cpu_temp_c"] = data.get("temp")
+                out["cpu_temp_available"] = True
+    except Exception:
+        pass
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
+        lines = stdout.decode("utf-8", errors="replace").strip().splitlines()
+        if lines and lines[0].strip().lstrip("-").isdigit():
+            out["gpu_temp_c"] = int(lines[0].strip())
+            out["gpu_temp_available"] = True
+    except Exception:
+        pass
+    if out["cpu_temp_available"] and out["cpu_temp_c"] and out["cpu_temp_c"] >= 85:
+        out["warnings"].append(f"⚠️ Température CPU élevée : {out['cpu_temp_c']}°C")
+    if out["gpu_temp_available"] and out["gpu_temp_c"] and out["gpu_temp_c"] >= 83:
+        out["warnings"].append(f"⚠️ Température GPU élevée : {out['gpu_temp_c']}°C")
+    if not out["cpu_temp_available"] and not out["gpu_temp_available"]:
+        out["message"] = ("Aucun capteur de température accessible sur cette machine (courant "
+                           "sur les cartes mères desktop) — ne pas affirmer d'état thermique "
+                           "sans données réelles.")
+    return out
+
+
+async def execute_pc_disk_smart_health(args: dict) -> dict:
+    """Santé RÉELLE des disques via les compteurs de fiabilité Windows Storage Management
+    (équivalent S.M.A.R.T. : erreurs de lecture non corrigées, usure SSD, heures de
+    fonctionnement) — bien plus profond que le simple statut 'Healthy' de win_disk_info, qui ne
+    détecte qu'une panne DÉJÀ imminente déclarée par le firmware, pas l'usure progressive."""
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "Get-PhysicalDisk | ForEach-Object { "
+                "$d = $_; try { $r = $d | Get-StorageReliabilityCounter -ErrorAction Stop } catch { $r = $null }; "
+                "[PSCustomObject]@{ "
+                "FriendlyName=$d.FriendlyName; MediaType=$d.MediaType.ToString(); "
+                "HealthStatus=$d.HealthStatus.ToString(); OperationalStatus=($d.OperationalStatus -join ','); "
+                "Wear=$r.Wear; Temperature=$r.Temperature; "
+                "ReadErrorsTotal=$r.ReadErrorsTotal; ReadErrorsUncorrected=$r.ReadErrorsUncorrected; "
+                "PowerOnHours=$r.PowerOnHours } "
+                "} | ConvertTo-Json -Depth 2 -Compress"
+            ),
+            "confirmed": True, "timeout": 20,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            return {"error": result.get("error") or result.get("stderr") or "Échec PowerShell"}
+        data = json.loads(result.get("stdout", "[]") or "[]")
+        if isinstance(data, dict):
+            data = [data]
+        warnings = []
+        for d in data:
+            wear = d.get("Wear")
+            if isinstance(wear, (int, float)) and wear >= 80:
+                warnings.append(f"⚠️ {d.get('FriendlyName')} : usure SSD à {wear}% — remplacement à prévoir")
+            uncorrected = d.get("ReadErrorsUncorrected")
+            if isinstance(uncorrected, (int, float)) and uncorrected > 0:
+                warnings.append(f"🔴 {d.get('FriendlyName')} : {uncorrected} erreurs de lecture NON corrigées — signe d'usure physique réelle")
+        return {"success": True, "count": len(data), "disks": data, "warnings": warnings}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_event_log_errors(args: dict) -> dict:
+    """Erreurs/critiques récentes des journaux d'événements Windows (Système + Application) —
+    détecte des problèmes INTERMITTENTS (plantages, pilotes en échec, erreurs disque) invisibles
+    dans un simple instantané CPU/RAM/disque. À inclure dans tout diagnostic PC complet."""
+    days = max(1, min(int(args.get("days", 7)), 30))
+    max_events = max(5, min(int(args.get("max_events", 20)), 50))
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                f"Get-WinEvent -FilterHashtable @{{LogName='System','Application'; Level=1,2; "
+                f"StartTime=(Get-Date).AddDays(-{days})}} -MaxEvents {max_events} -ErrorAction SilentlyContinue | "
+                "Select-Object @{Name='TimeCreated';Expression={$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')}}, "
+                "LevelDisplayName, ProviderName, Id, "
+                "@{Name='Message';Expression={($_.Message -split \"`n\")[0]}} | "
+                "ConvertTo-Json -Compress -Depth 2"
+            ),
+            "confirmed": True, "timeout": 25,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            return {"error": result.get("error") or result.get("stderr") or "Échec PowerShell"}
+        raw = result.get("stdout", "").strip()
+        events = json.loads(raw) if raw else []
+        if isinstance(events, dict):
+            events = [events]
+        from collections import Counter
+        sources = Counter(e.get("ProviderName", "?") for e in events)
+        recurring = [f"{name} ({count}×)" for name, count in sources.most_common(5) if count >= 2]
+        return {
+            "success": True, "period_days": days, "count": len(events),
+            "events": events[:max_events], "recurring_sources": recurring,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# v2.137 — 2 outils demandés explicitement après l'audit v2.136 (« fait les 3 » — le 3ᵉ,
+# le repli OAuth de calendar_list, est traité séparément plus bas).
+
+async def execute_win_firewall_status(args: dict) -> dict:
+    """État RÉEL du pare-feu Windows (profils Domaine/Privé/Public actifs ou non) + nombre de
+    règles entrantes AUTORISÉES actives (surface d'attaque). Rendu structuré au lieu de parser
+    du texte PowerShell brut — utilise ceci pour tout audit de sécurité poste."""
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "$profiles = Get-NetFirewallProfile | Select-Object Name, Enabled, "
+                "DefaultInboundAction, DefaultOutboundAction; "
+                "$inboundAllow = (Get-NetFirewallRule -Direction Inbound -Action Allow "
+                "-Enabled True -ErrorAction SilentlyContinue | Measure-Object).Count; "
+                "@{profiles=$profiles; inbound_allow_rules_count=$inboundAllow} | ConvertTo-Json -Depth 3 -Compress"
+            ),
+            "confirmed": True, "timeout": 20,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            return {"error": result.get("error") or result.get("stderr") or "Échec PowerShell"}
+        data = json.loads(result.get("stdout", "{}") or "{}")
+        profiles = data.get("profiles", [])
+        if isinstance(profiles, dict):
+            profiles = [profiles]
+        warnings = []
+        for p in profiles:
+            if not p.get("Enabled"):
+                warnings.append(f"🔴 Profil {p.get('Name')} : pare-feu DÉSACTIVÉ")
+        return {
+            "success": True,
+            "profiles": profiles,
+            "inbound_allow_rules_count": data.get("inbound_allow_rules_count"),
+            "warnings": warnings,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_driver_check(args: dict) -> dict:
+    """Vérifie si un pilote/composant a une version plus récente disponible, via une VRAIE
+    recherche web ciblée (pas une supposition du modèle). Renvoie les résultats de recherche
+    officiels/pertinents pour que tu puisses donner une réponse tranchée sur les pilotes,
+    au lieu de dire « vérifie toi-même »."""
+    component = args.get("component", "").strip()
+    installed_version = args.get("installed_version", "").strip()
+    if not component:
+        return {"error": "Paramètre 'component' requis (ex: 'NVIDIA GeForce RTX 2060')."}
+    query = f"{component} dernière version pilote driver download"
+    result = await execute_web_search({"query": query, "max_results": 5})
+    if not result.get("success"):
+        return result
+    return {
+        "success": True,
+        "component": component,
+        "installed_version": installed_version or None,
+        "query_used": query,
+        "results": result.get("results", []),
+        "note": ("Compare la version installée aux résultats ci-dessus — cite la source (URL) "
+                 "dans ta réponse, ne devine jamais un numéro de version."),
+    }
+
+
+async def execute_pc_health_trend(args: dict) -> dict:
+    """Tendance RÉELLE de santé du PC dans le temps (RAM, disque, usure SSD, erreurs
+    récurrentes) — basée sur des instantanés quotidiens enregistrés automatiquement, pas une
+    estimation. Utilise ceci pour répondre à « est-ce que ça empire ? », « dans combien de temps
+    le disque sera plein ? » ou tout diagnostic qui bénéficie d'une vue dans la durée plutôt
+    qu'un instantané isolé. Si moins de 2 points existent, le dis explicitement — pas de
+    tendance calculable sur un seul instantané."""
+    days = max(2, min(int(args.get("days", 30)), 90))
+    snapshots = db.get_system_snapshots(days=days)
+    if len(snapshots) < 2:
+        return {
+            "success": True,
+            "count": len(snapshots),
+            "snapshots": snapshots,
+            "trend_available": False,
+            "message": ("Pas assez d'historique pour calculer une tendance "
+                         f"({len(snapshots)} instantané(s) — il en faut au moins 2, "
+                         "un par jour est enregistré automatiquement)."),
+        }
+    first, last = snapshots[0], snapshots[-1]
+    try:
+        from datetime import datetime as _dt
+        d0 = _dt.fromisoformat(first["created_at"].replace(" ", "T"))
+        d1 = _dt.fromisoformat(last["created_at"].replace(" ", "T"))
+        span_days = max(1, (d1 - d0).days)
+    except Exception:
+        span_days = max(1, len(snapshots) - 1)
+
+    def _delta_per_week(key):
+        v0, v1 = first.get(key), last.get(key)
+        if v0 is None or v1 is None:
+            return None
+        return round((v1 - v0) / span_days * 7, 1)
+
+    ram_trend = _delta_per_week("ram_percent")
+    disk_trend = _delta_per_week("disk_max_percent")
+    warnings = []
+    if disk_trend and disk_trend > 0 and last.get("disk_max_percent") is not None:
+        remaining_pct = 100 - last["disk_max_percent"]
+        weeks_to_full = round(remaining_pct / disk_trend, 1) if disk_trend > 0 else None
+        if weeks_to_full and weeks_to_full < 12:
+            warnings.append(
+                f"⚠️ Au rythme actuel (+{disk_trend}%/semaine sur {last.get('disk_max_percent_drive')}), "
+                f"le disque sera plein dans environ {weeks_to_full} semaine(s)."
+            )
+    if ram_trend and ram_trend > 5:
+        warnings.append(f"⚠️ RAM en hausse de {ram_trend}%/semaine — à surveiller.")
+    return {
+        "success": True,
+        "count": len(snapshots),
+        "period_days": span_days,
+        "snapshots": snapshots,
+        "trend_available": True,
+        "ram_percent_per_week": ram_trend,
+        "disk_percent_per_week": disk_trend,
+        "warnings": warnings,
+    }
+
+
+async def capture_system_snapshot() -> dict:
+    """Enregistre UN instantané de santé système dans `system_snapshots` (RAM/disque via
+    psutil, usure SSD + erreurs récurrentes via les outils déjà existants). Appelé une fois
+    par jour par le worker de fond (`main.py::_health_trend_worker`) — jamais depuis le chat
+    directement. Best-effort : n'importe quel échec partiel (ex. SMART indisponible) n'empêche
+    pas d'enregistrer les métriques qui ont réussi."""
+    ram_percent = None
+    disk_max_percent = None
+    disk_max_drive = None
+    try:
+        ram_percent = psutil.virtual_memory().percent
+        worst = None
+        for dp in psutil.disk_partitions(all=False):
+            try:
+                u = psutil.disk_usage(dp.mountpoint)
+                if worst is None or u.percent > worst[1]:
+                    worst = (dp.device, u.percent)
+            except Exception:
+                pass
+        if worst:
+            disk_max_drive, disk_max_percent = worst
+    except Exception:
+        pass
+
+    disk_max_wear = None
+    try:
+        smart = await execute_pc_disk_smart_health({})
+        if smart.get("success"):
+            wears = [d.get("Wear") for d in smart.get("disks", []) if isinstance(d.get("Wear"), (int, float))]
+            if wears:
+                disk_max_wear = max(wears)
+    except Exception:
+        pass
+
+    recurring_errors_count = 0
+    try:
+        events = await execute_pc_event_log_errors({"days": 1, "max_events": 50})
+        if events.get("success"):
+            recurring_errors_count = len(events.get("recurring_sources", []))
+    except Exception:
+        pass
+
+    return db.save_system_snapshot(
+        ram_percent=ram_percent,
+        disk_max_percent=disk_max_percent,
+        disk_max_percent_drive=disk_max_drive,
+        disk_max_wear=disk_max_wear,
+        recurring_errors_count=recurring_errors_count,
+    )
+
+
+async def execute_pc_tool_reliability(args: dict) -> dict:
+    """Introspection : taux d'échec RÉEL de chaque outil Marvin sur les N derniers jours (pas
+    une estimation) — sépare le volume d'appels de la fiabilité. Utilise ceci quand l'utilisateur
+    demande quels outils échouent le plus, ou pour un audit de fiabilité auto-critique."""
+    min_calls = max(1, int(args.get("min_calls", 3)))
+    days = max(1, min(int(args.get("days", 90)), 365))
+    rows = db.get_tool_reliability(min_calls=min_calls, days=days)
+    return {
+        "success": True,
+        "period_days": days,
+        "count": len(rows),
+        "tools": rows[:20],
+        "note": "Trié par taux d'échec décroissant — les premiers de la liste méritent le plus d'attention.",
+    }
+
+
+async def execute_pc_conversation_trace(args: dict) -> dict:
+    """Chronologie complète des appels d'outils d'UNE conversation (durée de chacun, succès/
+    échec, ordre réel) — remplace le recomptage manuel des appels fait pour diagnostiquer une
+    lenteur. Utilise ceci quand l'utilisateur demande pourquoi une réponse a été lente ou veut
+    un audit précis de ce qui s'est passé dans un échange."""
+    conversation_id = args.get("conversation_id", "").strip()
+    if not conversation_id:
+        return {"error": "Paramètre 'conversation_id' requis."}
+    trace = db.get_conversation_trace(conversation_id)
+    total_ms = sum(t.get("duration_ms") or 0 for t in trace)
+    return {
+        "success": True,
+        "conversation_id": conversation_id,
+        "count": len(trace),
+        "total_duration_ms": total_ms,
+        "trace": [
+            {"tool": t.get("tool_name"), "success": t.get("success"),
+             "duration_ms": t.get("duration_ms"), "created_at": t.get("created_at")}
+            for t in trace
+        ],
+    }
+
+
+async def execute_net_inventory_scan(args: dict) -> dict:
+    """Scanne le réseau local ET enregistre les appareils dans un inventaire PERSISTANT (pas
+    un instantané jetable comme `net_scan_local` seul) — première vue/dernière vue conservées,
+    permet un suivi dans le temps (nouvel appareil détecté, appareil disparu). Utilise ceci pour
+    un vrai inventaire réseau, `net_scan_local` pour un coup d'œil ponctuel."""
+    scan = await execute_net_scan_local({})
+    if scan.get("error"):
+        return scan
+    devices = scan.get("devices", [])
+    new_count = 0
+    for d in devices:
+        ip = d.get("ip", "")
+        mac = d.get("mac", "")
+        if not ip:
+            continue
+        hostname = ""
+        try:
+            import socket as _socket
+            hostname = await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(None, lambda: _socket.gethostbyaddr(ip)[0]),
+                timeout=1.5,
+            )
+        except Exception:
+            pass
+        r = db.upsert_network_device(ip=ip, mac=mac, hostname=hostname)
+        if r.get("new"):
+            new_count += 1
+    return {
+        "success": True,
+        "scanned": len(devices),
+        "new_devices": new_count,
+        "message": f"{len(devices)} appareil(s) scanné(s), {new_count} nouveau(x) dans l'inventaire.",
+    }
+
+
+async def execute_net_inventory_list(args: dict) -> dict:
+    """Liste l'inventaire réseau PERSISTANT (appareils déjà vus, avec première/dernière
+    apparition, nom personnalisé et notes si renseignés) — pas un scan en direct. Appelle
+    `net_inventory_scan` d'abord si tu veux des données fraîches."""
+    days = max(1, min(int(args.get("days", 30)), 365))
+    devices = db.get_network_devices(days=days)
+    return {"success": True, "count": len(devices), "period_days": days, "devices": devices}
+
+
+async def execute_net_inventory_annotate(args: dict) -> dict:
+    """Ajoute un nom personnalisé et/ou une note à un appareil de l'inventaire réseau (ex:
+    « imprimante bureau », « switch salle serveur »)."""
+    device_id = args.get("device_id", "").strip()
+    if not device_id:
+        return {"error": "Paramètre 'device_id' requis (obtenu via net_inventory_list)."}
+    custom_name = args.get("custom_name")
+    notes = args.get("notes")
+    return db.set_network_device_notes(device_id, custom_name=custom_name, notes=notes)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Connecteurs ITSM/ticketing (v2.139) — architecture GÉNÉRIQUE multi-produit, demandée
+# explicitement (« les connecteurs doivent couvrir une large gamme de produit qui me seront
+# utiles »). Un seul jeu d'outils (`itsm_ticket_list`/`itsm_ticket_create`/`itsm_asset_list`)
+# avec un paramètre `system` qui sélectionne le backend — ajouter un nouveau produit (Zammad,
+# osTicket, Freshservice...) ne touche QUE `_ITSM_BACKENDS`, jamais les outils eux-mêmes.
+# GLPI implémenté en premier (celui réellement en cours de déploiement par l'utilisateur
+# aujourd'hui) ; les autres retournent une erreur claire "pas encore implémenté" plutôt que
+# d'échouer silencieusement ou d'halluciner un résultat.
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def _glpi_request(method: str, endpoint: str, json_body: dict = None, params: dict = None) -> dict:
+    """Appel GLPI REST API — ouvre/ferme une session à chaque appel (simple et robuste plutôt
+    que de gérer un cache de session_token entre requêtes, le volume d'appels reste faible).
+    Credentials lues via credentials_manager (jamais tapées en dur) : glpi_url, glpi_app_token,
+    glpi_user_token — configurables dans Réglages > Connexions, comme les autres clés API."""
+    import credentials_manager as cm
+    base_url = (cm.get_credential("glpi_url") or "").rstrip("/")
+    app_token = cm.get_credential("glpi_app_token") or ""
+    user_token = cm.get_credential("glpi_user_token") or ""
+    if not base_url or not app_token or not user_token:
+        return {"error": (
+            "GLPI non configuré. Il faut renseigner glpi_url, glpi_app_token et glpi_user_token "
+            "dans Réglages > Connexions (générés depuis GLPI : Configuration > Générale > API, "
+            "puis Préférences utilisateur > Clé d'accès à distance)."
+        )}
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            init = await client.get(
+                f"{base_url}/apirest.php/initSession",
+                headers={"Authorization": f"user_token {user_token}", "App-Token": app_token},
+            )
+            if init.status_code != 200:
+                return {"error": f"Connexion GLPI échouée (HTTP {init.status_code}) : {init.text[:200]}"}
+            session_token = init.json().get("session_token")
+            headers = {"Session-Token": session_token, "App-Token": app_token}
+            resp = await client.request(method, f"{base_url}/apirest.php/{endpoint}",
+                                         headers=headers, json=json_body, params=params)
+            data = resp.json() if resp.content else {}
+            await client.get(f"{base_url}/apirest.php/killSession", headers=headers)
+            if resp.status_code >= 400:
+                return {"error": f"GLPI a refusé la requête (HTTP {resp.status_code}) : {str(data)[:300]}"}
+            return {"success": True, "data": data}
+    except Exception as e:
+        return {"error": f"Erreur de connexion à GLPI : {e}"}
+
+
+_ITSM_BACKENDS = {"glpi"}  # systèmes réellement implémentés — étendre ici + ajouter le backend
+
+
+async def execute_itsm_ticket_list(args: dict) -> dict:
+    """Liste les tickets d'un système ITSM/ticketing connecté (GLPI pour l'instant — architecture
+    prête pour d'autres produits). Utilise ceci pour voir les tickets ouverts/en cours."""
+    system = (args.get("system") or "glpi").lower()
+    if system not in _ITSM_BACKENDS:
+        return {"error": f"Système '{system}' pas encore implémenté (disponibles : {', '.join(sorted(_ITSM_BACKENDS))})."}
+    limit = max(1, min(int(args.get("limit", 20)), 100))
+    r = await _glpi_request("GET", "Ticket", params={"range": f"0-{limit - 1}"})
+    if r.get("error"):
+        return r
+    tickets = r["data"] if isinstance(r["data"], list) else []
+    return {
+        "success": True, "system": system, "count": len(tickets),
+        "tickets": [
+            {"id": t.get("id"), "title": t.get("name"), "status": t.get("status"),
+             "urgency": t.get("urgency"), "date": t.get("date")}
+            for t in tickets
+        ],
+    }
+
+
+async def execute_itsm_ticket_create(args: dict) -> dict:
+    """Crée un ticket dans un système ITSM/ticketing connecté (GLPI pour l'instant). Confirme
+    toujours le contenu avec l'utilisateur avant d'appeler — action visible pour d'autres
+    personnes (technicien assigné, demandeur)."""
+    system = (args.get("system") or "glpi").lower()
+    if system not in _ITSM_BACKENDS:
+        return {"error": f"Système '{system}' pas encore implémenté (disponibles : {', '.join(sorted(_ITSM_BACKENDS))})."}
+    title = args.get("title", "").strip()
+    description = args.get("description", "").strip()
+    if not title:
+        return {"error": "Paramètre 'title' requis."}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": f"Créer un ticket {system.upper()} — « {title} » ?\n\n{description[:300]}"}
+    urgency = args.get("urgency")  # 1 (très basse) à 5 (très haute), GLPI
+    payload = {"input": {"name": title, "content": description}}
+    if urgency:
+        payload["input"]["urgency"] = int(urgency)
+    r = await _glpi_request("POST", "Ticket", json_body=payload)
+    if r.get("error"):
+        return r
+    ticket_id = r["data"].get("id") if isinstance(r["data"], dict) else None
+    return {"success": True, "system": system, "ticket_id": ticket_id, "message": f"Ticket créé (#{ticket_id})."}
+
+
+async def execute_itsm_asset_list(args: dict) -> dict:
+    """Liste les postes/matériel enregistrés dans l'inventaire d'un système ITSM (GLPI pour
+    l'instant) — complète `pc_hardware_specs`/`net_inventory_list` (données Marvin locales) avec
+    la vue « déjà déclarée dans l'outil de gestion de parc »."""
+    system = (args.get("system") or "glpi").lower()
+    if system not in _ITSM_BACKENDS:
+        return {"error": f"Système '{system}' pas encore implémenté (disponibles : {', '.join(sorted(_ITSM_BACKENDS))})."}
+    limit = max(1, min(int(args.get("limit", 50)), 200))
+    r = await _glpi_request("GET", "Computer", params={"range": f"0-{limit - 1}"})
+    if r.get("error"):
+        return r
+    computers = r["data"] if isinstance(r["data"], list) else []
+    return {
+        "success": True, "system": system, "count": len(computers),
+        "assets": [{"id": c.get("id"), "name": c.get("name"), "serial": c.get("serial")} for c in computers],
+    }
+
+
+async def execute_skill_learning_log(args: dict) -> dict:
+    """Introspection : ce que Marvin a appris récemment (créations/améliorations de
+    compétences après échec ou succès, consolidations automatiques — y compris la
+    consolidation nocturne). Utilise ceci quand l'utilisateur demande ce que Marvin a
+    appris, pourquoi une compétence a changé, ou pour vérifier que l'apprentissage marche."""
+    import skills as _sk
+    skill_name = (args.get("skill") or "").strip() or None
+    limit = int(args.get("limit", 10))
+    summary = _sk.get_learning_log_for_llm(skill_name=skill_name, limit=limit)
+    return {"success": True, "summary": summary, "log": _sk.get_learning_log(limit=limit, skill_name=skill_name)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION OCR — Extraction de texte par vision (llava-phi3)
+# ══════════════════════════════════════════════════════════════════════════════
+
+import base64 as _base64
+
+async def execute_ocr_extract(args: dict) -> dict:
+    """Extrait le texte d'une image via llava-phi3 (OCR par IA)."""
+    image_path = args.get("image_path", "").strip()
+    prompt = args.get("prompt", "Extrais tout le texte présent dans cette image. Retourne uniquement le texte brut, sans commentaire.")
+    model = args.get("model", "llava-phi3")
+
+    if not image_path:
+        return {"error": "Paramètre 'image_path' requis."}
+
+    # Le modèle peut avoir halluciné un nom plausible mais non installé (ex. "llava:13b",
+    # "llava:7b" — jamais installés sur cette machine) → 404 sec côté Ollama. On vérifie et
+    # on retombe silencieusement sur llava-phi3 (le seul modèle vision garanti présent)
+    # plutôt que d'échouer sur un nom de modèle halluciné.
+    # v2.122 — un modèle cloud n'a aucune garantie de supporter le multimodal, et l'OCR
+    # traite justement le type de contenu le plus sensible (scans de documents, captures
+    # d'écran de mots de passe) : jamais de cloud ici, quel que soit le réglage utilisateur.
+    import cloud_routing as _cr
+    if _cr.is_cloud_model(model):
+        model = "llava-phi3"
+    if model != "llava-phi3":
+        try:
+            import httpx as _hx
+            async with _hx.AsyncClient(timeout=5) as _c:
+                _r = await _c.get(f"{OLLAMA_URL}/api/tags")
+                _installed = {m.get("name", "") for m in _r.json().get("models", [])}
+                _installed |= {n[:-len(":latest")] for n in _installed if n.endswith(":latest")}
+            if model not in _installed:
+                model = "llava-phi3"
+        except Exception:
+            pass  # Ollama injoignable — laisse l'appel suivant échouer avec une erreur claire
+
+    resolved = _resolve_path(image_path)
+    if not os.path.exists(resolved):
+        return {"error": f"Fichier introuvable : {resolved}"}
+
+    # Lire et encoder l'image en base64 (redimensionner si > 1920px pour accélérer)
+    try:
+        from PIL import Image as _PILImage
+        import io as _io
+        with _PILImage.open(resolved) as _raw_img:
+            img = _raw_img.copy()   # detach from file so handle is released
+            orig_fmt = _raw_img.format
+        orig_size = img.size
+        max_dim = 1920
+        if max(img.size) > max_dim:
+            ratio = max_dim / max(img.size)
+            new_size = (int(img.width * ratio), int(img.height * ratio))
+            img = img.resize(new_size, _PILImage.LANCZOS)
+        buf = _io.BytesIO()
+        fmt = orig_fmt or "PNG"
+        if fmt not in ("PNG", "JPEG", "WEBP"):
+            fmt = "PNG"
+        img.save(buf, format=fmt)
+        image_b64 = _base64.b64encode(buf.getvalue()).decode()
+        resized = img.size != orig_size
+    except ImportError:
+        # Pillow non dispo → lire tel quel
+        with open(resolved, "rb") as f:
+            image_b64 = _base64.b64encode(f.read()).decode()
+        resized = False
+    except Exception as e:
+        return {"error": f"Erreur lecture image : {e}"}
+
+    # Appel Ollama vision
+    try:
+        import httpx
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "images": [image_b64],
+            "stream": False,
+        }
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            extracted = data.get("response", "").strip()
+            return {
+                "success": True,
+                "image": resolved,
+                "model": model,
+                "text": extracted,
+                "char_count": len(extracted),
+                "resized_for_speed": resized,
+            }
+    except Exception as e:
+        return {"error": f"Erreur OCR : {e}. Vérifiez que le modèle {model} est installé dans Ollama."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION ARCHIVES — Compression et extraction (ZIP/TAR)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_file_compress(args: dict) -> dict:
+    """Compresse des fichiers ou dossiers en ZIP."""
+    sources = args.get("sources", [])
+    if isinstance(sources, str):
+        sources = [sources]
+    output_path = args.get("output_path", "").strip()
+    if not sources:
+        return {"error": "Paramètre 'sources' requis (liste de fichiers/dossiers à compresser)."}
+
+    # Résoudre chemins
+    resolved_sources = [_resolve_path(s) for s in sources]
+    for s in resolved_sources:
+        if not os.path.exists(s):
+            return {"error": f"Fichier/dossier introuvable : {s}"}
+
+    # Chemin de sortie
+    if output_path:
+        out = Path(_resolve_path(output_path))
+    else:
+        first_name = Path(resolved_sources[0]).stem
+        out = Path(os.path.expanduser("~")) / "Desktop" / f"{first_name}_{int(time.time())}.zip"
+    if not out.suffix:
+        out = out.with_suffix(".zip")
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        import zipfile
+        with zipfile.ZipFile(str(out), "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for src in resolved_sources:
+                src_path = Path(src)
+                if src_path.is_dir():
+                    for file in src_path.rglob("*"):
+                        if file.is_file():
+                            zf.write(str(file), arcname=str(file.relative_to(src_path.parent)))
+                else:
+                    zf.write(str(src_path), arcname=src_path.name)
+        size = out.stat().st_size
+        return {
+            "success": True,
+            "message": f"Archive créée : {out}",
+            "path": str(out),
+            "size": f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / 1024 / 1024:.1f} MB",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_extract(args: dict) -> dict:
+    """Extrait une archive ZIP vers un dossier de destination."""
+    archive_path = _resolve_path(args.get("archive_path", "").strip())
+    dest_path = args.get("dest_path", "").strip()
+
+    if not archive_path:
+        return {"error": "Paramètre 'archive_path' requis."}
+    if not os.path.exists(archive_path):
+        return {"error": f"Archive introuvable : {archive_path}"}
+
+    # Destination par défaut = même dossier que l'archive
+    if dest_path:
+        dest = Path(_resolve_path(dest_path))
+    else:
+        dest = Path(archive_path).parent / Path(archive_path).stem
+
+    dest.mkdir(parents=True, exist_ok=True)
+
+    try:
+        ext = Path(archive_path).suffix.lower()
+        if ext == ".zip":
+            import zipfile
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                zf.extractall(str(dest))
+                names = zf.namelist()
+        elif ext in (".tar", ".gz", ".bz2", ".xz", ".tgz"):
+            import tarfile
+            with tarfile.open(archive_path, "r:*") as tf:
+                tf.extractall(str(dest))
+                names = tf.getnames()
+        else:
+            return {"error": f"Format d'archive non supporté : {ext}. Utilisez .zip ou .tar.gz"}
+
+        return {
+            "success": True,
+            "message": f"Archive extraite dans : {dest}",
+            "dest_path": str(dest),
+            "files_extracted": len(names),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION EMAIL — Lecture IMAP et envoi SMTP
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _all_email_cfgs() -> list[dict]:
+    """Liste COMPLÈTE des configs de boîtes mail (avec mots de passe, pour les opérations).
+    Migre l'ancienne config unique 'email_config' vers la liste 'email_accounts' si besoin."""
+    import json as _json
+    def _coerce(v):
+        if isinstance(v, str):
+            try:
+                return _json.loads(v)
+            except Exception:
+                return None
+        return v
+    accts = _coerce(db.get_setting("email_accounts"))
+    if not isinstance(accts, list):
+        accts = []
+    if not accts:
+        legacy = _coerce(db.get_setting("email_config"))
+        if isinstance(legacy, dict) and legacy.get("imap_host"):
+            accts = [legacy]
+            db.set_setting("email_accounts", accts)
+    return [a for a in accts if isinstance(a, dict) and a.get("imap_host")]
+
+
+def _get_email_cfg(account: str | None = None) -> dict | None:
+    """Config d'une boîte mail (multi-comptes). account = username ; sinon le 1er (défaut)."""
+    accts = _all_email_cfgs()
+    if not accts:
+        return None
+    if account:
+        for a in accts:
+            if a.get("username") == account:
+                return a
+        return None
+    return accts[0]
+
+
+def _list_email_accounts() -> list[dict]:
+    """Liste des comptes (username/provider) pour le chat — sans mots de passe."""
+    import json as _json
+    accts = db.get_setting("email_accounts")
+    if isinstance(accts, str):
+        try:
+            accts = _json.loads(accts)
+        except Exception:
+            accts = []
+    if not isinstance(accts, list):
+        cfg = _get_email_cfg(None)
+        accts = [cfg] if cfg else []
+    return [{"username": a.get("username"), "provider": a.get("provider", "custom")}
+            for a in accts if isinstance(a, dict) and a.get("imap_host")]
+
+
+async def execute_email_accounts(args: dict) -> dict:
+    """Liste les boîtes mail connectées (multi-comptes). Utile pour savoir lesquelles cibler."""
+    accts = _list_email_accounts()
+    if not accts:
+        return {"success": True, "count": 0, "accounts": [],
+                "message": "Aucune boîte mail configurée. Allez dans Paramètres > Email."}
+    return {"success": True, "count": len(accts), "accounts": accts,
+            "default": accts[0]["username"],
+            "message": f"{len(accts)} boîte(s) connectée(s) : " + ", ".join(a["username"] for a in accts)}
+
+
+async def execute_email_list(args: dict) -> dict:
+    """Liste les emails récents de la boîte de réception."""
+    cfg = _get_email_cfg(args.get("account"))
+    if not cfg:
+        return {"error": "Email non configuré. Allez dans Paramètres > Email pour configurer votre boîte."}
+    folder = args.get("folder", "INBOX")
+    limit = max(1, min(int(args.get("limit", 20)), 50))
+    offset = int(args.get("offset", 0))
+    try:
+        import email_manager as _em
+        loop = asyncio.get_running_loop()
+        emails = await loop.run_in_executor(None, lambda: _em.fetch_inbox(
+            cfg["imap_host"], int(cfg.get("imap_port", 993)),
+            cfg["username"], cfg["password"],
+            folder=folder, limit=limit, offset=offset,
+        ))
+        return {"success": True, "folder": folder, "count": len(emails), "emails": emails}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_email_read(args: dict) -> dict:
+    """Lit le contenu complet d'un email par son UID."""
+    cfg = _get_email_cfg(args.get("account"))
+    if not cfg:
+        return {"error": "Email non configuré."}
+    uid = str(args.get("uid", "")).strip()
+    if not uid:
+        return {"error": "Paramètre 'uid' requis."}
+    folder = args.get("folder", "INBOX")
+    try:
+        import email_manager as _em
+        loop = asyncio.get_running_loop()
+        msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
+            cfg["imap_host"], int(cfg.get("imap_port", 993)),
+            cfg["username"], cfg["password"],
+            uid=uid, folder=folder,
+        ))
+        return {"success": True, "email": msg}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_email_search(args: dict) -> dict:
+    """Recherche des emails par sujet, expéditeur ou mot-clé."""
+    cfg = _get_email_cfg(args.get("account"))
+    if not cfg:
+        return {"error": "Email non configuré."}
+    query = args.get("query", "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    folder = args.get("folder", "INBOX")
+    limit = max(1, min(int(args.get("limit", 20)), 50))
+    try:
+        import email_manager as _em
+        loop = asyncio.get_running_loop()
+        emails = await loop.run_in_executor(None, lambda: _em.search_emails(
+            cfg["imap_host"], int(cfg.get("imap_port", 993)),
+            cfg["username"], cfg["password"],
+            query=query, folder=folder, limit=limit,
+        ))
+        return {"success": True, "query": query, "count": len(emails), "emails": emails}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_email_send(args: dict) -> dict:
+    """Envoie un email via SMTP."""
+    cfg = _get_email_cfg(args.get("account"))
+    if not cfg:
+        return {"error": "Email non configuré."}
+    to = args.get("to", "").strip()
+    subject = args.get("subject", "").strip()
+    body = args.get("body", "").strip()
+    # Clarification (anti-erreur) : ne jamais deviner un envoi incomplet → demander
+    if not to:
+        return {"needsClarification": True, "message": "Il me manque le destinataire. À qui dois-je envoyer ce mail ?"}
+    if not subject:
+        return {"needsClarification": True, "message": "Quel doit être l'objet de ce mail ?"}
+    if not body:
+        return {"needsClarification": True, "message": "Que dois-je écrire dans le corps du mail ?"}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Envoyer l'email à {to} — Objet : {subject} ?\n\n{body[:300]}"}
+    cc = args.get("cc", "")
+    try:
+        import email_manager as _em
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, lambda: _em.send_email(
+            cfg.get("smtp_host", cfg["imap_host"].replace("imap.", "smtp.")),
+            int(cfg.get("smtp_port", 587)),
+            cfg["username"], cfg["password"],
+            to=to, subject=subject, body=body, cc=cc,
+        ))
+        return {"success": True, "message": f"Email envoyé à {to}", "detail": result}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_email_draft_reply(args: dict) -> dict:
+    """✨ Rédige par IA la meilleure réponse à un email, en français impeccable (sans fautes).
+    Fournir 'uid' (l'email sera lu automatiquement) OU le contenu ('body'/'subject'/'from').
+    'instruction' = consigne libre (ex : 'accepte poliment', 'demande un délai d'une semaine')."""
+    account = args.get("account")
+    original = (args.get("body") or "").strip()
+    subject = (args.get("subject") or "").strip()
+    sender = (args.get("from") or args.get("from_addr") or "").strip()
+    # Lire l'email depuis la boîte si seul l'uid est fourni
+    uid = str(args.get("uid", "")).strip()
+    if uid and not original:
+        cfg = _get_email_cfg(account)
+        if not cfg:
+            return {"error": "Email non configuré."}
+        try:
+            import email_manager as _em
+            loop = asyncio.get_running_loop()
+            msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
+                cfg["imap_host"], int(cfg.get("imap_port", 993)),
+                cfg["username"], cfg["password"],
+                uid=uid, folder=args.get("folder", "INBOX")))
+            original = (msg.get("body") or msg.get("text") or "").strip()
+            subject = subject or (msg.get("subject") or "")
+            sender = sender or (msg.get("from") or msg.get("from_addr") or "")
+        except Exception as e:
+            return {"error": f"Lecture de l'email impossible : {e}"}
+    if not original:
+        return {"error": "Aucun contenu à traiter : fournir 'uid' (email à lire) ou 'body'."}
+
+    instruction = (args.get("instruction") or args.get("intent") or "").strip()
+    tone = args.get("tone") or "professionnel, clair et courtois"
+    lang = args.get("language") or "français"
+    signature = args.get("signature") or ""
+    prompt = (
+        f"Tu es un assistant expert en rédaction d'emails. Rédige LA meilleure réponse à l'email ci-dessous, "
+        f"en {lang}, dans un style {tone}, avec une orthographe et une grammaire IRRÉPROCHABLES (zéro faute). "
+        f"Structure : formule d'appel adaptée, corps clair et bien tourné, formule de politesse finale. "
+        f"Réponds UNIQUEMENT avec le corps de l'email (pas d'objet, pas d'explication, pas de balises).\n\n"
+        f"=== EMAIL REÇU ===\nDe : {sender or '(inconnu)'}\nObjet : {subject or '(sans objet)'}\n\n{original[:5000]}\n\n"
+    )
+    if instruction:
+        prompt += f"=== CONSIGNE pour ta réponse ===\n{instruction}\n\n"
+    if signature:
+        prompt += f"Termine par cette signature :\n{signature}\n\n"
+    prompt += "=== TA RÉPONSE (corps de l'email uniquement) ==="
+    try:
+        draft = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+        draft = (draft or "").strip()
+        if not draft:
+            return {"error": "L'IA n'a pas produit de réponse. Réessayez."}
+        re_subject = subject if subject.lower().startswith("re:") else (f"Re: {subject}" if subject else "Re:")
+        return {"success": True, "draft": draft, "to": sender, "subject": re_subject,
+                "account": account, "message": "Brouillon de réponse généré."}
+    except Exception as e:
+        return _net_error(e, "rédaction IA") if "_net_error" in globals() else {"error": str(e)}
+
+
+async def execute_email_summarize(args: dict) -> dict:
+    """📝 Résume un email par IA en français : synthèse, points clés, action attendue.
+    Fournir 'uid' (lecture auto) OU le contenu ('body')."""
+    account = args.get("account")
+    original = (args.get("body") or "").strip()
+    subject = (args.get("subject") or "").strip()
+    sender = (args.get("from") or args.get("from_addr") or "").strip()
+    uid = str(args.get("uid", "")).strip()
+    if uid and not original:
+        cfg = _get_email_cfg(account)
+        if not cfg:
+            return {"error": "Email non configuré."}
+        try:
+            import email_manager as _em
+            loop = asyncio.get_running_loop()
+            msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
+                cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
+                uid=uid, folder=args.get("folder", "INBOX")))
+            original = (msg.get("body") or msg.get("text") or "").strip()
+            subject = subject or (msg.get("subject") or "")
+            sender = sender or (msg.get("from") or "")
+        except Exception as e:
+            return {"error": f"Lecture de l'email impossible : {e}"}
+    if not original:
+        return {"error": "Aucun contenu à résumer : fournir 'uid' ou 'body'."}
+    prompt = (
+        "Résume cet email en français, de manière concise et claire. Donne exactement :\n"
+        "**Résumé** : 2-3 phrases.\n**Points clés** : 2 à 4 puces.\n"
+        "**Action attendue** : ce que je dois faire (ou « Aucune action requise »).\n"
+        "N'invente rien, base-toi uniquement sur le contenu.\n\n"
+        f"De : {sender or '(inconnu)'}\nObjet : {subject or '(sans objet)'}\n\n{original[:6000]}"
+    )
+    try:
+        summary = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+        return {"success": True, "summary": (summary or "").strip(),
+                "subject": subject, "from": sender, "message": "Résumé généré."}
+    except Exception as e:
+        return _net_error(e, "résumé IA") if "_net_error" in globals() else {"error": str(e)}
+
+
+async def execute_email_digest(args: dict) -> dict:
+    """🧠 Briefing IA de la boîte : scanne les emails récents et les PRIORISE (urgent/à traiter/info).
+    account = adresse d'une boîte, ou '__all__' pour toutes."""
+    account = args.get("account")
+    limit = max(3, min(int(args.get("limit", 15)), 25))
+    folder = args.get("folder", "INBOX")
+    try:
+        import email_manager as _em
+        loop = asyncio.get_running_loop()
+
+        def _fetch(cfg):
+            ems = _em.fetch_inbox(cfg["imap_host"], int(cfg.get("imap_port", 993)),
+                                  cfg["username"], cfg["password"], folder=folder, limit=limit, offset=0)
+            for e in ems:
+                e["_account"] = cfg["username"]
+            return ems
+
+        if account == "__all__":
+            emails = []
+            for a in _all_email_cfgs():
+                try:
+                    emails += await loop.run_in_executor(None, lambda a=a: _fetch(a))
+                except Exception:
+                    continue
+        else:
+            cfg = _get_email_cfg(account)
+            if not cfg:
+                return {"error": "Email non configuré."}
+            emails = await loop.run_in_executor(None, lambda: _fetch(cfg))
+
+        if not emails:
+            return {"success": True, "digest": "Aucun email récent à analyser.", "count": 0}
+        emails.sort(key=lambda e: e.get("date") or "", reverse=True)
+        emails = emails[:limit]
+        lignes = []
+        for i, e in enumerate(emails, 1):
+            box = f" [{e.get('_account')}]" if account == "__all__" else ""
+            lignes.append(f"{i}. De : {e.get('from','?')} | Objet : {e.get('subject','(sans objet)')}{box}")
+        prompt = (
+            "Tu es mon assistant. Voici la liste de mes emails récents. Fais-moi un BRIEFING en français :\n"
+            "- Classe-les par priorité avec une pastille : 🔴 (urgent / à traiter vite), 🟡 (à traiter), ⚪ (info / promo / newsletter).\n"
+            "- Pour chaque email important, UNE ligne très courte : qui, de quoi, et l'action suggérée.\n"
+            "- Regroupe les ⚪ peu importants en une seule ligne à la fin.\n"
+            "- Termine par : « 👉 À TRAITER EN PRIORITÉ : … ».\n"
+            "Sois synthétique et concret.\n\n=== EMAILS ===\n" + "\n".join(lignes)
+        )
+        digest = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+        return {"success": True, "digest": (digest or "").strip(), "count": len(emails),
+                "message": f"Briefing de {len(emails)} email(s) généré."}
+    except Exception as e:
+        return _net_error(e, "briefing IA") if "_net_error" in globals() else {"error": str(e)}
+
+
+# ─────────────── Assistant email AUTOMATIQUE : 3 modes (v2.41) ───────────────
+_AUTO_NEVER_FROM = ["noreply", "no-reply", "no_reply", "do-not-reply", "donotreply",
+                    "notification", "notifications", "newsletter", "mailer-daemon",
+                    "postmaster", "bounce", "automated", "automatique", "ne-pas-repondre"]
+_AUTO_SKIP_KEYWORDS = ["banque", "bank", "mot de passe", "password", "sécurité", "securite",
+                       "security", "virement", "carte bancaire", "iban", "rib", "facture impayée",
+                       "code de vérification", "verification code", "2fa", "otp", "litige", "juridique"]
+
+
+def _email_automation_cfg() -> dict:
+    """Config de l'assistant email automatique (avec valeurs par défaut sûres)."""
+    import json as _json
+    cfg = db.get_setting("email_automation")
+    if isinstance(cfg, str):
+        try:
+            cfg = _json.loads(cfg)
+        except Exception:
+            cfg = None
+    if not isinstance(cfg, dict):
+        cfg = {}
+    return {
+        "mode": cfg.get("mode", "manuel"),                    # manuel | brouillon | autonome
+        "accounts": cfg.get("accounts") or [],                # boîtes concernées (vide = toutes)
+        "instructions": cfg.get("instructions", ""),
+        "tone": cfg.get("tone", "professionnel, clair et courtois"),
+        "signature": cfg.get("signature", ""),
+        "only_from": [s.lower().strip() for s in (cfg.get("only_from") or []) if s.strip()],
+        "never_from": [s.lower().strip() for s in (cfg.get("never_from") or [])] + _AUTO_NEVER_FROM,
+        "skip_keywords": [s.lower().strip() for s in (cfg.get("skip_keywords") or [])] + _AUTO_SKIP_KEYWORDS,
+        "max_per_run": int(cfg.get("max_per_run", 5)),
+    }
+
+
+async def execute_email_automation_run(args: dict) -> dict:
+    """⚙️ Traite les emails non lus selon le mode configuré :
+    - manuel  : ne fait rien.
+    - brouillon : prépare des réponses (à valider, rien n'est envoyé).
+    - autonome : ENVOIE les réponses automatiquement (selon le cadrage + garde-fous).
+    dry_run=true simule sans envoyer (test sûr)."""
+    from datetime import datetime as _dt
+    cfg = _email_automation_cfg()
+    mode = (args.get("mode") or cfg["mode"]).lower()
+    dry_run = bool(args.get("dry_run", False))
+    if mode == "manuel":
+        return {"success": True, "mode": "manuel", "processed": 0, "sent": 0, "drafted": 0,
+                "results": [], "message": "Mode manuel : aucune automatisation active."}
+
+    import email_manager as _em
+    loop = asyncio.get_running_loop()
+    accts = [a for a in _all_email_cfgs() if (not cfg["accounts"] or a["username"] in cfg["accounts"])]
+    if not accts:
+        return {"error": "Aucune boîte mail configurée pour l'automatisation."}
+
+    seen = set(db.get_setting("email_auto_seen") or [])
+    results, sent, drafted_items = [], 0, []
+    max_run = cfg["max_per_run"]
+
+    for a in accts:
+        if (sent + len(drafted_items)) >= max_run:
+            break
+        try:
+            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
+                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                folder="INBOX", limit=15, offset=0))
+        except Exception as e:
+            results.append({"account": a["username"], "action": "erreur", "reason": str(e)})
+            continue
+
+        for e in inbox:
+            if (sent + len(drafted_items)) >= max_run:   # plafond global (brouillon ET autonome)
+                break
+            uid = str(e.get("id") or e.get("uid") or "")
+            key = f"{a['username']}:{uid}"
+            if not uid or key in seen:
+                continue
+            if e.get("read"):       # on ne traite QUE les non-lus
+                continue
+            sender = (e.get("from") or "").lower()
+            subject = (e.get("subject") or "")
+            # ── Garde-fous (anti-erreur) ──
+            reason = None
+            if any(x in sender for x in cfg["never_from"]):
+                reason = "expéditeur automatique/exclu"
+            elif any(x in (subject.lower() + " " + sender) for x in cfg["skip_keywords"]):
+                reason = "sujet sensible (jamais d'auto-réponse)"
+            elif cfg["only_from"] and not any(x in sender for x in cfg["only_from"]):
+                reason = "hors liste d'expéditeurs autorisés"
+            if reason:
+                results.append({"account": a["username"], "from": e.get("from"), "subject": subject,
+                                "action": "ignoré", "reason": reason})
+                seen.add(key)
+                continue
+            # ── Rédaction de la réponse (français impeccable) ──
+            draft_res = await execute_email_draft_reply({
+                "uid": uid, "account": a["username"], "folder": "INBOX",
+                "instruction": cfg["instructions"], "tone": cfg["tone"], "signature": cfg["signature"]})
+            if draft_res.get("error"):
+                results.append({"account": a["username"], "subject": subject, "action": "erreur",
+                                "reason": draft_res["error"]})
+                continue
+            draft, to, re_subj = draft_res["draft"], draft_res["to"], draft_res["subject"]
+            if not to or len(draft.strip()) < 15:
+                results.append({"account": a["username"], "subject": subject, "action": "ignoré",
+                                "reason": "réponse vide ou destinataire manquant"})
+                seen.add(key)
+                continue
+
+            if mode == "autonome" and not dry_run:
+                send_res = await execute_email_send({"to": to, "subject": re_subj, "body": draft,
+                                                     "account": a["username"], "confirmed": True})
+                if send_res.get("success"):
+                    sent += 1
+                    results.append({"account": a["username"], "to": to, "subject": re_subj, "action": "envoyé"})
+                    seen.add(key)
+                else:
+                    results.append({"account": a["username"], "to": to, "action": "échec envoi",
+                                    "reason": send_res.get("error")})
+            else:
+                drafted_items.append({"account": a["username"], "to": to, "subject": re_subj,
+                                      "body": draft, "from": e.get("from"), "original_subject": subject,
+                                      "uid": uid, "created_at": _dt.now().isoformat(timespec="seconds")})
+                results.append({"account": a["username"], "to": to, "subject": re_subj,
+                                "action": "brouillon préparé" + (" (simulation)" if dry_run else "")})
+                seen.add(key)
+
+    db.set_setting("email_auto_seen", list(seen)[-800:])
+    if drafted_items and not dry_run:
+        existing = db.get_setting("email_pending_drafts") or []
+        if isinstance(existing, str):
+            import json as _json
+            try: existing = _json.loads(existing)
+            except Exception: existing = []
+        db.set_setting("email_pending_drafts", (existing + drafted_items)[-100:])
+
+    verb = "envoyée(s)" if mode == "autonome" else "préparée(s)"
+    n = sent if mode == "autonome" else len(drafted_items)
+    return {"success": True, "mode": mode, "dry_run": dry_run, "processed": len(results),
+            "sent": sent, "drafted": len(drafted_items), "results": results[:60],
+            "message": f"{n} réponse(s) {verb}" + (" (aucun envoi réel — simulation)" if dry_run else "") + "."}
+
+
+async def execute_email_to_task(args: dict) -> dict:
+    """✅ Transforme un email en TÂCHE actionnable (IA extrait l'action + l'échéance). Fournir 'uid' ou 'body'."""
+    account = args.get("account")
+    original = (args.get("body") or "").strip()
+    subject = (args.get("subject") or "").strip()
+    sender = (args.get("from") or "").strip()
+    uid = str(args.get("uid", "")).strip()
+    if uid and not original:
+        cfg = _get_email_cfg(account)
+        if not cfg:
+            return {"error": "Email non configuré."}
+        try:
+            import email_manager as _em
+            loop = asyncio.get_running_loop()
+            msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
+                cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
+                uid=uid, folder=args.get("folder", "INBOX")))
+            original = (msg.get("body") or msg.get("text") or "").strip()
+            subject = subject or (msg.get("subject") or "")
+            sender = sender or (msg.get("from") or "")
+        except Exception as e:
+            return {"error": f"Lecture de l'email impossible : {e}"}
+    if not original and not subject:
+        return {"error": "Aucun contenu : fournir 'uid' ou 'body'."}
+
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    prompt = (
+        "À partir de cet email, définis UNE tâche à faire. Réponds UNIQUEMENT par un objet JSON valide "
+        "(aucun texte autour), au format exact :\n"
+        '{"title": "...", "description": "...", "priority": "low|medium|high", "due_date": "YYYY-MM-DD ou null"}\n'
+        f"- title : court, actionnable, commence par un verbe (français).\n"
+        f"- due_date : déduis l'échéance si l'email en mentionne une (aujourd'hui = {today}), sinon null.\n"
+        "- priority : selon l'urgence/importance.\n\n"
+        f"De : {sender}\nObjet : {subject}\n\n{original[:4000]}"
+    )
+    try:
+        raw = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+    except Exception as e:
+        return _net_error(e, "extraction tâche IA") if "_net_error" in globals() else {"error": str(e)}
+    # Extraction robuste du JSON
+    import json as _json, re as _re2
+    data = None
+    m = _re2.search(r"\{.*\}", raw or "", _re2.DOTALL)
+    if m:
+        try:
+            data = _json.loads(m.group(0))
+        except Exception:
+            data = None
+    if not isinstance(data, dict):
+        data = {"title": (subject or (raw or "").strip()[:80] or "Tâche depuis email")}
+    title = str(data.get("title") or subject or "Tâche depuis email").strip()[:200]
+    prio = str(data.get("priority") or "medium").lower()
+    if prio not in ("low", "medium", "high"):
+        prio = "medium"
+    due = data.get("due_date")
+    if not due or str(due).lower() in ("null", "none", "aucune", "n/a"):
+        due = None
+    desc = str(data.get("description") or "").strip()
+    if subject:
+        desc = (desc + f"\n\n— Issu de l'email « {subject} »" + (f" de {sender}" if sender else "")).strip()
+    res = await execute_task_create({"title": title, "description": desc, "priority": prio,
+                                     "due_date": due, "tags": ["email"]})
+    if res.get("error"):
+        return res
+    return {"success": True, "task": res.get("task"), "title": title, "priority": prio, "due_date": due,
+            "message": f"Tâche créée : « {title} »" + (f" (échéance {due})" if due else "")}
+
+
+async def execute_email_attachment_summary(args: dict) -> dict:
+    """📎 Résume par IA une pièce jointe d'un email (PDF, Word, texte). uid + name requis."""
+    account = args.get("account")
+    uid = str(args.get("uid", "")).strip()
+    name = args.get("name", "")
+    if not uid:
+        return {"error": "Paramètre 'uid' requis."}
+    cfg = _get_email_cfg(account)
+    if not cfg:
+        return {"error": "Email non configuré."}
+    import email_manager as _em, tempfile as _tmp, os as _os, uuid as _uuid
+    loop = asyncio.get_running_loop()
+    att = await loop.run_in_executor(None, lambda: _em.fetch_attachment(
+        cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
+        uid=uid, name=name, folder=args.get("folder", "INBOX")))
+    if not att or not att.get("data"):
+        return {"error": "Pièce jointe introuvable."}
+    fname = att["name"]
+    ext = _os.path.splitext(fname)[1].lower()
+    path = _os.path.join(_tmp.gettempdir(), f"marvin_att_{_uuid.uuid4().hex[:8]}{ext}")
+    try:
+        with open(path, "wb") as f:
+            f.write(att["data"])
+        text = ""
+        if ext == ".pdf":
+            r = await execute_pdf_read({"path": path, "max_chars": 14000})
+            text = r.get("text") or r.get("content") or ""
+        elif ext in (".docx",):
+            r = await execute_docx_to_text({"path": path, "format": "text"})
+            text = r.get("text", "")
+        elif ext in (".txt", ".csv", ".md", ".log", ".json"):
+            with open(path, "r", encoding="utf-8", errors="replace") as _f:
+                text = _f.read(20000)
+        else:
+            return {"error": f"Type non pris en charge pour le résumé : {ext or fname}. (PDF, Word .docx, texte supportés)"}
+        if not (text or "").strip():
+            return {"error": f"Impossible d'extraire du texte de « {fname} » (document vide ou scanné)."}
+        prompt = (f"Résume en français cette pièce jointe nommée « {fname} ». Donne : **Résumé** (2-4 phrases), "
+                  f"**Points clés** (puces), et **À retenir / action** s'il y a lieu. Base-toi uniquement sur le contenu.\n\n{text[:13000]}")
+        summary = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+        return {"success": True, "name": fname, "size": att.get("size"), "summary": (summary or "").strip(),
+                "message": f"Résumé de « {fname} » généré."}
+    except Exception as e:
+        return _net_error(e, "résumé pièce jointe") if "_net_error" in globals() else {"error": str(e)}
+    finally:
+        try:
+            _os.remove(path)
+        except Exception:
+            pass
+
+
+async def execute_email_watch_check(args: dict) -> dict:
+    """🔔 Surveille les emails non lus, détecte les IMPORTANTS par IA et notifie sur le bureau.
+    Appelé périodiquement en arrière-plan. force=true ignore le réglage activé/désactivé ; dry_run=true ne notifie pas."""
+    import json as _json
+    from datetime import datetime as _dt
+    cfg = db.get_setting("email_watch")
+    if isinstance(cfg, str):
+        try: cfg = _json.loads(cfg)
+        except Exception: cfg = None
+    if not isinstance(cfg, dict):
+        cfg = {}
+    if not args.get("force") and not cfg.get("enabled"):
+        return {"success": True, "checked": 0, "important": 0, "message": "Surveillance désactivée."}
+    accounts_filter = cfg.get("accounts") or []
+    max_notify = int(cfg.get("max_notify", 5))
+    do_notify = not args.get("dry_run", False)
+
+    import email_manager as _em
+    loop = asyncio.get_running_loop()
+    accts = [a for a in _all_email_cfgs() if (not accounts_filter or a["username"] in accounts_filter)]
+    seen = set(db.get_setting("email_watch_seen") or [])
+    new_items = []
+    for a in accts:
+        try:
+            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
+                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                folder="INBOX", limit=15, offset=0))
+        except Exception:
+            continue
+        for e in inbox:
+            uid = str(e.get("id") or "")
+            key = f"{a['username']}:{uid}"
+            if not uid or key in seen or e.get("read"):
+                continue
+            new_items.append({"account": a["username"], "key": key, "from": e.get("from", ""), "subject": e.get("subject", "")})
+    if not new_items:
+        return {"success": True, "checked": 0, "important": 0, "message": "Aucun nouvel email non lu."}
+
+    # IA : repérer les importants (1 seul appel)
+    listing = "\n".join(f"{i+1}. De: {it['from']} | Objet: {it['subject']}" for i, it in enumerate(new_items[:20]))
+    prompt = ("Parmi ces nouveaux emails non lus, lesquels sont VRAIMENT IMPORTANTS (action requise, urgent, "
+              "vrai expéditeur attendant une réponse) — par opposition aux non importants (pub, newsletter, "
+              "notification automatique, réseaux sociaux) ? Réponds UNIQUEMENT par un JSON : {\"important\": [numéros]}.\n\n" + listing)
+    important_idx = set()
+    try:
+        raw = await _ollama_generate(prompt, model=args.get("model"), timeout=120)
+        import re as _re3
+        m = _re3.search(r"\{.*\}", raw or "", _re3.DOTALL)
+        if m:
+            d = _json.loads(m.group(0))
+            important_idx = {int(x) for x in d.get("important", []) if str(x).strip().lstrip("-").isdigit()}
+    except Exception:
+        important_idx = set()
+
+    alerts = db.get_setting("email_watch_alerts") or []
+    if isinstance(alerts, str):
+        try: alerts = _json.loads(alerts)
+        except Exception: alerts = []
+    if not isinstance(alerts, list):
+        alerts = []
+    notified = 0
+    for i, it in enumerate(new_items):
+        seen.add(it["key"])  # tous marqués vus (pas de re-notification)
+        if (i + 1) in important_idx and notified < max_notify:
+            if do_notify:
+                try:
+                    await execute_pc_notify({"title": f"📧 Email important — {it['from'][:40]}",
+                                             "message": (it["subject"] or "(sans objet)")[:140]})
+                except Exception:
+                    pass
+                # Alerte aussi sur Telegram (si activé)
+                await _telegram_notify(f"🔴 <b>Mail important</b>\nDe : {it['from'][:60]}\n{(it['subject'] or '(sans objet)')[:140]}")
+            alerts.insert(0, {"account": it["account"], "from": it["from"], "subject": it["subject"],
+                              "at": _dt.now().isoformat(timespec="seconds")})
+            notified += 1
+    db.set_setting("email_watch_seen", list(seen)[-1000:])
+    db.set_setting("email_watch_alerts", alerts[:50])
+    return {"success": True, "checked": len(new_items), "important": notified,
+            "message": f"{len(new_items)} nouvel(s) email(s) non lu(s), {notified} important(s) signalé(s)."}
+
+
+def _email_rules() -> list[dict]:
+    import json as _json
+    r = db.get_setting("email_rules")
+    if isinstance(r, str):
+        try: r = _json.loads(r)
+        except Exception: r = []
+    return r if isinstance(r, list) else []
+
+
+async def execute_email_apply_rules(args: dict) -> dict:
+    """🗂️ Applique les règles de classement aux emails récents : déplacer vers un dossier
+    ou marquer lu/non lu selon expéditeur/objet. dry_run=true pour simuler."""
+    rules = [r for r in _email_rules() if r.get("enabled", True) and (r.get("from_contains") or r.get("subject_contains"))]
+    if not rules:
+        return {"success": True, "applied": 0, "results": [], "message": "Aucune règle définie."}
+    dry_run = bool(args.get("dry_run", False))
+    only_account = args.get("account")
+    import email_manager as _em
+    loop = asyncio.get_running_loop()
+    accts = [a for a in _all_email_cfgs() if (not only_account or a["username"] == only_account)]
+    results = []
+    applied = 0
+    for a in accts:
+        try:
+            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
+                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                folder="INBOX", limit=int(args.get("limit", 25)), offset=0))
+        except Exception as e:
+            results.append({"account": a["username"], "action": "erreur", "reason": str(e)})
+            continue
+        for e in inbox:
+            uid = str(e.get("id") or "")
+            sender = (e.get("from") or "").lower()
+            subject = (e.get("subject") or "").lower()
+            for rule in rules:
+                if rule.get("account") and rule["account"] != a["username"]:
+                    continue
+                fc = (rule.get("from_contains") or "").lower().strip()
+                sc = (rule.get("subject_contains") or "").lower().strip()
+                if fc and fc not in sender:
+                    continue
+                if sc and sc not in subject:
+                    continue
+                act = rule.get("action", "move")
+                target = rule.get("folder", "")
+                label = f"{e.get('subject','(sans objet)')[:40]} → règle « {rule.get('name', act)} »"
+                if not dry_run:
+                    try:
+                        if act == "move" and target:
+                            await loop.run_in_executor(None, lambda a=a, uid=uid, target=target: _em.move_email(
+                                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                                uid=uid, dest_folder=target, folder="INBOX"))
+                        elif act == "mark_read":
+                            await loop.run_in_executor(None, lambda a=a, uid=uid: _em.mark_email(
+                                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                                uid=uid, folder="INBOX", seen=True))
+                        elif act == "mark_unread":
+                            await loop.run_in_executor(None, lambda a=a, uid=uid: _em.mark_email(
+                                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                                uid=uid, folder="INBOX", seen=False))
+                    except Exception as ex:
+                        results.append({"account": a["username"], "action": "échec", "detail": label, "reason": str(ex)})
+                        break
+                results.append({"account": a["username"], "action": act + (" (simulation)" if dry_run else ""),
+                                "detail": label, "folder": target})
+                applied += 1
+                break  # une seule règle par email (la première qui matche)
+    return {"success": True, "applied": applied, "dry_run": dry_run, "results": results[:60],
+            "message": f"{applied} email(s) classé(s) par règles" + (" (simulation)" if dry_run else "") + "."}
+
+
+# ─────────────────────── Briefing du jour (assistant) v2.47 ───────────────────────
+_FR_JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+_FR_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+            "septembre", "octobre", "novembre", "décembre"]
+
+
+async def execute_daily_briefing(args: dict) -> dict:
+    """🌅 Génère le briefing du jour : réunit les emails non lus + les tâches en attente
+    et produit une synthèse IA priorisée et motivante en français."""
+    from datetime import date as _date
+    d = _date.today()
+    today_fr = f"{_FR_JOURS[d.weekday()]} {d.day} {_FR_MOIS[d.month - 1]} {d.year}"
+    # Tâches en attente
+    try:
+        all_tasks = db.list_tasks(limit=50)
+    except Exception:
+        all_tasks = []
+    pending = [t for t in all_tasks if t.get("status") != "done"]
+    # Emails non lus (toutes boîtes)
+    import email_manager as _em
+    loop = asyncio.get_running_loop()
+    unread = []
+    for a in _all_email_cfgs():
+        try:
+            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
+                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
+                folder="INBOX", limit=12, offset=0))
+            unread += [{"from": e.get("from", ""), "subject": e.get("subject", ""), "account": a["username"]}
+                       for e in inbox if not e.get("read")]
+        except Exception:
+            continue
+    # Rendez-vous du jour (agenda local)
+    try:
+        events_today = db.list_events(start=d.strftime("%Y-%m-%d 00:00"),
+                                      end=d.strftime("%Y-%m-%d 23:59"), limit=30)
+    except Exception:
+        events_today = []
+    task_lines = "\n".join(
+        f"- [{t.get('priority', 'medium')}] {t.get('title', '')}" + (f" (échéance {t['due_date']})" if t.get("due_date") else "")
+        for t in pending[:15]) or "(aucune)"
+    mail_lines = "\n".join(f"- De {u['from']} : {u['subject']}" for u in unread[:20]) or "(aucun)"
+    event_lines = "\n".join(
+        f"- {(e.get('start_at') or '')[11:16] or 'journée'} : {e.get('title', '')}" + (f" @ {e['location']}" if e.get("location") else "")
+        for e in events_today) or "(aucun)"
+    prompt = (
+        f"Tu es l'assistant personnel de l'utilisateur. Rédige son BRIEFING DU JOUR en français, "
+        f"chaleureux mais concis et actionnable. Nous sommes le {today_fr}.\n\n"
+        f"RENDEZ-VOUS DU JOUR ({len(events_today)}) :\n{event_lines}\n\n"
+        f"TÂCHES EN ATTENTE ({len(pending)}) :\n{task_lines}\n\n"
+        f"EMAILS NON LUS ({len(unread)}) :\n{mail_lines}\n\n"
+        "Structure ta réponse :\n"
+        "1) Une salutation courte adaptée au moment.\n"
+        "2) 📅 AGENDA : rappelle les rendez-vous du jour dans l'ordre (s'il y en a).\n"
+        "3) 🔴 PRIORITÉS DU JOUR : les mails vraiment importants à traiter + les tâches urgentes (ignore pubs/newsletters/notifs).\n"
+        "4) 🟡 À VOIR : ce qui peut attendre.\n"
+        "5) Une phrase de motivation finale.\n"
+        "Sois synthétique, va à l'essentiel."
+    )
+    try:
+        briefing = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+    except Exception as e:
+        return _net_error(e, "briefing du jour") if "_net_error" in globals() else {"error": str(e)}
+    urgent = [t for t in pending if t.get("priority") == "high"]
+    return {"success": True, "briefing": (briefing or "").strip(), "date": today_fr,
+            "tasks_pending": len(pending), "tasks_urgent": len(urgent), "unread": len(unread),
+            "tasks": pending[:15], "events_today": events_today, "message": "Briefing du jour généré."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION AGENDA — Événements locaux (indépendant de Google Calendar)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _now_iso() -> str:
+    from datetime import datetime as _dt
+    return _dt.now().strftime("%Y-%m-%d %H:%M")
+
+
+def _period_range(period: str):
+    """Retourne (start_iso, end_iso, label_fr) pour un mot-clé de période."""
+    from datetime import datetime as _dt, timedelta as _td
+    now = _dt.now()
+    today0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    period = (period or "upcoming").lower().strip()
+    if period in ("today", "jour", "aujourd'hui", "aujourdhui"):
+        return today0.strftime("%Y-%m-%d 00:00"), today0.strftime("%Y-%m-%d 23:59"), "aujourd'hui"
+    if period in ("tomorrow", "demain"):
+        t = today0 + _td(days=1)
+        return t.strftime("%Y-%m-%d 00:00"), t.strftime("%Y-%m-%d 23:59"), "demain"
+    if period in ("week", "semaine", "7days"):
+        return today0.strftime("%Y-%m-%d 00:00"), (today0 + _td(days=7)).strftime("%Y-%m-%d 23:59"), "cette semaine"
+    if period in ("month", "mois", "30days"):
+        return today0.strftime("%Y-%m-%d 00:00"), (today0 + _td(days=31)).strftime("%Y-%m-%d 23:59"), "ce mois-ci"
+    if period in ("all", "tout"):
+        return None, None, "tous"
+    # défaut : à venir (now .. +30 jours)
+    return now.strftime("%Y-%m-%d %H:%M"), (today0 + _td(days=30)).strftime("%Y-%m-%d 23:59"), "à venir"
+
+
+async def _ai_parse_when(text: str, model: str = None) -> dict:
+    """Convertit une expression en langage naturel ('rdv dentiste demain 14h30') en
+    {title, start_at 'YYYY-MM-DD HH:MM', end_at, all_day} en s'appuyant sur la date du jour."""
+    from datetime import date as _date
+    d = _date.today()
+    today_fr = f"{_FR_JOURS[d.weekday()]} {d.day} {_FR_MOIS[d.month - 1]} {d.year}"
+    prompt = (
+        f"Nous sommes le {today_fr} (date ISO {d.isoformat()}). "
+        f"Analyse cette demande de rendez-vous/événement et renvoie UNIQUEMENT un JSON valide, sans texte autour :\n"
+        f'{{"title": "...", "start_at": "YYYY-MM-DD HH:MM", "end_at": "YYYY-MM-DD HH:MM ou null", "all_day": false, "location": ""}}\n'
+        f"Règles : si aucune heure n'est précisée mets 09:00 et all_day=false ; "
+        f"'demain'=+1 jour, 'après-demain'=+2, un jour de semaine = sa prochaine occurrence. "
+        f"Le titre doit être court et propre (sans la date).\n\n"
+        f"Demande : « {text} »"
+    )
+    raw = await _ollama_generate(prompt, model=model, timeout=120)
+    import json as _json, re as _re
+    m = _re.search(r"\{.*\}", raw or "", _re.DOTALL)
+    if not m:
+        raise RuntimeError("Impossible d'interpréter la date.")
+    return _json.loads(m.group(0))
+
+
+async def execute_event_create(args: dict) -> dict:
+    """Crée un événement dans l'agenda local. Accepte des champs structurés OU un texte
+    libre ('natural') interprété par l'IA (ex : « rdv client mardi 14h »)."""
+    title = (args.get("title") or "").strip()
+    start_at = (args.get("start_at") or "").strip()
+    natural = (args.get("natural") or args.get("text") or "").strip()
+    end_at = (args.get("end_at") or "").strip() or None
+    all_day = bool(args.get("all_day", False))
+    location = (args.get("location") or "").strip()
+    description = (args.get("description") or "").strip()
+    reminder = args.get("reminder_minutes")
+    # Interprétation IA si pas de date explicite
+    if not start_at and (natural or title):
+        try:
+            parsed = await _ai_parse_when(natural or title, model=args.get("model"))
+            title = title or (parsed.get("title") or "").strip()
+            start_at = (parsed.get("start_at") or "").strip()
+            end_at = end_at or (parsed.get("end_at") or None)
+            all_day = all_day or bool(parsed.get("all_day"))
+            location = location or (parsed.get("location") or "").strip()
+        except Exception as e:
+            return {"error": f"Date non comprise : {e}. Précisez par ex. « réunion 2026-06-20 14:00 »."}
+    if not title:
+        return {"error": "Titre de l'événement requis."}
+    if not start_at:
+        return {"error": "Date/heure de début requise (start_at ou texte 'natural')."}
+    start_at = start_at.replace("T", " ")[:16]
+    if end_at:
+        end_at = str(end_at).replace("T", " ")[:16]
+    try:
+        rem = int(reminder) if reminder not in (None, "") else None
+    except Exception:
+        rem = None
+
+    # ── Si Google Agenda est connecté → on crée l'événement SUR Google (il apparaît sur
+    #    le téléphone + rappel natif), puis on synchronise pour l'afficher dans Marvin.
+    #    'local_only=true' force l'agenda local. Repli local automatique si Google échoue.
+    if _google_calendar_ready() and not args.get("local_only"):
+        try:
+            g_start = start_at if all_day else start_at.replace(" ", "T")
+            g_end = (end_at.replace(" ", "T") if (end_at and not all_day) else (end_at or "")) if end_at else ""
+            gres = await execute_calendar_create({
+                "title": title, "start": g_start, "end": g_end,
+                "location": location, "description": description, "reminder_minutes": rem,
+            })
+            if gres.get("success"):
+                try:
+                    await _sync_google_into_events()
+                except Exception:
+                    pass
+                return {"success": True, "event": gres, "target": "google",
+                        "message": f"📅 Créé sur ton Google Agenda : « {title} » le {start_at}"
+                                   + (f" (rappel {rem} min)" if rem else "")
+                                   + " — visible sur ton téléphone."}
+            # sinon : on retombe sur l'agenda local
+        except Exception:
+            pass
+
+    ev = db.create_event(title=title, start_at=start_at, end_at=end_at, description=description,
+                         location=location, all_day=all_day, reminder_minutes=rem,
+                         tags=args.get("tags"))
+    return {"success": True, "event": ev, "target": "local",
+            "message": f"📅 Événement créé : « {title} » le {start_at}" + (f" (rappel {rem} min avant)" if rem else "")}
+
+
+async def execute_event_list(args: dict) -> dict:
+    """Liste les événements de l'agenda. 'period' = today/tomorrow/week/month/upcoming/all,
+    ou bornes explicites start/end (YYYY-MM-DD)."""
+    start = (args.get("start") or "").strip() or None
+    end = (args.get("end") or "").strip() or None
+    label = None
+    if not start and not end:
+        start, end, label = _period_range(args.get("period", "upcoming"))
+    limit = int(args.get("limit", 200))
+    events = db.list_events(start=start, end=end, limit=limit)
+    return {"success": True, "events": events, "count": len(events), "period": label or "personnalisé",
+            "message": f"{len(events)} événement(s) {('— ' + label) if label else ''}."}
+
+
+async def execute_event_update(args: dict) -> dict:
+    """Modifie/replanifie un événement (par id). Champs : title, start_at, end_at, location, description, reminder_minutes."""
+    eid = (args.get("id") or args.get("event_id") or "").strip()
+    if not eid:
+        return {"error": "id de l'événement requis."}
+    updates = {k: args[k] for k in ("title", "start_at", "end_at", "location", "description", "reminder_minutes", "all_day", "color")
+               if k in args and args[k] is not None}
+    if "start_at" in updates:
+        updates["start_at"] = str(updates["start_at"]).replace("T", " ")[:16]
+        updates["reminded"] = False  # on re-notifiera pour la nouvelle heure
+    if not updates:
+        return {"error": "Aucun champ à modifier."}
+
+    # ── Si l'événement vient de Google → on le modifie SUR Google (sinon le sync écraserait).
+    try:
+        ev0 = db.get_event(eid)
+    except Exception:
+        ev0 = None
+    if ev0 and ev0.get("source") == "google" and ev0.get("external_id"):
+        try:
+            gargs = {"event_id": ev0["external_id"]}
+            for k_loc, k_g in (("title", "title"), ("description", "description"), ("location", "location")):
+                if k_loc in updates:
+                    gargs[k_g] = updates[k_loc]
+            if "start_at" in updates:
+                gargs["start"] = str(updates["start_at"]).replace(" ", "T")
+                # Déplacer le début SANS toucher la fin rendrait fin < début (Google refuse) :
+                # on conserve la durée d'origine si la fin n'est pas explicitement fournie.
+                if not updates.get("end_at"):
+                    try:
+                        from datetime import datetime as _dt2, timedelta as _td2
+                        _os = _dt2.fromisoformat(str(ev0.get("start_at")).replace(" ", "T")[:16])
+                        _oe = (_dt2.fromisoformat(str(ev0.get("end_at")).replace(" ", "T")[:16])
+                               if ev0.get("end_at") else _os + _td2(hours=1))
+                        _ns = _dt2.fromisoformat(str(updates["start_at"]).replace(" ", "T")[:16])
+                        gargs["end"] = (_ns + (_oe - _os)).strftime("%Y-%m-%dT%H:%M:%S")
+                    except Exception:
+                        pass
+            if updates.get("end_at"):
+                gargs["end"] = str(updates["end_at"]).replace(" ", "T")
+            gres = await execute_calendar_update(gargs)
+            if gres.get("success"):
+                try:
+                    await _sync_google_into_events()
+                except Exception:
+                    pass
+                return {"success": True, "event": gres, "target": "google",
+                        "message": f"📅 RDV mis à jour sur ton Google Agenda : « {gres.get('title') or ev0.get('title')} »."}
+        except Exception:
+            pass
+
+    ev = db.update_event(eid, updates)
+    if not ev:
+        return {"error": "Événement introuvable."}
+    return {"success": True, "event": ev, "target": "local", "message": f"📅 Événement mis à jour : « {ev.get('title')} »."}
+
+
+async def execute_event_delete(args: dict) -> dict:
+    """Supprime un événement par id, ou par correspondance de titre si 'title' fourni."""
+    eid = (args.get("id") or args.get("event_id") or "").strip()
+    title = (args.get("title") or "").strip().lower()
+    ev_found = None
+    if not eid and title:
+        for ev in db.list_events(limit=500):
+            if title in (ev.get("title") or "").lower():
+                eid = ev["id"]; ev_found = ev
+                break
+    if not eid:
+        return {"error": "Aucun événement correspondant (fournissez 'id' ou 'title')."}
+    if ev_found is None:
+        try: ev_found = db.get_event(eid)
+        except Exception: ev_found = None
+    # Action irréversible → confirmation explicite (anti-erreur)
+    if not args.get("confirmed"):
+        label = (f"« {ev_found['title']} » du {(ev_found.get('start_at') or '')[:16]}"
+                 if ev_found else f"id {eid}")
+        return {"requiresConfirmation": True, "message": f"Supprimer définitivement l'événement {label} ?"}
+
+    # ── Si l'événement vient de Google → on le supprime SUR Google (sinon le sync le ramène).
+    if ev_found and ev_found.get("source") == "google" and ev_found.get("external_id"):
+        try:
+            gres = await execute_calendar_delete({"event_id": ev_found["external_id"], "confirmed": True})
+            if gres.get("success"):
+                try:
+                    await _sync_google_into_events()
+                except Exception:
+                    pass
+                db.delete_event(eid)  # nettoie la copie locale aussi
+                return {"success": True, "target": "google", "message": "🗑️ RDV supprimé de ton Google Agenda."}
+        except Exception:
+            pass
+
+    db.delete_event(eid)
+    return {"success": True, "target": "local", "message": "🗑️ Événement supprimé."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION AGENDAS CONNECTÉS — Abonnements iCal (Google, Outlook, Apple, tout CalDAV)
+# Lecture seule : synchronise les événements externes dans l'agenda local → Marvin
+# en est « au courant » dans le briefing, l'agenda et les recherches.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _calendar_subs() -> list:
+    subs = db.get_setting("calendar_subscriptions")
+    if isinstance(subs, str):
+        try:
+            import json as _json
+            subs = _json.loads(subs)
+        except Exception:
+            subs = []
+    return subs if isinstance(subs, list) else []
+
+
+def _save_calendar_subs(subs: list):
+    db.set_setting("calendar_subscriptions", subs)
+
+
+def _parse_ics(data: bytes) -> list:
+    """Parse un flux iCal et développe les récurrences (RRULE) sur une fenêtre
+    [−30 j, +180 j]. Convertit les heures en fuseau local."""
+    import icalendar, recurring_ical_events
+    from datetime import datetime as _dt, date as _date, timedelta as _td
+    cal = icalendar.Calendar.from_ical(data)
+    start = _dt.now() - _td(days=30)
+    end = _dt.now() + _td(days=180)
+    try:
+        occurrences = recurring_ical_events.of(cal).between(start, end)
+    except Exception:
+        # repli : pas d'expansion de récurrence
+        occurrences = [c for c in cal.walk("VEVENT")]
+
+    def _fmt(v):
+        if v is None:
+            return None, False
+        d = v.dt if hasattr(v, "dt") else v
+        if isinstance(d, _dt):
+            if d.tzinfo is not None:
+                try: d = d.astimezone()   # → heure locale
+                except Exception: pass
+            return d.strftime("%Y-%m-%d %H:%M"), False
+        if isinstance(d, _date):
+            return d.strftime("%Y-%m-%d 00:00"), True   # date pure = journée entière
+        return None, False
+
+    out = []
+    for ev in occurrences:
+        try:
+            start_at, all_day = _fmt(ev.get("DTSTART"))
+            if not start_at:
+                continue
+            end_at, _ = _fmt(ev.get("DTEND"))
+            out.append({
+                "title": str(ev.get("SUMMARY", "(sans titre)")),
+                "location": str(ev.get("LOCATION", "") or ""),
+                "description": str(ev.get("DESCRIPTION", "") or "")[:500],
+                "start_at": start_at, "end_at": end_at, "all_day": all_day,
+                "external_id": str(ev.get("UID", "") or ""),
+            })
+        except Exception:
+            continue
+    return out
+
+
+async def _fetch_ics(url: str, timeout: int = 25) -> bytes:
+    import httpx
+    u = url.strip()
+    if u.lower().startswith("webcal://"):
+        u = "https://" + u[len("webcal://"):]
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        r = await client.get(u, headers={"User-Agent": "Marvin/1.0 (+calendar-sync)"})
+        r.raise_for_status()
+        return r.content
+
+
+async def _sync_subscription(sub: dict) -> dict:
+    """Récupère + parse + remplace les événements d'un abonnement. Met à jour sub en place."""
+    from datetime import datetime as _dt
+    src = f"ics:{sub.get('id')}"
+    try:
+        data = await _fetch_ics(sub["url"])
+        loop = asyncio.get_running_loop()
+        events = await loop.run_in_executor(None, _parse_ics, data)
+        for e in events:
+            e["color"] = sub.get("color") or "#10b981"
+        n = db.replace_external_events(src, events)
+        sub["last_sync"] = _dt.now().strftime("%Y-%m-%d %H:%M")
+        sub["last_error"] = ""
+        sub["count"] = n
+        return {"success": True, "count": n}
+    except Exception as e:
+        sub["last_error"] = str(e)[:200]
+        return {"error": str(e)[:200]}
+
+
+async def execute_calendar_subscribe(args: dict) -> dict:
+    """Abonne Marvin à un agenda via son lien iCal (.ics / webcal). Le synchronise aussitôt."""
+    url = (args.get("url") or "").strip()
+    name = (args.get("name") or "").strip() or "Agenda"
+    color = (args.get("color") or "#10b981").strip()
+    if not url or (".ics" not in url.lower() and "ical" not in url.lower()
+                   and not url.lower().startswith(("webcal://", "http"))):
+        return {"error": "Lien iCal invalide. Fournissez l'URL .ics (Google : « Adresse secrète au format iCal »)."}
+    import uuid as _uuid
+    subs = _calendar_subs()
+    sub = {"id": _uuid.uuid4().hex[:8], "name": name, "url": url, "color": color,
+           "enabled": True, "last_sync": "", "last_error": "", "count": 0}
+    r = await _sync_subscription(sub)
+    subs.append(sub)
+    _save_calendar_subs(subs)
+    if r.get("error"):
+        return {"error": f"Abonnement ajouté mais synchro échouée : {r['error']}", "subscription": sub}
+    return {"success": True, "subscription": sub,
+            "message": f"📅 Agenda « {name} » connecté : {r.get('count', 0)} événement(s) importé(s)."}
+
+
+async def execute_calendar_subscriptions(args: dict) -> dict:
+    """Liste les agendas connectés (abonnements iCal) et leur état."""
+    subs = _calendar_subs()
+    return {"success": True, "subscriptions": subs, "count": len(subs)}
+
+
+async def execute_calendar_unsubscribe(args: dict) -> dict:
+    """Déconnecte un agenda (par id ou nom) et retire ses événements."""
+    key = (args.get("id") or args.get("name") or "").strip().lower()
+    if not key:
+        return {"error": "Fournissez l'id ou le nom de l'agenda à déconnecter."}
+    subs = _calendar_subs()
+    keep, removed = [], None
+    for s in subs:
+        if s.get("id", "").lower() == key or (s.get("name", "").lower() == key):
+            removed = s
+        else:
+            keep.append(s)
+    if not removed:
+        return {"error": "Agenda introuvable."}
+    db.delete_events_by_source(f"ics:{removed['id']}")
+    _save_calendar_subs(keep)
+    return {"success": True, "message": f"🗑️ Agenda « {removed.get('name')} » déconnecté."}
+
+
+async def _sync_google_into_events() -> dict:
+    """Si un compte Google est connecté, importe ses événements dans l'agenda local
+    (source='google'), comme un abonnement iCal. Best-effort (ignore si non connecté)."""
+    try:
+        service = _get_google_calendar_service()
+    except Exception:
+        return {"connected": False, "count": 0}
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    loop = asyncio.get_running_loop()
+
+    def _list():
+        now = _dt.now(_tz.utc)
+        res = service.events().list(
+            calendarId=_resolve_calendar_id("primary"),
+            timeMin=(now - _td(days=30)).isoformat(),
+            timeMax=(now + _td(days=180)).isoformat(),
+            singleEvents=True, orderBy="startTime", maxResults=500,
+        ).execute()
+        return res.get("items", [])
+
+    try:
+        items = await loop.run_in_executor(None, _list)
+    except Exception as e:
+        return {"connected": True, "count": 0, "error": str(e)[:150]}
+
+    def _fmt(x):
+        if not x:
+            return None
+        return x.replace("T", " ")[:16]   # garde l'heure murale fournie par Google
+
+    evts = []
+    for it in items:
+        st, en = it.get("start", {}), it.get("end", {})
+        all_day = "date" in st
+        evts.append({
+            "title": it.get("summary", "(sans titre)"),
+            "location": it.get("location", ""),
+            "start_at": _fmt(st.get("dateTime") or st.get("date")),
+            "end_at": _fmt(en.get("dateTime") or en.get("date")),
+            "all_day": all_day, "external_id": it.get("id"), "color": "#4285f4",
+        })
+    n = db.replace_external_events("google", evts)
+    return {"connected": True, "count": n}
+
+
+async def execute_calendar_sync(args: dict) -> dict:
+    """Resynchronise tous les agendas connectés (iCal + Google si connecté)."""
+    subs = _calendar_subs()
+    only = (args.get("id") or "").strip()
+    results, total, ok = [], 0, 0
+    for sub in subs:
+        if only and sub.get("id") != only:
+            continue
+        if not sub.get("enabled", True):
+            continue
+        r = await _sync_subscription(sub)
+        if r.get("success"):
+            total += r.get("count", 0); ok += 1
+        results.append({"name": sub.get("name"), "id": sub.get("id"), **r})
+    _save_calendar_subs(subs)
+    # Google (si connecté)
+    g = await _sync_google_into_events()
+    if g.get("connected"):
+        total += g.get("count", 0)
+        results.append({"name": "Google Agenda", "id": "google", "success": True, "count": g.get("count", 0)})
+        if g.get("count"):
+            ok += 1
+    if not subs and not g.get("connected"):
+        return {"success": True, "total_events": 0, "results": [], "message": "Aucun agenda connecté."}
+    return {"success": True, "synced": ok, "total_events": total, "results": results,
+            "message": f"🔄 {total} événement(s) synchronisé(s) depuis {ok} agenda(s)."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION DOCUMENTS — « Parle à tes documents » (RAG : indexation + Q/R sourcée)
+# Indexe PDF/Word/Excel/texte en local (embeddings nomic-embed-text + Qdrant) puis
+# répond aux questions en citant les passages. 100 % local et privé.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_DOC_EXTS = {".pdf", ".docx", ".txt", ".md", ".markdown", ".csv", ".tsv", ".log", ".json",
+             ".xlsx", ".pptx", ".html", ".htm", ".rtf", ".xml", ".yaml", ".yml", ".ini", ".rst"}
+
+
+def _indexed_docs() -> list:
+    docs = db.get_setting("indexed_documents")
+    if isinstance(docs, str):
+        try:
+            import json as _json
+            docs = _json.loads(docs)
+        except Exception:
+            docs = []
+    return docs if isinstance(docs, list) else []
+
+
+def _save_indexed_docs(docs: list):
+    db.set_setting("indexed_documents", docs)
+
+
+def _chunk_text(text: str, size: int = 900, overlap: int = 150) -> list:
+    text = " ".join((text or "").split())
+    if not text:
+        return []
+    chunks, i = [], 0
+    while i < len(text):
+        chunks.append(text[i:i + size])
+        i += max(1, size - overlap)
+    return chunks[:500]   # garde-fou : max 500 fragments / document
+
+
+def _extract_document_text(path: str) -> str:
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".pdf":
+        from pypdf import PdfReader
+        r = PdfReader(path)
+        return "\n".join((p.extract_text() or "") for p in r.pages)
+    if ext == ".docx":
+        import docx
+        d = docx.Document(path)
+        return "\n".join(p.text for p in d.paragraphs)
+    if ext == ".pptx":
+        from pptx import Presentation
+        prs = Presentation(path)
+        out = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    out.append(shape.text_frame.text)
+        return "\n".join(out)
+    if ext == ".xlsx":
+        import openpyxl
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        out = []
+        for ws in wb.worksheets:
+            for row in ws.iter_rows(values_only=True):
+                out.append(" ".join(str(c) for c in row if c is not None))
+        return "\n".join(out)
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        raw = f.read(500_000)
+    if ext in (".html", ".htm"):
+        import re as _re
+        raw = _re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
+        raw = _re.sub(r"(?s)<[^>]+>", " ", raw)
+        import html as _html
+        raw = _html.unescape(raw)
+    elif ext == ".rtf":
+        import re as _re
+        raw = _re.sub(r"\\'[0-9a-fA-F]{2}", "", raw)
+        raw = _re.sub(r"\\[a-zA-Z]+-?\d* ?", " ", raw)
+        raw = raw.replace("{", " ").replace("}", " ")
+    return raw
+
+
+async def execute_document_index(args: dict) -> dict:
+    """Indexe un fichier (ou tous les fichiers d'un dossier) pour pouvoir l'interroger ensuite."""
+    import vector_store as vs, uuid as _uuid
+    raw = (args.get("path") or "").strip()
+    if not raw:
+        return {"error": "Indiquez le chemin du fichier ou dossier à indexer."}
+    path = _resolve_path(raw)
+    if not os.path.exists(path):
+        return {"error": f"Introuvable : {path}"}
+
+    targets = []
+    if os.path.isdir(path):
+        for root, _dirs, files in os.walk(path):
+            for f in files:
+                if os.path.splitext(f)[1].lower() in _DOC_EXTS:
+                    targets.append(os.path.join(root, f))
+            if len(targets) > 200:
+                break
+    elif os.path.splitext(path)[1].lower() in _DOC_EXTS:
+        targets = [path]
+    else:
+        return {"error": f"Type non pris en charge. Formats : {', '.join(sorted(_DOC_EXTS))}"}
+    if not targets:
+        return {"error": "Aucun document compatible trouvé."}
+
+    docs = _indexed_docs()
+    by_path = {d["path"]: d for d in docs}
+    indexed, total_chunks = [], 0
+    loop = asyncio.get_running_loop()
+
+    # Parallélisme piloté par le MODE : on EXTRAIT le texte des fichiers en parallèle (lecture
+    # PDF/Word lente) ; l'indexation vectorielle reste séquentielle (Qdrant = mono-process).
+    try:
+        conc = max(1, int(db.get_setting("task_concurrency") or 3))
+    except Exception:
+        conc = 3
+    sem = asyncio.Semaphore(conc)
+
+    async def _extract(fp):
+        async with sem:
+            try:
+                text = await loop.run_in_executor(None, _extract_document_text, fp)
+                return fp, _chunk_text(text)
+            except Exception as e:
+                return fp, e
+
+    extracted = await asyncio.gather(*[_extract(fp) for fp in targets[:200]])
+
+    for fp, chunks in extracted:
+        if isinstance(chunks, Exception):
+            indexed.append(f"{os.path.basename(fp)} (échec: {str(chunks)[:60]})")
+            continue
+        if not chunks:
+            continue
+        try:
+            doc_id = by_path.get(fp, {}).get("id") or _uuid.uuid4().hex[:12]
+            if fp in by_path:
+                vs.delete_doc_chunks(doc_id)   # réindexation : on remplace
+            name = os.path.basename(fp)
+            n = await vs.index_chunks(doc_id, name, fp, chunks)
+            total_chunks += n
+            by_path[fp] = {"id": doc_id, "name": name, "path": fp, "chunks": n, "indexed_at": _now_iso()}
+            indexed.append(name)
+        except Exception as e:
+            indexed.append(f"{os.path.basename(fp)} (échec: {str(e)[:60]})")
+    _save_indexed_docs(list(by_path.values()))
+    return {"success": True, "indexed": indexed, "documents": len(indexed), "chunks": total_chunks,
+            "message": f"📄 {len(indexed)} document(s) indexé(s) ({total_chunks} fragments). Tu peux maintenant poser des questions dessus."}
+
+
+async def execute_document_ask(args: dict) -> dict:
+    """Pose une question à tes documents indexés : récupère les passages pertinents et répond en les citant."""
+    import vector_store as vs
+    question = (args.get("question") or args.get("query") or "").strip()
+    if not question:
+        return {"error": "Pose une question (paramètre 'question')."}
+    try:
+        _k = int(args.get("k") or db.get_setting("rag_k") or 6)
+    except Exception:
+        _k = 6
+    hits = await vs.search(question, collections=["documents"], limit=_k)
+    if not hits:
+        if not _indexed_docs():
+            return {"error": "Aucun document indexé. Indexe d'abord un fichier ou un dossier."}
+        return {"success": True, "answer": "Je n'ai trouvé aucun passage pertinent dans tes documents pour cette question.",
+                "sources": [], "message": "Aucun passage pertinent."}
+    context = "\n\n".join(f"[{i+1}] (source : {h['metadata'].get('name','?')})\n{h['text']}" for i, h in enumerate(hits))
+    prompt = (
+        "Tu réponds à la question de l'utilisateur en t'appuyant UNIQUEMENT sur les extraits de documents ci-dessous. "
+        "Réponds en français, précisément. Cite la source entre parenthèses (le nom du fichier). "
+        "Si l'information n'est pas dans les extraits, dis-le clairement.\n\n"
+        f"EXTRAITS :\n{context}\n\n"
+        f"QUESTION : {question}\n\nRÉPONSE :"
+    )
+    answer = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+    seen, sources = set(), []
+    for h in hits:
+        nm = h["metadata"].get("name", "?")
+        if nm not in seen:
+            seen.add(nm)
+            sources.append({"name": nm, "score": h.get("score"), "extrait": h["text"][:200]})
+    return {"success": True, "answer": (answer or "").strip(), "sources": sources,
+            "message": f"Réponse basée sur {len(sources)} document(s)."}
+
+
+async def execute_document_list(args: dict) -> dict:
+    """Liste les documents indexés (interrogeables)."""
+    docs = _indexed_docs()
+    return {"success": True, "documents": docs, "count": len(docs)}
+
+
+async def execute_document_forget(args: dict) -> dict:
+    """Retire un document de l'index (par id ou nom)."""
+    import vector_store as vs
+    key = (args.get("id") or args.get("name") or "").strip().lower()
+    if not key:
+        return {"error": "Indique l'id ou le nom du document à oublier."}
+    docs = _indexed_docs()
+    keep, removed = [], None
+    for d in docs:
+        if d.get("id", "").lower() == key or d.get("name", "").lower() == key:
+            removed = d
+        else:
+            keep.append(d)
+    if not removed:
+        return {"error": "Document introuvable dans l'index."}
+    vs.delete_doc_chunks(removed["id"])
+    _save_indexed_docs(keep)
+    return {"success": True, "message": f"🗑️ « {removed.get('name')} » retiré de l'index."}
+
+
+async def execute_document_refine_section(args: dict) -> dict:
+    """Affine UNE section d'un document généré : développe, raccourcit, reformule…
+    Réécrit seulement la section demandée puis régénère le .docx (en-tête/signature conservés).
+    Ex : « développe la partie Diagnostic », « ajoute un tableau dans Solution »."""
+    import json as _json, re as _re
+    raw_file = (args.get("file") or "").strip()
+    section = (args.get("section") or "").strip()
+    instruction = (args.get("instruction") or "développe et complète cette section").strip()
+    extra = (args.get("notes") or "").strip()
+    if not raw_file or not section:
+        return {"error": "Fournis 'file' (le .docx généré) et 'section' (le titre à affiner)."}
+
+    # Sécurité : rester dans documents_generes
+    base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "documents_generes"))
+    docx_path = os.path.abspath(_resolve_path(raw_file))
+    if not docx_path.startswith(base):
+        # tolère un simple nom de fichier
+        docx_path = os.path.abspath(os.path.join(base, os.path.basename(raw_file)))
+    meta_path = docx_path + ".meta.json"
+    if not os.path.exists(meta_path):
+        return {"error": "Document non affinable (régénère-le d'abord avec la nouvelle version)."}
+    try:
+        with open(meta_path, encoding="utf-8") as f:
+            meta = _json.load(f)
+    except Exception as e:
+        return {"error": f"Métadonnées illisibles : {str(e)[:80]}"}
+
+    markdown = meta.get("markdown") or ""
+    # Localise la section « ## Titre » jusqu'au prochain titre de même niveau
+    pat = _re.compile(r"(^|\n)(#{2,3})\s*" + _re.escape(section) + r"\s*\n", _re.IGNORECASE)
+    m = pat.search(markdown)
+    if not m:
+        secs = meta.get("sections", [])
+        # match approximatif
+        cand = next((s for s in secs if section.lower() in s.lower() or s.lower() in section.lower()), None)
+        if cand:
+            section = cand
+            pat = _re.compile(r"(^|\n)(#{2,3})\s*" + _re.escape(section) + r"\s*\n", _re.IGNORECASE)
+            m = pat.search(markdown)
+    if not m:
+        return {"error": f"Section « {section} » introuvable. Sections : {', '.join(meta.get('sections', []))}"}
+
+    start = m.start() if m.start() == 0 else m.start() + 1
+    # fin = prochain titre ## ou # après la section
+    nxt = _re.search(r"\n#{1,3}\s", markdown[m.end():])
+    end = m.end() + nxt.start() if nxt else len(markdown)
+    current = markdown[start:end].strip()
+
+    prompt = (
+        f"Tu es un rédacteur professionnel francophone. Voici UNE section d'un document « {meta.get('subtitle','')} » "
+        f"intitulé « {meta.get('title','')} ».\n\nSECTION ACTUELLE :\n{current}\n\n"
+        f"CONSIGNE : {instruction}. Réécris cette section en français impeccable, COMPLÈTE et professionnelle "
+        f"(sous-titres, listes ou tableaux markdown si utile). Garde le même titre. "
+        f"Commence ta réponse par « ## {section} » et ne rédige QUE cette section.\n"
+        + (f"\nÉLÉMENTS À INTÉGRER :\n{extra}\n" if extra else "")
+        + "\nNOUVELLE VERSION :"
+    )
+    try:
+        new_sec = (await _ollama_generate(prompt, model=args.get("model"), timeout=240) or "").strip()
+    except Exception as e:
+        return {"error": f"Génération échouée : {str(e)[:120]}"}
+    if not new_sec:
+        return {"error": "La régénération n'a rien produit."}
+    if "##" not in new_sec[:80]:
+        new_sec = f"## {section}\n\n" + new_sec
+
+    new_markdown = markdown[:start] + new_sec.strip() + "\n\n" + markdown[end:]
+    new_markdown = _re.sub(r"\n{3,}", "\n\n", new_markdown)
+
+    r = await execute_file_create_docx({
+        "path": docx_path, "title": meta.get("title", "Document"), "subtitle": meta.get("subtitle", ""),
+        "content": new_markdown, "author": meta.get("author", "Marvin"),
+        "letterhead": meta.get("letterhead") or {}, "references": meta.get("references") or {},
+        "signature": meta.get("signature") or {}})
+    if r.get("error"):
+        return {"error": f"Rendu Word échoué : {r['error']}"}
+    meta["markdown"] = new_markdown
+    try:
+        with open(meta_path, "w", encoding="utf-8") as f:
+            _json.dump(meta, f, ensure_ascii=False)
+    except Exception:
+        pass
+    return {"success": True, "file": docx_path, "section": section,
+            "section_markdown": new_sec[:3000], "markdown": new_markdown[:6000],
+            "sections": meta.get("sections", []),
+            "message": f"✍️ Section « {section} » affinée → {os.path.basename(docx_path)}"}
+
+
+_UNIFIED_SOURCES_DEFAULT = ["documents", "files_name", "files_content", "notes", "tasks", "events", "memory"]
+_UNIFIED_SOURCES_ALL = _UNIFIED_SOURCES_DEFAULT + ["emails", "web"]
+
+
+async def execute_unified_search(args: dict) -> dict:
+    """RECHERCHE UNIFIÉE : cherche le même terme PARTOUT à la fois — documents indexés,
+    fichiers du PC (nom + contenu), notes, tâches, agenda, mémoire, (emails et web en option).
+    Renvoie les résultats groupés par source. Idéal pour « retrouve tout ce qui concerne X »."""
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {"error": "Indique ce que tu cherches (paramètre 'query')."}
+    scope = args.get("scope") or _UNIFIED_SOURCES_DEFAULT
+    if isinstance(scope, str):
+        scope = _UNIFIED_SOURCES_ALL if scope == "all" else [scope]
+    scope = [s for s in scope if s in _UNIFIED_SOURCES_ALL]
+    per = max(1, min(int(args.get("limit", 5)), 15))
+    q_low = query.lower()
+
+    async def _documents():
+        import vector_store as vs
+        hits = await vs.search(query, collections=["documents"], limit=per)
+        return [{"name": h["metadata"].get("name", "?"), "snippet": (h.get("text") or "")[:200],
+                 "path": h["metadata"].get("path"), "score": round(h.get("score", 0), 3)} for h in hits]
+
+    async def _files_name():
+        r = await execute_system_search({"query": query, "max_results": per})
+        return [{"name": x.get("name"), "path": x.get("path"), "is_dir": x.get("is_dir"),
+                 "size_kb": x.get("size_kb")} for x in (r.get("results") or [])][:per]
+
+    async def _files_content():
+        r = await execute_system_search_content({"query": query, "max_results": per})
+        return [{"name": x.get("name"), "path": x.get("path"), "snippet": x.get("snippet")}
+                for x in (r.get("results") or [])][:per]
+
+    async def _notes():
+        rows = db.list_notes(search=query, limit=per)
+        return [{"id": n.get("id"), "title": n.get("title"), "snippet": (n.get("content") or "")[:160]} for n in rows]
+
+    async def _tasks():
+        out = []
+        for t in db.list_tasks(limit=200):
+            hay = (str(t.get("title", "")) + " " + str(t.get("description") or "")).lower()
+            if q_low in hay:
+                out.append({"id": t.get("id"), "title": t.get("title"), "status": t.get("status"),
+                            "priority": t.get("priority"), "due_date": t.get("due_date")})
+            if len(out) >= per:
+                break
+        return out
+
+    async def _events():
+        out = []
+        for e in db.list_events(limit=400):
+            hay = (str(e.get("title", "")) + " " + str(e.get("description") or "") + " " + str(e.get("location") or "")).lower()
+            if q_low in hay:
+                out.append({"id": e.get("id"), "title": e.get("title"), "start_at": e.get("start_at"),
+                            "location": e.get("location"), "source": e.get("source")})
+            if len(out) >= per:
+                break
+        return out
+
+    async def _memory():
+        import learning
+        rec = await learning.recall(query, max_facts=per, max_qa=3)
+        items = [{"type": "fait", "text": f} for f in rec.get("facts", [])]
+        items += [{"type": "q/r", "text": f"{qa.get('q', '')} → {qa.get('a', '')}"} for qa in rec.get("qa", [])]
+        return items[:per]
+
+    async def _emails():
+        r = await execute_email_search({"query": query, "account": args.get("account")})
+        if r.get("error"):
+            return []
+        return [{"subject": m.get("subject"), "from": m.get("from") or m.get("from_addr"),
+                 "date": m.get("date"), "uid": m.get("uid")} for m in (r.get("emails") or [])][:per]
+
+    async def _web():
+        try:
+            r = await execute_web_search({"query": query})
+        except Exception:
+            return []
+        return [{"title": x.get("title"), "url": x.get("url"), "snippet": (x.get("snippet") or x.get("description") or "")[:200]}
+                for x in (r.get("results") or [])][:per]
+
+    funcs = {"documents": _documents, "files_name": _files_name, "files_content": _files_content,
+             "notes": _notes, "tasks": _tasks, "events": _events, "memory": _memory,
+             "emails": _emails, "web": _web}
+    active = [s for s in scope if s in funcs]
+    gathered = await asyncio.gather(*[funcs[s]() for s in active], return_exceptions=True)
+    results, errors = {}, {}
+    for s, g in zip(active, gathered):
+        if isinstance(g, Exception):
+            results[s] = []
+            errors[s] = str(g)[:120]
+        else:
+            results[s] = g
+    total = sum(len(v) for v in results.values())
+    return {"success": True, "query": query, "total": total, "results": results,
+            "errors": errors or None,
+            "message": f"🔎 {total} résultat(s) pour « {query} » dans {len([s for s in active if results.get(s)])} source(s)."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION NOTIFICATIONS EXTERNES — Telegram (recevoir les alertes sur le téléphone)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _telegram_cfg() -> dict:
+    cfg = db.get_setting("telegram_config")
+    if isinstance(cfg, str):
+        try:
+            import json as _json
+            cfg = _json.loads(cfg)
+        except Exception:
+            cfg = {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
+async def _send_telegram(text: str) -> dict:
+    cfg = _telegram_cfg()
+    token = (cfg.get("bot_token") or "").strip()
+    chat_id = str(cfg.get("chat_id") or "").strip()
+    if not token or not chat_id:
+        return {"error": "Telegram non configuré (jeton du bot + chat_id requis)."}
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text[:3500], "parse_mode": "HTML",
+                      "disable_web_page_preview": True},
+            )
+        if r.status_code != 200:
+            return {"error": f"Telegram {r.status_code}: {r.text[:150]}"}
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)[:150]}
+
+
+async def _telegram_notify(text: str):
+    """Envoi best-effort (ne lève jamais) — utilisé par les workers."""
+    try:
+        if (_telegram_cfg().get("enabled")):
+            await _send_telegram(text)
+    except Exception:
+        pass
+
+
+async def execute_telegram_send(args: dict) -> dict:
+    """Envoie un message sur ton Telegram (alerte, rappel, note). Nécessite la config Telegram."""
+    text = (args.get("text") or args.get("message") or "").strip()
+    if not text:
+        return {"error": "Texte du message requis."}
+    r = await _send_telegram(text)
+    return r if r.get("error") else {"success": True, "message": "📲 Message envoyé sur Telegram."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION WEB NAVIGATEUR — Accès web par VRAI navigateur (contourne l'anti-bot)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_web_browser_open(args: dict) -> dict:
+    """Ouvre une page dans un VRAI navigateur (Chrome) et renvoie son texte lisible.
+    À utiliser quand l'outil web interne est bloqué, ou pour un site dynamique (JS)."""
+    url = (args.get("url") or "").strip()
+    if not url:
+        return {"error": "Paramètre 'url' requis."}
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        import web_browser as wb
+        r = await wb.fetch_text(url)
+        return {"success": True, "title": r.get("title", ""), "url": r.get("url", url),
+                "text": r.get("text") or "(page vide ou non textuelle)"}
+    except Exception as e:
+        return {"error": f"Lecture via navigateur échouée : {str(e)[:160]}"}
+
+
+async def execute_web_research(args: dict) -> dict:
+    """Cherche sur le web avec un VRAI navigateur, lit les meilleurs résultats, en tire
+    une réponse sourcée, et ENRICHIT la connaissance de Marvin. Pour « cherche sur internet »,
+    « trouve la réponse en ligne », quand l'info manque."""
+    query = (args.get("query") or args.get("q") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    try:
+        import web_browser as wb
+        results = await wb.search(query, n=6)
+    except Exception as e:
+        return {"error": f"Recherche navigateur échouée : {str(e)[:160]}"}
+    if not results:
+        return {"success": True, "answer": "Aucun résultat web trouvé.", "sources": []}
+    # Lire le contenu des N meilleurs résultats (profondeur pilotée par le MODE de performance)
+    try:
+        web_depth = max(1, int(args.get("depth") or db.get_setting("web_depth") or 2))
+    except Exception:
+        web_depth = 2
+    pages = []
+    for res in results[:web_depth]:
+        try:
+            p = await wb.fetch_text(res["url"], max_chars=2800)
+        except Exception:
+            p = None
+        pages.append((res, p))
+    if any(p for _, p in pages):
+        context = "\n\n".join(
+            f"[{i+1}] {res.get('title', '')} ({res['url']})\n{(p['text'] if p else res.get('snippet', ''))[:1500]}"
+            for i, (res, p) in enumerate(pages))
+    else:
+        context = "\n".join(f"- {r.get('title', '')} : {r.get('snippet', '')}" for r in results)
+    prompt = (
+        "En te basant UNIQUEMENT sur ces résultats web, réponds à la question en français, "
+        "concis et factuel. Indique la source (domaine) si pertinent. Si l'info n'y est pas, dis-le.\n\n"
+        f"QUESTION : {query}\n\nRÉSULTATS WEB :\n{context}\n\nRÉPONSE :")
+    answer = (await _ollama_generate(prompt, model=args.get("model"), timeout=180) or "").strip()
+    # Enrichir la base de connaissances (apprentissage)
+    try:
+        import learning
+        if len(answer) > 15:
+            await learning.add_qa(query, answer)
+    except Exception:
+        pass
+    return {"success": True, "answer": answer,
+            "sources": [{"title": r.get("title", ""), "url": r["url"]} for r in results[:4]],
+            "message": "Réponse trouvée sur le web et mémorisée."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION VOICE — Transcription audio (faster-whisper)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_whisper_model_cache: dict = {}
+
+async def execute_voice_transcribe(args: dict) -> dict:
+    """Transcrit un fichier audio local en texte via Whisper (faster-whisper)."""
+    audio_path = args.get("audio_path", "").strip()
+    model_size = args.get("model", "small")   # tiny, base, small, medium, large-v3
+    language = args.get("language", None)    # None = détection auto
+    if not audio_path:
+        return {"error": "Paramètre 'audio_path' requis."}
+    resolved = _resolve_path(audio_path)
+    if not os.path.exists(resolved):
+        return {"error": f"Fichier introuvable : {resolved}"}
+
+    def _transcribe():
+        global _whisper_model_cache
+        if model_size not in _whisper_model_cache:
+            try:
+                from faster_whisper import WhisperModel
+            except ImportError:
+                raise RuntimeError("faster-whisper non installé. Exécutez : pip install faster-whisper")
+            _whisper_model_cache[model_size] = WhisperModel(model_size, device="cpu", compute_type="int8")
+        model = _whisper_model_cache[model_size]
+        segments, info = model.transcribe(
+            resolved,
+            beam_size=5,
+            language=language,
+            vad_filter=True,
+        )
+        text = " ".join(seg.text.strip() for seg in segments).strip()
+        return text, info.language
+
+    try:
+        loop = asyncio.get_running_loop()
+        text, lang = await loop.run_in_executor(None, _transcribe)
+        return {
+            "success": True,
+            "audio_file": resolved,
+            "text": text,
+            "language": lang,
+            "char_count": len(text),
+        }
+    except Exception as e:
+        return {"error": f"Transcription échouée : {e}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION SSH — Exécution de commandes à distance
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _ssh_load_key(key_str: str, passphrase: str | None = None):
+    """Charge une clé privée quel que soit son type (Ed25519, ECDSA, RSA, DSS)."""
+    import paramiko, io as _io
+    last = None
+    for KeyClass in (getattr(paramiko, "Ed25519Key", None), getattr(paramiko, "ECDSAKey", None),
+                     paramiko.RSAKey, getattr(paramiko, "DSSKey", None)):
+        if KeyClass is None:
+            continue
+        try:
+            return KeyClass.from_private_key(_io.StringIO(key_str), password=passphrase or None)
+        except Exception as e:
+            last = e
+    raise ValueError(f"Format de clé privée non reconnu (RSA/Ed25519/ECDSA/DSS). {last}")
+
+
+def _ssh_connect(conn: dict, timeout: int = 30):
+    """Ouvre une connexion paramiko (clé tous formats ou mot de passe)."""
+    import paramiko
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    kwargs = dict(hostname=conn["host"], port=int(conn.get("port", 22) or 22),
+                  username=conn["username"], timeout=timeout,
+                  banner_timeout=timeout, auth_timeout=timeout)
+    if (conn.get("private_key") or "").strip():
+        kwargs["pkey"] = _ssh_load_key(conn["private_key"], conn.get("key_passphrase"))
+    elif conn.get("password"):
+        kwargs["password"] = conn["password"]
+    client.connect(**kwargs)
+    return client
+
+
+async def execute_ssh_list(args: dict) -> dict:
+    """Liste les connexions SSH sauvegardées."""
+    try:
+        connections = db.list_ssh_connections()
+        # Masquer les mots de passe et clés privées
+        safe = []
+        for c in connections:
+            safe.append({
+                "id": c["id"],
+                "name": c["name"],
+                "host": c["host"],
+                "port": c["port"],
+                "username": c["username"],
+                "has_password": bool(c.get("password")),
+                "has_key": bool(c.get("private_key", "").strip()),
+                "last_used": c.get("last_used"),
+            })
+        return {"success": True, "count": len(safe), "connections": safe}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ssh_exec(args: dict) -> dict:
+    """Exécute une commande sur un serveur SSH sauvegardé."""
+    connection_id = args.get("connection_id", "").strip()
+    command = args.get("command", "").strip()
+    timeout = max(5, min(int(args.get("timeout", 30)), 120))
+
+    if not connection_id:
+        return {"error": "Paramètre 'connection_id' requis. Utilisez ssh_list pour voir les connexions disponibles."}
+    if not command:
+        return {"error": "Paramètre 'command' requis."}
+    import security as _sec                      # 🛡️ garde-fou aussi sur les commandes distantes
+    _blk = _sec.guard_result(command)
+    if _blk:
+        return _blk
+
+    conn = db.get_ssh_connection(connection_id)
+    if not conn:
+        return {"error": f"Connexion SSH '{connection_id}' introuvable."}
+
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True, "message": f"Exécuter sur {conn['username']}@{conn['host']} : {command} ?"}
+
+
+    def _run():
+        client = _ssh_connect(conn, timeout)
+        _, stdout, stderr = client.exec_command(command, timeout=timeout)
+        out = stdout.read().decode(errors="replace")
+        err = stderr.read().decode(errors="replace")
+        exit_code = stdout.channel.recv_exit_status()
+        client.close()
+        return {"stdout": out, "stderr": err, "exit_code": exit_code}
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _run)
+        db.touch_ssh_connection(connection_id)
+        result["success"] = result["exit_code"] == 0
+        result["command"] = command
+        result["host"] = f"{conn['username']}@{conn['host']}"
+        return result
+    except Exception as e:
+        return {"error": str(e), "command": command}
+
+
+async def execute_ssh_exec_multi(args: dict) -> dict:
+    """⚡ Exécute une commande sur PLUSIEURS serveurs SSH en parallèle."""
+    ids = args.get("connection_ids") or []
+    command = (args.get("command") or "").strip()
+    timeout = max(5, min(int(args.get("timeout", 30)), 120))
+    if not ids:
+        return {"error": "Paramètre 'connection_ids' (liste) requis."}
+    if not command:
+        return {"error": "Paramètre 'command' requis."}
+    conns = [(i, db.get_ssh_connection(i)) for i in ids]
+    missing = [i for i, c in conns if not c]
+    if missing:
+        return {"error": f"Connexions introuvables : {missing}"}
+    if not args.get("confirmed"):
+        hosts = ", ".join(f"{c['username']}@{c['host']}" for _, c in conns)
+        return {"requiresConfirmation": True, "message": f"Exécuter « {command} » sur : {hosts} ?"}
+
+    def _run_one(conn):
+        try:
+            client = _ssh_connect(conn, timeout)
+            _, so, se = client.exec_command(command, timeout=timeout)
+            out, err = so.read().decode(errors="replace"), se.read().decode(errors="replace")
+            code = so.channel.recv_exit_status(); client.close()
+            return {"stdout": out, "stderr": err, "exit_code": code, "success": code == 0}
+        except Exception as e:
+            return {"error": str(e), "success": False}
+
+    loop = asyncio.get_running_loop()
+    tasks = [loop.run_in_executor(None, _run_one, c) for _, c in conns]
+    results = await asyncio.gather(*tasks)
+    out = []
+    for (i, c), r in zip(conns, results):
+        db.touch_ssh_connection(i)
+        out.append({"connection_id": i, "host": f"{c['username']}@{c['host']}", **r})
+    ok = sum(1 for r in out if r.get("success"))
+    return {"success": True, "command": command, "total": len(out), "succeeded": ok,
+            "failed": len(out) - ok, "results": out}
+
+
+async def execute_ssh_upload(args: dict) -> dict:
+    """📤 Envoie un fichier local vers un serveur SSH (SFTP)."""
+    cid = (args.get("connection_id") or "").strip()
+    local = _resolve_path(args.get("local_path", ""))
+    remote = (args.get("remote_path") or "").strip()
+    conn = db.get_ssh_connection(cid)
+    if not conn:
+        return {"error": "Connexion SSH introuvable."}
+    if not os.path.isfile(local):
+        return {"error": f"Fichier local introuvable : {local}"}
+    if not remote:
+        return {"error": "Paramètre 'remote_path' requis."}
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": f"Envoyer {os.path.basename(local)} → {conn['username']}@{conn['host']}:{remote} ?"}
+
+    def _run():
+        client = _ssh_connect(conn, 60)
+        sftp = client.open_sftp()
+        sftp.put(local, remote)
+        size = sftp.stat(remote).st_size
+        sftp.close(); client.close()
+        return size
+    try:
+        size = await asyncio.get_running_loop().run_in_executor(None, _run)
+        db.touch_ssh_connection(cid)
+        return {"success": True, "message": f"Envoyé : {remote} ({size} octets)",
+                "remote_path": remote, "size": size}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ssh_download(args: dict) -> dict:
+    """📥 Télécharge un fichier d'un serveur SSH vers le PC local (SFTP)."""
+    cid = (args.get("connection_id") or "").strip()
+    remote = (args.get("remote_path") or "").strip()
+    local = _resolve_path(args.get("local_path", "")) if args.get("local_path") else \
+        str(Path(_HOME) / "Downloads" / os.path.basename(remote or "download"))
+    conn = db.get_ssh_connection(cid)
+    if not conn:
+        return {"error": "Connexion SSH introuvable."}
+    if not remote:
+        return {"error": "Paramètre 'remote_path' requis."}
+
+    def _run():
+        client = _ssh_connect(conn, 60)
+        sftp = client.open_sftp()
+        os.makedirs(os.path.dirname(local), exist_ok=True)
+        sftp.get(remote, local)
+        sftp.close(); client.close()
+        return os.path.getsize(local)
+    try:
+        size = await asyncio.get_running_loop().run_in_executor(None, _run)
+        db.touch_ssh_connection(cid)
+        return {"success": True, "message": f"Téléchargé : {local} ({size} octets)",
+                "path": local, "size": size}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ssh_list_dir(args: dict) -> dict:
+    """📂 Liste un dossier distant d'un serveur SSH (SFTP)."""
+    cid = (args.get("connection_id") or "").strip()
+    remote = (args.get("remote_path") or ".").strip()
+    conn = db.get_ssh_connection(cid)
+    if not conn:
+        return {"error": "Connexion SSH introuvable."}
+
+    def _run():
+        import stat as _stat
+        client = _ssh_connect(conn, 30)
+        sftp = client.open_sftp()
+        entries = []
+        for a in sftp.listdir_attr(remote):
+            is_dir = _stat.S_ISDIR(a.st_mode)
+            entries.append({"name": a.filename, "is_dir": is_dir,
+                            "size": a.st_size, "size_human": _fmt_bytes(a.st_size) if not is_dir else "",
+                            "path": (remote.rstrip("/") + "/" + a.filename)})
+        sftp.close(); client.close()
+        entries.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
+        return entries
+    try:
+        entries = await asyncio.get_running_loop().run_in_executor(None, _run)
+        return {"success": True, "remote_path": remote, "count": len(entries), "entries": entries}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ssh_server_info(args: dict) -> dict:
+    """🩺 Diagnostic rapide d'un serveur SSH (OS, uptime, CPU/RAM, disque, charge)."""
+    cid = (args.get("connection_id") or "").strip()
+    conn = db.get_ssh_connection(cid)
+    if not conn:
+        return {"error": "Connexion SSH introuvable."}
+    cmd = ("echo '###OS'; (cat /etc/os-release 2>/dev/null | grep PRETTY_NAME || uname -a); "
+           "echo '###UP'; uptime; "
+           "echo '###MEM'; free -h 2>/dev/null || vm_stat; "
+           "echo '###DISK'; df -h / 2>/dev/null; "
+           "echo '###LOAD'; cat /proc/loadavg 2>/dev/null; "
+           "echo '###WHO'; who 2>/dev/null | head -5")
+
+    def _run():
+        client = _ssh_connect(conn, 30)
+        _, so, _se = client.exec_command(cmd, timeout=30)
+        out = so.read().decode(errors="replace"); client.close()
+        return out
+    try:
+        out = await asyncio.get_running_loop().run_in_executor(None, _run)
+        db.touch_ssh_connection(cid)
+        sections = {}
+        cur = None
+        for line in out.splitlines():
+            if line.startswith("###"):
+                cur = line[3:].lower(); sections[cur] = []
+            elif cur:
+                sections[cur].append(line)
+        info = {k: "\n".join(v).strip() for k, v in sections.items()}
+        return {"success": True, "host": f"{conn['username']}@{conn['host']}", "info": info, "raw": out}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 14 — Outils Utilitaires (Calculateur, Date/Heure, Météo)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_calculator(args: dict) -> dict:
+    """Évalue une expression mathématique de façon sécurisée."""
+    expr = args.get("expression", "").strip()
+    if not expr:
+        return {"error": "Paramètre 'expression' requis. Ex: '(12 + 4) * 3 / 2'"}
+
+    # Liste blanche de tokens autorisés : chiffres, opérateurs, fonctions math, constantes
+    import math as _math
+    import ast as _ast
+
+    _SAFE_NAMES = {
+        # constantes
+        "pi": _math.pi, "e": _math.e, "inf": _math.inf, "nan": _math.nan,
+        "tau": _math.tau,
+        # fonctions de base
+        "abs": abs, "round": round, "min": min, "max": max,
+        "int": int, "float": float,
+        # fonctions math
+        "sqrt": _math.sqrt, "cbrt": lambda x: x ** (1/3),
+        "sin": _math.sin, "cos": _math.cos, "tan": _math.tan,
+        "asin": _math.asin, "acos": _math.acos, "atan": _math.atan,
+        "atan2": _math.atan2,
+        "log": _math.log, "log2": _math.log2, "log10": _math.log10,
+        "exp": _math.exp, "pow": _math.pow,
+        "floor": _math.floor, "ceil": _math.ceil, "trunc": _math.trunc,
+        "factorial": _math.factorial, "gcd": _math.gcd,
+        "degrees": _math.degrees, "radians": _math.radians,
+        "hypot": _math.hypot, "comb": _math.comb, "perm": _math.perm,
+    }
+
+    try:
+        # Sécurité : parser l'AST et rejeter tout nœud non-autorisé
+        tree = _ast.parse(expr, mode="eval")
+
+        # Nœuds contexte (Load/Store/Del) — toujours inoffensifs, apparaissent dans ast.walk
+        _CTX_NODES = tuple(
+            getattr(_ast, n) for n in ("Load", "Store", "Del", "AugLoad", "AugStore", "Param")
+            if hasattr(_ast, n)
+        )
+
+        for node in _ast.walk(tree):
+            if isinstance(node, (_ast.Module, _ast.Expr, _ast.Expression)):
+                continue
+            if isinstance(node, _CTX_NODES):
+                continue
+            if isinstance(node, (_ast.BinOp, _ast.UnaryOp, _ast.BoolOp,
+                                   _ast.Compare, _ast.IfExp)):
+                continue
+            if isinstance(node, (_ast.Add, _ast.Sub, _ast.Mult, _ast.Div,
+                                   _ast.Mod, _ast.Pow, _ast.FloorDiv,
+                                   _ast.LShift, _ast.RShift, _ast.BitAnd,
+                                   _ast.BitOr, _ast.BitXor, _ast.Invert,
+                                   _ast.Not, _ast.UAdd, _ast.USub,
+                                   _ast.Eq, _ast.NotEq, _ast.Lt, _ast.LtE,
+                                   _ast.Gt, _ast.GtE,
+                                   _ast.And, _ast.Or)):
+                continue
+            if isinstance(node, _ast.Constant):
+                if not isinstance(node.value, (int, float, bool, complex)):
+                    raise ValueError(f"Constante non autorisée : {node.value!r}")
+                continue
+            if isinstance(node, _ast.Call):
+                # Vérifier que la fonction appelée est dans la whitelist
+                if isinstance(node.func, _ast.Name) and node.func.id in _SAFE_NAMES:
+                    continue
+                raise ValueError(f"Appel de fonction non autorisé : {_ast.unparse(node.func)}")
+            if isinstance(node, _ast.Name):
+                if node.id in _SAFE_NAMES:
+                    continue
+                raise ValueError(f"Nom non autorisé : {node.id!r}")
+            if isinstance(node, _ast.Tuple):
+                continue
+            # Arguments de la liste/keywords pour les appels de fonctions
+            if isinstance(node, (_ast.arguments, _ast.arg, _ast.keyword)):
+                continue
+            raise ValueError(f"Expression non autorisée : {type(node).__name__}")
+
+        result = eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, _SAFE_NAMES)
+
+        # Guard against infinite/NaN results
+        if isinstance(result, float):
+            if _math.isinf(result):
+                return {"error": "Résultat infini (division par zéro ou overflow)"}
+            if _math.isnan(result):
+                return {"error": "Résultat indéfini (NaN)"}
+
+        # Formater le résultat
+        if isinstance(result, float):
+            if result == int(result) and abs(result) < 1e15:
+                formatted = str(int(result))
+            else:
+                formatted = f"{result:.10g}"
+        elif isinstance(result, int):
+            # Truncate very large integers to avoid context window bloat
+            s = str(result)
+            if len(s) > 80:
+                formatted = f"{s[:40]}…[{len(s)} chiffres]"
+            else:
+                formatted = s
+        else:
+            formatted = str(result)
+
+        # Ensure result is JSON-serializable (large ints can be problematic)
+        result_serializable = formatted if isinstance(result, int) and abs(result) > 10**15 else result
+
+        return {
+            "success":    True,
+            "expression": expr,
+            "result":     result_serializable,
+            "formatted":  formatted,
+        }
+    except ZeroDivisionError:
+        return {"error": "Division par zéro"}
+    except OverflowError:
+        return {"error": "Dépassement de capacité (résultat trop grand)"}
+    except ValueError as e:
+        msg = str(e)
+        if "math domain" in msg:
+            return {"error": f"Domaine mathématique invalide : {msg}"}
+        return {"error": f"Expression non autorisée : {msg}"}
+    except Exception as e:
+        return {"error": f"Erreur de calcul : {e}"}
+
+
+async def execute_datetime_info(args: dict) -> dict:
+    """Retourne l'heure actuelle, effectue des conversions et calculs de dates."""
+    from datetime import datetime, timezone, timedelta
+    import zoneinfo
+
+    action   = args.get("action", "now")   # now | convert | diff | add
+    tz_name  = args.get("timezone", "Europe/Paris")
+    dt_input = args.get("datetime", "")    # ISO 8601 pour convert/diff/add
+    dt2      = args.get("datetime2", "")   # pour diff
+    delta    = args.get("delta", {})       # pour add : {"days": 5, "hours": 2}
+
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = timezone.utc
+        tz_name = "UTC"
+
+    now_utc = datetime.now(timezone.utc)
+    now_tz  = now_utc.astimezone(tz)
+
+    if action == "now":
+        return {
+            "success":   True,
+            "utc":       now_utc.isoformat(),
+            "local":     now_tz.isoformat(),
+            "timezone":  tz_name,
+            "weekday":   now_tz.strftime("%A"),
+            "formatted": now_tz.strftime("%d/%m/%Y %H:%M:%S %Z"),
+            "unix":      int(now_utc.timestamp()),
+        }
+
+    if action == "convert":
+        if not dt_input:
+            return {"error": "Paramètre 'datetime' requis pour action=convert"}
+        try:
+            dt = datetime.fromisoformat(dt_input)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            converted = dt.astimezone(tz)
+            return {
+                "success":   True,
+                "original":  dt.isoformat(),
+                "converted": converted.isoformat(),
+                "timezone":  tz_name,
+                "formatted": converted.strftime("%d/%m/%Y %H:%M:%S %Z"),
+            }
+        except ValueError as e:
+            return {"error": f"Format datetime invalide : {e}"}
+
+    if action == "diff":
+        if not dt_input or not dt2:
+            return {"error": "Paramètres 'datetime' et 'datetime2' requis pour action=diff"}
+        try:
+            d1 = datetime.fromisoformat(dt_input)
+            d2 = datetime.fromisoformat(dt2)
+            if d1.tzinfo is None: d1 = d1.replace(tzinfo=timezone.utc)
+            if d2.tzinfo is None: d2 = d2.replace(tzinfo=timezone.utc)
+            diff = abs(d2 - d1)
+            total_s = int(diff.total_seconds())
+            return {
+                "success":   True,
+                "diff_seconds":     total_s,
+                "diff_minutes":     round(total_s / 60, 2),
+                "diff_hours":       round(total_s / 3600, 2),
+                "diff_days":        diff.days,
+                "human":            f"{diff.days}j {diff.seconds // 3600}h {(diff.seconds % 3600) // 60}min",
+            }
+        except ValueError as e:
+            return {"error": f"Format datetime invalide : {e}"}
+
+    if action == "add":
+        if not dt_input:
+            return {"error": "Paramètre 'datetime' requis pour action=add"}
+        try:
+            dt = datetime.fromisoformat(dt_input)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            td = timedelta(
+                days=int(delta.get("days", 0)),
+                hours=int(delta.get("hours", 0)),
+                minutes=int(delta.get("minutes", 0)),
+                seconds=int(delta.get("seconds", 0)),
+                weeks=int(delta.get("weeks", 0)),
+            )
+            result = (dt + td).astimezone(tz)
+            return {
+                "success":   True,
+                "original":  dt.isoformat(),
+                "result":    result.isoformat(),
+                "formatted": result.strftime("%d/%m/%Y %H:%M:%S %Z"),
+            }
+        except ValueError as e:
+            return {"error": f"Format datetime invalide : {e}"}
+
+    return {"error": f"Action inconnue : {action!r}. Utilisez : now, convert, diff, add"}
+
+
+async def execute_unit_convert(args: dict) -> dict:
+    """Convertit une valeur d'une unité à une autre (longueur, masse, temp., vitesse, surface…)."""
+    value_raw = args.get("value")
+    from_unit = args.get("from_unit", "").strip().lower()
+    to_unit   = args.get("to_unit",   "").strip().lower()
+
+    if value_raw is None:
+        return {"error": "Paramètre 'value' requis"}
+    try:
+        value = float(value_raw)
+    except (TypeError, ValueError):
+        return {"error": f"Valeur numérique invalide : {value_raw!r}"}
+
+    # Définir toutes les conversions en termes d'une unité de base
+    # Format : { alias: (facteur_vers_base, unité_de_base) }
+    UNITS: dict[str, tuple[float, str]] = {
+        # Longueur (base: mètre)
+        "m": (1, "m"), "metre": (1, "m"), "meter": (1, "m"), "metres": (1, "m"), "meters": (1, "m"),
+        "km": (1000, "m"), "kilometre": (1000, "m"), "kilometer": (1000, "m"),
+        "cm": (0.01, "m"), "centimetre": (0.01, "m"), "centimeter": (0.01, "m"),
+        "mm": (0.001, "m"), "millimetre": (0.001, "m"), "millimeter": (0.001, "m"),
+        "mile": (1609.344, "m"), "miles": (1609.344, "m"), "mi": (1609.344, "m"),
+        "yard": (0.9144, "m"), "yards": (0.9144, "m"), "yd": (0.9144, "m"),
+        "foot": (0.3048, "m"), "feet": (0.3048, "m"), "ft": (0.3048, "m"),
+        "inch": (0.0254, "m"), "inches": (0.0254, "m"), "in": (0.0254, "m"),
+        "nm": (1e-9, "m"), "nanometre": (1e-9, "m"),
+        "au": (1.495978707e11, "m"),
+        "ly": (9.461e15, "m"),
+        # Masse (base: kg)
+        "kg": (1, "kg"), "kilogram": (1, "kg"), "kilogramme": (1, "kg"),
+        "g": (0.001, "kg"), "gram": (0.001, "kg"), "gramme": (0.001, "kg"),
+        "mg": (1e-6, "kg"), "milligram": (1e-6, "kg"),
+        "tonne": (1000, "kg"), "t": (1000, "kg"),
+        "lb": (0.45359237, "kg"), "pound": (0.45359237, "kg"), "pounds": (0.45359237, "kg"), "lbs": (0.45359237, "kg"),
+        "oz": (0.0283495, "kg"), "ounce": (0.0283495, "kg"), "ounces": (0.0283495, "kg"),
+        "stone": (6.35029, "kg"),
+        # Volume (base: litre)
+        "l": (1, "L"), "litre": (1, "L"), "liter": (1, "L"), "litres": (1, "L"), "liters": (1, "L"),
+        "ml": (0.001, "L"), "millilitre": (0.001, "L"), "milliliter": (0.001, "L"),
+        "cl": (0.01, "L"), "centilitre": (0.01, "L"),
+        "dl": (0.1, "L"), "decilitre": (0.1, "L"),
+        "m3": (1000, "L"), "m³": (1000, "L"),
+        "gallon": (3.78541, "L"), "gallons": (3.78541, "L"), "gal": (3.78541, "L"),
+        "pint": (0.473176, "L"), "pints": (0.473176, "L"), "pt": (0.473176, "L"),
+        "fl oz": (0.0295735, "L"),
+        # Vitesse (base: m/s)
+        "m/s": (1, "m/s"), "ms": (1, "m/s"),
+        "km/h": (1/3.6, "m/s"), "kmh": (1/3.6, "m/s"), "kph": (1/3.6, "m/s"),
+        "mph": (0.44704, "m/s"),
+        "knot": (0.514444, "m/s"), "knots": (0.514444, "m/s"), "kt": (0.514444, "m/s"),
+        # Surface (base: m²)
+        "m2": (1, "m²"), "m²": (1, "m²"),
+        "km2": (1e6, "m²"), "km²": (1e6, "m²"),
+        "cm2": (1e-4, "m²"), "cm²": (1e-4, "m²"),
+        "ha": (1e4, "m²"), "hectare": (1e4, "m²"),
+        "acre": (4046.86, "m²"), "acres": (4046.86, "m²"),
+        "ft2": (0.092903, "m²"), "sqft": (0.092903, "m²"),
+        # Énergie (base: joule)
+        "j": (1, "J"), "joule": (1, "J"), "joules": (1, "J"),
+        "kj": (1000, "J"), "kilojoule": (1000, "J"),
+        "cal": (4.184, "J"), "calorie": (4.184, "J"),
+        "kcal": (4184, "J"), "kilocalorie": (4184, "J"),
+        "kwh": (3.6e6, "J"), "wh": (3600, "J"),
+        "ev": (1.602e-19, "J"),
+        # Données numériques (base: octet/byte)
+        "b": (1, "o"), "byte": (1, "o"), "bytes": (1, "o"),
+        "ko": (1000, "o"), "kb": (1000, "o"), "kilobyte": (1000, "o"),
+        "mo": (1e6, "o"), "mb": (1e6, "o"), "megabyte": (1e6, "o"),
+        "go": (1e9, "o"), "gb": (1e9, "o"), "gigabyte": (1e9, "o"),
+        "to": (1e12, "o"), "tb": (1e12, "o"), "terabyte": (1e12, "o"),
+        "kib": (1024, "o"), "mib": (1048576, "o"), "gib": (1073741824, "o"),
+    }
+
+    # Températures — traitement spécial (pas linéaire pour certaines)
+    TEMP_UNITS = {"c", "celsius", "°c", "f", "fahrenheit", "°f", "k", "kelvin"}
+
+    def _temp_to_celsius(v: float, u: str) -> float:
+        if u in ("c", "celsius", "°c"):
+            return v
+        if u in ("f", "fahrenheit", "°f"):
+            return (v - 32) * 5 / 9
+        if u in ("k", "kelvin"):
+            return v - 273.15
+        raise ValueError(f"Unité de température inconnue : {u}")
+
+    def _celsius_to_unit(v: float, u: str) -> float:
+        if u in ("c", "celsius", "°c"):
+            return v
+        if u in ("f", "fahrenheit", "°f"):
+            return v * 9 / 5 + 32
+        if u in ("k", "kelvin"):
+            return v + 273.15
+        raise ValueError(f"Unité de température inconnue : {u}")
+
+    if from_unit in TEMP_UNITS or to_unit in TEMP_UNITS:
+        try:
+            celsius = _temp_to_celsius(value, from_unit)
+            result  = _celsius_to_unit(celsius, to_unit)
+        except ValueError as e:
+            return {"error": str(e)}
+        return {
+            "success":   True,
+            "value":     value,
+            "from_unit": from_unit,
+            "to_unit":   to_unit,
+            "result":    round(result, 6),
+            "formatted": f"{value} {from_unit} = {result:.6g} {to_unit}",
+        }
+
+    # Conversion linéaire
+    if from_unit not in UNITS:
+        return {"error": f"Unité source inconnue : '{from_unit}'. Exemples : m, km, kg, lb, L, °C, km/h…"}
+    if to_unit not in UNITS:
+        return {"error": f"Unité destination inconnue : '{to_unit}'."}
+
+    f_factor, f_base = UNITS[from_unit]
+    t_factor, t_base = UNITS[to_unit]
+    if f_base != t_base:
+        return {"error": f"Unités incompatibles : '{from_unit}' ({f_base}) ≠ '{to_unit}' ({t_base})"}
+
+    result = value * f_factor / t_factor
+    return {
+        "success":   True,
+        "value":     value,
+        "from_unit": from_unit,
+        "to_unit":   to_unit,
+        "result":    round(result, 9),
+        "formatted": f"{value} {from_unit} = {result:.6g} {to_unit}",
+    }
+
+
+async def execute_password_generate(args: dict) -> dict:
+    """Génère un mot de passe ou PIN sécurisé avec les critères choisis."""
+    import secrets
+    import string
+
+    length   = max(4, min(int(args.get("length", 16)), 128))
+    include  = set(args.get("include", ["letters", "digits", "symbols"]))
+    exclude  = str(args.get("exclude", ""))           # caractères à exclure
+    count    = max(1, min(int(args.get("count", 1)), 20))   # nombre de mots de passe
+    pin_mode = args.get("pin", False)                  # PIN numérique uniquement
+
+    if pin_mode:
+        charset = string.digits
+    else:
+        charset = ""
+        if "letters" in include:
+            charset += string.ascii_letters
+        if "digits" in include:
+            charset += string.digits
+        if "symbols" in include:
+            charset += "!@#$%^&*()-_=+[]{}|;:,.<>?"
+        if not charset:
+            charset = string.ascii_letters + string.digits
+
+    # Retirer les caractères exclus
+    for c in exclude:
+        charset = charset.replace(c, "")
+
+    if not charset:
+        return {"error": "Aucun caractère disponible après exclusions."}
+
+    passwords = []
+    for _ in range(count):
+        pwd = "".join(secrets.choice(charset) for _ in range(length))
+        # Forcer au moins un caractère de chaque catégorie demandée (sauf PIN)
+        if not pin_mode and count == 1:
+            tries = 0
+            while tries < 50:
+                ok = True
+                if "letters" in include and not any(c in string.ascii_letters for c in pwd):
+                    ok = False
+                if "digits" in include and not any(c in string.digits for c in pwd):
+                    ok = False
+                if "symbols" in include and not any(c in "!@#$%^&*()-_=+[]{}|;:,.<>?" for c in pwd):
+                    ok = False
+                if ok:
+                    break
+                pwd = "".join(secrets.choice(charset) for _ in range(length))
+                tries += 1
+        passwords.append(pwd)
+
+    return {
+        "success":   True,
+        "passwords": passwords,
+        "length":    length,
+        "charset_size": len(set(charset)),
+        "note": f"{'PIN numérique' if pin_mode else f'Mot de passe {length} caractères'} généré avec {len(set(charset))} caractères possibles",
+    }
+
+
+async def execute_translate(args: dict) -> dict:
+    """Traduit du texte via MyMemory (gratuit, 1000 req/j sans clé, + clé optionnelle)."""
+    import httpx
+    import urllib.parse
+
+    text    = args.get("text", "").strip()
+    # 'source'/'target' acceptés en alias de 'source_lang'/'target_lang' : sans ça, un appel
+    # avec le mauvais nom de paramètre retombe silencieusement sur les défauts (auto→en) au
+    # lieu de traduire vers la langue réellement demandée — pas une erreur visible, mais faux.
+    source  = (args.get("source_lang") or args.get("source") or "auto").lower()
+    target  = (args.get("target_lang") or args.get("target") or "en").lower()
+
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+    if not target:
+        return {"error": "Paramètre 'target_lang' requis. Ex: 'fr', 'en', 'es'."}
+
+    import credentials_manager as cm
+    api_key = cm.get_credential("mymemory_api_key") or ""
+
+    # MyMemory ne supporte pas "auto" comme code source — on détecte la langue
+    if source in ("auto", ""):
+        try:
+            from langdetect import detect as _detect
+            source = _detect(text[:200]) or "fr"
+        except Exception:
+            source = "fr"
+
+    # Si source == target, pas besoin de traduire
+    if source.lower() == target.lower():
+        return {
+            "success":    True,
+            "original":   text,
+            "translated": text,
+            "source_lang": source,
+            "target_lang": target,
+            "provider":   "local (même langue détectée)",
+            "note":       f"Le texte est déjà en '{source}' — aucune traduction nécessaire.",
+        }
+
+    # MyMemory attend le format "fr|en" pour langpair
+    langpair = f"{source}|{target}"
+
+    # Découper le texte si > 500 chars (limite MyMemory par requête)
+    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
+    translated_parts = []
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for chunk in chunks:
+                params = {
+                    "q":        chunk,
+                    "langpair": langpair,
+                }
+                if api_key:
+                    params["key"] = api_key
+
+                resp = await client.get(
+                    "https://api.mymemory.translated.net/get",
+                    params=params,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                if data.get("responseStatus") == 200:
+                    translated_parts.append(data["responseData"]["translatedText"])
+                else:
+                    return {"error": f"Erreur MyMemory : {data.get('responseDetails', 'inconnue')}"}
+
+        translated = " ".join(translated_parts)
+        return {
+            "success":     True,
+            "original":    text,
+            "translated":  translated,
+            "source_lang": source,
+            "target_lang": target,
+            "provider":    "MyMemory (mymemory.translated.net)",
+        }
+    except Exception as e:
+        return {"error": f"Traduction échouée : {e}"}
+
+
+# Cache for weather geocoding (city → lat/lon)
+# Same city geocoded → reuse the coords (saves ~200ms per call)
+_geocode_cache: dict = {}
+_GEOCODE_CACHE_MAX = 100
+
+# Reusable HTTPX client for weather API (HTTP/2, connection pooling)
+# Initialized lazily on first call
+_weather_client = None
+_weather_client_lock = None
+
+async def _get_weather_client():
+    """Singleton httpx client with connection pooling for fast repeat calls."""
+    global _weather_client, _weather_client_lock
+    if _weather_client_lock is None:
+        import asyncio as _aio
+        _weather_client_lock = _aio.Lock()
+    async with _weather_client_lock:
+        if _weather_client is None:
+            import httpx
+            # httpx.Timeout requires all 4 params (connect/read/write/pool) or a single default value
+            _weather_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(8.0, connect=3.0),
+                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+            )
+        return _weather_client
+
+
+async def execute_weather(args: dict) -> dict:
+    """Récupère la météo actuelle ou prévisions via Open-Meteo (gratuit, sans clé API). Optimisé pour la rapidité."""
+    from datetime import datetime, timezone
+
+    city    = args.get("city", "Paris").strip()
+    country = args.get("country", "FR").strip()
+    days    = max(1, min(int(args.get("days", 1)), 7))
+
+    cache_key = f"{city.lower()}|{country.lower()}"
+
+    # 1. Géocodage — avec cache
+    if cache_key in _geocode_cache:
+        loc = _geocode_cache[cache_key]
+    else:
+        try:
+            client = await _get_weather_client()
+            geo = await client.get(
+                "https://geocoding-api.open-meteo.com/v1/search",
+                params={"name": city, "count": 5, "language": "fr", "format": "json"},
+            )
+            geo.raise_for_status()
+            geo_data = geo.json()
+        except Exception as e:
+            return {"error": f"Géocodage échoué : {e}"}
+
+        results = geo_data.get("results", [])
+        if not results:
+            return {"error": f"Ville '{city}' non trouvée"}
+
+        loc = next(
+            (r for r in results if r.get("country_code", "").upper() == country.upper()),
+            results[0]
+        )
+        # Cache for next time
+        if len(_geocode_cache) >= _GEOCODE_CACHE_MAX:
+            _geocode_cache.clear()
+        _geocode_cache[cache_key] = loc
+
+    lat, lon = loc["latitude"], loc["longitude"]
+    city_name = f"{loc.get('name', city)}, {loc.get('country', '')}"
+
+    # 2. Récupérer la météo via Open-Meteo (réutilise le client → plus rapide)
+    try:
+        client = await _get_weather_client()
+        weather = await client.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat, "longitude": lon,
+                "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code",
+                "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
+                "forecast_days": days,
+                "timezone": "auto",
+            },
+        )
+        weather.raise_for_status()
+        wdata = weather.json()
+    except Exception as e:
+        return {"error": f"API météo échouée : {e}"}
+
+    # Interprétation des codes WMO
+    WMO = {
+        0: "Ciel dégagé ☀️", 1: "Principalement dégagé 🌤️", 2: "Partiellement nuageux ⛅",
+        3: "Couvert ☁️", 45: "Brouillard 🌫️", 48: "Brouillard givrant 🌫️",
+        51: "Bruine légère 🌦️", 53: "Bruine modérée 🌦️", 55: "Bruine dense 🌦️",
+        61: "Pluie légère 🌧️", 63: "Pluie modérée 🌧️", 65: "Forte pluie 🌧️",
+        71: "Légère neige 🌨️", 73: "Neige modérée 🌨️", 75: "Forte neige ❄️",
+        77: "Grésil ❄️", 80: "Averses légères 🌦️", 81: "Averses modérées 🌦️",
+        82: "Averses violentes ⛈️", 85: "Averses de neige 🌨️", 86: "Fortes averses de neige ❄️",
+        95: "Orage ⛈️", 96: "Orage avec grêle ⛈️", 99: "Orage fort avec grêle ⛈️",
+    }
+
+    cur = wdata.get("current", {})
+    wmo_code = cur.get("weather_code", 0)
+    condition = WMO.get(wmo_code, f"Code {wmo_code}")
+
+    current_weather = {
+        "city":        city_name,
+        "condition":   condition,
+        "temperature": cur.get("temperature_2m"),
+        "feels_like":  cur.get("apparent_temperature"),
+        "humidity":    cur.get("relative_humidity_2m"),
+        "wind_speed":  cur.get("wind_speed_10m"),
+        "precipitation": cur.get("precipitation"),
+    }
+
+    # Prévisions journalières
+    daily = wdata.get("daily", {})
+    forecasts = []
+    if daily:
+        dates  = daily.get("time", [])
+        maxT   = daily.get("temperature_2m_max", [])
+        minT   = daily.get("temperature_2m_min", [])
+        precip = daily.get("precipitation_sum", [])
+        codes  = daily.get("weather_code", [])
+        for i in range(min(len(dates), days)):
+            forecasts.append({
+                "date":        dates[i],
+                "condition":   WMO.get(codes[i] if i < len(codes) else 0, "?"),
+                "temp_max":    maxT[i] if i < len(maxT) else None,
+                "temp_min":    minT[i] if i < len(minT) else None,
+                "precipitation": precip[i] if i < len(precip) else None,
+            })
+
+    return {
+        "success": True,
+        "current": current_weather,
+        "forecasts": forecasts,
+        "source": "Open-Meteo (open-meteo.com)",
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 15 — Outils de traitement de données
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_hash_compute(args: dict) -> dict:
+    """Calcule le hash cryptographique d'un texte ou fichier."""
+    import hashlib as _hashlib
+
+    algorithm = args.get("algorithm", "sha256").lower()
+    text      = args.get("text", "")
+    file_path = args.get("file_path", "")
+
+    supported = ["md5", "sha1", "sha256", "sha512"]
+    if algorithm not in supported:
+        return {"error": f"Algorithme non supporté. Utilisez : {', '.join(supported)}"}
+
+    h = _hashlib.new(algorithm)
+
+    if file_path:
+        try:
+            resolved = _resolve_path(file_path)
+            with open(resolved, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    h.update(chunk)
+            digest = h.hexdigest()
+            return {
+                "success":   True,
+                "algorithm": algorithm.upper(),
+                "hash":      digest,
+                "source":    "file",
+                "file":      str(resolved),
+            }
+        except FileNotFoundError:
+            return {"error": f"Fichier introuvable : {file_path}"}
+        except Exception as e:
+            return {"error": str(e)}
+    elif text:
+        h.update(text.encode("utf-8"))
+        return {
+            "success":   True,
+            "algorithm": algorithm.upper(),
+            "hash":      h.hexdigest(),
+            "source":    "text",
+        }
+    else:
+        return {"error": "Fournissez 'text' ou 'file_path'."}
+
+
+async def execute_base64_tool(args: dict) -> dict:
+    """Encode ou décode du Base64."""
+    import base64 as _b64
+
+    action = args.get("action", "encode").lower()  # encode | decode
+    data   = args.get("data", "")
+    url_safe = args.get("url_safe", False)
+
+    if not data:
+        return {"error": "Paramètre 'data' requis."}
+
+    try:
+        if action == "encode":
+            raw = data.encode("utf-8")
+            if url_safe:
+                result = _b64.urlsafe_b64encode(raw).decode("ascii")
+            else:
+                result = _b64.b64encode(raw).decode("ascii")
+            return {"success": True, "action": "encode", "result": result, "length": len(result)}
+        elif action == "decode":
+            try:
+                if url_safe:
+                    decoded = _b64.urlsafe_b64decode(data + "==").decode("utf-8")
+                else:
+                    decoded = _b64.b64decode(data + "==").decode("utf-8")
+            except UnicodeDecodeError:
+                decoded = f"<données binaires — {len(_b64.b64decode(data + '=='))} octets>"
+            return {"success": True, "action": "decode", "result": decoded}
+        else:
+            return {"error": "Action invalide. Utilisez 'encode' ou 'decode'."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_text_extract(args: dict) -> dict:
+    """Extrait des emails, URLs ou numéros de téléphone d'un texte."""
+    import re as _re
+
+    text    = args.get("text", "")
+    extract = args.get("extract", "all").lower()  # emails | urls | phones | all
+
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+
+    results = {}
+
+    if extract in ("emails", "all"):
+        emails = _re.findall(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", text)
+        results["emails"] = sorted(set(emails))
+
+    if extract in ("urls", "all"):
+        urls = _re.findall(
+            r"https?://[^\s\"\'\)\]>]+",
+            text,
+        )
+        results["urls"] = sorted(set(u.rstrip(".,;") for u in urls))
+
+    if extract in ("phones", "all"):
+        phones = _re.findall(
+            r"(?:\+33|0033|0)[1-9](?:[.\- ]?\d{2}){4}"
+            r"|(?:\+\d{1,3}[\s\-]?)?\(?\d{3,4}\)?[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}",
+            text,
+        )
+        results["phones"] = sorted(set(phones))
+
+    total = sum(len(v) for v in results.values())
+    return {
+        "success": True,
+        "extracted": extract,
+        **results,
+        "total_found": total,
+    }
+
+
+async def execute_diff_text(args: dict) -> dict:
+    """Compare deux textes et retourne les différences ligne par ligne."""
+    import difflib as _difflib
+
+    text_a    = args.get("text_a", "")
+    text_b    = args.get("text_b", "")
+    mode      = args.get("mode", "unified")  # unified | context | ndiff | ratio
+    n_context = int(args.get("context_lines", 3))
+
+    if mode == "ratio":
+        ratio = _difflib.SequenceMatcher(None, text_a, text_b).ratio()
+        return {
+            "success":     True,
+            "mode":        "ratio",
+            "similarity":  round(ratio * 100, 2),
+            "message":     f"Les textes sont similaires à {round(ratio*100,1)} %.",
+        }
+
+    lines_a = text_a.splitlines(keepends=True)
+    lines_b = text_b.splitlines(keepends=True)
+
+    if mode == "unified":
+        diff = list(_difflib.unified_diff(lines_a, lines_b, fromfile="texte_a", tofile="texte_b", n=n_context))
+    elif mode == "context":
+        diff = list(_difflib.context_diff(lines_a, lines_b, fromfile="texte_a", tofile="texte_b", n=n_context))
+    else:  # ndiff
+        diff = list(_difflib.ndiff(lines_a, lines_b))
+
+    diff_str = "".join(diff)
+    added   = diff_str.count("\n+")
+    removed = diff_str.count("\n-")
+
+    return {
+        "success":      True,
+        "mode":         mode,
+        "diff":         diff_str or "(Textes identiques)",
+        "lines_added":  added,
+        "lines_removed": removed,
+        "identical":    not bool(diff_str.strip()),
+    }
+
+
+async def execute_image_info(args: dict) -> dict:
+    """Retourne les métadonnées d'une image (dimensions, format, mode couleur, taille)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+
+    try:
+        from PIL import Image as _Image
+        resolved = _resolve_path(path)
+        with _Image.open(resolved) as img:
+            exif_data = {}
+            try:
+                exif_raw = img._getexif()
+                if exif_raw:
+                    from PIL.ExifTags import TAGS
+                    for tag_id, value in exif_raw.items():
+                        tag = TAGS.get(tag_id, tag_id)
+                        if isinstance(value, (str, int, float)):
+                            exif_data[str(tag)] = str(value)
+            except Exception:
+                pass
+
+            return {
+                "success":    True,
+                "path":       str(resolved),
+                "format":     img.format or "inconnu",
+                "mode":       img.mode,
+                "width":      img.width,
+                "height":     img.height,
+                "megapixels": round(img.width * img.height / 1_000_000, 2),
+                "size_bytes": Path(resolved).stat().st_size,
+                "size_kb":    round(Path(resolved).stat().st_size / 1024, 1),
+                "exif":       exif_data,
+            }
+    except ImportError:
+        return {"error": "Pillow non installé. Installez avec : pip install Pillow"}
+    except FileNotFoundError:
+        return {"error": f"Fichier introuvable : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_image_resize(args: dict) -> dict:
+    """Redimensionne ou convertit une image (JPEG, PNG, WEBP, BMP)."""
+    path        = args.get("path", "").strip()
+    output_path = args.get("output_path", "").strip()
+    width       = args.get("width")
+    height      = args.get("height")
+    quality     = int(args.get("quality", 85))
+    keep_ratio  = args.get("keep_ratio", True)
+    output_format = args.get("format", "").upper()  # JPEG | PNG | WEBP
+
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    if not width and not height:
+        return {"error": "Spécifiez au moins 'width' ou 'height'."}
+
+    try:
+        from PIL import Image as _Image
+        resolved_in = Path(_resolve_path(path))
+
+        with _Image.open(resolved_in) as img:
+            orig_w, orig_h = img.width, img.height
+
+            if keep_ratio:
+                if width and height:
+                    ratio = min(width / orig_w, height / orig_h)
+                    new_w, new_h = round(orig_w * ratio), round(orig_h * ratio)
+                elif width:
+                    new_w = width
+                    new_h = round(orig_h * width / orig_w)
+                else:
+                    new_h = height
+                    new_w = round(orig_w * height / orig_h)
+            else:
+                new_w = width or orig_w
+                new_h = height or orig_h
+
+            resized = img.resize((new_w, new_h), _Image.LANCZOS)
+
+            # Chemin de sortie
+            if not output_path:
+                stem = resolved_in.stem
+                fmt_ext = (output_format or resolved_in.suffix[1:]).lower()
+                if fmt_ext == "jpeg": fmt_ext = "jpg"
+                out = resolved_in.parent / f"{stem}_resized.{fmt_ext}"
+            else:
+                out = Path(_resolve_path(output_path))
+
+            save_fmt = output_format or img.format or "PNG"
+            if save_fmt == "JPG": save_fmt = "JPEG"
+
+            save_kwargs = {}
+            if save_fmt in ("JPEG", "WEBP"):
+                save_kwargs["quality"] = quality
+
+            # Convertir en RGB si nécessaire pour JPEG
+            if save_fmt == "JPEG" and resized.mode in ("RGBA", "P"):
+                resized = resized.convert("RGB")
+
+            resized.save(str(out), format=save_fmt, **save_kwargs)
+
+        return {
+            "success":    True,
+            "output":     str(out),
+            "original":   {"width": orig_w, "height": orig_h},
+            "resized":    {"width": new_w,  "height": new_h},
+            "format":     save_fmt,
+            "size_kb":    round(out.stat().st_size / 1024, 1),
+        }
+    except ImportError:
+        return {"error": "Pillow non installé. Installez avec : pip install Pillow"}
+    except FileNotFoundError:
+        return {"error": f"Fichier introuvable : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_qr_generate(args: dict) -> dict:
+    """Génère un QR code en PNG depuis un texte ou URL."""
+    data        = args.get("data", "").strip()
+    output_path = args.get("output_path", "").strip()
+    size        = int(args.get("size", 10))          # box_size
+    border      = int(args.get("border", 4))
+    fg_color    = args.get("fg_color", "black")
+    bg_color    = args.get("bg_color", "white")
+
+    if not data:
+        return {"error": "Paramètre 'data' requis."}
+
+    try:
+        import qrcode as _qr
+    except ImportError:
+        return {"error": "qrcode non installé. Installez avec : pip install qrcode[pil]"}
+
+    try:
+        qr = _qr.QRCode(
+            version=1,
+            error_correction=_qr.constants.ERROR_CORRECT_L,
+            box_size=size,
+            border=border,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color=fg_color, back_color=bg_color)
+
+        if not output_path:
+            import re as _re2
+            desktop = Path(_resolve_path("~/Desktop"))
+            safe_name = _re2.sub(r"[^\w\-]", "_", data[:30]).strip("_") or "qrcode"
+            out = desktop / f"qr_{safe_name}.png"
+        else:
+            out = Path(_resolve_path(output_path))
+
+        img.save(str(out))
+
+        return {
+            "success":     True,
+            "output":      str(out),
+            "data":        data,
+            "size_px":     list(img.size),
+            "size_kb":     round(out.stat().st_size / 1024, 1),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_json_tool(args: dict) -> dict:
+    """Formate, valide, minifie ou interroge (JSONPath) un JSON."""
+    import json as _json
+
+    action = args.get("action", "format").lower()  # format | minify | validate | query
+    # 'json' accepté en alias de 'data' — le modèle confond parfois les deux noms.
+    data   = args.get("data") or args.get("json", "")
+    path   = args.get("path", "")  # JSONPath simple : "$.key.subkey[0]"
+
+    if not data:
+        return {"error": "Paramètre 'data' (JSON en texte) requis."}
+
+    try:
+        parsed = _json.loads(data)
+    except _json.JSONDecodeError as e:
+        return {"error": f"JSON invalide : {e}", "valid": False}
+
+    if action == "validate":
+        return {"success": True, "valid": True, "message": "JSON valide.", "type": type(parsed).__name__}
+
+    if action == "format":
+        return {"success": True, "result": _json.dumps(parsed, ensure_ascii=False, indent=2)}
+
+    if action == "minify":
+        return {"success": True, "result": _json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))}
+
+    if action == "query":
+        if not path:
+            return {"error": "Paramètre 'path' requis pour l'action 'query' (ex: 'key.subkey')."}
+        # Simple dot-notation traversal (subset of JSONPath)
+        keys = path.lstrip("$.").split(".")
+        current = parsed
+        try:
+            for k in keys:
+                if k == "": continue
+                # Gestion des indices : key[0]
+                bracket = k.find("[")
+                if bracket >= 0:
+                    idx = int(k[bracket+1:-1])
+                    k   = k[:bracket]
+                    if k: current = current[k]
+                    current = current[idx]
+                else:
+                    current = current[k]
+            return {"success": True, "result": _json.dumps(current, ensure_ascii=False, indent=2) if not isinstance(current, (str, int, float, bool)) else current}
+        except (KeyError, IndexError, TypeError) as e:
+            return {"error": f"Chemin introuvable : {path} — {e}"}
+
+    return {"error": f"Action inconnue : {action}. Utilisez format | minify | validate | query."}
+
+
+async def execute_markdown_convert(args: dict) -> dict:
+    """Convertit du Markdown en HTML ou en texte brut."""
+    import re as _re
+
+    text   = args.get("text", "")
+    to     = args.get("to", "html").lower()  # html | plain | stats
+
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+
+    if to == "stats":
+        headings = len(_re.findall(r"^#{1,6}\s", text, _re.MULTILINE))
+        links    = len(_re.findall(r"\[.+?\]\(.+?\)", text))
+        images   = len(_re.findall(r"!\[.+?\]\(.+?\)", text))
+        code_blocks = len(_re.findall(r"```", text)) // 2
+        return {"success": True, "headings": headings, "links": links, "images": images, "code_blocks": code_blocks}
+
+    if to == "plain":
+        # Strip markdown markup
+        plain = _re.sub(r"#+\s", "", text)
+        plain = _re.sub(r"\*{1,2}(.+?)\*{1,2}", r"\1", plain)
+        plain = _re.sub(r"_{1,2}(.+?)_{1,2}", r"\1", plain)
+        plain = _re.sub(r"`{1,3}(.+?)`{1,3}", r"\1", plain, flags=_re.DOTALL)
+        plain = _re.sub(r"!\[.*?\]\(.*?\)", "", plain)
+        plain = _re.sub(r"\[(.+?)\]\(.+?\)", r"\1", plain)
+        plain = _re.sub(r"^\s*[-*+]\s", "", plain, flags=_re.MULTILINE)
+        plain = _re.sub(r"^\s*\d+\.\s", "", plain, flags=_re.MULTILINE)
+        plain = _re.sub(r"---+|===+", "", plain)
+        return {"success": True, "format": "plain", "result": plain.strip()}
+
+    # HTML conversion (basic markdown → HTML)
+    html = text
+
+    # Code blocks first (to avoid processing inside them)
+    blocks = {}
+    def save_block(m):
+        key = f"__BLOCK_{len(blocks)}__"
+        lang = m.group(1) or ""
+        code = m.group(2).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        blocks[key] = f'<pre><code class="language-{lang}">{code}</code></pre>'
+        return key
+    html = _re.sub(r"```(\w*)\n?([\s\S]*?)```", save_block, html)
+
+    # Inline code
+    html = _re.sub(r"`([^`]+)`", r"<code>\1</code>", html)
+    # Headings
+    for i in range(6, 0, -1):
+        html = _re.sub(r"^#{" + str(i) + r"}\s+(.+)$", rf"<h{i}>\1</h{i}>", html, flags=_re.MULTILINE)
+    # Bold & italic
+    html = _re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", html)
+    html = _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
+    html = _re.sub(r"\*(.+?)\*", r"<em>\1</em>", html)
+    html = _re.sub(r"___(.+?)___", r"<strong><em>\1</em></strong>", html)
+    html = _re.sub(r"__(.+?)__", r"<strong>\1</strong>", html)
+    html = _re.sub(r"_(.+?)_", r"<em>\1</em>", html)
+    # Links and images
+    html = _re.sub(r"!\[(.+?)\]\((.+?)\)", r'<img src="\2" alt="\1">', html)
+    html = _re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', html)
+    # Lists
+    html = _re.sub(r"^[-*+]\s+(.+)$", r"<li>\1</li>", html, flags=_re.MULTILINE)
+    html = _re.sub(r"(<li>.*</li>\n?)+", lambda m: f"<ul>{m.group(0)}</ul>", html)
+    # Horizontal rule
+    html = _re.sub(r"^---+$", "<hr>", html, flags=_re.MULTILINE)
+    # Line breaks → paragraphs (double newline)
+    paragraphs = _re.split(r"\n\n+", html)
+    html = "\n".join(
+        f"<p>{p.strip()}</p>" if not _re.match(r"^<(h\d|ul|ol|li|pre|blockquote|hr)", p.strip()) else p.strip()
+        for p in paragraphs if p.strip()
+    )
+    # Restore code blocks
+    for key, val in blocks.items():
+        html = html.replace(key, val)
+
+    return {"success": True, "format": "html", "result": html}
+
+
+async def execute_regex_tool(args: dict) -> dict:
+    """Applique une expression régulière à un texte (recherche, extraction, remplacement)."""
+    import re as _re
+
+    pattern  = args.get("pattern", "")
+    text     = args.get("text", "")
+    action   = args.get("action", "findall").lower()  # findall | match | replace | split | test
+    replace  = args.get("replace", "")
+    flags_str = args.get("flags", "").upper()
+    max_results = int(args.get("max_results", 100))
+
+    if not pattern:
+        return {"error": "Paramètre 'pattern' requis."}
+    if not text and action != "test":
+        return {"error": "Paramètre 'text' requis."}
+
+    # Flags
+    flags = 0
+    if "I" in flags_str: flags |= _re.IGNORECASE
+    if "M" in flags_str: flags |= _re.MULTILINE
+    if "S" in flags_str: flags |= _re.DOTALL
+
+    try:
+        compiled = _re.compile(pattern, flags)
+    except _re.error as e:
+        return {"error": f"Expression régulière invalide : {e}"}
+
+    try:
+        if action == "test":
+            match = compiled.search(text)
+            return {"success": True, "action": "test", "matches": bool(match), "pattern": pattern}
+
+        if action == "findall":
+            matches = compiled.findall(text)[:max_results]
+            return {"success": True, "action": "findall", "count": len(matches), "matches": matches}
+
+        if action == "match":
+            m = compiled.match(text)
+            if not m:
+                return {"success": True, "action": "match", "matched": False}
+            return {"success": True, "action": "match", "matched": True,
+                    "groups": list(m.groups()), "span": list(m.span())}
+
+        if action == "replace":
+            result = compiled.sub(replace, text)
+            return {"success": True, "action": "replace", "result": result,
+                    "replacements": len(compiled.findall(text))}
+
+        if action == "split":
+            parts = compiled.split(text)[:max_results]
+            return {"success": True, "action": "split", "count": len(parts), "parts": parts}
+
+        return {"error": f"Action inconnue : {action}. Utilisez findall | match | replace | split | test."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_csv_analyze(args: dict) -> dict:
+    """Analyse un fichier CSV : aperçu, statistiques et valeurs uniques."""
+    import csv as _csv, io as _io, statistics as _stats
+
+    path       = args.get("path", "").strip()
+    max_rows   = int(args.get("max_rows", 100))    # lignes à charger pour stats
+    action     = args.get("action", "summary")     # summary | head | stats | unique
+    column     = args.get("column", "")            # pour stats/unique sur une colonne
+    delimiter  = args.get("delimiter", ",")
+
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+
+    try:
+        resolved = _resolve_path(path)
+        with open(resolved, encoding="utf-8-sig", errors="replace") as f:
+            raw = f.read(2 * 1024 * 1024)  # 2 MB max
+
+        reader = _csv.DictReader(_io.StringIO(raw), delimiter=delimiter)
+        headers = reader.fieldnames or []
+
+        rows = []
+        for i, row in enumerate(reader):
+            if i >= max_rows: break
+            rows.append(dict(row))
+
+        total_rows_approx = raw.count("\n")
+        base = {
+            "success":      True,
+            "file":         str(resolved),
+            "columns":      list(headers),
+            "column_count": len(headers),
+            "rows_loaded":  len(rows),
+            "total_rows_approx": total_rows_approx - 1,  # -1 pour l'en-tête
+        }
+
+        if action == "head":
+            base["preview"] = rows[:10]
+            return base
+
+        if action == "unique":
+            if not column or column not in headers:
+                return {**base, "error": f"Colonne '{column}' introuvable. Colonnes disponibles : {headers}"}
+            vals = sorted({r[column] for r in rows if r.get(column) not in ("", None)})
+            return {**base, "column": column, "unique_values": vals[:200], "unique_count": len(vals)}
+
+        if action == "stats":
+            if not column or column not in headers:
+                return {**base, "error": f"Colonne '{column}' introuvable. Colonnes disponibles : {headers}"}
+            nums = []
+            for r in rows:
+                v = r.get(column, "")
+                try: nums.append(float(v.replace(",", ".").strip()))
+                except: pass
+            if not nums:
+                return {**base, "column": column, "error": "Aucune valeur numérique dans cette colonne."}
+            return {
+                **base, "column": column,
+                "count":   len(nums),
+                "sum":     round(sum(nums), 6),
+                "mean":    round(_stats.mean(nums), 6),
+                "median":  round(_stats.median(nums), 6),
+                "min":     min(nums),
+                "max":     max(nums),
+                "stdev":   round(_stats.stdev(nums), 6) if len(nums) > 1 else 0,
+            }
+
+        # default: summary
+        col_stats = {}
+        for col in headers:
+            vals = [r.get(col, "") for r in rows]
+            non_empty = [v for v in vals if v not in ("", None)]
+            nums = []
+            for v in non_empty:
+                try: nums.append(float(str(v).replace(",", ".").strip()))
+                except: pass
+            col_stats[col] = {
+                "non_empty": len(non_empty),
+                "empty":     len(vals) - len(non_empty),
+                "unique":    len(set(non_empty)),
+                "numeric":   len(nums) == len(non_empty) and len(nums) > 0,
+            }
+            if nums:
+                col_stats[col]["min"]  = min(nums)
+                col_stats[col]["max"]  = max(nums)
+                col_stats[col]["mean"] = round(_stats.mean(nums), 4)
+
+        base["column_analysis"] = col_stats
+        base["preview"] = rows[:5]
+        return base
+
+    except FileNotFoundError:
+        return {"error": f"Fichier introuvable : {path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_text_stats(args: dict) -> dict:
+    """Calcule des statistiques sur un texte : mots, caractères, phrases, temps de lecture."""
+    import re as _re, collections as _coll
+
+    text    = args.get("text", "")
+    top_n   = int(args.get("top_words", 10))
+
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+
+    # Comptages de base
+    chars          = len(text)
+    chars_no_space = len(text.replace(" ", "").replace("\n", "").replace("\t", ""))
+    words_list     = _re.findall(r"\b\w+\b", text)
+    word_count     = len(words_list)
+    sentences      = len(_re.findall(r"[.!?]+", text)) or 1
+    paragraphs     = len([p for p in text.split("\n\n") if p.strip()])
+    lines          = text.count("\n") + 1
+
+    # Temps de lecture estimé (250 mots/min)
+    read_seconds = round(word_count / 250 * 60)
+    read_label = f"{read_seconds // 60}m {read_seconds % 60}s" if read_seconds >= 60 else f"{read_seconds}s"
+
+    # Mots les plus fréquents (stopwords basiques FR/EN filtrés)
+    stopwords = {
+        "le", "la", "les", "de", "du", "des", "et", "en", "un", "une",
+        "à", "au", "aux", "que", "qui", "dans", "est", "il", "elle",
+        "on", "se", "ce", "je", "tu", "vous", "nous", "ils", "elles",
+        "the", "a", "an", "of", "in", "to", "is", "it", "and", "or",
+        "for", "that", "this", "with", "are", "was", "be", "as", "at",
+    }
+    freq = _coll.Counter(
+        w.lower() for w in words_list if len(w) > 2 and w.lower() not in stopwords
+    )
+    top_words = [{"word": w, "count": c} for w, c in freq.most_common(top_n)]
+
+    return {
+        "success":        True,
+        "characters":     chars,
+        "chars_no_space": chars_no_space,
+        "words":          word_count,
+        "sentences":      sentences,
+        "paragraphs":     paragraphs,
+        "lines":          lines,
+        "avg_word_length": round(sum(len(w) for w in words_list) / max(1, word_count), 1),
+        "avg_words_per_sentence": round(word_count / sentences, 1),
+        "reading_time":   read_label,
+        "top_words":      top_words,
+    }
+
+
+async def execute_ip_info(args: dict) -> dict:
+    """Retourne la géolocalisation et les infos d'une adresse IP (ip-api.com, gratuit)."""
+    import urllib.request as _req, json as _json
+
+    ip = args.get("ip", "").strip()
+    # IP vide = IP publique de la machine
+    target = ip if ip else ""
+
+    try:
+        url = f"http://ip-api.com/json/{target}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query"
+        with _req.urlopen(url, timeout=8) as resp:
+            data = _json.loads(resp.read().decode())
+
+        if data.get("status") != "success":
+            return {"error": data.get("message", "IP introuvable ou réservée")}
+
+        return {
+            "success":      True,
+            "ip":           data.get("query"),
+            "country":      data.get("country"),
+            "country_code": data.get("countryCode"),
+            "region":       data.get("regionName"),
+            "city":         data.get("city"),
+            "postal_code":  data.get("zip"),
+            "latitude":     data.get("lat"),
+            "longitude":    data.get("lon"),
+            "timezone":     data.get("timezone"),
+            "isp":          data.get("isp"),
+            "org":          data.get("org"),
+            "asn":          data.get("as"),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 16 — Documents, Archives & Utilitaires couleur
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_pdf_read(args: dict) -> dict:
+    """Extrait le texte d'un fichier PDF (pypdf)."""
+    path = args.get("path", "").strip()
+    pages_arg = args.get("pages", None)   # "1-3", 2, ou None = tout
+    max_chars = int(args.get("max_chars", 4000))
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfReader
+        resolved = Path(_resolve_path(path))
+        if not resolved.exists():
+            return {"error": f"Fichier introuvable : {resolved}"}
+        reader = PdfReader(str(resolved))
+        total = len(reader.pages)
+        # Parse page selection
+        if pages_arg is None:
+            indices = list(range(total))
+        elif isinstance(pages_arg, str) and "-" in pages_arg:
+            s, e = pages_arg.split("-", 1)
+            indices = list(range(int(s) - 1, min(int(e), total)))
+        elif isinstance(pages_arg, (list, tuple)):
+            indices = [int(p) - 1 for p in pages_arg if 0 < int(p) <= total]
+        else:
+            indices = [int(pages_arg) - 1]
+        texts = []
+        for i in indices:
+            if 0 <= i < total:
+                t = (reader.pages[i].extract_text() or "").strip()
+                texts.append({"page": i + 1, "text": t})
+        full = "\n\n".join(f"[Page {t['page']}]\n{t['text']}" for t in texts)
+        return {
+            "success":    True,
+            "file":       str(resolved),
+            "total_pages": total,
+            "pages_read": len(texts),
+            "text":       full[:max_chars],
+            "truncated":  len(full) > max_chars,
+            "chars":      len(full),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_info(args: dict) -> dict:
+    """Retourne les métadonnées d'un fichier PDF (titre, auteur, nb pages…)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfReader
+        resolved = Path(_resolve_path(path))
+        if not resolved.exists():
+            return {"error": f"Fichier introuvable : {resolved}"}
+        reader = PdfReader(str(resolved))
+        meta = reader.metadata or {}
+        stat = resolved.stat()
+        return {
+            "success":   True,
+            "file":      str(resolved),
+            "pages":     len(reader.pages),
+            "size_kb":   round(stat.st_size / 1024, 1),
+            "encrypted": reader.is_encrypted,
+            "title":     meta.get("/Title", "") or "",
+            "author":    meta.get("/Author", "") or "",
+            "subject":   meta.get("/Subject", "") or "",
+            "creator":   meta.get("/Creator", "") or "",
+            "producer":  meta.get("/Producer", "") or "",
+            "created":   str(meta.get("/CreationDate", "") or ""),
+            "modified":  str(meta.get("/ModDate", "") or ""),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ───────────────────────── PDF & Image toolkit (v2.34) ─────────────────────────
+_PAGES_SAFETY_CAP = 100000  # garde-fou : ne jamais matérialiser une liste démesurée (anti-OOM)
+
+
+def _parse_pages(spec, total: int) -> list:
+    """'1,3,5-8' -> indices 0-based [0,2,4,5,6,7]. 1-based input, clampé à [1,total].
+    Borné par _PAGES_SAFETY_CAP pour ne JAMAIS saturer la mémoire, même si 'total' est aberrant."""
+    try:
+        total = max(0, int(total))
+    except Exception:
+        total = 0
+    if total > _PAGES_SAFETY_CAP:
+        total = _PAGES_SAFETY_CAP
+    if not spec:
+        return list(range(total))
+    out = []
+    for part in str(spec).replace(" ", "").split(","):
+        if not part:
+            continue
+        try:
+            if "-" in part:
+                a, _, b = part.partition("-")
+                a = max(1, int(a)) if a else 1
+                b = min(int(b), total) if b else total   # clamp pour éviter une boucle démesurée
+                for p in range(a, b + 1):
+                    out.append(p - 1)
+            else:
+                p = int(part)
+                if 1 <= p <= total:
+                    out.append(p - 1)
+        except ValueError:
+            continue
+    # dédoublonner en conservant l'ordre
+    seen = set(); res = []
+    for p in out:
+        if p not in seen:
+            seen.add(p); res.append(p)
+    return res
+
+
+async def execute_pdf_merge(args: dict) -> dict:
+    """Fusionne plusieurs PDF en un seul fichier (dans l'ordre fourni)."""
+    sources = args.get("sources") or args.get("paths") or []
+    if isinstance(sources, str):
+        sources = [s.strip() for s in sources.replace("\n", ",").split(",") if s.strip()]
+    if len(sources) < 2:
+        return {"error": "Fournir au moins 2 PDF dans 'sources'."}
+    try:
+        from pypdf import PdfWriter, PdfReader
+        out = args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "fusion.pdf")
+        out = _resolve_path(out)
+        writer = PdfWriter()
+        total = 0
+        for src in sources:
+            rp = Path(_resolve_path(src))
+            if not rp.exists():
+                return {"error": f"PDF introuvable : {rp}"}
+            r = PdfReader(str(rp))
+            for pg in r.pages:
+                writer.add_page(pg); total += 1
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "wb") as f:
+            writer.write(f)
+        return {"success": True, "path": out, "destination": out, "pages": total,
+                "merged": len(sources), "message": f"{len(sources)} PDF fusionnés ({total} pages) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_split(args: dict) -> dict:
+    """Découpe un PDF : soit une page par fichier (défaut), soit selon des plages.
+    pages='1-3,5' extrait ces pages dans UN fichier ; per_page=true sort un fichier par page."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfWriter, PdfReader
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        total = len(reader.pages)
+        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(rp.parent)))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        idxs = _parse_pages(args.get("pages"), total)
+        per_page = bool(args.get("per_page", not args.get("pages")))
+        created = []
+        if per_page:
+            for i in idxs:
+                w = PdfWriter(); w.add_page(reader.pages[i])
+                op = out_dir / f"{rp.stem}_p{i+1}.pdf"
+                with open(op, "wb") as f: w.write(f)
+                created.append(str(op))
+        else:
+            w = PdfWriter()
+            for i in idxs: w.add_page(reader.pages[i])
+            op = out_dir / f"{rp.stem}_extrait.pdf"
+            with open(op, "wb") as f: w.write(f)
+            created.append(str(op))
+        return {"success": True, "files": created, "count": len(created),
+                "path": created[0] if created else "", "destination": created[0] if created else "",
+                "message": f"{len(created)} fichier(s) créé(s) depuis {total} pages"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_rotate(args: dict) -> dict:
+    """Pivote des pages d'un PDF (angle multiple de 90 : 90, 180, 270)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        angle = int(args.get("angle", 90))
+        if angle % 90 != 0:
+            return {"error": "L'angle doit être un multiple de 90 (90, 180, 270)."}
+        from pypdf import PdfWriter, PdfReader
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        total = len(reader.pages)
+        targets = set(_parse_pages(args.get("pages"), total))
+        writer = PdfWriter()
+        for i, pg in enumerate(reader.pages):
+            if i in targets:
+                pg.rotate(angle)
+            writer.add_page(pg)
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_pivote.pdf")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "wb") as f: writer.write(f)
+        return {"success": True, "path": out, "destination": out, "rotated_pages": len(targets),
+                "message": f"{len(targets)} page(s) pivotée(s) de {angle}° → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_images_to_pdf(args: dict) -> dict:
+    """Assemble plusieurs images (JPG/PNG…) en un seul PDF, une image par page."""
+    sources = args.get("sources") or args.get("images") or []
+    if isinstance(sources, str):
+        sources = [s.strip() for s in sources.replace("\n", ",").split(",") if s.strip()]
+    if not sources:
+        return {"error": "Fournir des images dans 'sources'."}
+    try:
+        from PIL import Image as _Image
+        imgs = []
+        for s in sources:
+            rp = Path(_resolve_path(s))
+            if not rp.exists():
+                return {"error": f"Image introuvable : {rp}"}
+            im = _Image.open(str(rp))
+            if im.mode in ("RGBA", "P", "LA"):
+                im = im.convert("RGB")
+            imgs.append(im)
+        out = _resolve_path(args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "images.pdf"))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        imgs[0].save(out, "PDF", save_all=True, append_images=imgs[1:], resolution=float(args.get("dpi", 150)))
+        return {"success": True, "path": out, "destination": out, "pages": len(imgs),
+                "message": f"{len(imgs)} image(s) → PDF : {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_image_crop(args: dict) -> dict:
+    """Rogne une image. Boîte (left, top, right, bottom) en pixels OU aspect='1:1','16:9' (centré)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from PIL import Image as _Image
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Image introuvable : {rp}"}
+        im = _Image.open(str(rp))
+        W, H = im.size
+        if args.get("aspect"):
+            try:
+                aw, ah = (float(x) for x in str(args["aspect"]).replace("/", ":").split(":"))
+            except Exception:
+                return {"error": "aspect invalide (ex: '1:1', '16:9')."}
+            target = aw / ah
+            cur = W / H
+            if cur > target:  # trop large -> rogner les côtés
+                nw = int(H * target); x0 = (W - nw) // 2; box = (x0, 0, x0 + nw, H)
+            else:             # trop haut -> rogner haut/bas
+                nh = int(W / target); y0 = (H - nh) // 2; box = (0, y0, W, y0 + nh)
+        else:
+            box = (int(args.get("left", 0)), int(args.get("top", 0)),
+                   int(args.get("right", W)), int(args.get("bottom", H)))
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_crop" + rp.suffix)))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        im.crop(box).save(out)
+        return {"success": True, "path": out, "destination": out, "box": list(box),
+                "size": [box[2]-box[0], box[3]-box[1]], "message": f"Image rognée → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_image_rotate(args: dict) -> dict:
+    """Pivote/retourne une image. angle (sens horaire) ; flip='horizontal'|'vertical'."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from PIL import Image as _Image
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Image introuvable : {rp}"}
+        im = _Image.open(str(rp))
+        flip = (args.get("flip") or "").lower()
+        if flip in ("horizontal", "h"):
+            im = im.transpose(_Image.FLIP_LEFT_RIGHT)
+        elif flip in ("vertical", "v"):
+            im = im.transpose(_Image.FLIP_TOP_BOTTOM)
+        angle = float(args.get("angle", 0))
+        if angle:
+            im = im.rotate(-angle, expand=True)  # négatif = sens horaire
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_rot" + rp.suffix)))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        im.save(out)
+        return {"success": True, "path": out, "destination": out, "message": f"Image transformée → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_image_compress(args: dict) -> dict:
+    """Compresse une image (JPEG/WEBP) en visant un poids cible (target_kb) ou une qualité fixe."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from PIL import Image as _Image
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Image introuvable : {rp}"}
+        im = _Image.open(str(rp))
+        if im.mode in ("RGBA", "P", "LA"):
+            im = im.convert("RGB")
+        fmt = (args.get("format") or "JPEG").upper()
+        ext = ".webp" if fmt == "WEBP" else ".jpg"
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_compresse" + ext)))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        orig = rp.stat().st_size
+        target_kb = args.get("target_kb")
+        if target_kb:
+            target = int(target_kb) * 1024
+            q = 90
+            while q >= 20:
+                im.save(out, fmt, quality=q, optimize=True)
+                if Path(out).stat().st_size <= target:
+                    break
+                q -= 10
+        else:
+            im.save(out, fmt, quality=int(args.get("quality", 80)), optimize=True)
+        new = Path(out).stat().st_size
+        return {"success": True, "path": out, "destination": out,
+                "original_kb": round(orig/1024, 1), "compressed_kb": round(new/1024, 1),
+                "saved_pct": round((1 - new/orig) * 100, 1) if orig else 0,
+                "message": f"{round(orig/1024,1)} Ko → {round(new/1024,1)} Ko ({round((1-new/orig)*100)}% gagné)"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_large_finder(args: dict) -> dict:
+    """Trouve les plus gros fichiers d'un dossier (récursif) — pour repérer ce qui prend de la place."""
+    directory = args.get("directory") or args.get("path") or _HOME
+    try:
+        root = Path(_resolve_path(directory))
+        if not root.exists():
+            return {"error": f"Dossier introuvable : {root}"}
+        import heapq
+        top = max(1, min(int(args.get("top", 20)), 500))
+        threshold = float(args.get("min_mb", 0)) * 1024 * 1024
+        # Tas borné : on ne garde JAMAIS plus de `top` fichiers en mémoire (anti-OOM sur gros disques)
+        heap = []  # min-heap de (taille, chemin)
+        scanned = 0
+        for dp, dns, fns in os.walk(root):
+            dns[:] = [d for d in dns if d.lower() not in ("$recycle.bin", "system volume information")]
+            for fn in fns:
+                try:
+                    fp = os.path.join(dp, fn)
+                    sz = os.path.getsize(fp)
+                    scanned += 1
+                    if sz >= threshold:
+                        if len(heap) < top:
+                            heapq.heappush(heap, (sz, fp))
+                        elif sz > heap[0][0]:
+                            heapq.heapreplace(heap, (sz, fp))
+                except Exception:
+                    continue
+        items = sorted(heap, reverse=True)
+        total = sum(s for s, _ in items)
+        return {"success": True, "directory": str(root), "count": len(items),
+                "total_human": _fmt_bytes(total),
+                "files": [{"path": p, "size_bytes": s, "size_human": _fmt_bytes(s)} for s, p in items],
+                "message": f"{len(items)} plus gros fichiers ({_fmt_bytes(total)})"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_system_cleanup(args: dict) -> dict:
+    """Analyse (et, si delete=true, vide) les fichiers temporaires pour libérer de l'espace.
+    Sans delete=true : rapport seulement (aucune suppression). delete=true est une action sensible."""
+    import tempfile
+    try:
+        candidates = []
+        seen = set()
+        for d in [tempfile.gettempdir(),
+                  os.environ.get("TEMP"), os.environ.get("TMP"),
+                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp"),
+                  os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Temp")]:
+            if d and os.path.isdir(d):
+                rd = os.path.normcase(os.path.abspath(d))
+                if rd not in seen:
+                    seen.add(rd); candidates.append(d)
+        min_age_days = float(args.get("min_age_days", 1))
+        cutoff = time.time() - min_age_days * 86400
+        do_delete = bool(args.get("delete", False))
+        report = []
+        grand_total = 0; grand_files = 0; freed = 0; freed_files = 0
+        for d in candidates:
+            dtotal = 0; dfiles = 0
+            for dp, dns, fns in os.walk(d):
+                for fn in fns:
+                    fp = os.path.join(dp, fn)
+                    try:
+                        st = os.stat(fp)
+                        dtotal += st.st_size; dfiles += 1
+                        if do_delete and st.st_mtime < cutoff:
+                            try:
+                                os.remove(fp); freed += st.st_size; freed_files += 1
+                            except Exception:
+                                pass
+                    except Exception:
+                        continue
+            grand_total += dtotal; grand_files += dfiles
+            report.append({"dir": d, "size_human": _fmt_bytes(dtotal), "files": dfiles})
+        res = {"success": True, "locations": report,
+               "reclaimable_human": _fmt_bytes(grand_total), "total_files": grand_files,
+               "deleted": do_delete}
+        if do_delete:
+            res["freed_human"] = _fmt_bytes(freed); res["freed_files"] = freed_files
+            res["message"] = f"Nettoyage : {_fmt_bytes(freed)} libérés ({freed_files} fichiers supprimés, > {min_age_days} j)"
+        else:
+            res["message"] = f"{_fmt_bytes(grand_total)} potentiellement récupérables dans {len(candidates)} dossiers temp. Relancez avec delete=true pour nettoyer."
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ───────────────────────── PDF avancé & lot d'images (v2.35) ─────────────────────
+async def execute_pdf_watermark(args: dict) -> dict:
+    """Appose un filigrane texte en diagonale sur chaque page d'un PDF."""
+    path = args.get("path", "").strip()
+    text = args.get("text", "").strip()
+    if not path or not text:
+        return {"error": "Paramètres 'path' et 'text' requis."}
+    try:
+        from pypdf import PdfReader, PdfWriter
+        from reportlab.pdfgen import canvas as _canvas
+        from reportlab.lib.colors import Color
+        import io as _io
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        opacity = float(args.get("opacity", 0.12))
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_filigrane.pdf")))
+        writer = PdfWriter()
+        for page in reader.pages:
+            w = float(page.mediabox.width); h = float(page.mediabox.height)
+            buf = _io.BytesIO()
+            c = _canvas.Canvas(buf, pagesize=(w, h))
+            c.saveState()
+            c.translate(w / 2, h / 2)
+            c.rotate(45)
+            c.setFillColor(Color(0.5, 0.5, 0.5, alpha=opacity))
+            fs = int(args.get("font_size", max(28, int(min(w, h) / 12))))
+            c.setFont("Helvetica-Bold", fs)
+            c.drawCentredString(0, 0, text)
+            c.restoreState(); c.save()
+            buf.seek(0)
+            stamp = PdfReader(buf).pages[0]
+            page.merge_page(stamp)
+            writer.add_page(page)
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "wb") as f:
+            writer.write(f)
+        return {"success": True, "path": out, "destination": out, "pages": len(reader.pages),
+                "message": f"Filigrane « {text} » apposé sur {len(reader.pages)} page(s) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_protect(args: dict) -> dict:
+    """Protège un PDF par mot de passe (chiffrement AES). owner_password optionnel."""
+    path = args.get("path", "").strip()
+    password = args.get("password", "")
+    if not path or not password:
+        return {"error": "Paramètres 'path' et 'password' requis."}
+    try:
+        from pypdf import PdfReader, PdfWriter
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        try:
+            writer.encrypt(user_password=password, owner_password=args.get("owner_password") or None,
+                           algorithm="AES-256")
+        except TypeError:
+            writer.encrypt(password)  # compat anciennes versions
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_protege.pdf")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "wb") as f:
+            writer.write(f)
+        return {"success": True, "path": out, "destination": out, "encrypted": True,
+                "message": f"PDF protégé par mot de passe (AES-256) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_extract_images(args: dict) -> dict:
+    """Extrait les images intégrées d'un PDF vers un dossier."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfReader
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(rp.parent / f"{rp.stem}_images")))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        reader = PdfReader(str(rp))
+        saved = []
+        for pi, page in enumerate(reader.pages):
+            try:
+                images = page.images
+            except Exception:
+                images = []
+            for ii, img in enumerate(images):
+                try:
+                    name = f"p{pi+1}_{ii+1}_{Path(img.name).stem}"[:40]
+                    ext = Path(img.name).suffix or ".png"
+                    op = out_dir / f"{name}{ext}"
+                    with open(op, "wb") as f:
+                        f.write(img.data)
+                    saved.append(str(op))
+                except Exception:
+                    continue
+        if not saved:
+            return {"success": True, "count": 0, "files": [], "output_dir": str(out_dir),
+                    "message": "Aucune image intégrée trouvée dans ce PDF."}
+        return {"success": True, "count": len(saved), "files": saved[:50], "output_dir": str(out_dir),
+                "path": saved[0], "message": f"{len(saved)} image(s) extraite(s) → {out_dir}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_image_batch(args: dict) -> dict:
+    """Traite en LOT toutes les images d'un dossier : convert/resize/compress/rotate/watermark.
+    operation ∈ convert|resize|compress|rotate|watermark. Sortie dans output_dir (ou <dossier>_traite)."""
+    directory = (args.get("directory") or args.get("path") or "").strip()
+    if not directory:
+        return {"error": "Paramètre 'directory' requis."}
+    op = (args.get("operation") or "convert").lower()
+    try:
+        from PIL import Image as _Image
+        src_dir = Path(_resolve_path(directory))
+        if not src_dir.is_dir():
+            return {"error": f"Dossier introuvable : {src_dir}"}
+        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(src_dir.parent / f"{src_dir.name}_traite")))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff"}
+        files = [p for p in sorted(src_dir.iterdir()) if p.suffix.lower() in exts and p.is_file()]
+        if not files:
+            return {"error": f"Aucune image dans {src_dir}"}
+        recurse = bool(args.get("recursive", False))
+        if recurse:
+            files = [p for p in src_dir.rglob("*") if p.suffix.lower() in exts and p.is_file()]
+        fmt = (args.get("format") or "").upper()
+        width = args.get("width"); height = args.get("height")
+        target_kb = args.get("target_kb"); quality = int(args.get("quality", 85))
+        angle = float(args.get("angle", 0)); flip = (args.get("flip") or "").lower()
+        wm_text = args.get("text", "")
+        done, errors = [], 0
+        for fp in files:
+            try:
+                im = _Image.open(str(fp))
+                ext = fp.suffix
+                if op == "convert" and fmt:
+                    ext = "." + ("jpg" if fmt == "JPEG" else fmt.lower())
+                    if im.mode in ("RGBA", "P", "LA") and fmt in ("JPEG",):
+                        im = im.convert("RGB")
+                elif op == "resize":
+                    w = int(width) if width else None; h = int(height) if height else None
+                    if w and h:
+                        im = im.resize((w, h))
+                    elif w:
+                        im = im.resize((w, int(im.height * w / im.width)))
+                    elif h:
+                        im = im.resize((int(im.width * h / im.height), h))
+                elif op == "compress":
+                    ext = ".jpg"
+                    if im.mode in ("RGBA", "P", "LA"):
+                        im = im.convert("RGB")
+                elif op == "rotate":
+                    if flip in ("horizontal", "h"):
+                        im = im.transpose(_Image.FLIP_LEFT_RIGHT)
+                    elif flip in ("vertical", "v"):
+                        im = im.transpose(_Image.FLIP_TOP_BOTTOM)
+                    if angle:
+                        im = im.rotate(-angle, expand=True)
+                elif op == "watermark" and wm_text:
+                    from PIL import ImageDraw, ImageFont
+                    if im.mode != "RGBA":
+                        im = im.convert("RGBA")
+                    overlay = _Image.new("RGBA", im.size, (0, 0, 0, 0))
+                    d = ImageDraw.Draw(overlay)
+                    fs = max(16, im.width // 18)
+                    try:
+                        font = ImageFont.truetype("arial.ttf", fs)
+                    except Exception:
+                        font = ImageFont.load_default()
+                    tb = d.textbbox((0, 0), wm_text, font=font)
+                    tw, th = tb[2] - tb[0], tb[3] - tb[1]
+                    d.text((im.width - tw - 12, im.height - th - 12), wm_text,
+                           fill=(255, 255, 255, 160), font=font)
+                    im = _Image.alpha_composite(im, overlay).convert("RGB")
+                    ext = ".png" if fp.suffix.lower() == ".png" else ".jpg"
+                outp = out_dir / (fp.stem + ext)
+                if op == "compress" and target_kb:
+                    target = int(target_kb) * 1024; q = 90
+                    while q >= 20:
+                        im.save(str(outp), "JPEG", quality=q, optimize=True)
+                        if outp.stat().st_size <= target:
+                            break
+                        q -= 10
+                elif ext.lower() in (".jpg", ".jpeg"):
+                    if im.mode in ("RGBA", "P", "LA"):
+                        im = im.convert("RGB")
+                    im.save(str(outp), "JPEG", quality=quality, optimize=True)
+                else:
+                    im.save(str(outp))
+                done.append(str(outp))
+            except Exception:
+                errors += 1
+        return {"success": True, "operation": op, "processed": len(done), "errors": errors,
+                "output_dir": str(out_dir), "files": done[:30],
+                "message": f"{len(done)} image(s) traitée(s) ({op}) → {out_dir}" + (f" | {errors} échec(s)" if errors else "")}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ════════════════ PDF render/OCR/forms, PPTX, conversions, IA (v2.36) ════════════
+async def _ollama_generate(prompt: str, model: str = None, images: list = None, timeout: int = 180) -> str:
+    """Appel texte (ou vision) à Ollama /api/generate, AVEC robustesse :
+    - 1 essai primaire (timeout complet) + 1 retry primaire SEULEMENT si l'échec n'est pas
+      un timeout (v2.137 — un timeout sur un gros prompt est structurel, pas transitoire) ;
+    - repli sur un modèle plus léger (chat) avec un timeout réduit si le primaire échoue.
+    Retourne la réponse brute.
+
+    v2.122 — passe par `cloud_routing.resolve_model()` : c'est le point d'entrée UNIQUE
+    utilisé par 13+ outils (document_generate, email_*, text_summarize, document_ask...) et,
+    indirectement, par `skills.py` (upgrade_skill/suggest_skills, injecté comme callback) —
+    un seul endroit à corriger pour que TOUS ces appels bénéficient du même routage
+    cloud/sensibilité que la boucle de chat principale, au lieu de tomber systématiquement
+    en local sans jamais consulter le réglage Ollama Cloud de l'utilisateur. Les images
+    (OCR/vision) forcent toujours le local (cf. docstring de `resolve_model`)."""
+    import httpx, asyncio as _aio
+    import cloud_routing as _cr
+    primary = _cr.resolve_model(model, profile="agent", text_for_sensitivity=prompt, has_images=bool(images))
+    try:
+        light = MODEL_PROFILES.get("chat", {}).get("model") or "qwen2.5:3b"
+    except Exception:
+        light = "qwen2.5:3b"
+    # v2.137 — trouvé en corrigeant la lenteur de /api/skills/suggest (timeout 5 min dépassé,
+    # backend resté sain — pas un hang, juste un budget de temps catastrophique) : l'ancien
+    # schéma retentait le modèle PRIMAIRE 3× AU TIMEOUT COMPLET avant même d'essayer le repli
+    # léger — pire cas 3×240s = 12 minutes rien que pour le primaire. Un timeout n'est presque
+    # jamais un blip réseau transitoire pour un GROS prompt (comme les 120 messages analysés
+    # par suggest_skills) : la génération est structurellement lente, pas temporairement en
+    # panne — réessayer IDENTIQUE échoue de la même façon. Seules les erreurs non-timeout
+    # (connexion refusée, 5xx ponctuel) bénéficient vraiment d'un retry rapide. Nouveau schéma :
+    # 1 essai primaire au timeout complet, 1 SEUL retry primaire UNIQUEMENT si l'échec n'était
+    # PAS un timeout, puis repli léger avec un timeout RÉDUIT (modèle plus petit = plus rapide,
+    # pas besoin du budget complet). Pire cas : timeout + timeout_léger, au lieu de 4×timeout.
+    light_timeout = max(30, min(timeout, 60))
+    has_light_fallback = bool(light) and light != primary
+
+    async def _call(mdl: str, to: int):
+        payload = {"model": mdl, "prompt": prompt, "stream": False}
+        if images:
+            payload["images"] = images
+        async with httpx.AsyncClient(timeout=to) as client:
+            resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
+            resp.raise_for_status()
+            return resp.json().get("response", "").strip()
+
+    last_err = None
+    # 1) Essai primaire, timeout complet.
+    try:
+        return await _call(primary, timeout)
+    except Exception as e:
+        last_err = e
+        # 2) Retry primaire — SEULEMENT si l'échec n'était pas un timeout (connexion, 5xx
+        #    ponctuel) : réessayer un timeout identique à l'identique échouerait pareil.
+        if not isinstance(e, httpx.TimeoutException):
+            await _aio.sleep(1)
+            try:
+                return await _call(primary, timeout)
+            except Exception as e2:
+                last_err = e2
+    # 3) Repli sur le modèle léger, timeout réduit (petit modèle = rapide).
+    if has_light_fallback:
+        try:
+            return await _call(light, light_timeout)
+        except Exception as e3:
+            last_err = e3
+    raise last_err if last_err else RuntimeError("Ollama indisponible")
+
+
+def _pil_to_b64(img, fmt: str = "PNG") -> str:
+    import io as _io
+    buf = _io.BytesIO()
+    img.save(buf, format=fmt)
+    return _base64.b64encode(buf.getvalue()).decode()
+
+
+async def execute_pdf_to_images(args: dict) -> dict:
+    """Convertit chaque page d'un PDF en image PNG (rendu via pypdfium2)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import pypdfium2 as pdfium
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(rp.parent / f"{rp.stem}_pages")))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        scale = float(args.get("dpi", 150)) / 72.0
+        pages_spec = args.get("pages")
+        loop = asyncio.get_running_loop()
+
+        def _render():
+            pdf = pdfium.PdfDocument(str(rp))
+            n = len(pdf)
+            # ⚠️ Calculer les pages APRÈS avoir le vrai nombre de pages (jamais un sentinel géant)
+            page_idxs = _parse_pages(pages_spec, n) if pages_spec else range(n)
+            saved = []
+            for i in page_idxs:
+                if i < 0 or i >= n:
+                    continue
+                pil = pdf[i].render(scale=scale).to_pil()
+                op = out_dir / f"{rp.stem}_p{i+1}.png"
+                pil.save(str(op)); saved.append(str(op))
+            pdf.close()
+            return saved, n
+
+        saved, n = await loop.run_in_executor(None, _render)
+        return {"success": True, "count": len(saved), "files": saved[:50], "output_dir": str(out_dir),
+                "path": saved[0] if saved else "", "total_pages": n,
+                "message": f"{len(saved)} page(s) rendue(s) en PNG → {out_dir}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_ocr(args: dict) -> dict:
+    """OCR d'un PDF (même scanné) → texte. Utilise le texte intégré si présent, sinon rend la page et l'OCR via IA (llava)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfReader
+        import pypdfium2 as pdfium
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        total = len(reader.pages)
+        # Profondeur OCR (nb de pages) + qualité de rendu pilotées par le MODE de performance
+        try:
+            max_pages = int(args.get("max_pages") or db.get_setting("ocr_max_pages") or 15)
+        except Exception:
+            max_pages = 15
+        try:
+            ocr_scale = float(args.get("scale") or db.get_setting("ocr_scale") or 2.0)
+        except Exception:
+            ocr_scale = 2.0
+        targets = _parse_pages(args.get("pages"), total) if args.get("pages") else list(range(total))
+        targets = targets[:max_pages]
+        model = args.get("model", "llava-phi3")
+        loop = asyncio.get_running_loop()
+        out_pages = []
+        ocr_used = 0
+        pdf_doc = await loop.run_in_executor(None, lambda: pdfium.PdfDocument(str(rp)))
+        try:
+            for i in targets:
+                txt = ""
+                try:
+                    txt = (reader.pages[i].extract_text() or "").strip()
+                except Exception:
+                    txt = ""
+                if len(txt) < 25:  # page probablement scannée → OCR visuel
+                    def _render_page(idx=i, _scale=ocr_scale):
+                        pil = pdf_doc[idx].render(scale=_scale).to_pil()
+                        _cap = int(1920 * (_scale / 2.0))   # plafond de résolution selon la qualité du mode
+                        if max(pil.size) > _cap:
+                            r = _cap / max(pil.size)
+                            pil = pil.resize((int(pil.width*r), int(pil.height*r)))
+                        return _pil_to_b64(pil, "JPEG")
+                    b64 = await loop.run_in_executor(None, _render_page)
+                    txt = await _ollama_generate(
+                        "Extrais TOUT le texte de cette page. Retourne uniquement le texte brut, sans commentaire.",
+                        model=model, images=[b64], timeout=180)
+                    ocr_used += 1
+                out_pages.append(f"--- Page {i+1} ---\n{txt.strip()}")
+        finally:
+            await loop.run_in_executor(None, pdf_doc.close)
+        full = "\n\n".join(out_pages)
+        saved = None
+        if args.get("output_path"):
+            saved = _resolve_path(args["output_path"])
+            Path(saved).parent.mkdir(parents=True, exist_ok=True)
+            Path(saved).write_text(full, encoding="utf-8")
+        return {"success": True, "pages_processed": len(targets), "total_pages": total,
+                "ocr_pages": ocr_used, "text": full[:8000], "truncated": len(full) > 8000,
+                "path": saved, "message": f"OCR terminé : {len(targets)} page(s), {ocr_used} via vision IA"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_form_fields(args: dict) -> dict:
+    """Liste les champs de formulaire (AcroForm) remplissables d'un PDF."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfReader
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        fields = reader.get_fields() or {}
+        out = []
+        for name, f in fields.items():
+            out.append({"name": name, "type": str(f.get("/FT", "")).lstrip("/") or "text",
+                        "value": str(f.get("/V", "") or ""),
+                        "options": [str(o) for o in (f.get("/Opt") or [])][:20]})
+        return {"success": True, "count": len(out), "fields": out,
+                "message": f"{len(out)} champ(s) de formulaire" if out else "Aucun champ de formulaire (PDF non interactif)."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_fill_form(args: dict) -> dict:
+    """Remplit les champs d'un formulaire PDF à partir d'un dictionnaire {champ: valeur}."""
+    path = args.get("path", "").strip()
+    data = args.get("data") or args.get("fields") or {}
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    if not isinstance(data, dict) or not data:
+        return {"error": "Paramètre 'data' requis : un objet {nom_du_champ: valeur}."}
+    try:
+        from pypdf import PdfReader, PdfWriter
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        writer = PdfWriter()
+        writer.append(reader)
+        filled = 0
+        data_str = {k: ("" if v is None else str(v)) for k, v in data.items()}
+        for page in writer.pages:
+            try:
+                writer.update_page_form_field_values(page, data_str, auto_regenerate=False)
+                filled += 1
+            except Exception:
+                continue
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_rempli.pdf")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "wb") as f:
+            writer.write(f)
+        return {"success": True, "path": out, "destination": out, "fields_set": len(data_str),
+                "message": f"Formulaire rempli ({len(data_str)} champ(s)) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pptx_create(args: dict) -> dict:
+    """Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces."""
+    slides = args.get("slides") or []
+    if isinstance(slides, str):
+        try:
+            slides = json.loads(slides)
+        except Exception:
+            return {"error": "'slides' doit être une liste d'objets {title, bullets}."}
+    if not slides and not args.get("title"):
+        return {"error": "Fournir 'title' et/ou 'slides' (liste de {title, bullets})."}
+    try:
+        from pptx import Presentation
+        from pptx.util import Pt
+        prs = Presentation()
+        # Diapo de titre
+        if args.get("title"):
+            s = prs.slides.add_slide(prs.slide_layouts[0])
+            s.shapes.title.text = args["title"]
+            if args.get("subtitle") and len(s.placeholders) > 1:
+                s.placeholders[1].text = args["subtitle"]
+        # Diapos de contenu
+        for sl in slides:
+            if isinstance(sl, str):
+                sl = {"title": sl, "bullets": []}
+            s = prs.slides.add_slide(prs.slide_layouts[1])
+            s.shapes.title.text = sl.get("title", "")
+            bullets = sl.get("bullets") or sl.get("points") or []
+            if isinstance(bullets, str):
+                bullets = [b.strip() for b in bullets.split("\n") if b.strip()]
+            if bullets and len(s.placeholders) > 1:
+                tf = s.placeholders[1].text_frame
+                tf.text = str(bullets[0])
+                for b in bullets[1:]:
+                    p = tf.add_paragraph(); p.text = str(b)
+        out = _resolve_path(args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "presentation.pptx"))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        prs.save(out)
+        n_slides = len(slides) + (1 if args.get("title") else 0)
+        return {"success": True, "path": out, "destination": out, "slides": n_slides,
+                "message": f"Présentation créée ({n_slides} diapos) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pptx_read(args: dict) -> dict:
+    """Extrait le texte de toutes les diapos d'un fichier PowerPoint (.pptx)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pptx import Presentation
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Fichier introuvable : {rp}"}
+        prs = Presentation(str(rp))
+        out = []
+        for i, slide in enumerate(prs.slides):
+            parts = []
+            for shape in slide.shapes:
+                if shape.has_text_frame and shape.text_frame.text.strip():
+                    parts.append(shape.text_frame.text.strip())
+            out.append({"slide": i + 1, "text": "\n".join(parts)})
+        full = "\n\n".join(f"--- Diapo {s['slide']} ---\n{s['text']}" for s in out)
+        return {"success": True, "slides": len(out), "content": out, "text": full[:6000],
+                "message": f"{len(out)} diapo(s) lue(s)"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_csv_to_xlsx(args: dict) -> dict:
+    """Convertit un fichier CSV en classeur Excel (.xlsx) avec en-têtes en gras."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import csv as _csv
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Fichier introuvable : {rp}"}
+        delim = args.get("delimiter") or ""
+        with open(rp, "r", encoding="utf-8-sig", newline="") as f:
+            sample = f.read(2048); f.seek(0)
+            if not delim:
+                try:
+                    delim = _csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+                except Exception:
+                    delim = ","
+            rows = list(_csv.reader(f, delimiter=delim))
+        wb = Workbook(); ws = wb.active; ws.title = rp.stem[:31]
+        for r, row in enumerate(rows, 1):
+            for c, val in enumerate(row, 1):
+                cell = ws.cell(row=r, column=c, value=val)
+                if r == 1:
+                    cell.font = Font(bold=True)
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_suffix(".xlsx")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        wb.save(out)
+        return {"success": True, "path": out, "destination": out, "rows": len(rows),
+                "message": f"CSV converti en Excel ({len(rows)} lignes) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_xlsx_to_csv(args: dict) -> dict:
+    """Convertit une feuille d'un classeur Excel (.xlsx) en CSV."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import csv as _csv
+        from openpyxl import load_workbook
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Fichier introuvable : {rp}"}
+        wb = load_workbook(str(rp), read_only=True, data_only=True)
+        ws = wb[args["sheet"]] if args.get("sheet") and args["sheet"] in wb.sheetnames else wb.active
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_suffix(".csv")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        n = 0
+        with open(out, "w", encoding="utf-8-sig", newline="") as f:
+            w = _csv.writer(f, delimiter=args.get("delimiter", ","))
+            for row in ws.iter_rows(values_only=True):
+                w.writerow(["" if v is None else v for v in row]); n += 1
+        wb.close()
+        return {"success": True, "path": out, "destination": out, "rows": n, "sheet": ws.title,
+                "message": f"Excel converti en CSV ({n} lignes, feuille « {ws.title} ») → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_docx_to_text(args: dict) -> dict:
+    """Extrait le texte d'un document Word (.docx), en texte brut ou Markdown (titres, listes, tableaux)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    as_md = (args.get("format", "markdown").lower() == "markdown")
+    try:
+        from docx import Document
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Fichier introuvable : {rp}"}
+        doc = Document(str(rp))
+        lines = []
+        for para in doc.paragraphs:
+            t = para.text.strip()
+            if not t:
+                lines.append("")
+                continue
+            style = (para.style.name or "").lower() if para.style else ""
+            if as_md and style.startswith("heading"):
+                try:
+                    lvl = int(style.replace("heading", "").strip() or 1)
+                except Exception:
+                    lvl = 1
+                lines.append("#" * min(lvl, 6) + " " + t)
+            elif as_md and ("list" in style or "bullet" in style):
+                lines.append("- " + t)
+            else:
+                lines.append(t)
+        # Tableaux
+        for tbl in doc.tables:
+            if as_md and tbl.rows:
+                hdr = [c.text.strip() for c in tbl.rows[0].cells]
+                lines.append("\n| " + " | ".join(hdr) + " |")
+                lines.append("| " + " | ".join("---" for _ in hdr) + " |")
+                for row in tbl.rows[1:]:
+                    lines.append("| " + " | ".join(c.text.strip() for c in row.cells) + " |")
+            else:
+                for row in tbl.rows:
+                    lines.append(" | ".join(c.text.strip() for c in row.cells))
+        text = "\n".join(lines).strip()
+        saved = None
+        if args.get("output_path"):
+            saved = _resolve_path(args["output_path"])
+            Path(saved).parent.mkdir(parents=True, exist_ok=True)
+            Path(saved).write_text(text, encoding="utf-8")
+        return {"success": True, "text": text[:8000], "truncated": len(text) > 8000,
+                "paragraphs": len(doc.paragraphs), "tables": len(doc.tables), "path": saved,
+                "message": f"Word extrait ({len(doc.paragraphs)} paragraphes, {len(doc.tables)} tableau(x))"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_text_summarize(args: dict) -> dict:
+    """Résume un texte ou un document (txt/pdf/docx) via l'IA locale. style: bref|détaillé|puces|action."""
+    text = args.get("text", "")
+    src_path = args.get("path", "").strip()
+    if src_path and not text:
+        rp = Path(_resolve_path(src_path))
+        if not rp.exists():
+            return {"error": f"Fichier introuvable : {rp}"}
+        ext = rp.suffix.lower()
+        if ext == ".pdf":
+            r = await execute_pdf_read({"path": str(rp), "max_chars": 12000})
+            text = r.get("text") or r.get("content") or ""
+        elif ext == ".docx":
+            r = await execute_docx_to_text({"path": str(rp), "format": "text"})
+            text = r.get("text", "")
+        else:
+            try:
+                # Borné : ne JAMAIS charger un fichier entier (un .log de plusieurs Go saturerait la RAM)
+                with open(rp, "r", encoding="utf-8", errors="replace") as _f:
+                    text = _f.read(200_000)
+            except Exception as e:
+                return {"error": f"Lecture impossible : {e}"}
+    if not text or len(text.strip()) < 20:
+        return {"error": "Fournir 'text' (≥20 caractères) ou 'path' vers un document."}
+    style = (args.get("style") or "bref").lower()
+    style_instr = {
+        "bref": "Résume en 3-4 phrases claires.",
+        "détaillé": "Fais un résumé structuré et complet (paragraphes).",
+        "detaille": "Fais un résumé structuré et complet (paragraphes).",
+        "puces": "Résume sous forme de 5-8 puces concises.",
+        "action": "Extrais les points d'action / décisions / tâches sous forme de liste.",
+    }.get(style, "Résume en 3-4 phrases claires.")
+    lang = args.get("language", "français")
+    prompt = (f"Tu es un assistant qui synthétise. {style_instr} Réponds en {lang}, "
+              f"uniquement le résumé sans préambule.\n\nTEXTE:\n{text[:12000]}")
+    try:
+        summary = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+        return {"success": True, "summary": summary, "style": style,
+                "source_chars": len(text), "source": src_path or None,
+                "message": "Résumé généré."}
+    except Exception as e:
+        return _net_error(e, "résumé IA") if "_net_error" in globals() else {"error": str(e)}
+
+
+# ════════════════ Synthèse vocale, PDF compress/numérotation, data→chart (v2.37) ═══════════
+_TTS_VOICES = {
+    "henri": "fr-FR-HenriNeural", "denise": "fr-FR-DeniseNeural", "eloise": "fr-FR-EloiseNeural",
+    "vivienne": "fr-FR-VivienneMultilingualNeural", "remy": "fr-FR-RemyMultilingualNeural",
+    "thierry": "fr-CA-ThierryNeural", "sylvie": "fr-CA-SylvieNeural",
+    "en-femme": "en-US-AriaNeural", "en-homme": "en-US-GuyNeural",
+}
+
+
+async def execute_text_to_speech(args: dict) -> dict:
+    """🔊 Génère un fichier audio (MP3) parlant à partir d'un texte, voix neurale (edge-tts, en ligne)."""
+    text = (args.get("text") or "").strip()
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+    voice = (args.get("voice") or "denise").lower()
+    voice_id = _TTS_VOICES.get(voice, args.get("voice") if "-" in str(args.get("voice", "")) else "fr-FR-DeniseNeural")
+    rate = args.get("rate", "+0%"); pitch = args.get("pitch", "+0Hz")
+    # nettoyer le markdown pour une lecture propre
+    for pat, rep in [(r"\*\*(.+?)\*\*", r"\1"), (r"\*(.+?)\*", r"\1"), (r"`([^`]+)`", r"\1"),
+                     (r"#{1,6}\s+", ""), (r"\[([^\]]+)\]\([^\)]+\)", r"\1")]:
+        text = _re.sub(pat, rep, text)
+    if len(text) > 8000:
+        text = text[:8000] + "…"
+    out = _resolve_path(args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "synthese_vocale.mp3"))
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(text, voice_id, rate=rate, pitch=pitch)
+        chunks = []
+        async for ch in communicate.stream():
+            if ch["type"] == "audio":
+                chunks.append(ch["data"])
+        data = b"".join(chunks)
+        if not data:
+            return {"error": "Aucun audio généré (voix ou texte invalide)."}
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_bytes(data)
+        return {"success": True, "path": out, "destination": out, "voice": voice_id,
+                "chars": len(text), "size_human": _fmt_bytes(len(data)),
+                "message": f"Audio généré ({_fmt_bytes(len(data))}, voix {voice_id}) → {out}"}
+    except Exception as e:
+        return _net_error(e, "synthèse vocale") if "_net_error" in globals() else {"error": str(e)}
+
+
+async def execute_pdf_compress(args: dict) -> dict:
+    """🗜️ Réduit le poids d'un PDF (recompression des flux + flux d'objets) via pikepdf."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import pikepdf
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_compresse.pdf")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        orig = rp.stat().st_size
+        loop = asyncio.get_running_loop()
+
+        def _do():
+            with pikepdf.open(str(rp)) as pdf:
+                pdf.save(str(out), compress_streams=True, recompress_flate=True,
+                         object_stream_mode=pikepdf.ObjectStreamMode.generate)
+
+        await loop.run_in_executor(None, _do)
+        new = Path(out).stat().st_size
+        # Garantie : ne jamais produire un fichier plus gros que l'original
+        if new >= orig:
+            shutil.copy2(str(rp), str(out))
+            new = Path(out).stat().st_size
+            return {"success": True, "path": out, "destination": out,
+                    "original_kb": round(orig / 1024, 1), "compressed_kb": round(new / 1024, 1),
+                    "saved_pct": 0, "already_optimal": True,
+                    "message": f"PDF déjà optimal ({round(orig/1024,1)} Ko) — copie conservée → {out}"}
+        saved = round((1 - new / orig) * 100, 1) if orig else 0
+        return {"success": True, "path": out, "destination": out,
+                "original_kb": round(orig / 1024, 1), "compressed_kb": round(new / 1024, 1),
+                "saved_pct": saved,
+                "message": f"{round(orig/1024,1)} Ko → {round(new/1024,1)} Ko ({saved}% gagné) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pdf_add_page_numbers(args: dict) -> dict:
+    """#️⃣ Ajoute une numérotation (ou un texte de pied/en-tête) sur chaque page d'un PDF.
+    format accepte {n} (numéro), {total} (total). position: bottom-center/right/left, top-*."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        from pypdf import PdfReader, PdfWriter
+        from reportlab.pdfgen import canvas as _canvas
+        import io as _io
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"PDF introuvable : {rp}"}
+        reader = PdfReader(str(rp))
+        total = len(reader.pages)
+        fmt = args.get("format", "Page {n} / {total}")
+        position = (args.get("position", "bottom-center") or "bottom-center").lower()
+        start = int(args.get("start_number", 1))
+        size = int(args.get("font_size", 9))
+        writer = PdfWriter()
+        for i, page in enumerate(reader.pages):
+            w = float(page.mediabox.width); h = float(page.mediabox.height)
+            label = fmt.replace("{n}", str(i + start)).replace("{total}", str(total)).replace("{page}", str(i + start))
+            buf = _io.BytesIO()
+            c = _canvas.Canvas(buf, pagesize=(w, h))
+            c.setFont("Helvetica", size)
+            margin = 24
+            y = (h - margin) if "top" in position else margin
+            if "right" in position:
+                c.drawRightString(w - margin, y, label)
+            elif "left" in position:
+                c.drawString(margin, y, label)
+            else:
+                c.drawCentredString(w / 2, y, label)
+            c.save(); buf.seek(0)
+            page.merge_page(PdfReader(buf).pages[0])
+            writer.add_page(page)
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_numerote.pdf")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "wb") as f:
+            writer.write(f)
+        return {"success": True, "path": out, "destination": out, "pages": total,
+                "message": f"Numérotation ajoutée sur {total} page(s) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_csv_to_chart(args: dict) -> dict:
+    """📊 Génère un graphique (PNG) directement à partir d'un fichier CSV.
+    chart_type: bar|line|pie. label_column = colonne des étiquettes ; value_columns auto-détectées si absentes."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import csv as _csv
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        rp = Path(_resolve_path(path))
+        if not rp.exists():
+            return {"error": f"Fichier introuvable : {rp}"}
+        with open(rp, "r", encoding="utf-8-sig", newline="") as f:
+            sample = f.read(2048); f.seek(0)
+            try:
+                delim = _csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+            except Exception:
+                delim = ","
+            rows = [r for r in _csv.reader(f, delimiter=delim) if any(c.strip() for c in r)]
+        if len(rows) < 2:
+            return {"error": "CSV insuffisant (il faut un en-tête + des données)."}
+        header = rows[0]
+        data = rows[1:200]  # borné
+        label_col = int(args.get("label_column", 0))
+
+        def _num(v):
+            try:
+                return float(str(v).replace(" ", "").replace(" ", "").replace(",", "."))
+            except Exception:
+                return None
+
+        # colonnes de valeurs : spécifiées, sinon auto-détection des colonnes numériques
+        if args.get("value_columns"):
+            vc = args["value_columns"]
+            value_cols = [int(x) for x in (vc if isinstance(vc, list) else str(vc).split(","))]
+        else:
+            value_cols = []
+            for ci in range(len(header)):
+                if ci == label_col:
+                    continue
+                col_vals = [_num(r[ci]) for r in data if len(r) > ci]
+                if col_vals and sum(1 for v in col_vals if v is not None) >= max(1, len(col_vals) // 2):
+                    value_cols.append(ci)
+        if not value_cols:
+            return {"error": "Aucune colonne numérique détectée à tracer."}
+
+        labels = [r[label_col] if len(r) > label_col else "" for r in data]
+        chart_type = (args.get("chart_type") or "bar").lower()
+        title = args.get("title") or rp.stem
+        plt.figure(figsize=(11, 6))
+        plt.rcParams.update({"font.size": 10})
+
+        if chart_type == "pie":
+            ci = value_cols[0]
+            vals = [(_num(r[ci]) or 0) for r in data if len(r) > ci]
+            plt.pie(vals, labels=labels[:len(vals)], autopct="%1.1f%%", startangle=90)
+            plt.axis("equal")
+        else:
+            import numpy as _np
+            x = _np.arange(len(labels))
+            nseries = len(value_cols)
+            width = 0.8 / max(1, nseries) if chart_type == "bar" else None
+            for si, ci in enumerate(value_cols):
+                vals = [(_num(r[ci]) if len(r) > ci else None) for r in data]
+                vals = [v if v is not None else 0 for v in vals]
+                name = header[ci] if ci < len(header) else f"Col {ci}"
+                if chart_type == "line":
+                    plt.plot(x, vals, marker="o", label=name)
+                else:  # bar
+                    plt.bar(x + si * width - 0.4 + width / 2, vals, width=width, label=name)
+            plt.xticks(x, labels, rotation=45, ha="right")
+            if nseries > 1:
+                plt.legend()
+            plt.grid(axis="y", alpha=0.3)
+        plt.title(title)
+        plt.tight_layout()
+        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_suffix(".png")))
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(out, dpi=120, bbox_inches="tight")
+        plt.close()
+        return {"success": True, "path": out, "destination": out, "chart_type": chart_type,
+                "series": len(value_cols), "points": len(labels),
+                "message": f"Graphique {chart_type} généré ({len(value_cols)} série(s), {len(labels)} points) → {out}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_xlsx_read(args: dict) -> dict:
+    """Lit un fichier Excel (.xlsx) et retourne le contenu d'une feuille."""
+    path     = args.get("path", "").strip()
+    sheet    = args.get("sheet", None)
+    max_rows = int(args.get("max_rows", 50))
+    action   = args.get("action", "read")   # read | sheets | summary
+
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import openpyxl as _xl
+        resolved = Path(_resolve_path(path))
+        if not resolved.exists():
+            return {"error": f"Fichier introuvable : {resolved}"}
+        wb = _xl.load_workbook(str(resolved), read_only=True, data_only=True)
+        sheet_names = wb.sheetnames
+
+        if action == "sheets":
+            wb.close()
+            return {"success": True, "file": str(resolved), "sheets": sheet_names, "count": len(sheet_names)}
+
+        ws = wb[sheet] if sheet and sheet in sheet_names else wb.active
+
+        if action == "summary":
+            result = {
+                "success": True, "file": str(resolved),
+                "active_sheet": ws.title, "sheets": sheet_names,
+                "rows": ws.max_row, "columns": ws.max_column,
+            }
+            wb.close()
+            return result
+
+        # action == "read"
+        rows = []; headers = None
+        for i, row in enumerate(ws.iter_rows(values_only=True)):
+            if i == 0:
+                headers = [str(c) if c is not None else f"Col{j+1}" for j, c in enumerate(row)]
+            elif i <= max_rows:
+                rows.append({
+                    headers[j]: (str(v) if v is not None else "")
+                    for j, v in enumerate(row) if j < len(headers)
+                })
+        wb.close()
+        return {
+            "success":     True,
+            "file":        str(resolved),
+            "sheet":       ws.title,
+            "headers":     headers,
+            "rows_loaded": len(rows),
+            "data":        rows,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_url_analyze(args: dict) -> dict:
+    """Analyse une URL : titre, meta description, statut HTTP, serveur et temps de réponse."""
+    url = args.get("url", "").strip()
+    if not url:
+        return {"error": "Paramètre 'url' requis."}
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    import re as _re, time as _t2
+    try:
+        def _fetch():
+            import urllib.request as _ureq
+            hdrs = {"User-Agent": "Mozilla/5.0 (compatible; MarvinBot/2.9)"}
+            req = _ureq.Request(url, headers=hdrs, method="GET")
+            t0 = _t2.time()
+            with _ureq.urlopen(req, timeout=10) as resp:
+                elapsed = round((_t2.time() - t0) * 1000)
+                status = resp.status
+                rh = dict(resp.headers)
+                ct = rh.get("Content-Type", "")
+                body = resp.read(60_000).decode("utf-8", errors="replace") if "html" in ct else ""
+                return status, rh, body, elapsed
+        loop = asyncio.get_running_loop()
+        status, rh, body, elapsed = await loop.run_in_executor(None, _fetch)
+        title = ""
+        tm = _re.search(r"<title[^>]*>([^<]{1,200})</title>", body, _re.I)
+        if tm:
+            title = _re.sub(r"\s+", " ", tm.group(1)).strip()
+        desc = ""
+        dm = _re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']{1,500})["\']', body, _re.I)
+        if not dm:
+            dm = _re.search(r'<meta[^>]+content=["\']([^"\']{1,500})["\'][^>]+name=["\']description["\']', body, _re.I)
+        if dm:
+            desc = _re.sub(r"\s+", " ", dm.group(1)).strip()
+        canon = ""
+        cm = _re.search(r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']', body, _re.I)
+        if cm:
+            canon = cm.group(1).strip()
+        return {
+            "success":          True,
+            "url":              url,
+            "status":           status,
+            "response_time_ms": elapsed,
+            "title":            title,
+            "description":      desc,
+            "canonical":        canon,
+            "content_type":     rh.get("Content-Type", ""),
+            "server":           rh.get("Server", ""),
+            "content_length":   rh.get("Content-Length", ""),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_zip_list(args: dict) -> dict:
+    """Liste le contenu d'une archive ZIP sans l'extraire."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        import zipfile as _zf
+        resolved = _resolve_path(path)
+        if not os.path.exists(resolved):
+            return {"error": f"Archive introuvable : {resolved}"}
+        entries = []; total_size = 0; comp_size = 0
+        with _zf.ZipFile(resolved, "r") as zf:
+            for info in zf.infolist():
+                entries.append({
+                    "name":       info.filename,
+                    "size":       info.file_size,
+                    "compressed": info.compress_size,
+                    "is_dir":     info.filename.endswith("/"),
+                    "date":       f"{info.date_time[0]}-{info.date_time[1]:02d}-{info.date_time[2]:02d}",
+                })
+                total_size += info.file_size
+                comp_size  += info.compress_size
+        ratio = f"{round((1 - comp_size / total_size) * 100, 1)}%" if total_size > 0 else "0%"
+        return {
+            "success":            True,
+            "archive":            str(resolved),
+            "entries_count":      len(entries),
+            "total_size_kb":      round(total_size / 1024, 1),
+            "compressed_size_kb": round(comp_size  / 1024, 1),
+            "compression_ratio":  ratio,
+            "entries":            entries[:200],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_color_tool(args: dict) -> dict:
+    """Convertit des couleurs entre HEX, RGB et HSL, et calcule la couleur complémentaire."""
+    color = args.get("color", "").strip()
+    if not color:
+        return {"error": "Paramètre 'color' requis. Exemple : #FF5733 ou rgb(255,87,51) ou hsl(11,100%,60%)"}
+    import colorsys as _cs, re as _re
+    try:
+        def _hex_to_rgb(h):
+            h = h.lstrip("#")
+            if len(h) == 3:
+                h = "".join(c * 2 for c in h)
+            return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+        if color.startswith("#"):
+            r, g, b = _hex_to_rgb(color)
+        elif color.lower().startswith("rgb"):
+            nums = _re.findall(r"\d+", color)
+            r, g, b = int(nums[0]), int(nums[1]), int(nums[2])
+        elif color.lower().startswith("hsl"):
+            nums = _re.findall(r"[\d.]+", color)
+            h_deg, s_pct, l_pct = float(nums[0]), float(nums[1]), float(nums[2])
+            r_, g_, b_ = _cs.hls_to_rgb(h_deg / 360, l_pct / 100, s_pct / 100)
+            r, g, b = round(r_ * 255), round(g_ * 255), round(b_ * 255)
+        else:
+            return {"error": f"Format non reconnu : {color}. Utilisez #RRGGBB, rgb(r,g,b) ou hsl(h,s%,l%)"}
+
+        h, lum, s = _cs.rgb_to_hls(r / 255, g / 255, b / 255)
+        h_deg2 = round(h * 360, 1); s_pct2 = round(s * 100, 1); l_pct2 = round(lum * 100, 1)
+        hex_out = f"#{r:02X}{g:02X}{b:02X}"
+
+        # Complementary colour
+        h_comp = (h + 0.5) % 1.0
+        rc, gc, bc = _cs.hls_to_rgb(h_comp, lum, s)
+        complementary = f"#{round(rc*255):02X}{round(gc*255):02X}{round(bc*255):02X}"
+
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return {
+            "success":       True,
+            "input":         color,
+            "hex":           hex_out,
+            "rgb":           {"r": r, "g": g, "b": b},
+            "rgb_str":       f"rgb({r},{g},{b})",
+            "hsl":           {"h": h_deg2, "s": s_pct2, "l": l_pct2},
+            "hsl_str":       f"hsl({h_deg2},{s_pct2}%,{l_pct2}%)",
+            "complementary": complementary,
+            "luminance":     round(luminance, 3),
+            "brightness":    "clair" if luminance > 0.5 else "sombre",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 17 — SQLite, Git & Fichiers avancés
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_sqlite_query(args: dict) -> dict:
+    """Exécute une requête SQL sur une base SQLite locale."""
+    db_path  = args.get("db_path", "").strip()
+    query    = args.get("query", "").strip()
+    max_rows = int(args.get("max_rows", 100))
+    confirmed = args.get("confirmed", False)
+
+    if not db_path:
+        return {"error": "Paramètre 'db_path' requis."}
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+
+    resolved = _resolve_path(db_path)
+    if not os.path.exists(resolved):
+        return {"error": f"Base de données introuvable : {resolved}"}
+
+    # Les requêtes d'écriture (INSERT/UPDATE/DELETE/DROP/CREATE) nécessitent confirmation
+    is_write = any(
+        query.strip().upper().startswith(kw)
+        for kw in ("INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "REPLACE", "TRUNCATE")
+    )
+    if is_write and not confirmed:
+        preview = query[:200]
+        return {
+            "requiresConfirmation": True,
+            "message": f"Exécuter cette requête d'écriture sur {os.path.basename(resolved)} ?\n{preview}",
+        }
+
+    import sqlite3 as _sq
+    try:
+        def _run():
+            conn = _sq.connect(resolved)
+            conn.row_factory = _sq.Row
+            cur = conn.cursor()
+            cur.execute(query)
+            if is_write:
+                conn.commit()
+                rows_affected = cur.rowcount
+                conn.close()
+                return {"write": True, "rows_affected": rows_affected}
+            cols = [d[0] for d in (cur.description or [])]
+            rows = [dict(zip(cols, r)) for r in cur.fetchmany(max_rows)]
+            # Convert non-serializable types
+            for row in rows:
+                for k, v in row.items():
+                    if isinstance(v, bytes):
+                        row[k] = f"<bytes:{len(v)}>"
+            total = cur.fetchall()  # consume remainder for count
+            conn.close()
+            return {"cols": cols, "rows": rows, "rows_count": len(rows), "has_more": len(total) > 0}
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _run)
+        if result.get("write"):
+            return {"success": True, "write": True, "rows_affected": result["rows_affected"]}
+        return {
+            "success":    True,
+            "db":         os.path.basename(resolved),
+            "query":      query[:200],
+            "columns":    result["cols"],
+            "rows":       result["rows"],
+            "rows_count": result["rows_count"],
+            "truncated":  result["has_more"],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_sqlite_tables(args: dict) -> dict:
+    """Liste les tables et leur schéma dans une base SQLite."""
+    db_path = args.get("db_path", "").strip()
+    if not db_path:
+        return {"error": "Paramètre 'db_path' requis."}
+    resolved = _resolve_path(db_path)
+    if not os.path.exists(resolved):
+        return {"error": f"Base de données introuvable : {resolved}"}
+    import sqlite3 as _sq
+    try:
+        def _run():
+            conn = _sq.connect(resolved)
+            cur = conn.cursor()
+            cur.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') ORDER BY name;")
+            tables = [{"name": r[0], "type": r[1]} for r in cur.fetchall()]
+            schema = {}
+            for t in tables:
+                cur.execute(f"PRAGMA table_info('{t['name']}');")
+                schema[t["name"]] = [
+                    {"col": r[1], "type": r[2], "notnull": bool(r[3]), "pk": bool(r[5])}
+                    for r in cur.fetchall()
+                ]
+            conn.close()
+            return tables, schema
+        loop = asyncio.get_running_loop()
+        tables, schema = await loop.run_in_executor(None, _run)
+        stat = Path(resolved).stat()
+        return {
+            "success":    True,
+            "db":         os.path.basename(resolved),
+            "size_kb":    round(stat.st_size / 1024, 1),
+            "table_count": len(tables),
+            "tables":     tables,
+            "schema":     schema,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_git_info(args: dict) -> dict:
+    """Retourne les informations Git d'un dépôt : branche, statut, derniers commits."""
+    path = args.get("path", ".").strip() or "."
+    action = args.get("action", "status")  # status | log | branches | diff
+
+    resolved = _resolve_path(path)
+    if not os.path.exists(resolved):
+        return {"error": f"Dossier introuvable : {resolved}"}
+
+    try:
+        def _git(cmd: list) -> str:
+            result = subprocess.run(
+                ["git", "-C", resolved] + cmd,
+                capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
+            )
+            return result.stdout.strip(), result.returncode
+
+        if action == "status":
+            out, rc = await asyncio.to_thread(_git, ["status", "--short", "--branch"])
+            if rc != 0:
+                return {"error": "Ce dossier n'est pas un dépôt Git ou git n'est pas installé."}
+            lines = out.splitlines()
+            branch_line = lines[0] if lines else ""
+            changes = [l for l in lines[1:] if l.strip()]
+            branch = branch_line.replace("## ", "").split("...")[0] if branch_line.startswith("## ") else branch_line
+            return {
+                "success":  True,
+                "repo":     resolved,
+                "branch":   branch,
+                "changes_count": len(changes),
+                "changes":  changes[:50],
+                "clean":    len(changes) == 0,
+            }
+        elif action == "log":
+            count = int(args.get("count", 10))
+            out, rc = await asyncio.to_thread(_git, ["log", f"--max-count={count}", "--oneline", "--no-color"])
+            if rc != 0:
+                return {"error": "Impossible d'accéder au log Git."}
+            commits = []
+            for line in out.splitlines():
+                if line.strip():
+                    parts = line.split(" ", 1)
+                    commits.append({"hash": parts[0], "message": parts[1] if len(parts) > 1 else ""})
+            return {"success": True, "repo": resolved, "commits": commits, "count": len(commits)}
+        elif action == "branches":
+            out, rc = await asyncio.to_thread(_git, ["branch", "-a", "--no-color"])
+            if rc != 0:
+                return {"error": "Impossible de lister les branches."}
+            branches = [b.strip().lstrip("* ") for b in out.splitlines() if b.strip()]
+            current = next((b.lstrip("* ") for b in out.splitlines() if b.startswith("*")), "")
+            return {"success": True, "repo": resolved, "current": current, "branches": branches}
+        elif action == "diff":
+            out, rc = await asyncio.to_thread(_git, ["diff", "--stat", "--no-color"])
+            return {"success": True, "repo": resolved, "diff_stat": out or "(aucune modification)"}
+        else:
+            return {"error": f"Action inconnue : {action}. Valeurs : status, log, branches, diff"}
+    except FileNotFoundError:
+        return {"error": "git n'est pas installé ou introuvable dans PATH."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_bulk_rename(args: dict) -> dict:
+    """Renomme en masse des fichiers dans un dossier selon un motif de recherche/remplacement."""
+    folder   = args.get("folder", "").strip()
+    pattern  = args.get("pattern", "").strip()  # regex ou texte à trouver dans le nom
+    replace  = args.get("replace", "")          # texte de remplacement
+    glob_pat = args.get("glob", "*")            # filtre de fichiers ex: "*.jpg"
+    dry_run  = args.get("dry_run", True)        # True = simuler seulement
+    confirmed = args.get("confirmed", False)
+
+    if not folder:
+        return {"error": "Paramètre 'folder' requis."}
+    if not pattern:
+        return {"error": "Paramètre 'pattern' requis."}
+
+    resolved = Path(_resolve_path(folder))
+    if not resolved.exists():
+        return {"error": f"Dossier introuvable : {resolved}"}
+
+    import re as _re, fnmatch as _fn
+    try:
+        files = [f for f in resolved.iterdir() if f.is_file()]
+        if glob_pat != "*":
+            files = [f for f in files if _fn.fnmatch(f.name, glob_pat)]
+
+        renames = []
+        for f in files:
+            new_name = _re.sub(pattern, replace, f.name)
+            if new_name != f.name:
+                renames.append({"old": f.name, "new": new_name, "old_path": str(f), "new_path": str(f.parent / new_name)})
+
+        if not renames:
+            return {"success": True, "message": "Aucun fichier ne correspond au motif.", "renamed": 0}
+
+        if dry_run and not confirmed:
+            return {
+                "requiresConfirmation": True,
+                "message": f"Renommer {len(renames)} fichier(s) dans {resolved.name} ?\nExemple : {renames[0]['old']} → {renames[0]['new']}",
+                "preview": renames[:10],
+            }
+
+        # Execute rename
+        done = []; errors = []
+        for r in renames:
+            try:
+                os.rename(r["old_path"], r["new_path"])
+                done.append(r)
+            except Exception as e:
+                errors.append({"file": r["old"], "error": str(e)})
+        return {
+            "success": True,
+            "folder": str(resolved),
+            "renamed": len(done),
+            "errors": errors,
+            "files": done[:50],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 18 — Outils composés & productivité
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_screen_ocr(args: dict) -> dict:
+    """
+    Capture l'écran et en extrait le texte via l'IA vision (llava) ou pytesseract.
+    Méthode 1 (recommandée) : Ollama + llava-phi3 (no extra install needed).
+    Méthode 2 (fallback)     : pytesseract si installé + tesseract binary.
+    """
+    region   = args.get("region", None)    # [x, y, w, h] ou None = écran entier
+    save     = args.get("save", False)     # True = sauvegarder le screenshot
+    method   = args.get("method", "auto")  # auto | vision | tesseract
+    prompt   = args.get("prompt", "Extrais tout le texte visible dans cette image. Retourne uniquement le texte brut.")
+
+    try:
+        import mss as _mss
+        from PIL import Image as PILImg
+        import io as _io, tempfile as _tmp
+
+        with _mss.mss() as sct:
+            if region and len(region) == 4:
+                x, y, w, h = region
+                mon = {"left": x, "top": y, "width": w, "height": h}
+            else:
+                mon = sct.monitors[0]  # Virtual screen (all monitors combined)
+            shot = sct.grab(mon)
+            img  = PILImg.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
+
+        screen_size = list(shot.size)
+
+        # Reduce size for faster OCR (max 1920px)
+        max_dim = 1920
+        if max(img.size) > max_dim:
+            ratio    = max_dim / max(img.size)
+            img      = img.resize((int(img.width * ratio), int(img.height * ratio)), PILImg.LANCZOS)
+
+        # Save to temp PNG
+        tmp = _tmp.NamedTemporaryFile(suffix=".png", delete=False)
+        img.save(tmp.name, "PNG")
+        tmp.close()
+        tmp_path = tmp.name
+
+        text = ""
+        ocr_method_used = "none"
+
+        # Method 1: Ollama vision (llava-phi3)
+        if method in ("auto", "vision"):
+            try:
+                result = await execute_ocr_extract({"image_path": tmp_path, "prompt": prompt})
+                if result.get("text") and not result.get("error"):
+                    text = result["text"].strip()
+                    ocr_method_used = "vision (llava)"
+            except Exception:
+                pass
+
+        # Method 2: pytesseract fallback
+        if not text and method in ("auto", "tesseract"):
+            try:
+                import pytesseract
+                lang = args.get("lang", "fra+eng")
+                try:
+                    text = pytesseract.image_to_string(img, lang=lang, config="--oem 3 --psm 6").strip()
+                except Exception:
+                    text = pytesseract.image_to_string(img, config="--oem 3 --psm 6").strip()
+                if text:
+                    ocr_method_used = "tesseract"
+            except Exception:
+                pass
+
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+        result = {
+            "success":     True,
+            "text":        text,
+            "text_length": len(text),
+            "screen_size": screen_size,
+            "method":      ocr_method_used,
+        }
+
+        if save:
+            saved_path = Path(os.path.expanduser("~")) / "Desktop" / f"screen_ocr_{int(time.time())}.png"
+            PILImg.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX").save(str(saved_path))
+            result["saved_to"] = str(saved_path)
+
+        if not text:
+            result["warning"] = "Aucun texte extrait. Installez Tesseract ou assurez-vous que llava-phi3 est disponible dans Ollama."
+
+        return result
+
+    except ImportError as e:
+        return {"error": f"Dépendance manquante : {e}. Installez 'mss' avec : pip install mss"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_batch_read(args: dict) -> dict:
+    """Lit plusieurs fichiers texte en une seule requête et retourne leur contenu agrégé."""
+    paths       = args.get("paths", [])
+    max_per_file = int(args.get("max_chars_per_file", 5000))
+    encoding    = args.get("encoding", "utf-8")
+
+    if not paths:
+        return {"error": "Paramètre 'paths' requis (liste de chemins de fichiers)."}
+    if isinstance(paths, str):
+        paths = [p.strip() for p in paths.split(",") if p.strip()]
+
+    results = []
+    total_chars = 0
+    for raw_path in paths[:20]:  # max 20 fichiers
+        resolved = _resolve_path(raw_path.strip())
+        entry = {"path": resolved, "success": False}
+        try:
+            with open(resolved, encoding=encoding, errors="replace") as f:
+                content = f.read(max_per_file)
+            entry.update({
+                "success":   True,
+                "content":   content,
+                "chars":     len(content),
+                "truncated": len(content) >= max_per_file,
+            })
+            total_chars += len(content)
+        except FileNotFoundError:
+            entry["error"] = "Fichier introuvable"
+        except Exception as e:
+            entry["error"] = str(e)
+        results.append(entry)
+
+    return {
+        "success":     True,
+        "files_read":  sum(1 for r in results if r.get("success")),
+        "files_error": sum(1 for r in results if r.get("error")),
+        "total_chars": total_chars,
+        "files":       results,
+    }
+
+
+async def execute_clipboard_append(args: dict) -> dict:
+    """Ajoute du texte au presse-papiers (append) sans écraser le contenu existant."""
+    text      = args.get("text", "")
+    separator = args.get("separator", "\n")
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+    try:
+        import pyperclip
+        current = pyperclip.paste() or ""
+        new_content = (current + separator + text) if current else text
+        pyperclip.copy(new_content)
+        return {
+            "success":      True,
+            "old_length":   len(current),
+            "new_length":   len(new_content),
+            "appended":     len(text),
+        }
+    except ImportError:
+        return {"error": "pyperclip non installé. Utilisez pc_clipboard_set à la place."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_text_join(args: dict) -> dict:
+    """Fusionne plusieurs textes avec un séparateur (jointure de lignes, CSV → texte, etc.)."""
+    texts     = args.get("texts", [])
+    separator = args.get("separator", "\n")
+    prefix    = args.get("prefix", "")
+    suffix    = args.get("suffix", "")
+    dedupe    = args.get("dedupe", False)       # supprimer les doublons
+
+    if not texts:
+        return {"error": "Paramètre 'texts' requis (liste de chaînes)."}
+    if isinstance(texts, str):
+        texts = [texts]
+
+    if dedupe:
+        seen = set(); unique = []
+        for t in texts:
+            if t not in seen:
+                seen.add(t); unique.append(t)
+        texts = unique
+
+    result = separator.join(f"{prefix}{t}{suffix}" for t in texts)
+    return {
+        "success":     True,
+        "result":      result,
+        "items":       len(texts),
+        "total_chars": len(result),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 19 — Exécution de code Python (sandboxée)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_code_python(args: dict) -> dict:
+    """
+    Exécute un extrait de code Python dans un environnement sécurisé.
+    Idéal pour : calculs de données, traitement de texte, transformations, visualisations simples.
+    Timeout configurable. Les imports de bibliothèques installées sont autorisés.
+    ⚠️ Accès au système de fichiers et réseau en mode Expert uniquement.
+    """
+    code     = args.get("code", "").strip()
+    timeout  = min(int(args.get("timeout", 15)), 60)
+    confirmed = args.get("confirmed", False)
+
+    if not code:
+        return {"error": "Paramètre 'code' requis."}
+
+    # Check for potentially dangerous patterns
+    _DANGEROUS = [
+        "__import__", "exec(", "eval(", "compile(",
+        "os.system", "subprocess", "shutil.rmtree",
+        "open(", "socket.", "urllib.request", "requests.",
+        "ctypes", "importlib", "pickle.loads",
+    ]
+    code_lower = code.lower()
+    risks = [d for d in _DANGEROUS if d in code]
+
+    if risks and not confirmed:
+        risk_str = ", ".join(risks[:3])
+        return {
+            "requiresConfirmation": True,
+            "message": f"Ce code utilise des fonctions potentiellement sensibles ({risk_str}). Exécuter quand même ?",
+            "risks": risks,
+        }
+
+    import io as _io_mod, contextlib as _ctx, traceback as _tb
+
+    # Build execution namespace with useful imports pre-loaded
+    _namespace = {
+        "__builtins__": __builtins__,
+        # Pre-import common useful libraries
+        "json": __import__("json"),
+        "math": __import__("math"),
+        "re": __import__("re"),
+        "datetime": __import__("datetime"),
+        "collections": __import__("collections"),
+        "itertools": __import__("itertools"),
+        "functools": __import__("functools"),
+        "statistics": __import__("statistics"),
+        "random": __import__("random"),
+        "string": __import__("string"),
+        "pathlib": __import__("pathlib"),
+        "os": __import__("os"),
+    }
+    # Try to add optional scientific libs
+    for lib in ["numpy", "pandas", "matplotlib"]:
+        try:
+            _namespace[lib] = __import__(lib)
+        except ImportError:
+            pass
+
+    stdout_buf = _io_mod.StringIO()
+    stderr_buf = _io_mod.StringIO()
+
+    try:
+        def _run_code():
+            with _ctx.redirect_stdout(stdout_buf), _ctx.redirect_stderr(stderr_buf):
+                exec(compile(code, "<user_code>", "exec"), _namespace)
+
+        loop = asyncio.get_running_loop()
+        await asyncio.wait_for(
+            loop.run_in_executor(None, _run_code),
+            timeout=timeout,
+        )
+        stdout = stdout_buf.getvalue()
+        stderr = stderr_buf.getvalue()
+
+        # Capture the last expression value if any
+        last_val = _namespace.get("_result_") or _namespace.get("result") or _namespace.get("output")
+
+        return {
+            "success":  True,
+            "stdout":   stdout[:4000] or "(aucune sortie)",
+            "stderr":   stderr[:500] if stderr else "",
+            "result":   str(last_val)[:500] if last_val is not None else None,
+            "vars":     {k: str(v)[:100] for k, v in _namespace.items()
+                         if not k.startswith("_") and k not in ("json","math","re","datetime","collections","itertools","functools","statistics","random","string","pathlib","os","numpy","pandas","matplotlib")},
+        }
+    except asyncio.TimeoutError:
+        return {"error": f"Timeout dépassé ({timeout}s). Simplifiez le code ou augmentez le timeout."}
+    except Exception:
+        return {
+            "error":   _tb.format_exc(limit=5),
+            "stdout":  stdout_buf.getvalue()[:1000],
+            "stderr":  stderr_buf.getvalue()[:500],
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 20 — Assistant Devis / Facturation IT
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_billing_client_create(args: dict) -> dict:
+    """Crée un nouveau client dans le module devis/facturation."""
+    if not args.get("name"):
+        return {"error": "Paramètre 'name' requis."}
+    try:
+        client = db.billing_client_create(args)
+        return {"success": True, "message": f"Client '{client['name']}' créé.", "client": client}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_client_list(args: dict) -> dict:
+    """Liste les clients (filtrable par type : mairie | pme | asso | particulier)."""
+    try:
+        clients = db.billing_client_list(args.get("client_type"))
+        return {"success": True, "count": len(clients), "clients": clients}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_catalog_list(args: dict) -> dict:
+    """Liste le catalogue de prestations IT (par catégorie optionnelle)."""
+    try:
+        services = db.billing_catalog_list(args.get("category"))
+        # Group by category for readability
+        by_cat = {}
+        for s in services:
+            cat = s.get("category", "Autre")
+            by_cat.setdefault(cat, []).append(s)
+        return {
+            "success": True,
+            "count": len(services),
+            "categories": list(by_cat.keys()),
+            "by_category": by_cat,
+            "services": services,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_analyze_need(args: dict) -> dict:
+    """
+    Analyse structurée d'un besoin client pour préparer une proposition commerciale.
+    Catégorise les besoins par axe (infrastructure, sécurité, maintenance, etc.)
+    et propose les prestations du catalogue qui matchent.
+    """
+    description = args.get("description", "").strip()
+    client_type = args.get("client_type", "pme")
+    if not description:
+        return {"error": "Paramètre 'description' du besoin requis."}
+
+    try:
+        catalog = db.billing_catalog_list()
+
+        # Keyword matching against catalog
+        text = description.lower()
+        keywords_to_categories = {
+            "support": ["support", "hotline", "depannage", "dépannage", "assistance", "aide", "maintenance"],
+            "infrastructure": ["serveur", "server", "poste", "ordinateur", "matériel", "materiel",
+                                "installation", "nouveau poste", "infra"],
+            "sécurité": ["sécurité", "securite", "antivirus", "backup", "sauvegarde", "firewall",
+                          "intrusion", "audit", "vpn", "rgpd"],
+            "logiciel": ["microsoft 365", "office", "m365", "logiciel", "licence", "cloud",
+                          "migration", "google workspace"],
+            "formation": ["formation", "former", "apprendre", "tutoriel"],
+            "web": ["site web", "site internet", "wordpress", "vitrine", "hébergement"],
+            "réseau": ["réseau", "wifi", "câblage", "cablage", "switch", "router"],
+            "téléphonie": ["téléphone", "telephone", "voip", "standard", "ligne"],
+        }
+
+        matched_categories = set()
+        for cat, kws in keywords_to_categories.items():
+            if any(k in text for k in kws):
+                matched_categories.add(cat)
+
+        # ── Scoring de pertinence générique (multi-métiers) ───────────────────
+        # On note chaque prestation du catalogue par recoupement de mots avec le
+        # besoin → fonctionne pour TOUT métier, pas seulement l'informatique.
+        import re as _r
+        stop = {"de", "la", "le", "les", "des", "un", "une", "et", "pour", "avec", "du",
+                "en", "à", "au", "aux", "sur", "ou", "nos", "mon", "ma", "mes", "notre",
+                "client", "besoin", "nous", "vous", "il", "elle", "je", "tu"}
+        need_words = {w for w in _r.findall(r"[a-zàâçéèêëîïôûùüÿñ0-9]{3,}", text) if w not in stop}
+
+        def _score(s):
+            blob = f"{s.get('name','')} {s.get('description','')} {s.get('category','')} {s.get('use_cases','')}".lower()
+            sw = set(_r.findall(r"[a-zàâçéèêëîïôûùüÿñ0-9]{3,}", blob))
+            overlap = len(need_words & sw)
+            cat_match = 1 if (s["category"].lower() in matched_categories or
+                              any(mc in s["category"].lower() for mc in matched_categories)) else 0
+            return overlap * 2 + cat_match * 3
+
+        scored = [(s, _score(s)) for s in catalog]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        # Si rien ne ressort vraiment, on propose tout le catalogue
+        relevant = [s for s, sc in scored if sc > 0]
+        chosen = relevant if relevant else [s for s, _ in scored]
+
+        suggested = [{
+            "id": s["id"], "category": s["category"], "name": s["name"],
+            "description": s["description"], "unit": s["unit"],
+            "price_basic": s["price_basic"], "price_standard": s["price_standard"],
+            "price_premium": s["price_premium"], "time_hours": s["time_hours"],
+        } for s in chosen[:25]]
+
+        # Rough total estimates per tier
+        total_basic    = sum(s["price_basic"] for s in suggested)
+        total_standard = sum(s["price_standard"] for s in suggested)
+        total_premium  = sum(s["price_premium"] for s in suggested)
+        total_hours    = sum(s["time_hours"] for s in suggested)
+
+        return {
+            "success": True,
+            "description": description,
+            "client_type": client_type,
+            "matched_categories": sorted(matched_categories),
+            "suggested_services": suggested,
+            "suggested_count": len(suggested),
+            "estimated_totals_ht": {
+                "basic":    round(total_basic, 2),
+                "standard": round(total_standard, 2),
+                "premium":  round(total_premium, 2),
+            },
+            "estimated_time_hours": total_hours,
+            "hint": "Utilisez billing_quote_create avec les items choisis pour générer un devis.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_quote_create(args: dict) -> dict:
+    """Crée un devis avec lignes (items), calcul automatique HT/TTC/marge."""
+    if not args.get("client_id"):
+        return {"error": "Paramètre 'client_id' requis."}
+    if not args.get("items"):
+        return {"error": "Paramètre 'items' requis (liste de prestations)."}
+    try:
+        quote = db.billing_quote_create(args)
+        return {
+            "success": True,
+            "message": f"Devis {quote['number']} créé : {quote['total_ttc']}€ TTC (marge {quote['margin_pct']}%)",
+            "quote": quote,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_quote_list(args: dict) -> dict:
+    """Liste les devis (filtrable par client_id ou status)."""
+    try:
+        quotes = db.billing_quote_list(args.get("client_id"), args.get("status"))
+        return {"success": True, "count": len(quotes), "quotes": quotes}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_quote_compare(args: dict) -> dict:
+    """
+    Compare un devis avec le prestataire précédent.
+    Calcule économies, gains, valeur ajoutée.
+    """
+    quote_id = args.get("quote_id", "").strip()
+    if not quote_id:
+        return {"error": "Paramètre 'quote_id' requis."}
+    try:
+        quote = db.billing_quote_get(quote_id)
+        if not quote:
+            return {"error": "Devis introuvable"}
+        client = db.billing_client_get(quote["client_id"])
+        if not client:
+            return {"error": "Client introuvable"}
+
+        previous_amount = float(client.get("previous_amount") or 0)
+        new_amount = float(quote["total_ttc"])
+        difference = round(previous_amount - new_amount, 2)
+        savings_pct = round((difference / previous_amount * 100) if previous_amount > 0 else 0, 1)
+
+        verdict = (
+            f"Économie de {difference:.2f}€ ({savings_pct}%)" if difference > 0
+            else f"Augmentation de {-difference:.2f}€ ({-savings_pct}%)" if difference < 0
+            else "Tarif équivalent"
+        )
+
+        return {
+            "success": True,
+            "client": client.get("name"),
+            "previous_provider": client.get("previous_provider", "Inconnu"),
+            "previous_amount": previous_amount,
+            "new_amount": new_amount,
+            "difference": difference,
+            "savings_percent": savings_pct,
+            "verdict": verdict,
+            "quote_number": quote["number"],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_quote_pdf(args: dict) -> dict:
+    """Génère un PDF professionnel du devis."""
+    quote_id = args.get("quote_id", "").strip()
+    if not quote_id:
+        return {"error": "Paramètre 'quote_id' requis."}
+    try:
+        quote = db.billing_quote_get(quote_id)
+        if not quote:
+            return {"error": "Devis introuvable"}
+        client = db.billing_client_get(quote["client_id"])
+        if not client:
+            return {"error": "Client introuvable"}
+
+        # Build markdown content for PDF
+        from datetime import datetime as _dt
+        date_str = _dt.now().strftime("%d/%m/%Y")
+        valid_until = quote.get("valid_until") or "30 jours"
+
+        def _num(v, default=0.0):
+            # Les valeurs numériques d'un devis peuvent arriver en string (JSON produit par
+            # le LLM, ex. "150.00") — coercion défensive pour éviter "Unknown format code 'f'
+            # for object of type 'str'" sur le formatage {:.2f} plus bas.
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+
+        items_md = ""
+        for i, it in enumerate(quote.get("items", []), 1):
+            label = it.get("label", "Prestation")
+            desc  = it.get("description", "")
+            qty   = _num(it.get("qty", 1), 1.0)
+            unit  = it.get("unit", "")
+            up    = _num(it.get("unit_price", it.get("price", 0)))
+            total = _num(it.get("total"), up * qty)
+            items_md += f"\n| {i} | {label} | {qty:g} {unit} | {up:.2f}€ | {total:.2f}€ |"
+            if desc:
+                items_md += f"\n|  | _{desc}_ |  |  |  |"
+
+        tier_label = {"basic": "Basic", "standard": "Standard", "premium": "Premium",
+                       "custom": "Sur mesure"}.get(quote.get("tier"), quote.get("tier"))
+
+        content = f"""# DEVIS N° {quote['number']}
+
+**Date :** {date_str}    **Validité :** {valid_until}    **Formule :** {tier_label}
+
+---
+
+## Client
+**{client['name']}**
+{client.get('address', '')}
+{('SIRET : ' + client['siret']) if client.get('siret') else ''}
+{('Contact : ' + client['contact_name']) if client.get('contact_name') else ''}
+{('Email : ' + client['contact_email']) if client.get('contact_email') else ''}
+{('Tél : ' + client['contact_phone']) if client.get('contact_phone') else ''}
+
+## Objet
+{quote.get('title', 'Prestation informatique')}
+
+{('## Analyse du besoin\\n\\n' + quote['need_analysis']) if quote.get('need_analysis') else ''}
+
+## Détail des prestations
+
+| # | Désignation | Quantité | P.U. HT | Total HT |
+|---|-------------|----------|---------|----------|{items_md}
+
+## Récapitulatif
+
+| | |
+|---|---|
+| **Total HT** | **{_num(quote.get('total_ht')):.2f} €** |
+| TVA {_num(quote.get('tva_rate')):.1f}% | {(_num(quote.get('total_ttc')) - _num(quote.get('total_ht'))):.2f} € |
+| **Total TTC** | **{_num(quote.get('total_ttc')):.2f} €** |
+
+{('## Notes\\n\\n' + quote['notes']) if quote.get('notes') else ''}
+
+---
+
+*Devis valable {valid_until}. Bon pour accord, à retourner signé.*
+"""
+        # Use existing file_create_pdf tool
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" / f"devis_{quote['number']}.pdf"
+        )
+        result = await execute_file_create_pdf({
+            "path": output_path,
+            "title": f"Devis {quote['number']} - {client['name']}",
+            "content": content,
+        })
+        if result.get("error"):
+            return result
+        # Mark quote as sent_pdf (optional metadata)
+        return {
+            "success": True,
+            "message": f"Devis PDF généré : {output_path}",
+            "path": output_path,
+            "quote_number": quote["number"],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_quote_email(args: dict) -> dict:
+    """
+    Génère un email d'accompagnement professionnel pour envoyer un devis.
+    Le ton est adapté au type de client (mairie = formel, asso = chaleureux, PME = pro).
+    """
+    quote_id = args.get("quote_id", "").strip()
+    if not quote_id:
+        return {"error": "Paramètre 'quote_id' requis."}
+    try:
+        quote = db.billing_quote_get(quote_id)
+        if not quote:
+            return {"error": "Devis introuvable"}
+        client = db.billing_client_get(quote["client_id"])
+        if not client:
+            return {"error": "Client introuvable"}
+
+        client_type = client.get("client_type", "pme")
+        contact_name = client.get("contact_name") or "Madame, Monsieur"
+
+        # Tone adapted per client type
+        if client_type == "mairie":
+            opening = f"Madame, Monsieur,"
+            tone_body = "J'ai l'honneur de vous adresser, ci-joint, notre proposition commerciale relative à"
+            closing = "Je me tiens à votre entière disposition pour toute précision complémentaire.\n\nJe vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées."
+        elif client_type == "asso":
+            opening = f"Bonjour {contact_name},"
+            tone_body = "Je vous transmets notre proposition pour"
+            closing = "N'hésitez pas à me contacter si vous avez la moindre question, je serai ravi d'y répondre.\n\nBien à vous,"
+        else:  # pme / particulier
+            opening = f"Bonjour {contact_name},"
+            tone_body = "Suite à nos échanges, je vous adresse en pièce jointe notre devis concernant"
+            closing = "Je reste à votre disposition pour tout échange complémentaire.\n\nCordialement,"
+
+        # Build the cover email
+        items_summary = []
+        for it in quote.get("items", [])[:5]:
+            items_summary.append(f"• {it.get('label', '?')}")
+        items_text = "\n".join(items_summary)
+        if len(quote.get("items", [])) > 5:
+            items_text += f"\n• … et {len(quote['items']) - 5} autres prestations"
+
+        valid = quote.get("valid_until") or "30 jours"
+        tier_label = {"basic":"Basic","standard":"Standard","premium":"Premium","custom":"Sur mesure"}.get(quote.get("tier"), "")
+
+        subject = f"Devis {quote['number']} — {quote.get('title','Prestation IT')}"
+        body = f"""{opening}
+
+{tone_body} {quote.get('title', 'votre projet informatique').lower()}.
+
+Vous trouverez en pièce jointe le devis n°{quote['number']} (formule {tier_label}) détaillant l'ensemble des prestations proposées.
+
+**Récapitulatif :**
+{items_text}
+
+**Montant total : {quote['total_ttc']:.2f} € TTC**
+(soit {quote['total_ht']:.2f} € HT + {quote['tva_rate']:.0f}% de TVA)
+
+Cette proposition est valable {valid} à compter de la date d'envoi.
+
+{closing}
+"""
+        return {
+            "success": True,
+            "subject": subject,
+            "body": body,
+            "to": client.get("contact_email", ""),
+            "client_name": client.get("name"),
+            "quote_number": quote["number"],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_tier_breakdown(args: dict) -> dict:
+    """
+    Génère 3 propositions Basic/Standard/Premium pour un besoin donné.
+    Permet au client de choisir le niveau qui lui convient.
+    """
+    service_ids = args.get("service_ids", [])
+    if not service_ids:
+        return {"error": "Paramètre 'service_ids' requis (liste d'IDs du catalogue)."}
+    try:
+        catalog = {s["id"]: s for s in db.billing_catalog_list()}
+        chosen = [catalog[sid] for sid in service_ids if sid in catalog]
+        if not chosen:
+            return {"error": "Aucun service trouvé pour les IDs donnés."}
+
+        breakdown = {}
+        for tier in ("basic", "standard", "premium"):
+            items = []
+            total = 0
+            for s in chosen:
+                price = s[f"price_{tier}"]
+                items.append({
+                    "name": s["name"],
+                    "category": s["category"],
+                    "unit": s["unit"],
+                    "price": price,
+                    "qty": 1,
+                    "total": price,
+                })
+                total += price
+            tva = round(total * 0.20, 2)
+            breakdown[tier] = {
+                "label":     {"basic": "Basic", "standard": "Standard", "premium": "Premium"}[tier],
+                "items":     items,
+                "total_ht":  round(total, 2),
+                "total_ttc": round(total + tva, 2),
+                "description": {
+                    "basic":    "Formule essentielle, fonctionnalités de base.",
+                    "standard": "Formule équilibrée, recommandée pour la plupart des besoins.",
+                    "premium":  "Formule complète avec accompagnement et services additionnels.",
+                }[tier],
+            }
+        return {
+            "success": True,
+            "service_count": len(chosen),
+            "breakdown": breakdown,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 28 — Devis IT avancé : comparaison web, pricing, propositions, factures
+# Inspiré des meilleures pratiques IT (TCO, SLA, récurrent) et commerciales
+# (ancrage 3 paliers, valeur, ROI, marges cibles par segment).
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _parse_price_number(raw: str) -> float | None:
+    """Parse un nombre de prix issu du web (formats EU/US) → float robuste."""
+    s = (raw or "").strip().replace(" ", "").replace("\xa0", "").replace(" ", "")
+    if not s:
+        return None
+    has_dot, has_com = "." in s, "," in s
+    try:
+        if has_dot and has_com:
+            # le dernier séparateur = décimal
+            if s.rfind(",") > s.rfind("."):
+                s = s.replace(".", "").replace(",", ".")
+            else:
+                s = s.replace(",", "")
+        elif has_com:
+            # ',XX' final (2 chiffres) = décimal, sinon milliers
+            if _re.search(r",\d{2}$", s):
+                s = s.replace(",", ".")
+            else:
+                s = s.replace(",", "")
+        elif has_dot:
+            # '.XXX' (3 chiffres) = milliers EU ; '.XX' = décimal
+            if _re.search(r"\.\d{3}(?:\D|$)", s) and not _re.search(r"\.\d{2}$", s):
+                s = s.replace(".", "")
+        return float(s)
+    except Exception:
+        return None
+
+
+def v_has_no_sep(raw: str) -> bool:
+    """True si le nombre n'a aucun séparateur (espace, virgule, point)."""
+    return not any(c in raw for c in (" ", ",", ".", " "))
+
+
+def _extract_prices(text: str) -> list[dict]:
+    """
+    Extrait les prix (€ et $) d'un texte web — version STRICTE et vérifiée.
+    Le symbole monétaire doit être collé au nombre (≤1 espace) et le contexte
+    est vérifié pour écarter les comptages (« 40 999 résultats »), les specs
+    (MHz, Go), les remises (« -10€ »), les frais de port et les prix /mois.
+    """
+    out = []
+    if not text:
+        return out
+    t = text.replace(" ", " ").replace(" ", " ").replace(" ", " ")
+    num = r'\d{1,3}(?:[ .]\d{3})+(?:,\d{1,2})?|\d{1,6}(?:,\d{1,2})?'
+    pat = r'(?:(?P<pre>€|EUR)\s?(?P<a>' + num + r')|(?P<b>' + num + r')\s?(?P<post>€|EUR|euros?))'
+    for m in _re.finditer(pat, t, _re.IGNORECASE):
+        raw = m.group("a") or m.group("b") or ""
+        start, end = m.start(), m.end()
+        imm = t[max(0, start - 14):start].lower()          # voisinage très proche
+        wide = t[max(0, start - 32):start].lower()          # contexte élargi (livraison)
+        after = t[end:end + 7]
+        after_l = after.lower()
+        # marqueur de note de bas de page (condition, ex '10€*') → pas un prix produit
+        if after.startswith("*"):
+            continue
+        # frais de port / livraison (signal fort même un peu éloigné)
+        if "livraison" in wide or "frais de port" in wide or "port offert" in wide or imm.rstrip().endswith("port"):
+            continue
+        # remise / réduction / signe '-' COLLÉ au chiffre (ex '-10€')
+        if (start > 0 and t[start - 1] == "-") or "remise" in imm or "économ" in imm            or "econom" in imm or "éduction" in imm or "eduction" in imm:
+            continue
+        # prix récurrent /mois /an
+        if after_l.lstrip().startswith(("/mois", "/an", "/mo", "/ mois")):
+            continue
+        # grand entier SANS séparateur collé à € : presque toujours un comptage ou un
+        # prix dont la virgule décimale a été perdue (ex '40999€' = '409,99€') → on écarte
+        if v_has_no_sep(raw) and (_parse_price_number(raw) or 0) >= 10000:
+            continue
+        v = _parse_price_number(raw)
+        if v and 2 <= v <= 200000:
+            out.append({"value": round(v, 2), "currency": "EUR"})
+    for m in _re.finditer(r'(?:US)?\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d{1,6}(?:\.\d{2})?)', t):
+        v = _parse_price_number(m.group(1))
+        if v and 2 <= v <= 200000:
+            out.append({"value": round(v, 2), "currency": "USD"})
+    return out
+
+
+def _parse_int(raw: str) -> int | None:
+    try:
+        return int(_re.sub(r"[ \xa0.]", "", raw))
+    except Exception:
+        return None
+
+
+def _extract_ratings(text: str) -> dict:
+    """Extrait une note (/5) et un nombre d'avis d'un texte web. {} si rien."""
+    if not text:
+        return {}
+    t = text.replace("\xa0", " ")
+    rating = None
+    count = None
+    # "4,5/5" · "4.5 / 5" · "4,5 sur 5" · "4.5 out of 5"
+    m = _re.search(r'\b([0-5](?:[.,]\d)?)\s*(?:/|sur|out of)\s*5\b', t, _re.IGNORECASE)
+    if m:
+        v = float(m.group(1).replace(",", "."))
+        if 0 <= v <= 5:
+            rating = v
+    # note /10 (ex lesnumeriques, 01net) → ramenée sur 5
+    if rating is None:
+        m = _re.search(r'\b([0-9](?:[.,]\d)?|10)\s*(?:/|sur)\s*10\b', t, _re.IGNORECASE)
+        if m:
+            v = float(m.group(1).replace(",", ".")) / 2.0
+            if 0 <= v <= 5:
+                rating = round(v, 1)
+    # TrustScore / Trustpilot "TrustScore 4,2"
+    if rating is None:
+        m = _re.search(r'trustscore\s*:?\s*([0-5](?:[.,]\d)?)', t, _re.IGNORECASE)
+        if m:
+            v = float(m.group(1).replace(",", "."))
+            if 0 <= v <= 5:
+                rating = v
+    # "Note : 4,5" · "noté 4,5" · "★ 4,5"
+    if rating is None:
+        m = _re.search(r'(?:note|not[ée]+|rating|★|étoiles?)\s*:?\s*([0-5](?:[.,]\d)?)\b', t, _re.IGNORECASE)
+        if m:
+            v = float(m.group(1).replace(",", "."))
+            if 0 <= v <= 5:
+                rating = v
+    # "4,4 (62)" = note (nb d'avis) — très fréquent (Amazon, Google)
+    if rating is None:
+        m = _re.search(r'\b([0-5](?:[.,]\d))\s*\((\d[\d \xa0.]{0,7})\)', t)
+        if m:
+            v = float(m.group(1).replace(",", "."))
+            if 0 <= v <= 5:
+                rating = v
+                count = _parse_int(m.group(2))
+    # nombre d'avis : "(62 avis)" · "1 234 reviews" · "62 évaluations"
+    if count is None:
+        m = _re.search(r'(\d[\d \xa0.]{0,7})\s*(?:avis|reviews?|évaluations?|commentaires?|ratings?)', t, _re.IGNORECASE)
+        if m:
+            count = _parse_int(m.group(1))
+    out = {}
+    if rating is not None:
+        out["rating"] = round(rating, 1)
+    if count:
+        out["reviews"] = count
+    return out
+
+
+async def execute_billing_product_reviews(args: dict) -> dict:
+    """
+    ⭐ Recherche et agrège les AVIS d'un produit/prestation sur le web : note
+    moyenne /5 (pondérée par le nb d'avis), total d'avis, et extraits d'avis.
+    """
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    queries = [f"{query} avis note", f"{query} avis clients trustpilot",
+               f"{query} review rating capterra g2", f"{query} test note /5"]
+    rated, snippets, seen = [], [], set()
+    try:
+        # Séquentiel : DuckDuckGo bloque les rafales parallèles (anti-bot).
+        for q in queries:
+            res = await execute_web_search({"query": q, "max_results": 8})
+            if not (isinstance(res, dict) and res.get("success")):
+                continue
+            for r in res.get("results", []):
+                blob = f"{r.get('title','')} {r.get('snippet','')}"
+                rt = _extract_ratings(blob)
+                url = r.get("url", "")
+                if rt.get("rating") is not None and url not in seen:
+                    seen.add(url)
+                    rated.append({"source": r.get("title", "")[:90], "url": url,
+                                  "rating": rt["rating"], "reviews": rt.get("reviews")})
+                if r.get("snippet"):
+                    snippets.append({"source": r.get("title", "")[:80], "text": r["snippet"][:220], "url": url})
+        if not rated:
+            return {"success": True, "query": query, "rated_sources": 0,
+                    "message": "Aucune note exploitable détectée. Consultez les extraits/sources.",
+                    "review_snippets": snippets[:6]}
+        tot_w = sum(s.get("reviews") or 1 for s in rated)
+        avg = round(sum(s["rating"] * (s.get("reviews") or 1) for s in rated) / tot_w, 2)
+        total_reviews = sum(s.get("reviews") or 0 for s in rated)
+        best = max(rated, key=lambda s: (s["rating"], s.get("reviews") or 0))
+        sentiment = ("excellent" if avg >= 4.5 else "très bon" if avg >= 4.0 else
+                     "bon" if avg >= 3.5 else "mitigé" if avg >= 2.5 else "faible")
+        return {
+            "success": True, "query": query,
+            "average_rating": avg, "rating_out_of": 5,
+            "total_reviews": total_reviews, "rated_sources": len(rated),
+            "sentiment": sentiment,
+            "ratings": sorted(rated, key=lambda s: -(s.get("reviews") or 0))[:8],
+            "review_snippets": snippets[:6],
+            "advice": f"Note moyenne {avg}/5 ({sentiment}) sur {total_reviews or '?'} avis, "
+                      f"{len(rated)} source(s). À recouper avec les extraits.",
+            "disclaimer": "Notes agrégées automatiquement du web ; vérifiez les sources.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_market_research(args: dict) -> dict:
+    """
+    🔎 Compare les offres du marché sur le web pour un produit/prestation IT.
+    Cherche les prix en ligne (multi-requêtes), agrège (min/médiane/max), liste les
+    sources, et recommande un prix de revient + un prix de vente selon la marge cible.
+    """
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis (ex: 'Dell Latitude 5550 i5 16Go 512Go')."}
+    target_margin = float(args.get("target_margin_pct", 30))
+    usd_to_eur = float(args.get("usd_to_eur", 0.92))
+
+    # Plusieurs angles de recherche pour capter un maximum de prix
+    queries = [f"{query} prix", f"{query} acheter prix €", f"{query} price buy"]
+    all_prices, sources, seen_urls = [], [], set()
+    try:
+        # Séquentiel : DuckDuckGo bloque les rafales parallèles (anti-bot). Le cache
+        # TTL gère l'efficacité sur les requêtes répétées.
+        for q in queries:
+            res = await execute_web_search({"query": q, "max_results": 8})
+            if not (isinstance(res, dict) and res.get("success")):
+                continue
+            for r in res.get("results", []):
+                blob = f"{r.get('title','')} {r.get('snippet','')}"
+                prices = _extract_prices(blob)
+                rt = _extract_ratings(blob)
+                if prices:
+                    url = r.get("url", "")
+                    # normalise USD→EUR
+                    norm = []
+                    for p in prices:
+                        val = p["value"] * usd_to_eur if p["currency"] == "USD" else p["value"]
+                        norm.append(round(val, 2))
+                    lo = min(norm)
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        src = {
+                            "title": r.get("title", "")[:120],
+                            "url": url,
+                            "prices_eur": sorted(set(norm))[:5],
+                            "low_eur": lo,
+                        }
+                        if rt.get("rating") is not None:
+                            src["rating"] = rt["rating"]
+                            src["reviews"] = rt.get("reviews")
+                        sources.append(src)
+                    all_prices.extend(norm)
+                elif rt.get("rating") is not None and r.get("url") not in seen_urls:
+                    # source sans prix mais avec une note → on la garde pour les avis
+                    seen_urls.add(r.get("url"))
+                    sources.append({"title": r.get("title", "")[:120], "url": r.get("url", ""),
+                                    "prices_eur": [], "rating": rt["rating"], "reviews": rt.get("reviews")})
+
+        if not all_prices:
+            return {
+                "success": True, "query": query, "found_prices": 0,
+                "message": "Aucun prix détecté automatiquement. Affinez la requête (modèle/référence précise) "
+                           "ou consultez les sources manuellement.",
+                "sources": sources,
+            }
+
+        all_prices.sort()
+        n0 = len(all_prices)
+        # Médiane brute = ancre robuste
+        median0 = all_prices[n0 // 2] if n0 % 2 else (all_prices[n0 // 2 - 1] + all_prices[n0 // 2]) / 2
+        # Filtrer les valeurs ABERRANTES autour de la médiane (accessoires, prix /mois,
+        # lots, abonnements) qui faussent le prix de revient. On garde le cluster réel.
+        filtered = [p for p in all_prices if median0 * 0.35 <= p <= median0 * 2.8] or all_prices
+        filtered.sort()
+        outliers_removed = n0 - len(filtered)
+        n = len(filtered)
+        median = filtered[n // 2] if n % 2 else round((filtered[n // 2 - 1] + filtered[n // 2]) / 2, 2)
+        lo, hi = filtered[0], filtered[-1]
+        # Prix de revient conseillé = 1er quartile du cluster réel (bon prix d'achat)
+        cost_basis = round(filtered[max(0, n // 4)], 2)
+        spread_pct = round((hi - lo) / lo * 100, 1) if lo else 0
+        # Prix de vente conseillé selon marge cible (marge sur PV)
+        margins = {}
+        for mlabel, mpct in [("basic", max(15, target_margin - 10)),
+                             ("standard", target_margin),
+                             ("premium", target_margin + 12)]:
+            sell = round(cost_basis / (1 - mpct / 100), 2)
+            margins[mlabel] = {"margin_pct": round(mpct, 1), "sell_price_ht": sell,
+                               "profit": round(sell - cost_basis, 2)}
+
+        # Nettoie l'affichage des sources : ne garde que les prix dans la bande
+        # crédible (cohérents avec le cluster), pour ne montrer que de l'info vérifiée.
+        band_lo, band_hi = median0 * 0.35, median0 * 2.8
+        clean_sources = []
+        for s in sources:
+            kept = [p for p in s.get("prices_eur", []) if band_lo <= p <= band_hi]
+            if kept:
+                clean_sources.append({**s, "prices_eur": kept, "low_eur": min(kept)})
+            elif s.get("rating") is not None:
+                clean_sources.append({**s, "prices_eur": []})  # source avis-seule
+        sources = clean_sources or sources
+
+        # ── Avis agrégés (note /5 pondérée par le nb d'avis) ──────────────────
+        rated = [s for s in sources if s.get("rating") is not None]
+        reviews_block = None
+        if rated:
+            tw = sum(s.get("reviews") or 1 for s in rated)
+            avg_rating = round(sum(s["rating"] * (s.get("reviews") or 1) for s in rated) / tw, 2)
+            total_reviews = sum(s.get("reviews") or 0 for s in rated)
+            reviews_block = {"average_rating": avg_rating, "rating_out_of": 5,
+                             "total_reviews": total_reviews, "rated_sources": len(rated)}
+
+        # ── Fiabilité de l'estimation (information toujours vérifiée) ──────────
+        if n >= 5 and spread_pct < 180:
+            confidence, conf_msg = "élevée", "Estimation fiable (plusieurs prix concordants)."
+        elif n >= 3 and spread_pct < 350:
+            confidence, conf_msg = "moyenne", "Estimation indicative — recoupez avec 1-2 fournisseurs."
+        else:
+            confidence, conf_msg = "faible", ("Peu de prix fiables ou trop dispersés — "
+                                              "VÉRIFIEZ MANUELLEMENT via les sources avant de chiffrer.")
+
+        return {
+            "success": True,
+            "query": query,
+            "found_prices": n0,
+            "prices_analyzed": n,
+            "outliers_removed": outliers_removed,
+            "confidence": confidence,
+            "market": {
+                "min_eur": lo, "median_eur": median, "max_eur": hi,
+                "spread_pct": spread_pct,
+            },
+            "recommended_cost_basis_eur": cost_basis,
+            "recommended_sell": margins,
+            "reviews": reviews_block,
+            "sources": sources[:10],
+            "advice": (f"Marché {lo:.0f}–{hi:.0f}€ (médiane {median:.0f}€, {n} prix retenus, "
+                       f"{outliers_removed} écartés). Achat conseillé ≈ {cost_basis:.0f}€ HT → "
+                       f"revente ~{margins['standard']['sell_price_ht']:.0f}€ HT ({target_margin:.0f}% de marge). "
+                       f"Fiabilité : {confidence}."
+                       + (f" Avis : {reviews_block['average_rating']}/5 ({reviews_block['total_reviews']} avis)." if reviews_block else "")
+                       + f" {conf_msg}"),
+            "disclaimer": "Prix extraits automatiquement du web et filtrés ; toujours à recouper "
+                          "avec les sources et vos fournisseurs avant d'engager un devis.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_find_products(args: dict) -> dict:
+    """
+    🛒 Recherche de matériel/produits selon une CONTRAINTE DE BUDGET.
+    Ex: 'PC portable bureautique à moins de 500€'. Cherche sur le web, extrait les
+    offres dont le prix tient dans le budget, les trie (moins cher / meilleur rapport
+    qualité-prix avec les avis) et renvoie une short-list avec sources.
+    """
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis (ex: 'PC portable bureautique')."}
+    max_b = args.get("max_budget")
+    max_b = float(max_b) if max_b not in (None, "", 0, "0") else None
+    min_b = float(args.get("min_budget", 0) or 0)
+    usd_to_eur = float(args.get("usd_to_eur", 0.92))
+
+    # Requêtes orientées budget (meilleures pratiques de recherche d'achat)
+    if max_b:
+        queries = [f"{query} moins de {int(max_b)}€", f"meilleur {query} pas cher {int(max_b)} euros",
+                   f"{query} comparatif prix"]
+    else:
+        queries = [f"{query} prix comparatif", f"meilleur {query} pas cher", f"{query} acheter prix"]
+
+    offers, seen, all_in = [], set(), []
+    try:
+        for q in queries:
+            res = await execute_web_search({"query": q, "max_results": 8})
+            if not (isinstance(res, dict) and res.get("success")):
+                continue
+            for r in res.get("results", []):
+                blob = f"{r.get('title','')} {r.get('snippet','')}"
+                prices = _extract_prices(blob)
+                if not prices:
+                    continue
+                norm = sorted({round(p["value"] * usd_to_eur, 2) if p["currency"] == "USD" else p["value"]
+                               for p in prices})
+                in_budget = [p for p in norm if p >= min_b and (max_b is None or p <= max_b)]
+                if not in_budget:
+                    continue
+                url = r.get("url", "")
+                if url in seen:
+                    continue
+                seen.add(url)
+                rt = _extract_ratings(blob)
+                price = min(in_budget)
+                all_in.append(price)
+                offers.append({
+                    "title": r.get("title", "")[:110],
+                    "price_eur": price,
+                    "all_prices_in_budget": in_budget[:4],
+                    "rating": rt.get("rating"),
+                    "reviews": rt.get("reviews"),
+                    "url": url,
+                    "snippet": (r.get("snippet", "") or "")[:170],
+                })
+
+        if not offers:
+            return {"success": True, "query": query, "max_budget": max_b, "count": 0,
+                    "message": (f"Aucune offre détectée sous {int(max_b)}€." if max_b else "Aucune offre détectée.")
+                               + " Élargissez le budget ou précisez le produit.",
+                    "offers": []}
+
+        # Tri : prix croissant (le moins cher d'abord). Meilleur rapport qualité/prix
+        # = note élevée parmi les moins chers.
+        offers.sort(key=lambda o: o["price_eur"])
+        rated = [o for o in offers if o.get("rating")]
+        best_value = None
+        if rated:
+            best_value = max(rated, key=lambda o: (o["rating"] or 0) - (o["price_eur"] / (max_b or max(all_in) or 1)))
+
+        all_in.sort()
+        return {
+            "success": True,
+            "query": query,
+            "max_budget": max_b,
+            "min_budget": min_b,
+            "count": len(offers),
+            "price_range_in_budget": {"min": all_in[0], "max": all_in[-1]} if all_in else None,
+            "cheapest": offers[0],
+            "best_value": best_value,
+            "offers": offers[:10],
+            "advice": (f"{len(offers)} offre(s) trouvée(s)"
+                       + (f" sous {int(max_b)}€" if max_b else "")
+                       + f" : de {all_in[0]:.0f}€ à {all_in[-1]:.0f}€. "
+                       + (f"Le moins cher : {offers[0]['title'][:50]} à {offers[0]['price_eur']:.0f}€. " if offers else "")
+                       + (f"Meilleur rapport qualité/prix : {best_value['title'][:45]} "
+                          f"({best_value['rating']}/5, {best_value['price_eur']:.0f}€)." if best_value else "")),
+            "disclaimer": "Offres extraites du web (prix variables) ; vérifiez sur les sources avant achat.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_price_recommendation(args: dict) -> dict:
+    """
+    💰 Recommande un prix de vente compétitif à partir d'un coût d'achat, selon
+    les marges-cibles par segment (meilleures pratiques commerciales IT).
+    """
+    cost = args.get("cost")
+    if cost is None:
+        return {"error": "Paramètre 'cost' (coût d'achat HT) requis."}
+    cost = float(cost)
+    client_type = args.get("client_type", "pme")
+    category = (args.get("category") or "").lower()
+
+    # Marges-cibles indicatives (marge sur PV) selon segment & nature
+    base = {"mairie": 22, "pme": 30, "asso": 18, "particulier": 35, "autre": 28}.get(client_type, 30)
+    # Le matériel se marge moins que le service/conseil
+    if any(k in category for k in ("matériel", "materiel", "hardware", "licence", "logiciel")):
+        base -= 8
+    elif any(k in category for k in ("conseil", "audit", "sécurité", "securite", "formation", "service", "support")):
+        base += 8
+    base = max(10, min(base, 60))
+
+    tiers = {}
+    for label, delta in [("basic", -8), ("standard", 0), ("premium", +12)]:
+        m = max(8, base + delta)
+        sell = round(cost / (1 - m / 100), 2)
+        tiers[label] = {"margin_pct": round(m, 1), "sell_price_ht": sell,
+                        "sell_price_ttc": round(sell * 1.2, 2), "profit": round(sell - cost, 2)}
+    return {
+        "success": True, "cost_ht": cost, "client_type": client_type,
+        "category": args.get("category", ""),
+        "recommended": tiers,
+        "advice": f"Pour un coût de {cost:.0f}€ HT, prix de vente conseillé ~{tiers['standard']['sell_price_ht']:.0f}€ HT "
+                  f"(marge {tiers['standard']['margin_pct']:.0f}%). Présentez 3 paliers pour l'effet d'ancrage.",
+    }
+
+
+def _eur(v) -> str:
+    try:
+        return f"{float(v):,.2f}".replace(",", " ").replace(".", ",") + " €"
+    except Exception:
+        return f"{v} €"
+
+
+async def execute_billing_generate_proposal(args: dict) -> dict:
+    """
+    📑 Génère une PROPOSITION COMMERCIALE structurée et persuasive depuis un devis
+    (meilleures pratiques : résumé exécutif, solution, valeur/ROI, TCO, garanties,
+    appel à l'action). Sortie Markdown prête à présenter / exporter en PDF.
+    """
+    quote_id = (args.get("quote_id") or "").strip()
+    if not quote_id:
+        return {"error": "Paramètre 'quote_id' requis."}
+    try:
+        quote = db.billing_quote_get(quote_id)
+        if not quote:
+            return {"error": "Devis introuvable"}
+        client = db.billing_client_get(quote["client_id"]) or {}
+        import json as _json
+        items = quote.get("items_json")
+        items = _json.loads(items) if isinstance(items, str) else (items or [])
+
+        ctype = client.get("client_type", "pme")
+        formality = {"mairie": "vouvoiement institutionnel", "asso": "chaleureux et engagé",
+                     "pme": "professionnel et orienté ROI", "particulier": "simple et rassurant"}.get(ctype, "professionnel")
+        cname = client.get("name", "le client")
+
+        # Regrouper par catégorie
+        by_cat = {}
+        for it in items:
+            by_cat.setdefault(it.get("category", "Prestations"), []).append(it)
+
+        total_ht = float(quote.get("total_ht", 0))
+        total_ttc = float(quote.get("total_ttc", 0))
+        prev = float(client.get("previous_amount") or 0)
+
+        md = []
+        md.append(f"# Proposition commerciale — {cname}")
+        md.append(f"**Réf. devis :** {quote.get('number','')}  ·  **Date :** {quote.get('created_at','')[:10]}  ·  "
+                  f"**Validité :** {quote.get('valid_until') or '30 jours'}\n")
+
+        # 1. Résumé exécutif
+        md.append("## 1. Votre contexte et vos enjeux")
+        need = quote.get("need_analysis") or "Modernisation et fiabilisation de votre système d'information."
+        md.append(f"{need}\n")
+        md.append(f"Cette proposition répond à vos besoins avec une approche {formality}, "
+                  "centrée sur la disponibilité, la sécurité et la maîtrise des coûts.\n")
+
+        # 2. Solution proposée
+        md.append("## 2. Notre solution")
+        for cat, its in by_cat.items():
+            md.append(f"### {cat}")
+            for it in its:
+                qty = it.get("qty", 1)
+                label = it.get("label") or it.get("name", "Prestation")
+                line_total = it.get("total", it.get("unit_price", 0) * qty)
+                desc = it.get("description", "")
+                md.append(f"- **{label}**{f' ×{qty}' if qty and qty != 1 else ''} — {_eur(line_total)} HT"
+                          + (f"  \n  _{desc}_" if desc else ""))
+            md.append("")
+
+        # 3. Valeur & bénéfices
+        md.append("## 3. Bénéfices pour vous")
+        benefits = [
+            "🛡️ **Sécurité renforcée** : protection des données, sauvegardes vérifiées, conformité RGPD.",
+            "⏱️ **Disponibilité** : interventions rapides, supervision proactive, moins d'interruptions.",
+            "💶 **Coûts maîtrisés** : forfaits clairs, pas de mauvaise surprise, budget prévisible.",
+            "🤝 **Interlocuteur unique** : un partenaire de confiance, réactif et de proximité.",
+        ]
+        md.extend(benefits)
+        md.append("")
+
+        # 4. Investissement + comparaison
+        md.append("## 4. Votre investissement")
+        md.append(f"- **Total HT :** {_eur(total_ht)}")
+        md.append(f"- **TVA ({quote.get('tva_rate',20)}%) :** {_eur(total_ttc - total_ht)}")
+        md.append(f"- **Total TTC :** **{_eur(total_ttc)}**\n")
+        if prev > 0:
+            diff = prev - total_ttc
+            if diff > 0:
+                md.append(f"> 💡 **Économie vs votre prestataire actuel ({client.get('previous_provider','')}) : "
+                          f"{_eur(diff)}/an** ({diff/prev*100:.0f}%), à service supérieur.\n")
+            else:
+                md.append(f"> 💎 Pour un investissement comparable, vous gagnez en sécurité, réactivité et conformité.\n")
+
+        # 5. Garanties / engagement
+        md.append("## 5. Nos engagements")
+        md.append("- ✅ Devis ferme, sans frais cachés.\n- ✅ Intervention par des techniciens certifiés.\n"
+                  "- ✅ Garantie de bon fonctionnement et accompagnement au changement.\n"
+                  "- ✅ Réversibilité : vos données vous appartiennent.\n")
+
+        # 6. Appel à l'action
+        md.append("## 6. Prochaine étape")
+        md.append("Pour démarrer, il vous suffit de **valider cette proposition** (retour signé ou accord par email). "
+                  "Nous planifions alors un point de lancement sous 5 jours ouvrés.\n")
+        contact = client.get("contact_name", "")
+        md.append(f"_Nous restons à votre disposition{', ' + contact if contact else ''} pour tout échange._")
+
+        proposal = "\n".join(md)
+        return {
+            "success": True,
+            "quote_number": quote.get("number"),
+            "client": cname,
+            "proposal_markdown": proposal,
+            "word_count": len(proposal.split()),
+            "hint": "Utilisez billing_quote_pdf pour un PDF, ou copiez ce Markdown dans un document.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_tco_analysis(args: dict) -> dict:
+    """
+    📊 Analyse du coût total de possession (TCO) sur N années + ROI vs alternative.
+    Best practice IT pour justifier un investissement (achat vs location/cloud).
+    """
+    try:
+        years = int(args.get("years", 3))
+        upfront = float(args.get("upfront_cost", 0))          # matériel/setup initial
+        monthly = float(args.get("monthly_cost", 0))          # support/licences récurrents
+        alt_monthly = float(args.get("alternative_monthly", 0))  # solution comparée (ex: cloud)
+        alt_upfront = float(args.get("alternative_upfront", 0))
+        downtime_hours_year = float(args.get("downtime_hours_year_saved", 0))
+        hourly_value = float(args.get("hourly_value", 50))    # coût horaire d'un arrêt
+
+        months = years * 12
+        tco = round(upfront + monthly * months, 2)
+        alt_tco = round(alt_upfront + alt_monthly * months, 2)
+        savings = round(alt_tco - tco, 2) if alt_tco else 0
+        # Valeur du temps d'arrêt évité
+        productivity_gain = round(downtime_hours_year * hourly_value * years, 2)
+        net_benefit = round(savings + productivity_gain, 2)
+        roi_pct = round((net_benefit / tco * 100), 1) if tco > 0 else 0
+
+        breakdown = []
+        for y in range(1, years + 1):
+            breakdown.append({"year": y, "cumulative_tco": round(upfront + monthly * 12 * y, 2)})
+
+        return {
+            "success": True,
+            "years": years,
+            "tco_total": tco,
+            "tco_yearly_avg": round(tco / years, 2) if years else tco,
+            "breakdown_per_year": breakdown,
+            "alternative_tco": alt_tco,
+            "savings_vs_alternative": savings,
+            "productivity_value": productivity_gain,
+            "net_benefit": net_benefit,
+            "roi_pct": roi_pct,
+            "advice": (f"TCO sur {years} ans : {tco:.0f}€"
+                       + (f" vs {alt_tco:.0f}€ pour l'alternative (économie {savings:.0f}€)." if alt_tco else ".")
+                       + (f" Bénéfice net estimé {net_benefit:.0f}€ (ROI {roi_pct:.0f}%)." if net_benefit else "")),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_invoice_create(args: dict) -> dict:
+    """🧾 Crée une facture, optionnellement depuis un devis accepté (from_quote_id)."""
+    try:
+        from_quote = (args.get("from_quote_id") or "").strip()
+        data = dict(args)
+        if from_quote:
+            q = db.billing_quote_get(from_quote)
+            if not q:
+                return {"error": "Devis source introuvable"}
+            import json as _json
+            its = q.get("items_json")
+            data.update({
+                "client_id": q["client_id"], "quote_id": q["id"],
+                "title": q.get("title", "Facture"),
+                "total_ht": q.get("total_ht", 0), "tva_rate": q.get("tva_rate", 20),
+                "total_ttc": q.get("total_ttc", 0),
+                "items": _json.loads(its) if isinstance(its, str) else (its or []),
+            })
+        if not data.get("client_id"):
+            return {"error": "client_id requis (ou from_quote_id)."}
+        inv = db.billing_invoice_create(data)
+        return {"success": True, "message": f"Facture {inv['number']} créée ({_eur(inv['total_ttc'])} TTC).",
+                "invoice": inv}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_invoice_list(args: dict) -> dict:
+    """Liste les factures (filtrable par client_id / status). Signale les retards."""
+    try:
+        invs = db.billing_invoice_list(args.get("client_id"), args.get("status"))
+        overdue = [i for i in invs if i.get("is_overdue")]
+        unpaid = sum(float(i["total_ttc"]) - float(i.get("amount_paid", 0))
+                     for i in invs if i["status"] in ("sent", "partial", "overdue"))
+        return {"success": True, "count": len(invs), "invoices": invs,
+                "overdue_count": len(overdue), "total_unpaid_ttc": round(unpaid, 2)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_invoice_mark_paid(args: dict) -> dict:
+    """Marque une facture payée (totalement ou partiellement)."""
+    iid = (args.get("invoice_id") or "").strip()
+    if not iid:
+        return {"error": "Paramètre 'invoice_id' requis."}
+    try:
+        inv = db.billing_invoice_get(iid)
+        if not inv:
+            return {"error": "Facture introuvable"}
+        amount = args.get("amount")
+        total = float(inv["total_ttc"])
+        paid = float(amount) if amount is not None else total
+        from datetime import datetime as _dt
+        status = "paid" if paid >= total - 0.01 else "partial"
+        upd = db.billing_invoice_update(iid, {
+            "amount_paid": paid, "status": status,
+            "payment_method": args.get("payment_method", ""),
+            "paid_date": _dt.now().strftime("%Y-%m-%d") if status == "paid" else None,
+        })
+        return {"success": True, "message": f"Facture {inv['number']} : {status} ({_eur(paid)}).", "invoice": upd}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_billing_revenue_dashboard(args: dict) -> dict:
+    """
+    📈 Tableau de bord commercial : CA facturé/encaissé, impayés, MRR/ARR (contrats
+    récurrents), taux de conversion des devis, pipeline. Best practice de pilotage.
+    """
+    try:
+        quotes = db.billing_quote_list()
+        invoices = db.billing_invoice_list()
+        contracts = db.billing_contract_list()
+
+        # Devis : pipeline + taux de conversion
+        by_status = {}
+        pipeline_value = 0.0
+        for q in quotes:
+            by_status[q["status"]] = by_status.get(q["status"], 0) + 1
+            if q["status"] in ("draft", "sent"):
+                pipeline_value += float(q.get("total_ttc", 0))
+        decided = by_status.get("accepted", 0) + by_status.get("refused", 0)
+        win_rate = round(by_status.get("accepted", 0) / decided * 100, 1) if decided else 0
+
+        # Factures : CA
+        invoiced = sum(float(i["total_ttc"]) for i in invoices)
+        collected = sum(float(i.get("amount_paid", 0)) for i in invoices)
+        unpaid = round(invoiced - collected, 2)
+        overdue = round(sum(float(i["total_ttc"]) - float(i.get("amount_paid", 0))
+                            for i in invoices if i.get("is_overdue")), 2)
+
+        # Récurrent : MRR / ARR
+        mrr = 0.0
+        for c in contracts:
+            if c.get("status") != "active":
+                continue
+            amt = float(c.get("amount_ht", 0))
+            per = c.get("period", "mois")
+            mrr += amt if per == "mois" else (amt / 3 if per == "trimestre" else amt / 12)
+        mrr = round(mrr, 2)
+
+        return {
+            "success": True,
+            "pipeline": {"open_quotes": by_status.get("draft", 0) + by_status.get("sent", 0),
+                         "pipeline_value_ttc": round(pipeline_value, 2),
+                         "win_rate_pct": win_rate, "quotes_by_status": by_status},
+            "revenue": {"invoiced_ttc": round(invoiced, 2), "collected_ttc": round(collected, 2),
+                        "unpaid_ttc": unpaid, "overdue_ttc": overdue},
+            "recurring": {"mrr_ht": mrr, "arr_ht": round(mrr * 12, 2), "active_contracts":
+                          len([c for c in contracts if c.get("status") == "active"])},
+            "advice": (f"Taux de conversion {win_rate:.0f}% · Pipeline {pipeline_value:.0f}€ · "
+                       f"MRR {mrr:.0f}€ (ARR {mrr*12:.0f}€)"
+                       + (f" · ⚠️ {overdue:.0f}€ en retard de paiement." if overdue else ".")),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# Catalogue moderne : services IT actuels (cloud, cyber, RGPD, VoIP, BaaS…)
+_ADVANCED_CATALOG = [
+    ("Cybersécurité", "EDR / Antivirus managé (par poste/mois)",
+     "Protection nouvelle génération supervisée, détection comportementale", "mois", 4, 7, 12, 2, 0.2),
+    ("Cybersécurité", "Audit de sécurité & test d'intrusion",
+     "Cartographie des risques, scan de vulnérabilités, rapport + plan d'action", "forfait", 900, 1800, 3500, 400, 16),
+    ("Cybersécurité", "Pare-feu nouvelle génération (installation + config)",
+     "UTM/NGFW, filtrage, VPN, segmentation réseau", "forfait", 600, 1100, 2200, 350, 8),
+    ("Cybersécurité", "Sensibilisation phishing (campagne + formation)",
+     "Campagnes simulées + formation des utilisateurs, reporting", "forfait", 350, 600, 1200, 120, 6),
+    ("Cloud & Sauvegarde", "Sauvegarde externalisée (BaaS, par To/mois)",
+     "Sauvegarde chiffrée hors site, tests de restauration, rétention", "mois", 15, 25, 45, 8, 0.5),
+    ("Cloud & Sauvegarde", "Migration Microsoft 365 (par utilisateur)",
+     "Migration emails/fichiers, configuration, accompagnement", "unité", 25, 45, 80, 12, 0.5),
+    ("Cloud & Sauvegarde", "Plan de reprise d'activité (PRA/PCA)",
+     "Conception et test d'un plan de continuité, RTO/RPO définis", "forfait", 1200, 2500, 5000, 600, 24),
+    ("Conformité", "Mise en conformité RGPD (TPE/PME)",
+     "Registre des traitements, politique, mentions, accompagnement DPO", "forfait", 800, 1500, 3000, 350, 14),
+    ("Supervision", "Supervision proactive 24/7 (par équipement)",
+     "Monitoring, alertes, reporting mensuel, intervention préventive", "mois", 8, 15, 28, 4, 0.3),
+    ("Téléphonie", "Téléphonie VoIP (par ligne/mois)",
+     "Standard cloud, mobilité, enregistrement, numéros illimités France", "mois", 8, 14, 22, 5, 0.2),
+    ("Infrastructure", "Serveur NAS + configuration RAID",
+     "Stockage centralisé, partages, sauvegardes, accès distant sécurisé", "forfait", 700, 1300, 2600, 450, 6),
+    ("Formation", "Formation cybersécurité utilisateurs (1/2 journée)",
+     "Bonnes pratiques, mots de passe, phishing, mobilité", "forfait", 350, 550, 900, 150, 4),
+]
+
+
+async def execute_billing_catalog_enrich(args: dict) -> dict:
+    """➕ Ajoute au catalogue les prestations IT modernes (cyber, cloud, RGPD, VoIP…)
+    si elles n'y figurent pas déjà (idempotent par nom)."""
+    try:
+        existing = {s["name"].strip().lower() for s in db.billing_catalog_list()}
+        added = []
+        for cat, name, desc, unit, pb, ps, pp, cost, hours in _ADVANCED_CATALOG:
+            if name.strip().lower() in existing:
+                continue
+            db.billing_catalog_create({
+                "category": cat, "name": name, "description": desc, "unit": unit,
+                "price_basic": pb, "price_standard": ps, "price_premium": pp,
+                "cost": cost, "time_hours": hours,
+            })
+            added.append(name)
+        return {"success": True, "added_count": len(added), "added": added,
+                "message": f"{len(added)} prestation(s) moderne(s) ajoutée(s) au catalogue."
+                           if added else "Catalogue déjà à jour."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# Catalogues PRÉ-DÉFINIS par métier (devis utilisable hors IT)
+# Format : (catégorie, nom, description, unité, prix_basic, prix_standard, prix_premium, coût, heures)
+_TRADE_CATALOGS = {
+    "plomberie": [
+        ("Dépannage", "Intervention de dépannage (heure)", "Déplacement + main d'œuvre", "heure", 55, 70, 90, 20, 1),
+        ("Installation", "Remplacement de robinetterie", "Fourniture et pose d'un mitigeur", "forfait", 120, 180, 280, 70, 1.5),
+        ("Installation", "Installation chauffe-eau", "Pose d'un cumulus + raccordements", "forfait", 350, 550, 800, 250, 4),
+        ("Installation", "Remplacement WC", "Dépose ancien + pose neuf", "forfait", 180, 280, 420, 120, 2),
+        ("Rénovation", "Réfection salle de bain (forfait)", "Plomberie complète d'une salle de bain", "forfait", 1800, 3200, 5500, 1400, 40),
+        ("Urgence", "Recherche et réparation de fuite", "Détection + réparation", "forfait", 150, 250, 400, 60, 2),
+        ("Entretien", "Débouchage canalisation", "Furet / haute pression", "forfait", 90, 150, 250, 40, 1.5),
+    ],
+    "électricité": [
+        ("Dépannage", "Intervention électricien (heure)", "Déplacement + main d'œuvre", "heure", 50, 65, 85, 18, 1),
+        ("Installation", "Pose de prise / interrupteur", "Fourniture et pose", "unité", 45, 65, 90, 20, 0.5),
+        ("Installation", "Tableau électrique neuf", "Remplacement tableau aux normes NF C 15-100", "forfait", 800, 1400, 2200, 600, 10),
+        ("Installation", "Pose de luminaire", "Installation et raccordement", "unité", 60, 90, 140, 30, 1),
+        ("Mise aux normes", "Diagnostic + mise en sécurité", "Audit installation + corrections", "forfait", 250, 450, 800, 120, 6),
+        ("Domotique", "Installation prise connectée / éclairage smart", "Configuration incluse", "forfait", 120, 200, 350, 80, 2),
+        ("Borne", "Installation borne de recharge VE", "Pose IRVE + protection", "forfait", 700, 1100, 1800, 500, 6),
+    ],
+    "peinture": [
+        ("Intérieur", "Peinture mur / plafond (m²)", "Préparation + 2 couches", "unité", 18, 28, 40, 8, 0.2),
+        ("Intérieur", "Peinture d'une pièce (forfait)", "Murs + plafond, pièce 12 m²", "forfait", 350, 550, 850, 200, 12),
+        ("Préparation", "Rebouchage / ponçage / enduit", "Préparation des supports", "heure", 35, 45, 60, 10, 1),
+        ("Extérieur", "Ravalement de façade (m²)", "Nettoyage + traitement + peinture", "unité", 35, 55, 85, 20, 0.5),
+        ("Décoration", "Pose papier peint / toile (m²)", "Fourniture pose", "unité", 22, 35, 55, 12, 0.3),
+        ("Boiserie", "Peinture portes / boiseries", "Laquage", "unité", 60, 95, 150, 30, 1.5),
+    ],
+    "menuiserie": [
+        ("Pose", "Pose de porte intérieure", "Fourniture et pose bloc-porte", "unité", 180, 280, 420, 120, 2),
+        ("Pose", "Pose de fenêtre / baie", "Dépose + pose menuiserie", "unité", 350, 550, 900, 250, 4),
+        ("Sur mesure", "Meuble sur mesure (devis)", "Conception, fabrication, pose", "forfait", 800, 1600, 3500, 600, 30),
+        ("Agencement", "Pose de placard / dressing", "Sur mesure", "forfait", 600, 1100, 2200, 450, 16),
+        ("Réparation", "Réparation / ajustement menuiserie", "Main d'œuvre", "heure", 45, 60, 80, 15, 1),
+        ("Parquet", "Pose de parquet (m²)", "Pose flottante ou collée", "unité", 25, 40, 65, 14, 0.4),
+    ],
+    "jardinage": [
+        ("Entretien", "Tonte de pelouse (forfait)", "Tonte + ramassage", "forfait", 40, 60, 90, 15, 1.5),
+        ("Entretien", "Taille de haie (ml)", "Taille + évacuation", "unité", 8, 14, 22, 4, 0.2),
+        ("Création", "Création de massif / plantation", "Conception + plantation", "forfait", 250, 500, 1000, 180, 8),
+        ("Élagage", "Élagage / abattage d'arbre", "Selon hauteur, évacuation incluse", "forfait", 150, 350, 800, 100, 4),
+        ("Contrat", "Entretien annuel jardin (forfait/mois)", "Passages réguliers", "mois", 80, 140, 250, 50, 3),
+        ("Aménagement", "Pose de gazon / terrassement (m²)", "Préparation + pose", "unité", 12, 20, 35, 7, 0.3),
+    ],
+    "ménage": [
+        ("Régulier", "Ménage à domicile (heure)", "Entretien courant", "heure", 22, 28, 38, 12, 1),
+        ("Ponctuel", "Grand ménage / remise en état", "Nettoyage approfondi", "forfait", 120, 200, 350, 80, 5),
+        ("Fin de chantier", "Nettoyage fin de chantier (m²)", "Après travaux", "unité", 4, 7, 12, 2, 0.1),
+        ("Vitres", "Nettoyage de vitres", "Intérieur/extérieur", "heure", 25, 32, 45, 12, 1),
+        ("Repassage", "Repassage (heure)", "À domicile", "heure", 20, 26, 34, 10, 1),
+        ("Contrat", "Contrat ménage entreprise (forfait/mois)", "Bureaux, locaux", "mois", 300, 600, 1200, 200, 20),
+    ],
+    "coiffure_esthétique": [
+        ("Coiffure", "Coupe femme + brushing", "", "forfait", 30, 45, 70, 8, 1),
+        ("Coiffure", "Coupe homme", "", "forfait", 18, 25, 40, 4, 0.5),
+        ("Coiffure", "Coloration / mèches", "Produits inclus", "forfait", 45, 70, 120, 20, 1.5),
+        ("Esthétique", "Soin du visage", "", "forfait", 40, 60, 95, 15, 1),
+        ("Esthétique", "Épilation (forfait)", "", "forfait", 20, 35, 60, 6, 0.5),
+        ("Onglerie", "Pose vernis semi-permanent / gel", "", "forfait", 25, 40, 65, 10, 1),
+        ("Domicile", "Prestation à domicile (supplément)", "Déplacement", "forfait", 10, 15, 25, 5, 0.3),
+    ],
+    "photographie": [
+        ("Événement", "Reportage mariage (forfait)", "Journée + photos retouchées", "forfait", 900, 1600, 3000, 300, 20),
+        ("Studio", "Séance portrait / book", "1h + retouches", "forfait", 120, 220, 400, 40, 3),
+        ("Entreprise", "Photos produits (par photo)", "Prise + retouche", "unité", 15, 25, 45, 5, 0.3),
+        ("Immobilier", "Reportage immobilier", "Photos HD d'un bien", "forfait", 120, 200, 350, 40, 3),
+        ("Vidéo", "Captation vidéo + montage", "Tournage + montage court", "forfait", 400, 800, 1600, 200, 12),
+        ("Tirage", "Tirage / album photo", "Impression qualité pro", "unité", 20, 40, 80, 15, 0.5),
+    ],
+    "web_design": [
+        ("Site", "Site vitrine (forfait)", "Design + intégration responsive", "forfait", 800, 1800, 3500, 300, 30),
+        ("E-commerce", "Boutique en ligne", "Catalogue + paiement", "forfait", 2000, 4000, 8000, 800, 60),
+        ("Identité", "Logo + charte graphique", "Création identité visuelle", "forfait", 350, 800, 1800, 100, 12),
+        ("Maintenance", "Maintenance site (forfait/mois)", "MAJ, sauvegardes, sécurité", "mois", 50, 100, 200, 20, 2),
+        ("SEO", "Référencement naturel (forfait/mois)", "Optimisation + suivi", "mois", 250, 500, 1000, 100, 8),
+        ("Contenu", "Rédaction web (par article)", "SEO-friendly", "unité", 40, 80, 150, 15, 1.5),
+        ("Design", "Maquette / UI design (par écran)", "", "unité", 80, 150, 280, 30, 2),
+    ],
+    "conseil": [
+        ("Conseil", "Consultation / audit (jour)", "Analyse + recommandations", "jour", 400, 700, 1200, 100, 7),
+        ("Accompagnement", "Accompagnement projet (forfait/mois)", "Suivi récurrent", "mois", 800, 1500, 3000, 200, 15),
+        ("Formation", "Formation / atelier (jour)", "Animation, support inclus", "jour", 600, 1000, 1800, 150, 8),
+        ("Coaching", "Séance de coaching (heure)", "", "heure", 70, 120, 200, 10, 1),
+        ("Étude", "Étude de marché / faisabilité", "Rapport complet", "forfait", 1200, 2500, 5000, 400, 30),
+    ],
+    "comptabilité": [
+        ("Tenue", "Tenue comptable (forfait/mois)", "Saisie, rapprochements", "mois", 90, 180, 350, 40, 4),
+        ("Bilan", "Établissement du bilan annuel", "Liasse fiscale", "forfait", 600, 1200, 2500, 250, 20),
+        ("Paie", "Gestion de la paie (par bulletin)", "", "unité", 15, 25, 40, 8, 0.3),
+        ("Conseil", "Conseil fiscal / social (heure)", "", "heure", 80, 120, 180, 20, 1),
+        ("Création", "Accompagnement création d'entreprise", "Statuts, formalités", "forfait", 400, 800, 1500, 150, 10),
+    ],
+}
+
+
+async def execute_billing_seed_trade(args: dict) -> dict:
+    """
+    🧰 Charge dans le catalogue les prestations TYPES d'un métier (hors IT) :
+    plomberie, électricité, peinture, menuiserie, jardinage, ménage,
+    coiffure_esthétique, photographie, web_design, conseil, comptabilité.
+    Permet d'utiliser le module devis/facture pour TOUT métier.
+    """
+    trade = (args.get("trade") or "").strip().lower().replace("é", "é")
+    if trade in ("list", "", "?"):
+        return {"success": True, "available_trades": sorted(_TRADE_CATALOGS.keys()),
+                "hint": "Appelez billing_seed_trade(trade='plomberie') pour charger un métier."}
+    # tolérance d'orthographe simple
+    key = next((k for k in _TRADE_CATALOGS if k == trade or k.startswith(trade[:5]) or trade in k), None)
+    if not key:
+        return {"error": f"Métier inconnu : {trade}. Disponibles : {', '.join(sorted(_TRADE_CATALOGS))}"}
+    try:
+        existing = {s["name"].strip().lower() for s in db.billing_catalog_list()}
+        added = []
+        for cat, name, desc, unit, pb, ps, pp, cost, hours in _TRADE_CATALOGS[key]:
+            if name.strip().lower() in existing:
+                continue
+            db.billing_catalog_create({
+                "category": cat, "name": name, "description": desc, "unit": unit,
+                "price_basic": pb, "price_standard": ps, "price_premium": pp,
+                "cost": cost, "time_hours": hours,
+            })
+            added.append(name)
+        return {"success": True, "trade": key, "added_count": len(added), "added": added,
+                "message": f"{len(added)} prestation(s) « {key} » ajoutée(s) au catalogue."
+                           if added else f"Catalogue « {key} » déjà présent."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 29 — Base de connaissances IT consultable par Marvin
+# Recommandations instantanées d'outils/logiciels sans recherche web → rapide & smart.
+# Utilisée par le chat, l'Agent Documentation Technique et l'assistant Devis.
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_it_kb_search(args: dict) -> dict:
+    """🧠 Recherche dans la base de connaissances IT de Marvin (outils/logiciels)."""
+    query = (args.get("query") or "").strip()
+    try:
+        results = db.it_kb_search(query, int(args.get("limit", 12))) if query else db.it_kb_list(args.get("category"))
+        return {"success": True, "query": query, "count": len(results), "tools": results,
+                "categories": db.it_kb_categories()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_it_kb_list(args: dict) -> dict:
+    """📚 Liste / parcourt la base de connaissances IT (par catégorie optionnelle)."""
+    try:
+        tools_ = db.it_kb_list(args.get("category"))
+        by_cat = {}
+        for t in tools_:
+            by_cat.setdefault(t["category"], []).append(t["name"])
+        return {"success": True, "count": len(tools_), "categories": db.it_kb_categories(),
+                "by_category": by_cat, "tools": tools_}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_it_kb_recommend(args: dict) -> dict:
+    """
+    🎯 Recommande le(s) meilleur(s) outil(s) IT pour un besoin donné, depuis la base
+    de connaissances de Marvin (instantané). Tient compte du budget/contraintes
+    (gratuit, open source, souveraineté/RGPD…). Enrichit du web si rien en base.
+    """
+    need = (args.get("need") or args.get("query") or "").strip()
+    if not need:
+        return {"error": "Paramètre 'need' requis (ex: 'sauvegarde pour une mairie, budget limité')."}
+    text = need.lower()
+    try:
+        # Recherche en base sur les mots-clés significatifs
+        import re as _r
+        # Mots ignorés pour le MATCH (les contraintes budget/souveraineté ne servent
+        # qu'au SCORE, pas à ramener des outils hors-sujet).
+        stop = {"pour", "une", "un", "des", "de", "la", "le", "les", "du", "avec", "et",
+                "outil", "logiciel", "solution", "besoin", "client", "quel", "quelle", "meilleur",
+                "gratuit", "gratuite", "budget", "open", "source", "opensource", "souverain",
+                "souveraine", "rgpd", "anssi", "français", "française", "france", "limité", "limite",
+                "pas", "cher", "économique", "economique", "petit", "auto", "hébergé", "heberge",
+                "mairie", "collectivité", "collectivite", "pme", "tpe", "entreprise", "association"}
+        words = [w for w in _r.findall(r"[a-zàâçéèêëîïôûùüÿñ0-9]{3,}", text) if w not in stop]
+        hits, seen = [], set()
+        for w in words:
+            for t in db.it_kb_search(w, 8):
+                if t["id"] not in seen:
+                    seen.add(t["id"]); hits.append(t)
+        # Préférences budget/contraintes
+        wants_free = any(k in text for k in ("gratuit", "budget", "open source", "opensource", "sans coût", "pas cher", "économ"))
+        wants_sovereign = any(k in text for k in ("souverain", "rgpd", "français", "france", "anssi", "auto-héberg", "auto heberg"))
+
+        def score(t):
+            s = float(t.get("rating") or 0) + t.get("times_used", 0) * 0.5
+            if wants_free and t.get("pricing_model") in ("opensource", "free", "freemium"):
+                s += 3
+            if wants_sovereign and any(k in (t.get("tags", "") + t.get("best_for", "")).lower()
+                                       for k in ("souverain", "rgpd", "anssi", "français", "auto-héberg")):
+                s += 3
+            return s
+
+        hits.sort(key=score, reverse=True)
+        top = hits[:5]
+        for t in top:
+            db.it_kb_increment_usage(t["id"])
+
+        if not top:
+            return {"success": True, "need": need, "from_kb": 0,
+                    "message": "Aucun outil en base pour ce besoin. Lancez une recherche web "
+                               "(web_search) puis ajoutez le résultat avec it_kb_add.",
+                    "hint": "billing_product_reviews / billing_market_research pour évaluer une piste."}
+
+        recos = [{
+            "name": t["name"], "category": t["category"], "vendor": t.get("vendor", ""),
+            "why": t.get("best_for") or t.get("use_cases", ""),
+            "pricing": t.get("pricing_model"), "typical_price": t.get("typical_price", ""),
+            "platforms": t.get("platforms", ""), "url": t.get("official_url", ""),
+        } for t in top]
+        best = recos[0]
+        return {
+            "success": True, "need": need, "from_kb": len(top),
+            "recommendations": recos,
+            "advice": (f"Recommandé : **{best['name']}** ({best['category']}) — {best['why']}. "
+                       + ("Priorité gratuit/open source. " if wants_free else "")
+                       + ("Priorité souveraineté/RGPD. " if wants_sovereign else "")
+                       + "Comparez les avis via billing_product_reviews avant de proposer."),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_it_kb_add(args: dict) -> dict:
+    """➕ Ajoute (ou met à jour) un outil dans la base de connaissances de Marvin.
+    Permet à Marvin d'apprendre de nouveaux outils au fil du temps."""
+    if not args.get("name"):
+        return {"error": "Paramètre 'name' requis."}
+    try:
+        entry = db.it_kb_upsert(args)
+        return {"success": True, "message": f"« {entry['name']} » enregistré dans la base IT.",
+                "tool": entry}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 21 — Outils Windows Admin (Win11 / Windows Server)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_pc_installed_software(args: dict) -> dict:
+    """Liste les LOGICIELS INSTALLÉS sur le PC (nom, version, éditeur) — sans argument à fournir.
+    Lit la base de registre Windows (Uninstall) → fiable et complet. Pour « inventaire logiciel »,
+    « liste des programmes installés », « quels logiciels sont sur ce PC »."""
+    try:
+        ps = (
+            "$paths='HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',"
+            "'HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',"
+            "'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*';"
+            "Get-ItemProperty $paths -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.DisplayName } | "
+            "Select-Object @{N='name';E={$_.DisplayName}},@{N='version';E={$_.DisplayVersion}},@{N='publisher';E={$_.Publisher}} | "
+            "Sort-Object name -Unique | ConvertTo-Json -Compress"
+        )
+        result = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 30})
+        if result.get("error"):
+            return result
+        import json as _j
+        try:
+            apps = _j.loads(result.get("stdout", "[]") or "[]")
+            if isinstance(apps, dict):
+                apps = [apps]
+        except Exception:
+            return {"error": "Impossible de lire la liste des logiciels installés."}
+        apps = [a for a in apps if a.get("name")]
+        return {"success": True, "count": len(apps), "software": apps[:600],
+                "message": f"{len(apps)} logiciel(s) installé(s) détecté(s) sur ce PC."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_win_services_list(args: dict) -> dict:
+    """Liste les services Windows avec leur état (running/stopped/etc.)."""
+    filter_name = args.get("filter", "").strip().lower()
+    status_filter = args.get("status", "").strip().lower()  # running | stopped | etc.
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "Get-Service | Select-Object -Property Name,DisplayName,Status,StartType | "
+                "ConvertTo-Json -Depth 2 -Compress"
+            ),
+            "confirmed": True,
+            "timeout": 15,
+        })
+        if result.get("error"):
+            return result
+        import json as _j
+        try:
+            services = _j.loads(result.get("stdout", "[]"))
+            if isinstance(services, dict):
+                services = [services]
+        except Exception:
+            return {"error": "Impossible de parser la sortie PowerShell."}
+
+        # Normalize
+        out = []
+        for s in services:
+            name    = s.get("Name", "")
+            display = s.get("DisplayName", "")
+            status  = str(s.get("Status", "")).lower()
+            stype   = s.get("StartType", "")
+            # Map status int to name (Status can be enum number)
+            status_map = {1: "stopped", 2: "start_pending", 3: "stop_pending",
+                          4: "running", 5: "continue_pending", 6: "pause_pending", 7: "paused"}
+            if status.isdigit():
+                status = status_map.get(int(status), status)
+
+            if filter_name and filter_name not in name.lower() and filter_name not in display.lower():
+                continue
+            if status_filter and status_filter != status:
+                continue
+
+            out.append({
+                "name": name,
+                "display_name": display,
+                "status": status,
+                "start_type": stype,
+            })
+        # Sort: running first, then alphabetical
+        out.sort(key=lambda x: (0 if x["status"] == "running" else 1, x["name"].lower()))
+        return {
+            "success": True,
+            "count": len(out),
+            "running": sum(1 for s in out if s["status"] == "running"),
+            "stopped": sum(1 for s in out if s["status"] == "stopped"),
+            "services": out[:200],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def _resolve_service_name(name: str) -> tuple[str | None, list[dict]]:
+    """Résout un nom de service FLOU (nom d'affichage, casse différente, ordre des mots
+    différent selon la langue — ex. "Windows Defender Firewall" vs "Pare-feu Windows
+    Defender" sur un Windows en français) vers le nom INTERNE exact attendu par
+    Get-Service/Start-Service/etc. (ex. "MpsSvc"). Renvoie (nom_résolu, []) si trouvé
+    sans ambiguïté, ou (None, candidats) si plusieurs services correspondent."""
+    safe = name.replace("'", "")
+    exact = await execute_pc_run_powershell({
+        "script": f"Get-Service -Name '{safe}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name",
+        "confirmed": True, "timeout": 15,
+    })
+    out = (exact.get("stdout") or "").strip()
+    if out and out not in ("(aucune sortie)", ""):
+        return out.splitlines()[0].strip(), []
+    fuzzy = await execute_pc_run_powershell({
+        "script": (f"Get-Service | Where-Object {{ $_.Name -like '*{safe}*' -or $_.DisplayName -like '*{safe}*' }} | "
+                   "Select-Object Name, DisplayName | ConvertTo-Json -Compress"),
+        "confirmed": True, "timeout": 15,
+    })
+    import json as _j
+    try:
+        candidates = _j.loads(fuzzy.get("stdout") or "[]")
+        if isinstance(candidates, dict):
+            candidates = [candidates]
+    except Exception:
+        candidates = []
+    if len(candidates) == 1:
+        return candidates[0]["Name"], []
+    return None, candidates
+
+
+async def execute_win_service_action(args: dict) -> dict:
+    """Démarre, arrête, redémarre ou met en pause un service Windows."""
+    name = args.get("name", "").strip()
+    action = args.get("action", "").strip().lower()
+    confirmed = args.get("confirmed", False)
+    if not name:
+        return {"error": "Paramètre 'name' requis."}
+
+    # v2.113 — bug réel constaté : le LLM (et l'utilisateur) utilisent naturellement le nom
+    # D'AFFICHAGE d'un service ("Windows Defender Firewall"), jamais son nom INTERNE exact
+    # ("MpsSvc") qu'exigent Get-Service/Start-Service. Pire, sur un Windows localisé en
+    # français, le nom d'affichage réel ("Pare-feu Windows Defender") a un ordre de mots
+    # différent de l'anglais → même une recherche par sous-chaîne sur DisplayName échouait.
+    # On résout maintenant nous-mêmes le nom exact avant toute lecture/action.
+    resolved, candidates = await _resolve_service_name(name)
+    if resolved:
+        name = resolved
+    elif candidates:
+        options = ", ".join(f"{c.get('DisplayName')} ({c.get('Name')})" for c in candidates[:8])
+        return {"error": f"Plusieurs services correspondent à « {name} » — précise avec le nom exact : {options}"}
+    else:
+        return {"success": False, "service": name,
+                "message": f"Service « {name} » introuvable (vérifie le nom via win_services_list)."}
+
+    # Lecture seule : interroger l'état d'un service (pas de confirmation requise).
+    # Tolère les formulations naturelles du modèle (query/status/get/state/info).
+    if action in ("query", "status", "get", "state", "info", "check"):
+        result = await execute_pc_run_powershell({
+            "script": (f"Get-Service -Name '{name}' -ErrorAction SilentlyContinue | "
+                       "Select-Object Name, DisplayName, Status, StartType | ConvertTo-Json"),
+            "confirmed": True, "timeout": 20,
+        })
+        out = (result.get("stdout") or "").strip()
+        if not out or out == "(aucune sortie)":
+            return {"success": False, "service": name,
+                    "message": f"Service « {name} » introuvable (vérifie le nom exact via win_services_list)."}
+        return {"success": result.get("returncode") == 0, "action": "query",
+                "service": name, "output": out}
+    if action not in ("start", "stop", "restart", "pause", "resume"):
+        return {"error": "Action invalide. Utilisez : query | start | stop | restart | pause | resume"}
+    if not confirmed:
+        return {
+            "requiresConfirmation": True,
+            "message": f"Confirmer l'action '{action}' sur le service '{name}' ? (peut nécessiter droits admin)",
+        }
+    try:
+        ps_action = {
+            "start":   f"Start-Service -Name '{name}' -PassThru",
+            "stop":    f"Stop-Service -Name '{name}' -Force -PassThru",
+            "restart": f"Restart-Service -Name '{name}' -Force -PassThru",
+            "pause":   f"Suspend-Service -Name '{name}' -PassThru",
+            "resume":  f"Resume-Service -Name '{name}' -PassThru",
+        }[action]
+        result = await execute_pc_run_powershell({
+            "script": f"{ps_action} | Select-Object Name, Status | ConvertTo-Json",
+            "confirmed": True,
+            "timeout": 30,
+        })
+        return {
+            "success": result.get("returncode") == 0,
+            "action": action,
+            "service": name,
+            "output": result.get("stdout", ""),
+            "error": result.get("stderr", "") or None,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_win_event_log(args: dict) -> dict:
+    """Lit les derniers événements du journal Windows (System / Application / Security)."""
+    log_name = args.get("log", "System")  # System | Application | Security | Setup
+    max_events = int(args.get("max_events", 30))
+    level = args.get("level", "").lower()   # error | warning | information
+
+    level_filter = ""
+    if level == "error":
+        level_filter = " -EntryType Error"
+    elif level == "warning":
+        level_filter = " -EntryType Warning"
+    elif level == "information":
+        level_filter = " -EntryType Information"
+
+    try:
+        ps_script = (
+            f"Get-EventLog -LogName '{log_name}' -Newest {max_events}{level_filter} | "
+            "Select-Object TimeGenerated, EntryType, Source, EventID, "
+            "@{Name='Message';Expression={$_.Message.Substring(0, [Math]::Min(200, $_.Message.Length))}} | "
+            "ConvertTo-Json -Depth 2 -Compress"
+        )
+        result = await execute_pc_run_powershell({
+            "script": ps_script, "confirmed": True, "timeout": 20,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            _err = result.get("error") or result.get("stderr") or result.get("stdout") or "Échec PowerShell"
+            _el = str(_err).lower()
+            if log_name.lower() == "security" or "access" in _el or "denied" in _el or "refus" in _el:
+                return {"error": f"Lecture du journal « {log_name} » impossible — ce journal exige "
+                                 f"souvent les droits ADMINISTRATEUR. Lance Marvin en administrateur, "
+                                 f"ou utilise les journaux System/Application. Détail : {str(_err)[:140]}"}
+            return {"error": str(_err)[:200]}
+        import json as _j
+        try:
+            events = _j.loads(result.get("stdout", "[]"))
+            if isinstance(events, dict):
+                events = [events]
+        except Exception:
+            return {"error": "Impossible de parser la sortie."}
+        return {
+            "success": True,
+            "log": log_name,
+            "count": len(events),
+            "events": events,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_win_users_list(args: dict) -> dict:
+    """Liste les comptes utilisateurs locaux Windows."""
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "Get-LocalUser | Select-Object Name, Enabled, LastLogon, "
+                "Description, PasswordExpires | ConvertTo-Json -Depth 2 -Compress"
+            ),
+            "confirmed": True, "timeout": 15,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            return {"error": result.get("error") or result.get("stderr") or "Échec PowerShell"}
+        import json as _j
+        try:
+            users = _j.loads(result.get("stdout", "[]"))
+            if isinstance(users, dict):
+                users = [users]
+        except Exception:
+            return {"error": "Impossible de parser la sortie."}
+        return {"success": True, "count": len(users), "users": users}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_win_disk_info(args: dict) -> dict:
+    """Infos détaillées sur les disques Windows (partitions, espace, santé)."""
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "Get-Volume | Where-Object {$_.DriveLetter} | Select-Object DriveLetter, "
+                "FileSystemLabel, FileSystem, "
+                "@{Name='SizeGB';Expression={[math]::Round($_.Size/1GB,1)}}, "
+                "@{Name='FreeGB';Expression={[math]::Round($_.SizeRemaining/1GB,1)}}, "
+                "@{Name='UsedGB';Expression={[math]::Round(($_.Size - $_.SizeRemaining)/1GB,1)}}, "
+                "@{Name='UsedPct';Expression={if($_.Size -gt 0){[math]::Round((($_.Size - $_.SizeRemaining)/$_.Size)*100,1)}else{0}}}, "
+                "HealthStatus | ConvertTo-Json -Depth 2 -Compress"
+            ),
+            "confirmed": True, "timeout": 15,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            return {"error": result.get("error") or result.get("stderr") or "Échec PowerShell"}
+        import json as _j
+        try:
+            disks = _j.loads(result.get("stdout", "[]"))
+            if isinstance(disks, dict):
+                disks = [disks]
+        except Exception:
+            return {"error": "Impossible de parser la sortie."}
+        return {"success": True, "count": len(disks), "disks": disks}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_win_update_status(args: dict) -> dict:
+    """Vérifie l'état des mises à jour Windows (dernière, en attente)."""
+    try:
+        result = await execute_pc_run_powershell({
+            "script": (
+                "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 10 "
+                "HotFixID, Description, InstalledOn | ConvertTo-Json -Depth 2 -Compress"
+            ),
+            "confirmed": True, "timeout": 15,
+        })
+        if result.get("error") or result.get("returncode") != 0:
+            return {"error": result.get("error") or result.get("stderr")}
+        import json as _j
+        try:
+            hotfixes = _j.loads(result.get("stdout", "[]"))
+            if isinstance(hotfixes, dict):
+                hotfixes = [hotfixes]
+        except Exception:
+            return {"error": "Impossible de parser."}
+        return {
+            "success": True,
+            "recent_updates": hotfixes,
+            "count": len(hotfixes),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 26 — v2.31 Windows Diagnostics avancés (Win11 / Server)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Cache léger pour les diagnostics qui changent lentement (TTL en secondes)
+_win_diag_cache: dict = {}
+
+async def _cached_ps_json(cache_key: str, script: str, ttl: float = 0, timeout: int = 20):
+    """Exécute un script PowerShell renvoyant du JSON, avec cache optionnel."""
+    import time as _t, json as _j
+    now = _t.monotonic()
+    if ttl > 0 and cache_key in _win_diag_cache:
+        ts, data = _win_diag_cache[cache_key]
+        if now - ts < ttl:
+            return data, True  # (data, from_cache)
+    result = await execute_pc_run_powershell({"script": script, "confirmed": True, "timeout": timeout})
+    if result.get("error") or result.get("returncode") != 0:
+        return {"_error": result.get("error") or result.get("stderr") or "Échec PowerShell"}, False
+    try:
+        data = _j.loads(result.get("stdout", "[]") or "[]")
+        if isinstance(data, dict):
+            data = [data]
+    except Exception:
+        return {"_error": "Impossible de parser la sortie PowerShell."}, False
+    if ttl > 0:
+        _win_diag_cache[cache_key] = (now, data)
+    return data, False
+
+
+async def execute_win_uptime(args: dict) -> dict:
+    """Retourne l'uptime du système et la date de dernier démarrage."""
+    data, cached = await _cached_ps_json(
+        "uptime",
+        "$os = Get-CimInstance Win32_OperatingSystem; "
+        "$bt = $os.LastBootUpTime; $up = (Get-Date) - $bt; "
+        "@{LastBoot=$bt.ToString('yyyy-MM-dd HH:mm:ss'); "
+        "Days=$up.Days; Hours=$up.Hours; Minutes=$up.Minutes; "
+        "TotalHours=[math]::Round($up.TotalHours,1)} | ConvertTo-Json -Compress",
+        ttl=10,
+    )
+    if isinstance(data, dict) and data.get("_error"):
+        return {"error": data["_error"]}
+    info = data[0] if isinstance(data, list) and data else data
+    return {
+        "success": True,
+        "last_boot": info.get("LastBoot"),
+        "uptime_days": info.get("Days"),
+        "uptime_hours": info.get("Hours"),
+        "uptime_minutes": info.get("Minutes"),
+        "total_hours": info.get("TotalHours"),
+        "human": f"{info.get('Days',0)}j {info.get('Hours',0)}h {info.get('Minutes',0)}min",
+    }
+
+
+async def execute_win_startup_programs(args: dict) -> dict:
+    """Liste les programmes lancés au démarrage de Windows (diagnostic boot lent)."""
+    data, cached = await _cached_ps_json(
+        "startup",
+        "Get-CimInstance Win32_StartupCommand | "
+        "Select-Object Name, Command, Location, User | ConvertTo-Json -Depth 2 -Compress",
+        ttl=30,
+    )
+    if isinstance(data, dict) and data.get("_error"):
+        return {"error": data["_error"]}
+    return {
+        "success": True,
+        "count": len(data),
+        "from_cache": cached,
+        "startup_programs": data[:100],
+    }
+
+
+async def execute_win_scheduled_tasks(args: dict) -> dict:
+    """Liste les tâches planifiées Windows (filtrable, exclut Microsoft par défaut)."""
+    include_microsoft = args.get("include_microsoft", False)
+    filter_state = args.get("state", "")  # Ready | Running | Disabled
+    where = "" if include_microsoft else "| Where-Object {$_.TaskPath -notlike '\\Microsoft\\*'}"
+    data, cached = await _cached_ps_json(
+        f"sched_{include_microsoft}",
+        f"Get-ScheduledTask {where} | "
+        "Select-Object TaskName, TaskPath, State, "
+        "@{N='Author';E={$_.Author}} | ConvertTo-Json -Depth 2 -Compress",
+        ttl=30, timeout=25,
+    )
+    if isinstance(data, dict) and data.get("_error"):
+        return {"error": data["_error"]}
+    tasks = data
+    if filter_state:
+        tasks = [t for t in tasks if str(t.get("State", "")).lower() == filter_state.lower()]
+    return {
+        "success": True,
+        "count": len(tasks),
+        "from_cache": cached,
+        "tasks": tasks[:150],
+    }
+
+
+async def execute_win_network_config(args: dict) -> dict:
+    """Configuration réseau complète : adaptateurs, IPs, passerelle, DNS."""
+    data, cached = await _cached_ps_json(
+        "netconfig",
+        "Get-NetIPConfiguration | ForEach-Object { "
+        "@{Interface=$_.InterfaceAlias; "
+        "Status=$_.NetAdapter.Status; "
+        "IPv4=($_.IPv4Address.IPAddress -join ', '); "
+        "Gateway=($_.IPv4DefaultGateway.NextHop -join ', '); "
+        "DNS=($_.DNSServer.ServerAddresses -join ', '); "
+        "MAC=$_.NetAdapter.MacAddress} } | ConvertTo-Json -Depth 3 -Compress",
+        ttl=15,
+    )
+    if isinstance(data, dict) and data.get("_error"):
+        return {"error": data["_error"]}
+    return {
+        "success": True,
+        "count": len(data),
+        "from_cache": cached,
+        "adapters": data,
+    }
+
+
+async def execute_win_system_report(args: dict) -> dict:
+    """
+    Rapport diagnostic système complet en UN SEUL appel :
+    OS, uptime, CPU, RAM, disques, réseau, top processus, mises à jour.
+    Idéal pour un diagnostic rapide lors d'un support.
+    """
+    import json as _j
+    try:
+        # psutil pour les métriques rapides (pas de PowerShell)
+        mem = psutil.virtual_memory()
+        cpu_pct = psutil.cpu_percent(interval=0.3)
+        disks = []
+        for dp in psutil.disk_partitions(all=False):
+            try:
+                u = psutil.disk_usage(dp.mountpoint)
+                disks.append({
+                    "drive": dp.device, "total_gb": round(u.total/1024**3, 1),
+                    "free_gb": round(u.free/1024**3, 1), "used_pct": u.percent,
+                })
+            except Exception:
+                pass
+        # Top 5 processus par RAM
+        procs = []
+        for p in psutil.process_iter(['name', 'memory_info']):
+            try:
+                procs.append((p.info['name'], p.info['memory_info'].rss))
+            except Exception:
+                pass
+        procs.sort(key=lambda x: x[1], reverse=True)
+        top_procs = [{"name": n, "ram_mb": round(r/1024**2, 1)} for n, r in procs[:5]]
+
+        # OS + uptime via une seule commande PowerShell
+        report_extra = {}
+        try:
+            ps_data, _ = await _cached_ps_json(
+                "sysreport",
+                "$os = Get-CimInstance Win32_OperatingSystem; "
+                "$cs = Get-CimInstance Win32_ComputerSystem; "
+                "$up = (Get-Date) - $os.LastBootUpTime; "
+                "@{OS=$os.Caption; Version=$os.Version; Build=$os.BuildNumber; "
+                "Hostname=$cs.Name; Domain=$cs.Domain; "
+                "Manufacturer=$cs.Manufacturer; Model=$cs.Model; "
+                "UptimeDays=$up.Days; UptimeHours=$up.Hours} | ConvertTo-Json -Compress",
+                ttl=20,
+            )
+            if isinstance(ps_data, list) and ps_data:
+                report_extra = ps_data[0]
+            elif isinstance(ps_data, dict) and not ps_data.get("_error"):
+                report_extra = ps_data
+        except Exception:
+            pass
+
+        # Synthèse + alertes
+        alerts = []
+        if mem.percent > 85:
+            alerts.append(f"⚠️ RAM élevée : {mem.percent}%")
+        if cpu_pct > 85:
+            alerts.append(f"⚠️ CPU élevé : {cpu_pct}%")
+        for d in disks:
+            if d["used_pct"] > 90:
+                alerts.append(f"⚠️ Disque {d['drive']} presque plein : {d['used_pct']}%")
+
+        return {
+            "success": True,
+            "os": report_extra.get("OS", "Windows"),
+            "os_version": report_extra.get("Version", ""),
+            "build": report_extra.get("Build", ""),
+            "hostname": report_extra.get("Hostname", ""),
+            "domain": report_extra.get("Domain", ""),
+            "manufacturer": report_extra.get("Manufacturer", ""),
+            "model": report_extra.get("Model", ""),
+            "uptime": f"{report_extra.get('UptimeDays',0)}j {report_extra.get('UptimeHours',0)}h",
+            "cpu_percent": cpu_pct,
+            "cpu_cores": psutil.cpu_count(),
+            "ram_total_gb": round(mem.total/1024**3, 1),
+            "ram_used_gb": round(mem.used/1024**3, 1),
+            "ram_percent": mem.percent,
+            "disks": disks,
+            "top_processes": top_procs,
+            "alerts": alerts,
+            "health": "⚠️ Attention requise" if alerts else "✅ Système sain",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_file_duplicate_finder(args: dict) -> dict:
+    """
+    Trouve les fichiers en double dans un dossier (par taille puis hash MD5).
+    Utile pour le nettoyage de disque. Ne supprime rien.
+    """
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    resolved = Path(_resolve_path(path))
+    if not resolved.exists():
+        return {"error": f"Dossier introuvable : {resolved}"}
+    min_size = int(args.get("min_size_kb", 10)) * 1024  # ignore tiny files
+    max_files = int(args.get("max_files", 5000))
+
+    try:
+        import hashlib as _hl
+        # 1. Group by size (fast pre-filter)
+        size_map = {}
+        scanned = 0
+        for root, dirs, files in os.walk(str(resolved)):
+            dirs[:] = [d for d in dirs if d not in ('$RECYCLE.BIN', 'System Volume Information', 'node_modules', '.git')]
+            for fname in files:
+                if scanned >= max_files:
+                    break
+                fpath = os.path.join(root, fname)
+                try:
+                    sz = os.path.getsize(fpath)
+                    if sz >= min_size:
+                        size_map.setdefault(sz, []).append(fpath)
+                        scanned += 1
+                except Exception:
+                    pass
+            if scanned >= max_files:
+                break
+
+        # 2. For sizes with >1 file, compute hash
+        duplicates = []
+        total_wasted = 0
+        for sz, paths in size_map.items():
+            if len(paths) < 2:
+                continue
+            hash_map = {}
+            for p in paths:
+                try:
+                    h = _hl.md5()
+                    with open(p, "rb") as f:
+                        # Hash first 64KB for speed (good enough for dedup detection)
+                        h.update(f.read(65536))
+                    hash_map.setdefault(h.hexdigest(), []).append(p)
+                except Exception:
+                    pass
+            for hsh, dups in hash_map.items():
+                if len(dups) > 1:
+                    duplicates.append({
+                        "size_kb": round(sz/1024, 1),
+                        "count": len(dups),
+                        "files": dups,
+                    })
+                    total_wasted += sz * (len(dups) - 1)
+
+        duplicates.sort(key=lambda d: d["size_kb"] * d["count"], reverse=True)
+        return {
+            "success": True,
+            "root": str(resolved),
+            "scanned": scanned,
+            "duplicate_groups": len(duplicates),
+            "wasted_space_mb": round(total_wasted/1024**2, 1),
+            "duplicates": duplicates[:50],
+            "hint": "Hash sur les 64 premiers Ko (rapide). Vérifiez avant toute suppression.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 27 — v2.32 Édition vidéo / GIF (ffmpeg local, sans GPU ni API)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_video_info(args: dict) -> dict:
+    """Métadonnées d'un fichier vidéo/GIF : durée, résolution, fps, codec, taille."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    info = await loop.run_in_executor(None, lambda: _vm.get_media_info(resolved))
+    if info.get("error"):
+        return info
+    return {"success": True, **info}
+
+
+async def execute_video_to_gif(args: dict) -> dict:
+    """Convertit une vidéo en GIF optimisé (palette haute qualité)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_to_gif(
+        resolved, fps=int(args.get("fps", 12)), width=int(args.get("width", 480)),
+        start=args.get("start"), duration=args.get("duration"),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_gif_to_video(args: dict) -> dict:
+    """Convertit un GIF en MP4 (bien plus léger pour le partage)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.gif_to_video(
+        resolved, fps=args.get("fps"),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_video_trim(args: dict) -> dict:
+    """Découpe un segment d'une vidéo (start/end ou start/duration)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_trim(
+        resolved, start=float(args.get("start", 0)),
+        end=float(args["end"]) if args.get("end") is not None else None,
+        duration=float(args["duration"]) if args.get("duration") is not None else None,
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_video_compress(args: dict) -> dict:
+    """Compresse une vidéo (crf 18=qualité, 28=équilibré, 35=petit)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_compress(
+        resolved, crf=int(args.get("crf", 28)),
+        scale_width=int(args["scale_width"]) if args.get("scale_width") else None,
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_video_resize(args: dict) -> dict:
+    """Redimensionne une vidéo (width et/ou height, ratio préservé)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_resize(
+        resolved, width=int(args["width"]) if args.get("width") else None,
+        height=int(args["height"]) if args.get("height") else None,
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_video_extract_frames(args: dict) -> dict:
+    """Extrait des images d'une vidéo (fps=1 → 1 image/seconde)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_extract_frames(
+        resolved, fps=float(args.get("fps", 1)), max_frames=int(args.get("max_frames", 30)),
+    ))
+
+
+async def execute_video_speed(args: dict) -> dict:
+    """Change la vitesse d'une vidéo (2.0=2x rapide, 0.5=ralenti)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_speed(
+        resolved, factor=float(args.get("factor", 2.0)),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_video_watermark(args: dict) -> dict:
+    """Ajoute un texte / filigrane sur une vidéo."""
+    path = args.get("path", "").strip()
+    text = args.get("text", "").strip()
+    if not path or not text:
+        return {"error": "Paramètres 'path' et 'text' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.video_add_watermark(
+        resolved, text, position=args.get("position", "bottom-right"),
+        font_size=int(args.get("font_size", 24)),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_gif_optimize(args: dict) -> dict:
+    """Optimise un GIF (réduit fps/couleurs/taille)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    resolved = _resolve_path(path)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.gif_optimize(
+        resolved, fps=int(args.get("fps", 10)),
+        width=int(args["width"]) if args.get("width") else None,
+        colors=int(args.get("colors", 128)),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+async def execute_screen_record_gif(args: dict) -> dict:
+    """Enregistre l'écran en GIF (durée limitée). region=[x,y,w,h] ou écran entier."""
+    import video_manager as _vm
+    duration = min(float(args.get("duration", 5)), 20)  # cap 20s for safety
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.screen_record_gif(
+        duration=duration, fps=int(args.get("fps", 10)),
+        region=args.get("region"),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
+    ))
+
+
+# ───────────────────────── Boîte à outils AUDIO (v2.35) ─────────────────────────
+async def execute_audio_info(args: dict) -> dict:
+    """Métadonnées d'un fichier audio : durée, débit, fréquence, canaux."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.audio_info(_resolve_path(path)))
+
+
+async def execute_audio_extract(args: dict) -> dict:
+    """Extrait la piste audio d'une vidéo vers un fichier (mp3/wav/aac…)."""
+    path = args.get("path") or args.get("video_path") or ""
+    if not path.strip():
+        return {"error": "Paramètre 'path' (vidéo) requis."}
+    import video_manager as _vm
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.audio_extract(
+        _resolve_path(path), fmt=args.get("format", "mp3"), bitrate=args.get("bitrate", "192k"),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
+
+
+async def execute_audio_convert(args: dict) -> dict:
+    """Convertit un fichier audio vers un autre format."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.audio_convert(
+        _resolve_path(path), fmt=args.get("format", "mp3"), bitrate=args.get("bitrate", "192k"),
+        sample_rate=int(args["sample_rate"]) if args.get("sample_rate") else None,
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
+
+
+async def execute_audio_trim(args: dict) -> dict:
+    """Découpe un segment audio (start/end ou start+duration en secondes)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.audio_trim(
+        _resolve_path(path), start=float(args.get("start", 0)),
+        end=float(args["end"]) if args.get("end") is not None else None,
+        duration=float(args["duration"]) if args.get("duration") is not None else None,
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
+
+
+async def execute_audio_merge(args: dict) -> dict:
+    """Concatène plusieurs fichiers audio bout à bout."""
+    paths = args.get("paths") or args.get("sources") or []
+    if isinstance(paths, str):
+        paths = [s.strip() for s in paths.replace("\n", ",").split(",") if s.strip()]
+    if len(paths) < 2:
+        return {"error": "Fournir au moins 2 fichiers audio dans 'paths'."}
+    import video_manager as _vm
+    resolved = [_resolve_path(p) for p in paths]
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.audio_merge(
+        resolved, fmt=args.get("format", "mp3"),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
+
+
+async def execute_audio_volume(args: dict) -> dict:
+    """Ajuste le volume (factor ex 1.5, gain_db ex +6) ou normalise (normalize=true)."""
+    path = args.get("path", "").strip()
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    import video_manager as _vm
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _vm.audio_volume(
+        _resolve_path(path),
+        factor=float(args["factor"]) if args.get("factor") is not None else None,
+        gain_db=float(args["gain_db"]) if args.get("gain_db") is not None else None,
+        normalize=bool(args.get("normalize", False)),
+        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 22 — Agent IA Documentation Technique
+# Transforme des interventions brutes en documentation professionnelle.
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_doc_intervention_create(args: dict) -> dict:
+    """Crée une nouvelle intervention IT (incident, déploiement, maintenance…)."""
+    if not args.get("title"):
+        return {"error": "Paramètre 'title' requis."}
+    try:
+        interv = db.doc_intervention_create(args)
+        return {
+            "success": True,
+            "message": f"Intervention {interv['number']} créée.",
+            "intervention": interv,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_intervention_list(args: dict) -> dict:
+    """Liste les interventions (filtrable par client_id, status)."""
+    try:
+        items = db.doc_intervention_list(
+            args.get("client_id"), args.get("status"), int(args.get("limit", 50))
+        )
+        return {
+            "success": True,
+            "count": len(items),
+            "interventions": items,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_intervention_update(args: dict) -> dict:
+    """Met à jour une intervention existante (status, notes, résolution, etc.)."""
+    iid = args.get("id")
+    if not iid:
+        return {"error": "Paramètre 'id' requis."}
+    try:
+        interv = db.doc_intervention_update(iid, args)
+        if not interv:
+            return {"error": "Intervention introuvable"}
+        return {"success": True, "intervention": interv}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_analyze_input(args: dict) -> dict:
+    """
+    Analyse intelligente du contenu brut d'une intervention.
+    Extrait : commandes exécutées, services impactés, type d'incident, mots-clés ITIL.
+    """
+    raw_text = args.get("raw_text", "").strip()
+    if not raw_text:
+        return {"error": "Paramètre 'raw_text' requis."}
+
+    import re as _re
+
+    text = raw_text
+    text_lower = text.lower()
+
+    # Extract commands (lines starting with $, #, >, PS>, C:\>, or known commands)
+    command_patterns = [
+        r"^[\$#>]\s*(.+)$",
+        r"^PS\s+[A-Z]:\\[^>]*>\s*(.+)$",
+        r"^[A-Z]:\\[^>]*>\s*(.+)$",
+        r"^(sudo\s+\S.*)$",
+        r"^(systemctl\s+\S.*)$",
+        r"^(Get-\S+.*)$",
+        r"^(Set-\S+.*)$",
+        r"^(net\s+\S.*)$",
+        r"^(ping\s+\S.*)$",
+        r"^(ipconfig.*)$",
+        r"^(nslookup\s+.*)$",
+    ]
+    commands = []
+    for line in text.splitlines():
+        line = line.strip()
+        for pat in command_patterns:
+            m = _re.match(pat, line, _re.MULTILINE)
+            if m:
+                commands.append(m.group(1).strip())
+                break
+
+    # Extract IP addresses
+    ips = list(set(_re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text)))
+
+    # Extract MAC addresses
+    macs = list(set(_re.findall(r"(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", text)))
+
+    # Extract file paths
+    paths = list(set(_re.findall(r"[A-Z]:\\[A-Za-z0-9_\\.-]+", text)))[:20]
+
+    # Detect intervention type via keywords
+    type_keywords = {
+        "incident":    ["panne","ne fonctionne","planté","crashed","erreur","problème","bug","tombé"],
+        "deployment":  ["installer","installation","déployer","déploiement","setup","mise en place"],
+        "maintenance": ["maintenance","mise à jour","update","patch","upgrade","sauvegarde","backup"],
+        "change":      ["modifier","changer","reconfiguration","migration","évolution"],
+        "audit":       ["audit","contrôle","vérification","analyse","inventaire"],
+        "request":     ["demande","ajout","création de compte","accès","habilitation"],
+    }
+    detected_types = []
+    for itype, kws in type_keywords.items():
+        if any(k in text_lower for k in kws):
+            detected_types.append(itype)
+
+    # Detect ITIL category
+    itil_keywords = {
+        "Hardware":      ["disque","cpu","ram","mémoire","carte mère","alimentation","matériel","écran","clavier","souris"],
+        "Software":      ["logiciel","application","windows","office","navigateur","bug"],
+        "Network":       ["réseau","wifi","internet","switch","routeur","vlan","dns","dhcp","ping"],
+        "Security":      ["sécurité","virus","malware","ransomware","pare-feu","firewall","antivirus","piratage"],
+        "Database":      ["base de données","sql","mysql","postgresql","sqlite"],
+        "Email":         ["mail","email","outlook","exchange","smtp","imap","pop3"],
+        "Backup":        ["sauvegarde","backup","restoration","restauration","veeam"],
+        "Server":        ["serveur","ad","active directory","dc","gpo","windows server","linux"],
+        "User Access":   ["mot de passe","login","compte utilisateur","authentification","sso","mfa"],
+    }
+    detected_categories = []
+    for cat, kws in itil_keywords.items():
+        if any(k in text_lower for k in kws):
+            detected_categories.append(cat)
+
+    # Detect priority hints
+    priority_hints = {
+        "critical": ["urgent","critique","production","arrêt","outage","aucun service"],
+        "high":     ["important","prioritaire","plusieurs personnes","beaucoup d'utilisateurs"],
+        "low":      ["mineur","peu important","demain","quand vous pouvez"],
+    }
+    suggested_priority = "medium"
+    for prio, kws in priority_hints.items():
+        if any(k in text_lower for k in kws):
+            suggested_priority = prio
+            break
+
+    # GDPR/RGPD relevant?
+    rgpd_keywords = ["données personnelles","rgpd","gdpr","fuite","exfiltration","nominatif","carte d'identité"]
+    rgpd_relevant = any(k in text_lower for k in rgpd_keywords)
+
+    # Suggested tags
+    suggested_tags = list(set(detected_categories + detected_types))[:10]
+
+    # ── v2.30 : Command Safety integration (non-destructive add) ──────────────
+    # Analyse le risque des commandes via une extraction LARGE (rm, format, iptables…)
+    # sans modifier le champ 'extracted_commands' existant (rétro-compatibilité).
+    command_safety = None
+    try:
+        safety_extract = await execute_cmd_extract_from_text({"text": raw_text})
+        broad_commands = safety_extract.get("commands", []) if safety_extract.get("success") else commands
+        if broad_commands:
+            risk_counts = {"safe": 0, "medium": 0, "high": 0, "critical": 0, "blocked": 0}
+            analyzed = []
+            risk_order = ["safe", "medium", "high", "critical", "blocked"]
+            highest = "safe"
+            for cmd in broad_commands[:30]:
+                a = _analyze_command_risk(cmd)
+                risk_counts[a["risk_level"]] = risk_counts.get(a["risk_level"], 0) + 1
+                if risk_order.index(a["risk_level"]) > risk_order.index(highest):
+                    highest = a["risk_level"]
+                if a["risk_level"] != "safe":
+                    analyzed.append({
+                        "command": a["command"],
+                        "risk_level": a["risk_level"],
+                        "explanation": a["risk_explanation"],
+                        "safer_alternative": a["safer_alternative"],
+                    })
+            command_safety = {
+                "highest_risk": highest,
+                "risk_counts": risk_counts,
+                "risky_commands": analyzed,
+                "requires_approval": highest in ("critical", "blocked"),
+                "has_blocked": risk_counts.get("blocked", 0) > 0,
+            }
+    except Exception:
+        command_safety = None  # Never break doc_analyze_input
+
+    return {
+        "success": True,
+        "extracted_commands": commands[:30],
+        "command_count": len(commands),
+        "ip_addresses": ips[:15],
+        "mac_addresses": macs[:10],
+        "file_paths": paths,
+        "detected_intervention_types": detected_types,
+        "main_type": detected_types[0] if detected_types else "incident",
+        "itil_categories": detected_categories,
+        "suggested_priority": suggested_priority,
+        "rgpd_relevant": rgpd_relevant,
+        "suggested_tags": suggested_tags,
+        "word_count": len(text.split()),
+        "command_safety": command_safety,
+        "hint": "Utilisez ces données pour pré-remplir une intervention via doc_intervention_create.",
+    }
+
+
+def _render_template(template: str, vars: dict) -> str:
+    """Simple {{key}} template substitution."""
+    out = template
+    for k, v in vars.items():
+        out = out.replace("{{" + k + "}}", str(v) if v is not None else "")
+    # Remove any remaining {{xxx}} placeholders for cleanliness
+    import re as _re
+    out = _re.sub(r"\{\{[^}]+\}\}", "_(non renseigné)_", out)
+    return out
+
+
+async def execute_doc_generate_report(args: dict) -> dict:
+    """
+    Génère un rapport d'intervention professionnel en PDF (ou DOCX).
+    Format adapté pour un compte rendu client.
+    """
+    intervention_id = args.get("intervention_id")
+    output_format = (args.get("format") or "pdf").lower()
+    template_id = args.get("template_id")  # optional
+
+    if not intervention_id:
+        return {"error": "Paramètre 'intervention_id' requis."}
+
+    try:
+        interv = db.doc_intervention_get(intervention_id)
+        if not interv:
+            return {"error": "Intervention introuvable"}
+
+        # Fetch client info if any
+        client_block = ""
+        if interv.get("client_id"):
+            try:
+                client = db.billing_client_get(interv["client_id"])
+                if client:
+                    client_block = (
+                        f"**{client.get('name', '')}**\n"
+                        f"{client.get('address', '')}\n"
+                        f"Contact : {client.get('contact_name', '')} "
+                        f"({client.get('contact_email', '')})"
+                    )
+            except Exception:
+                pass
+
+        # Pick template
+        if template_id:
+            tmpl = db.doc_template_get(template_id)
+        else:
+            tmpls = db.doc_template_list("report")
+            tmpl = tmpls[0] if tmpls else None
+
+        from datetime import datetime as _dt
+        date_str = _dt.now().strftime("%d/%m/%Y %H:%M")
+        duration = f"{interv['duration_minutes']} min" if interv.get("duration_minutes") else "_(non renseigné)_"
+
+        vars = {
+            "number":          interv.get("number", ""),
+            "title":           interv.get("title", ""),
+            "date":            date_str,
+            "technician":      interv.get("technician") or "_(non renseigné)_",
+            "duration":        duration,
+            "client_block":    client_block or "_(client non renseigné)_",
+            "context":         interv.get("raw_notes") or "_(à compléter)_",
+            "diagnostic":      interv.get("root_cause") or "_(à compléter)_",
+            "actions":         interv.get("summary") or interv.get("raw_notes") or "_(à compléter)_",
+            "commands":        interv.get("commands_executed") or "(aucune)",
+            "resolution":      interv.get("resolution") or "_(à compléter)_",
+            "recommendations": interv.get("recommendations") or "_(aucune recommandation)_",
+        }
+
+        if tmpl:
+            content_md = _render_template(tmpl["content_md"], vars)
+            db.doc_template_use(tmpl["id"])
+            template_name = tmpl["name"]
+        else:
+            # Fallback minimal content
+            content_md = f"# Rapport d'intervention {interv['number']}\n\n{interv.get('summary','(vide)')}"
+            template_name = "default"
+
+        # Generate the file
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"rapport_{interv['number']}.{output_format}"
+        )
+
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path,
+                "title": f"Rapport d'intervention {interv['number']}",
+                "content": content_md,
+            })
+        elif output_format == "md":
+            try:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text(content_md, encoding="utf-8")
+                size = Path(output_path).stat().st_size
+                result = {"success": True, "path": output_path, "size": size}
+            except Exception as e:
+                result = {"error": str(e)}
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path,
+                "title": f"Rapport d'intervention {interv['number']}",
+                "content": content_md,
+            })
+
+        if result.get("error"):
+            return result
+
+        # Save in doc_documents table
+        try:
+            doc = db.doc_document_create({
+                "intervention_id": intervention_id,
+                "client_id": interv.get("client_id"),
+                "doc_type": "report",
+                "format": output_format,
+                "title": f"Rapport {interv['number']}",
+                "file_path": output_path,
+                "content_md": content_md,
+                "template_used": template_name,
+                "size_bytes": result.get("size") or 0,
+            })
+        except Exception:
+            doc = None
+
+        return {
+            "success": True,
+            "message": f"Rapport généré : {output_path}",
+            "path": output_path,
+            "document": doc,
+            "format": output_format,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_generate_procedure(args: dict) -> dict:
+    """Génère une procédure technique pas-à-pas en PDF/DOCX/MD."""
+    intervention_id = args.get("intervention_id")
+    output_format = (args.get("format") or "pdf").lower()
+    if not intervention_id:
+        return {"error": "Paramètre 'intervention_id' requis."}
+
+    try:
+        interv = db.doc_intervention_get(intervention_id)
+        if not interv:
+            return {"error": "Intervention introuvable"}
+
+        tmpls = db.doc_template_list("procedure")
+        tmpl = tmpls[0] if tmpls else None
+
+        from datetime import datetime as _dt
+        vars = {
+            "title":         interv.get("title", "Procédure"),
+            "date":          _dt.now().strftime("%d/%m/%Y"),
+            "technician":    interv.get("technician") or "Marvin",
+            "difficulty":    args.get("difficulty", "Moyenne"),
+            "objective":     args.get("objective") or interv.get("summary") or "_(à compléter)_",
+            "prerequisites": args.get("prerequisites") or "_(aucun)_",
+            "tools_required": args.get("tools_required") or "_(à préciser)_",
+            "steps":         args.get("steps") or interv.get("raw_notes") or "_(à compléter)_",
+            "commands":      interv.get("commands_executed") or "(aucune)",
+            "validation":    args.get("validation") or "_(à compléter)_",
+            "rollback":      args.get("rollback") or "_(à compléter)_",
+            "notes":         args.get("notes") or "",
+        }
+
+        if tmpl:
+            content_md = _render_template(tmpl["content_md"], vars)
+            db.doc_template_use(tmpl["id"])
+        else:
+            content_md = f"# Procédure : {vars['title']}\n\n{vars['steps']}"
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"procedure_{interv['number']}.{output_format}"
+        )
+
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": vars["title"], "content": content_md,
+            })
+        elif output_format == "md":
+            try:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text(content_md, encoding="utf-8")
+                result = {"success": True, "path": output_path, "size": Path(output_path).stat().st_size}
+            except Exception as e:
+                result = {"error": str(e)}
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": vars["title"], "content": content_md,
+            })
+
+        if result.get("error"):
+            return result
+
+        doc = db.doc_document_create({
+            "intervention_id": intervention_id, "client_id": interv.get("client_id"),
+            "doc_type": "procedure", "format": output_format,
+            "title": f"Procédure : {vars['title']}",
+            "file_path": output_path, "content_md": content_md,
+            "template_used": tmpl["name"] if tmpl else "default",
+            "size_bytes": result.get("size") or 0,
+        })
+        return {"success": True, "message": f"Procédure générée : {output_path}",
+                "path": output_path, "document": doc}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_generate_client_sheet(args: dict) -> dict:
+    """Génère une fiche client complète (infrastructure, contrats, historique)."""
+    client_id = args.get("client_id")
+    output_format = (args.get("format") or "pdf").lower()
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+
+    try:
+        client = db.billing_client_get(client_id)
+        if not client:
+            return {"error": "Client introuvable"}
+
+        # Fetch assets
+        assets = db.doc_asset_list(client_id)
+        workstations = [a for a in assets if a["asset_type"] == "workstation"]
+        servers      = [a for a in assets if a["asset_type"] == "server"]
+        network      = [a for a in assets if a["asset_type"] in ("firewall","switch","router")]
+
+        # Fetch recent interventions
+        interventions = db.doc_intervention_list(client_id, limit=20)
+
+        def fmt_assets(items, title="aucun"):
+            if not items:
+                return f"_({title})_"
+            lines = []
+            for a in items:
+                line = f"- **{a['name']}**"
+                if a.get("os"): line += f" ({a['os']})"
+                if a.get("ip_address"): line += f" — {a['ip_address']}"
+                if a.get("location"): line += f" — {a['location']}"
+                lines.append(line)
+            return "\n".join(lines)
+
+        def fmt_history(items):
+            if not items:
+                return "_(aucune intervention)_"
+            lines = []
+            for i in items[:10]:
+                lines.append(f"- {i.get('created_at','')[:10]} — **{i['number']}** {i['title']} _({i['status']})_")
+            return "\n".join(lines)
+
+        from datetime import datetime as _dt
+        tmpls = db.doc_template_list("client_sheet")
+        tmpl = tmpls[0] if tmpls else None
+
+        client_type_label = {"mairie":"Mairie","pme":"PME","asso":"Association","particulier":"Particulier"}.get(
+            client.get("client_type","pme"), client.get("client_type",""))
+
+        vars = {
+            "client_name":   client.get("name",""),
+            "client_type":   client_type_label,
+            "contact":       client.get("contact_name") or "_(non renseigné)_",
+            "phone":         client.get("contact_phone") or "—",
+            "email":         client.get("contact_email") or "—",
+            "presentation":  client.get("notes") or "_(à compléter)_",
+            "workstations":  fmt_assets(workstations, "aucun poste enregistré"),
+            "servers":       fmt_assets(servers, "aucun serveur enregistré"),
+            "network":       fmt_assets(network, "aucun équipement réseau enregistré"),
+            "security":      args.get("security") or "_(à compléter)_",
+            "backup":        args.get("backup") or "_(à compléter)_",
+            "contracts":     args.get("contracts") or "_(aucun contrat enregistré)_",
+            "history":       fmt_history(interventions),
+            "contacts":      args.get("contacts") or "_(à compléter)_",
+            "date":          _dt.now().strftime("%d/%m/%Y"),
+        }
+        if tmpl:
+            content_md = _render_template(tmpl["content_md"], vars)
+            db.doc_template_use(tmpl["id"])
+        else:
+            content_md = f"# Fiche client : {vars['client_name']}\n\n_(template manquant)_"
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"fiche_client_{client['name'].replace(' ','_')}.{output_format}"
+        )
+
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": f"Fiche client — {client['name']}", "content": content_md,
+            })
+        elif output_format == "md":
+            try:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text(content_md, encoding="utf-8")
+                result = {"success": True, "path": output_path, "size": Path(output_path).stat().st_size}
+            except Exception as e:
+                result = {"error": str(e)}
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": f"Fiche client — {client['name']}", "content": content_md,
+            })
+
+        if result.get("error"):
+            return result
+
+        doc = db.doc_document_create({
+            "client_id": client_id, "doc_type": "client_sheet", "format": output_format,
+            "title": f"Fiche client {client['name']}",
+            "file_path": output_path, "content_md": content_md,
+            "size_bytes": result.get("size") or 0,
+        })
+        return {"success": True, "message": f"Fiche client générée : {output_path}",
+                "path": output_path, "document": doc,
+                "assets_count": len(assets), "interventions_count": len(interventions)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_generate_recovery_plan(args: dict) -> dict:
+    """Génère un Plan de Reprise d'Activité (PRA/PCA) en PDF."""
+    client_id = args.get("client_id")
+    output_format = (args.get("format") or "pdf").lower()
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+
+    try:
+        client = db.billing_client_get(client_id)
+        if not client:
+            return {"error": "Client introuvable"}
+
+        tmpls = db.doc_template_list("recovery_plan")
+        tmpl = tmpls[0] if tmpls else None
+
+        # Risks table (markdown)
+        risks = args.get("risks") or [
+            {"name":"Panne matérielle serveur","probability":"Moyenne","impact":"Élevé","priority":"Haute"},
+            {"name":"Coupure électrique prolongée","probability":"Faible","impact":"Critique","priority":"Haute"},
+            {"name":"Ransomware","probability":"Moyenne","impact":"Critique","priority":"Critique"},
+            {"name":"Erreur humaine (suppression)","probability":"Élevée","impact":"Moyen","priority":"Moyenne"},
+            {"name":"Sinistre incendie/dégât des eaux","probability":"Faible","impact":"Critique","priority":"Haute"},
+        ]
+        risks_table = "\n".join([f"| {r['name']} | {r['probability']} | {r['impact']} | {r['priority']} |" for r in risks])
+
+        services = args.get("services") or [
+            {"name":"Messagerie","rto":"4 heures","rpo":"1 heure"},
+            {"name":"Fichiers partagés","rto":"8 heures","rpo":"24 heures"},
+            {"name":"ERP/Métier","rto":"4 heures","rpo":"24 heures"},
+            {"name":"Site web","rto":"24 heures","rpo":"24 heures"},
+        ]
+        services_table = "\n".join([f"| {s['name']} | {s['rto']} | {s['rpo']} |" for s in services])
+
+        from datetime import datetime as _dt
+        vars = {
+            "client_name":   client.get("name",""),
+            "date":          _dt.now().strftime("%d/%m/%Y"),
+            "validator":     args.get("validator") or "_(à définir)_",
+            "scope":         args.get("scope") or f"Périmètre IT complet de {client.get('name','')}",
+            "risks_table":   risks_table,
+            "services_table": services_table,
+            "backup_arch":   args.get("backup_arch") or "_(à décrire : type sauvegarde, fréquence, rétention, localisation)_",
+            "recovery_steps": args.get("recovery_steps") or (
+                "1. **Évaluation** : identifier la nature du sinistre (panne, attaque, sinistre physique)\n"
+                "2. **Notification** : alerter l'équipe IT et la direction\n"
+                "3. **Isolation** : isoler les systèmes affectés\n"
+                "4. **Activation du site de repli** ou restauration sauvegarde\n"
+                "5. **Vérification** : tests fonctionnels avant remise en production\n"
+                "6. **Communication utilisateurs**\n"
+                "7. **Post-mortem** et amélioration du PRA"
+            ),
+            "tests":         args.get("tests") or "Test annuel minimum (restauration complète d'un serveur).",
+            "contacts":      args.get("contacts") or "_(à compléter avec numéros 24/7)_",
+            "annexes":       args.get("annexes") or "Voir fiches techniques par serveur et procédures associées.",
+        }
+        content_md = _render_template(tmpl["content_md"] if tmpl else "# PRA\n\n{{scope}}", vars)
+        if tmpl: db.doc_template_use(tmpl["id"])
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"PRA_{client['name'].replace(' ','_')}.{output_format}"
+        )
+
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": f"PRA — {client['name']}", "content": content_md,
+            })
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": f"PRA — {client['name']}", "content": content_md,
+            })
+        if result.get("error"):
+            return result
+
+        doc = db.doc_document_create({
+            "client_id": client_id, "doc_type": "recovery_plan", "format": output_format,
+            "title": f"PRA {client['name']}",
+            "file_path": output_path, "content_md": content_md,
+            "size_bytes": result.get("size") or 0,
+        })
+        return {"success": True, "path": output_path, "document": doc,
+                "message": f"PRA généré : {output_path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_generate_maintenance(args: dict) -> dict:
+    """Génère une procédure de maintenance préventive (mensuelle/trimestrielle/annuelle)."""
+    client_id = args.get("client_id")
+    output_format = (args.get("format") or "pdf").lower()
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+    try:
+        client = db.billing_client_get(client_id)
+        if not client:
+            return {"error": "Client introuvable"}
+
+        tmpls = db.doc_template_list("maintenance")
+        tmpl = tmpls[0] if tmpls else None
+
+        from datetime import datetime as _dt
+        vars = {
+            "frequency":         args.get("frequency", "Mensuelle"),
+            "client_name":       client.get("name",""),
+            "duration":          args.get("duration", "2 heures"),
+            "workstation_extra": args.get("workstation_extra", ""),
+            "server_extra":      args.get("server_extra", ""),
+            "network_extra":     args.get("network_extra", ""),
+            "security_extra":    args.get("security_extra", ""),
+            "anomalies":         args.get("anomalies", "_(aucune anomalie détectée à ce jour)_"),
+            "corrective_actions": args.get("corrective_actions", "_(aucune action urgente)_"),
+        }
+        content_md = _render_template(tmpl["content_md"] if tmpl else "# Maintenance\n", vars)
+        if tmpl: db.doc_template_use(tmpl["id"])
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"maintenance_{client['name'].replace(' ','_')}.{output_format}"
+        )
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": f"Maintenance — {client['name']}", "content": content_md,
+            })
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": f"Maintenance — {client['name']}", "content": content_md,
+            })
+        if result.get("error"):
+            return result
+
+        doc = db.doc_document_create({
+            "client_id": client_id, "doc_type": "maintenance", "format": output_format,
+            "title": f"Procédure maintenance {client['name']}",
+            "file_path": output_path, "content_md": content_md,
+            "size_bytes": result.get("size") or 0,
+        })
+        return {"success": True, "path": output_path, "document": doc,
+                "message": f"Procédure maintenance générée : {output_path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_generate_runbook(args: dict) -> dict:
+    """Génère un runbook (procédure d'urgence) pour un incident critique."""
+    intervention_id = args.get("intervention_id")
+    if not intervention_id:
+        return {"error": "Paramètre 'intervention_id' requis."}
+    output_format = (args.get("format") or "pdf").lower()
+    try:
+        interv = db.doc_intervention_get(intervention_id)
+        if not interv:
+            return {"error": "Intervention introuvable"}
+
+        tmpls = db.doc_template_list("runbook")
+        tmpl = tmpls[0] if tmpls else None
+
+        vars = {
+            "title":              interv.get("title",""),
+            "severity":           {"critical":"🔴 CRITIQUE","high":"🟠 ÉLEVÉE","medium":"🟡 MOYENNE","low":"🟢 BASSE"}.get(interv.get("priority","medium"),"MOYENNE"),
+            "service":            args.get("service", "_(à préciser)_"),
+            "technician":         interv.get("technician") or "Astreinte",
+            "symptoms":           args.get("symptoms") or interv.get("raw_notes") or "_(à décrire)_",
+            "business_impact":    args.get("business_impact") or "_(à évaluer)_",
+            "diagnostic_steps":   args.get("diagnostic_steps") or "_(à compléter)_",
+            "step1":              args.get("step1") or "_(à compléter)_",
+            "step2":              args.get("step2") or "_(à compléter)_",
+            "step3":              args.get("step3") or "_(à compléter)_",
+            "step4":              args.get("step4") or "_(à compléter)_",
+            "level1_contact":     args.get("level1_contact", "_(N1)_"),
+            "level2_contact":     args.get("level2_contact", "_(N2)_"),
+            "level3_contact":     args.get("level3_contact", "_(N3 / Direction)_"),
+        }
+        content_md = _render_template(tmpl["content_md"] if tmpl else "# Runbook", vars)
+        if tmpl: db.doc_template_use(tmpl["id"])
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"runbook_{interv['number']}.{output_format}"
+        )
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": f"Runbook {interv['number']}", "content": content_md,
+            })
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": f"Runbook {interv['number']}", "content": content_md,
+            })
+        if result.get("error"):
+            return result
+        doc = db.doc_document_create({
+            "intervention_id": intervention_id, "client_id": interv.get("client_id"),
+            "doc_type": "runbook", "format": output_format,
+            "title": f"Runbook {interv['number']}",
+            "file_path": output_path, "content_md": content_md,
+            "size_bytes": result.get("size") or 0,
+        })
+        return {"success": True, "path": output_path, "document": doc,
+                "message": f"Runbook généré : {output_path}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_generate_schema(args: dict) -> dict:
+    """
+    Génère un schéma logique en Mermaid à partir d'une configuration réseau.
+    Retourne le code Mermaid (que le frontend peut afficher) + un fichier .md.
+    """
+    network_config = args.get("network_config", "").strip()
+    title = args.get("title", "Schéma réseau")
+    save_to_file = args.get("save", True)
+
+    try:
+        # Auto-extract IPs and devices from network_config text
+        import re as _re
+        ips = list(set(_re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", network_config)))
+        # Detect typical devices via patterns
+        device_patterns = {
+            "Firewall":   [r"firewall", r"pfsense", r"fortigate", r"sophos"],
+            "Switch":     [r"switch", r"cisco", r"hp.{0,5}switch"],
+            "Router":     [r"routeur", r"router", r"livebox", r"freebox"],
+            "Server":     [r"serveur", r"server", r"windows server", r"ad/dc", r"active directory"],
+            "NAS":        [r"\bnas\b", r"synology", r"qnap"],
+            "Workstation":[r"poste", r"workstation", r"pc utilisateur"],
+        }
+        devices_found = {}
+        text_lower = network_config.lower()
+        for kind, pats in device_patterns.items():
+            for p in pats:
+                if _re.search(p, text_lower):
+                    devices_found[kind] = devices_found.get(kind, 0) + 1
+                    break
+
+        # Build Mermaid graph
+        lines = ["graph TB"]
+        lines.append("    WAN[Internet / FAI]")
+        if "Firewall" in devices_found:
+            lines.append("    FW[Firewall]")
+            lines.append("    WAN --> FW")
+            uplink = "FW"
+        else:
+            uplink = "WAN"
+        if "Router" in devices_found:
+            lines.append(f"    RT[Routeur]")
+            lines.append(f"    {uplink} --> RT")
+            uplink = "RT"
+        if "Switch" in devices_found:
+            lines.append(f"    SW[Switch principal]")
+            lines.append(f"    {uplink} --> SW")
+            uplink = "SW"
+        if "Server" in devices_found:
+            for i in range(min(devices_found["Server"], 3)):
+                lines.append(f"    SRV{i+1}[Serveur {i+1}]")
+                lines.append(f"    {uplink} --> SRV{i+1}")
+        if "NAS" in devices_found:
+            lines.append(f"    NAS[NAS]")
+            lines.append(f"    {uplink} --> NAS")
+        if "Workstation" in devices_found:
+            count = devices_found["Workstation"]
+            lines.append(f"    PCS[{count} poste{'s' if count > 1 else ''} utilisateur{'s' if count > 1 else ''}]")
+            lines.append(f"    {uplink} --> PCS")
+        # If no devices detected, generate a generic template
+        if not devices_found:
+            lines = [
+                "graph TB",
+                "    WAN[Internet]",
+                "    FW[Firewall]",
+                "    SW[Switch]",
+                "    SRV[Serveur]",
+                "    PCS[Postes utilisateurs]",
+                "    WAN --> FW",
+                "    FW --> SW",
+                "    SW --> SRV",
+                "    SW --> PCS",
+            ]
+
+        mermaid_code = "\n".join(lines)
+
+        content_md = f"""# {title}
+
+## Schéma de l'infrastructure
+
+```mermaid
+{mermaid_code}
+```
+
+## Éléments détectés
+
+| Type | Quantité |
+|------|----------|
+""" + "\n".join([f"| {k} | {v} |" for k, v in devices_found.items()]) + f"""
+
+## Adresses IP relevées
+{', '.join(ips[:20]) if ips else '_(aucune)_'}
+
+---
+*Schéma généré par Marvin AI à partir de la configuration réseau fournie.*
+"""
+
+        path = None
+        if save_to_file:
+            from datetime import datetime as _dt
+            path = args.get("output_path") or str(
+                Path(os.path.expanduser("~")) / "Desktop" /
+                f"schema_{_dt.now().strftime('%Y%m%d_%H%M%S')}.md"
+            )
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(content_md, encoding="utf-8")
+
+        return {
+            "success": True,
+            "mermaid": mermaid_code,
+            "markdown": content_md,
+            "devices_detected": devices_found,
+            "ips_found": ips[:20],
+            "path": path,
+            "message": (f"Schéma sauvegardé : {path}" if path else "Schéma Mermaid généré (non sauvegardé)"),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def _doc_export_md(content_md: str, title: str, doc_type: str, output_format: str,
+                        output_path: str | None, intervention_id=None, client_id=None,
+                        subtitle: str = "") -> dict:
+    """Exporte un markdown en PDF/docx + enregistre le document. Mutualisé."""
+    fmt = (output_format or "pdf").lower()
+    safe = _re.sub(r"[^\w-]", "_", title.lower())[:40]
+    out = output_path or str(Path(_HOME) / "Desktop" / f"{safe}.{fmt}")
+    if fmt == "docx":
+        res = await execute_file_create_docx({"path": out, "title": title, "subtitle": subtitle, "content": content_md})
+    else:
+        res = await execute_file_create_pdf({"path": out, "title": title, "subtitle": subtitle, "content": content_md})
+    if res.get("error"):
+        return res
+    out = res.get("path", out)
+    try:
+        db.doc_document_create({"intervention_id": intervention_id, "client_id": client_id,
+                                "doc_type": doc_type, "format": fmt, "title": title,
+                                "file_path": out, "content_md": content_md, "size_bytes": res.get("size") or 0})
+    except Exception:
+        pass
+    return {"success": True, "path": out, "markdown": content_md, "message": f"Document généré : {out}"}
+
+
+async def execute_doc_generate_postmortem(args: dict) -> dict:
+    """📋 Génère un POST-MORTEM / analyse de cause racine (RCA) d'un incident."""
+    from datetime import datetime as _dt
+    interv = db.doc_intervention_get(args["intervention_id"]) if args.get("intervention_id") else {}
+    title = args.get("title") or interv.get("title") or "Post-mortem incident"
+    sev = {"critical": "🔴 Critique", "high": "🟠 Élevée", "medium": "🟡 Moyenne", "low": "🟢 Basse"}.get(
+        args.get("severity") or interv.get("priority", "medium"), "🟡 Moyenne")
+    md = [f"## Résumé exécutif\n{args.get('summary') or interv.get('summary') or '_(résumé de l_incident)_'}\n",
+          "## Informations clés",
+          f"| Champ | Valeur |\n|---|---|\n| Gravité | {sev} |\n| Date de l'incident | {args.get('incident_date', _dt.now().strftime('%d/%m/%Y'))} |"
+          f"\n| Durée d'indisponibilité | {args.get('downtime', '_(à préciser)_')} |\n| Services impactés | {args.get('services_impacted', '_(à préciser)_')} |"
+          f"\n| Détecté par | {args.get('detected_by', '_(supervision/utilisateur)_')} |\n",
+          "## Chronologie des événements",
+          args.get("timeline") or "- **HH:MM** — Détection\n- **HH:MM** — Diagnostic\n- **HH:MM** — Mitigation\n- **HH:MM** — Résolution\n",
+          "## Cause racine",
+          args.get("root_cause") or interv.get("root_cause") or "_(analyse de la cause première — pourquoi ? les 5 pourquoi)_\n",
+          "## Impact",
+          f"- **Technique** : {args.get('technical_impact', '_(systèmes touchés)_')}\n- **Métier** : {args.get('business_impact', '_(utilisateurs, CA, image)_')}\n",
+          "## Résolution",
+          args.get("resolution") or interv.get("resolution") or "_(comment l'incident a été résolu)_\n",
+          "## Actions correctives & préventives",
+          args.get("corrective_actions") or "| Action | Responsable | Échéance | Priorité |\n|---|---|---|---|\n| _(à définir)_ | | | |\n",
+          "## Leçons apprises",
+          args.get("lessons") or "- _(ce qui a bien fonctionné)_\n- _(ce qui est à améliorer)_\n"]
+    return await _doc_export_md("\n".join(md), f"Post-mortem — {title}", "postmortem",
+                               args.get("format", "pdf"), args.get("output_path"),
+                               args.get("intervention_id"), interv.get("client_id"),
+                               subtitle="Analyse de cause racine (RCA)")
+
+
+async def execute_doc_generate_change(args: dict) -> dict:
+    """🔄 Génère une DEMANDE DE CHANGEMENT (Change Request ITIL)."""
+    interv = db.doc_intervention_get(args["intervention_id"]) if args.get("intervention_id") else {}
+    title = args.get("title") or interv.get("title") or "Demande de changement"
+    risk = {"low": "🟢 Faible", "medium": "🟡 Moyen", "high": "🟠 Élevé", "critical": "🔴 Critique"}.get(args.get("risk", "medium"), "🟡 Moyen")
+    md = [f"## Objet du changement\n{args.get('description') or '_(description du changement demandé)_'}\n",
+          "## Synthèse",
+          f"| Champ | Valeur |\n|---|---|\n| Type | {args.get('change_type', 'Normal')} |\n| Niveau de risque | {risk} |"
+          f"\n| Demandeur | {args.get('requester', '_(à préciser)_')} |\n| Date souhaitée | {args.get('planned_date', '_(à préciser)_')} |"
+          f"\n| Fenêtre de maintenance | {args.get('window', '_(hors heures ouvrées)_')} |\n",
+          "## Justification / bénéfices",
+          args.get("justification") or "_(pourquoi ce changement est nécessaire)_\n",
+          "## Périmètre & systèmes concernés",
+          args.get("scope") or "_(serveurs, services, utilisateurs impactés)_\n",
+          "## Plan de mise en œuvre",
+          args.get("implementation_plan") or "1. _(étape)_\n2. _(étape)_\n3. _(vérification)_\n",
+          "## Analyse de risque & impact",
+          args.get("risk_analysis") or f"Niveau de risque : {risk}. _(impacts potentiels, interruptions)_\n",
+          "## Plan de retour arrière (rollback)",
+          args.get("rollback_plan") or "_(comment annuler le changement si problème — point de restauration, sauvegarde)_\n",
+          "## Tests de validation",
+          args.get("validation_tests") or "- _(test post-changement à réaliser)_\n",
+          "## Validation",
+          "| Rôle | Nom | Décision | Date |\n|---|---|---|---|\n| Demandeur | | | |\n| Validateur (CAB) | | | |\n"]
+    return await _doc_export_md("\n".join(md), f"Change Request — {title}", "change",
+                               args.get("format", "pdf"), args.get("output_path"),
+                               args.get("intervention_id"), interv.get("client_id"),
+                               subtitle="Demande de changement (ITIL)")
+
+
+async def execute_doc_generate_onboarding(args: dict) -> dict:
+    """👤 Génère une fiche d'ARRIVÉE ou de DÉPART IT d'un collaborateur (checklist)."""
+    mode = (args.get("mode") or "onboarding").lower()
+    person = args.get("person_name", "_(Nom du collaborateur)_")
+    is_off = mode in ("offboarding", "départ", "depart", "sortie")
+    title = f"{'Départ' if is_off else 'Arrivée'} IT — {person}"
+    verb = "Désactiver / récupérer" if is_off else "Créer / fournir"
+    accounts = ("- [ ] Désactiver compte AD / Microsoft 365\n- [ ] Bloquer la messagerie + transfert vers le manager\n"
+                "- [ ] Révoquer les accès VPN / applications\n- [ ] Changer les mots de passe partagés\n"
+                if is_off else
+                "- [ ] Créer le compte AD / Microsoft 365\n- [ ] Configurer la messagerie + signature\n"
+                "- [ ] Donner les accès applications métiers\n- [ ] Configurer le VPN si télétravail\n")
+    hardware = ("- [ ] Récupérer le PC portable + chargeur\n- [ ] Récupérer le téléphone / SIM\n"
+                "- [ ] Récupérer badges / clés / périphériques\n- [ ] Effacer et reconditionner le matériel\n"
+                if is_off else
+                "- [ ] Préparer et configurer le PC\n- [ ] Installer les logiciels nécessaires\n"
+                "- [ ] Fournir téléphone / périphériques\n- [ ] Remettre badge / accès locaux\n")
+    md = [f"## Collaborateur\n| Champ | Valeur |\n|---|---|\n| Nom | {person} |\n| Poste / Service | {args.get('role', '_(à préciser)_')} |"
+          f"\n| Date d'effet | {args.get('date', '_(à préciser)_')} |\n| Manager | {args.get('manager', '_(à préciser)_')} |\n",
+          f"## Comptes & accès — {verb}\n{accounts}",
+          f"## Matériel — {verb}\n{hardware}",
+          "## Données",
+          ("- [ ] Sauvegarder/transférer les fichiers et la boîte mail\n- [ ] Réaffecter les documents partagés\n"
+           if is_off else "- [ ] Préparer l'espace de stockage / partages\n- [ ] Restaurer les données si mutation\n"),
+          "## Sécurité",
+          ("- [ ] Vérifier qu'aucun accès résiduel ne subsiste\n- [ ] Journaliser la clôture\n"
+           if is_off else "- [ ] Sensibiliser aux bonnes pratiques (phishing, mot de passe)\n- [ ] Activer la double authentification\n"),
+          f"## Validation\n| Étape | Responsable | Fait le |\n|---|---|---|\n| Préparation | {args.get('technician', 'IT')} | |\n| Validation manager | | |\n"]
+    return await _doc_export_md("\n".join(md), title, "onboarding",
+                               args.get("format", "pdf"), args.get("output_path"),
+                               None, None,
+                               subtitle="Checklist " + ("offboarding" if is_off else "onboarding"))
+
+
+async def execute_doc_template_list(args: dict) -> dict:
+    """Liste les templates de documentation disponibles."""
+    try:
+        templates = db.doc_template_list(args.get("doc_type"))
+        return {"success": True, "count": len(templates), "templates": templates}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_asset_create(args: dict) -> dict:
+    """Crée un asset (CMDB-lite) : poste, serveur, équipement réseau…"""
+    if not args.get("name"):
+        return {"error": "Paramètre 'name' requis."}
+    try:
+        asset = db.doc_asset_create(args)
+        return {"success": True, "asset": asset, "message": f"Asset '{asset['name']}' créé."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_asset_list(args: dict) -> dict:
+    """Liste les assets (par client_id optionnel)."""
+    try:
+        assets = db.doc_asset_list(args.get("client_id"))
+        return {"success": True, "count": len(assets), "assets": assets}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_doc_knowledge_search(args: dict) -> dict:
+    """Cherche dans la base de connaissances (interventions passées) par mot-clé."""
+    query = args.get("query", "").strip().lower()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    try:
+        all_interv = db.doc_intervention_list(limit=500)
+        results = []
+        for i in all_interv:
+            score = 0
+            haystack = " ".join([
+                i.get("title",""), i.get("raw_notes",""), i.get("summary",""),
+                i.get("resolution",""), i.get("root_cause","")
+            ]).lower()
+            if query in haystack:
+                score += haystack.count(query)
+                results.append({
+                    "id": i["id"], "number": i["number"], "title": i["title"],
+                    "intervention_type": i.get("intervention_type"),
+                    "status": i.get("status"),
+                    "snippet": (i.get("resolution") or i.get("summary") or i.get("raw_notes",""))[:300],
+                    "score": score,
+                    "created_at": i.get("created_at",""),
+                })
+        results.sort(key=lambda r: r["score"], reverse=True)
+        return {
+            "success": True,
+            "query": query,
+            "count": len(results),
+            "results": results[:20],
+            "hint": "Utilisez cette knowledge base pour résoudre rapidement des incidents similaires.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 23 — v2.30.0 Operations Safety : Command Safety / Guardrails
+# Analyse de risque des commandes (PowerShell, CMD, Bash, Linux, Proxmox, Cisco, FW)
+# NB : aucune commande n'est jamais exécutée ici — analyse statique uniquement.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _detect_command_platform(cmd: str) -> str:
+    """Détecte la plateforme d'une commande par heuristique."""
+    c = cmd.lower().strip()
+    if _re.search(r"\b(get-|set-|new-|remove-item|stop-process|restart-service|"
+                  r"start-service|remove-localuser|set-executionpolicy|gpupdate|"
+                  r"restart-computer|netsh)\b", c):
+        return "powershell"
+    if _re.search(r"\b(qm|pct|pveceph|pvesm|pvecm|vzdump)\b", c):
+        return "proxmox"
+    if _re.search(r"(erase\s+startup-config|write\s+(erase|memory)|show\s+ip\s+int|"
+                  r"conf\s+t|configure\s+terminal|no\s+shutdown)", c):
+        return "cisco"
+    if _re.search(r"(advfirewall|clear\s+configure|set\s+firewall|access-list)", c):
+        return "firewall"
+    if _re.search(r"^\s*(diskpart|format|del\s+/|reg\s+|net\s+user|ipconfig|"
+                  r"tasklist|sfc|chkdsk)\b", c):
+        return "cmd"
+    if _re.search(r"\b(sudo|rm|chmod|chown|systemctl|apt|yum|dnf|dd|mkfs|"
+                  r"iptables|kill|mount|umount|fdisk|crontab)\b", c):
+        return "linux"
+    if _re.search(r"^\s*(bash|sh|\./|export\s+)", c):
+        return "bash"
+    return "unknown"
+
+
+def _analyze_command_risk(cmd: str) -> dict:
+    """
+    Analyse statique du risque d'une commande contre les règles en base.
+    Retourne le niveau de risque le plus élevé qui matche.
+    """
+    cmd_stripped = cmd.strip()
+    platform = _detect_command_platform(cmd_stripped)
+
+    risk_order = {"safe": 0, "medium": 1, "high": 2, "critical": 3, "blocked": 4}
+    best = {
+        "command": cmd_stripped,
+        "platform": platform,
+        "risk_level": "safe",
+        "risk_explanation": "Aucun motif à risque détecté. Commande considérée comme sûre.",
+        "safer_alternative": "",
+        "requires_approval": False,
+        "matched_rule": "",
+    }
+
+    try:
+        rules = db.cmd_rules_list(active_only=True)
+    except Exception:
+        rules = []
+
+    for rule in rules:
+        try:
+            if _re.search(rule["pattern"], cmd_stripped, _re.IGNORECASE):
+                if risk_order.get(rule["risk_level"], 0) > risk_order.get(best["risk_level"], 0):
+                    best = {
+                        "command": cmd_stripped,
+                        "platform": rule.get("platform") or platform,
+                        "risk_level": rule["risk_level"],
+                        "risk_explanation": rule.get("explanation", ""),
+                        "safer_alternative": rule.get("safer_alternative", ""),
+                        "requires_approval": rule["risk_level"] in ("critical", "blocked"),
+                        "matched_rule": rule["pattern"],
+                    }
+        except Exception:
+            continue
+    return best
+
+
+async def execute_cmd_extract_from_text(args: dict) -> dict:
+    """Extrait les commandes (PowerShell/CMD/Bash/Linux/Proxmox/Cisco/FW) d'un texte."""
+    text = args.get("text", "").strip()
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+
+    # Lignes ressemblant à des commandes
+    command_patterns = [
+        r"^[\$#>]\s*(.+)$",
+        r"^PS\s+[A-Z]:\\[^>]*>\s*(.+)$",
+        r"^[A-Z]:\\[^>]*>\s*(.+)$",
+        r"^(sudo\s+\S.*)$",
+        r"^(rm\s+\S.*)$", r"^(chmod\s+\S.*)$", r"^(chown\s+\S.*)$",
+        r"^(systemctl\s+\S.*)$", r"^(dd\s+\S.*)$", r"^(mkfs\S*\s+.*)$",
+        r"^(iptables\s+\S.*)$", r"^(kill\s+\S.*)$",
+        r"^(Get-\S+.*)$", r"^(Set-\S+.*)$", r"^(New-\S+.*)$",
+        r"^(Remove-\S+.*)$", r"^(Stop-\S+.*)$", r"^(Start-\S+.*)$",
+        r"^(Restart-\S+.*)$", r"^(netsh\s+\S.*)$", r"^(reg\s+\S.*)$",
+        r"^(net\s+\S.*)$", r"^(diskpart.*)$", r"^(format\s+\S.*)$",
+        r"^(del\s+\S.*)$", r"^(qm\s+\S.*)$", r"^(pct\s+\S.*)$",
+        r"^(pveceph\s+\S.*)$", r"^(ipconfig.*)$", r"^(ping\s+\S.*)$",
+        r"^(nslookup\s+.*)$", r"^(write\s+(erase|memory).*)$",
+        r"^(erase\s+startup-config.*)$",
+    ]
+    commands = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        for pat in command_patterns:
+            m = _re.match(pat, line, _re.IGNORECASE)
+            if m:
+                cmd = m.group(1).strip() if m.lastindex else line
+                if cmd and cmd not in commands:
+                    commands.append(cmd)
+                break
+    return {
+        "success": True,
+        "commands": commands[:50],
+        "count": len(commands),
+    }
+
+
+async def execute_cmd_analyze_risk(args: dict) -> dict:
+    """
+    Analyse le risque d'une ou plusieurs commandes. Journalise chaque analyse.
+    Niveaux : safe, medium, high, critical, blocked.
+    """
+    command = args.get("command", "").strip()
+    commands = args.get("commands", [])
+    intervention_id = args.get("intervention_id")
+
+    if command and not commands:
+        commands = [command]
+    if not commands:
+        return {"error": "Paramètre 'command' ou 'commands' requis."}
+
+    analyses = []
+    risk_counts = {"safe": 0, "medium": 0, "high": 0, "critical": 0, "blocked": 0}
+    for cmd in commands[:50]:
+        if not cmd or not str(cmd).strip():
+            continue
+        analysis = _analyze_command_risk(str(cmd))
+        risk_counts[analysis["risk_level"]] = risk_counts.get(analysis["risk_level"], 0) + 1
+        # Journalise
+        try:
+            review = db.cmd_review_create({**analysis, "intervention_id": intervention_id})
+            analysis["review_id"] = review["id"]
+        except Exception:
+            analysis["review_id"] = None
+        analyses.append(analysis)
+
+    # Verdict global
+    highest = "safe"
+    risk_order = ["safe", "medium", "high", "critical", "blocked"]
+    for a in analyses:
+        if risk_order.index(a["risk_level"]) > risk_order.index(highest):
+            highest = a["risk_level"]
+
+    blocked_or_critical = [a for a in analyses if a["risk_level"] in ("blocked", "critical")]
+
+    return {
+        "success": True,
+        "analyses": analyses,
+        "count": len(analyses),
+        "risk_counts": risk_counts,
+        "highest_risk": highest,
+        "requires_approval": len(blocked_or_critical) > 0,
+        "blocked_commands": [a["command"] for a in analyses if a["risk_level"] == "blocked"],
+        "verdict": (
+            "🚫 BLOQUÉ — commande(s) destructive(s) détectée(s)" if highest == "blocked"
+            else "🔴 CRITIQUE — approbation requise" if highest == "critical"
+            else "🟠 RISQUE ÉLEVÉ — vérification recommandée" if highest == "high"
+            else "🟡 RISQUE MODÉRÉ" if highest == "medium"
+            else "🟢 SÛR"
+        ),
+    }
+
+
+async def execute_cmd_suggest_safer_alternative(args: dict) -> dict:
+    """Propose une alternative plus sûre pour une commande risquée."""
+    command = args.get("command", "").strip()
+    if not command:
+        return {"error": "Paramètre 'command' requis."}
+    analysis = _analyze_command_risk(command)
+    if analysis["safer_alternative"]:
+        return {
+            "success": True,
+            "command": command,
+            "risk_level": analysis["risk_level"],
+            "explanation": analysis["risk_explanation"],
+            "safer_alternative": analysis["safer_alternative"],
+        }
+    return {
+        "success": True,
+        "command": command,
+        "risk_level": analysis["risk_level"],
+        "safer_alternative": "",
+        "message": "Aucune alternative spécifique — commande déjà sûre ou pas de règle dédiée. Bonnes pratiques générales : faire une sauvegarde, tester en pré-prod, vérifier les cibles.",
+    }
+
+
+async def execute_cmd_require_approval(args: dict) -> dict:
+    """Crée une demande d'approbation pour une commande destructive."""
+    command = args.get("command", "").strip()
+    if not command:
+        return {"error": "Paramètre 'command' requis."}
+    try:
+        review = None
+        if args.get("command_review_id"):
+            review_id = args["command_review_id"]
+        else:
+            analysis = _analyze_command_risk(command)
+            review = db.cmd_review_create({**analysis, "intervention_id": args.get("intervention_id")})
+            review_id = review["id"]
+        req = db.approval_create({
+            "command_review_id": review_id,
+            "command": command,
+            "requested_by": args.get("requested_by", ""),
+            "reason": args.get("reason", ""),
+        })
+        return {
+            "success": True,
+            "approval_request": req,
+            "message": "Demande d'approbation créée. La commande NE sera PAS exécutée tant qu'elle n'est pas approuvée.",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_cmd_review_history(args: dict) -> dict:
+    """Historique des analyses de commandes (journal)."""
+    try:
+        reviews = db.cmd_review_list(
+            args.get("intervention_id"), args.get("risk_level"), int(args.get("limit", 100))
+        )
+        return {"success": True, "count": len(reviews), "reviews": reviews}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 24 — v2.30.0 Operations Safety : Pre-Check / Post-Check
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Points de contrôle automatiques selon le type d'intervention
+_PRECHECK_TEMPLATES = {
+    "deployment": [
+        ("Sauvegarde réalisée avant déploiement", "backup", "Sauvegarde complète disponible", "critical"),
+        ("Fenêtre de maintenance validée", "planning", "Créneau confirmé avec le client", "warning"),
+        ("Espace disque suffisant", "infrastructure", "≥ 20% libre", "warning", "Get-Volume"),
+        ("Plan de retour arrière (rollback) préparé", "rollback", "Procédure documentée", "critical"),
+        ("Utilisateurs prévenus", "communication", "Notification envoyée", "info"),
+        ("Compatibilité vérifiée", "compatibility", "Prérequis logiciels validés", "warning"),
+    ],
+    "maintenance": [
+        ("Sauvegarde récente disponible", "backup", "< 24h", "critical"),
+        ("État initial documenté", "documentation", "Captures/logs avant", "warning"),
+        ("Fenêtre de maintenance respectée", "planning", "Horaire convenu", "warning"),
+        ("Services critiques identifiés", "infrastructure", "Liste à jour", "info"),
+    ],
+    "change": [
+        ("Demande de changement approuvée", "approval", "Ticket validé", "critical"),
+        ("Sauvegarde de la configuration", "backup", "Config exportée", "critical"),
+        ("Impact évalué", "risk", "Analyse d'impact faite", "warning"),
+        ("Plan de rollback prêt", "rollback", "Procédure testée", "critical"),
+        ("Communication faite", "communication", "Parties prenantes informées", "info"),
+    ],
+    "incident": [
+        ("Périmètre de l'incident délimité", "scope", "Systèmes affectés identifiés", "warning"),
+        ("Sauvegarde avant manipulation", "backup", "Snapshot si possible", "critical"),
+        ("Impact métier évalué", "risk", "Criticité confirmée", "warning"),
+        ("Ticket ouvert", "documentation", "Référence tracée", "info"),
+    ],
+    "audit": [
+        ("Périmètre d'audit défini", "scope", "Documenté", "info"),
+        ("Accès en lecture seule confirmé", "security", "Pas de modification", "critical"),
+        ("Outils d'audit prêts", "tools", "Disponibles", "info"),
+    ],
+    "default": [
+        ("Sauvegarde disponible", "backup", "Récente", "critical"),
+        ("Impact évalué", "risk", "Analysé", "warning"),
+        ("Client informé", "communication", "Notifié", "info"),
+        ("Plan de rollback", "rollback", "Préparé", "warning"),
+    ],
+}
+
+_POSTCHECK_TEMPLATES = {
+    "deployment": [
+        ("Service/application démarré(e)", "validation", "Statut Running", "critical", "Get-Service"),
+        ("Tests fonctionnels OK", "validation", "Fonctionnalités vérifiées", "critical"),
+        ("Pas d'erreur dans les logs", "validation", "Journaux propres", "warning", "Get-EventLog -LogName Application -Newest 20 -EntryType Error"),
+        ("Performances nominales", "performance", "Temps de réponse normaux", "warning"),
+        ("Sauvegarde post-déploiement", "backup", "Nouvelle sauvegarde", "warning"),
+        ("Documentation mise à jour", "documentation", "Rapport rédigé", "info"),
+        ("Utilisateurs informés de la fin", "communication", "Notification envoyée", "info"),
+    ],
+    "maintenance": [
+        ("Tous les services redémarrés", "validation", "Running", "critical", "Get-Service"),
+        ("Espace disque vérifié", "infrastructure", "OK", "warning", "Get-Volume"),
+        ("Sauvegardes fonctionnelles", "backup", "Testées", "critical"),
+        ("Logs sans erreur critique", "validation", "Propres", "warning"),
+        ("Rapport de maintenance rédigé", "documentation", "Document généré", "info"),
+    ],
+    "change": [
+        ("Changement appliqué et vérifié", "validation", "Effectif", "critical"),
+        ("Tests de non-régression OK", "validation", "Pas de régression", "critical"),
+        ("Logs vérifiés", "validation", "Propres", "warning"),
+        ("Rollback non nécessaire", "rollback", "Changement stable", "info"),
+        ("Documentation à jour", "documentation", "CMDB mise à jour", "warning"),
+    ],
+    "incident": [
+        ("Service rétabli", "validation", "Fonctionnel", "critical", "Get-Service"),
+        ("Cause racine identifiée", "rca", "Documentée", "warning"),
+        ("Tests utilisateur OK", "validation", "Confirmé par le client", "critical"),
+        ("Mesures préventives notées", "prevention", "Recommandations", "info"),
+        ("Ticket clôturé", "documentation", "Résolution tracée", "info"),
+    ],
+    "audit": [
+        ("Rapport d'audit produit", "documentation", "Livré", "critical"),
+        ("Recommandations formulées", "recommendation", "Listées", "warning"),
+        ("Aucune modification effectuée", "security", "Lecture seule respectée", "critical"),
+    ],
+    "default": [
+        ("Service fonctionnel", "validation", "OK", "critical"),
+        ("Tests effectués", "validation", "Passés", "warning"),
+        ("Documentation produite", "documentation", "Rapport", "info"),
+        ("Client informé", "communication", "Notifié", "info"),
+    ],
+}
+
+
+async def execute_ops_checklist_generate(args: dict) -> dict:
+    """
+    Génère automatiquement les points de contrôle selon le type d'intervention.
+    Ne crée PAS de checklist en base — retourne juste les items proposés.
+    """
+    intervention_type = args.get("intervention_type", "default")
+    check_type = args.get("check_type", "precheck")  # precheck | postcheck
+
+    templates = _PRECHECK_TEMPLATES if check_type == "precheck" else _POSTCHECK_TEMPLATES
+    items_raw = templates.get(intervention_type, templates["default"])
+
+    items = []
+    for idx, t in enumerate(items_raw):
+        item = {
+            "label": t[0],
+            "category": t[1],
+            "expected": t[2],
+            "severity": t[3],
+            "order_index": idx,
+            "auto_command": t[4] if len(t) > 4 else "",
+        }
+        items.append(item)
+
+    return {
+        "success": True,
+        "check_type": check_type,
+        "intervention_type": intervention_type,
+        "items": items,
+        "count": len(items),
+        "hint": "Utilisez ops_precheck_create / ops_postcheck_run pour matérialiser cette checklist.",
+    }
+
+
+async def execute_ops_precheck_create(args: dict) -> dict:
+    """
+    Crée une checklist (pre-check par défaut) liée à une intervention,
+    avec des points de contrôle auto-générés selon le type.
+    """
+    intervention_id = args.get("intervention_id")
+    if not intervention_id:
+        return {"error": "Paramètre 'intervention_id' requis."}
+    check_type = args.get("check_type", "precheck")
+
+    try:
+        # Récupérer le type d'intervention pour générer les bons items
+        interv = db.doc_intervention_get(intervention_id)
+        if not interv:
+            return {"error": "Intervention introuvable"}
+        itype = interv.get("intervention_type", "default")
+
+        # Créer la checklist
+        title = args.get("title") or (
+            f"Pré-check — {interv['title']}" if check_type == "precheck"
+            else f"Post-check — {interv['title']}"
+        )
+        check = db.ops_check_create({
+            "intervention_id": intervention_id,
+            "check_type": check_type,
+            "title": title,
+        })
+
+        # Générer + insérer les items (depuis args.items si fourni, sinon auto)
+        if args.get("items") and isinstance(args["items"], list):
+            items_data = args["items"]
+        else:
+            gen = await execute_ops_checklist_generate({
+                "intervention_type": itype, "check_type": check_type
+            })
+            items_data = gen["items"]
+
+        for it in items_data:
+            db.ops_item_create(check["id"], it)
+
+        return {
+            "success": True,
+            "message": f"Checklist {check_type} créée ({len(items_data)} points).",
+            "check": db.ops_check_get(check["id"]),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ops_precheck_run(args: dict) -> dict:
+    """
+    Enregistre les résultats d'un pre-check (ok/warning/failed/skipped par item).
+    NB : n'exécute aucune commande système — l'opérateur fournit les résultats.
+    """
+    return await _ops_run_check(args, expected_type="precheck")
+
+
+async def execute_ops_postcheck_run(args: dict) -> dict:
+    """Enregistre les résultats d'un post-check (validation après intervention)."""
+    return await _ops_run_check(args, expected_type="postcheck")
+
+
+async def _ops_run_check(args: dict, expected_type: str) -> dict:
+    check_id = args.get("check_id")
+    results = args.get("results", [])  # [{item_id, status, actual_value, notes}]
+    if not check_id:
+        return {"error": "Paramètre 'check_id' requis."}
+    try:
+        check = db.ops_check_get(check_id)
+        if not check:
+            return {"error": "Checklist introuvable"}
+
+        # Enregistrer chaque résultat fourni
+        for r in results:
+            if r.get("item_id"):
+                db.ops_result_set(check_id, r["item_id"], {
+                    "status": r.get("status", "skipped"),
+                    "actual_value": r.get("actual_value", ""),
+                    "notes": r.get("notes", ""),
+                })
+
+        # Recharger et calculer le statut global
+        check = db.ops_check_get(check_id)
+        statuses = [it.get("result", {}).get("status") if it.get("result") else "skipped"
+                    for it in check["items"]]
+        n_failed = statuses.count("failed")
+        n_warning = statuses.count("warning")
+        n_ok = statuses.count("ok")
+
+        # Un échec sur un item critical = checklist failed
+        critical_failed = any(
+            it.get("severity") == "critical" and
+            (it.get("result", {}).get("status") if it.get("result") else "skipped") == "failed"
+            for it in check["items"]
+        )
+        if critical_failed or n_failed > 0:
+            global_status = "failed"
+        elif n_warning > 0:
+            global_status = "partial"
+        elif n_ok > 0:
+            global_status = "passed"
+        else:
+            global_status = "running"
+
+        summary = f"{n_ok} OK, {n_warning} avertissement(s), {n_failed} échec(s) sur {len(statuses)} points."
+        db.ops_check_update(check_id, {
+            "status": global_status,
+            "summary": summary,
+            "completed_at": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+        return {
+            "success": True,
+            "global_status": global_status,
+            "summary": summary,
+            "critical_failed": critical_failed,
+            "check": db.ops_check_get(check_id),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ops_evidence_add(args: dict) -> dict:
+    """
+    Associe une preuve à une checklist/item : texte, commande, chemin fichier, capture, log.
+    NB : enregistre la référence/contenu — n'exécute rien.
+    """
+    evidence_type = args.get("evidence_type", "text")
+    content = args.get("content", "")
+    if not content:
+        return {"error": "Paramètre 'content' requis."}
+    if evidence_type not in ("text", "command", "file_path", "screenshot", "log"):
+        return {"error": "evidence_type invalide (text|command|file_path|screenshot|log)"}
+    try:
+        ev = db.ops_evidence_create({
+            "check_id": args.get("check_id"),
+            "item_id": args.get("item_id"),
+            "result_id": args.get("result_id"),
+            "intervention_id": args.get("intervention_id"),
+            "evidence_type": evidence_type,
+            "content": content,
+        })
+        return {"success": True, "evidence": ev, "message": "Preuve ajoutée."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_ops_validation_report_generate(args: dict) -> dict:
+    """
+    Génère un rapport de validation (pre-check + post-check + preuves) en MD/PDF/DOCX.
+    Réutilise les générateurs de documents existants du projet.
+    """
+    intervention_id = args.get("intervention_id")
+    output_format = (args.get("format") or "pdf").lower()
+    if not intervention_id:
+        return {"error": "Paramètre 'intervention_id' requis."}
+    try:
+        interv = db.doc_intervention_get(intervention_id)
+        if not interv:
+            return {"error": "Intervention introuvable"}
+
+        prechecks = db.ops_check_list(intervention_id, "precheck")
+        postchecks = db.ops_check_list(intervention_id, "postcheck")
+        evidence = db.ops_evidence_list(intervention_id)
+
+        from datetime import datetime as _dt
+        date_str = _dt.now().strftime("%d/%m/%Y %H:%M")
+
+        def render_check_block(checks, label):
+            if not checks:
+                return f"### {label}\n\n_(aucune checklist)_\n"
+            out = f"### {label}\n"
+            for c in checks:
+                full = db.ops_check_get(c["id"])
+                status_emoji = {"passed":"✅","failed":"❌","partial":"⚠️","running":"🔄","pending":"⏳"}.get(full["status"], "•")
+                out += f"\n**{status_emoji} {full['title']}** — {full.get('summary','')}\n\n"
+                out += "| Point de contrôle | Sévérité | Résultat | Note |\n|---|---|---|---|\n"
+                for it in full["items"]:
+                    res = it.get("result") or {}
+                    rstatus = res.get("status", "skipped")
+                    remoji = {"ok":"✅","warning":"⚠️","failed":"❌","skipped":"⬜"}.get(rstatus, "")
+                    note = (res.get("notes","") or res.get("actual_value","") or "").replace("|","/")[:60]
+                    out += f"| {it['label']} | {it['severity']} | {remoji} {rstatus} | {note} |\n"
+                out += "\n"
+            return out
+
+        evidence_block = ""
+        if evidence:
+            evidence_block = "## Preuves collectées\n\n"
+            for e in evidence:
+                etype = {"text":"📝 Note","command":"⚡ Commande","file_path":"📂 Fichier",
+                         "screenshot":"📷 Capture","log":"📋 Log"}.get(e["evidence_type"], e["evidence_type"])
+                content_short = (e.get("content","") or "")[:200]
+                evidence_block += f"- **{etype}** : `{content_short}`\n"
+
+        content_md = f"""# Rapport de Validation — {interv['number']}
+
+**Intervention :** {interv['title']}
+**Date du rapport :** {date_str}
+**Technicien :** {interv.get('technician') or '_(non renseigné)_'}
+**Statut intervention :** {interv.get('status','')}
+
+---
+
+## Pré-checks (avant intervention)
+
+{render_check_block(prechecks, "Vérification des prérequis")}
+
+## Post-checks (après intervention)
+
+{render_check_block(postchecks, "Validation de l'état final")}
+
+{evidence_block}
+
+---
+
+## Conclusion
+
+{interv.get('resolution') or interv.get('summary') or '_(à compléter)_'}
+
+---
+*Rapport de validation généré par Marvin AI (module Operations Safety v2.30).*
+"""
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"validation_{interv['number']}.{output_format}"
+        )
+
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": f"Validation {interv['number']}", "content": content_md,
+            })
+        elif output_format == "md":
+            try:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text(content_md, encoding="utf-8")
+                result = {"success": True, "path": output_path, "size": Path(output_path).stat().st_size}
+            except Exception as e:
+                result = {"error": str(e)}
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": f"Validation {interv['number']}", "content": content_md,
+            })
+
+        if result.get("error"):
+            return result
+
+        # Save in doc_documents
+        try:
+            doc = db.doc_document_create({
+                "intervention_id": intervention_id, "client_id": interv.get("client_id"),
+                "doc_type": "report", "format": output_format,
+                "title": f"Rapport de validation {interv['number']}",
+                "file_path": output_path, "content_md": content_md,
+                "template_used": "ops_validation", "size_bytes": result.get("size") or 0,
+            })
+        except Exception:
+            doc = None
+
+        return {
+            "success": True,
+            "message": f"Rapport de validation généré : {output_path}",
+            "path": output_path,
+            "document": doc,
+            "precheck_count": len(prechecks),
+            "postcheck_count": len(postchecks),
+            "evidence_count": len(evidence),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 25 — v2.30.0 Operations Safety : Client Health Score
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_client_health_compute(args: dict) -> dict:
+    """
+    Calcule le score de santé opérationnelle d'un client (0-100 par axe).
+    Axes : backup, security, documentation, infrastructure, incident.
+    """
+    client_id = args.get("client_id")
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+    try:
+        client = db.billing_client_get(client_id)
+        if not client:
+            return {"error": "Client introuvable"}
+
+        # ── Collecte des données ──
+        interventions = db.doc_intervention_list(client_id, limit=500)
+        assets = db.doc_asset_list(client_id)
+        documents = db.doc_document_list(client_id=client_id)
+        cmd_reviews = []
+        for iv in interventions:
+            cmd_reviews.extend(db.cmd_review_list(iv["id"], limit=200))
+
+        from datetime import datetime as _dt, timedelta as _td
+        now = _dt.now()
+
+        def parse_dt(s):
+            try:
+                return _dt.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                return None
+
+        items = []
+        recommendations = []
+
+        # ── 1. DOCUMENTATION (0-100) ──
+        doc_score = 100.0
+        has_client_sheet = any(d["doc_type"] == "client_sheet" for d in documents)
+        if not has_client_sheet:
+            doc_score -= 35
+            items.append({"category":"documentation","label":"Fiche client","points":0,"max_points":35,"status":"failed","detail":"Aucune fiche client générée"})
+            recommendations.append({"priority":"high","category":"documentation","title":"Créer une fiche client","description":"Générez une fiche client complète (infrastructure, contacts, contrats)."})
+        else:
+            items.append({"category":"documentation","label":"Fiche client","points":35,"max_points":35,"status":"ok","detail":"Présente"})
+
+        recent_docs = [d for d in documents if (pd := parse_dt(d.get("created_at",""))) and (now - pd).days < 90]
+        if not recent_docs:
+            doc_score -= 25
+            items.append({"category":"documentation","label":"Documents récents (90j)","points":0,"max_points":25,"status":"warning","detail":"Aucun document récent"})
+            recommendations.append({"priority":"medium","category":"documentation","title":"Documenter les interventions récentes","description":"Générez des rapports pour les dernières interventions."})
+        else:
+            items.append({"category":"documentation","label":"Documents récents (90j)","points":25,"max_points":25,"status":"ok","detail":f"{len(recent_docs)} document(s)"})
+
+        # Interventions sans post-check
+        interv_without_postcheck = 0
+        for iv in interventions:
+            if iv["status"] in ("resolved", "closed"):
+                postchecks = db.ops_check_list(iv["id"], "postcheck")
+                if not postchecks:
+                    interv_without_postcheck += 1
+        if interv_without_postcheck > 0:
+            penalty = min(40, interv_without_postcheck * 10)
+            doc_score -= penalty
+            items.append({"category":"documentation","label":"Post-checks","points":40-penalty,"max_points":40,"status":"warning","detail":f"{interv_without_postcheck} intervention(s) sans post-check"})
+            recommendations.append({"priority":"medium","category":"validation","title":"Réaliser des post-checks","description":f"{interv_without_postcheck} intervention(s) résolue(s) sans validation post-intervention."})
+        else:
+            items.append({"category":"documentation","label":"Post-checks","points":40,"max_points":40,"status":"ok","detail":"Toutes validées"})
+        doc_score = max(0, doc_score)
+
+        # ── 2. INFRASTRUCTURE (0-100) ──
+        infra_score = 100.0
+        if not assets:
+            infra_score -= 50
+            items.append({"category":"infrastructure","label":"Inventaire CMDB","points":0,"max_points":50,"status":"warning","detail":"Aucun asset enregistré"})
+            recommendations.append({"priority":"medium","category":"infrastructure","title":"Inventorier les assets","description":"Ajoutez les postes/serveurs/équipements dans la CMDB."})
+        else:
+            items.append({"category":"infrastructure","label":"Inventaire CMDB","points":50,"max_points":50,"status":"ok","detail":f"{len(assets)} asset(s)"})
+            critical_assets = [a for a in assets if a.get("criticality") in ("high","critical")]
+            undocumented_critical = [a for a in critical_assets if not a.get("specs") and not a.get("os")]
+            if undocumented_critical:
+                penalty = min(50, len(undocumented_critical) * 15)
+                infra_score -= penalty
+                items.append({"category":"infrastructure","label":"Assets critiques documentés","points":50-penalty,"max_points":50,"status":"warning","detail":f"{len(undocumented_critical)} asset(s) critique(s) peu documenté(s)"})
+                recommendations.append({"priority":"high","category":"infrastructure","title":"Documenter les assets critiques","description":f"{len(undocumented_critical)} asset(s) critique(s) sans specs/OS renseignés."})
+            else:
+                items.append({"category":"infrastructure","label":"Assets critiques documentés","points":50,"max_points":50,"status":"ok","detail":"OK"})
+        infra_score = max(0, infra_score)
+
+        # ── 3. INCIDENT (0-100) ──
+        incident_score = 100.0
+        open_critical = [iv for iv in interventions
+                         if iv.get("priority") == "critical" and iv["status"] in ("open","in_progress")]
+        if open_critical:
+            penalty = min(60, len(open_critical) * 30)
+            incident_score -= penalty
+            items.append({"category":"incident","label":"Incidents critiques ouverts","points":60-penalty,"max_points":60,"status":"failed","detail":f"{len(open_critical)} ouvert(s)"})
+            recommendations.append({"priority":"critical","category":"incident","title":"Traiter les incidents critiques","description":f"{len(open_critical)} incident(s) critique(s) non résolu(s)."})
+        else:
+            items.append({"category":"incident","label":"Incidents critiques ouverts","points":60,"max_points":60,"status":"ok","detail":"Aucun"})
+
+        # Incidents récurrents (même type)
+        from collections import Counter as _C
+        type_counts = _C(iv.get("itil_category","") for iv in interventions if iv.get("itil_category"))
+        recurring = [(k,v) for k,v in type_counts.items() if v >= 3]
+        if recurring:
+            incident_score -= 40
+            items.append({"category":"incident","label":"Incidents récurrents","points":0,"max_points":40,"status":"warning","detail":f"{len(recurring)} catégorie(s) récurrente(s)"})
+            recommendations.append({"priority":"high","category":"incident","title":"Traiter les causes récurrentes","description":f"Catégories répétées : {', '.join(k for k,v in recurring)}. Action de fond recommandée."})
+        else:
+            items.append({"category":"incident","label":"Incidents récurrents","points":40,"max_points":40,"status":"ok","detail":"Pas de récurrence forte"})
+        incident_score = max(0, incident_score)
+
+        # ── 4. SECURITY (0-100) ──
+        security_score = 100.0
+        # Commandes high/critical/blocked dans l'historique
+        risky_cmds = [r for r in cmd_reviews if r.get("risk_level") in ("high","critical","blocked")]
+        if risky_cmds:
+            penalty = min(50, len(risky_cmds) * 10)
+            security_score -= penalty
+            blocked = [r for r in risky_cmds if r.get("risk_level") == "blocked"]
+            items.append({"category":"security","label":"Commandes à risque","points":50-penalty,"max_points":50,"status":"failed" if blocked else "warning","detail":f"{len(risky_cmds)} commande(s) risquée(s), {len(blocked)} bloquée(s)"})
+            if blocked:
+                recommendations.append({"priority":"critical","category":"security","title":"Commandes destructives détectées","description":f"{len(blocked)} commande(s) bloquée(s) dans l'historique. Revue de sécurité requise."})
+        else:
+            items.append({"category":"security","label":"Commandes à risque","points":50,"max_points":50,"status":"ok","detail":"Aucune"})
+
+        # Approbations en attente
+        try:
+            pending_approvals = db.approval_list("pending")
+        except Exception:
+            pending_approvals = []
+        if pending_approvals:
+            security_score -= 20
+            items.append({"category":"security","label":"Approbations en attente","points":0,"max_points":20,"status":"warning","detail":f"{len(pending_approvals)} en attente"})
+        else:
+            items.append({"category":"security","label":"Approbations","points":20,"max_points":20,"status":"ok","detail":"Aucune en attente"})
+
+        # RGPD
+        rgpd_interv = [iv for iv in interventions if iv.get("rgpd_relevant")]
+        if rgpd_interv:
+            items.append({"category":"security","label":"Interventions RGPD","points":30,"max_points":30,"status":"warning","detail":f"{len(rgpd_interv)} intervention(s) sensible(s) RGPD"})
+        else:
+            items.append({"category":"security","label":"RGPD","points":30,"max_points":30,"status":"ok","detail":"RAS"})
+        security_score = max(0, security_score)
+
+        # ── 5. BACKUP (0-100) ──
+        backup_score = 100.0
+        has_recovery_plan = any(d["doc_type"] == "recovery_plan" for d in documents)
+        if not has_recovery_plan:
+            backup_score -= 50
+            items.append({"category":"backup","label":"Plan de reprise (PRA)","points":0,"max_points":50,"status":"failed","detail":"Aucun PRA/PCA"})
+            recommendations.append({"priority":"high","category":"backup","title":"Établir un plan de reprise (PRA)","description":"Aucun PRA/PCA documenté. Risque majeur en cas de sinistre."})
+        else:
+            items.append({"category":"backup","label":"Plan de reprise (PRA)","points":50,"max_points":50,"status":"ok","detail":"Présent"})
+
+        has_maintenance = any(d["doc_type"] == "maintenance" for d in documents)
+        if not has_maintenance:
+            backup_score -= 50
+            items.append({"category":"backup","label":"Plan de maintenance","points":0,"max_points":50,"status":"warning","detail":"Aucun plan de maintenance"})
+            recommendations.append({"priority":"medium","category":"backup","title":"Mettre en place une maintenance préventive","description":"Aucun plan de maintenance documenté."})
+        else:
+            items.append({"category":"backup","label":"Plan de maintenance","points":50,"max_points":50,"status":"ok","detail":"Présent"})
+        backup_score = max(0, backup_score)
+
+        # ── GLOBAL ──
+        global_score = round(
+            (backup_score + security_score + doc_score + infra_score + incident_score) / 5, 1
+        )
+        if global_score >= 80:
+            risk_level = "low"
+        elif global_score >= 60:
+            risk_level = "medium"
+        elif global_score >= 40:
+            risk_level = "high"
+        else:
+            risk_level = "critical"
+
+        # Persist
+        score_data = {
+            "client_id": client_id,
+            "backup_score": round(backup_score, 1),
+            "security_score": round(security_score, 1),
+            "documentation_score": round(doc_score, 1),
+            "infrastructure_score": round(infra_score, 1),
+            "incident_score": round(incident_score, 1),
+            "global_score": global_score,
+            "risk_level": risk_level,
+        }
+        saved = db.health_score_create(score_data, items, recommendations)
+
+        return {
+            "success": True,
+            "client": client.get("name"),
+            "scores": {
+                "backup": round(backup_score, 1),
+                "security": round(security_score, 1),
+                "documentation": round(doc_score, 1),
+                "infrastructure": round(infra_score, 1),
+                "incident": round(incident_score, 1),
+                "global": global_score,
+            },
+            "risk_level": risk_level,
+            "items": items,
+            "recommendations": recommendations,
+            "score_id": saved["id"],
+            "data_analyzed": {
+                "interventions": len(interventions),
+                "assets": len(assets),
+                "documents": len(documents),
+                "command_reviews": len(cmd_reviews),
+            },
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "detail": traceback.format_exc()[-400:]}
+
+
+async def execute_client_health_get(args: dict) -> dict:
+    """Récupère le dernier score de santé calculé pour un client."""
+    client_id = args.get("client_id")
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+    try:
+        score = db.health_score_latest(client_id)
+        if not score:
+            return {"success": True, "score": None, "message": "Aucun score calculé. Lancez client_health_compute."}
+        return {"success": True, "score": score}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_client_health_history(args: dict) -> dict:
+    """Historique des scores de santé d'un client (évolution dans le temps)."""
+    client_id = args.get("client_id")
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+    try:
+        history = db.health_score_history(client_id, int(args.get("limit", 12)))
+        return {"success": True, "count": len(history), "history": history}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_client_recommendations_generate(args: dict) -> dict:
+    """Génère/liste les recommandations issues du dernier score de santé."""
+    client_id = args.get("client_id")
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+    try:
+        # Recompute to get fresh recommendations if asked
+        if args.get("recompute"):
+            comp = await execute_client_health_compute({"client_id": client_id})
+            if comp.get("error"):
+                return comp
+        recos = db.health_recommendations_list(client_id, args.get("status", "open"))
+        # Sort by priority
+        prio_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        recos.sort(key=lambda r: prio_order.get(r.get("priority", "medium"), 2))
+        return {"success": True, "count": len(recos), "recommendations": recos}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_client_monthly_summary_generate(args: dict) -> dict:
+    """
+    Génère un compte-rendu mensuel pour un client (interventions, score santé, recommandations)
+    en MD/PDF/DOCX.
+    """
+    client_id = args.get("client_id")
+    output_format = (args.get("format") or "pdf").lower()
+    if not client_id:
+        return {"error": "Paramètre 'client_id' requis."}
+    try:
+        client = db.billing_client_get(client_id)
+        if not client:
+            return {"error": "Client introuvable"}
+
+        from datetime import datetime as _dt, timedelta as _td
+        now = _dt.now()
+        month_ago = now - _td(days=30)
+
+        def parse_dt(s):
+            try: return _dt.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
+            except Exception: return None
+
+        all_interv = db.doc_intervention_list(client_id, limit=500)
+        month_interv = [iv for iv in all_interv if (pd := parse_dt(iv.get("created_at",""))) and pd >= month_ago]
+
+        # Compute fresh health score
+        comp = await execute_client_health_compute({"client_id": client_id})
+        scores = comp.get("scores", {}) if comp.get("success") else {}
+        risk_level = comp.get("risk_level", "?")
+        recos = comp.get("recommendations", [])
+
+        # Build markdown
+        interv_table = ""
+        for iv in month_interv[:30]:
+            interv_table += f"| {iv.get('created_at','')[:10]} | {iv['number']} | {iv['title'][:40]} | {iv.get('intervention_type','')} | {iv.get('status','')} |\n"
+        if not interv_table:
+            interv_table = "| — | — | Aucune intervention ce mois-ci | — | — |\n"
+
+        reco_block = ""
+        for r in sorted(recos, key=lambda x: {"critical":0,"high":1,"medium":2,"low":3}.get(x.get("priority"),2))[:10]:
+            pe = {"critical":"🔴","high":"🟠","medium":"🟡","low":"🟢"}.get(r.get("priority"),"•")
+            reco_block += f"- {pe} **{r.get('title','')}** — {r.get('description','')}\n"
+        if not reco_block:
+            reco_block = "_(aucune recommandation — situation saine)_\n"
+
+        risk_emoji = {"low":"🟢","medium":"🟡","high":"🟠","critical":"🔴"}.get(risk_level,"")
+
+        content_md = f"""# Compte-rendu mensuel — {client['name']}
+
+**Période :** {month_ago.strftime('%d/%m/%Y')} → {now.strftime('%d/%m/%Y')}
+**Généré le :** {now.strftime('%d/%m/%Y %H:%M')}
+
+---
+
+## 📊 Score de santé opérationnelle
+
+**Score global : {scores.get('global','?')}/100** {risk_emoji} (risque : {risk_level})
+
+| Axe | Score |
+|-----|-------|
+| 🔐 Sécurité | {scores.get('security','?')}/100 |
+| 💾 Sauvegarde / PRA | {scores.get('backup','?')}/100 |
+| 📄 Documentation | {scores.get('documentation','?')}/100 |
+| 🖥️ Infrastructure | {scores.get('infrastructure','?')}/100 |
+| 🚨 Incidents | {scores.get('incident','?')}/100 |
+
+## 📋 Interventions du mois ({len(month_interv)})
+
+| Date | N° | Titre | Type | Statut |
+|------|----|----|------|--------|
+{interv_table}
+
+## 🎯 Recommandations
+
+{reco_block}
+
+---
+*Compte-rendu généré automatiquement par Marvin AI (Operations Safety v2.30).*
+"""
+
+        output_path = args.get("output_path") or str(
+            Path(os.path.expanduser("~")) / "Desktop" /
+            f"CR_mensuel_{client['name'].replace(' ','_')}_{now.strftime('%Y%m')}.{output_format}"
+        )
+
+        if output_format == "docx":
+            result = await execute_file_create_docx({
+                "path": output_path, "title": f"CR mensuel — {client['name']}", "content": content_md,
+            })
+        elif output_format == "md":
+            try:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_text(content_md, encoding="utf-8")
+                result = {"success": True, "path": output_path, "size": Path(output_path).stat().st_size}
+            except Exception as e:
+                result = {"error": str(e)}
+        else:
+            result = await execute_file_create_pdf({
+                "path": output_path, "title": f"CR mensuel — {client['name']}", "content": content_md,
+            })
+        if result.get("error"):
+            return result
+
+        try:
+            doc = db.doc_document_create({
+                "client_id": client_id, "doc_type": "report", "format": output_format,
+                "title": f"CR mensuel {client['name']} {now.strftime('%Y-%m')}",
+                "file_path": output_path, "content_md": content_md,
+                "template_used": "monthly_summary", "size_bytes": result.get("size") or 0,
+            })
+        except Exception:
+            doc = None
+
+        return {
+            "success": True,
+            "message": f"Compte-rendu mensuel généré : {output_path}",
+            "path": output_path,
+            "document": doc,
+            "interventions_this_month": len(month_interv),
+            "global_score": scores.get("global"),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 30 — Auto-diagnostic de Marvin
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_system_self_test(args: dict) -> dict:
+    """
+    🩺 Auto-diagnostic : Marvin teste un échantillon de ses propres outils (sûrs,
+    lecture seule) et rapporte leur état + latence. include_web=true ajoute les
+    outils réseau. Permet de vérifier en un appel que tout fonctionne.
+    """
+    category = (args.get("category") or "").lower().strip()
+    include_web = bool(args.get("include_web", False))
+    SAFE = [
+        ("calcul", "calculator", {"expression": "2+2"}),
+        ("date", "datetime_info", {}),
+        ("conversion", "unit_convert", {"value": 1, "from_unit": "km", "to_unit": "m"}),
+        ("crypto", "hash_compute", {"text": "x", "algorithm": "md5"}),
+        ("texte", "json_tool", {"data": "{}", "operation": "format"}),
+        ("système", "pc_system_info", {}),
+        ("disque", "win_disk_info", {}),
+        ("système", "win_uptime", {}),
+        ("devis", "billing_catalog_list", {}),
+        ("base IT", "it_kb_list", {}),
+        ("base IT", "it_kb_recommend", {"need": "antivirus pme"}),
+        ("mémoire", "memory_list", {}),
+        ("notes", "note_list", {}),
+        ("tâches", "task_list", {}),
+        ("chemins", "pc_get_real_paths", {}),
+        ("documentation", "doc_intervention_list", {}),
+        # v2.106 — élargissement (couverture ~18→46 outils) pour un vrai audit,
+        # à charge d'exclure explicitement tout ce qui a un effet de bord (écriture,
+        # e-mail, réseau destructif, tweak système…).
+        ("réseau", "ip_info", {}),
+        ("réseau", "net_ping", {"host": "127.0.0.1", "count": 1}),
+        ("système", "pc_process_list", {}),
+        ("système", "pc_window_list", {}),
+        ("système", "pc_installed_software", {}),
+        ("système", "win_services_list", {}),
+        ("système", "win_startup_programs", {}),
+        ("système", "win_users_list", {}),
+        ("système", "pc_gpu_status", {}),
+        ("système", "pc_hardware_specs", {}),
+        ("système", "win_update_status", {}),
+        ("outils", "password_generate", {}),
+        ("outils", "base64_tool", {"data": "test", "action": "encode"}),
+        ("outils", "color_tool", {"color": "#ffffff"}),
+        ("outils", "regex_tool", {"pattern": "a+", "text": "aaa", "action": "findall"}),
+        ("outils", "text_stats", {"text": "Bonjour le monde."}),
+        ("outils", "diff_text", {"text_a": "a", "text_b": "b"}),
+        ("outils", "pc_clipboard_get", {}),
+        ("agenda", "calendar_list", {}),
+        ("email", "email_accounts", {}),
+        ("mémoire", "memory_search", {"query": "test"}),
+        ("recherche", "search_semantic", {"query": "test"}),
+        ("devis", "billing_client_list", {}),
+        ("devis", "billing_quote_list", {}),
+        ("devis", "billing_invoice_list", {}),
+        ("documentation", "doc_template_list", {}),
+        ("ssh", "ssh_list", {}),
+    ]
+    if include_web:
+        SAFE += [
+            ("web", "web_search", {"query": "test", "max_results": 2}),
+            ("météo", "weather", {"city": "Paris"}),
+        ]
+    results = []
+    for cat, name, a in SAFE:
+        if category and category not in cat.lower() and category not in name:
+            continue
+        fn = TOOLS_REGISTRY.get(name)
+        if not fn:
+            results.append({"tool": name, "category": cat, "status": "absent"})
+            continue
+        t0 = time.time()
+        try:
+            r = await fn(a)
+            ok = not (isinstance(r, dict) and r.get("error"))
+            results.append({"tool": name, "category": cat,
+                            "status": "ok" if ok else "erreur",
+                            "detail": "" if ok else str(r.get("error"))[:90],
+                            "ms": int((time.time() - t0) * 1000)})
+        except Exception as e:
+            results.append({"tool": name, "category": cat, "status": "crash",
+                            "detail": str(e)[:90], "ms": int((time.time() - t0) * 1000)})
+    ok = sum(1 for r in results if r["status"] == "ok")
+    failed = [r for r in results if r["status"] != "ok"]
+    return {
+        "success": True,
+        "registry_total": len(TOOLS_REGISTRY),
+        "tested": len(results), "ok": ok, "failed": len(failed),
+        "failures": failed,
+        "results": results,
+        "summary": (f"✅ {ok}/{len(results)} outils testés OK (sur {len(TOOLS_REGISTRY)} au total)."
+                    if not failed else
+                    f"⚠️ {ok}/{len(results)} OK — {len(failed)} à vérifier : "
+                    + ", ".join(f['tool'] for f in failed)),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REGISTRE DES OUTILS
+# ══════════════════════════════════════════════════════════════════════════════
+
+TOOLS_REGISTRY: dict[str, Any] = {
+    "system_self_test": execute_system_self_test,
+    "file_list": execute_file_list,
+    "file_info": execute_file_info,
+    "file_read": execute_file_read,
+    "file_write": execute_file_write,
+    "file_delete": execute_file_delete,
+    "file_rename": execute_file_rename,
+    "file_move": execute_file_move,
+    "file_copy": execute_file_copy,
+    "file_create_folder": execute_file_create_folder,
+    "file_create_docx": execute_file_create_docx,
+    "file_convert_docx_to_pdf": execute_file_convert_docx_to_pdf,
+    "file_search_text": execute_file_search_text,
+    "file_find":        execute_file_find,
+    "system_search":    execute_system_search,
+    "system_search_content": execute_system_search_content,
+    "pc_open_file": execute_pc_open_file,
+    "pc_reveal": execute_pc_reveal,
+    "pc_browse": execute_pc_browse,
+    "pc_app_launch": execute_pc_app_launch,
+    "pc_run_command":     execute_pc_run_command,
+    "pc_run_powershell":  execute_pc_run_powershell,
+    "pc_run_elevated":    execute_pc_run_elevated,
+    "winget_search":          execute_winget_search,
+    "winget_list_upgrades":   execute_winget_list_upgrades,
+    "winget_list_installed":  execute_winget_list_installed,
+    "winget_install":         execute_winget_install,
+    "winget_upgrade":         execute_winget_upgrade,
+    "winget_uninstall":       execute_winget_uninstall,
+    "system_restore_point":   execute_system_restore_point,
+    "registry_get":           execute_registry_get,
+    "registry_backup":        execute_registry_backup,
+    "registry_set":           execute_registry_set,
+    "tweak_telemetry":        execute_tweak_telemetry,
+    "tweak_debloat_list":     execute_tweak_debloat_list,
+    "tweak_debloat_remove":   execute_tweak_debloat_remove,
+    "tweak_network_harden":   execute_tweak_network_harden,
+    "catharsis_scan":         execute_catharsis_scan,
+    "catharsis_clean":        execute_catharsis_clean,
+    "os_power_plan":          execute_os_power_plan,
+    "os_dark_mode":           execute_os_dark_mode,
+    "os_firewall":            execute_os_firewall,
+    "os_network_adapters":    execute_os_network_adapters,
+    "os_hibernation":         execute_os_hibernation,
+    "pc_system_info": execute_pc_system_info,
+    "pc_screenshot": execute_pc_screenshot,
+    "pc_window_list": execute_pc_window_list,
+    "pc_window_focus": execute_pc_window_focus,
+    "pc_notify": execute_pc_notify,
+    "pc_pull_ollama_model": execute_pc_pull_ollama_model,
+    "pc_clipboard_get": execute_pc_clipboard_get,
+    "pc_clipboard_set": execute_pc_clipboard_set,
+    "pc_process_list": execute_pc_process_list,
+    "pc_process_kill": execute_pc_process_kill,
+    "task_create": execute_task_create,
+    "task_list": execute_task_list,
+    "task_update": execute_task_update,
+    "task_delete": execute_task_delete,
+    "note_create": execute_note_create,
+    "note_list": execute_note_list,
+    "note_update": execute_note_update,
+    "note_delete": execute_note_delete,
+    "memory_save": execute_memory_save,
+    "memory_list": execute_memory_list,
+    "memory_delete": execute_memory_delete,
+    "memory_search": execute_memory_search,
+    "search_semantic": execute_search_semantic,
+    # PC — découverte
+    "pc_get_real_paths": execute_pc_get_real_paths,
+    # Web
+    "web_search": execute_web_search,
+    "web_browse": execute_web_browse,
+    # Documents avancés
+    "infographic_create": execute_infographic_create,
+    "file_create_xlsx": execute_file_create_xlsx,
+    "file_create_pdf": execute_file_create_pdf,
+    # Google Calendar
+    "calendar_list":   execute_calendar_list,
+    "calendar_create": execute_calendar_create,
+    "calendar_update": execute_calendar_update,
+    "calendar_delete": execute_calendar_delete,
+    # Google Drive
+    "google_drive_list": execute_google_drive_list,
+    "google_drive_read": execute_google_drive_read,
+    "google_drive_upload": execute_google_drive_upload,
+    # OneDrive
+    "onedrive_list": execute_onedrive_list,
+    "onedrive_read": execute_onedrive_read,
+    "onedrive_upload": execute_onedrive_upload,
+    # Réseau
+    "net_ping": execute_net_ping,
+    "net_port_scan": execute_net_port_scan,
+    "net_dns_lookup": execute_net_dns_lookup,
+    "net_traceroute": execute_net_traceroute,
+    "net_scan_local": execute_net_scan_local,
+    "net_whois": execute_net_whois,
+    "net_nmap_scan":         execute_net_nmap_scan,
+    "net_service_detect":    execute_net_service_detect,
+    "net_http_probe":        execute_net_http_probe,
+    "net_tls_check":         execute_net_tls_check,
+    "net_subnet_sweep":      execute_net_subnet_sweep,
+    "net_route_diagnostics": execute_net_route_diagnostics,
+    "pc_hardware_specs":     execute_pc_hardware_specs,
+    "pc_gpu_status":         execute_pc_gpu_status,
+    "pc_hardware_temps":     execute_pc_hardware_temps,
+    "pc_disk_smart_health":  execute_pc_disk_smart_health,
+    "pc_event_log_errors":   execute_pc_event_log_errors,
+    "win_firewall_status":   execute_win_firewall_status,
+    "pc_driver_check":       execute_pc_driver_check,
+    "pc_health_trend":       execute_pc_health_trend,
+    "pc_tool_reliability":   execute_pc_tool_reliability,
+    "pc_conversation_trace": execute_pc_conversation_trace,
+    "net_inventory_scan":    execute_net_inventory_scan,
+    "net_inventory_list":    execute_net_inventory_list,
+    "net_inventory_annotate": execute_net_inventory_annotate,
+    "itsm_ticket_list":      execute_itsm_ticket_list,
+    "itsm_ticket_create":    execute_itsm_ticket_create,
+    "itsm_asset_list":       execute_itsm_asset_list,
+    "skill_learning_log":    execute_skill_learning_log,
+    "win_quick_launch_list": execute_win_quick_launch_list,
+    "win_quick_launch":      execute_win_quick_launch,
+    # OCR
+    "ocr_extract": execute_ocr_extract,
+    # Archives
+    "file_compress": execute_file_compress,
+    "file_extract": execute_file_extract,
+    # Email
+    "email_accounts": execute_email_accounts,
+    "email_list": execute_email_list,
+    "email_read": execute_email_read,
+    "email_search": execute_email_search,
+    "email_send": execute_email_send,
+    "email_draft_reply": execute_email_draft_reply,
+    "email_summarize": execute_email_summarize,
+    "email_digest": execute_email_digest,
+    "email_automation_run": execute_email_automation_run,
+    "email_to_task": execute_email_to_task,
+    "email_attachment_summary": execute_email_attachment_summary,
+    "email_watch_check": execute_email_watch_check,
+    "email_apply_rules": execute_email_apply_rules,
+    "daily_briefing": execute_daily_briefing,
+    # Agenda local
+    "event_create": execute_event_create,
+    "event_list": execute_event_list,
+    "event_update": execute_event_update,
+    "event_delete": execute_event_delete,
+    # Agendas connectés (abonnements iCal)
+    "calendar_subscribe": execute_calendar_subscribe,
+    "calendar_subscriptions": execute_calendar_subscriptions,
+    "calendar_unsubscribe": execute_calendar_unsubscribe,
+    "calendar_sync": execute_calendar_sync,
+    # Génération de documentation (notes → Word complet)
+    "document_generate": execute_document_generate,
+    # Documents (RAG : parle à tes documents)
+    "document_index": execute_document_index,
+    "document_ask": execute_document_ask,
+    "document_list": execute_document_list,
+    "document_forget": execute_document_forget,
+    "document_refine_section": execute_document_refine_section,
+    "unified_search": execute_unified_search,
+    # Notifications externes
+    "telegram_send": execute_telegram_send,
+    # Web par vrai navigateur (anti-blocage)
+    "web_browser_open": execute_web_browser_open,
+    "web_research": execute_web_research,
+    # SSH
+    "ssh_list": execute_ssh_list,
+    "ssh_exec": execute_ssh_exec,
+    "ssh_exec_multi": execute_ssh_exec_multi,
+    "ssh_upload": execute_ssh_upload,
+    "ssh_download": execute_ssh_download,
+    "ssh_list_dir": execute_ssh_list_dir,
+    "ssh_server_info": execute_ssh_server_info,
+    # Voice
+    "voice_transcribe": execute_voice_transcribe,
+    # Utilitaires
+    "calculator":        execute_calculator,
+    "datetime_info":     execute_datetime_info,
+    "weather":           execute_weather,
+    "translate":         execute_translate,
+    "unit_convert":      execute_unit_convert,
+    "password_generate": execute_password_generate,
+    # Section 15 — traitement de données
+    "text_stats":        execute_text_stats,
+    "ip_info":           execute_ip_info,
+    "markdown_convert":  execute_markdown_convert,
+    "regex_tool":        execute_regex_tool,
+    "csv_analyze":       execute_csv_analyze,
+    "hash_compute":      execute_hash_compute,
+    "base64_tool":       execute_base64_tool,
+    "text_extract":      execute_text_extract,
+    "diff_text":         execute_diff_text,
+    "image_info":        execute_image_info,
+    "image_resize":      execute_image_resize,
+    "qr_generate":       execute_qr_generate,
+    "json_tool":         execute_json_tool,
+    # Section 16 — Documents, Archives & Couleurs
+    "pdf_read":          execute_pdf_read,
+    "pdf_info":          execute_pdf_info,
+    "pdf_merge":         execute_pdf_merge,
+    "pdf_split":         execute_pdf_split,
+    "pdf_rotate":        execute_pdf_rotate,
+    "pdf_watermark":     execute_pdf_watermark,
+    "pdf_protect":       execute_pdf_protect,
+    "pdf_extract_images": execute_pdf_extract_images,
+    "pdf_to_images":     execute_pdf_to_images,
+    "pdf_ocr":           execute_pdf_ocr,
+    "pdf_form_fields":   execute_pdf_form_fields,
+    "pdf_fill_form":     execute_pdf_fill_form,
+    "images_to_pdf":     execute_images_to_pdf,
+    "image_crop":        execute_image_crop,
+    "image_rotate":      execute_image_rotate,
+    "image_compress":    execute_image_compress,
+    "image_batch":       execute_image_batch,
+    "file_large_finder": execute_file_large_finder,
+    "system_cleanup":    execute_system_cleanup,
+    # Bureautique & IA documentaire (v2.36)
+    "pptx_create":       execute_pptx_create,
+    "pptx_read":         execute_pptx_read,
+    "csv_to_xlsx":       execute_csv_to_xlsx,
+    "xlsx_to_csv":       execute_xlsx_to_csv,
+    "docx_to_text":      execute_docx_to_text,
+    "text_summarize":    execute_text_summarize,
+    # v2.37 — Synthèse vocale, PDF compress/numérotation, data→chart
+    "text_to_speech":      execute_text_to_speech,
+    "pdf_compress":        execute_pdf_compress,
+    "pdf_add_page_numbers": execute_pdf_add_page_numbers,
+    "csv_to_chart":        execute_csv_to_chart,
+    "xlsx_read":         execute_xlsx_read,
+    "url_analyze":       execute_url_analyze,
+    "zip_list":          execute_zip_list,
+    "color_tool":        execute_color_tool,
+    # Section 17 — SQLite, Git & Fichiers avancés
+    "sqlite_query":      execute_sqlite_query,
+    "sqlite_tables":     execute_sqlite_tables,
+    "git_info":          execute_git_info,
+    "bulk_rename":       execute_bulk_rename,
+    # Section 18 — Outils composés & productivité
+    "screen_ocr":        execute_screen_ocr,
+    "file_batch_read":   execute_file_batch_read,
+    "clipboard_append":  execute_clipboard_append,
+    "text_join":         execute_text_join,
+    # Section 19 — Exécution de code
+    "code_python":       execute_code_python,
+    # Section 20 — Devis / Facturation IT
+    "billing_client_create":  execute_billing_client_create,
+    "billing_client_list":    execute_billing_client_list,
+    "billing_catalog_list":   execute_billing_catalog_list,
+    "billing_analyze_need":   execute_billing_analyze_need,
+    "billing_quote_create":   execute_billing_quote_create,
+    "billing_quote_list":     execute_billing_quote_list,
+    "billing_quote_compare":  execute_billing_quote_compare,
+    "billing_quote_pdf":      execute_billing_quote_pdf,
+    "billing_quote_email":    execute_billing_quote_email,
+    "billing_tier_breakdown": execute_billing_tier_breakdown,
+    # Section 28 — Devis IT avancé (comparaison web, pricing, propositions, factures)
+    "billing_market_research":     execute_billing_market_research,
+    "billing_find_products":       execute_billing_find_products,
+    "billing_product_reviews":     execute_billing_product_reviews,
+    "billing_price_recommendation":execute_billing_price_recommendation,
+    "billing_generate_proposal":   execute_billing_generate_proposal,
+    "billing_tco_analysis":        execute_billing_tco_analysis,
+    "billing_invoice_create":      execute_billing_invoice_create,
+    "billing_invoice_list":        execute_billing_invoice_list,
+    "billing_invoice_mark_paid":   execute_billing_invoice_mark_paid,
+    "billing_revenue_dashboard":   execute_billing_revenue_dashboard,
+    "billing_catalog_enrich":      execute_billing_catalog_enrich,
+    "billing_seed_trade":          execute_billing_seed_trade,
+    # Section 29 — Base de connaissances IT
+    "it_kb_search":                execute_it_kb_search,
+    "it_kb_list":                  execute_it_kb_list,
+    "it_kb_recommend":             execute_it_kb_recommend,
+    "it_kb_add":                   execute_it_kb_add,
+    # Section 21 — Windows Admin
+    "pc_installed_software":   execute_pc_installed_software,
+    "win_services_list":      execute_win_services_list,
+    "win_service_action":     execute_win_service_action,
+    "win_event_log":          execute_win_event_log,
+    "win_users_list":         execute_win_users_list,
+    "win_disk_info":          execute_win_disk_info,
+    "win_update_status":      execute_win_update_status,
+    # Section 26 — v2.31 Windows Diagnostics avancés
+    "win_uptime":             execute_win_uptime,
+    "win_startup_programs":   execute_win_startup_programs,
+    "win_scheduled_tasks":    execute_win_scheduled_tasks,
+    "win_network_config":     execute_win_network_config,
+    "win_system_report":      execute_win_system_report,
+    "file_duplicate_finder":  execute_file_duplicate_finder,
+    # Section 27 — v2.32 Édition vidéo / GIF
+    "video_info":             execute_video_info,
+    "video_to_gif":           execute_video_to_gif,
+    "gif_to_video":           execute_gif_to_video,
+    "video_trim":             execute_video_trim,
+    "video_compress":         execute_video_compress,
+    "video_resize":           execute_video_resize,
+    "video_extract_frames":   execute_video_extract_frames,
+    "video_speed":            execute_video_speed,
+    "video_watermark":        execute_video_watermark,
+    "gif_optimize":           execute_gif_optimize,
+    "screen_record_gif":      execute_screen_record_gif,
+    # Audio (ffmpeg embarqué)
+    "audio_info":             execute_audio_info,
+    "audio_extract":          execute_audio_extract,
+    "audio_convert":          execute_audio_convert,
+    "audio_trim":             execute_audio_trim,
+    "audio_merge":            execute_audio_merge,
+    "audio_volume":           execute_audio_volume,
+    # Section 22 — Agent IA Documentation Technique
+    "doc_intervention_create":   execute_doc_intervention_create,
+    "doc_intervention_list":     execute_doc_intervention_list,
+    "doc_intervention_update":   execute_doc_intervention_update,
+    "doc_analyze_input":         execute_doc_analyze_input,
+    "doc_generate_report":       execute_doc_generate_report,
+    "doc_generate_procedure":    execute_doc_generate_procedure,
+    "doc_generate_client_sheet": execute_doc_generate_client_sheet,
+    "doc_generate_recovery_plan": execute_doc_generate_recovery_plan,
+    "doc_generate_maintenance":  execute_doc_generate_maintenance,
+    "doc_generate_runbook":      execute_doc_generate_runbook,
+    "doc_generate_schema":       execute_doc_generate_schema,
+    "doc_generate_postmortem":   execute_doc_generate_postmortem,
+    "doc_generate_change":       execute_doc_generate_change,
+    "doc_generate_onboarding":   execute_doc_generate_onboarding,
+    "doc_template_list":         execute_doc_template_list,
+    "doc_asset_create":          execute_doc_asset_create,
+    "doc_asset_list":            execute_doc_asset_list,
+    "doc_knowledge_search":      execute_doc_knowledge_search,
+    # Section 23 — v2.30 Command Safety / Guardrails
+    "cmd_extract_from_text":         execute_cmd_extract_from_text,
+    "cmd_analyze_risk":              execute_cmd_analyze_risk,
+    "cmd_suggest_safer_alternative": execute_cmd_suggest_safer_alternative,
+    "cmd_require_approval":          execute_cmd_require_approval,
+    "cmd_review_history":            execute_cmd_review_history,
+    # Section 24 — v2.30 Pre-Check / Post-Check
+    "ops_checklist_generate":        execute_ops_checklist_generate,
+    "ops_precheck_create":           execute_ops_precheck_create,
+    "ops_precheck_run":              execute_ops_precheck_run,
+    "ops_postcheck_run":             execute_ops_postcheck_run,
+    "ops_evidence_add":              execute_ops_evidence_add,
+    "ops_validation_report_generate": execute_ops_validation_report_generate,
+    # Section 25 — v2.30 Client Health Score
+    "client_health_compute":           execute_client_health_compute,
+    "client_health_get":               execute_client_health_get,
+    "client_health_history":           execute_client_health_history,
+    "client_recommendations_generate": execute_client_recommendations_generate,
+    "client_monthly_summary_generate": execute_client_monthly_summary_generate,
+}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPÉCIFICATION OLLAMA (JSON Schema pour chaque outil)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _t(name: str, description: str, properties: dict, required: list = None) -> dict:
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required or [],
+            },
+        },
+    }
+
+
+TOOLS_SPEC = [
+    _t("system_self_test",
+       "Auto-diagnostic : Marvin teste un échantillon de ses propres outils et rapporte ceux qui fonctionnent ou non (+ latence). include_web=true teste aussi les outils réseau. Pour répondre à 'est-ce que tout fonctionne ?'.",
+       {"category":    {"type": "string", "description": "Filtrer par catégorie/outil (optionnel)"},
+        "include_web": {"type": "boolean", "description": "Inclure les outils réseau (web, météo)"}}, []),
+    _t("file_list", "Liste les fichiers et dossiers dans un répertoire.",
+       {"path": {"type": "string", "description": "Chemin du répertoire à lister"},
+        "show_hidden": {"type": "boolean", "description": "Afficher les fichiers cachés"}},
+       ["path"]),
+
+    _t("file_info", "Retourne les métadonnées détaillées d'un fichier ou dossier (taille, dates, hash MD5 optionnel).",
+       {"path": {"type": "string", "description": "Chemin du fichier ou dossier"},
+        "hash": {"type": "boolean", "description": "Calculer le MD5 du fichier (défaut : false)"}},
+       ["path"]),
+
+    _t("file_read", "Lit le contenu d'un fichier (TXT, PDF, Word DOCX, Excel XLSX, CSV, Markdown, code source...).",
+       {"path": {"type": "string", "description": "Chemin du fichier à lire"}},
+       ["path"]),
+
+    _t("file_write", "Écrit du contenu dans un fichier texte ou markdown. Crée le fichier s'il n'existe pas.",
+       {"path": {"type": "string", "description": "Chemin du fichier à écrire"},
+        "content": {"type": "string", "description": "Contenu à écrire"},
+        "append": {"type": "boolean", "description": "Ajouter au fichier existant (true) ou écraser (false, défaut)"},
+        "mode": {"type": "string", "enum": ["overwrite", "append"], "description": "Mode d'écriture : 'overwrite' (défaut) ou 'append'"}},
+       ["path", "content"]),
+
+    _t("file_delete", "Supprime un fichier ou un dossier (demande confirmation).",
+       {"path": {"type": "string", "description": "Chemin à supprimer"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       ["path"]),
+
+    _t("file_rename", "Renomme un fichier ou un dossier.",
+       {"source": {"type": "string", "description": "Chemin actuel (absolu)"},
+        "destination": {"type": "string", "description": "Nouveau chemin complet ou nouveau nom seul"},
+        "new_name": {"type": "string", "description": "Nouveau nom simple (ex: 'rapport_v2.docx'). Alternative à 'destination'."}},
+       ["source"]),
+
+    _t("file_move", "Déplace un fichier ou un dossier vers un autre emplacement.",
+       {"source": {"type": "string", "description": "Chemin source"},
+        "destination": {"type": "string", "description": "Chemin de destination"}},
+       ["source", "destination"]),
+
+    _t("file_copy", "Copie un fichier ou un dossier.",
+       {"source": {"type": "string", "description": "Chemin source"},
+        "destination": {"type": "string", "description": "Chemin de destination"}},
+       ["source", "destination"]),
+
+    _t("file_create_folder", "Crée un nouveau dossier (et ses parents si nécessaire).",
+       {"path": {"type": "string", "description": "Chemin du dossier à créer"}},
+       ["path"]),
+
+    _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, numéros de page.",
+       {"path": {"type": "string", "description": "Chemin du fichier Word à créer (.docx)"},
+        "title": {"type": "string", "description": "Titre principal du document"},
+        "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
+        "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, ``` code"},
+        "author": {"type": "string", "description": "Auteur du document"},
+        "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"}},
+       ["path", "title", "content"]),
+
+    _t("file_convert_docx_to_pdf", "Convertit un document Word (.docx/.doc) en PDF.",
+       {"path": {"type": "string", "description": "Chemin du fichier Word"},
+        "output_dir": {"type": "string", "description": "Répertoire de sortie (optionnel)"}},
+       ["path"]),
+
+    _t("file_search_text", "Recherche un texte ou mot-clé dans le contenu des fichiers d'un répertoire.",
+       {"directory": {"type": "string", "description": "Répertoire où chercher"},
+        "query": {"type": "string", "description": "Texte ou mot-clé à rechercher"},
+        "extensions": {"type": "array", "items": {"type": "string"}, "description": "Extensions à chercher (.txt, .pdf, .docx...)"},
+        "case_sensitive": {"type": "boolean", "description": "Recherche sensible à la casse"}},
+       ["directory", "query"]),
+    _t("file_find", "Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (très rapide ~50ms) ou os.walk en fallback. Pour chercher sur TOUT le PC, omettez 'path' ou utilisez path='all'.",
+       {"pattern":      {"type": "string",  "description": "Motif : *.pdf, rapport*, *2024*, ou simplement un nom. Supporte * et ?"},
+        "path":         {"type": "string",  "description": "Dossier de recherche, ou 'all' pour tout le PC (défaut : tout le PC via l'index Windows)"},
+        "max_results":  {"type": "integer", "description": "Limite de résultats (défaut 100)"},
+        "include_dirs": {"type": "boolean", "description": "Inclure les dossiers dans les résultats (défaut false)"}},
+       ["pattern"]),
+    _t("system_search", "🚀 RECHERCHE ULTRA-RAPIDE sur tout le PC via l'index Windows Search (~50ms). Utilisez cet outil EN PRIORITÉ quand l'utilisateur cherche un fichier ou dossier dont il ne connaît pas l'emplacement exact.",
+       {"query":      {"type": "string", "description": "Mot-clé à chercher dans les noms de fichiers/dossiers (ex: 'abdou', 'rapport', 'photo vacances')"},
+        "file_type":  {"type": "string", "enum": ["all", "folder", "file", "pdf", "docx", "xlsx", "image"],
+                       "description": "Filtrer par type. Utilisez 'folder' pour chercher seulement des dossiers"},
+        "max_results":{"type": "integer", "description": "Limite de résultats (défaut 30)"}},
+       ["query"]),
+    _t("system_search_content", "🔎 RECHERCHE PAR CONTENU sur tout le PC (index plein-texte Windows). Trouve les documents d'après ce qu'ils CONTIENNENT, pas seulement leur nom. Pour « retrouve le document qui parle de X », « où est le contrat avec Y », « le fichier où j'ai écrit Z ». Renvoie un extrait du passage.",
+       {"query":      {"type": "string", "description": "Termes à chercher DANS le contenu des fichiers (ex: 'clause de résiliation', 'facture Dupont')"},
+        "file_type":  {"type": "string", "enum": ["all", "pdf", "docx", "xlsx", "text"],
+                       "description": "Filtrer par type de document"},
+        "max_results":{"type": "integer", "description": "Limite de résultats (défaut 25)"}},
+       ["query"]),
+
+    _t("pc_get_real_paths", (
+           "OUTIL DE RÉFÉRENCE — Retourne les vrais chemins Windows de cet ordinateur "
+           "(bureau, documents, téléchargements, nom d'utilisateur réel). "
+           "À utiliser EN PRIORITÉ si tu n'es pas certain du chemin correct."),
+       {}, []),
+
+    _t("pc_open_file", "Ouvre un fichier ou dossier dans son application par défaut.",
+       {"path": {"type": "string", "description": "Chemin du fichier à ouvrir"}},
+       ["path"]),
+
+    _t("pc_browse", "Explore un dossier Windows (sous-dossiers + fichiers avec taille/date) et donne les accès rapides (Bureau, Documents, lecteurs). Pour naviguer l'arborescence sans connaître le chemin exact.",
+       {"path": {"type": "string", "description": "Dossier à explorer (vide = Accueil)"},
+        "show_hidden": {"type": "boolean", "description": "Afficher les éléments cachés"}},
+       []),
+    _t("pc_reveal", "Ouvre l'Explorateur Windows sur l'emplacement d'un fichier/dossier (le met en surbrillance).",
+       {"path": {"type": "string", "description": "Chemin du fichier/dossier à révéler"}},
+       ["path"]),
+
+    _t("pc_app_launch", "Lance une application Windows installée par son nom (Chrome, Word, Spotify, etc.). Résout via PATH, registre App Paths et menu Démarrer → lance n'importe quelle app installée.",
+       {"app_name": {"type": "string", "description": "Nom de l'application à lancer"}},
+       ["app_name"]),
+
+    _t("pc_run_command", "Exécute une commande système Windows (demande confirmation).",
+       {"command": {"type": "string", "description": "Commande shell à exécuter"},
+        "timeout": {"type": "integer", "description": "Délai max en secondes"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       ["command"]),
+
+    _t("pc_run_powershell", "Exécute un script ou une commande PowerShell Windows et retourne la sortie (demande confirmation).",
+       {"script":    {"type": "string",  "description": "Script ou commande PowerShell à exécuter"},
+        "timeout":   {"type": "integer", "description": "Délai max en secondes (défaut 30)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       ["script"]),
+
+    _t("pc_run_elevated", "Exécute une commande ou un script PowerShell AVEC DROITS ADMINISTRATEUR, "
+       "via le démon élevé séparé (le backend reste en utilisateur normal). N'utilise ceci QUE si "
+       "pc_run_command/pc_run_powershell ont échoué par manque de droits admin. Demande confirmation.",
+       {"command":   {"type": "string",  "description": "Commande cmd.exe à exécuter en admin"},
+        "script":    {"type": "string",  "description": "Script/commande PowerShell à exécuter en admin"},
+        "timeout":   {"type": "integer", "description": "Délai max en secondes (défaut 30)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       []),
+
+    # ── Emporium : gestionnaire de paquets Winget ────────────────────────────
+    _t("winget_search", "Recherche des logiciels installables via Winget (renvoie nom, ID, version, source).",
+       {"query":  {"type": "string",  "description": "Terme de recherche (nom du logiciel)"},
+        "source": {"type": "string",  "description": "Source : 'winget' ou 'msstore' (optionnel)"},
+        "limit":  {"type": "integer", "description": "Nombre max de résultats (défaut 20)"}},
+       ["query"]),
+    _t("winget_list_upgrades", "Liste les logiciels installés ayant une mise à jour disponible (Winget).",
+       {}, []),
+    _t("winget_list_installed", "Liste les logiciels INSTALLÉS sur le PC (filtrable par nom) — pour les voir/désinstaller.",
+       {"query": {"type": "string", "description": "Filtre optionnel (nom partiel)"}}, []),
+    _t("winget_install", "Installe un logiciel en silencieux via Winget (demande confirmation).",
+       {"id":        {"type": "string",  "description": "ID exact du paquet (ex: 7zip.7zip) — préférable"},
+        "query":     {"type": "string",  "description": "À défaut d'ID, nom approximatif (moins fiable)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       []),
+    _t("winget_upgrade", "Met à jour un paquet précis (id) ou TOUS les paquets (all=true) via Winget (demande confirmation).",
+       {"id":        {"type": "string",  "description": "ID du paquet à mettre à jour"},
+        "all":       {"type": "boolean", "description": "true = mettre à jour TOUS les paquets"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       []),
+    _t("winget_uninstall", "Désinstalle un logiciel en silencieux via Winget (demande confirmation).",
+       {"id":        {"type": "string",  "description": "ID exact du paquet (préférable)"},
+        "query":     {"type": "string",  "description": "À défaut d'ID, nom approximatif"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       []),
+
+    # ── Pantheon : optimisation & durcissement (tweaks sûrs, réversibles) ─────
+    _t("system_restore_point", "Crée un point de restauration système (filet de sécurité avant optimisation). Demande confirmation.",
+       {"description": {"type": "string",  "description": "Libellé du point de restauration"},
+        "confirmed":   {"type": "boolean", "description": "Confirmation de l'utilisateur"}}, []),
+    _t("registry_get", "Lit une valeur (ou toute une clé) du registre Windows (lecture seule).",
+       {"path": {"type": "string", "description": "Chemin PowerShell, ex: HKLM:\\SOFTWARE\\Microsoft\\Windows"},
+        "name": {"type": "string", "description": "Nom de la valeur (optionnel ; sinon toutes)"}}, ["path"]),
+    _t("registry_backup", "Exporte une clé de registre dans un fichier .reg de secours.",
+       {"path": {"type": "string", "description": "Chemin de la clé (HKLM:\\...)"}}, ["path"]),
+    _t("registry_set", "Écrit une valeur de registre (SAUVEGARDE auto de la clé + confirmation).",
+       {"path":      {"type": "string", "description": "Chemin de la clé (HKLM:\\...)"},
+        "name":      {"type": "string", "description": "Nom de la valeur"},
+        "value":     {"type": "string", "description": "Valeur à écrire"},
+        "type":      {"type": "string", "description": "DWord | String | QWord | ExpandString (défaut DWord)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}}, ["path", "name", "value"]),
+    _t("tweak_telemetry", "Statut / désactivation / réactivation de la télémétrie Windows (DiagTrack + AllowTelemetry). Réversible, sauvegarde auto.",
+       {"action":    {"type": "string", "enum": ["status", "disable", "enable"]},
+        "confirmed": {"type": "boolean", "description": "Requis pour disable/enable"}}, ["action"]),
+    _t("tweak_debloat_list", "Liste les applications d'usine non essentielles (bloatware UWP) désinstallables.",
+       {}, []),
+    _t("tweak_debloat_remove", "Désinstalle des applications UWP (bloatware). Demande confirmation.",
+       {"packages":  {"type": "array", "items": {"type": "string"}, "description": "Noms UWP à retirer (ex: Microsoft.BingNews)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}}, ["packages"]),
+    _t("tweak_network_harden", "Statut / optimisations réseau légères (cache DNS, auto-tuning TCP). 'apply' demande confirmation.",
+       {"action":    {"type": "string", "enum": ["status", "apply"]},
+        "confirmed": {"type": "boolean", "description": "Requis pour apply"}}, ["action"]),
+
+    # ── Catharsis : moteur de purge (scan d'abord, puis nettoyage confirmé) ───
+    _t("catharsis_scan", "Analyse l'espace disque récupérable par catégorie (temp, caches navigateurs, .dmp, corbeille…). Ne supprime rien.",
+       {}, []),
+    _t("catharsis_clean", "Purge les catégories choisies (ids issus de catharsis_scan). Demande confirmation.",
+       {"categories": {"type": "array", "items": {"type": "string"}, "description": "Ids de catégories à vider (ex: temp_user, edge_cache, recycle_bin)"},
+        "confirmed":  {"type": "boolean", "description": "Confirmation de l'utilisateur"}}, ["categories"]),
+
+    # ── Codex : paramètres OS exposés en fonctions ───────────────────────────
+    _t("os_power_plan", "Lit ou change le plan d'alimentation Windows (équilibré/performances/économie).",
+       {"action":    {"type": "string", "enum": ["get", "set"]},
+        "plan":      {"type": "string", "enum": ["balanced", "performance", "powersaver"]},
+        "confirmed": {"type": "boolean", "description": "Requis pour set"}}, ["action"]),
+    _t("os_dark_mode", "Lit ou bascule le mode sombre/clair de Windows (sans droits admin).",
+       {"action":    {"type": "string", "enum": ["get", "dark", "light", "toggle"]},
+        "confirmed": {"type": "boolean", "description": "Requis pour changer"}}, ["action"]),
+    _t("os_firewall", "Statut / activation / désactivation du pare-feu Windows Defender (tous profils).",
+       {"action":    {"type": "string", "enum": ["status", "on", "off"]},
+        "confirmed": {"type": "boolean", "description": "Requis pour on/off"}}, ["action"]),
+    _t("os_network_adapters", "Liste / active / désactive les cartes réseau.",
+       {"action":    {"type": "string", "enum": ["list", "enable", "disable"]},
+        "name":      {"type": "string", "description": "Nom de la carte (pour enable/disable)"},
+        "confirmed": {"type": "boolean", "description": "Requis pour enable/disable"}}, ["action"]),
+    _t("os_hibernation", "Statut / activation / désactivation de l'hibernation (libère hiberfil.sys).",
+       {"action":    {"type": "string", "enum": ["status", "on", "off"]},
+        "confirmed": {"type": "boolean", "description": "Requis pour on/off"}}, ["action"]),
+
+    _t("csv_analyze", "Analyse un fichier CSV : aperçu, statistiques par colonne, valeurs uniques.",
+       {"path":      {"type": "string",  "description": "Chemin du fichier CSV"},
+        "action":    {"type": "string",  "enum": ["summary", "head", "stats", "unique"],
+                      "description": "Action : summary (défaut), head (5 premières lignes), stats (stats numériques colonne), unique (valeurs uniques colonne)"},
+        "column":    {"type": "string",  "description": "Colonne cible pour stats ou unique"},
+        "max_rows":  {"type": "integer", "description": "Nombre max de lignes à charger (défaut 100)"},
+        "delimiter": {"type": "string",  "description": "Séparateur (défaut ',')"}},
+       ["path"]),
+
+    _t("pc_system_info", "Retourne les informations techniques du PC : CPU, RAM, disques, uptime.",
+       {}, []),
+
+    _t("pc_screenshot", "Prend une capture d'écran du bureau Windows. Avec embed=true, retourne l'image base64 pour l'afficher dans le chat.",
+       {"output_path": {"type": "string", "description": "Chemin de sauvegarde PNG (optionnel, défaut : Bureau)"},
+        "embed": {"type": "boolean", "description": "Si true, retourner l'image base64 dans la réponse (pour affichage dans le chat)"}},
+       []),
+
+    _t("pc_window_list", "Liste toutes les fenêtres ouvertes sur le bureau.",
+       {}, []),
+
+    _t("pc_window_focus", "Met une fenêtre au premier plan par son titre.",
+       {"search": {"type": "string", "description": "Texte à rechercher dans le titre de la fenêtre"}},
+       ["search"]),
+
+    _t("pc_notify", "Envoie une notification Windows à l'utilisateur.",
+       {"title": {"type": "string", "description": "Titre de la notification"},
+        "message": {"type": "string", "description": "Corps de la notification"}},
+       ["title", "message"]),
+
+    _t("pc_pull_ollama_model", "Télécharge un modèle Ollama (ex: llama3.2:3b) pour accélérer les réponses.",
+       {"model": {"type": "string", "description": "Nom du modèle à télécharger (ex: llama3.2:3b)"}},
+       ["model"]),
+
+    _t("pc_clipboard_get", "Lit le contenu actuel du presse-papiers Windows.",
+       {}, []),
+
+    _t("pc_clipboard_set", "Copie un texte dans le presse-papiers Windows.",
+       {"text": {"type": "string", "description": "Texte à copier"}},
+       ["text"]),
+
+    _t("pc_process_list", "Liste les processus actifs sur le PC (top 50 par mémoire).",
+       {}, []),
+
+    _t("pc_process_kill", "Arrête un processus par PID ou nom (demande confirmation).",
+       {"pid": {"type": "integer", "description": "PID du processus"},
+        "name": {"type": "string", "description": "Nom du processus (si PID inconnu)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       []),
+
+    _t("task_create", "Crée une nouvelle tâche (todo).",
+       {"title": {"type": "string", "description": "Titre de la tâche"},
+        "description": {"type": "string", "description": "Description détaillée"},
+        "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"], "description": "Priorité"},
+        "due_date": {"type": "string", "description": "Date d'échéance (YYYY-MM-DD)"},
+        "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags"}},
+       ["title"]),
+
+    _t("task_list", "Liste et filtre les tâches.",
+       {"status": {"type": "string", "enum": ["pending", "in_progress", "done", "cancelled"], "description": "Filtrer par statut"},
+        "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"], "description": "Filtrer par priorité"}},
+       []),
+
+    _t("task_update", "Met à jour une tâche existante.",
+       {"id": {"type": "string", "description": "ID de la tâche"},
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "status": {"type": "string", "enum": ["pending", "in_progress", "done", "cancelled"]},
+        "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"]},
+        "due_date": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}}},
+       ["id"]),
+
+    _t("task_delete", "Supprime une tâche (demande confirmation).",
+       {"id": {"type": "string", "description": "ID de la tâche"},
+        "confirmed": {"type": "boolean"}},
+       ["id"]),
+
+    _t("note_create", "Crée une nouvelle note personnelle.",
+       {"title": {"type": "string", "description": "Titre de la note"},
+        "content": {"type": "string", "description": "Contenu en markdown"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "pinned": {"type": "boolean", "description": "Épingler la note"}},
+       ["title"]),
+
+    _t("note_list", "Liste et recherche les notes.",
+       {"search": {"type": "string", "description": "Texte à rechercher dans le titre ou contenu"},
+        "pinned": {"type": "boolean", "description": "Filtrer les notes épinglées"}},
+       []),
+
+    _t("note_update", "Met à jour une note existante.",
+       {"id": {"type": "string", "description": "ID de la note"},
+        "title": {"type": "string"},
+        "content": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "pinned": {"type": "boolean"}},
+       ["id"]),
+
+    _t("note_delete", "Supprime une note (demande confirmation).",
+       {"id": {"type": "string", "description": "ID de la note"},
+        "confirmed": {"type": "boolean"}},
+       ["id"]),
+
+    _t("memory_save", "Enregistre un fait, une préférence ou une habitude en mémoire à long terme.",
+       {"content": {"type": "string", "description": "Fait ou préférence à mémoriser"},
+        "category": {"type": "string", "enum": ["user_profile", "preference", "fact", "habit"], "description": "Catégorie"}},
+       ["content"]),
+
+    _t("memory_list", "Liste tous les souvenirs enregistrés.",
+       {}, []),
+
+    _t("memory_delete", "Oublie un souvenir obsolète ou erroné (demande confirmation).",
+       {"id": {"type": "string", "description": "ID du souvenir à supprimer"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+       ["id"]),
+
+    _t("memory_search", "Cherche dans les souvenirs mémorisés par sens ou par mots-clés.",
+       {"query": {"type": "string", "description": "Requête de recherche"},
+        "limit": {"type": "integer", "description": "Nombre de résultats max (défaut 5)"}},
+       ["query"]),
+
+    _t("search_semantic", "Recherche sémantique dans notes, mémoires et documents indexés (Qdrant).",
+       {"query": {"type": "string", "description": "Requête en langage naturel"},
+        "collections": {"type": "array", "items": {"type": "string"}, "description": "Collections : memories, notes, documents"},
+        "limit": {"type": "integer", "description": "Nombre de résultats (défaut 5)"}},
+       ["query"]),
+
+    _t("web_search", "Effectue une recherche web (DuckDuckGo gratuit, ou Brave/Google/SerpAPI si clés configurées).",
+       {"query": {"type": "string", "description": "Requête de recherche"},
+        "provider": {"type": "string", "enum": ["auto", "duckduckgo", "brave", "google", "serpapi"], "description": "Moteur de recherche (auto = meilleur disponible)"},
+        "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"}},
+       ["query"]),
+
+    _t("web_browse", "Récupère et extrait le texte principal d'une page web depuis une URL. Retourne titre, description et contenu texte.",
+       {"url": {"type": "string", "description": "URL de la page à visiter"},
+        "max_chars": {"type": "integer", "description": "Limite de caractères à retourner (défaut 25000, max 60000)"}},
+       ["url"]),
+
+    _t("infographic_create", "Crée un graphique PNG. Types : bar, horizontal_bar, pie, donut, line, area, multi_line, scatter, radar, grouped_bar, stacked_bar. Pour les multi-séries (grouped/stacked/multi_line/radar), fournir 'series' = [{name, values}].",
+       {"chart_type": {"type": "string", "enum": ["bar", "horizontal_bar", "pie", "donut", "line", "area", "multi_line", "scatter", "radar", "grouped_bar", "stacked_bar"], "description": "Type de graphique"},
+        "title": {"type": "string", "description": "Titre du graphique"},
+        "labels": {"type": "array", "items": {"type": "string"}, "description": "Étiquettes (axe / catégories)"},
+        "values": {"type": "array", "items": {"type": "number"}, "description": "Valeurs (mono-série)"},
+        "series": {"type": "array", "description": "Multi-séries : [{\"name\":\"2024\",\"values\":[...]}, …]"},
+        "x_values": {"type": "array", "items": {"type": "number"}, "description": "Abscisses pour scatter"},
+        "theme": {"type": "string", "enum": ["dark", "light"], "description": "Thème (défaut sombre)"},
+        "output_path": {"type": "string", "description": "Chemin de sauvegarde PNG (défaut : Bureau)"},
+        "subtitle": {"type": "string", "description": "Sous-titre optionnel"},
+        "colors": {"type": "array", "items": {"type": "string"}, "description": "Couleurs HEX optionnelles"}},
+       ["title", "labels"]),
+
+    _t("file_create_xlsx", "Crée un fichier Excel (.xlsx) avec titres, en-têtes et données.",
+       {"path": {"type": "string", "description": "Chemin du fichier Excel"},
+        "title": {"type": "string", "description": "Titre du tableau"},
+        "headers": {"type": "array", "items": {"type": "string"}, "description": "En-têtes des colonnes"},
+        "rows": {"type": "array", "items": {"type": "array"}, "description": "Lignes de données (tableau de tableaux)"},
+        "sheet_name": {"type": "string", "description": "Nom de la feuille"}},
+       ["headers", "rows"]),
+
+    _t("file_create_pdf", "Crée un PDF PROFESSIONNEL (sans Word) : page de titre, **gras**/*italique*/`code`, tableaux markdown stylés, citations, blocs de code, liens, numéros de page.",
+       {"path": {"type": "string", "description": "Chemin du PDF à créer"},
+        "title": {"type": "string", "description": "Titre du document"},
+        "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
+        "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, [lien](url)"},
+        "author": {"type": "string", "description": "Auteur"},
+        "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"}},
+       ["title", "content"]),
+
+    # ── Google Calendar ───────────────────────────────────────────────────────
+    _t("calendar_list", "Liste les événements Google Calendar à venir (nécessite OAuth Google configuré).",
+       {"calendar_id":  {"type": "string",  "description": "ID du calendrier (défaut : 'primary')"},
+        "days":         {"type": "integer", "description": "Nombre de jours à afficher à partir de time_min (défaut 7, max 90)"},
+        "max_results":  {"type": "integer", "description": "Nombre max d'événements (défaut 20, max 50)"},
+        "time_min":     {"type": "string",  "description": "Début de la plage (ISO 8601). Défaut : maintenant."}},
+       []),
+
+    _t("calendar_create", "Crée un événement dans Google Calendar (nécessite OAuth Google configuré).",
+       {"title": {"type": "string", "description": "Titre de l'événement"},
+        "start": {"type": "string", "description": "Début : 'YYYY-MM-DD' (toute la journée) ou 'YYYY-MM-DDTHH:MM:SS' (précis)"},
+        "end": {"type": "string", "description": "Fin : même format que 'start'. Défaut : +1h ou lendemain."},
+        "location": {"type": "string", "description": "Lieu de l'événement (optionnel)"},
+        "description": {"type": "string", "description": "Description / notes (optionnel)"},
+        "calendar_id": {"type": "string", "description": "ID du calendrier (défaut : 'primary')"}},
+       ["title", "start"]),
+
+    _t("calendar_delete", "Supprime un événement Google Calendar par son ID (nécessite OAuth Google configuré).",
+       {"event_id":    {"type": "string", "description": "ID de l'événement Google Calendar à supprimer"},
+        "calendar_id": {"type": "string", "description": "ID du calendrier (défaut : 'primary')"}},
+       ["event_id"]),
+
+    _t("calendar_update", "Met à jour un événement Google Calendar existant (nécessite OAuth Google configuré).",
+       {"event_id":    {"type": "string",  "description": "ID de l'événement Google Calendar à modifier"},
+        "calendar_id": {"type": "string",  "description": "ID du calendrier (défaut : 'primary')"},
+        "title":       {"type": "string",  "description": "Nouveau titre"},
+        "start":       {"type": "string",  "description": "Nouveau début (ISO 8601)"},
+        "end":         {"type": "string",  "description": "Nouvelle fin (ISO 8601)"},
+        "description": {"type": "string",  "description": "Nouvelle description"},
+        "location":    {"type": "string",  "description": "Nouveau lieu"}},
+       ["event_id"]),
+
+    _t("google_drive_list", "Liste les fichiers Google Drive (nécessite OAuth Google configuré).",
+       {"folder_id": {"type": "string", "description": "ID du dossier (défaut : racine)"},
+        "max_results": {"type": "integer", "description": "Nombre de résultats"},
+        "query": {"type": "string", "description": "Recherche par nom"}},
+       []),
+
+    _t("google_drive_read", "Lit le contenu texte d'un Google Doc ou Google Sheet.",
+       {"file_id": {"type": "string", "description": "ID du fichier Google Drive"}},
+       ["file_id"]),
+
+    _t("google_drive_upload", "Téléverse un fichier local vers Google Drive.",
+       {"local_path": {"type": "string", "description": "Chemin du fichier local"},
+        "folder_id": {"type": "string", "description": "ID du dossier de destination (défaut : racine)"},
+        "file_name": {"type": "string", "description": "Nom du fichier dans Drive (optionnel)"}},
+       ["local_path"]),
+
+    _t("onedrive_list", "Liste les fichiers OneDrive (nécessite OAuth Microsoft configuré).",
+       {"folder_id": {"type": "string", "description": "ID du dossier (défaut : root)"},
+        "max_results": {"type": "integer", "description": "Nombre de résultats"},
+        "query": {"type": "string", "description": "Recherche par nom"}},
+       []),
+
+    _t("onedrive_read", "Lit le contenu texte d'un fichier OneDrive.",
+       {"file_id": {"type": "string", "description": "ID du fichier OneDrive"}},
+       ["file_id"]),
+
+    _t("onedrive_upload", "Téléverse un fichier local vers OneDrive.",
+       {"local_path": {"type": "string", "description": "Chemin du fichier local"},
+        "dest_path": {"type": "string", "description": "Chemin de destination dans OneDrive (ex: Documents/rapport.pdf)"}},
+       ["local_path"]),
+
+    # ── Réseau ────────────────────────────────────────────────────────────────
+    _t("net_ping", "Ping une adresse IP ou un nom d'hôte pour tester la connectivité.",
+       {"host": {"type": "string", "description": "Adresse IP ou nom d'hôte"},
+        "count": {"type": "integer", "description": "Nombre de paquets à envoyer (défaut 4, max 20)"}},
+       ["host"]),
+
+    _t("net_port_scan", "Scanne les ports TCP ouverts sur un hôte donné.",
+       {"host": {"type": "string", "description": "Adresse IP ou nom d'hôte"},
+        "ports": {"type": "string", "description": "Ports à scanner : '80,443' ou '20-25' ou mix (défaut : ports communs)"},
+        "timeout": {"type": "number", "description": "Timeout par port en secondes (défaut 1.0)"}},
+       ["host"]),
+
+    _t("net_dns_lookup", "Résolution DNS d'un nom d'hôte (ou reverse lookup d'une IP).",
+       {"host": {"type": "string", "description": "Nom d'hôte ou adresse IP"},
+        "type": {"type": "string", "enum": ["A", "AAAA", "MX", "NS", "PTR"], "description": "Type d'enregistrement (défaut A)"}},
+       ["host"]),
+
+    _t("net_traceroute", "Affiche le chemin réseau (hops) jusqu'à une adresse IP ou un hôte.",
+       {"host": {"type": "string", "description": "Adresse IP ou nom d'hôte"},
+        "max_hops": {"type": "integer", "description": "Nombre maximum de sauts (défaut 15, max 30)"}},
+       ["host"]),
+
+    _t("net_scan_local", "Scanne le réseau local via ARP pour détecter tous les appareils connectés.",
+       {}, []),
+
+    _t("net_whois", "Requête WHOIS sur un domaine ou une adresse IP pour obtenir les infos d'enregistrement.",
+       {"host": {"type": "string", "description": "Nom de domaine ou adresse IP"}},
+       ["host"]),
+
+    # ── Réseau Pro : diagnostic avancé (nmap optionnel, TLS, HTTP, sweep, routage) ──
+    _t("net_nmap_scan", "Scan réseau avancé type Nmap. Utilise nmap.exe si installé, sinon repli TCP local borné. Idéal pour audit de ports sur un hôte ou un petit CIDR.",
+       {"target":    {"type": "string",  "description": "IP, hôte ou CIDR, ex: 192.168.1.10 ou 192.168.1.0/24"},
+        "profile":   {"type": "string",  "enum": ["quick", "web", "windows", "remote", "top100"], "description": "Profil de ports si 'ports' est vide"},
+        "ports":     {"type": "string",  "description": "Ports CSV/plages, ex: 22,80,443 ou 1-1024"},
+        "timeout":   {"type": "number",  "description": "Timeout TCP par port en secondes"},
+        "confirmed": {"type": "boolean", "description": "Confirmation pour scans larges CIDR/plages"}},
+       ["target"]),
+
+    _t("net_service_detect", "Détecte les services TCP ouverts sur un hôte et tente une capture de bannière simple (sans scan agressif).",
+       {"host":    {"type": "string", "description": "Hôte ou IP"},
+        "ports":   {"type": "string", "description": "Ports CSV/plages à tester"},
+        "timeout": {"type": "number", "description": "Timeout par port en secondes"}},
+       ["host"]),
+
+    _t("net_http_probe", "Analyse un site ou endpoint HTTP/HTTPS : code de statut, titre, redirections, en-têtes et en-têtes de sécurité.",
+       {"url":     {"type": "string", "description": "URL ou nom de domaine"},
+        "timeout": {"type": "number", "description": "Timeout HTTP en secondes"}},
+       ["url"]),
+
+    _t("net_tls_check", "Contrôle le certificat TLS d'un hôte HTTPS : expiration, émetteur, SAN, protocole, cipher.",
+       {"host":    {"type": "string",  "description": "Domaine ou IP"},
+        "port":    {"type": "integer", "description": "Port TLS, défaut 443"},
+        "timeout": {"type": "number",  "description": "Timeout en secondes"}},
+       ["host"]),
+
+    _t("net_subnet_sweep", "Sweep TCP borné d'un CIDR local pour repérer les hôtes actifs sur des ports courants.",
+       {"cidr":      {"type": "string",  "description": "CIDR, ex: 192.168.1.0/24"},
+        "ports":     {"type": "string",  "description": "Ports de détection, défaut 22,80,443,445,3389,5985,8080"},
+        "timeout":   {"type": "number",  "description": "Timeout court par port"},
+        "confirmed": {"type": "boolean", "description": "Confirmation pour sous-réseaux larges"}},
+       ["cidr"]),
+
+    _t("net_route_diagnostics", "Diagnostic réseau complet : config locale, DNS, ping internet/cible et traceroute optionnel. Utile pour « pourquoi je n'ai pas internet ».",
+       {"target":        {"type": "string",  "description": "Cible à diagnostiquer, défaut 1.1.1.1"},
+        "include_trace": {"type": "boolean", "description": "Inclure un traceroute (plus lent)"}},
+       []),
+
+    _t("pc_hardware_specs", "Inventaire matériel complet du PC (fabricant/modèle/n° de série, CPU, RAM, disques, GPU, cartes réseau) avec liens officiels support/pilotes selon le fabricant détecté (Dell, HP, Lenovo, ASUS, Acer, Surface, MSI, GIGABYTE, ASRock, Intel, AMD, NVIDIA, Samsung/WD/Seagate/Crucial).",
+       {}, []),
+
+    _t("pc_gpu_status", "État du GPU utilisé pour l'IA locale (vidéo…) : marque, VRAM, backend de calcul (CUDA NVIDIA / DirectML AMD-Intel / CPU). Utilise ceci si l'utilisateur a changé de carte graphique et veut que Marvin s'en rende compte tout de suite.",
+       {"refresh": {"type": "boolean", "description": "true pour forcer une redétection immédiate (après changement de carte)"}},
+       []),
+
+    _t("pc_hardware_temps", "Températures RÉELLES du CPU et du GPU (capteur ACPI + nvidia-smi) — se déclenche pour tout diagnostic de surchauffe/plantage/ventilateur bruyant, ou avant d'affirmer quoi que ce soit sur une température. Ne devine JAMAIS une température, appelle toujours cet outil d'abord.",
+       {}, []),
+
+    _t("pc_disk_smart_health", "Santé RÉELLE des disques (compteurs de fiabilité S.M.A.R.T. Windows : usure SSD, erreurs de lecture non corrigées, heures de fonctionnement) — bien plus fiable que le simple statut Healthy/Unhealthy. Utilise ceci pour tout diagnostic PC complet ou si l'utilisateur suspecte un problème de disque.",
+       {}, []),
+
+    _t("pc_event_log_errors", "Erreurs/critiques récentes des journaux d'événements Windows (Système + Application) — détecte des plantages/pilotes en échec/erreurs disque INTERMITTENTS invisibles dans un instantané CPU/RAM/disque. Utilise ceci pour tout diagnostic PC complet, ou si l'utilisateur signale des plantages/lenteurs intermittentes.",
+       {"days": {"type": "number", "description": "Nombre de jours en arrière à scanner (défaut 7, max 30)"},
+        "max_events": {"type": "number", "description": "Nombre maximum d'événements à retourner (défaut 20, max 50)"}},
+       []),
+
+    _t("win_firewall_status", "État RÉEL du pare-feu Windows (profils Domaine/Privé/Public actifs, nombre de règles entrantes autorisées) — rendu structuré au lieu de parser du texte PowerShell. Utilise ceci pour tout audit de sécurité poste ou question sur le pare-feu.",
+       {}, []),
+
+    _t("pc_driver_check", "Vérifie si un pilote/composant matériel a une version plus récente disponible, via une VRAIE recherche web ciblée (pas une supposition). Utilise ceci systématiquement avant d'affirmer qu'un pilote est à jour ou obsolète — ne dis jamais « vérifie toi-même ».",
+       {"component": {"type": "string", "description": "Nom exact du composant (ex: 'NVIDIA GeForce RTX 2060')"},
+        "installed_version": {"type": "string", "description": "Version actuellement installée, si connue (optionnel)"}},
+       ["component"]),
+
+    _t("pc_health_trend", "Tendance RÉELLE de santé du PC dans le temps (RAM/disque/usure SSD/erreurs), basée sur des instantanés quotidiens enregistrés automatiquement — pas un instantané isolé. Utilise ceci pour « est-ce que ça empire ? », « dans combien de temps le disque sera plein ? » ou tout diagnostic dans la durée.",
+       {"days": {"type": "number", "description": "Nombre de jours d'historique à analyser (défaut 30, max 90)"}},
+       []),
+
+    _t("pc_tool_reliability", "Taux d'échec RÉEL de chaque outil Marvin (pas une estimation) — sépare le volume d'appels de la fiabilité. Utilise ceci quand l'utilisateur demande quels outils échouent le plus, ou pour un audit de fiabilité.",
+       {"min_calls": {"type": "number", "description": "Nombre minimum d'appels pour qu'un outil soit inclus (défaut 3, évite le bruit statistique)"},
+        "days": {"type": "number", "description": "Période analysée en jours (défaut 90)"}},
+       []),
+
+    _t("pc_conversation_trace", "Chronologie complète des appels d'outils d'UNE conversation (durée réelle de chacun, ordre, succès/échec). Utilise ceci quand l'utilisateur demande pourquoi une réponse a été lente.",
+       {"conversation_id": {"type": "string", "description": "ID de la conversation à analyser"}},
+       ["conversation_id"]),
+
+    _t("net_inventory_scan", "Scanne le réseau local ET enregistre les appareils dans un inventaire PERSISTANT (pas un instantané jetable) — première/dernière apparition suivies dans le temps. Utilise ceci pour un vrai inventaire réseau à jour.",
+       {}, []),
+
+    _t("net_inventory_list", "Liste l'inventaire réseau déjà enregistré (appareils vus précédemment, avec noms personnalisés/notes) — pas un scan en direct, utilise net_inventory_scan pour rafraîchir d'abord.",
+       {"days": {"type": "number", "description": "Ne montrer que les appareils vus dans les N derniers jours (défaut 30)"}},
+       []),
+
+    _t("net_inventory_annotate", "Ajoute un nom personnalisé et/ou une note à un appareil de l'inventaire réseau (ex: « imprimante bureau »).",
+       {"device_id": {"type": "string", "description": "ID de l'appareil (obtenu via net_inventory_list)"},
+        "custom_name": {"type": "string", "description": "Nom personnalisé à donner à l'appareil"},
+        "notes": {"type": "string", "description": "Note libre sur l'appareil"}},
+       ["device_id"]),
+
+    _t("itsm_ticket_list", "Liste les tickets d'un système ITSM/ticketing connecté (GLPI). Utilise ceci pour voir les tickets ouverts/en cours.",
+       {"system": {"type": "string", "description": "Système ITSM (défaut 'glpi')"},
+        "limit": {"type": "number", "description": "Nombre max de tickets (défaut 20)"}},
+       []),
+
+    _t("itsm_ticket_create", "Crée un ticket dans un système ITSM/ticketing connecté (GLPI). Confirme toujours le contenu avec l'utilisateur avant d'appeler.",
+       {"system": {"type": "string", "description": "Système ITSM (défaut 'glpi')"},
+        "title": {"type": "string", "description": "Titre du ticket"},
+        "description": {"type": "string", "description": "Description détaillée"},
+        "urgency": {"type": "number", "description": "Urgence GLPI 1 (très basse) à 5 (très haute)"}},
+       ["title"]),
+
+    _t("itsm_asset_list", "Liste le matériel enregistré dans l'inventaire d'un système ITSM (GLPI).",
+       {"system": {"type": "string", "description": "Système ITSM (défaut 'glpi')"},
+        "limit": {"type": "number", "description": "Nombre max d'éléments (défaut 50)"}},
+       []),
+
+    _t("skill_learning_log", "Historique d'apprentissage de Marvin : compétences créées/améliorées après un échec ou un succès, consolidations automatiques (y compris la revue nocturne). Utilise ceci quand l'utilisateur demande ce que tu as appris récemment, pourquoi une compétence a changé, ou pour prouver que l'auto-amélioration fonctionne.",
+       {"skill": {"type": "string", "description": "Nom d'une compétence précise (optionnel, sinon tout l'historique récent)"},
+        "limit": {"type": "number", "description": "Nombre d'événements à retourner (défaut 10)"}},
+       []),
+
+    _t("win_quick_launch_list", "Liste les raccourcis Windows disponibles (God Mode, Paramètres, panneaux legacy, outils admin, dossiers utiles) avec leur id — catalogue « Windows+ ».",
+       {}, []),
+
+    _t("win_quick_launch", "Ouvre directement un panneau/outil Windows par son id (God Mode, ms-settings:*, appwiz.cpl, services.msc, taskmgr, dossier Temp…). Utilise win_quick_launch_list pour voir les id disponibles. N'écrit/ne modifie rien.",
+       {"id": {"type": "string", "description": "Id du raccourci (ex : settings_privacy, tools_services, control_programs, folder_temp, god_mode)"}},
+       ["id"]),
+
+    # ── OCR ───────────────────────────────────────────────────────────────────
+    _t("ocr_extract", "Extrait le texte visible dans une image (OCR par IA, utilise llava-phi3).",
+       {"image_path": {"type": "string", "description": "Chemin vers le fichier image (PNG, JPG, etc.)"},
+        "prompt": {"type": "string", "description": "Instruction personnalisée pour l'extraction (optionnel)"},
+        "model": {"type": "string", "description": "Modèle vision Ollama à utiliser (défaut : llava-phi3)"}},
+       ["image_path"]),
+
+    # ── Archives ─────────────────────────────────────────────────────────────
+    _t("file_compress", "Compresse des fichiers ou dossiers en une archive ZIP.",
+       {"sources": {"type": "array", "items": {"type": "string"}, "description": "Liste de chemins à compresser (fichiers ou dossiers)"},
+        "output_path": {"type": "string", "description": "Chemin du fichier ZIP de sortie (défaut : Bureau)"}},
+       ["sources"]),
+
+    _t("file_extract", "Extrait une archive ZIP ou TAR vers un dossier de destination.",
+       {"archive_path": {"type": "string", "description": "Chemin de l'archive à extraire (ZIP, TAR, TGZ...)"},
+        "dest_path": {"type": "string", "description": "Dossier de destination (défaut : dossier de l'archive)"}},
+       ["archive_path"]),
+
+    # ── Email (multi-comptes : param 'account' = adresse de la boîte à cibler) ──
+    _t("email_accounts", "Liste les boîtes mail connectées (multi-comptes). À utiliser pour savoir quelle adresse cibler.",
+       {}, []),
+    _t("email_list", "Liste les emails récents d'un dossier (IMAP). 'account' = adresse de la boîte (sinon la 1ère).",
+       {"folder": {"type": "string", "description": "Dossier IMAP (défaut : INBOX)"},
+        "limit": {"type": "integer", "description": "Nombre d'emails à récupérer (défaut 20, max 50)"},
+        "offset": {"type": "integer", "description": "Décalage pour la pagination (défaut 0)"},
+        "account": {"type": "string", "description": "Adresse de la boîte mail à consulter (multi-comptes)"}},
+       []),
+
+    _t("email_read", "Lit le contenu complet d'un email par son UID.",
+       {"uid": {"type": "string", "description": "UID de l'email (récupéré via email_list)"},
+        "folder": {"type": "string", "description": "Dossier IMAP (défaut : INBOX)"},
+        "account": {"type": "string", "description": "Adresse de la boîte mail (multi-comptes)"}},
+       ["uid"]),
+
+    _t("email_search", "Recherche des emails par sujet, expéditeur ou mot-clé.",
+       {"query": {"type": "string", "description": "Terme de recherche (sujet ou expéditeur)"},
+        "folder": {"type": "string", "description": "Dossier IMAP (défaut : INBOX)"},
+        "limit": {"type": "integer", "description": "Nombre de résultats max (défaut 20)"},
+        "account": {"type": "string", "description": "Adresse de la boîte mail (multi-comptes)"}},
+       ["query"]),
+
+    _t("email_send", "Envoie un email via SMTP. Requiert confirmation explicite. Nécessite la config email dans Paramètres.",
+       {"to": {"type": "string", "description": "Adresse email du destinataire"},
+        "subject": {"type": "string", "description": "Objet de l'email"},
+        "body": {"type": "string", "description": "Corps du message (texte ou markdown)"},
+        "cc": {"type": "string", "description": "Adresse email en copie (optionnel)"},
+        "account": {"type": "string", "description": "Adresse de la boîte EXPÉDITRICE (multi-comptes ; sinon la 1ère)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant envoi)"}},
+       ["to", "subject", "body"]),
+
+    _t("email_draft_reply", "Rédige par IA la meilleure réponse à un email, en français impeccable (sans fautes). Génère un brouillon — n'envoie PAS.",
+       {"uid": {"type": "string", "description": "UID de l'email auquel répondre (sera lu automatiquement)"},
+        "body": {"type": "string", "description": "Ou collez directement le contenu de l'email reçu"},
+        "subject": {"type": "string", "description": "Objet de l'email reçu (optionnel)"},
+        "from": {"type": "string", "description": "Expéditeur de l'email reçu (optionnel)"},
+        "instruction": {"type": "string", "description": "Consigne libre (ex : 'accepte poliment', 'demande un délai')"},
+        "tone": {"type": "string", "description": "Ton souhaité (défaut : professionnel et courtois)"},
+        "account": {"type": "string", "description": "Boîte mail concernée (multi-comptes)"},
+        "folder": {"type": "string", "description": "Dossier IMAP si lecture par uid (défaut INBOX)"}},
+       []),
+
+    _t("email_summarize", "Résume un email par IA en français : synthèse, points clés, action attendue. Fournir 'uid' ou 'body'.",
+       {"uid": {"type": "string", "description": "UID de l'email à résumer (lu automatiquement)"},
+        "body": {"type": "string", "description": "Ou contenu de l'email directement"},
+        "subject": {"type": "string", "description": "Objet (optionnel)"},
+        "from": {"type": "string", "description": "Expéditeur (optionnel)"},
+        "account": {"type": "string", "description": "Boîte mail concernée (multi-comptes)"},
+        "folder": {"type": "string", "description": "Dossier IMAP (défaut INBOX)"}},
+       []),
+
+    _t("email_digest", "Briefing IA de la boîte : scanne les emails récents et les PRIORISE (urgent/à traiter/info) avec actions suggérées.",
+       {"account": {"type": "string", "description": "Boîte mail (adresse) ou '__all__' pour toutes les boîtes"},
+        "limit": {"type": "integer", "description": "Nombre d'emails à analyser (défaut 15, max 25)"},
+        "folder": {"type": "string", "description": "Dossier IMAP (défaut INBOX)"}},
+       []),
+
+    _t("email_automation_run", "Traite les emails non lus selon le mode configuré (brouillon = prépare, autonome = ENVOIE). dry_run=true pour simuler sans envoyer.",
+       {"mode": {"type": "string", "enum": ["manuel", "brouillon", "autonome"], "description": "Forcer un mode (sinon celui configuré)"},
+        "dry_run": {"type": "boolean", "description": "true = simulation sans envoi réel (recommandé pour tester)"}},
+       []),
+
+    _t("email_to_task", "Transforme un email en tâche actionnable (l'IA extrait l'action + l'échéance, puis crée la tâche).",
+       {"uid": {"type": "string", "description": "UID de l'email (lu automatiquement)"},
+        "body": {"type": "string", "description": "Ou contenu de l'email directement"},
+        "subject": {"type": "string", "description": "Objet (optionnel)"},
+        "from": {"type": "string", "description": "Expéditeur (optionnel)"},
+        "account": {"type": "string", "description": "Boîte mail concernée (multi-comptes)"},
+        "folder": {"type": "string", "description": "Dossier IMAP (défaut INBOX)"}},
+       []),
+
+    _t("email_attachment_summary", "Résume par IA une pièce jointe d'un email (PDF, Word .docx, texte).",
+       {"uid": {"type": "string", "description": "UID de l'email contenant la pièce jointe"},
+        "name": {"type": "string", "description": "Nom de la pièce jointe (sinon la première)"},
+        "account": {"type": "string", "description": "Boîte mail concernée (multi-comptes)"},
+        "folder": {"type": "string", "description": "Dossier IMAP (défaut INBOX)"}},
+       ["uid"]),
+
+    _t("email_watch_check", "Surveille les emails non lus, détecte les importants par IA et notifie sur le bureau. force=true pour forcer, dry_run=true pour ne pas notifier.",
+       {"force": {"type": "boolean", "description": "Forcer même si la surveillance est désactivée"},
+        "dry_run": {"type": "boolean", "description": "Ne pas envoyer de notification (test)"}},
+       []),
+
+    _t("email_apply_rules", "Applique les règles de classement (déplacer/marquer lu) aux emails récents. dry_run=true pour simuler.",
+       {"account": {"type": "string", "description": "Limiter à une boîte (sinon toutes)"},
+        "dry_run": {"type": "boolean", "description": "Simuler sans rien déplacer"},
+        "limit": {"type": "integer", "description": "Nb d'emails à examiner par boîte (défaut 25)"}},
+       []),
+
+    _t("daily_briefing", "Génère le briefing du jour : réunit les emails non lus et les tâches en attente en une synthèse IA priorisée. Pour « fais le point », « ma journée », « briefing ».",
+       {}, []),
+
+    # ── Agenda local ─────────────────────────────────────────────────────────
+    _t("event_create", "Ajoute un rendez-vous/événement. Comprend le langage naturel : « ajoute rdv dentiste mardi 14h », « réunion équipe demain 10h-11h ». Si Google Agenda est connecté, l'événement est créé SUR Google (visible sur le téléphone) ; sinon en local. Pour planifier, agender, noter un RDV.",
+       {"natural": {"type": "string", "description": "Demande en langage naturel (l'IA en extrait date/heure/titre)"},
+        "title": {"type": "string", "description": "Titre de l'événement (si déjà séparé)"},
+        "start_at": {"type": "string", "description": "Début explicite 'YYYY-MM-DD HH:MM' (sinon déduit du texte)"},
+        "end_at": {"type": "string", "description": "Fin optionnelle 'YYYY-MM-DD HH:MM'"},
+        "location": {"type": "string", "description": "Lieu"},
+        "all_day": {"type": "boolean", "description": "Toute la journée"},
+        "reminder_minutes": {"type": "integer", "description": "Rappel X minutes avant (notification + rappel Google)"},
+        "local_only": {"type": "boolean", "description": "Forcer l'agenda LOCAL même si Google est connecté"}},
+       []),
+    _t("event_list", "Liste les rendez-vous de l'agenda. Pour « mon agenda », « mes rendez-vous », « quels RDV cette semaine ».",
+       {"period": {"type": "string", "description": "today / tomorrow / week / month / upcoming / all"},
+        "start": {"type": "string", "description": "Borne début YYYY-MM-DD (optionnel)"},
+        "end": {"type": "string", "description": "Borne fin YYYY-MM-DD (optionnel)"}},
+       []),
+    _t("event_update", "Modifie ou replanifie un événement existant (par id).",
+       {"id": {"type": "string", "description": "Identifiant de l'événement"},
+        "title": {"type": "string"}, "start_at": {"type": "string"}, "end_at": {"type": "string"},
+        "location": {"type": "string"}, "reminder_minutes": {"type": "integer"}},
+       ["id"]),
+    _t("event_delete", "Supprime un événement de l'agenda (par id, ou par titre approchant).",
+       {"id": {"type": "string", "description": "Identifiant de l'événement"},
+        "title": {"type": "string", "description": "Ou titre à rechercher"}},
+       []),
+
+    # ── Agendas connectés (abonnements iCal) ───────────────────────────────────
+    _t("calendar_subscribe", "Connecte un agenda externe (Google, Outlook, Apple…) via son lien iCal/webcal pour que Marvin voie ses événements. Pour « connecte mon agenda », « ajoute mon calendrier Google ».",
+       {"url": {"type": "string", "description": "Lien iCal (.ics) ou webcal de l'agenda"},
+        "name": {"type": "string", "description": "Nom de l'agenda (ex : Perso, Boulot)"},
+        "color": {"type": "string", "description": "Couleur hex (optionnel)"}},
+       ["url"]),
+    _t("calendar_subscriptions", "Liste les agendas connectés (abonnements iCal) et leur état de synchronisation.",
+       {}, []),
+    _t("calendar_unsubscribe", "Déconnecte un agenda connecté et retire ses événements.",
+       {"id": {"type": "string", "description": "Id de l'agenda"},
+        "name": {"type": "string", "description": "Ou nom de l'agenda"}},
+       []),
+    _t("calendar_sync", "Resynchronise les agendas connectés (rafraîchit les événements externes). Pour « mets à jour mes agendas ».",
+       {"id": {"type": "string", "description": "Limiter à un agenda (optionnel)"}},
+       []),
+
+    # ── Génération de documentation ────────────────────────────────────────────
+    _t("document_generate", "Génère un document professionnel COMPLET au format Word (.docx) à partir de notes brutes, selon un modèle (rapport d'intervention, dossier professionnel, procédure, cahier des charges, compte-rendu, doc technique). Pour « rédige un rapport », « fais-moi un dossier Word », « génère une procédure ».",
+       {"text": {"type": "string", "description": "Les notes / éléments bruts à mettre en forme"},
+        "template": {"type": "string", "description": "Modèle : rapport_intervention, dossier_pro, procedure, cahier_charges, compte_rendu, doc_technique, libre"},
+        "title": {"type": "string", "description": "Titre du document"},
+        "author": {"type": "string", "description": "Auteur (sinon déduit ou « Marvin »)"},
+        "pdf": {"type": "boolean", "description": "Aussi exporter en PDF"},
+        "mode": {"type": "string", "description": "rapide (1 passe, défaut) ou detaille (section par section, plus complet mais plus lent)"},
+        "use_documents": {"type": "boolean", "description": "Enrichir avec les documents indexés"},
+        "client": {"type": "string", "description": "Nom du client (apparaît sur la page de titre)"},
+        "reference": {"type": "string", "description": "Référence du document"},
+        "include_header": {"type": "boolean", "description": "Inclure l'en-tête configuré (défaut oui)"},
+        "sign": {"type": "boolean", "description": "Ajouter un bloc signature à la fin"},
+        "lieu": {"type": "string", "description": "Lieu pour la signature (« Fait à … »)"}},
+       []),
+
+    # ── Documents (RAG) ────────────────────────────────────────────────────────
+    _t("document_index", "Indexe un fichier ou un dossier (PDF, Word, Excel, PowerPoint, texte) pour pouvoir l'interroger. Pour « indexe ce document », « apprends ce dossier ».",
+       {"path": {"type": "string", "description": "Chemin du fichier ou dossier à indexer"}},
+       ["path"]),
+    _t("document_ask", "Répond à une question en s'appuyant sur tes documents indexés, en citant les sources. Pour « que dit le contrat sur… », « cherche dans mes documents ».",
+       {"question": {"type": "string", "description": "La question posée aux documents"},
+        "k": {"type": "integer", "description": "Nombre de passages à récupérer (défaut 6)"}},
+       ["question"]),
+    _t("document_list", "Liste les documents actuellement indexés (interrogeables).", {}, []),
+    _t("document_forget", "Retire un document de l'index (par id ou nom).",
+       {"id": {"type": "string"}, "name": {"type": "string"}},
+       []),
+    _t("document_refine_section", "Affine UNE section d'un document déjà généré : développe, raccourcit, reformule, ajoute un tableau… puis régénère le .docx (en-tête/signature conservés). Pour « développe la partie Diagnostic », « complète la section Solution ».",
+       {"file": {"type": "string", "description": "Le fichier .docx généré (nom ou chemin dans documents_generes)"},
+        "section": {"type": "string", "description": "Le titre exact de la section à affiner (ex: 'Diagnostic')"},
+        "instruction": {"type": "string", "description": "Ce qu'il faut faire (développe, raccourcis, ajoute un tableau, reformule plus formel…)"},
+        "notes": {"type": "string", "description": "Éléments supplémentaires à intégrer (optionnel)"}},
+       ["file", "section"]),
+    _t("unified_search", "RECHERCHE UNIFIÉE : cherche le même terme PARTOUT à la fois (documents indexés, fichiers du PC par nom ET par contenu, notes, tâches, agenda, mémoire ; emails et web en option). Pour « retrouve tout ce qui concerne X », « cherche partout Y ».",
+       {"query": {"type": "string", "description": "Ce que tu cherches"},
+        "scope": {"type": "array", "items": {"type": "string"}, "description": "Sources à interroger (défaut : documents, fichiers, notes, tâches, agenda, mémoire). Ajoute 'emails' et 'web' au besoin, ou 'all'."},
+        "limit": {"type": "integer", "description": "Résultats max par source (défaut 5)"}},
+       ["query"]),
+
+    # ── Notifications externes ─────────────────────────────────────────────────
+    _t("telegram_send", "Envoie un message sur le Telegram de l'utilisateur (alerte/rappel sur son téléphone). Nécessite la config Telegram.",
+       {"text": {"type": "string", "description": "Le message à envoyer"}},
+       ["text"]),
+
+    # ── Web par vrai navigateur ────────────────────────────────────────────────
+    _t("web_research", "Cherche la réponse sur INTERNET avec un vrai navigateur (contourne les blocages anti-bot), lit les meilleurs résultats et mémorise la réponse. Pour « cherche sur le web », « trouve en ligne », quand une info manque.",
+       {"query": {"type": "string", "description": "La question / les mots-clés à rechercher"}},
+       ["query"]),
+    _t("web_browser_open", "Ouvre une page web précise dans un vrai navigateur et renvoie son texte (utile si l'outil web interne est bloqué ou pour un site dynamique).",
+       {"url": {"type": "string", "description": "L'adresse de la page à ouvrir"}},
+       ["url"]),
+
+    # ── SSH ───────────────────────────────────────────────────────────────────
+    _t("ssh_list", "Liste les connexions SSH sauvegardées dans Marvin.",
+       {}, []),
+
+    _t("ssh_exec", "Exécute une commande sur un serveur SSH sauvegardé. Requiert confirmation explicite.",
+       {"connection_id": {"type": "string", "description": "ID de la connexion SSH (récupéré via ssh_list)"},
+        "command": {"type": "string", "description": "Commande à exécuter sur le serveur distant"},
+        "timeout": {"type": "integer", "description": "Délai maximum en secondes (défaut 30, max 120)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant exécution)"}},
+       ["connection_id", "command"]),
+    _t("ssh_exec_multi", "Exécute une commande sur PLUSIEURS serveurs SSH en parallèle (administration de parc).",
+       {"connection_ids": {"type": "array", "description": "Liste d'IDs de connexions SSH"},
+        "command": {"type": "string"},
+        "timeout": {"type": "integer"},
+        "confirmed": {"type": "boolean"}},
+       ["connection_ids", "command"]),
+    _t("ssh_upload", "Envoie un fichier local vers un serveur SSH via SFTP.",
+       {"connection_id": {"type": "string"},
+        "local_path": {"type": "string", "description": "Fichier local à envoyer"},
+        "remote_path": {"type": "string", "description": "Destination sur le serveur"},
+        "confirmed": {"type": "boolean"}},
+       ["connection_id", "local_path", "remote_path"]),
+    _t("ssh_download", "Télécharge un fichier d'un serveur SSH vers le PC (SFTP).",
+       {"connection_id": {"type": "string"},
+        "remote_path": {"type": "string", "description": "Fichier distant à récupérer"},
+        "local_path": {"type": "string", "description": "Destination locale (défaut : Téléchargements)"}},
+       ["connection_id", "remote_path"]),
+    _t("ssh_list_dir", "Liste un dossier distant d'un serveur SSH (SFTP).",
+       {"connection_id": {"type": "string"},
+        "remote_path": {"type": "string", "description": "Dossier distant (défaut : ~)"}},
+       ["connection_id"]),
+    _t("ssh_server_info", "Diagnostic rapide d'un serveur SSH : OS, uptime, RAM, disque, charge.",
+       {"connection_id": {"type": "string"}},
+       ["connection_id"]),
+
+    # ── Voice ─────────────────────────────────────────────────────────────────
+    _t("voice_transcribe", "Transcrit un fichier audio local en texte via Whisper (faster-whisper, entièrement local).",
+       {"audio_path": {"type": "string", "description": "Chemin du fichier audio (mp3, wav, ogg, webm, mp4...)"},
+        "model": {"type": "string", "enum": ["tiny", "base", "small", "medium", "large-v3"],
+                  "description": "Taille du modèle Whisper (défaut : base). Plus grand = plus précis mais plus lent."},
+        "language": {"type": "string", "description": "Code langue ISO (ex: fr, en). Omis = détection automatique."}},
+       ["audio_path"]),
+
+    # ── Utilitaires ───────────────────────────────────────────────────────────
+    _t("calculator", "Évalue une expression mathématique (arithmétique, trigonométrie, logarithmes, factorielle, etc.).",
+       {"expression": {"type": "string", "description": "Expression à évaluer. Exemples : '(12 + 4) * 3 / 2', 'sqrt(144)', 'sin(pi/2)', 'factorial(10)'"}},
+       ["expression"]),
+
+    _t("datetime_info",
+       "Retourne la date/heure actuelle, convertit entre fuseaux horaires, calcule des différences ou ajoute un delta à une date.",
+       {"action":    {"type": "string", "enum": ["now", "convert", "diff", "add"],
+                      "description": "Action : now=heure actuelle, convert=changer fuseau, diff=durée entre deux dates, add=ajouter un delta"},
+        "timezone":  {"type": "string", "description": "Nom du fuseau horaire IANA (ex: Europe/Paris, America/New_York). Défaut : Europe/Paris"},
+        "datetime":  {"type": "string", "description": "Date/heure ISO 8601 (requis pour convert, diff, add). Ex: '2025-06-01T14:30:00'"},
+        "datetime2": {"type": "string", "description": "Deuxième date/heure ISO 8601 (requis pour action=diff)"},
+        "delta":     {"type": "object", "description": "Durée à ajouter (action=add). Ex: {\"days\": 5, \"hours\": 2, \"minutes\": 30}"}},
+       []),
+
+    _t("weather", "Récupère la météo actuelle et les prévisions (jusqu'à 7 jours) via Open-Meteo (gratuit, sans clé API).",
+       {"city":    {"type": "string", "description": "Nom de la ville (ex: Paris, Lyon, Toulouse)"},
+        "country": {"type": "string", "description": "Code pays ISO 2 lettres (ex: FR, BE, CH). Aide à disambiguïser."},
+        "days":    {"type": "integer", "description": "Nombre de jours de prévisions (1 à 7, défaut : 1)"}},
+       ["city"]),
+
+    _t("translate", "Traduit du texte dans n'importe quelle langue via MyMemory (gratuit, sans clé, 1000 req/j).",
+       {"text":        {"type": "string",  "description": "Texte à traduire"},
+        "target_lang": {"type": "string",  "description": "Langue cible (code ISO 2 lettres : fr, en, es, de, it, pt, ar, zh, ja, ru…)"},
+        "source_lang": {"type": "string",  "description": "Langue source (code ISO ou 'auto' pour détection automatique — défaut : auto)"}},
+       ["text", "target_lang"]),
+
+    _t("unit_convert", "Convertit une valeur entre unités (longueur, masse, volume, vitesse, surface, énergie, données numériques, température).",
+       {"value":     {"type": "number", "description": "Valeur numérique à convertir"},
+        "from_unit": {"type": "string", "description": "Unité source (ex: km, lb, L, °C, km/h, GB…)"},
+        "to_unit":   {"type": "string", "description": "Unité destination (ex: m, kg, ml, °F, m/s, MB…)"}},
+       ["value", "from_unit", "to_unit"]),
+
+    _t("password_generate", "Génère des mots de passe ou PINs sécurisés avec critères configurables.",
+       {"length":  {"type": "integer", "description": "Longueur du mot de passe (défaut 16, max 128)"},
+        "count":   {"type": "integer", "description": "Nombre de mots de passe à générer (défaut 1, max 20)"},
+        "include": {"type": "array",   "items": {"type": "string"},
+                    "description": "Catégories incluses : ['letters', 'digits', 'symbols']. Défaut : les trois."},
+        "exclude": {"type": "string",  "description": "Caractères à exclure (ex: 'Il1O0' pour éviter confusions)"},
+        "pin":     {"type": "boolean", "description": "Mode PIN numérique uniquement (défaut false)"}},
+       []),
+
+    # ── Section 15 — traitement de données ────────────────────────────────────
+    _t("hash_compute", "Calcule le hash cryptographique (MD5/SHA1/SHA256/SHA512) d'un texte ou fichier.",
+       {"text":      {"type": "string", "description": "Texte à hacher"},
+        "file_path": {"type": "string", "description": "Chemin du fichier à hacher"},
+        "algorithm": {"type": "string", "enum": ["md5", "sha1", "sha256", "sha512"],
+                      "description": "Algorithme (défaut : sha256)"}},
+       []),
+
+    _t("base64_tool", "Encode ou décode en Base64 (standard ou URL-safe).",
+       {"data":     {"type": "string",  "description": "Texte à encoder ou chaîne Base64 à décoder"},
+        "action":   {"type": "string",  "enum": ["encode", "decode"], "description": "Action (défaut : encode)"},
+        "url_safe": {"type": "boolean", "description": "Utiliser le variant URL-safe (défaut false)"}},
+       ["data"]),
+
+    _t("text_extract", "Extrait des emails, URLs et numéros de téléphone d'un texte.",
+       {"text":    {"type": "string", "description": "Texte source à analyser"},
+        "extract": {"type": "string", "enum": ["emails", "urls", "phones", "all"],
+                    "description": "Type à extraire (défaut : all)"}},
+       ["text"]),
+
+    _t("diff_text", "Compare deux textes et affiche les différences (unified diff ou ratio de similarité).",
+       {"text_a":        {"type": "string", "description": "Premier texte"},
+        "text_b":        {"type": "string", "description": "Second texte"},
+        "mode":          {"type": "string", "enum": ["unified", "context", "ndiff", "ratio"],
+                          "description": "Mode de diff (défaut : unified)"},
+        "context_lines": {"type": "integer", "description": "Lignes de contexte (défaut 3)"}},
+       ["text_a", "text_b"]),
+
+    _t("image_info", "Retourne les métadonnées d'une image (dimensions, format, taille, EXIF).",
+       {"path": {"type": "string", "description": "Chemin de l'image"}},
+       ["path"]),
+
+    _t("image_resize", "Redimensionne ou convertit une image (PNG, JPEG, WEBP) via Pillow.",
+       {"path":        {"type": "string",  "description": "Chemin de l'image source"},
+        "width":       {"type": "integer", "description": "Largeur cible en pixels"},
+        "height":      {"type": "integer", "description": "Hauteur cible en pixels"},
+        "output_path": {"type": "string",  "description": "Chemin de sortie (défaut : même dossier _resized)"},
+        "format":      {"type": "string",  "enum": ["JPEG", "PNG", "WEBP"], "description": "Format de sortie"},
+        "quality":     {"type": "integer", "description": "Qualité JPEG/WEBP (1-95, défaut 85)"},
+        "keep_ratio":  {"type": "boolean", "description": "Conserver le ratio (défaut true)"}},
+       ["path"]),
+
+    _t("qr_generate", "Génère un QR code PNG depuis un texte ou une URL.",
+       {"data":        {"type": "string",  "description": "Texte ou URL à encoder dans le QR code"},
+        "output_path": {"type": "string",  "description": "Chemin du fichier PNG de sortie (défaut : Bureau)"},
+        "size":        {"type": "integer", "description": "Taille des modules en pixels (défaut 10)"},
+        "border":      {"type": "integer", "description": "Bordure blanche autour (défaut 4 modules)"},
+        "fg_color":    {"type": "string",  "description": "Couleur des modules (défaut black)"},
+        "bg_color":    {"type": "string",  "description": "Couleur de fond (défaut white)"}},
+       ["data"]),
+
+    _t("json_tool", "Formate, minifie, valide ou interroge un JSON (dot-notation path).",
+       {"data":   {"type": "string", "description": "JSON en texte"},
+        "action": {"type": "string", "enum": ["format", "minify", "validate", "query"],
+                   "description": "Action (défaut : format)"},
+        "path":   {"type": "string", "description": "Chemin JSON pour l'action query (ex: 'user.address.city')"}},
+       ["data"]),
+
+    _t("text_stats", "Analyse un texte : nombre de mots, caractères, phrases, temps de lecture et mots fréquents.",
+       {"text":      {"type": "string",  "description": "Texte à analyser"},
+        "top_words": {"type": "integer", "description": "Nombre de mots fréquents à retourner (défaut 10)"}},
+       ["text"]),
+
+    _t("ip_info", "Retourne la géolocalisation et les infos réseau d'une adresse IP publique (ip-api.com, gratuit).",
+       {"ip": {"type": "string", "description": "Adresse IP à analyser (vide = IP publique de la machine)"}},
+       []),
+
+    _t("markdown_convert", "Convertit du Markdown en HTML, texte brut ou retourne des statistiques (titres, liens, blocs de code).",
+       {"text":   {"type": "string", "description": "Contenu Markdown à convertir"},
+        "to":     {"type": "string", "enum": ["html", "plain", "stats"],
+                   "description": "Format cible : html (défaut), plain (texte brut), stats"}},
+       ["text"]),
+
+    _t("regex_tool", "Applique une expression régulière à un texte : recherche, extraction, remplacement ou validation.",
+       {"pattern":     {"type": "string", "description": "Expression régulière"},
+        "text":        {"type": "string", "description": "Texte cible"},
+        "action":      {"type": "string", "enum": ["findall", "match", "replace", "split", "test"],
+                        "description": "Action (défaut : findall)"},
+        "replace":     {"type": "string", "description": "Texte de remplacement (pour action replace)"},
+        "flags":       {"type": "string", "description": "Flags : I (insensible à la casse), M (multiline), S (dot-all)"},
+        "max_results": {"type": "integer", "description": "Limite de résultats (défaut 100)"}},
+       ["pattern"]),
+    # ── Section 16 ──────────────────────────────────────────────────────────
+    _t("pdf_read", "Extrait le texte d'un fichier PDF page par page.",
+       {"path":      {"type": "string", "description": "Chemin du fichier PDF"},
+        "pages":     {"type": "string", "description": "Pages à lire : '1-3', '2' ou null pour tout (défaut : tout)"},
+        "max_chars": {"type": "integer", "description": "Limite de caractères retournés (défaut 4000)"}},
+       ["path"]),
+    _t("pdf_info", "Retourne les métadonnées d'un fichier PDF : titre, auteur, nombre de pages, taille.",
+       {"path": {"type": "string", "description": "Chemin du fichier PDF"}},
+       ["path"]),
+    _t("pdf_merge", "Fusionne plusieurs PDF en un seul fichier, dans l'ordre fourni.",
+       {"sources": {"type": "array", "items": {"type": "string"}, "description": "Liste des PDF à fusionner (≥2)"},
+        "output_path": {"type": "string", "description": "PDF de sortie (défaut : Bureau/fusion.pdf)"}},
+       ["sources"]),
+    _t("pdf_split", "Découpe un PDF : une page par fichier (per_page) ou extrait des pages précises (pages='1-3,5').",
+       {"path": {"type": "string", "description": "PDF source"},
+        "pages": {"type": "string", "description": "Pages à extraire, ex '1-3,5' (vide = toutes)"},
+        "per_page": {"type": "boolean", "description": "Un fichier par page (défaut si pages vide)"},
+        "output_dir": {"type": "string", "description": "Dossier de sortie (défaut : dossier du PDF)"}},
+       ["path"]),
+    _t("pdf_rotate", "Pivote des pages d'un PDF (angle multiple de 90).",
+       {"path": {"type": "string", "description": "PDF source"},
+        "angle": {"type": "integer", "enum": [90, 180, 270], "description": "Angle de rotation horaire"},
+        "pages": {"type": "string", "description": "Pages à pivoter, ex '1,3-4' (vide = toutes)"},
+        "output_path": {"type": "string", "description": "PDF de sortie"}},
+       ["path"]),
+    _t("pdf_watermark", "Appose un filigrane texte en diagonale sur chaque page d'un PDF (ex : CONFIDENTIEL).",
+       {"path": {"type": "string", "description": "PDF source"},
+        "text": {"type": "string", "description": "Texte du filigrane"},
+        "opacity": {"type": "number", "description": "Opacité 0-1 (défaut 0.12)"},
+        "font_size": {"type": "integer", "description": "Taille de police (auto si absent)"},
+        "output_path": {"type": "string", "description": "PDF de sortie"}},
+       ["path", "text"]),
+    _t("pdf_protect", "Protège un PDF par mot de passe (chiffrement AES-256).",
+       {"path": {"type": "string", "description": "PDF source"},
+        "password": {"type": "string", "description": "Mot de passe d'ouverture"},
+        "owner_password": {"type": "string", "description": "Mot de passe propriétaire (optionnel)"},
+        "output_path": {"type": "string", "description": "PDF de sortie"}},
+       ["path", "password"]),
+    _t("pdf_extract_images", "Extrait les images intégrées d'un PDF vers un dossier.",
+       {"path": {"type": "string", "description": "PDF source"},
+        "output_dir": {"type": "string", "description": "Dossier de sortie (défaut : <pdf>_images)"}},
+       ["path"]),
+    _t("pdf_to_images", "Convertit chaque page d'un PDF en image PNG (rendu visuel haute qualité).",
+       {"path": {"type": "string", "description": "PDF source"},
+        "pages": {"type": "string", "description": "Pages, ex '1-3,5' (vide = toutes)"},
+        "dpi": {"type": "integer", "description": "Résolution en DPI (défaut 150)"},
+        "output_dir": {"type": "string", "description": "Dossier de sortie (défaut : <pdf>_pages)"}},
+       ["path"]),
+    _t("pdf_ocr", "OCR d'un PDF même SCANNÉ → texte. Utilise le texte intégré si présent, sinon rend la page et l'OCR par IA (llava).",
+       {"path": {"type": "string", "description": "PDF source"},
+        "pages": {"type": "string", "description": "Pages à traiter, ex '1-3' (vide = toutes)"},
+        "max_pages": {"type": "integer", "description": "Limite de pages à traiter (défaut 15)"},
+        "output_path": {"type": "string", "description": "Fichier .txt de sortie (optionnel)"}},
+       ["path"]),
+    _t("pdf_form_fields", "Liste les champs de formulaire remplissables (AcroForm) d'un PDF.",
+       {"path": {"type": "string", "description": "PDF source"}},
+       ["path"]),
+    _t("pdf_fill_form", "Remplit les champs d'un formulaire PDF depuis un objet {champ: valeur}.",
+       {"path": {"type": "string", "description": "PDF formulaire source"},
+        "data": {"type": "object", "description": "Dictionnaire {nom_du_champ: valeur}"},
+        "output_path": {"type": "string", "description": "PDF de sortie (défaut : _rempli)"}},
+       ["path", "data"]),
+    _t("images_to_pdf", "Assemble plusieurs images en un PDF (une image par page).",
+       {"sources": {"type": "array", "items": {"type": "string"}, "description": "Images à assembler (ordre conservé)"},
+        "output_path": {"type": "string", "description": "PDF de sortie (défaut : Bureau/images.pdf)"},
+        "dpi": {"type": "integer", "description": "Résolution (défaut 150)"}},
+       ["sources"]),
+    _t("image_crop", "Rogne une image : boîte (left/top/right/bottom) ou aspect ('1:1','16:9') centré.",
+       {"path": {"type": "string", "description": "Image source"},
+        "aspect": {"type": "string", "description": "Ratio cible centré, ex '1:1', '16:9'"},
+        "left": {"type": "integer"}, "top": {"type": "integer"},
+        "right": {"type": "integer"}, "bottom": {"type": "integer"},
+        "output_path": {"type": "string", "description": "Image de sortie"}},
+       ["path"]),
+    _t("image_rotate", "Pivote (angle horaire) et/ou retourne (flip horizontal/vertical) une image.",
+       {"path": {"type": "string", "description": "Image source"},
+        "angle": {"type": "number", "description": "Angle horaire en degrés"},
+        "flip": {"type": "string", "enum": ["horizontal", "vertical"], "description": "Miroir"},
+        "output_path": {"type": "string", "description": "Image de sortie"}},
+       ["path"]),
+    _t("image_compress", "Compresse une image vers un poids cible (target_kb) ou une qualité fixe (JPEG/WEBP).",
+       {"path": {"type": "string", "description": "Image source"},
+        "target_kb": {"type": "integer", "description": "Poids cible en Ko (ajuste la qualité automatiquement)"},
+        "quality": {"type": "integer", "description": "Qualité fixe 1-100 (défaut 80) si pas de target_kb"},
+        "format": {"type": "string", "enum": ["JPEG", "WEBP"], "description": "Format de sortie"},
+        "output_path": {"type": "string", "description": "Image de sortie"}},
+       ["path"]),
+    _t("image_batch", "Traite en LOT toutes les images d'un dossier : convert/resize/compress/rotate/watermark.",
+       {"directory": {"type": "string", "description": "Dossier contenant les images"},
+        "operation": {"type": "string", "enum": ["convert", "resize", "compress", "rotate", "watermark"], "description": "Opération à appliquer"},
+        "output_dir": {"type": "string", "description": "Dossier de sortie (défaut : <dossier>_traite)"},
+        "format": {"type": "string", "description": "Format cible pour convert (JPEG/PNG/WEBP)"},
+        "width": {"type": "integer", "description": "Largeur pour resize"},
+        "height": {"type": "integer", "description": "Hauteur pour resize"},
+        "target_kb": {"type": "integer", "description": "Poids cible pour compress"},
+        "quality": {"type": "integer", "description": "Qualité JPEG (défaut 85)"},
+        "angle": {"type": "number", "description": "Angle pour rotate"},
+        "flip": {"type": "string", "enum": ["horizontal", "vertical"], "description": "Miroir pour rotate"},
+        "text": {"type": "string", "description": "Texte pour watermark"},
+        "recursive": {"type": "boolean", "description": "Inclure les sous-dossiers"}},
+       ["directory", "operation"]),
+    _t("file_large_finder", "Liste les plus gros fichiers d'un dossier (récursif) pour repérer ce qui occupe l'espace disque.",
+       {"directory": {"type": "string", "description": "Dossier à analyser (défaut : dossier personnel)"},
+        "top": {"type": "integer", "description": "Nombre de fichiers à retourner (défaut 20)"},
+        "min_mb": {"type": "number", "description": "Taille minimale en Mo à considérer"}},
+       []),
+    _t("system_cleanup", "Analyse les fichiers temporaires et l'espace récupérable. delete=true vide les temp (action sensible, fichiers anciens uniquement).",
+       {"delete": {"type": "boolean", "description": "true = supprimer réellement (sinon rapport seul)"},
+        "min_age_days": {"type": "number", "description": "Âge minimal des fichiers à supprimer en jours (défaut 1)"}},
+       []),
+    _t("pptx_create", "Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces.",
+       {"title": {"type": "string", "description": "Titre de la présentation (diapo de couverture)"},
+        "subtitle": {"type": "string", "description": "Sous-titre de couverture"},
+        "slides": {"type": "array", "items": {"type": "object"},
+                   "description": "Diapos : [{title, bullets:[...]}, …]"},
+        "output_path": {"type": "string", "description": "Fichier .pptx de sortie (défaut : Bureau)"}},
+       []),
+    _t("pptx_read", "Extrait le texte de toutes les diapos d'un PowerPoint (.pptx).",
+       {"path": {"type": "string", "description": "Fichier .pptx"}},
+       ["path"]),
+    _t("csv_to_xlsx", "Convertit un fichier CSV en classeur Excel (.xlsx) avec en-têtes en gras.",
+       {"path": {"type": "string", "description": "Fichier CSV source"},
+        "delimiter": {"type": "string", "description": "Séparateur (auto-détecté si absent)"},
+        "output_path": {"type": "string", "description": "Fichier .xlsx de sortie"}},
+       ["path"]),
+    _t("xlsx_to_csv", "Convertit une feuille Excel (.xlsx) en CSV.",
+       {"path": {"type": "string", "description": "Fichier Excel source"},
+        "sheet": {"type": "string", "description": "Nom de la feuille (défaut : active)"},
+        "delimiter": {"type": "string", "description": "Séparateur de sortie (défaut ',')"},
+        "output_path": {"type": "string", "description": "Fichier .csv de sortie"}},
+       ["path"]),
+    _t("docx_to_text", "Extrait le texte d'un document Word (.docx) en texte brut ou Markdown (titres, listes, tableaux).",
+       {"path": {"type": "string", "description": "Fichier .docx"},
+        "format": {"type": "string", "enum": ["markdown", "text"], "description": "Format de sortie (défaut markdown)"},
+        "output_path": {"type": "string", "description": "Fichier texte de sortie (optionnel)"}},
+       ["path"]),
+    _t("text_summarize", "Résume un texte OU un document (txt/pdf/docx) via l'IA locale. Styles : bref, détaillé, puces, action.",
+       {"text": {"type": "string", "description": "Texte à résumer (ou utiliser 'path')"},
+        "path": {"type": "string", "description": "Document à résumer (txt/pdf/docx)"},
+        "style": {"type": "string", "enum": ["bref", "détaillé", "puces", "action"], "description": "Style de résumé"},
+        "language": {"type": "string", "description": "Langue du résumé (défaut français)"}},
+       []),
+    _t("text_to_speech", "Génère un fichier audio MP3 parlant à partir d'un texte (voix neurale FR/EN, edge-tts).",
+       {"text": {"type": "string", "description": "Texte à lire à voix haute"},
+        "voice": {"type": "string", "enum": ["henri","denise","eloise","vivienne","remy","thierry","sylvie","en-femme","en-homme"], "description": "Voix (défaut denise)"},
+        "rate": {"type": "string", "description": "Vitesse, ex '+10%' ou '-10%'"},
+        "pitch": {"type": "string", "description": "Hauteur, ex '+5Hz' ou '-5Hz'"},
+        "output_path": {"type": "string", "description": "Fichier .mp3 de sortie (défaut : Bureau)"}},
+       ["text"]),
+    _t("pdf_compress", "Réduit le poids d'un fichier PDF (recompression des flux) via pikepdf.",
+       {"path": {"type": "string", "description": "PDF source"},
+        "output_path": {"type": "string", "description": "PDF de sortie (défaut : _compresse)"}},
+       ["path"]),
+    _t("pdf_add_page_numbers", "Ajoute une numérotation (ou un texte) sur chaque page d'un PDF. {n}=numéro, {total}=total.",
+       {"path": {"type": "string", "description": "PDF source"},
+        "format": {"type": "string", "description": "Modèle, ex 'Page {n} / {total}'"},
+        "position": {"type": "string", "enum": ["bottom-center","bottom-right","bottom-left","top-center","top-right","top-left"], "description": "Position"},
+        "start_number": {"type": "integer", "description": "Numéro de départ (défaut 1)"},
+        "font_size": {"type": "integer", "description": "Taille de police (défaut 9)"},
+        "output_path": {"type": "string", "description": "PDF de sortie (défaut : _numerote)"}},
+       ["path"]),
+    _t("csv_to_chart", "Génère un graphique PNG directement depuis un fichier CSV (bar/line/pie, colonnes numériques auto-détectées).",
+       {"path": {"type": "string", "description": "Fichier CSV source"},
+        "chart_type": {"type": "string", "enum": ["bar","line","pie"], "description": "Type de graphique"},
+        "label_column": {"type": "integer", "description": "Index de la colonne des étiquettes (défaut 0)"},
+        "value_columns": {"type": "string", "description": "Indices des colonnes de valeurs, ex '1,2' (auto si absent)"},
+        "title": {"type": "string", "description": "Titre du graphique"},
+        "output_path": {"type": "string", "description": "Image PNG de sortie"}},
+       ["path"]),
+    _t("xlsx_read", "Lit un fichier Excel (.xlsx) et retourne le contenu d'une feuille.",
+       {"path":     {"type": "string", "description": "Chemin du fichier Excel (.xlsx)"},
+        "sheet":    {"type": "string", "description": "Nom de la feuille (défaut : première feuille active)"},
+        "action":   {"type": "string", "enum": ["read", "sheets", "summary"],
+                     "description": "read = données, sheets = liste des onglets, summary = dimensions (défaut : read)"},
+        "max_rows": {"type": "integer", "description": "Nombre max de lignes à retourner (défaut 50)"}},
+       ["path"]),
+    _t("url_analyze", "Analyse une URL : titre, meta description, statut HTTP, serveur et temps de réponse.",
+       {"url": {"type": "string", "description": "URL à analyser (avec ou sans https://)"}},
+       ["url"]),
+    _t("zip_list", "Liste le contenu d'une archive ZIP sans l'extraire.",
+       {"path": {"type": "string", "description": "Chemin de l'archive ZIP"}},
+       ["path"]),
+    _t("color_tool", "Convertit une couleur entre HEX, RGB et HSL, et calcule la couleur complémentaire.",
+       {"color": {"type": "string",
+                  "description": "Couleur à convertir. Formats acceptés : #RRGGBB (#FF5733), rgb(r,g,b) (rgb(255,87,51)) ou hsl(h,s%,l%)"}},
+       ["color"]),
+    # ── Section 17 ──────────────────────────────────────────────────────────
+    _t("sqlite_query", "Exécute une requête SQL (SELECT ou écriture avec confirmation) sur une base SQLite locale.",
+       {"db_path":   {"type": "string",  "description": "Chemin du fichier .db ou .sqlite"},
+        "query":     {"type": "string",  "description": "Requête SQL à exécuter"},
+        "max_rows":  {"type": "integer", "description": "Nombre max de lignes retournées (défaut 100)"},
+        "confirmed": {"type": "boolean", "description": "Requis pour les requêtes d'écriture (INSERT/UPDATE/DELETE…)"}},
+       ["db_path", "query"]),
+    _t("sqlite_tables", "Liste les tables et leur schéma dans une base SQLite.",
+       {"db_path": {"type": "string", "description": "Chemin du fichier SQLite (.db, .sqlite)"}},
+       ["db_path"]),
+    _t("git_info", "Retourne des informations sur un dépôt Git : branche, statut, commits, branches.",
+       {"path":   {"type": "string", "description": "Chemin du dépôt (défaut : dossier courant)"},
+        "action": {"type": "string", "enum": ["status", "log", "branches", "diff"],
+                   "description": "status = fichiers modifiés, log = historique, branches = liste, diff = statistiques"},
+        "count":  {"type": "integer", "description": "Nombre de commits pour l'action 'log' (défaut 10)"}},
+       []),
+    _t("bulk_rename", "Renomme en masse des fichiers d'un dossier selon un motif regex (avec confirmation et mode dry_run).",
+       {"folder":   {"type": "string", "description": "Dossier contenant les fichiers"},
+        "pattern":  {"type": "string", "description": "Expression régulière à trouver dans le nom de fichier"},
+        "replace":  {"type": "string", "description": "Texte de remplacement (peut utiliser des groupes de capture)"},
+        "glob":     {"type": "string", "description": "Filtre de fichiers ex: *.jpg (défaut: *)"},
+        "dry_run":  {"type": "boolean", "description": "Si true, simule seulement et demande confirmation (défaut : true)"},
+        "confirmed":{"type": "boolean", "description": "Requis pour exécuter le renommage réel"}},
+       ["folder", "pattern"]),
+    # ── Section 18 ──────────────────────────────────────────────────────────
+    _t("screen_ocr", "Capture l'écran et en extrait le texte via OCR (pytesseract). Combine screenshot + OCR en un seul appel.",
+       {"lang":  {"type": "string", "description": "Langue OCR (défaut : fra+eng). Exemples : eng, fra, deu"},
+        "region":{"type": "array",  "description": "Région [x, y, largeur, hauteur] ou null pour tout l'écran"},
+        "save":  {"type": "boolean","description": "Sauvegarder le screenshot sur le Bureau (défaut : false)"}},
+       []),
+    _t("file_batch_read", "Lit plusieurs fichiers texte en une seule requête et retourne leur contenu agrégé.",
+       {"paths":              {"type": "array",   "description": "Liste des chemins de fichiers à lire"},
+        "max_chars_per_file": {"type": "integer", "description": "Limite de caractères par fichier (défaut 5000)"},
+        "encoding":           {"type": "string",  "description": "Encodage (défaut utf-8)"}},
+       ["paths"]),
+    _t("clipboard_append", "Ajoute du texte au contenu actuel du presse-papiers (append) sans écraser ce qui est déjà dedans.",
+       {"text":      {"type": "string", "description": "Texte à ajouter au presse-papiers"},
+        "separator": {"type": "string", "description": "Séparateur entre l'ancien et le nouveau contenu (défaut : saut de ligne)"}},
+       ["text"]),
+    _t("text_join", "Fusionne une liste de textes avec un séparateur personnalisé (jointure, concaténation, déduplication).",
+       {"texts":     {"type": "array",   "description": "Liste des textes à fusionner"},
+        "separator": {"type": "string",  "description": "Séparateur entre les textes (défaut : saut de ligne)"},
+        "prefix":    {"type": "string",  "description": "Préfixe ajouté à chaque élément"},
+        "suffix":    {"type": "string",  "description": "Suffixe ajouté à chaque élément"},
+        "dedupe":    {"type": "boolean", "description": "Supprimer les doublons avant la fusion (défaut : false)"}},
+       ["texts"]),
+    # ── Section 19 ──────────────────────────────────────────────────────────
+    _t("code_python",
+       "Exécute un extrait de code Python et retourne stdout, stderr et les variables résultantes. "
+       "Idéal pour : calculs de données, transformations, statistiques, génération de listes. "
+       "Bibliothèques disponibles : json, math, re, datetime, collections, statistics, random, numpy (si installé), pandas (si installé). "
+       "Les variables nommées 'result' ou 'output' sont retournées dans le champ 'result'.",
+       {"code":      {"type": "string",  "description": "Code Python à exécuter"},
+        "timeout":   {"type": "integer", "description": "Délai max en secondes (1–60, défaut 15)"},
+        "confirmed": {"type": "boolean", "description": "Requis si le code utilise open(), os., subprocess, etc."}},
+       ["code"]),
+
+    # ── Section 20 — Devis / Facturation IT ────────────────────────────────
+    _t("billing_client_create", "Crée un nouveau client dans le module devis/facturation.",
+       {"name":           {"type": "string", "description": "Nom du client/société"},
+        "client_type":    {"type": "string", "enum": ["mairie","pme","asso","particulier","autre"], "description": "Type de client"},
+        "contact_name":   {"type": "string"},
+        "contact_email":  {"type": "string"},
+        "contact_phone":  {"type": "string"},
+        "address":        {"type": "string"},
+        "siret":          {"type": "string"},
+        "previous_provider": {"type": "string", "description": "Nom du prestataire actuel à remplacer"},
+        "previous_amount":{"type": "number", "description": "Montant annuel du prestataire actuel"}},
+       ["name"]),
+    _t("billing_client_list", "Liste les clients, filtrable par type.",
+       {"client_type": {"type": "string", "enum": ["mairie","pme","asso","particulier","autre"]}}, []),
+    _t("billing_catalog_list", "Liste le catalogue des prestations IT (avec prix Basic/Standard/Premium).",
+       {"category": {"type": "string", "description": "Filtrer par catégorie (Support, Infrastructure, Sécurité, etc.)"}}, []),
+    _t("billing_analyze_need",
+       "Analyse le besoin d'un client et propose les prestations pertinentes du catalogue avec estimations Basic/Standard/Premium.",
+       {"description":  {"type": "string", "description": "Description libre du besoin client"},
+        "client_type":  {"type": "string", "description": "mairie | pme | asso | particulier"}},
+       ["description"]),
+    _t("billing_quote_create",
+       "Crée un devis avec lignes (items). Calcule automatiquement HT/TTC/marge.",
+       {"client_id":     {"type": "string", "description": "ID du client (billing_client_list)"},
+        "title":         {"type": "string"},
+        "tier":          {"type": "string", "enum": ["basic","standard","premium","custom"]},
+        "items":         {"type": "array",  "description": "Liste de prestations : [{label, qty, unit_price, total, cost}]"},
+        "tva_rate":      {"type": "number", "description": "Taux TVA (défaut 20.0)"},
+        "need_analysis": {"type": "string"},
+        "notes":         {"type": "string"},
+        "valid_until":   {"type": "string", "description": "Date de fin de validité (texte libre ou ISO)"}},
+       ["client_id","items"]),
+    _t("billing_quote_list", "Liste les devis (filtrable par client_id ou status).",
+       {"client_id": {"type": "string"},
+        "status":    {"type": "string", "enum": ["draft","sent","accepted","refused","expired"]}}, []),
+    _t("billing_quote_compare",
+       "Compare un devis avec l'ancien prestataire du client (économies, gains).",
+       {"quote_id": {"type": "string"}}, ["quote_id"]),
+    _t("billing_quote_pdf", "Génère un PDF professionnel du devis.",
+       {"quote_id":    {"type": "string"},
+        "output_path": {"type": "string", "description": "Chemin du PDF (défaut : Bureau)"}},
+       ["quote_id"]),
+    _t("billing_quote_email",
+       "Génère un email d'accompagnement professionnel pour envoyer un devis. Ton adapté au type de client (mairie=formel, asso=chaleureux, pme=pro).",
+       {"quote_id": {"type": "string"}}, ["quote_id"]),
+    _t("billing_tier_breakdown",
+       "Génère 3 propositions Basic/Standard/Premium pour une liste de prestations sélectionnées.",
+       {"service_ids": {"type": "array", "description": "Liste d'IDs du catalogue de services"}},
+       ["service_ids"]),
+
+    # ── Section 28 — Devis IT avancé ───────────────────────────────────────
+    _t("billing_market_research",
+       "Compare les offres du marché sur le WEB pour un produit/prestation IT : cherche les prix en ligne, agrège (min/médiane/max), liste les sources et recommande un prix de revient + prix de vente selon la marge cible. Idéal pour chiffrer du matériel/licences au juste prix.",
+       {"query":            {"type": "string", "description": "Produit/prestation à comparer (ex: 'Dell Latitude 5550 i5 16Go', 'Microsoft 365 Business Premium', 'pare-feu Fortinet 60F')"},
+        "target_margin_pct":{"type": "number", "description": "Marge cible en % (défaut 30)"},
+        "usd_to_eur":       {"type": "number", "description": "Taux USD→EUR (défaut 0.92)"}},
+       ["query"]),
+    _t("billing_find_products",
+       "Recherche du MATÉRIEL/produits selon une CONTRAINTE DE BUDGET sur le web (ex: 'PC portable bureautique à moins de 500€'). Renvoie les offres dans le budget, triées par prix, avec le meilleur rapport qualité/prix (avis) et les sources.",
+       {"query":      {"type": "string", "description": "Type de produit/besoin (ex: 'PC portable bureautique', 'écran 27 pouces', 'serveur NAS')"},
+        "max_budget": {"type": "number", "description": "Budget maximum en € (ex: 500)"},
+        "min_budget": {"type": "number", "description": "Budget minimum en € (optionnel)"}},
+       ["query"]),
+    _t("billing_product_reviews",
+       "Recherche et agrège les AVIS d'un produit/prestation sur le web : note moyenne /5 pondérée, total d'avis, sentiment et extraits. Utile pour conseiller le meilleur produit.",
+       {"query": {"type": "string", "description": "Produit/prestation (ex: 'Veeam Backup', 'Bitdefender GravityZone')"}},
+       ["query"]),
+    _t("billing_price_recommendation",
+       "Recommande un prix de vente compétitif (3 paliers) à partir d'un coût d'achat, selon les marges-cibles par segment client et nature de prestation.",
+       {"cost":        {"type": "number", "description": "Coût d'achat HT"},
+        "client_type": {"type": "string", "enum": ["mairie","pme","asso","particulier","autre"]},
+        "category":    {"type": "string", "description": "Nature (matériel, conseil, sécurité, support…)"}},
+       ["cost"]),
+    _t("billing_generate_proposal",
+       "Génère une PROPOSITION COMMERCIALE structurée et persuasive depuis un devis (résumé exécutif, solution, bénéfices, investissement, garanties, appel à l'action). Sortie Markdown prête à présenter.",
+       {"quote_id": {"type": "string", "description": "ID du devis"}}, ["quote_id"]),
+    _t("billing_tco_analysis",
+       "Analyse le coût total de possession (TCO) sur N années + ROI vs une alternative (cloud/location). Justifie un investissement IT.",
+       {"years":             {"type": "integer", "description": "Durée d'analyse (défaut 3)"},
+        "upfront_cost":      {"type": "number", "description": "Coût initial (matériel/setup)"},
+        "monthly_cost":      {"type": "number", "description": "Coût mensuel récurrent (support/licences)"},
+        "alternative_monthly":{"type": "number", "description": "Coût mensuel de l'alternative comparée"},
+        "alternative_upfront":{"type": "number"},
+        "downtime_hours_year_saved": {"type": "number", "description": "Heures d'arrêt évitées/an"},
+        "hourly_value":      {"type": "number", "description": "Valeur d'une heure d'arrêt (défaut 50€)"}},
+       []),
+    _t("billing_invoice_create",
+       "Crée une FACTURE, optionnellement depuis un devis accepté (from_quote_id reprend client, lignes et montants).",
+       {"from_quote_id": {"type": "string", "description": "ID d'un devis à facturer (optionnel)"},
+        "client_id":     {"type": "string"},
+        "title":         {"type": "string"},
+        "total_ht":      {"type": "number"},
+        "tva_rate":      {"type": "number"},
+        "items":         {"type": "array"},
+        "payment_terms": {"type": "string", "description": "Délai de paiement en jours (défaut 30)"}}, []),
+    _t("billing_invoice_list",
+       "Liste les factures (filtrable par client_id/status). Signale les impayés et retards.",
+       {"client_id": {"type": "string"},
+        "status":    {"type": "string", "enum": ["draft","sent","paid","partial","overdue","cancelled"]}}, []),
+    _t("billing_invoice_mark_paid",
+       "Marque une facture payée (totalement ou partiellement avec 'amount').",
+       {"invoice_id":     {"type": "string"},
+        "amount":         {"type": "number", "description": "Montant payé (défaut = total)"},
+        "payment_method": {"type": "string"}}, ["invoice_id"]),
+    _t("billing_revenue_dashboard",
+       "Tableau de bord commercial : CA facturé/encaissé, impayés, MRR/ARR (récurrent), taux de conversion des devis, pipeline.",
+       {}, []),
+    _t("billing_catalog_enrich",
+       "Ajoute au catalogue les prestations IT modernes (cybersécurité, cloud, sauvegarde, RGPD, VoIP, supervision…) si absentes.",
+       {}, []),
+    _t("billing_seed_trade",
+       "Charge un catalogue de prestations TYPES pour un MÉTIER (hors IT) : plomberie, électricité, peinture, menuiserie, jardinage, ménage, coiffure_esthétique, photographie, web_design, conseil, comptabilité. Rend le module devis/facture utilisable pour tout métier. trade='list' pour voir les métiers.",
+       {"trade": {"type": "string", "description": "Métier (ex: plomberie, électricité, jardinage…) ou 'list'"}},
+       []),
+
+    # ── Section 29 — Base de connaissances IT (consultable par Marvin) ──────
+    _t("it_kb_search",
+       "Recherche dans la base de connaissances IT de Marvin (outils/logiciels/produits) : sauvegarde, antivirus, supervision, virtualisation, pare-feu, diagnostic… Réponse instantanée sans recherche web.",
+       {"query":    {"type": "string", "description": "Mots-clés (ex: 'sauvegarde VM', 'antivirus', 'accès distant gratuit')"},
+        "category": {"type": "string", "description": "Filtrer par catégorie (optionnel)"},
+        "limit":    {"type": "integer"}}, []),
+    _t("it_kb_list",
+       "Liste/parcourt la base de connaissances IT (groupée par catégorie).",
+       {"category": {"type": "string"}}, []),
+    _t("it_kb_recommend",
+       "Recommande le(s) MEILLEUR(S) outil(s) IT pour un besoin, depuis la base de Marvin (instantané). Tient compte du budget (gratuit/open source) et de la souveraineté (RGPD/ANSSI). Idéal pour l'Agent Documentation Technique et les devis.",
+       {"need": {"type": "string", "description": "Besoin en clair (ex: 'sauvegarde pour une mairie budget limité', 'pare-feu souverain', 'supervision réseau gratuite')"}},
+       ["need"]),
+    _t("it_kb_add",
+       "Ajoute ou met à jour un outil dans la base de connaissances IT de Marvin (apprentissage). Utile après une recherche web concluante.",
+       {"name":          {"type": "string"},
+        "category":      {"type": "string"},
+        "vendor":        {"type": "string"},
+        "description":   {"type": "string"},
+        "use_cases":     {"type": "string"},
+        "pricing_model": {"type": "string", "enum": ["opensource","free","freemium","paid","saas","unknown"]},
+        "typical_price": {"type": "string"},
+        "platforms":     {"type": "string"},
+        "best_for":      {"type": "string"},
+        "official_url":  {"type": "string"},
+        "tags":          {"type": "string"},
+        "rating":        {"type": "number"}},
+       ["name"]),
+
+    # ── Section 21 — Windows Admin ─────────────────────────────────────────
+    _t("pc_installed_software",
+       "Liste les LOGICIELS INSTALLÉS sur ce PC (nom, version, éditeur) — AUCUN argument. Utilise cet outil EN PRIORITÉ pour « inventaire logiciel », « liste des programmes installés », « quels logiciels sur ce PC ».",
+       {}, []),
+    _t("win_services_list",
+       "Liste les services Windows avec leur état (running/stopped). Filtre par nom ou statut.",
+       {"filter": {"type": "string", "description": "Filtre sur le nom (substring)"},
+        "status": {"type": "string", "enum": ["running","stopped","paused","start_pending","stop_pending"]}}, []),
+    _t("win_service_action",
+       "Interroge (query) ou pilote un service Windows. 'query' = lecture seule de l'état "
+       "(sans confirmation) ; start/stop/restart/pause/resume = action (peut nécessiter droits admin).",
+       {"name":      {"type": "string", "description": "Nom du service Windows"},
+        "action":    {"type": "string", "enum": ["query","start","stop","restart","pause","resume"],
+                      "description": "query pour lire l'état ; sinon l'action à effectuer"},
+        "confirmed": {"type": "boolean", "description": "Requis pour les actions de modification (pas pour query)"}},
+       ["name","action"]),
+    _t("win_event_log",
+       "Lit les derniers événements du journal Windows (System / Application / Security / Setup).",
+       {"log":        {"type": "string", "enum": ["System","Application","Security","Setup"]},
+        "max_events": {"type": "integer", "description": "Nombre max d'événements (défaut 30)"},
+        "level":      {"type": "string", "enum": ["error","warning","information"]}}, []),
+    _t("win_users_list", "Liste les comptes utilisateurs locaux Windows.", {}, []),
+    _t("win_disk_info",
+       "Infos détaillées sur les disques Windows (lettre, label, taille, utilisation, santé).",
+       {}, []),
+    _t("win_update_status",
+       "Affiche les 10 dernières mises à jour Windows installées.", {}, []),
+
+    # ── Section 26 — v2.31 Windows Diagnostics avancés ────────────────────
+    _t("win_uptime", "Uptime du système et date de dernier démarrage Windows.", {}, []),
+    _t("win_startup_programs", "Liste les programmes lancés au démarrage de Windows (diagnostic boot lent).", {}, []),
+    _t("win_scheduled_tasks",
+       "Liste les tâches planifiées Windows (exclut Microsoft par défaut).",
+       {"include_microsoft": {"type": "boolean", "description": "Inclure les tâches Microsoft système"},
+        "state": {"type": "string", "enum": ["Ready","Running","Disabled"], "description": "Filtrer par état"}}, []),
+    _t("win_network_config",
+       "Configuration réseau complète : adaptateurs, IPs, passerelle, DNS, MAC.", {}, []),
+    _t("win_system_report",
+       "🔍 Rapport diagnostic système COMPLET en un seul appel : OS, uptime, CPU, RAM, disques, top processus, alertes. Idéal pour un support rapide.",
+       {}, []),
+    _t("file_duplicate_finder",
+       "Trouve les fichiers en double dans un dossier (par taille + hash). Utile pour le nettoyage disque. Ne supprime rien.",
+       {"path": {"type": "string", "description": "Dossier à analyser"},
+        "min_size_kb": {"type": "integer", "description": "Taille minimale en Ko (défaut 10)"},
+        "max_files": {"type": "integer", "description": "Limite de fichiers scannés (défaut 5000)"}},
+       ["path"]),
+
+    # ── Section 27 — v2.32 Édition vidéo / GIF (ffmpeg local) ─────────────
+    _t("video_info",
+       "Donne les métadonnées d'une vidéo ou d'un GIF : durée, résolution, fps, codec, taille.",
+       {"path": {"type": "string", "description": "Chemin du fichier vidéo/GIF"}},
+       ["path"]),
+    _t("video_to_gif",
+       "Convertit une vidéo en GIF animé optimisé (palette haute qualité). Idéal pour partager un extrait léger.",
+       {"path":     {"type": "string", "description": "Chemin de la vidéo source"},
+        "fps":      {"type": "integer", "description": "Images par seconde du GIF (défaut 12)"},
+        "width":    {"type": "integer", "description": "Largeur en px, hauteur auto (défaut 480)"},
+        "start":    {"type": "number",  "description": "Début en secondes (optionnel)"},
+        "duration": {"type": "number",  "description": "Durée en secondes (optionnel)"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("gif_to_video",
+       "Convertit un GIF en vidéo MP4, bien plus légère pour le stockage et le partage.",
+       {"path": {"type": "string", "description": "Chemin du GIF source"},
+        "fps":  {"type": "integer", "description": "Images par seconde (optionnel)"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("video_trim",
+       "Découpe un segment d'une vidéo (sans réencodage si possible). Fournir start + end OU start + duration.",
+       {"path":     {"type": "string", "description": "Chemin de la vidéo"},
+        "start":    {"type": "number", "description": "Début en secondes (défaut 0)"},
+        "end":      {"type": "number", "description": "Fin en secondes"},
+        "duration": {"type": "number", "description": "Durée en secondes"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("video_compress",
+       "Compresse une vidéo (H.264). crf 18=haute qualité, 28=équilibré, 35=très léger. Retourne le % de réduction.",
+       {"path":        {"type": "string",  "description": "Chemin de la vidéo"},
+        "crf":         {"type": "integer", "description": "Facteur de qualité 18-35 (défaut 28)"},
+        "scale_width": {"type": "integer", "description": "Réduire la largeur en px (optionnel)"},
+        "output_path": {"type": "string",  "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("video_resize",
+       "Redimensionne une vidéo (ratio préservé si une seule dimension est fournie).",
+       {"path":   {"type": "string",  "description": "Chemin de la vidéo"},
+        "width":  {"type": "integer", "description": "Nouvelle largeur en px"},
+        "height": {"type": "integer", "description": "Nouvelle hauteur en px"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("video_extract_frames",
+       "Extrait des images d'une vidéo (fps=1 → une image par seconde). Utile pour créer des miniatures ou analyser.",
+       {"path":      {"type": "string", "description": "Chemin de la vidéo"},
+        "fps":       {"type": "number", "description": "Images extraites par seconde (défaut 1)"},
+        "max_frames":{"type": "integer", "description": "Nombre max d'images (défaut 30)"}},
+       ["path"]),
+    _t("video_speed",
+       "Change la vitesse d'une vidéo. factor=2.0 → 2x plus rapide, 0.5 → ralenti.",
+       {"path":   {"type": "string", "description": "Chemin de la vidéo"},
+        "factor": {"type": "number", "description": "Facteur de vitesse (défaut 2.0)"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("video_watermark",
+       "Ajoute un filigrane texte sur une vidéo (date, nom de société, mention confidentielle…).",
+       {"path":      {"type": "string", "description": "Chemin de la vidéo"},
+        "text":      {"type": "string", "description": "Texte à incruster"},
+        "position":  {"type": "string", "enum": ["top-left","top-right","bottom-left","bottom-right","center"], "description": "Position (défaut bottom-right)"},
+        "font_size": {"type": "integer", "description": "Taille de police (défaut 24)"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path", "text"]),
+    _t("gif_optimize",
+       "Optimise un GIF existant (réduit fps, couleurs et taille). Retourne le % de réduction.",
+       {"path":   {"type": "string",  "description": "Chemin du GIF"},
+        "fps":    {"type": "integer", "description": "Images par seconde (défaut 10)"},
+        "width":  {"type": "integer", "description": "Nouvelle largeur en px (optionnel)"},
+        "colors": {"type": "integer", "description": "Nombre de couleurs 2-256 (défaut 128)"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       ["path"]),
+    _t("screen_record_gif",
+       "Enregistre l'écran en GIF animé (durée limitée à 20s). region=[x,y,largeur,hauteur] ou écran entier.",
+       {"duration": {"type": "number",  "description": "Durée en secondes (max 20, défaut 5)"},
+        "fps":      {"type": "integer", "description": "Images par seconde (défaut 10)"},
+        "region":   {"type": "array",   "description": "Zone [x, y, largeur, hauteur] (optionnel)"},
+        "output_path": {"type": "string", "description": "Chemin de sortie (optionnel)"}},
+       []),
+
+    # ── Audio (ffmpeg embarqué) ───────────────────────────────────────────
+    _t("audio_info", "Métadonnées d'un fichier audio : durée, débit, fréquence d'échantillonnage, canaux.",
+       {"path": {"type": "string", "description": "Chemin du fichier audio"}},
+       ["path"]),
+    _t("audio_extract", "Extrait la piste audio d'une vidéo vers un fichier audio (mp3/wav/aac…).",
+       {"path":   {"type": "string", "description": "Chemin de la vidéo"},
+        "format": {"type": "string", "enum": ["mp3","wav","ogg","flac","aac","m4a","opus"], "description": "Format audio (défaut mp3)"},
+        "bitrate":{"type": "string", "description": "Débit ex '192k' (défaut 192k)"},
+        "output_path": {"type": "string", "description": "Fichier de sortie"}},
+       ["path"]),
+    _t("audio_convert", "Convertit un fichier audio vers un autre format (mp3/wav/ogg/flac/aac/opus).",
+       {"path":   {"type": "string", "description": "Fichier audio source"},
+        "format": {"type": "string", "enum": ["mp3","wav","ogg","flac","aac","m4a","opus"], "description": "Format cible"},
+        "bitrate":{"type": "string", "description": "Débit ex '192k'"},
+        "sample_rate": {"type": "integer", "description": "Fréquence d'échantillonnage ex 44100"},
+        "output_path": {"type": "string", "description": "Fichier de sortie"}},
+       ["path", "format"]),
+    _t("audio_trim", "Découpe un segment audio (start/end ou start + duration, en secondes).",
+       {"path":     {"type": "string", "description": "Fichier audio source"},
+        "start":    {"type": "number", "description": "Début en secondes (défaut 0)"},
+        "end":      {"type": "number", "description": "Fin en secondes"},
+        "duration": {"type": "number", "description": "Durée en secondes (alternative à end)"},
+        "output_path": {"type": "string", "description": "Fichier de sortie"}},
+       ["path"]),
+    _t("audio_merge", "Concatène plusieurs fichiers audio bout à bout (formats différents acceptés).",
+       {"paths":  {"type": "array", "items": {"type": "string"}, "description": "Fichiers audio à concaténer (≥2, ordre conservé)"},
+        "format": {"type": "string", "enum": ["mp3","wav","ogg","flac","aac","opus"], "description": "Format de sortie (défaut mp3)"},
+        "output_path": {"type": "string", "description": "Fichier de sortie"}},
+       ["paths"]),
+    _t("audio_volume", "Ajuste le volume (factor ex 1.5, gain_db ex +6/-6) ou normalise (normalize=true).",
+       {"path":      {"type": "string", "description": "Fichier audio source"},
+        "factor":    {"type": "number", "description": "Facteur multiplicatif (1.5 = +50%)"},
+        "gain_db":   {"type": "number", "description": "Gain en décibels (ex 6 ou -6)"},
+        "normalize": {"type": "boolean", "description": "Normalisation loudness (EBU R128)"},
+        "output_path": {"type": "string", "description": "Fichier de sortie"}},
+       ["path"]),
+
+    # ── Section 22 — Agent IA Documentation Technique ─────────────────────
+    _t("doc_intervention_create",
+       "Crée une nouvelle intervention IT (incident, déploiement, maintenance, audit…).",
+       {"title":            {"type": "string", "description": "Titre court de l'intervention"},
+        "intervention_type":{"type": "string", "enum": ["incident","request","change","problem","deployment","maintenance","audit","other"]},
+        "priority":         {"type": "string", "enum": ["low","medium","high","critical"]},
+        "client_id":        {"type": "string", "description": "ID du client concerné"},
+        "technician":       {"type": "string"},
+        "raw_notes":        {"type": "string", "description": "Notes brutes du technicien"},
+        "commands_executed":{"type": "string", "description": "Commandes exécutées pendant l'intervention"},
+        "ticket_refs":      {"type": "string"},
+        "client_emails":    {"type": "string"},
+        "network_config":   {"type": "string"},
+        "summary":          {"type": "string"},
+        "resolution":       {"type": "string"},
+        "recommendations":  {"type": "string"},
+        "tags":             {"type": "array"},
+        "duration_minutes": {"type": "integer"}},
+       ["title"]),
+    _t("doc_intervention_list",
+       "Liste les interventions documentées (filtrable par client_id et status).",
+       {"client_id": {"type": "string"},
+        "status":    {"type": "string", "enum": ["open","in_progress","resolved","closed","cancelled"]},
+        "limit":     {"type": "integer", "description": "Nombre max (défaut 50)"}}, []),
+    _t("doc_intervention_update",
+       "Met à jour une intervention (status, résolution, notes…).",
+       {"id":             {"type": "string"},
+        "status":         {"type": "string", "enum": ["open","in_progress","resolved","closed","cancelled"]},
+        "summary":        {"type": "string"},
+        "root_cause":     {"type": "string"},
+        "resolution":     {"type": "string"},
+        "recommendations":{"type": "string"}},
+       ["id"]),
+    _t("doc_analyze_input",
+       "Analyse intelligente d'un contenu brut d'intervention. Extrait commandes, IPs, MACs, type ITIL, priorité suggérée, pertinence RGPD.",
+       {"raw_text": {"type": "string", "description": "Notes brutes / log / texte d'intervention"}},
+       ["raw_text"]),
+    _t("doc_generate_report",
+       "Génère un rapport d'intervention professionnel (PDF/DOCX/MD).",
+       {"intervention_id": {"type": "string"},
+        "format":          {"type": "string", "enum": ["pdf","docx","md"]},
+        "template_id":     {"type": "string", "description": "ID du template à utiliser (optionnel)"},
+        "output_path":     {"type": "string"}},
+       ["intervention_id"]),
+    _t("doc_generate_procedure",
+       "Génère une procédure technique pas-à-pas (PDF/DOCX/MD) reproductible.",
+       {"intervention_id": {"type": "string"},
+        "format":          {"type": "string", "enum": ["pdf","docx","md"]},
+        "objective":       {"type": "string"},
+        "prerequisites":   {"type": "string"},
+        "tools_required":  {"type": "string"},
+        "steps":           {"type": "string", "description": "Étapes numérotées"},
+        "validation":      {"type": "string"},
+        "rollback":        {"type": "string"},
+        "difficulty":      {"type": "string", "enum": ["Facile","Moyenne","Avancée","Expert"]}},
+       ["intervention_id"]),
+    _t("doc_generate_client_sheet",
+       "Génère une fiche client complète (infrastructure + assets + historique des interventions).",
+       {"client_id":   {"type": "string"},
+        "format":      {"type": "string", "enum": ["pdf","docx","md"]},
+        "security":    {"type": "string"},
+        "backup":      {"type": "string"},
+        "contracts":   {"type": "string"},
+        "contacts":    {"type": "string"}},
+       ["client_id"]),
+    _t("doc_generate_recovery_plan",
+       "Génère un Plan de Reprise d'Activité (PRA/PCA) conforme ISO 22301.",
+       {"client_id":     {"type": "string"},
+        "format":        {"type": "string", "enum": ["pdf","docx"]},
+        "scope":         {"type": "string"},
+        "risks":         {"type": "array"},
+        "services":      {"type": "array"},
+        "backup_arch":   {"type": "string"},
+        "recovery_steps":{"type": "string"},
+        "tests":         {"type": "string"},
+        "contacts":      {"type": "string"},
+        "validator":     {"type": "string"}},
+       ["client_id"]),
+    _t("doc_generate_maintenance",
+       "Génère une procédure de maintenance préventive (checklist mensuelle/trimestrielle/annuelle).",
+       {"client_id":     {"type": "string"},
+        "format":        {"type": "string", "enum": ["pdf","docx"]},
+        "frequency":     {"type": "string", "enum": ["Hebdomadaire","Mensuelle","Trimestrielle","Annuelle"]},
+        "duration":      {"type": "string"},
+        "anomalies":     {"type": "string"},
+        "corrective_actions": {"type": "string"}},
+       ["client_id"]),
+    _t("doc_generate_runbook",
+       "Génère un runbook (procédure d'urgence) pour un incident critique.",
+       {"intervention_id":   {"type": "string"},
+        "format":            {"type": "string", "enum": ["pdf","docx"]},
+        "service":           {"type": "string"},
+        "symptoms":          {"type": "string"},
+        "business_impact":   {"type": "string"},
+        "diagnostic_steps":  {"type": "string"},
+        "step1":             {"type": "string"},
+        "step2":             {"type": "string"},
+        "step3":             {"type": "string"},
+        "step4":             {"type": "string"},
+        "level1_contact":    {"type": "string"},
+        "level2_contact":    {"type": "string"},
+        "level3_contact":    {"type": "string"}},
+       ["intervention_id"]),
+    _t("doc_generate_schema",
+       "Génère un schéma logique d'infrastructure en Mermaid à partir d'une description ou config réseau.",
+       {"network_config": {"type": "string", "description": "Texte décrivant l'infra réseau (équipements, IPs, etc.)"},
+        "title":          {"type": "string"},
+        "save":           {"type": "boolean", "description": "Sauvegarder en .md (défaut true)"},
+        "output_path":    {"type": "string"}},
+       ["network_config"]),
+    _t("doc_generate_postmortem",
+       "Génère un POST-MORTEM / analyse de cause racine (RCA) d'un incident : chronologie, cause racine, impact, résolution, actions correctives, leçons. PDF ou Word.",
+       {"intervention_id": {"type": "string", "description": "Intervention liée (optionnel, pour reprendre le contexte)"},
+        "title": {"type": "string"}, "severity": {"type": "string", "enum": ["low","medium","high","critical"]},
+        "summary": {"type": "string"}, "timeline": {"type": "string"}, "root_cause": {"type": "string"},
+        "business_impact": {"type": "string"}, "resolution": {"type": "string"},
+        "corrective_actions": {"type": "string"}, "lessons": {"type": "string"},
+        "downtime": {"type": "string"}, "services_impacted": {"type": "string"},
+        "format": {"type": "string", "enum": ["pdf","docx"]}, "output_path": {"type": "string"}},
+       []),
+    _t("doc_generate_change",
+       "Génère une DEMANDE DE CHANGEMENT (Change Request ITIL) : justification, plan de mise en œuvre, analyse de risque, plan de rollback, validation. PDF ou Word.",
+       {"intervention_id": {"type": "string"}, "title": {"type": "string"},
+        "description": {"type": "string"}, "change_type": {"type": "string"},
+        "risk": {"type": "string", "enum": ["low","medium","high","critical"]},
+        "justification": {"type": "string"}, "implementation_plan": {"type": "string"},
+        "rollback_plan": {"type": "string"}, "planned_date": {"type": "string"},
+        "format": {"type": "string", "enum": ["pdf","docx"]}, "output_path": {"type": "string"}},
+       []),
+    _t("doc_generate_onboarding",
+       "Génère une fiche d'ARRIVÉE ou de DÉPART IT d'un collaborateur (checklist comptes, matériel, accès, données, sécurité). PDF ou Word.",
+       {"mode": {"type": "string", "enum": ["onboarding","offboarding"], "description": "Arrivée ou départ"},
+        "person_name": {"type": "string"}, "role": {"type": "string"}, "date": {"type": "string"},
+        "manager": {"type": "string"}, "technician": {"type": "string"},
+        "format": {"type": "string", "enum": ["pdf","docx"]}, "output_path": {"type": "string"}},
+       ["person_name"]),
+    _t("doc_template_list",
+       "Liste les templates de documentation disponibles.",
+       {"doc_type": {"type": "string", "enum": ["report","procedure","client_sheet","recovery_plan","maintenance","schema","runbook"]}}, []),
+    _t("doc_asset_create",
+       "Crée un asset dans la CMDB-lite (poste, serveur, firewall, switch, NAS, etc.).",
+       {"name":        {"type": "string"},
+        "asset_type":  {"type": "string", "enum": ["workstation","server","firewall","switch","router","printer","phone","nas","vm","other"]},
+        "client_id":   {"type": "string"},
+        "ip_address":  {"type": "string"},
+        "mac_address": {"type": "string"},
+        "os":          {"type": "string"},
+        "specs":       {"type": "string"},
+        "location":    {"type": "string"},
+        "criticality": {"type": "string", "enum": ["low","medium","high","critical"]},
+        "notes":       {"type": "string"}},
+       ["name"]),
+    _t("doc_asset_list", "Liste les assets de la CMDB.",
+       {"client_id": {"type": "string"}}, []),
+    _t("doc_knowledge_search",
+       "Cherche dans la base de connaissances (interventions passées) par mot-clé pour résoudre rapidement des problèmes similaires.",
+       {"query": {"type": "string", "description": "Mot-clé ou phrase à chercher"}},
+       ["query"]),
+
+    # ── Section 23 — v2.30 Command Safety / Guardrails ────────────────────
+    _t("cmd_extract_from_text",
+       "Extrait les commandes (PowerShell/CMD/Bash/Linux/Proxmox/Cisco/firewall) présentes dans un texte.",
+       {"text": {"type": "string", "description": "Texte/notes contenant des commandes"}},
+       ["text"]),
+    _t("cmd_analyze_risk",
+       "Analyse le niveau de risque d'une ou plusieurs commandes (safe/medium/high/critical/blocked). Journalise l'analyse. N'exécute JAMAIS la commande.",
+       {"command":         {"type": "string", "description": "Une commande à analyser"},
+        "commands":        {"type": "array",  "description": "Liste de commandes à analyser"},
+        "intervention_id": {"type": "string", "description": "Lier l'analyse à une intervention"}},
+       []),
+    _t("cmd_suggest_safer_alternative",
+       "Propose une alternative plus sûre pour une commande risquée.",
+       {"command": {"type": "string"}}, ["command"]),
+    _t("cmd_require_approval",
+       "Crée une demande d'approbation pour une commande destructive (la commande n'est pas exécutée).",
+       {"command":           {"type": "string"},
+        "command_review_id": {"type": "string"},
+        "intervention_id":   {"type": "string"},
+        "requested_by":      {"type": "string"},
+        "reason":            {"type": "string"}},
+       ["command"]),
+    _t("cmd_review_history",
+       "Historique des analyses de commandes (filtrable par intervention ou niveau de risque).",
+       {"intervention_id": {"type": "string"},
+        "risk_level":      {"type": "string", "enum": ["safe","medium","high","critical","blocked"]},
+        "limit":           {"type": "integer"}},
+       []),
+
+    # ── Section 24 — v2.30 Pre-Check / Post-Check ─────────────────────────
+    _t("ops_checklist_generate",
+       "Génère automatiquement des points de contrôle selon le type d'intervention (sans rien créer en base).",
+       {"intervention_type": {"type": "string", "enum": ["incident","request","change","problem","deployment","maintenance","audit","other","default"]},
+        "check_type":        {"type": "string", "enum": ["precheck","postcheck"]}},
+       []),
+    _t("ops_precheck_create",
+       "Crée une checklist (pre-check ou post-check) liée à une intervention, avec points de contrôle auto-générés.",
+       {"intervention_id": {"type": "string"},
+        "check_type":      {"type": "string", "enum": ["precheck","postcheck"]},
+        "title":           {"type": "string"},
+        "items":           {"type": "array", "description": "Points personnalisés (optionnel)"}},
+       ["intervention_id"]),
+    _t("ops_precheck_run",
+       "Enregistre les résultats d'un pre-check (ok/warning/failed/skipped par point). N'exécute aucune commande.",
+       {"check_id": {"type": "string"},
+        "results":  {"type": "array", "description": "[{item_id, status, actual_value, notes}]"}},
+       ["check_id"]),
+    _t("ops_postcheck_run",
+       "Enregistre les résultats d'un post-check (validation après intervention).",
+       {"check_id": {"type": "string"},
+        "results":  {"type": "array", "description": "[{item_id, status, actual_value, notes}]"}},
+       ["check_id"]),
+    _t("ops_evidence_add",
+       "Associe une preuve à une checklist : texte, commande, chemin fichier, capture ou log.",
+       {"evidence_type":   {"type": "string", "enum": ["text","command","file_path","screenshot","log"]},
+        "content":         {"type": "string"},
+        "check_id":        {"type": "string"},
+        "item_id":         {"type": "string"},
+        "intervention_id": {"type": "string"}},
+       ["content"]),
+    _t("ops_validation_report_generate",
+       "Génère un rapport de validation (pre-check + post-check + preuves) en MD/PDF/DOCX.",
+       {"intervention_id": {"type": "string"},
+        "format":          {"type": "string", "enum": ["pdf","docx","md"]},
+        "output_path":     {"type": "string"}},
+       ["intervention_id"]),
+
+    # ── Section 25 — v2.30 Client Health Score ────────────────────────────
+    _t("client_health_compute",
+       "Calcule le score de santé opérationnelle d'un client (backup, sécurité, doc, infra, incidents) et génère des recommandations.",
+       {"client_id": {"type": "string"}}, ["client_id"]),
+    _t("client_health_get",
+       "Récupère le dernier score de santé calculé pour un client.",
+       {"client_id": {"type": "string"}}, ["client_id"]),
+    _t("client_health_history",
+       "Historique des scores de santé d'un client (évolution).",
+       {"client_id": {"type": "string"}, "limit": {"type": "integer"}}, ["client_id"]),
+    _t("client_recommendations_generate",
+       "Liste/génère les recommandations issues du score de santé d'un client.",
+       {"client_id": {"type": "string"},
+        "status":    {"type": "string", "enum": ["open","done","dismissed"]},
+        "recompute": {"type": "boolean", "description": "Recalculer le score d'abord"}},
+       ["client_id"]),
+    _t("client_monthly_summary_generate",
+       "Génère un compte-rendu mensuel client (interventions + score santé + recommandations) en MD/PDF/DOCX.",
+       {"client_id":   {"type": "string"},
+        "format":      {"type": "string", "enum": ["pdf","docx","md"]},
+        "output_path": {"type": "string"}},
+       ["client_id"]),
+]

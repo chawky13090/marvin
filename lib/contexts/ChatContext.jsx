@@ -1,0 +1,415 @@
+'use client';
+/**
+ * ChatContext — Global chat state mounted at the layout level.
+ *
+ * WHY: Previously chat state lived in ChatContainer. When the user navigated
+ * to another page (Outils, Fichiers, etc.), ChatContainer unmounted and the
+ * SSE stream was aborted → the conversation in progress got cut.
+ *
+ * This provider lives in app/layout.js so it persists across page navigations.
+ * The ChatContainer becomes a thin "view" that just reads from this context.
+ *
+ * Public API (via useChat()):
+ *   - messages, status, error, isLoading
+ *   - conversationId, setConversationId
+ *   - initialMessages, setInitialMessages
+ *   - activeModel, setActiveModel
+ *   - sendMessage({ text, images })
+ *   - addToolResult({ toolCallId, result })
+ *   - stop()
+ *   - setMessages(updaterOrValue)
+ *
+ * For navigation indicator (sidebar badge):
+ *   - useChatStatus() → { isLoading, status, hasActiveStream }
+ */
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { useVoice } from '@/lib/hooks/useVoice';
+
+const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+
+const ChatContext = createContext(null);
+
+function genId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+}
+
+function extractText(msg) {
+  if (typeof msg.content === 'string') return msg.content;
+  if (Array.isArray(msg.parts)) {
+    return msg.parts.filter(p => p.type === 'text').map(p => p.text).join('');
+  }
+  return '';
+}
+
+export function ChatProvider({ children }) {
+  // Core chat state
+  const [messages, setMessages] = useState([]);
+  const [status, setStatus] = useState('ready');           // 'ready'|'submitted'|'streaming'|'error'
+  const [error, setError] = useState(null);
+  const [conversationId, setConversationId] = useState(null);
+  const [initialMessages, setInitialMessages] = useState([]);
+  const [activeModel, setActiveModel] = useState('auto');
+
+  // Voice state (TTS + voice mode)
+  const voice = useVoice();
+  // sendMessage est un useCallback([]) → il capturerait le `voice` du 1er render
+  // (voiceMode=false). On lit toujours la valeur LIVE via cette ref, sinon la
+  // synthèse vocale ne se déclenche jamais (réponse écrite OK mais pas parlée).
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  // Track which message IDs have already been auto-spoken (avoid speaking
+  // the same message multiple times if React re-renders during streaming)
+  const spokenMessagesRef = useRef(new Set());
+
+  // For onConversationCreated callback (called when a new conv ID is allocated)
+  const conversationCreatedListenersRef = useRef([]);
+  const subscribeConversationCreated = useCallback((cb) => {
+    conversationCreatedListenersRef.current.push(cb);
+    return () => {
+      conversationCreatedListenersRef.current = conversationCreatedListenersRef.current.filter(c => c !== cb);
+    };
+  }, []);
+
+  // For onStreamFinish (called when the stream completes)
+  const streamFinishListenersRef = useRef([]);
+  const subscribeStreamFinish = useCallback((cb) => {
+    streamFinishListenersRef.current.push(cb);
+    return () => {
+      streamFinishListenersRef.current = streamFinishListenersRef.current.filter(c => c !== cb);
+    };
+  }, []);
+
+  // Refs for live values (used by sendMessage to avoid stale closures)
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const conversationIdRef = useRef(conversationId);
+  conversationIdRef.current = conversationId;
+  const activeModelRef = useRef(activeModel);
+  activeModelRef.current = activeModel;
+  const abortRef = useRef(null);
+
+  // Send a message — does NOT abort on unmount because it lives in the provider
+  const sendMessage = useCallback(async ({ text, images }) => {
+    if (!text?.trim() && (!images || images.length === 0)) return;
+
+    const textContent = text?.trim() || '';
+    const imageList = images || [];
+
+    const userMsg = {
+      id: genId(),
+      role: 'user',
+      content: textContent,
+      parts: [{ type: 'text', text: textContent }],
+      images: imageList.map(img => img.data),
+    };
+
+    const assistantId = genId();
+    const assistantMsg = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      parts: [],
+      toolInvocations: [],
+    };
+
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
+    setStatus('submitted');
+    setError(null);
+
+    // Mode vocal : on lit les phrases AU FIL DE LA GÉNÉRATION (pas à la fin)
+    // → Marvin commence à parler dès la 1ère phrase écrite.
+    const liveVoice = voiceRef.current;   // valeur LIVE (pas la capture obsolète)
+    if (liveVoice.voiceMode && liveVoice.stopSpeaking) liveVoice.stopSpeaking();  // coupe l'ancienne lecture
+    const voiceStream = { text: '', spoken: 0, active: !!liveVoice.voiceMode };
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const allMessages = [...messagesRef.current, userMsg];
+
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: allMessages.map(m => {
+            const msgText = extractText(m);
+            let content;
+            if (m.role === 'user' && m.images && m.images.length > 0) {
+              content = [
+                { type: 'text', text: msgText },
+                ...m.images.map(dataUrl => ({ type: 'image_url', image_url: { url: dataUrl } })),
+              ];
+            } else {
+              content = msgText;
+            }
+            return {
+              role: m.role,
+              content,
+              ...(m.toolInvocations?.length > 0 && m.role === 'assistant' ? {
+                tool_calls: m.toolInvocations.map(inv => ({
+                  toolName: inv.toolName,
+                  args: inv.args,
+                }))
+              } : {}),
+            };
+          }),
+          conversationId: conversationIdRef.current || null,
+          model: activeModelRef.current || null,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      setStatus('streaming');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+
+          let event;
+          try { event = JSON.parse(raw); } catch { continue; }
+
+          switch (event.type) {
+            case 'conv_id':
+              if (event.conversationId) {
+                setConversationId(event.conversationId);
+                conversationCreatedListenersRef.current.forEach(cb => {
+                  try { cb(event.conversationId); } catch { /* ignore */ }
+                });
+              }
+              break;
+
+            case 'model_info':
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                return {
+                  ...m,
+                  modelInfo: {
+                    profile: event.profile,
+                    model: event.model,
+                    label: event.label,
+                  },
+                };
+              }));
+              break;
+
+            // v2.125 — certains modèles (notamment cloud) renvoient leur raisonnement dans
+            // un champ SÉPARÉ de la réponse finale, avant celle-ci ou avant un appel
+            // d'outil. Jusqu'ici ignoré côté backend → rien ne s'affichait pendant
+            // potentiellement plusieurs minutes (jusqu'à 3min10 mesurées en réel), donnant
+            // l'impression que Marvin restait bloqué à "réfléchir". MessageBubble.jsx avait
+            // DÉJÀ un bloc collapsible "🧠 Réflexion..." tout construit pour les parts de
+            // type 'reasoning' — jamais alimenté faute d'émission côté backend. On le
+            // nourrit ici plutôt que d'inventer un nouvel affichage.
+            case 'thinking':
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const reasoningParts = m.parts.filter(p => p.type === 'reasoning');
+                const otherParts = m.parts.filter(p => p.type !== 'reasoning');
+                const newReasoningText = (reasoningParts[0]?.text || '') + event.text;
+                return { ...m, parts: [{ type: 'reasoning', text: newReasoningText }, ...otherParts] };
+              }));
+              break;
+
+            case 'text':
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const newContent = (m.content || '') + event.text;
+                // v2.125 fix — ne gardait que les parts 'tool-invocation', ce qui effaçait
+                // silencieusement le bloc 'reasoning' (thinking) dès l'arrivée du premier
+                // token de texte final. Préserve maintenant aussi le raisonnement déjà streamé.
+                const keptParts = m.parts.filter(p => p.type === 'tool-invocation' || p.type === 'reasoning');
+                return {
+                  ...m,
+                  content: newContent,
+                  parts: [
+                    { type: 'text', text: newContent },
+                    ...keptParts,
+                  ],
+                };
+              }));
+              // Vocal en streaming : lit chaque phrase complète dès qu'elle arrive
+              if (voiceStream.active && liveVoice.enqueueSpeech) {
+                voiceStream.text += event.text;
+                const rest = voiceStream.text.slice(voiceStream.spoken);
+                const m = rest.match(/^[\s\S]*[.!?…\n]/);   // jusqu'à la dernière fin de phrase
+                if (m && m[0].replace(/[\s*#`>_-]/g, '').length > 1) {
+                  liveVoice.enqueueSpeech(m[0]);
+                  voiceStream.spoken += m[0].length;
+                }
+              }
+              break;
+
+            case 'tool_start': {
+              const inv = {
+                state: 'call',
+                toolCallId: event.toolCallId,
+                toolName: event.toolName,
+                args: event.args || {},
+              };
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                return {
+                  ...m,
+                  parts: [...m.parts, { type: 'tool-invocation', toolInvocation: inv }],
+                  toolInvocations: [...(m.toolInvocations || []), inv],
+                };
+              }));
+              break;
+            }
+
+            case 'tool_end':
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const updatedParts = m.parts.map(p => {
+                  if (p.type === 'tool-invocation' && p.toolInvocation?.toolCallId === event.toolCallId) {
+                    return {
+                      ...p,
+                      toolInvocation: { ...p.toolInvocation, state: 'result', result: event.result },
+                    };
+                  }
+                  return p;
+                });
+                const updatedInvocations = (m.toolInvocations || []).map(inv =>
+                  inv.toolCallId === event.toolCallId
+                    ? { ...inv, state: 'result', result: event.result }
+                    : inv
+                );
+                return { ...m, parts: updatedParts, toolInvocations: updatedInvocations };
+              }));
+              break;
+
+            case 'done':
+              setStatus('ready');
+              // Mode vocal : on a déjà lu les phrases au fil de l'eau. Il ne reste
+              // qu'à lire la « queue » non terminée par un point (dernier fragment).
+              if (voiceStream.active && !spokenMessagesRef.current.has(assistantId)) {
+                spokenMessagesRef.current.add(assistantId);
+                const finalMsg = messagesRef.current.find(m => m.id === assistantId);
+                const full = finalMsg?.content || voiceStream.text || '';
+                const tail = full.slice(voiceStream.spoken).trim();
+                if (tail && tail.replace(/[\s*#`>_-]/g, '').length > 1 && liveVoice.enqueueSpeech) {
+                  liveVoice.enqueueSpeech(tail);
+                } else if (voiceStream.spoken === 0 && full.trim() && liveVoice.speak) {
+                  // fallback : rien n'a été lu (réponse sans ponctuation) → lit tout
+                  liveVoice.speak(full).catch(() => {});
+                }
+              }
+              streamFinishListenersRef.current.forEach(cb => {
+                try { cb(); } catch { /* ignore */ }
+              });
+              break;
+
+            case 'error':
+              setError(new Error(
+                event.message ||
+                event.detail ||
+                event.error ||
+                'Erreur backend inconnue (le modèle a peut-être renvoyé une réponse invalide)'
+              ));
+              setStatus('error');
+              if (!event.message?.includes('Ollama')) {
+                setMessages(prev => prev.filter(m => m.id !== assistantId || m.content));
+              }
+              break;
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('[ChatContext] Erreur streaming:', err);
+        // Give a meaningful error message even when err.message is empty
+        const msg = err.message
+          || err.toString()
+          || `Erreur réseau ou backend (${err.name || 'inconnu'})`;
+        setError(new Error(msg));
+        setStatus('error');
+      } else {
+        setStatus('ready');
+      }
+    }
+
+    setStatus(s => s === 'streaming' || s === 'submitted' ? 'ready' : s);
+  }, []);
+
+  const addToolResult = useCallback(({ toolCallId, result }) => {
+    setMessages(prev => prev.map(m => {
+      if (m.role !== 'assistant') return m;
+      const updatedParts = (m.parts || []).map(p => {
+        if (p.type === 'tool-invocation' && p.toolInvocation?.toolCallId === toolCallId) {
+          return { ...p, toolInvocation: { ...p.toolInvocation, state: 'result', result } };
+        }
+        return p;
+      });
+      const updatedInvocations = (m.toolInvocations || []).map(inv =>
+        inv.toolCallId === toolCallId ? { ...inv, state: 'result', result } : inv
+      );
+      return { ...m, parts: updatedParts, toolInvocations: updatedInvocations };
+    }));
+  }, []);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    setStatus('ready');
+  }, []);
+
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  const value = {
+    // State
+    messages, setMessages,
+    status, error, isLoading,
+    conversationId, setConversationId,
+    initialMessages, setInitialMessages,
+    activeModel, setActiveModel,
+    // Actions
+    sendMessage,
+    addToolResult,
+    stop,
+    // Subscriptions
+    subscribeConversationCreated,
+    subscribeStreamFinish,
+    // Voice (TTS + voice mode)
+    voice,
+  };
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+}
+
+export function useChat() {
+  const ctx = useContext(ChatContext);
+  if (!ctx) {
+    throw new Error('useChat must be used within a ChatProvider (wrap your layout with <ChatProvider>)');
+  }
+  return ctx;
+}
+
+/** Lightweight subscription for sidebar/indicator components that only need status */
+export function useChatStatus() {
+  const ctx = useContext(ChatContext);
+  return {
+    isLoading: ctx?.isLoading ?? false,
+    status: ctx?.status ?? 'ready',
+    conversationId: ctx?.conversationId ?? null,
+    messageCount: ctx?.messages?.length ?? 0,
+  };
+}

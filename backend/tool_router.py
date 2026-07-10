@@ -1,0 +1,109 @@
+"""
+Routing INTELLIGENT des outils.
+
+Deux signaux complémentaires des mots-clés (qui ratent les paraphrases) :
+  1. Sémantique  — compare le SENS de la demande aux descriptions d'outils
+                   (embeddings nomic-embed-text + Qdrant).
+  2. Appris      — se souvient des outils qui ont DÉJÀ bien répondu à des
+                   demandes similaires → Marvin s'améliore avec l'usage.
+
+Tout est best-effort : si Qdrant ou l'embedding sont indisponibles, on renvoie
+des ensembles vides et l'agent retombe sur le routing par mots-clés (jamais cassé).
+"""
+import hashlib
+import uuid
+
+import vector_store as vs
+import database as db
+
+_TOOL_COLLECTION = "tool_index"
+_FEEDBACK_COLLECTION = "routing_feedback"
+_indexed = False
+
+
+def _ensure_collection(name: str):
+    client = vs.get_client()
+    if client is None:
+        return None
+    from qdrant_client.models import Distance, VectorParams
+    try:
+        existing = {c.name for c in client.get_collections().collections}
+        if name not in existing:
+            client.create_collection(name, vectors_config=VectorParams(size=768, distance=Distance.COSINE))
+    except Exception:
+        pass
+    return client
+
+
+async def ensure_tool_index(tools_spec: list) -> bool:
+    """Indexe les descriptions d'outils (une fois ; réindexe si le set d'outils change)."""
+    global _indexed
+    client = _ensure_collection(_TOOL_COLLECTION)
+    if client is None:
+        return False
+    names = sorted(s.get("function", {}).get("name", "") for s in tools_spec)
+    h = hashlib.md5("|".join(names).encode()).hexdigest()
+    if _indexed and db.get_setting("tool_index_hash") == h:
+        return True
+    if db.get_setting("tool_index_hash") != h:
+        from qdrant_client.models import PointStruct
+        points = []
+        for s in tools_spec:
+            fn = s.get("function", {})
+            name = fn.get("name")
+            if not name:
+                continue
+            vec = await vs.embed(f"{name}: {fn.get('description', '')}")
+            if vec:
+                points.append(PointStruct(id=vs._safe_id("tool::" + name), vector=vec, payload={"name": name}))
+        if points:
+            # upsert par lots de 64
+            for i in range(0, len(points), 64):
+                client.upsert(collection_name=_TOOL_COLLECTION, points=points[i:i + 64])
+            db.set_setting("tool_index_hash", h)
+    _indexed = True
+    return True
+
+
+async def route_tools(query: str, k_sem: int = 8, k_learn: int = 5, min_learn: float = 0.72) -> dict:
+    """Renvoie {'semantic': set, 'learned': set} pour une requête.
+    'learned' = outils ayant réussi sur des demandes TRÈS proches par le passé."""
+    out = {"semantic": set(), "learned": set()}
+    client = vs.get_client()
+    if client is None or not (query or "").strip():
+        return out
+    vec = await vs.embed(query)
+    if not vec:
+        return out
+    # 1) Sémantique : outils dont la description colle au sens de la demande
+    try:
+        resp = client.query_points(collection_name=_TOOL_COLLECTION, query=vec, limit=k_sem, with_payload=True)
+        out["semantic"] = {h.payload.get("name") for h in resp.points if h.payload.get("name")}
+    except Exception:
+        pass
+    # 2) Appris : outils qui ont déjà bien marché sur des demandes similaires
+    try:
+        resp = client.query_points(collection_name=_FEEDBACK_COLLECTION, query=vec, limit=k_learn, with_payload=True)
+        out["learned"] = {h.payload.get("tool") for h in resp.points if h.score >= min_learn and h.payload.get("tool")}
+    except Exception:
+        pass
+    return out
+
+
+async def record_success(query: str, tool_name: str):
+    """Mémorise qu'un outil a bien répondu à une demande (apprentissage du routing)."""
+    if not (query or "").strip() or not tool_name:
+        return
+    client = _ensure_collection(_FEEDBACK_COLLECTION)
+    if client is None:
+        return
+    vec = await vs.embed(query)
+    if not vec:
+        return
+    from qdrant_client.models import PointStruct
+    try:
+        client.upsert(collection_name=_FEEDBACK_COLLECTION,
+                      points=[PointStruct(id=str(uuid.uuid4()), vector=vec,
+                                          payload={"tool": tool_name, "query": (query or "")[:200]})])
+    except Exception:
+        pass

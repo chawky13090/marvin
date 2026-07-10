@@ -1,0 +1,80 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Marvin / SecretaryAI — dépendances Python du backend (v2.37)
+#  Versions ÉPINGLÉES = environnement testé et fonctionnel (reproductible à l'identique).
+#  Installation :  python -m venv .venv  &&  .venv\Scripts\python -m pip install -r requirements.txt
+#  (Génération vidéo IA locale = optionnelle, voir requirements-video.txt)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# --- Cœur API / serveur ---
+fastapi==0.136.3
+uvicorn[standard]==0.48.0
+websockets==16.0           # v2.118 — requis par uvicorn pour le WebSocket SSH interactif
+                            # (/api/ssh/{id}/shell)
+httpx==0.28.1
+requests==2.34.2
+python-dotenv==1.2.2
+python-multipart==0.0.29
+
+# --- Recherche sémantique (base vectorielle) ---
+qdrant-client==1.18.0
+flashrank==0.2.10
+rank-bm25==0.2.2
+
+# --- Documents : Word, PDF, Excel, PowerPoint ---
+python-docx==1.2.0
+docx2pdf==0.1.8
+pypdf==6.12.2
+pypdfium2==5.9.0
+pikepdf==10.8.0
+openpyxl==3.1.5
+XlsxWriter==3.2.9
+reportlab==4.5.1
+python-pptx==1.0.2
+
+# --- Images / graphiques / QR / OCR ---
+pillow==11.3.0
+matplotlib==3.10.9
+numpy==2.4.6
+qrcode[pil]==8.2
+pytesseract==0.3.13
+mss==10.2.0
+
+# --- Audio / Vidéo (ffmpeg embarqué — aucune install système requise) ---
+imageio-ffmpeg==0.6.0
+moviepy==2.2.1
+edge-tts==7.2.8
+faster-whisper==1.2.1
+
+# --- Système Windows / presse-papiers / notifications ---
+pywin32==311
+pyperclip==1.11.0
+psutil==7.2.2
+plyer==2.1.0
+
+# --- Réseau / SSH / web ---
+paramiko==5.0.0
+beautifulsoup4==4.14.3
+lxml==6.1.1
+
+# --- Intégrations Google / Microsoft ---
+google-api-python-client==2.196.0
+google-auth-oauthlib==1.4.0
+google-auth-httplib2==0.4.0
+msal==1.36.0
+
+# --- Agendas connectés (abonnements iCal : Google, Outlook, Apple…) ---
+icalendar==7.1.3
+recurring-ical-events==3.8.2
+
+# --- Web par vrai navigateur (anti-blocage) ---
+# Utilise le Chrome installé via channel="chrome" (sinon: python -m playwright install chromium)
+playwright==1.60.0
+
+# --- Dates / planification / langue ---
+croniter==6.2.2
+python-dateutil==2.9.0.post0
+tzdata==2026.2
+langdetect==1.0.9
+
+# --- MCP (Model Context Protocol) : Marvin en serveur MCP (v2.103) ---
+mcp==1.28.1

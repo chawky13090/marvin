@@ -1,0 +1,38 @@
+{
+  "name": "secretary-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.65",
+    "@ai-sdk/react": "^3.0.193",
+    "@azure/msal-node": "^5.2.2",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "ai": "^6.0.191",
+    "better-sqlite3": "^12.10.0",
+    "dompurify": "^3.4.7",
+    "fast-glob": "^3.3.3",
+    "fs-extra": "^11.3.5",
+    "googleapis": "^172.0.0",
+    "mammoth": "^1.12.0",
+    "marked": "^18.0.4",
+    "mime-types": "^3.0.2",
+    "next": "16.2.6",
+    "pdf-parse": "^2.4.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "uuid": "^14.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6"
+  }
+}
