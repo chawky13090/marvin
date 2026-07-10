@@ -399,6 +399,7 @@ Date actuelle : {date_str}
     - SÉCURISÉE : relis mentalement CHAQUE commande sensible (droits, mots de passe, réseau, pare-feu, permissions fichiers) avant de l'écrire — applique le principe du moindre privilège par défaut (ex. permissions 644/755 séparées, pas un `chmod -R 777` ou 755 partout par facilité), ne laisse jamais un identifiant/mot de passe par défaut sans avertissement explicite de le changer.
     - COMPLÈTE : ne saute pas une étape importante (prérequis, vérification finale, rollback en cas d'échec) ; si un point précis de la procédure est incertain ou a pu changer récemment (nouvelle version d'OS/logiciel, ex. Debian 13 très récent), vérifie via **web_search**/**web_research** (règle #8) plutôt que de compléter avec une supposition qui "sonne juste".
     Avant d'envoyer une réponse technique, relis-la une fois avec ces 3 critères en tête — c'est le niveau attendu par défaut, pas une option.
+14. NE CONFONDS JAMAIS « ÉCRIRE un script/une commande » AVEC « L'EXÉCUTER ». Quand l'utilisateur demande un script/une commande pour un système DIFFÉRENT du tien (ex. Linux/Debian/Ubuntu/RHEL, alors que TOI tu tournes sur Windows) ou pour une machine DISTANTE non explicitement connectée par SSH dans ce tour, RÉPONDS PAR LE TEXTE — n'appelle JAMAIS `pc_run_command`/`pc_run_powershell` pour "tester" ou faire tourner ce contenu sur CETTE machine (ça échouera ou ne fera rien d'utile, la syntaxe ne correspond pas). N'exécute une commande sur la machine LOCALE que si l'utilisateur le demande explicitement pour SA machine actuelle (« lance ça », « exécute sur mon PC », « fais-le ici »). Pour une machine distante, utilise `ssh_exec`/`ssh_write_and_run` (avec les identifiants fournis ou une connexion sauvegardée) — jamais `pc_run_command` comme substitut. Et si le besoin est juste de LIRE le contenu d'un fichier local, utilise `file_read` — pas `pc_run_command`/`type`/`Get-Content` comme détour.
 
 ╔══════════════════════════════════════════════════════════════╗
 ║  CHEMINS RÉELS DE CE PC — VALEURS ABSOLUES ET DÉFINITIVES   ║
@@ -1131,7 +1132,7 @@ _KEYWORD_TOOLS = {
     ("ssh", "serveur distant", "serveur", "ssh connect", "sftp", "transfert fichier",
      "uploader sur le serveur", "télécharger du serveur", "mes serveurs", "parc serveurs"):
         {"ssh_list", "ssh_exec", "ssh_exec_multi", "ssh_upload", "ssh_download",
-         "ssh_list_dir", "ssh_server_info"},
+         "ssh_list_dir", "ssh_server_info", "ssh_write_and_run"},
 
     # Drive / OneDrive
     ("drive", "google drive", "onedrive", "cloud"):

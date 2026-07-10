@@ -116,6 +116,7 @@ SECURE_BLOCKED_TOOLS: set[str] = {
     "email_send",
     # SSH (exécution distante = action externe potentiellement irréversible)
     "ssh_exec",
+    "ssh_write_and_run",
 }
 
 # ── Outils nécessitant une confirmation manuelle (niveau Standard = 2) ────────
@@ -133,6 +134,7 @@ DANGEROUS_TOOLS: set[str] = {
     "ssh_exec",         # commande distante potentiellement destructrice
     "ssh_exec_multi",   # commande sur plusieurs serveurs
     "ssh_upload",       # écriture de fichier sur un serveur distant
+    "ssh_write_and_run",  # écriture + exécution d'un script sur un serveur distant
     "system_cleanup",   # suppression de fichiers temporaires (delete=true)
     "itsm_ticket_create",  # crée un ticket visible dans un système externe (GLPI...)
 }

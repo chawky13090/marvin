@@ -2057,6 +2057,50 @@ async def lifespan(app_instance):
 #   deux → réponse complète et correcte, citée, avec fusion de plusieurs passes de
 #   recherche confirmée (champ `sources` enrichi) ; document de test retiré de l'index
 #   après coup. `scripts/smoke_test_chat.py` 5/5 après coup (aucune régression).
+#
+# v2.144 (🔐 SSH ad hoc + garde-fou "écrire ≠ exécuter" + règle d'or #14) : audit d'une
+#   vraie conversation demandé explicitement (« regarde les dernières conversations et
+#   dis-moi ce que tu penses de ce comportement »). Trouvé (pas supposé) : sur « script
+#   d'installation de zabbix server sur debian 13 avec mariadb », l'agent avait appelé
+#   `pc_run_command` avec un script RHEL/CentOS (dnf, systemctl) SUR LA MACHINE WINDOWS
+#   LOCALE — sans dégât (dnf n'existe pas sous Windows) mais révélateur d'une confusion
+#   « écrire une commande » / « l'exécuter ICI ». `pc_run_command` n'est routé par aucun
+#   mot-clé (arrive via similarité sémantique, correctement) — le vrai trou : aucune des
+#   13 règles d'or n'interdisait explicitement cette confusion.
+#   1. **Règle d'or #14** : ne jamais confondre écrire un script pour un AUTRE système
+#      (OS différent, machine distante) avec l'exécuter localement. N'exécute sur LA
+#      machine locale que si explicitement demandé pour elle ; pour une machine
+#      distante, utilise `ssh_exec`/`ssh_write_and_run` — jamais `pc_run_command` comme
+#      substitut. Testé en réel : reproduction EXACTE du message qui a causé le bug
+#      d'origine → 0 appel d'outil cette fois, script livré directement en texte avec
+#      une note explicite sur la machine cible.
+#   2. **Filet déterministe complémentaire** (`security.py::detect_cross_platform_
+#      mismatch`) : avant toute confirmation de `pc_run_command`/`pc_run_powershell`,
+#      détecte des motifs clairement non-Windows (sudo, apt/dnf/yum, systemctl, chmod
+#      +x, shebang bash...) et enrichit le message de confirmation d'un avertissement
+#      visible — pas un blocage dur (une commande Linux n'est pas catastrophique en
+#      soi, WSL/tests de syntaxe sont légitimes), mais l'HUMAIN voit l'alerte avant de
+#      cliquer confirmer, même si le jugement du modèle a échoué malgré la règle #14.
+#      Bug trouvé au passage : `ssh_exec_multi` n'avait JAMAIS le garde `security.
+#      guard_result()` (présent sur `ssh_exec` depuis v2.117) — corrigé, d'autant plus
+#      important qu'elle vise plusieurs machines à la fois.
+#   3. **SSH ad hoc** (`_resolve_ssh_target`, partagé par `ssh_exec` et le nouvel outil
+#      `ssh_write_and_run`) : demandé explicitement (« si je lui demande de se connecter
+#      avec cet ip et ces credentials il doit pouvoir le faire »). `ssh_exec` accepte
+#      maintenant host/username/password/private_key DIRECTEMENT, sans connexion
+#      sauvegardée au préalable — même garde-fou déterministe, même confirmation
+#      obligatoire, rien d'affaibli. Connexion ad hoc réussie → `suggest_save_
+#      connection` proposé (jamais automatique, l'utilisateur décide).
+#   4. **`ssh_write_and_run`** (nouvel outil) : écrit un script généré sur une machine
+#      distante via SFTP PUIS l'exécute — pour « crée un script d'installation de X et
+#      lance-le sur ce serveur » en un seul geste, sans heredoc bash fragile dans
+#      `ssh_exec`. Contenu passé par le même `security.guard_result()`.
+#   Testé en réel : `detect_cross_platform_mismatch` 5/5 commandes Linux détectées, 3/3
+#   commandes Windows silencieuses ; `ssh_exec`/`ssh_write_and_run` ad hoc — validation
+#   des paramètres manquants, contenu catastrophique bloqué par le garde déterministe
+#   AVANT toute tentative SFTP, connexion vers une IP injoignable tentée pour de vrai
+#   et échoue proprement (timeout, pas un crash) ; reproduction du bug d'origine → 0
+#   appel d'outil, script direct. `scripts/smoke_test_chat.py` 5/5.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -6570,7 +6614,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.143.0",
+            "version":         "2.144.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

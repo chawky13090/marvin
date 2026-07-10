@@ -95,3 +95,35 @@ def guard_result(command: str) -> dict | None:
     v = screen_command(command)
     return None if v["allowed"] else {"error": "🛡️ " + v["reason"], "blocked": True,
                                        "security_block": v["match"]}
+
+
+# v2.144 — trouvé en auditant une vraie conversation (« script d'installation zabbix sur
+# debian ») : l'agent avait appelé `pc_run_command` avec un script écrit pour RHEL/CentOS
+# (dnf, systemctl…) sur la machine Windows locale — sans dégât (dnf n'existe pas sous
+# Windows) mais révélateur d'une confusion « écrire une commande » / « l'exécuter ICI ».
+# PAS un blocage dur (une commande Linux/Unix n'est pas catastrophique en soi — WSL, test
+# de syntaxe, etc. sont des usages légitimes) : enrichit juste le message de confirmation
+# déjà obligatoire pour que l'HUMAIN voie l'alerte avant de cliquer, même si le jugement du
+# modèle a échoué malgré la règle d'or #14.
+_NON_WINDOWS_PATTERNS = [_rx(p) for p in [
+    r"^#!\s*/bin/(ba)?sh\b", r"^#!\s*/usr/bin/env\s+(ba)?sh\b",
+    r"\bsudo\s+", r"\bapt(-get)?\s+(install|update|upgrade|remove)\b",
+    r"\bdnf\s+(-y\s+)?install\b", r"\byum\s+(-y\s+)?install\b", r"\bpacman\s+-S\b",
+    r"\bsystemctl\s+(start|stop|enable|restart|status)\b", r"\bchmod\s+\+x\b",
+    r"\buseradd\b", r"\bgroupadd\b", r"\bufw\s+(allow|enable|deny)\b",
+    r"/etc/(apt|systemd|nginx|apache2|mysql|ssh)/", r"\bjournalctl\b",
+    r"\bapt-get\b", r"\bsystemctl\b",
+]]
+
+
+def detect_cross_platform_mismatch(command: str) -> str | None:
+    """Retourne un avertissement si la commande ressemble à du Linux/Unix (pas de blocage,
+    juste un signal à afficher dans le dialogue de confirmation) — None sinon."""
+    if not command or not isinstance(command, str):
+        return None
+    if any(rx.search(command) for rx in _NON_WINDOWS_PATTERNS):
+        return ("⚠️ Cette commande ressemble à du Linux/Unix (sudo/apt/systemctl…) — elle ne "
+                "fonctionnera pas telle quelle sur CETTE machine Windows. Si tu voulais juste "
+                "le TEXTE du script (pour une autre machine), pas la peine de confirmer ; pour "
+                "l'exécuter sur un serveur distant, utilise ssh_exec/ssh_write_and_run à la place.")
+    return None

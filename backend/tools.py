@@ -1936,7 +1936,11 @@ async def execute_pc_run_command(args: dict) -> dict:
     if _blk:
         return _blk
     if not args.get("confirmed"):
-        return {"requiresConfirmation": True, "message": f"Exécuter la commande : {command} ?"}
+        msg = f"Exécuter la commande : {command} ?"
+        _mismatch = _sec.detect_cross_platform_mismatch(command)
+        if _mismatch:
+            msg = _mismatch + "\n\n" + msg
+        return {"requiresConfirmation": True, "message": msg}
     timeout = args.get("timeout", 30)
     # Auto-routage : si la commande est en fait du PowerShell, on l'exécute via PowerShell
     # (sinon cmd.exe renvoie « commande introuvable »). Rend les compétences robustes.
@@ -1982,7 +1986,11 @@ async def execute_pc_run_powershell(args: dict) -> dict:
         return _blk
     if not args.get("confirmed"):
         preview = script[:120] + ("…" if len(script) > 120 else "")
-        return {"requiresConfirmation": True, "message": f"Exécuter ce script PowerShell ?\n{preview}"}
+        msg = f"Exécuter ce script PowerShell ?\n{preview}"
+        _mismatch = _sec.detect_cross_platform_mismatch(script)
+        if _mismatch:
+            msg = _mismatch + "\n\n" + msg
+        return {"requiresConfirmation": True, "message": msg}
     import base64 as _b64
     # Use EncodedCommand to avoid antivirus string-matching on the script content.
     # UTF-16-LE is required by PowerShell's -EncodedCommand parameter.
@@ -8264,14 +8272,46 @@ async def execute_ssh_list(args: dict) -> dict:
         return {"error": str(e)}
 
 
+# v2.144 — connexion SSH AD HOC (sans passer par une connexion sauvegardée au préalable),
+# demandé explicitement (« si je lui demande de se connecter avec cet ip et ces credentials
+# en ssh il doit pouvoir le faire »). Résolveur PARTAGÉ entre `ssh_exec` et `ssh_write_and_run`
+# — un seul endroit pour la logique "connexion sauvegardée OU ad hoc", jamais dupliquée.
+def _resolve_ssh_target(args: dict) -> tuple[dict | None, str | None]:
+    """Retourne (conn, error). `conn` a la même forme qu'une ligne `ssh_connections` (host/
+    port/username/password/private_key/key_passphrase) — construite depuis `connection_id`
+    (connexion sauvegardée, réutilise les identifiants stockés) ou depuis host/username/
+    password/private_key fournis DIRECTEMENT (connexion ponctuelle, jamais enregistrée sans
+    action explicite ultérieure de l'utilisateur)."""
+    connection_id = (args.get("connection_id") or "").strip()
+    if connection_id:
+        conn = db.get_ssh_connection(connection_id)
+        if not conn:
+            return None, f"Connexion SSH '{connection_id}' introuvable. Utilise ssh_list pour voir les connexions disponibles."
+        return dict(conn), None
+
+    host = (args.get("host") or "").strip()
+    username = (args.get("username") or "").strip()
+    if not host or not username:
+        return None, ("Fournis soit 'connection_id' (connexion sauvegardée, voir ssh_list), "
+                       "soit 'host' + 'username' (+ 'password' ou 'private_key') pour une connexion ponctuelle.")
+    if not (args.get("password") or "").strip() and not (args.get("private_key") or "").strip():
+        return None, "Fournis 'password' ou 'private_key' pour te connecter à cette machine."
+    return {
+        "host": host,
+        "port": int(args.get("port") or 22),
+        "username": username,
+        "password": args.get("password") or "",
+        "private_key": args.get("private_key") or "",
+        "key_passphrase": args.get("key_passphrase") or "",
+    }, None
+
+
 async def execute_ssh_exec(args: dict) -> dict:
-    """Exécute une commande sur un serveur SSH sauvegardé."""
-    connection_id = args.get("connection_id", "").strip()
-    command = args.get("command", "").strip()
+    """Exécute une commande sur un serveur SSH — connexion sauvegardée (connection_id) OU
+    ponctuelle (host + username + password/private_key, sans l'enregistrer au préalable)."""
+    command = (args.get("command") or "").strip()
     timeout = max(5, min(int(args.get("timeout", 30)), 120))
 
-    if not connection_id:
-        return {"error": "Paramètre 'connection_id' requis. Utilisez ssh_list pour voir les connexions disponibles."}
     if not command:
         return {"error": "Paramètre 'command' requis."}
     import security as _sec                      # 🛡️ garde-fou aussi sur les commandes distantes
@@ -8279,13 +8319,13 @@ async def execute_ssh_exec(args: dict) -> dict:
     if _blk:
         return _blk
 
-    conn = db.get_ssh_connection(connection_id)
-    if not conn:
-        return {"error": f"Connexion SSH '{connection_id}' introuvable."}
+    connection_id = (args.get("connection_id") or "").strip()
+    conn, err = _resolve_ssh_target(args)
+    if err:
+        return {"error": err}
 
     if not args.get("confirmed"):
         return {"requiresConfirmation": True, "message": f"Exécuter sur {conn['username']}@{conn['host']} : {command} ?"}
-
 
     def _run():
         client = _ssh_connect(conn, timeout)
@@ -8299,10 +8339,18 @@ async def execute_ssh_exec(args: dict) -> dict:
     try:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, _run)
-        db.touch_ssh_connection(connection_id)
+        if connection_id:
+            db.touch_ssh_connection(connection_id)
         result["success"] = result["exit_code"] == 0
         result["command"] = command
         result["host"] = f"{conn['username']}@{conn['host']}"
+        # v2.144 — connexion ad hoc réussie : PROPOSE de la sauvegarder (jamais automatique)
+        # pour ne pas re-taper les identifiants la prochaine fois — l'utilisateur décide.
+        if not connection_id and result["exit_code"] == 0:
+            result["suggest_save_connection"] = {
+                "host": conn["host"], "port": conn["port"], "username": conn["username"],
+                "message": f"Connexion à {conn['username']}@{conn['host']} réussie — veux-tu que je l'enregistre pour la réutiliser sans retaper les identifiants ?",
+            }
         return result
     except Exception as e:
         return {"error": str(e), "command": command}
@@ -8317,6 +8365,14 @@ async def execute_ssh_exec_multi(args: dict) -> dict:
         return {"error": "Paramètre 'connection_ids' (liste) requis."}
     if not command:
         return {"error": "Paramètre 'command' requis."}
+    # v2.144 — trouvé en travaillant sur l'ad hoc SSH juste à côté : cette fonction n'avait
+    # JAMAIS le garde-fou security.guard_result() (présent sur ssh_exec depuis v2.117), alors
+    # qu'elle exécute la même commande sur PLUSIEURS machines à la fois — impact plus large
+    # en cas de commande catastrophique, garde-fou d'autant plus nécessaire ici.
+    import security as _sec
+    _blk = _sec.guard_result(command)
+    if _blk:
+        return _blk
     conns = [(i, db.get_ssh_connection(i)) for i in ids]
     missing = [i for i, c in conns if not c]
     if missing:
@@ -8345,6 +8401,69 @@ async def execute_ssh_exec_multi(args: dict) -> dict:
     ok = sum(1 for r in out if r.get("success"))
     return {"success": True, "command": command, "total": len(out), "succeeded": ok,
             "failed": len(out) - ok, "results": out}
+
+
+# v2.144 — « crée un script pour cette machine distante et exécute-le » en un seul outil,
+# demandé explicitement. Sans ça, la seule option était de construire un heredoc bash à la
+# main dans `ssh_exec` (fragile — échappement des quotes/apostrophes du script généré).
+# Écrit le contenu via SFTP (fiable, pas de souci d'échappement de shell) puis exécute en
+# une commande séparée — mêmes garanties que ssh_exec (garde déterministe + confirmation).
+async def execute_ssh_write_and_run(args: dict) -> dict:
+    """Écrit un script (contenu texte) sur une machine distante via SFTP puis l'exécute —
+    connexion sauvegardée (connection_id) OU ponctuelle (host+username+password/private_key).
+    Idéal pour « crée un script d'installation de X et lance-le sur ce serveur »."""
+    content = args.get("content") or ""
+    remote_path = (args.get("remote_path") or "").strip()
+    if not content.strip():
+        return {"error": "Paramètre 'content' requis (le script à écrire)."}
+    if not remote_path:
+        return {"error": "Paramètre 'remote_path' requis (ex. /tmp/install.sh)."}
+
+    import security as _sec
+    _blk = _sec.guard_result(content)  # 🛡️ le CONTENU du script passe par le même garde-fou
+    if _blk:
+        return _blk
+
+    conn, err = _resolve_ssh_target(args)
+    if err:
+        return {"error": err}
+    connection_id = (args.get("connection_id") or "").strip()
+
+    run_cmd = (args.get("run_command") or "").strip() or f"chmod +x {remote_path} && {remote_path}"
+    if not args.get("confirmed"):
+        return {"requiresConfirmation": True,
+                "message": f"Écrire « {remote_path} » ({len(content)} car.) sur {conn['username']}@{conn['host']} puis exécuter « {run_cmd} » ?"}
+
+    def _run():
+        client = _ssh_connect(conn, 60)
+        sftp = client.open_sftp()
+        with sftp.open(remote_path, "w") as f:
+            f.write(content)
+        sftp.close()
+        _, stdout, stderr = client.exec_command(run_cmd, timeout=max(5, min(int(args.get("timeout", 120)), 600)))
+        out = stdout.read().decode(errors="replace")
+        err = stderr.read().decode(errors="replace")
+        exit_code = stdout.channel.recv_exit_status()
+        client.close()
+        return {"stdout": out, "stderr": err, "exit_code": exit_code}
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _run)
+        if connection_id:
+            db.touch_ssh_connection(connection_id)
+        result["success"] = result["exit_code"] == 0
+        result["remote_path"] = remote_path
+        result["run_command"] = run_cmd
+        result["host"] = f"{conn['username']}@{conn['host']}"
+        if not connection_id and result["exit_code"] == 0:
+            result["suggest_save_connection"] = {
+                "host": conn["host"], "port": conn["port"], "username": conn["username"],
+                "message": f"Connexion à {conn['username']}@{conn['host']} réussie — veux-tu que je l'enregistre pour la réutiliser ?",
+            }
+        return result
+    except Exception as e:
+        return {"error": str(e), "remote_path": remote_path}
 
 
 async def execute_ssh_upload(args: dict) -> dict:
@@ -16529,6 +16648,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "ssh_list": execute_ssh_list,
     "ssh_exec": execute_ssh_exec,
     "ssh_exec_multi": execute_ssh_exec_multi,
+    "ssh_write_and_run": execute_ssh_write_and_run,
     "ssh_upload": execute_ssh_upload,
     "ssh_download": execute_ssh_download,
     "ssh_list_dir": execute_ssh_list_dir,
@@ -17547,18 +17667,44 @@ TOOLS_SPEC = [
     _t("ssh_list", "Liste les connexions SSH sauvegardées dans Marvin.",
        {}, []),
 
-    _t("ssh_exec", "Exécute une commande sur un serveur SSH sauvegardé. Requiert confirmation explicite.",
-       {"connection_id": {"type": "string", "description": "ID de la connexion SSH (récupéré via ssh_list)"},
+    _t("ssh_exec",
+       "Exécute une commande sur un serveur SSH — connexion SAUVEGARDÉE (connection_id, voir "
+       "ssh_list) OU PONCTUELLE (host + username + password ou private_key, sans l'enregistrer "
+       "au préalable — pour « connecte-toi à cette IP avec ces identifiants »). Requiert "
+       "confirmation explicite dans tous les cas.",
+       {"connection_id": {"type": "string", "description": "ID d'une connexion SSH déjà sauvegardée (voir ssh_list)"},
+        "host": {"type": "string", "description": "Adresse du serveur (connexion ponctuelle, alternative à connection_id)"},
+        "port": {"type": "integer", "description": "Port SSH (défaut 22)"},
+        "username": {"type": "string", "description": "Utilisateur SSH (connexion ponctuelle)"},
+        "password": {"type": "string", "description": "Mot de passe (connexion ponctuelle, si pas de clé)"},
+        "private_key": {"type": "string", "description": "Clé privée SSH complète (connexion ponctuelle, si pas de mot de passe)"},
         "command": {"type": "string", "description": "Commande à exécuter sur le serveur distant"},
         "timeout": {"type": "integer", "description": "Délai maximum en secondes (défaut 30, max 120)"},
         "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant exécution)"}},
-       ["connection_id", "command"]),
-    _t("ssh_exec_multi", "Exécute une commande sur PLUSIEURS serveurs SSH en parallèle (administration de parc).",
+       ["command"]),
+    _t("ssh_exec_multi", "Exécute une commande sur PLUSIEURS serveurs SSH SAUVEGARDÉS en parallèle (administration de parc).",
        {"connection_ids": {"type": "array", "description": "Liste d'IDs de connexions SSH"},
         "command": {"type": "string"},
         "timeout": {"type": "integer"},
         "confirmed": {"type": "boolean"}},
        ["connection_ids", "command"]),
+    _t("ssh_write_and_run",
+       "Écrit un script (texte généré) sur une machine distante via SFTP PUIS l'exécute — "
+       "connexion sauvegardée (connection_id) OU ponctuelle (host+username+password/private_key). "
+       "Pour « crée un script d'installation de X et lance-le sur ce serveur » — plus fiable "
+       "qu'un heredoc dans ssh_exec (pas de souci d'échappement de quotes).",
+       {"connection_id": {"type": "string", "description": "ID d'une connexion SSH sauvegardée"},
+        "host": {"type": "string", "description": "Adresse du serveur (connexion ponctuelle)"},
+        "port": {"type": "integer", "description": "Port SSH (défaut 22)"},
+        "username": {"type": "string", "description": "Utilisateur SSH (connexion ponctuelle)"},
+        "password": {"type": "string", "description": "Mot de passe (connexion ponctuelle)"},
+        "private_key": {"type": "string", "description": "Clé privée SSH (connexion ponctuelle)"},
+        "content": {"type": "string", "description": "Contenu du script à écrire sur la machine distante"},
+        "remote_path": {"type": "string", "description": "Chemin distant du script (ex. /tmp/install.sh)"},
+        "run_command": {"type": "string", "description": "Commande d'exécution (défaut : chmod +x puis lance le script)"},
+        "timeout": {"type": "integer", "description": "Délai maximum en secondes (défaut 120, max 600)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire)"}},
+       ["content", "remote_path"]),
     _t("ssh_upload", "Envoie un fichier local vers un serveur SSH via SFTP.",
        {"connection_id": {"type": "string"},
         "local_path": {"type": "string", "description": "Fichier local à envoyer"},
