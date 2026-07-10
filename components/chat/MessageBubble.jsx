@@ -20,6 +20,10 @@ const BACKEND_URL = (typeof window !== 'undefined' && window.location)
 // tous partagent la même forme de résultat) — plus robuste à un futur outil de génération.
 const DOCUMENT_EXTENSIONS = new Set([
   'pdf', 'docx', 'doc', 'rtf', 'odt', 'xlsx', 'xls', 'csv', 'pptx', 'ppt', 'txt', 'md',
+  // v2.145 — webapp_create ("ChatGPT Sites") génère une mini-appli HTML autonome ;
+  // pc_open_file (os.startfile) ouvre déjà un .html dans le navigateur par défaut,
+  // zéro code supplémentaire nécessaire côté ouverture — juste la reconnaître ici.
+  'html', 'htm',
 ]);
 // v2.142 — code_python capture désormais les fichiers écrits par le code exécuté (Code
 // Interpreter local) : le cas le plus courant est un graphique matplotlib. Set séparé
@@ -31,6 +35,7 @@ function docIcon(ext) {
   const map = {
     pdf: '📕', docx: '📝', doc: '📝', rtf: '📝', odt: '📝',
     xlsx: '📗', xls: '📗', csv: '📗', pptx: '📊', ppt: '📊', txt: '📄', md: '📄',
+    html: '🌐', htm: '🌐',
   };
   return map[ext] || '📄';
 }

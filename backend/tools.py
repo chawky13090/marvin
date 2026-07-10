@@ -1686,6 +1686,40 @@ def _fmt_bytes(n):
     return f"{n:.1f} Po"
 
 
+# v2.145 — « ChatGPT Sites » (juillet 2026) : générer une mini-appli web interactive sans
+# quitter le chat. Marvin générait déjà des documents/graphiques/code (v2.142) mais rien qui
+# produise une page consultable dans le navigateur — vrai trou identifié en comparant aux
+# fonctionnalités des IA payantes. Réutilise le pattern déjà établi (GeneratedFileCard v2.128,
+# étendu ici aux .html) : le fichier est juste un fichier de plus, ouvert via os.startfile()
+# (déjà le comportement de pc_open_file — un .html ouvre le navigateur par défaut, zéro code
+# supplémentaire nécessaire côté ouverture).
+async def execute_webapp_create(args: dict) -> dict:
+    """Génère une mini-application web autonome (HTML/CSS/JS auto-contenu, un seul fichier)
+    et l'enregistre localement — pour un dashboard, un prototype, un outil interactif, une
+    page de suivi de projet... Ouvrable directement dans le navigateur (clic sur la carte
+    dans le chat). Le contenu doit être self-contained : CSS/JS inline, pas de dépendance
+    CDN externe (fonctionne même hors-ligne, cohérent avec un usage local)."""
+    content = (args.get("content") or "").strip()
+    title = (args.get("title") or "webapp").strip()
+    if not content:
+        return {"error": "Paramètre 'content' requis (le code HTML complet de la page)."}
+    if "<html" not in content.lower():
+        content = (
+            f'<!DOCTYPE html>\n<html lang="fr"><head><meta charset="utf-8">'
+            f'<title>{title}</title></head><body>\n{content}\n</body></html>'
+        )
+    import re as _re, uuid as _uuid
+    safe_name = _re.sub(r"[^a-zA-Z0-9_-]+", "_", title)[:60].strip("_") or "webapp"
+    out_dir = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "data", "webapps", f"{safe_name}_{_uuid.uuid4().hex[:8]}"))
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "index.html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return {"success": True, "path": path,
+            "message": f"Mini-appli « {title} » créée — clique pour l'ouvrir dans ton navigateur."}
+
+
 async def execute_pc_open_file(args: dict) -> dict:
     raw = args.get("path", "")
     path = _resolve_path(raw)
@@ -8164,6 +8198,202 @@ async def execute_ai_model_council(args: dict) -> dict:
         "individual_answers": [{"model": m, "answer": (a or "")[:1500]} for m, a in zip(models, answers)],
         "message": f"{len(models)} modèles consultés en parallèle.",
     }
+
+
+# v2.145 — « Ultra mode » (GPT-5.6 Sol, juillet 2026) : au lieu d'une seule chaîne de
+# raisonnement séquentielle, décompose un objectif en sous-tâches INDÉPENDANTES traitées
+# EN PARALLÈLE, puis synthétise. Positionnement HONNÊTE (pas de survente) : contrairement
+# à Ultra qui orchestre de vrais sous-agents avec accès aux outils (coordination "dans les
+# poids" du modèle), ceci décompose puis fait raisonner des appels LLM en parallèle SANS
+# accès aux outils — un vrai gain de rapidité/qualité sur les tâches qui se décomposent en
+# angles indépendants (ex. rédiger une politique de sécurité en 3 volets), pas un
+# framework d'agents généraliste. Complète `ai_model_council` (même question, plusieurs
+# modèles) avec l'axe perpendiculaire (même modèle/plusieurs modèles, sous-questions
+# différentes d'un même objectif).
+async def execute_ai_subagents_run(args: dict) -> dict:
+    """Décompose un objectif en sous-tâches indépendantes, les traite EN PARALLÈLE (raisonnement,
+    pas d'accès aux outils), puis synthétise en un résultat cohérent. Pour un objectif qui se
+    découpe naturellement en plusieurs angles (ex. « rédige une politique de sécurité couvrant
+    accès/incidents/sauvegardes ») — plus rapide et plus complet qu'un seul passage linéaire.
+    PAS pour une tâche qui nécessite des outils (fichiers, PC, web) — pour ça, la boucle
+    d'agent normale est plus appropriée."""
+    goal = (args.get("goal") or args.get("objectif") or "").strip()
+    if not goal:
+        return {"error": "Paramètre 'goal' requis (l'objectif à décomposer)."}
+    subtasks = args.get("subtasks") or []
+
+    if not subtasks:
+        decompose_prompt = (
+            f"Objectif : {goal}\n\n"
+            "Décompose cet objectif en 2 à 5 sous-tâches INDÉPENDANTES (chacune traitable "
+            "séparément, sans dépendre du résultat des autres). Réponds UNIQUEMENT par une "
+            "liste à puces, une sous-tâche par ligne, formulée comme une consigne claire — "
+            "rien d'autre (pas de préambule, pas de numérotation autre que les puces)."
+        )
+        try:
+            raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=60) or "")
+        except Exception:
+            raw = ""
+        subtasks = [
+            line.lstrip("-•* ").strip()
+            for line in raw.splitlines()
+            if line.strip() and line.lstrip().startswith(("-", "•", "*"))
+        ][:5]
+    if len(subtasks) < 2:
+        return {"error": "Impossible de décomposer cet objectif en sous-tâches indépendantes — utilise la boucle d'agent normale pour une tâche unique."}
+
+    async def _work(subtask: str):
+        prompt = (
+            f"Objectif global : {goal}\n\n"
+            f"Ta sous-tâche (traite UNIQUEMENT celle-ci, en profondeur) : {subtask}\n\n"
+            "Réponds de façon complète et autonome à cette sous-tâche."
+        )
+        try:
+            return await _ollama_generate(prompt, model=args.get("model"), timeout=180)
+        except Exception as e:
+            return f"(échec : {str(e)[:100]})"
+
+    results = await asyncio.gather(*[_work(s) for s in subtasks])
+
+    digest = "\n\n".join(
+        f"### Sous-tâche {i+1} : {s}\n{(r or '').strip()}"
+        for i, (s, r) in enumerate(zip(subtasks, results)))
+    synth_prompt = (
+        f"Objectif global : {goal}\n\n"
+        f"Voici les résultats de {len(subtasks)} sous-tâches traitées en parallèle :\n\n{digest}\n\n"
+        "Fusionne ces résultats en UN document cohérent qui répond à l'objectif global — "
+        "structuré, sans répétition entre les parties, transitions naturelles entre les "
+        "sections. Ne résume pas superficiellement : intègre le contenu réel de chaque "
+        "sous-tâche."
+    )
+    synthesis = (await _ollama_generate(synth_prompt, model=args.get("model"), timeout=240) or "").strip()
+
+    return {
+        "success": True,
+        "answer": synthesis,
+        "subtasks": subtasks,
+        "subtask_results": [{"subtask": s, "result": (r or "")[:2000]} for s, r in zip(subtasks, results)],
+        "message": f"{len(subtasks)} sous-tâches traitées en parallèle puis fusionnées.",
+    }
+
+
+# v2.145 — « ChatGPT Work » (tâche longue autonome, juillet 2026) : décompose un objectif en
+# checklist (table `tasks` déjà existante, tag `longtask:<slug>`) et programme un job CRON qui
+# relance un VRAI tour d'agent (outils complets, pas juste du texte — via `run_agent`, cf.
+# `main.py::_long_task_resume_tick`) toutes les 5 min jusqu'à ce que toutes les étapes soient
+# faites. Réutilise l'infra cron+tasks déjà existante et testée plutôt que d'inventer un
+# nouveau système d'exécution en arrière-plan. Positionnement HONNÊTE (pas de survente) :
+# reprise toutes les 5 min, pas un process qui tourne en continu pendant des heures comme
+# ChatGPT Work (infra cloud dédiée) — mais un vrai gain : Marvin continue d'avancer après
+# avoir répondu, sans qu'on ait à relancer chaque étape soi-même.
+async def execute_long_task_start(args: dict) -> dict:
+    """Démarre une tâche longue autonome : décompose l'objectif en étapes (visibles dans
+    Tâches), avance IMMÉDIATEMENT sur la première avec tes outils normaux, puis programme
+    une reprise automatique (toutes les 5 min) jusqu'à ce que tout soit fait. Pour un
+    objectif qui prend plusieurs étapes/outils et peut continuer sans supervision constante
+    (« occupe-toi de X en tâche de fond », « fais avancer ce projet pendant que je fais
+    autre chose »). PAS pour une question simple ou une action en un seul appel d'outil."""
+    goal = (args.get("goal") or "").strip()
+    conversation_id = args.get("_conversation_id")
+    if not goal:
+        return {"error": "Paramètre 'goal' requis."}
+    if not conversation_id:
+        return {"error": "Cette tâche longue doit être démarrée depuis une conversation active."}
+
+    decompose_prompt = (
+        f"Objectif : {goal}\n\n"
+        "Décompose en 2 à 8 ÉTAPES concrètes, dans l'ordre logique. IMPORTANT : ces étapes "
+        "seront exécutées PAR UN ASSISTANT IA AUTONOME disposant d'outils (fichiers, "
+        "commandes système, SSH, web, documents...) — PAS par un humain qui suit un mode "
+        "d'emploi. Formule chaque étape comme une action que l'IA peut accomplir elle-même "
+        "avec ses outils (ex. « lister les fichiers de X », « vérifier l'espace disque via "
+        "une commande système »), jamais une instruction manuelle du type « cliquez sur », "
+        "« appuyez sur la touche ». Réponds UNIQUEMENT par une liste à puces, une étape par "
+        "ligne — rien d'autre."
+    )
+    try:
+        raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=60) or "")
+    except Exception:
+        raw = ""
+    steps = [
+        line.lstrip("-•* ").strip()
+        for line in raw.splitlines()
+        if line.strip() and line.lstrip().startswith(("-", "•", "*"))
+    ][:8]
+    if not steps:
+        return {"error": "Impossible de décomposer cet objectif en étapes claires — reformule plus précisément."}
+
+    import re as _re, uuid as _uuid
+    slug = _re.sub(r"[^a-z0-9]+", "-", goal.lower())[:40].strip("-") or _uuid.uuid4().hex[:8]
+    tag = f"longtask:{slug}"
+    created = [db.create_task(title=step, description=f"Étape de la tâche longue : {goal}", tags=[tag])
+               for step in steps]
+
+    try:
+        db.create_cron_job(
+            name=f"Reprise tâche longue : {goal[:60]}",
+            tool_name="_long_task_resume",
+            args={"conversation_id": conversation_id, "slug": slug, "goal": goal},
+            schedule="every 5 minutes",
+        )
+    except Exception as e:
+        return {"error": f"Étapes créées mais échec de la programmation de reprise automatique : {str(e)[:150]}",
+                "steps": steps, "tag": tag}
+
+    return {
+        "success": True,
+        "goal": goal,
+        "steps": steps,
+        "tag": tag,
+        "task_ids": [t["id"] for t in created],
+        "message": (
+            f"{len(steps)} étape(s) créée(s) (visibles dans Tâches, tag « {tag} »). "
+            "Continue MAINTENANT sur la première étape avec tes outils normaux — la reprise "
+            "automatique (toutes les 5 min) prendra le relais pour les étapes restantes."
+        ),
+    }
+
+
+async def execute_long_task_status(args: dict) -> dict:
+    """Vérifie l'avancement d'une ou de toutes les tâches longues (voir long_task_start)."""
+    tag = (args.get("tag") or "").strip()
+    all_tasks = db.list_tasks(limit=200)
+    relevant = [t for t in all_tasks if any(tg.startswith("longtask:") for tg in (t.get("tags") or []))
+                and (not tag or tag in (t.get("tags") or []))]
+    if not relevant:
+        return {"success": True, "count": 0, "message": "Aucune tâche longue en cours."}
+    by_tag: dict[str, list] = {}
+    for t in relevant:
+        for tg in (t.get("tags") or []):
+            if tg.startswith("longtask:"):
+                by_tag.setdefault(tg, []).append(t)
+    groups = [
+        {"tag": tg, "total": len(tasks), "done": sum(1 for t in tasks if t.get("status") == "done"),
+         # v2.145 — bug trouvé en testant en réel : sans 'id', le modèle n'a AUCUN moyen de
+         # marquer une étape faite (task_update exige l'ID exact) — il inventait le tag ou
+         # un numéro de position à la place, échec systématique.
+         "steps": [{"id": t["id"], "title": t["title"], "status": t["status"]} for t in tasks]}
+        for tg, tasks in by_tag.items()
+    ]
+    return {"success": True, "groups": groups, "message": f"{len(groups)} tâche(s) longue(s) trouvée(s)."}
+
+
+async def execute_long_task_stop(args: dict) -> dict:
+    """Arrête la reprise automatique d'une tâche longue (les étapes déjà faites restent, la
+    checklist reste consultable — seule la reprise en arrière-plan s'arrête)."""
+    tag = (args.get("tag") or "").strip()
+    slug = tag.split(":", 1)[-1] if ":" in tag else tag
+    if not slug:
+        return {"error": "Paramètre 'tag' requis (voir long_task_status pour la liste)."}
+    jobs = db.list_cron_jobs()
+    stopped = 0
+    for j in jobs:
+        if j.get("tool_name") == "_long_task_resume" and (j.get("args") or {}).get("slug") == slug:
+            db.update_cron_job(j["id"], {"enabled": False})
+            stopped += 1
+    return {"success": True, "stopped": stopped,
+            "message": (f"{stopped} reprise(s) automatique(s) arrêtée(s)." if stopped
+                        else "Aucune reprise automatique trouvée pour ce tag.")}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -16493,6 +16723,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "file_find":        execute_file_find,
     "system_search":    execute_system_search,
     "system_search_content": execute_system_search_content,
+    "webapp_create": execute_webapp_create,
     "pc_open_file": execute_pc_open_file,
     "pc_reveal": execute_pc_reveal,
     "pc_browse": execute_pc_browse,
@@ -16644,6 +16875,10 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "web_research": execute_web_research,
     "web_deep_research": execute_web_deep_research,
     "ai_model_council": execute_ai_model_council,
+    "ai_subagents_run": execute_ai_subagents_run,
+    "long_task_start": execute_long_task_start,
+    "long_task_status": execute_long_task_status,
+    "long_task_stop": execute_long_task_stop,
     # SSH
     "ssh_list": execute_ssh_list,
     "ssh_exec": execute_ssh_exec,
@@ -16943,6 +17178,15 @@ TOOLS_SPEC = [
            "À utiliser EN PRIORITÉ si tu n'es pas certain du chemin correct."),
        {}, []),
 
+    _t("webapp_create",
+       "Génère une mini-application web autonome (HTML/CSS/JS auto-contenu en un seul "
+       "fichier) et l'ouvre dans le navigateur — pour un dashboard, un prototype, un outil "
+       "interactif, une page de suivi de projet. Pour « crée-moi une page/un dashboard/une "
+       "mini-appli qui... », « fais-moi une interface pour... ». Le HTML doit être "
+       "self-contained (CSS/JS inline, pas de CDN externe).",
+       {"content": {"type": "string", "description": "Le code HTML complet de la page (ou un fragment, enveloppé automatiquement)"},
+        "title": {"type": "string", "description": "Titre de la mini-appli (utilisé comme nom de fichier)"}},
+       ["content"]),
     _t("pc_open_file", "Ouvre un fichier ou dossier dans son application par défaut.",
        {"path": {"type": "string", "description": "Chemin du fichier à ouvrir"}},
        ["path"]),
@@ -17649,6 +17893,32 @@ TOOLS_SPEC = [
        {"question": {"type": "string", "description": "La question à poser à plusieurs modèles"},
         "n_models": {"type": "integer", "description": "Nombre de modèles à consulter (2-5, défaut 3)"}},
        ["question"]),
+    _t("ai_subagents_run",
+       "Décompose un objectif en 2-5 sous-tâches INDÉPENDANTES traitées EN PARALLÈLE puis "
+       "fusionnées en un résultat cohérent (équivalent Ultra mode de GPT-5.6 Sol, sans accès "
+       "aux outils par sous-tâche). Pour un objectif qui se découpe naturellement en angles "
+       "indépendants (« rédige une politique de sécurité couvrant accès/incidents/"
+       "sauvegardes », « analyse ce sujet sous 3 angles différents »). PAS pour une tâche qui "
+       "a besoin d'outils (fichiers, PC, web) — utilise la conversation normale pour ça.",
+       {"goal": {"type": "string", "description": "L'objectif global à décomposer"},
+        "subtasks": {"type": "array", "items": {"type": "string"}, "description": "Sous-tâches explicites (optionnel — auto-décomposées si absent)"}},
+       ["goal"]),
+    _t("long_task_start",
+       "Démarre une TÂCHE LONGUE AUTONOME : décompose l'objectif en étapes (créées dans "
+       "Tâches), avance immédiatement dessus avec tes outils normaux, puis continue "
+       "automatiquement en arrière-plan (reprise toutes les 5 min) jusqu'à ce que tout soit "
+       "fait — même après la fin de cette conversation. Pour « occupe-toi de X en tâche de "
+       "fond », « fais avancer ce projet pendant que je fais autre chose », un objectif à "
+       "plusieurs étapes qui n'a pas besoin de supervision constante. PAS pour une question "
+       "simple ou une action en un seul appel d'outil (équivalent ChatGPT Work, en plus léger).",
+       {"goal": {"type": "string", "description": "L'objectif à accomplir en tâche de fond"}},
+       ["goal"]),
+    _t("long_task_status", "Vérifie l'avancement d'une ou de toutes les tâches longues en cours (voir long_task_start).",
+       {"tag": {"type": "string", "description": "Tag précis (ex. longtask:xxx) — optionnel, toutes si absent"}},
+       []),
+    _t("long_task_stop", "Arrête la reprise automatique d'une tâche longue (les étapes déjà faites restent visibles).",
+       {"tag": {"type": "string", "description": "Le tag de la tâche longue (voir long_task_status)"}},
+       ["tag"]),
     _t("web_deep_research",
        "Recherche APPROFONDIE multi-passes sur le web (équivalent Deep Research de ChatGPT/Claude/"
        "Gemini/Perplexity) : plusieurs cycles recherche→analyse des trous→recherche complémentaire, "

@@ -820,6 +820,18 @@ _KEYWORD_TOOLS = {
      "deuxième avis", "second avis", "autre ia", "autre modele", "autre modèle"):
         {"ai_model_council"},
 
+    # v2.145 — Décomposition en sous-tâches parallèles (« Ultra mode »)
+    ("plusieurs angles", "sous plusieurs angles", "decompose", "décompose",
+     "sous-taches", "sous-tâches", "en parallele", "en parallèle", "plusieurs volets",
+     "differents aspects", "différents aspects"):
+        {"ai_subagents_run"},
+
+    # v2.145 — Tâche longue autonome (« ChatGPT Work »)
+    ("tache de fond", "tâche de fond", "en arriere-plan", "en arrière-plan",
+     "pendant que je fais autre chose", "occupe-toi de", "occupe toi de",
+     "fais avancer ce projet", "tache longue", "tâche longue", "sans supervision"):
+        {"long_task_start", "long_task_status", "long_task_stop"},
+
     # v2.122 — Fraîcheur de l'information (règle d'or #8) : signaux qu'une réponse "de
     # mémoire" risque d'être périmée (version, actualité, disponibilité, événement récent) —
     # déclenche la recherche web même sans mention explicite de "web"/"internet".
@@ -1193,6 +1205,12 @@ _KEYWORD_TOOLS = {
     # Vidéo / infographie
     ("infographie", "graphique"):
         {"infographic_create"},
+
+    # v2.145 — Mini-appli web (« ChatGPT Sites »)
+    ("dashboard", "mini-appli", "mini appli", "page web", "interface web",
+     "appli web", "application web", "site interactif", "prototype web",
+     "page de suivi", "outil interactif", "webapp"):
+        {"webapp_create"},
 
     # Édition vidéo / GIF (v2.32)
     ("vidéo", "video", "gif", "mp4", "avi", "mkv", "mov", "webm",
@@ -2182,6 +2200,12 @@ async def run_agent(
                 })
 
                 _tool_t0 = time.time()
+                # v2.145 — `long_task_start` a besoin du `conversation_id` COURANT pour
+                # programmer sa reprise en arrière-plan (cron → nouveau tour sur CETTE
+                # conversation) — injecté ici plutôt que demandé au LLM (qui n'a de toute
+                # façon pas une vision fiable de son propre conversation_id).
+                if tool_name == "long_task_start":
+                    tool_args["_conversation_id"] = conversation_id
                 # ── Outil explicite : bloque toute substitution ────────────────
                 # Le modèle propose parfois un outil "proche" au lieu de celui demandé par
                 # son nom exact (ex: net_ping au lieu de file_find). tools_payload a déjà été

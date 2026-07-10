@@ -124,6 +124,86 @@ def _next_run_dt(schedule: str) -> str:
     return (now + timedelta(seconds=secs)).strftime("%Y-%m-%d %H:%M:%S")
 
 
+async def _drain_run_agent(message: str, conv_id: str):
+    """Consomme un tour `run_agent` complet (les messages/outils sont déjà sauvegardés par
+    run_agent lui-même, rien à faire du flux SSE ici) — factorisé pour pouvoir le borner
+    avec asyncio.wait_for depuis _long_task_resume_tick."""
+    async for _ in run_agent([{"role": "user", "content": message}], conv_id, None):
+        pass
+
+
+async def _long_task_resume_tick(job: dict, now_str: str):
+    """v2.145 — reprise d'une tâche longue (`long_task_start`) : contrairement aux jobs cron
+    normaux (1 outil, args fixes), celui-ci relance un VRAI tour d'agent complet (`run_agent`,
+    outils inclus) sur la conversation d'origine — pas juste un appel d'outil isolé. S'arrête
+    tout seul (désactive le job) une fois toutes les étapes de la checklist marquées 'done'."""
+    args = job.get("args") or {}
+    conv_id = args.get("conversation_id")
+    slug = args.get("slug")
+    goal = args.get("goal", "")
+    if not conv_id or not slug:
+        db.update_cron_job(job["id"], {"enabled": False, "last_run": now_str,
+                                        "last_result": json.dumps({"error": "job long_task mal formé"})[:500]})
+        return
+
+    tag = f"longtask:{slug}"
+    pending = [t for t in db.list_tasks(limit=200)
+               if t.get("status") != "done" and tag in (t.get("tags") or [])]
+    if not pending:
+        db.update_cron_job(job["id"], {
+            "enabled": False, "last_run": now_str,
+            "last_result": json.dumps({"message": f"Tâche longue « {goal[:80]} » terminée."})[:500],
+        })
+        try:
+            notifier = tool_module.TOOLS_REGISTRY.get("pc_notify")
+            if notifier:
+                await notifier({"title": "Marvin — Tâche longue terminée",
+                                 "message": goal[:200] or "Toutes les étapes sont faites."})
+        except Exception:
+            pass
+        return
+
+    # v2.145 — 2 bugs trouvés en testant en réel :
+    #   1. Nommer littéralement "long_task_status"/"task_update" dans le nudge déclenchait
+    #      la règle d'or #6 (outil explicite cité = SEUL outil autorisé ce tour), bloquant
+    #      l'accès aux VRAIS outils nécessaires pour avancer (file_large_finder, etc.) —
+    #      corrigé en décrivant l'étape en PROSE, sans jamais nommer un outil précis.
+    #   2. Le modèle n'avait aucun moyen fiable de connaître l'ID exact de la tâche à
+    #      marquer terminée (inventait le tag ou un numéro de position) — corrigé en
+    #      donnant l'ID exact de la PROCHAINE étape directement dans le nudge.
+    next_step = pending[0]
+    nudge = (
+        f"[Reprise automatique de tâche longue « {goal} »] Étape à traiter maintenant : "
+        f"« {next_step['title']} » (identifiant de tâche : {next_step['id']}). Avance "
+        "dessus avec les outils appropriés à cette étape précise — reste sur une action "
+        "CIBLÉE et RAPIDE, évite un scan récursif ou une opération lourde qui prendrait "
+        "plusieurs minutes — puis mets à jour le statut de cette tâche à 'done' une fois "
+        f"terminée. Il reste {len(pending)} étape(s) au total sur cette tâche longue."
+    )
+    # v2.145 — 3e bug trouvé en testant en réel : une reprise SANS limite de temps peut
+    # enchaîner suffisamment d'appels d'outils/cloud pour prendre plusieurs MINUTES (même
+    # symptôme déjà documenté en v2.136 — un tour d'agent normal peut être lent), ce qui
+    # retarde TOUS les autres jobs cron suivants (le worker traite les jobs séquentiellement)
+    # et peut bloquer la réactivité perçue du backend le temps que ça tourne. Borné à 3 min
+    # (buffer confortable avant le prochain cycle à 5 min) — la progression déjà faite dans
+    # ce délai reste sauvegardée (run_agent écrit chaque message au fil de l'eau), seule la
+    # suite est coupée et reprise au cycle suivant.
+    try:
+        await _asyncio.wait_for(_drain_run_agent(nudge, conv_id), timeout=180)
+        result = {"message": "Reprise exécutée."}
+    except _asyncio.TimeoutError:
+        result = {"message": "Reprise interrompue après 3 min (progression déjà faite conservée) — continuera au prochain cycle."}
+    except Exception as e:
+        result = {"error": str(e)[:200]}
+
+    db.update_cron_job(job["id"], {
+        "last_run": now_str,
+        "next_run": _next_run_dt(job["schedule"]),
+        "last_result": json.dumps(result)[:500],
+        "run_count": True,
+    })
+
+
 async def _cron_worker():
     """Tâche de fond : vérifie et exécute les jobs cron toutes les 30 secondes."""
     while True:
@@ -133,6 +213,11 @@ async def _cron_worker():
             for job in jobs:
                 next_run = job.get("next_run")
                 if not next_run or next_run <= now_str:
+                    # v2.145 — les jobs de reprise de tâche longue relancent un tour d'agent
+                    # complet, pas un simple appel d'outil (cf. _long_task_resume_tick).
+                    if job["tool_name"] == "_long_task_resume":
+                        await _long_task_resume_tick(job, now_str)
+                        continue
                     # Exécuter l'outil
                     executor = tool_module.TOOLS_REGISTRY.get(job["tool_name"])
                     result = {"error": f"Outil '{job['tool_name']}' introuvable"}
@@ -2101,6 +2186,54 @@ async def lifespan(app_instance):
 #   AVANT toute tentative SFTP, connexion vers une IP injoignable tentée pour de vrai
 #   et échoue proprement (timeout, pas un crash) ; reproduction du bug d'origine → 0
 #   appel d'outil, script direct. `scripts/smoke_test_chat.py` 5/5.
+#
+# v2.145 (🚀 3 idées de GPT-5.6 Sol/ChatGPT Work — Sites, Ultra mode, tâche longue) : sur
+#   demande explicite (« regarde les nouveautés [ChatGPT Sol/GPT-5.6] et dis-moi ce qu'on
+#   peut reprendre » puis « les 3 »), recherche web menée avant implémentation.
+#
+#   1. **`webapp_create`** (« ChatGPT Sites ») : génère une mini-appli web autonome (HTML/
+#      CSS/JS self-contained) ouverte dans le navigateur par défaut — réutilise `pc_open_
+#      file`/`os.startfile()` tel quel (déjà le bon comportement pour un .html, zéro code
+#      supplémentaire) et `GeneratedFileCard` (v2.128) étendu aux .html/.htm.
+#   2. **`ai_subagents_run`** (« Ultra mode ») : décompose un objectif en 2-5 sous-tâches
+#      INDÉPENDANTES traitées en parallèle (raisonnement, pas d'accès outils) puis
+#      synthétisées — positionnement HONNÊTE dans la description : PAS de vrais sous-agents
+#      avec outils comme Ultra (coordination "dans les poids" du modèle), un vrai gain de
+#      rapidité/qualité sur des tâches qui se décomposent en angles indépendants.
+#   3. **Tâche longue autonome** (« ChatGPT Work », allégé) : `long_task_start` décompose
+#      un objectif en checklist (table `tasks` existante), avance immédiatement dans le
+#      tour courant, puis programme un job CRON (`_long_task_resume`, nouveau cas spécial
+#      dans `_cron_worker`) qui relance un VRAI tour `run_agent` (outils complets) toutes
+#      les 5 min jusqu'à ce que tout soit fait. `long_task_status`/`long_task_stop` pour le
+#      contrôle utilisateur. Positionnement honnête : reprise toutes les 5 min, pas un
+#      process continu pendant des heures (infra cloud dédiée chez OpenAI).
+#      **3 bugs trouvés en testant EN RÉEL** (pas supposés) :
+#      a) Nommer littéralement les outils dans le message de reprise ("Utilise long_task_
+#         status... task_update...") déclenchait la règle d'or #6 (outil explicite cité =
+#         SEUL outil autorisé), bloquant l'accès aux VRAIS outils nécessaires pour avancer
+#         — corrigé en décrivant l'étape en PROSE sans jamais nommer un outil précis.
+#      b) `long_task_status` n'exposait pas l'`id` réel de la tâche → le modèle inventait
+#         un identifiant (le tag, un numéro de position) pour `task_update`, échec
+#         systématique — corrigé en donnant l'ID exact de la PROCHAINE étape directement
+#         dans le message de reprise.
+#      c) Une reprise SANS limite de temps peut enchaîner assez d'appels d'outils/cloud
+#         pour prendre plusieurs MINUTES (même symptôme déjà documenté en v2.136) —
+#         `asyncio.wait_for` borne chaque reprise à 3 min (buffer avant le prochain cycle
+#         à 5 min) ; la progression déjà faite reste sauvegardée (run_agent écrit chaque
+#         message au fil de l'eau), seule la suite est coupée et reprise au cycle suivant.
+#      Petit correctif de qualité au passage : le prompt de décomposition demandait des
+#      "étapes actionnables" sans préciser PAR QUI — le modèle proposait parfois des
+#      instructions manuelles ("appuyez sur la touche Windows") inexécutables par un
+#      agent autonome — précisé explicitement dans le prompt.
+#   Testé en réel de bout en bout (2 fois, avec fix) : conversation réelle créée, tâche
+#   longue démarrée, checklist créée avec IDs réels, job cron déclenché par le VRAI worker
+#   (pas simulé), reprise complétée dans le délai borné, backend resté réactif tout du
+#   long (vérifié par sondage pendant l'exécution) ; décomposition re-testée après le
+#   correctif de prompt → étapes orientées outils au lieu d'instructions manuelles.
+#   `ai_subagents_run` testé en réel (3 sous-tâches sécurité réseau, réponses détaillées
+#   et correctes, synthèse cohérente) ; `webapp_create` testé (fichier HTML généré et
+#   correctement enveloppé). `scripts/smoke_test_chat.py` 5/5, tous les artefacts de test
+#   nettoyés (cron/tâches/conversations).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -6614,7 +6747,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.144.0",
+            "version":         "2.145.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
