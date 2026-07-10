@@ -2037,6 +2037,26 @@ async def lifespan(app_instance):
 #   code propre exécuté directement, graphique matplotlib capturé et chemin renvoyé ;
 #   `web_deep_research` : rapport réel généré (4 sources, 1 passe) ; `ai_model_council` :
 #   2 modèles consultés en parallèle, synthèse cohérente produite.
+#
+# v2.143 (🧠 RAG agentique pour document_ask) : sur demande explicite (« continue sur
+#   cette voie pour augmenter le niveau d'intelligence de Marvin »), suite du chantier
+#   v2.142. `document_ask` faisait une recherche UNIQUE et figée (naive RAG) — même
+#   limite que celle corrigée pour `web_research`→`web_deep_research` en v2.142, jamais
+#   appliquée au RAG documentaire local. Ajouté : après la 1ʳᵉ recherche, un petit
+#   modèle JUGE si le contexte récupéré suffit ; sinon reformule UNE requête
+#   complémentaire (mots-clés différents) pour une 2ᵉ recherche, résultats fusionnés
+#   (dédoublonnés par texte) avant la synthèse finale. Coût borné à AU PLUS 1 recherche
+#   + 1 petit appel de jugement supplémentaires (pas une boucle non bornée comme
+#   `web_deep_research` — le corpus local est petit, pas besoin de 6 passes).
+#   Recherche menée avant implémentation : vérifié que le paramètre Ollama `think`
+#   n'apporte AUCUNE différence sur les modèles cloud installés (glm-5.2 émet déjà
+#   son raisonnement par défaut, avec ou sans le flag — testé en isolation, résultat
+#   identique) — piste explorée puis écartée sur preuve, pas laissée en l'état.
+#   Testé en réel : indexation d'un document de test à 2 sections de vocabulaire
+#   disjoint (installation technique / code de facturation), question portant sur les
+#   deux → réponse complète et correcte, citée, avec fusion de plusieurs passes de
+#   recherche confirmée (champ `sources` enrichi) ; document de test retiré de l'index
+#   après coup. `scripts/smoke_test_chat.py` 5/5 après coup (aucune régression).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -6550,7 +6570,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.142.0",
+            "version":         "2.143.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

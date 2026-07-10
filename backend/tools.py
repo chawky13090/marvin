@@ -7546,8 +7546,15 @@ async def execute_document_index(args: dict) -> dict:
             "message": f"📄 {len(indexed)} document(s) indexé(s) ({total_chunks} fragments). Tu peux maintenant poser des questions dessus."}
 
 
+# v2.143 — RAG AGENTIQUE (2ᵉ passe de retrieval si la 1ʳᵉ ne suffit pas), au lieu d'une
+# recherche unique figée. Recherche 2026 (cf. mémoire session) : « agentic RAG » — le
+# modèle DÉCIDE si le contexte récupéré suffit, sinon reformule et récupère à nouveau —
+# remplace le retrieval linéaire pour les questions complexes. Coût borné : AU PLUS 1
+# passe supplémentaire + 1 petit appel de jugement (pas une boucle non bornée comme
+# `web_deep_research`, le corpus local est petit — pas besoin de 6 passes).
 async def execute_document_ask(args: dict) -> dict:
-    """Pose une question à tes documents indexés : récupère les passages pertinents et répond en les citant."""
+    """Pose une question à tes documents indexés : récupère les passages pertinents (avec
+    une 2ᵉ passe de recherche reformulée si la 1ʳᵉ ne suffit pas) et répond en les citant."""
     import vector_store as vs
     question = (args.get("question") or args.get("query") or "").strip()
     if not question:
@@ -7556,13 +7563,53 @@ async def execute_document_ask(args: dict) -> dict:
         _k = int(args.get("k") or db.get_setting("rag_k") or 6)
     except Exception:
         _k = 6
-    hits = await vs.search(question, collections=["documents"], limit=_k)
-    if not hits:
-        if not _indexed_docs():
-            return {"error": "Aucun document indexé. Indexe d'abord un fichier ou un dossier."}
+    if not _indexed_docs():
+        return {"error": "Aucun document indexé. Indexe d'abord un fichier ou un dossier."}
+
+    seen_texts: set[str] = set()
+    all_hits: list[dict] = []
+    current_query = question
+
+    hits = await vs.search(current_query, collections=["documents"], limit=_k)
+    for h in hits:
+        key = h["text"][:200]
+        if key not in seen_texts:
+            seen_texts.add(key)
+            all_hits.append(h)
+
+    if all_hits:
+        # Une seule vérification (pas de boucle) : le modèle juge si le 1er passage
+        # suffit, sinon reformule UNE requête complémentaire pour une 2ᵉ recherche.
+        digest = "\n\n".join(
+            f"[{i+1}] ({h['metadata'].get('name', '?')})\n{h['text'][:600]}"
+            for i, h in enumerate(all_hits[:8]))
+        judge_prompt = (
+            f"Question : {question}\n\nExtraits déjà trouvés dans les documents :\n{digest}\n\n"
+            "Ces extraits suffisent-ils pour répondre PRÉCISÉMENT à la question ? Réponds "
+            "UNIQUEMENT par « SUFFISANT » si oui, ou par UNE requête de recherche COURTE "
+            "(mots-clés reformulés différemment, pas une phrase) pour combler ce qui manque "
+            "— rien d'autre."
+        )
+        try:
+            verdict = (await _ollama_generate(judge_prompt, model=args.get("model"), timeout=45) or "").strip()
+        except Exception:
+            verdict = "SUFFISANT"
+        if (verdict and not verdict.upper().startswith("SUFFISANT") and len(verdict) <= 150
+                and verdict.strip().lower() != current_query.strip().lower()):
+            hits2 = await vs.search(verdict.strip(), collections=["documents"], limit=_k)
+            for h in hits2:
+                key = h["text"][:200]
+                if key not in seen_texts:
+                    seen_texts.add(key)
+                    all_hits.append(h)
+            current_query = verdict.strip()
+
+    if not all_hits:
         return {"success": True, "answer": "Je n'ai trouvé aucun passage pertinent dans tes documents pour cette question.",
                 "sources": [], "message": "Aucun passage pertinent."}
-    context = "\n\n".join(f"[{i+1}] (source : {h['metadata'].get('name','?')})\n{h['text']}" for i, h in enumerate(hits))
+
+    context = "\n\n".join(f"[{i+1}] (source : {h['metadata'].get('name','?')})\n{h['text']}"
+                           for i, h in enumerate(all_hits[:_k * 2]))
     prompt = (
         "Tu réponds à la question de l'utilisateur en t'appuyant UNIQUEMENT sur les extraits de documents ci-dessous. "
         "Réponds en français, précisément. Cite la source entre parenthèses (le nom du fichier). "
@@ -7572,13 +7619,14 @@ async def execute_document_ask(args: dict) -> dict:
     )
     answer = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
     seen, sources = set(), []
-    for h in hits:
+    for h in all_hits:
         nm = h["metadata"].get("name", "?")
         if nm not in seen:
             seen.add(nm)
             sources.append({"name": nm, "score": h.get("score"), "extrait": h["text"][:200]})
     return {"success": True, "answer": (answer or "").strip(), "sources": sources,
-            "message": f"Réponse basée sur {len(sources)} document(s)."}
+            "message": f"Réponse basée sur {len(sources)} document(s)"
+                       + (f" (2 passes de recherche)." if current_query != question else ".")}
 
 
 async def execute_document_list(args: dict) -> dict:
