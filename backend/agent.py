@@ -693,6 +693,76 @@ def _scan_dangerous_script_patterns(text: str, require_code_fence: bool = True, 
         return []
 
 
+# v2.141 — Passe de critique par un 2ᵉ modèle (demandé explicitement : « je pense que
+# quand une demande est faite le llm cloud répond mais doit aussi passer après réponse
+# par une revue critique d'un autre llm avant d'envoyer la réponse »). Complète le
+# scanner déterministe ci-dessus (regex, ne peut voir que des motifs connus à l'avance)
+# avec un vrai jugement de modèle — principe Mixture-of-Agents (un 2ᵉ regard indépendant
+# détecte des erreurs qu'un modèle ne voit pas dans sa propre sortie).
+# Scope VOLONTAIREMENT restreint aux réponses contenant un bloc de code (même critère
+# que le scanner déterministe) : appliquer ça à CHAQUE message ("quelle heure est-il ?")
+# doublerait la latence pour zéro bénéfice — régression déjà vécue et corrigée (v2.125/
+# v2.126, "Marvin reste à réfléchir"). Produit un BANDEAU visible (jamais une réécriture
+# silencieuse de la réponse) : un texte auto-corrigé par un LLM sans supervision humaine
+# est invérifiable, contraire à l'exigence de fiabilité prouvée de cette session.
+_CRITIQUE_PROMPT_TMPL = (
+    "Tu es un RELECTEUR technique indépendant. Un AUTRE modèle vient de répondre à un "
+    "technicien informatique. Cherche UNIQUEMENT des problèmes GRAVES parmi ces 4 "
+    "catégories précises — RIEN d'autre :\n"
+    "1. Un identifiant/nom de modèle/ID technique INVENTÉ, présenté comme réel sans "
+    "avoir été vérifié.\n"
+    "2. Une information factuellement FAUSSE ou probablement périmée, présentée comme certaine.\n"
+    "3. Une dégradation de sécurité RÉELLE déguisée en amélioration (mot de passe vidé, "
+    "authentification supprimée sans remplacement, permissions 777, pare-feu désactivé).\n"
+    "4. Une syntaxe shell NON évaluée (ex. littéralement `$(date ...)`) écrite telle quelle "
+    "dans un contenu censé être lu tel quel (document/rapport), pas dans un script exécutable.\n\n"
+    "IMPORTANT — N'ES PAS un relecteur de style : IGNORE tout ce qui est préférence, "
+    "convention, formulation, usage de `sudo`, absence d'étape « vérification finale », "
+    "ou tout point que le rédacteur original a déjà lui-même signalé comme risque dans sa "
+    "réponse. En cas de doute, ne signale RIEN plutôt que de trouver un problème mineur "
+    "pour justifier ta relecture — la plupart des réponses sont correctes et méritent « OK ».\n\n"
+    "DEMANDE ORIGINALE :\n{query}\n\n"
+    "RÉPONSE À VÉRIFIER :\n{response}\n\n"
+    "Réponds UNIQUEMENT par « OK » si aucun problème GRAVE des 4 catégories ci-dessus n'est "
+    "trouvé, sinon par une liste à puces courte (3 points maximum) — rien d'autre."
+)
+
+
+async def _run_critique_pass(user_query: str, full_content: str, active_model: str) -> str | None:
+    """Retourne le verdict du critique (texte des problèmes trouvés) ou None si le
+    critique n'a rien trouvé / a échoué / ne s'applique pas à ce tour. Best-effort
+    strict : aucune exception ne doit jamais empêcher l'envoi de la réponse principale."""
+    if "```" not in full_content:
+        return None
+    try:
+        import cloud_routing as _cr2
+        import tools as _tm2
+        # Choisir un modèle DIFFÉRENT de celui qui a répondu (diversité de jugement,
+        # cf. Mixture-of-Agents) — reste dans les modèles cloud déjà configurés par
+        # l'utilisateur, jamais un choix arbitraire hors de ses réglages.
+        critic_model = None
+        if _cr2.is_cloud_model(active_model):
+            _, _overrides = _cr2.get_cloud_config()
+            for _m in _overrides.values():
+                if _m and _m != active_model:
+                    critic_model = _m
+                    break
+        prompt = _CRITIQUE_PROMPT_TMPL.format(
+            query=(user_query or "")[:2000], response=full_content[:6000])
+        verdict = await _tm2._ollama_generate(prompt, model=critic_model, timeout=90)
+        verdict = (verdict or "").strip()
+        if not verdict or verdict.upper().startswith("OK"):
+            return None
+        # Filet : un critique qui dégénère en sortie quasi vide (ex. juste "-", observé
+        # en test réel sur un appel) ne doit jamais produire un bandeau vide/inutile —
+        # mieux vaut ne rien afficher qu'un "problème" sans contenu substantiel.
+        if len(re.sub(r"[\s\-•*]", "", verdict)) < 15:
+            return None
+        return verdict
+    except Exception:
+        return None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Filtrage intelligent des outils — réduit drastiquement le temps de réponse
 # ══════════════════════════════════════════════════════════════════════════════
@@ -730,6 +800,24 @@ _KEYWORD_TOOLS = {
      "actualité", "news", "actu", "info", "trouve en ligne", "sur le net", "sur le web",
      "renseigne-toi", "renseigne toi"):
         {"web_search", "web_browse", "web_research"},
+
+    # v2.142 — Recherche APPROFONDIE (« Deep Research ») : groupe de mots-clés SÉPARÉ et
+    # plus restrictif que la recherche web générale ci-dessus — outil volontairement lent
+    # (plusieurs minutes), ne doit apparaître que sur une demande explicite de profondeur/
+    # exhaustivité, jamais sur "cherche sur le web" tout court.
+    ("recherche approfondie", "recherche exhaustive", "recherche detaillee",
+     "recherche détaillée", "rapport de recherche", "rapport complet sur",
+     "rapport detaille sur", "rapport détaillé sur", "deep research", "enquete complete",
+     "enquête complète", "analyse approfondie du web", "fouille le web"):
+        {"web_deep_research"},
+
+    # v2.142 — Conseil de plusieurs modèles IA (« Model Council ») : signal explicite
+    # uniquement, jamais déclenché par défaut (coût de plusieurs appels LLM en parallèle).
+    ("plusieurs ia", "plusieurs modeles", "plusieurs modèles", "conseil de modeles",
+     "conseil de modèles", "demande a plusieurs", "demande à plusieurs",
+     "differents modeles", "différents modèles", "model council", "deuxieme avis",
+     "deuxième avis", "second avis", "autre ia", "autre modele", "autre modèle"):
+        {"ai_model_council"},
 
     # v2.122 — Fraîcheur de l'information (règle d'or #8) : signaux qu'une réponse "de
     # mémoire" risque d'être périmée (version, actualité, disponibilité, événement récent) —
@@ -1569,6 +1657,14 @@ async def run_agent(
             _text_norm = _strip_accents((_user_query or "").lower())
             if _ultra or not _is_sensitive_request(messages, _text_norm):
                 active_model = _cloud_overrides[profile_name]
+                # v2.141 — routage par TÂCHE prioritaire sur le routage par PROFIL : un
+                # signal clair (ex. demande de script/procédure) route vers le modèle
+                # cloud le plus fort en code plutôt que le généraliste agentique du
+                # profil (« privilégier le cloud pour la puissance, mais le BON cloud »).
+                _task = _cr.detect_task(_user_query)
+                _task_overrides = _cr.get_task_overrides()
+                if _task and _task in _task_overrides:
+                    active_model = _task_overrides[_task]
     else:
         # Modèle forcé manuellement par l'utilisateur
         active_model = model
@@ -1709,6 +1805,25 @@ async def run_agent(
     _skill_task = asyncio.create_task(_match_skill())
 
     system_prompt = _build_system_prompt(memories, permission_level)
+
+    # v2.142 — « Projects » avec instructions persistantes (équivalent Claude/ChatGPT
+    # Projects) : si cette conversation est rattachée à un projet ayant des instructions,
+    # elles sont injectées ici — s'appliquent à TOUTE conversation du projet, sans avoir
+    # à les répéter à chaque fois. Best-effort (jamais bloquant).
+    try:
+        _conv = db.get_conversation(conversation_id)
+        _pid = (_conv or {}).get("project_id")
+        if _pid:
+            _project = db.get_project(_pid)
+            _pinstr = (_project or {}).get("instructions") or ""
+            if _pinstr.strip():
+                system_prompt += (
+                    f"\n\n=== INSTRUCTIONS DU PROJET « {_project.get('name', '')} » ===\n"
+                    f"{_pinstr.strip()}\n"
+                    "(Ces instructions s'appliquent à toute cette conversation, en plus des règles ci-dessus.)"
+                )
+    except Exception:
+        pass
 
     # SKILL : si une compétence (fichier Markdown) correspond à la demande, on injecte sa
     # MÉTHODE dans le prompt (Marvin l'applique avec ses outils déjà vérifiés). Couche-prompt
@@ -1889,6 +2004,23 @@ async def run_agent(
         except Exception:
             pass
         return None
+
+    # v2.142 — BUG RACINE trouvé en diagnostiquant pourquoi les instructions de projet
+    # (ci-dessus) n'avaient AUCUN effet malgré une injection confirmée correcte dans
+    # `system_prompt` : le champ top-level `"system"` de `/api/chat` Ollama Cloud est
+    # SILENCIEUSEMENT IGNORÉ — testé en isolation sur 3 modèles (glm-5.2, deepseek-v4-
+    # flash, qwen2.5:14b LOCAL) avec des instructions triviales ("réponds toujours en
+    # anglais", "termine par ce tag exact") : 0/3 compliance via `"system": "..."`, 3/3
+    # compliance en plaçant le MÊME contenu comme message `{"role":"system", ...}` dans
+    # `messages[]`. Ce n'est PAS spécifique à un modèle ni au tool-calling (reproduit
+    # avec et sans `tools`) — cela affecte potentiellement TOUTES les règles d'or de
+    # `_build_system_prompt` depuis leur introduction, pas seulement cette fonctionnalité.
+    # Corrigé en injectant `system_prompt` comme premier message plutôt que via le champ
+    # dédié (gardé en plus, en pure redondance défensive — ne coûte rien s'il est ignoré).
+    if not ollama_msgs or ollama_msgs[0].get("role") != "system":
+        ollama_msgs.insert(0, {"role": "system", "content": system_prompt})
+    else:
+        ollama_msgs[0]["content"] = system_prompt
 
     async with httpx.AsyncClient(timeout=_ollama_timeout) as _ollama_client:
       for step in range(MAX_TOOL_STEPS):
@@ -2271,6 +2403,12 @@ async def run_agent(
                 yield _sse({"type": "text", "text": _warning_block})
                 full_content += _warning_block
 
+            _critique = await _run_critique_pass(_user_query, full_content, active_model)
+            if _critique:
+                _critique_block = "\n\n---\n🧠 **Revue critique (2ᵉ modèle)** :\n" + _critique
+                yield _sse({"type": "text", "text": _critique_block})
+                full_content += _critique_block
+
             db.create_message(conversation_id, "assistant", full_content)
 
             # Auto-titre de la conversation si encore « Nouvelle conversation »
@@ -2396,6 +2534,12 @@ async def run_agent(
         )
         yield _sse({"type": "text", "text": _warning_block})
         full_content += _warning_block
+
+    _critique = await _run_critique_pass(_user_query, full_content, active_model)
+    if _critique:
+        _critique_block = "\n\n---\n🧠 **Revue critique (2ᵉ modèle)** :\n" + _critique
+        yield _sse({"type": "text", "text": _critique_block})
+        full_content += _critique_block
 
     db.create_message(conversation_id, "assistant", full_content)
 

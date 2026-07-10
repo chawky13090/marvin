@@ -7,6 +7,7 @@ Chaque outil expose :
 """
 import os
 import sys
+import ast
 import json
 import shutil
 import asyncio
@@ -7918,6 +7919,197 @@ async def execute_web_research(args: dict) -> dict:
             "message": "Réponse trouvée sur le web et mémorisée."}
 
 
+# v2.142 — « Deep Research » : équivalent du mode phare des IA payantes 2026 (ChatGPT
+# Deep Research, Claude Research, Gemini Deep Research, Perplexity Deep Research). Se
+# distingue de `web_research` (1 recherche + quelques pages + 1 synthèse, quelques
+# secondes) par une boucle MULTI-PASSES : après chaque round, un modèle juge si les
+# sources trouvées suffisent, sinon propose une requête complémentaire CIBLÉE sur ce
+# qui manque encore — jusqu'à `max_rounds` fois. Rapport final structuré avec citations
+# numérotées. Volontairement un outil SÉPARÉ (pas un remplacement de web_research) :
+# plusieurs minutes d'exécution, à réserver aux demandes explicites de recherche
+# approfondie/exhaustive, jamais déclenché par défaut sur une question simple.
+async def execute_web_deep_research(args: dict) -> dict:
+    """Recherche approfondie multi-passes sur le web : boucle recherche → identifie les
+    angles morts → recherche complémentaire ciblée, plusieurs fois, avant de produire un
+    rapport structuré avec citations numérotées. BEAUCOUP plus lent que web_research
+    (plusieurs minutes) — réservé aux demandes explicites de recherche exhaustive."""
+    query = (args.get("query") or args.get("q") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    try:
+        max_rounds = max(1, min(int(args.get("max_rounds", 4)), 6))
+    except Exception:
+        max_rounds = 4
+
+    try:
+        import web_browser as wb
+    except Exception as e:
+        return {"error": f"Navigateur web indisponible : {str(e)[:160]}"}
+
+    seen_urls = set()
+    sources: list[dict] = []
+    queries_done = [query]
+
+    for round_idx in range(max_rounds):
+        current_query = queries_done[-1]
+        try:
+            results = await wb.search(current_query, n=6)
+        except Exception:
+            results = []
+        new_pages = 0
+        for res in results:
+            url = res.get("url")
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            try:
+                p = await wb.fetch_text(url, max_chars=3000)
+            except Exception:
+                p = None
+            text = ((p or {}).get("text") or res.get("snippet", "") or "").strip()
+            if text:
+                sources.append({"title": res.get("title", ""), "url": url, "text": text[:3000]})
+                new_pages += 1
+            if new_pages >= 4:  # limite par passe — reste raisonnable en temps total
+                break
+
+        if not sources:
+            break
+
+        # Le modèle juge si c'est suffisant, sinon propose UNE requête complémentaire
+        # courte ciblée sur ce qui manque — c'est ce qui distingue une "recherche
+        # approfondie" d'une simple recherche répétée à l'identique.
+        digest = "\n\n".join(f"[{i+1}] {s['title']} ({s['url']})\n{s['text'][:800]}"
+                              for i, s in enumerate(sources[-8:]))
+        judge_prompt = (
+            f"Question de recherche : {query}\n\n"
+            f"Sources déjà trouvées (passe {round_idx+1}/{max_rounds}) :\n{digest}\n\n"
+            "Ces sources suffisent-elles pour répondre COMPLÈTEMENT et précisément à la "
+            "question ? Réponds UNIQUEMENT par « SUFFISANT » si oui, ou par UNE requête de "
+            "recherche COURTE (mots-clés seulement, pas une phrase) pour combler ce qui "
+            "manque encore — rien d'autre, pas d'explication."
+        )
+        try:
+            verdict = (await _ollama_generate(judge_prompt, model=args.get("model"), timeout=60) or "").strip()
+        except Exception:
+            verdict = "SUFFISANT"
+        if not verdict or verdict.upper().startswith("SUFFISANT") or len(verdict) > 150:
+            break
+        if verdict.strip().lower() in [q.strip().lower() for q in queries_done]:
+            break  # évite de boucler sur la même requête
+        queries_done.append(verdict.strip())
+
+    if not sources:
+        return {"success": True, "answer": "Aucune source trouvée pour cette recherche.", "sources": []}
+
+    context = "\n\n".join(f"[{i+1}] {s['title']} ({s['url']})\n{s['text'][:2000]}"
+                           for i, s in enumerate(sources))
+    report_prompt = (
+        "Rédige un RAPPORT DE RECHERCHE structuré et complet en français, en te basant "
+        "UNIQUEMENT sur les sources ci-dessous. Structure : un résumé en 2-3 phrases, puis "
+        "des sections thématiques (## titres), avec une citation [n] après chaque "
+        "affirmation factuelle en te référant au numéro de la source correspondante. Sois "
+        "factuel, ne comble pas les trous par supposition — dis explicitement si un point "
+        "reste incertain plutôt que d'inventer.\n\n"
+        f"QUESTION : {query}\n\nSOURCES :\n{context}\n\nRAPPORT :"
+    )
+    report = (await _ollama_generate(report_prompt, model=args.get("model"), timeout=240) or "").strip()
+
+    try:
+        import learning
+        if len(report) > 15:
+            await learning.add_qa(query, report[:2000])
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "answer": report,
+        "rounds": len(queries_done),
+        "queries_used": queries_done,
+        "sources": [{"title": s["title"], "url": s["url"]} for s in sources],
+        "message": f"Recherche approfondie terminée : {len(sources)} source(s) sur {len(queries_done)} passe(s).",
+    }
+
+
+# v2.142 — « Model Council » (Perplexity, février 2026) : interroge PLUSIEURS modèles
+# cloud EN PARALLÈLE sur la même question et synthétise leurs points d'accord/désaccord,
+# au lieu d'une seule réponse d'un seul modèle. Marvin a en réalité PLUS de diversité de
+# modèles cloud installés (7) que le conseil à 3 modèles de Perplexity. Outil explicite,
+# volontairement pas utilisé par défaut (coût de plusieurs appels LLM en parallèle) —
+# réservé aux questions importantes/ambiguës où l'utilisateur veut plusieurs avis.
+async def execute_ai_model_council(args: dict) -> dict:
+    """Interroge plusieurs modèles IA cloud DIFFÉRENTS en parallèle sur la même question
+    et synthétise leurs réponses (accord/désaccord explicite). Réservé aux questions
+    importantes ou ambiguës — coûte plusieurs appels LLM, pas un outil pour une question
+    simple. Nécessite le mode cloud activé et au moins 2 modèles cloud configurés."""
+    question = (args.get("question") or args.get("query") or "").strip()
+    if not question:
+        return {"error": "Paramètre 'question' requis."}
+    try:
+        n_models = max(2, min(int(args.get("n_models", 3)), 5))
+    except Exception:
+        n_models = 3
+
+    import cloud_routing as _cr
+    cloud_enabled, overrides = _cr.get_cloud_config()
+    if not cloud_enabled:
+        return {"error": "Le mode cloud n'est pas activé (Réglages → Modèle IA) — le conseil de modèles nécessite plusieurs modèles cloud."}
+    if _cr.is_sensitive_text(question):
+        return {"error": "Cette question contient une donnée sensible — le conseil de modèles reste désactivé sur ce type de contenu, mêmes garanties que le reste du routage cloud."}
+
+    # Modèles DÉJÀ configurés par l'utilisateur (jamais de choix arbitraire hors réglages) —
+    # dédoublonnés, en gardant l'ordre. Complété avec d'autres modèles cloud installés si
+    # les overrides ne donnent pas assez de diversité.
+    candidates = list(dict.fromkeys(overrides.values()))
+    if len(candidates) < n_models:
+        try:
+            import httpx as _hx
+            async with _hx.AsyncClient(timeout=5) as _c:
+                _r = await _c.get(f"{OLLAMA_URL}/api/tags")
+                installed = [m.get("name", "") for m in _r.json().get("models", [])]
+        except Exception:
+            installed = []
+        for m in installed:
+            if _cr.is_cloud_model(m) and m not in candidates:
+                candidates.append(m)
+            if len(candidates) >= n_models:
+                break
+    models = candidates[:n_models]
+    if len(models) < 2:
+        return {"error": "Pas assez de modèles cloud distincts configurés pour un conseil (il en faut au moins 2 — vérifie Réglages → Modèle IA)."}
+
+    prompt = f"Réponds à cette question de façon claire et complète :\n\n{question}"
+
+    async def _ask(m):
+        try:
+            return await _ollama_generate(prompt, model=m, timeout=120)
+        except Exception as e:
+            return f"(échec : {str(e)[:100]})"
+
+    answers = await asyncio.gather(*[_ask(m) for m in models])
+
+    digest = "\n\n".join(
+        f"[Modèle {i+1} — {m}]\n{(a or '').strip()[:1500]}"
+        for i, (m, a) in enumerate(zip(models, answers)))
+    synth_prompt = (
+        f"Voici {len(models)} réponses de modèles IA DIFFÉRENTS à la même question. Rédige "
+        "une synthèse en français : 1) la réponse consensuelle si les modèles sont d'accord, "
+        "2) les points de DÉSACCORD explicites entre modèles s'il y en a (cite lequel dit "
+        "quoi), 3) ta meilleure recommandation. Sois direct, pas de préambule.\n\n"
+        f"QUESTION : {question}\n\nRÉPONSES :\n{digest}\n\nSYNTHÈSE :"
+    )
+    synthesis = (await _ollama_generate(synth_prompt, model=None, timeout=120) or "").strip()
+
+    return {
+        "success": True,
+        "answer": synthesis,
+        "models_consulted": models,
+        "individual_answers": [{"model": m, "answer": (a or "")[:1500]} for m, a in zip(models, answers)],
+        "message": f"{len(models)} modèles consultés en parallèle.",
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION VOICE — Transcription audio (faster-whisper)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -11504,99 +11696,155 @@ async def execute_text_join(args: dict) -> dict:
 # SECTION 19 — Exécution de code Python (sandboxée)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# v2.142 — liste de modules/appels sensibles pour l'analyse STRUCTURELLE (AST) du code
+# avant exécution. Remplace l'ancienne liste noire par SOUS-CHAÎNE (v2.36-2.106), trouvée
+# contournable en auditant le code pour la comparaison "meilleur que le payant" (v2.141) :
+# `getattr(os, 'sys'+'tem')(...)` ne contient AUCUNE des chaînes interdites d'origine, et
+# `os` était de toute façon importé SANS CONDITION dans l'espace de noms — le denylist
+# n'aurait jamais empêché grand-chose. L'AST voit la structure réelle (Import/Call), pas
+# le texte brut : impossible à déguiser par concaténation de chaînes ou obfuscation.
+_CODE_FORBIDDEN_MODULES = {
+    "os", "subprocess", "socket", "shutil", "ctypes", "sys",
+    "multiprocessing", "threading", "urllib", "http", "ftplib", "smtplib",
+    "importlib", "pickle", "winreg", "psutil",
+}
+_CODE_FORBIDDEN_CALLS = {"eval", "exec", "compile", "__import__", "open", "input"}
+
+
+def _scan_code_ast(code: str) -> list[str]:
+    """Retourne les motifs sensibles trouvés (imports/appels) par analyse AST, ou
+    ["Erreur de syntaxe : ..."] si le code ne parse pas. Best-effort mais structurel :
+    un `import os` ou `eval(...)` est détecté quelle que soit la façon dont le module
+    est ensuite utilisé — contrairement à un test de sous-chaîne, contourner la
+    DÉTECTION DE L'IMPORT LUI-MÊME ne sert à rien puisque sans l'import, le nom
+    n'existe simplement pas dans l'espace de noms du sous-processus."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return [f"Erreur de syntaxe : {e}"]
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split(".")[0]
+                if root in _CODE_FORBIDDEN_MODULES:
+                    found.add(f"import {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".")[0]
+            if root in _CODE_FORBIDDEN_MODULES:
+                found.add(f"from {node.module or '?'} import ...")
+        elif isinstance(node, ast.Call):
+            fn = node.func
+            name = fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else None)
+            if name in _CODE_FORBIDDEN_CALLS:
+                found.add(f"appel à {name}(...)")
+    return sorted(found)
+
+
+_CODE_RESULT_MARKER = "___MARVIN_RESULT___"
+
+
 async def execute_code_python(args: dict) -> dict:
     """
-    Exécute un extrait de code Python dans un environnement sécurisé.
-    Idéal pour : calculs de données, traitement de texte, transformations, visualisations simples.
-    Timeout configurable. Les imports de bibliothèques installées sont autorisés.
-    ⚠️ Accès au système de fichiers et réseau en mode Expert uniquement.
+    Exécute un extrait de code Python dans un SOUS-PROCESSUS isolé (v2.142 — l'ancienne
+    version tournait par exec() DANS le process du backend, avec `os` toujours disponible :
+    un vrai isolement de processus, pas juste un espace de noms restreint). Idéal pour :
+    calculs de données, statistiques, transformations, GRAPHIQUES (matplotlib) — tout
+    fichier écrit dans le dossier de travail (image, CSV...) est automatiquement détecté
+    et renvoyé, cliquable dans le chat (comme un Code Interpreter). Les imports sensibles
+    (os, subprocess, réseau, fichiers via open()...) demandent confirmation explicite.
     """
-    code     = args.get("code", "").strip()
-    timeout  = min(int(args.get("timeout", 15)), 60)
-    confirmed = args.get("confirmed", False)
+    code = (args.get("code") or "").strip()
+    timeout = max(1, min(int(args.get("timeout", 15)), 60))
+    confirmed = bool(args.get("confirmed", False))
 
     if not code:
         return {"error": "Paramètre 'code' requis."}
 
-    # Check for potentially dangerous patterns
-    _DANGEROUS = [
-        "__import__", "exec(", "eval(", "compile(",
-        "os.system", "subprocess", "shutil.rmtree",
-        "open(", "socket.", "urllib.request", "requests.",
-        "ctypes", "importlib", "pickle.loads",
-    ]
-    code_lower = code.lower()
-    risks = [d for d in _DANGEROUS if d in code]
-
+    risks = _scan_code_ast(code)
     if risks and not confirmed:
-        risk_str = ", ".join(risks[:3])
         return {
             "requiresConfirmation": True,
-            "message": f"Ce code utilise des fonctions potentiellement sensibles ({risk_str}). Exécuter quand même ?",
+            "message": f"Ce code utilise des fonctionnalités sensibles ({', '.join(risks[:4])}). Exécuter quand même ?",
             "risks": risks,
         }
 
-    import io as _io_mod, contextlib as _ctx, traceback as _tb
+    import uuid as _uuid
+    import glob as _glob
 
-    # Build execution namespace with useful imports pre-loaded
-    _namespace = {
-        "__builtins__": __builtins__,
-        # Pre-import common useful libraries
-        "json": __import__("json"),
-        "math": __import__("math"),
-        "re": __import__("re"),
-        "datetime": __import__("datetime"),
-        "collections": __import__("collections"),
-        "itertools": __import__("itertools"),
-        "functools": __import__("functools"),
-        "statistics": __import__("statistics"),
-        "random": __import__("random"),
-        "string": __import__("string"),
-        "pathlib": __import__("pathlib"),
-        "os": __import__("os"),
-    }
-    # Try to add optional scientific libs
-    for lib in ["numpy", "pandas", "matplotlib"]:
-        try:
-            _namespace[lib] = __import__(lib)
-        except ImportError:
-            pass
+    run_id = _uuid.uuid4().hex[:12]
+    out_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "code_outputs", run_id))
+    os.makedirs(out_dir, exist_ok=True)
+    script_path = os.path.join(out_dir, "_script.py")
+    # Capture best-effort d'une variable `result`/`output` si le code en définit une —
+    # imprimée avec un marqueur unique, extrait du stdout après coup (le sous-processus
+    # ne partage pas de mémoire avec le backend, donc pas d'autre moyen de la récupérer).
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(code)
+        f.write(
+            "\ntry:\n"
+            "    _mv_r = locals().get('result', locals().get('output'))\n"
+            "    if _mv_r is not None:\n"
+            f"        print({_CODE_RESULT_MARKER!r} + repr(_mv_r)[:2000])\n"
+            "except Exception:\n"
+            "    pass\n"
+        )
 
-    stdout_buf = _io_mod.StringIO()
-    stderr_buf = _io_mod.StringIO()
+    env = dict(os.environ)
+    env["MPLBACKEND"] = "Agg"  # graphiques sans affichage (sous-processus headless)
+    env["PYTHONIOENCODING"] = "utf-8"
 
     try:
-        def _run_code():
-            with _ctx.redirect_stdout(stdout_buf), _ctx.redirect_stderr(stderr_buf):
-                exec(compile(code, "<user_code>", "exec"), _namespace)
-
-        loop = asyncio.get_running_loop()
-        await asyncio.wait_for(
-            loop.run_in_executor(None, _run_code),
-            timeout=timeout,
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-I", script_path,
+            cwd=out_dir, env=env,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
-        stdout = stdout_buf.getvalue()
-        stderr = stderr_buf.getvalue()
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return {"error": f"Timeout dépassé ({timeout}s). Simplifiez le code ou augmentez le timeout."}
+    except Exception as e:
+        return {"error": f"Échec de lancement du sous-processus : {str(e)[:200]}"}
 
-        # Capture the last expression value if any
-        last_val = _namespace.get("_result_") or _namespace.get("result") or _namespace.get("output")
+    stdout = stdout_b.decode("utf-8", errors="replace")
+    stderr = stderr_b.decode("utf-8", errors="replace")
 
-        return {
-            "success":  True,
-            "stdout":   stdout[:4000] or "(aucune sortie)",
-            "stderr":   stderr[:500] if stderr else "",
-            "result":   str(last_val)[:500] if last_val is not None else None,
-            "vars":     {k: str(v)[:100] for k, v in _namespace.items()
-                         if not k.startswith("_") and k not in ("json","math","re","datetime","collections","itertools","functools","statistics","random","string","pathlib","os","numpy","pandas","matplotlib")},
-        }
-    except asyncio.TimeoutError:
-        return {"error": f"Timeout dépassé ({timeout}s). Simplifiez le code ou augmentez le timeout."}
-    except Exception:
-        return {
-            "error":   _tb.format_exc(limit=5),
-            "stdout":  stdout_buf.getvalue()[:1000],
-            "stderr":  stderr_buf.getvalue()[:500],
-        }
+    result_val = None
+    clean_lines = []
+    for line in stdout.splitlines():
+        if line.startswith(_CODE_RESULT_MARKER):
+            result_val = line[len(_CODE_RESULT_MARKER):][:2000]
+        else:
+            clean_lines.append(line)
+    stdout_clean = "\n".join(clean_lines)
+
+    # Fichiers écrits par le code (graphiques, CSV exportés...) — glob du dossier de
+    # travail dédié à cette exécution, en excluant le script lui-même. `path`/`files`
+    # sont détectés côté frontend par EXTENSION (GeneratedFileCard, v2.128/v2.142),
+    # donc rien à câbler côté LLM : un simple plt.savefig("chart.png") suffit.
+    generated = [
+        os.path.abspath(p) for p in sorted(_glob.glob(os.path.join(out_dir, "*")))
+        if os.path.isfile(p) and os.path.basename(p) != "_script.py"
+    ]
+
+    resp = {
+        "success":    proc.returncode == 0,
+        "stdout":     stdout_clean[:4000] or "(aucune sortie)",
+        "stderr":     stderr[:1500] if stderr else "",
+        "result":     result_val,
+        "returncode": proc.returncode,
+    }
+    if generated:
+        resp["files"] = generated
+        if len(generated) == 1:
+            resp["path"] = generated[0]
+            resp["message"] = f"Fichier généré : {os.path.basename(generated[0])}"
+    if proc.returncode != 0 and not resp["stderr"]:
+        resp["error"] = "Le script a échoué (code de retour non nul) sans message d'erreur."
+    return resp
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -16227,6 +16475,8 @@ TOOLS_REGISTRY: dict[str, Any] = {
     # Web par vrai navigateur (anti-blocage)
     "web_browser_open": execute_web_browser_open,
     "web_research": execute_web_research,
+    "web_deep_research": execute_web_deep_research,
+    "ai_model_council": execute_ai_model_council,
     # SSH
     "ssh_list": execute_ssh_list,
     "ssh_exec": execute_ssh_exec,
@@ -17221,6 +17471,26 @@ TOOLS_SPEC = [
     _t("web_research", "Cherche la réponse sur INTERNET avec un vrai navigateur (contourne les blocages anti-bot), lit les meilleurs résultats et mémorise la réponse. Pour « cherche sur le web », « trouve en ligne », quand une info manque.",
        {"query": {"type": "string", "description": "La question / les mots-clés à rechercher"}},
        ["query"]),
+    _t("ai_model_council",
+       "Interroge PLUSIEURS modèles IA cloud DIFFÉRENTS en parallèle sur la même question et "
+       "synthétise leurs réponses en signalant les points d'accord/désaccord (équivalent Model "
+       "Council de Perplexity). Réservé aux questions IMPORTANTES ou AMBIGUËS où l'utilisateur "
+       "demande explicitement plusieurs avis (« demande à plusieurs IA », « fais un conseil de "
+       "modèles », « qu'en pensent différents modèles »). Coûte plusieurs appels — jamais pour "
+       "une question simple.",
+       {"question": {"type": "string", "description": "La question à poser à plusieurs modèles"},
+        "n_models": {"type": "integer", "description": "Nombre de modèles à consulter (2-5, défaut 3)"}},
+       ["question"]),
+    _t("web_deep_research",
+       "Recherche APPROFONDIE multi-passes sur le web (équivalent Deep Research de ChatGPT/Claude/"
+       "Gemini/Perplexity) : plusieurs cycles recherche→analyse des trous→recherche complémentaire, "
+       "rapport structuré avec citations numérotées. PREND PLUSIEURS MINUTES — à utiliser UNIQUEMENT "
+       "quand l'utilisateur demande explicitement une recherche approfondie/exhaustive/un rapport "
+       "détaillé (« fais une recherche approfondie sur... », « fais-moi un rapport complet sur... »), "
+       "jamais pour une question simple (utiliser web_research à la place, bien plus rapide).",
+       {"query": {"type": "string", "description": "Le sujet à rechercher en profondeur"},
+        "max_rounds": {"type": "integer", "description": "Nombre max de passes de recherche (1-6, défaut 4)"}},
+       ["query"]),
     _t("web_browser_open", "Ouvre une page web précise dans un vrai navigateur et renvoie son texte (utile si l'outil web interne est bloqué ou pour un site dynamique).",
        {"url": {"type": "string", "description": "L'adresse de la page à ouvrir"}},
        ["url"]),
@@ -17626,13 +17896,17 @@ TOOLS_SPEC = [
        ["texts"]),
     # ── Section 19 ──────────────────────────────────────────────────────────
     _t("code_python",
-       "Exécute un extrait de code Python et retourne stdout, stderr et les variables résultantes. "
-       "Idéal pour : calculs de données, transformations, statistiques, génération de listes. "
-       "Bibliothèques disponibles : json, math, re, datetime, collections, statistics, random, numpy (si installé), pandas (si installé). "
-       "Les variables nommées 'result' ou 'output' sont retournées dans le champ 'result'.",
+       "Exécute un extrait de code Python dans un SOUS-PROCESSUS isolé (vrai « Code Interpreter »). "
+       "Idéal pour : calculs de données, statistiques, transformations, et GRAPHIQUES — un simple "
+       "plt.savefig('nom.png') suffit, l'image est automatiquement détectée et affichée cliquable "
+       "dans le chat (pas besoin de chemin spécial). Bibliothèques disponibles : json, math, re, "
+       "datetime, collections, statistics, random, numpy/pandas/matplotlib (si installés) — utilise "
+       "un simple 'import'. Imprime le résultat avec print() pour le voir, ou définis une variable "
+       "'result'/'output' pour qu'elle apparaisse dans le champ 'result'. "
+       "os/subprocess/réseau/fichiers (open) demandent une confirmation explicite.",
        {"code":      {"type": "string",  "description": "Code Python à exécuter"},
         "timeout":   {"type": "integer", "description": "Délai max en secondes (1–60, défaut 15)"},
-        "confirmed": {"type": "boolean", "description": "Requis si le code utilise open(), os., subprocess, etc."}},
+        "confirmed": {"type": "boolean", "description": "Requis si le code utilise open(), import os/subprocess/socket, eval/exec, etc."}},
        ["code"]),
 
     # ── Section 20 — Devis / Facturation IT ────────────────────────────────

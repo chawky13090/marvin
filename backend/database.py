@@ -578,6 +578,13 @@ def _ensure_projects_table(conn):
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
     """)
+    # v2.142 — un projet n'était jusqu'ici qu'un NOM (regroupement de conversations),
+    # contrairement aux "Projects" de Claude/ChatGPT (instructions persistantes injectées
+    # automatiquement dans chaque conversation du projet). Migration transparente, même
+    # motif que le reste du fichier (PRAGMA table_info + ALTER conditionnel).
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
+    if "instructions" not in cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN instructions TEXT")
 
 
 def get_projects() -> list[dict]:
@@ -587,13 +594,32 @@ def get_projects() -> list[dict]:
     return [row_to_dict(r) for r in rows]
 
 
-def create_project(name: str) -> dict:
+def get_project(pid: str) -> dict | None:
+    with db() as conn:
+        _ensure_projects_table(conn)
+        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
+    return row_to_dict(row) if row else None
+
+
+def create_project(name: str, instructions: str | None = None) -> dict:
     pid = str(uuid.uuid4())
     with db() as conn:
         _ensure_projects_table(conn)
-        conn.execute("INSERT INTO projects (id, name) VALUES (?, ?)", (pid, name))
+        conn.execute("INSERT INTO projects (id, name, instructions) VALUES (?, ?, ?)",
+                     (pid, name, instructions))
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
     return row_to_dict(row)
+
+
+def update_project(pid: str, name: str | None = None, instructions: str | None = None) -> dict | None:
+    with db() as conn:
+        _ensure_projects_table(conn)
+        if name is not None:
+            conn.execute("UPDATE projects SET name = ?, updated_at = datetime('now') WHERE id = ?", (name, pid))
+        if instructions is not None:
+            conn.execute("UPDATE projects SET instructions = ?, updated_at = datetime('now') WHERE id = ?", (instructions, pid))
+        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
+    return row_to_dict(row) if row else None
 
 
 def delete_project(pid: str):

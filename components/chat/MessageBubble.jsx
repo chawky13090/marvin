@@ -21,6 +21,11 @@ const BACKEND_URL = (typeof window !== 'undefined' && window.location)
 const DOCUMENT_EXTENSIONS = new Set([
   'pdf', 'docx', 'doc', 'rtf', 'odt', 'xlsx', 'xls', 'csv', 'pptx', 'ppt', 'txt', 'md',
 ]);
+// v2.142 — code_python capture désormais les fichiers écrits par le code exécuté (Code
+// Interpreter local) : le cas le plus courant est un graphique matplotlib. Set séparé
+// (pas fusionné à DOCUMENT_EXTENSIONS) pour permettre un rendu en VIGNETTE plutôt qu'une
+// simple icône cliquable — voir GeneratedFileCard.
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp']);
 
 function docIcon(ext) {
   const map = {
@@ -34,6 +39,7 @@ function GeneratedFileCard({ path, message, securityWarning }) {
   const [status, setStatus] = useState('idle'); // idle | opening | error
   const fileName = path.split(/[\\/]/).pop() || path;
   const ext = (fileName.split('.').pop() || '').toLowerCase();
+  const isImage = IMAGE_EXTENSIONS.has(ext);
 
   const handleOpen = async () => {
     setStatus('opening');
@@ -49,6 +55,42 @@ function GeneratedFileCard({ path, message, securityWarning }) {
       setStatus('error');
     }
   };
+
+  // v2.142 — un fichier image (graphique généré par code_python) se prête à une
+  // VIGNETTE inline plutôt qu'à une simple icône — sert le fichier via l'endpoint
+  // déjà existant /api/files/raw (utilisé ailleurs pour la visionneuse de fichiers).
+  if (isImage) {
+    return (
+      <div>
+        <div
+          onClick={handleOpen}
+          title={`${path} — cliquer pour ouvrir`}
+          style={{
+            display: 'inline-block', padding: '8px', background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer',
+          }}
+        >
+          <img
+            src={`${BACKEND_URL}/api/files/raw?path=${encodeURIComponent(path)}`}
+            alt={fileName}
+            style={{ maxWidth: '360px', maxHeight: '320px', display: 'block', borderRadius: '4px' }}
+          />
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'center' }}>
+            {fileName}{message ? ` — ${message}` : ''}
+          </div>
+        </div>
+        {securityWarning && (
+          <div style={{
+            marginTop: '6px', padding: '8px 12px',
+            background: 'var(--danger-bg, rgba(239,68,68,0.08))', border: '1px solid var(--danger)',
+            borderRadius: '6px', fontSize: '11px', color: 'var(--danger)', whiteSpace: 'pre-wrap',
+          }}>
+            {securityWarning}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -607,10 +649,27 @@ function renderToolResult(toolName, result) {
     );
   }
 
-  // ── Document généré (PDF/Word/Excel/PPT/texte) — clic pour ouvrir ─────
+  // ── Plusieurs fichiers générés (v2.142 — code_python peut écrire plusieurs
+  // graphiques/CSV en une seule exécution) — une carte par fichier reconnu.
+  if (result.success && Array.isArray(result.files) && result.files.length > 1) {
+    const cards = result.files
+      .filter(p => typeof p === 'string')
+      .map(p => (p.split(/[\\/]/).pop() || '').split('.').pop().toLowerCase())
+      .map((ext, i) => ({ ext, path: result.files[i] }))
+      .filter(({ ext }) => DOCUMENT_EXTENSIONS.has(ext) || IMAGE_EXTENSIONS.has(ext));
+    if (cards.length > 0) {
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {cards.map(({ path }, i) => <GeneratedFileCard key={i} path={path} />)}
+        </div>
+      );
+    }
+  }
+
+  // ── Document/fichier généré (PDF/Word/Excel/PPT/texte/image) — clic pour ouvrir ─────
   if (result.success && typeof result.path === 'string') {
     const ext = (result.path.split(/[\\/]/).pop() || '').split('.').pop().toLowerCase();
-    if (DOCUMENT_EXTENSIONS.has(ext)) {
+    if (DOCUMENT_EXTENSIONS.has(ext) || IMAGE_EXTENSIONS.has(ext)) {
       return <GeneratedFileCard path={result.path} message={result.message} securityWarning={result.security_warning} />;
     }
   }

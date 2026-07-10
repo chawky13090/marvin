@@ -48,7 +48,16 @@ def is_sensitive_tool(name: str) -> bool:
 
 
 def is_cloud_model(name: str) -> bool:
-    return (name or "").endswith(":cloud")
+    # v2.141 — certains modèles cloud installés (ex. `qwen3-coder:480b-cloud`,
+    # `gemma4:31b-cloud`) suffixent le TAG par `-cloud`, pas `:cloud` (seuls les
+    # modèles sans taille dans le tag, ex. `glm-5.2:cloud`, utilisent `:cloud`).
+    # L'ancien test ratait silencieusement ces modèles → la protection mid-boucle
+    # (bascule vers le local si un outil sensible est appelé) ne les aurait jamais
+    # reconnus comme "cloud", laissant passer une fuite potentielle. Trouvé en
+    # implémentant le routage par tâche (v2.141), qui introduit justement
+    # `qwen3-coder:480b-cloud` comme override réel.
+    n = name or ""
+    return n.endswith(":cloud") or n.endswith("-cloud")
 
 
 def get_cloud_config() -> tuple[bool, dict]:
@@ -64,6 +73,41 @@ def get_cloud_config() -> tuple[bool, dict]:
     except Exception:
         overrides = {}
     return enabled, overrides
+
+
+# v2.141 — Routage par TÂCHE, plus fin que le routage par PROFIL ci-dessus. Demandé
+# explicitement (« privilégier le cloud pour la puissance ») après avoir trouvé que
+# `cloud_overrides` pointait les 3 profils vers le MÊME modèle cloud, alors que les
+# benchmarks 2026 (LiveBench Agentic, tool-calling) montrent des écarts nets par
+# spécialité : GLM-5.2 domine l'agentique/tool-calling (90,6% de succès), qwen3-coder
+# domine le code long. Un signal de tâche détecté (ex. "code") prend le pas sur
+# l'override de PROFIL, mais seulement si le cloud est activé et la requête non
+# sensible — mêmes garanties que le reste de ce module, jamais contournées.
+_CODE_TASK_KEYWORDS = (
+    "script", "installation", "installer", "procedure d'installation",
+    "commande powershell", "commande bash", "ligne de commande", ".ps1", ".sh",
+    "code source", "programme informatique", "deploiement", "configuration serveur",
+    "dockerfile", "docker compose", "automatiser", "automatisation",
+)
+
+
+def detect_task(text: str) -> str | None:
+    """Détecte un type de tâche pour un routage cloud plus fin que par profil.
+    Best-effort, conservateur : retourne None (pas de routage spécial) dès que le
+    signal n'est pas clair — l'appelant garde alors son modèle par défaut (profil)."""
+    norm = strip_accents((text or "").lower())
+    if any(strip_accents(k) in norm for k in _CODE_TASK_KEYWORDS):
+        return "code"
+    return None
+
+
+def get_task_overrides() -> dict:
+    """cloud_task_overrides ({tâche: modèle_cloud}) — ex. {"code": "qwen3-coder:480b-cloud"}."""
+    try:
+        overrides = db.get_setting("cloud_task_overrides") or {}
+        return overrides if isinstance(overrides, dict) else {}
+    except Exception:
+        return {}
 
 
 def is_local_only_lockdown() -> bool:
@@ -116,8 +160,15 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
             return requested_model  # choix local explicite — toujours respecté
         return fallback if sensitive else requested_model
 
-    # Aucun modèle demandé : tenter le cloud auto si configuré pour ce profil.
+    # Aucun modèle demandé : tenter le cloud auto si configuré pour ce profil/tâche.
     cloud_enabled, overrides = get_cloud_config()
-    if cloud_enabled and profile in overrides and not sensitive:
-        return overrides[profile]
+    if cloud_enabled and not sensitive:
+        # v2.141 — un signal de TÂCHE (ex. "code") prend le pas sur l'override de PROFIL :
+        # modèle cloud spécialisé plutôt que le généraliste du profil courant.
+        task = detect_task(text_for_sensitivity)
+        task_overrides = get_task_overrides()
+        if task and task in task_overrides:
+            return task_overrides[task]
+        if profile in overrides:
+            return overrides[profile]
     return fallback

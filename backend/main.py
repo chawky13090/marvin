@@ -1928,6 +1928,115 @@ async def lifespan(app_instance):
 #   avec fichier réel → traité et affiché (35 car.) ; test de bout en bout (2 fichiers + question
 #   + soumission) → message combiné correct avec les 2 documents étiquetés séparément, Marvin
 #   traite normalement derrière. `scripts/smoke_test_chat.py` : 5/5.
+#
+# v2.141 (☁️ routage cloud par TÂCHE + 🧠 passe de critique 2e modèle) :
+#   sur demande explicite (« je préfère que l'on travail le plus possible avec les
+#   models cloud [...] fait aussi la critique [...] revue critique d'un autre llm
+#   avant d'envoyer la réponse »), suite à une recherche web sur les benchmarks
+#   agentiques 2026 des modèles cloud Ollama disponibles.
+#   VÉRIFIÉ EN DIRECT avant implémentation : `cloud_overrides` était déjà appliqué
+#   aux 3 profils (agent/chat/analysis), donc tout ce qui n'est pas sensible passait
+#   déjà par le cloud — la préférence de l'utilisateur était déjà largement respectée.
+#   Le vrai écart : un SEUL modèle cloud (deepseek-v4-flash) pour tout, alors que les
+#   benchmarks montrent des écarts nets par spécialité (GLM-5.2 : 90,6% tool-calling,
+#   meilleur du comparatif ; qwen3-coder:480b : nettement meilleur en code long).
+#   1. **Routage par TÂCHE** (`cloud_routing.py::detect_task/get_task_overrides`) :
+#      un signal détecté dans le message (script/installation/commande/docker...)
+#      route vers `cloud_task_overrides["code"]` (qwen3-coder:480b-cloud), prioritaire
+#      sur l'override de PROFIL — câblé à la fois dans `agent.py::run_agent` (boucle
+#      principale) et `cloud_routing.py::resolve_model()` (appels LLM internes aux
+#      outils), mêmes garanties (cloud_enabled + non-sensible) jamais contournées.
+#      Réglage appliqué : agent→glm-5.2:cloud (le généraliste agentique était sur le
+#      modèle le MOINS bon des 3 en tool-calling), chat/analysis→deepseek-v4-flash.
+#   BUG TROUVÉ EN IMPLÉMENTANT (pas cherché délibérément) : `is_cloud_model()` ne
+#      testait que le suffixe `:cloud` — or `qwen3-coder:480b-cloud` (et plusieurs
+#      autres modèles cloud installés) suffixent le TAG par `-cloud`, pas `:cloud`.
+#      La protection mid-boucle (bascule vers le local si un outil sensible est
+#      appelé en cours de tour) ne les aurait JAMAIS reconnus comme "cloud" — fuite
+#      potentielle silencieuse. Corrigé (accepte les deux suffixes).
+#   2. **Passe de critique par un 2e modèle** (`agent.py::_run_critique_pass`) :
+#      après le scanner déterministe existant (v2.131/2.133, motifs regex connus
+#      à l'avance), un vrai jugement de modèle — principe Mixture-of-Agents (un 2e
+#      regard indépendant détecte ce qu'un modèle ne voit pas dans sa propre sortie).
+#      Scope VOLONTAIREMENT restreint aux réponses contenant un bloc de code (même
+#      critère que le scanner) : appliquer ça à chaque message aurait doublé la
+#      latence pour zéro bénéfice (régression déjà vécue et corrigée v2.125/2.126).
+#      Produit un BANDEAU visible, jamais une réécriture silencieuse (invérifiable).
+#      Modèle critique DIFFÉRENT du modèle qui a répondu (diversité de jugement),
+#      reste dans les modèles cloud déjà configurés par l'utilisateur ; repasse en
+#      local si la requête est sensible (mêmes garanties que le reste du module).
+#   ITÉRATION SUR LE PROMPT (testé, pas supposé) : 1er prompt trouvé TROP sensible
+#      (flaguait "usage de sudo" et "vérification finale manquante" sur une réponse
+#      déjà propre — faux positif reproduit en test direct) → resserré à 4 catégories
+#      GRAVES uniquement (ID inventé, info fausse, régression sécurité, syntaxe non
+#      évaluée), avec consigne explicite d'ignorer le style. Re-testé : le cas propre
+#      ne déclenche plus, le cas dangereux (mot de passe root vidé) déclenche toujours.
+#      2e bug trouvé en testant : un appel a dégénéré en sortie quasi vide ("-" seul)
+#      → filet de longueur minimale ajouté (sinon bandeau vide affiché pour rien).
+#   Testé en réel (curl SSE + appels directs à `_run_critique_pass`) : "quelle heure
+#   est-il" → glm-5.2:cloud ; "script bash installation nginx" → qwen3-coder:480b-cloud
+#   (routage tâche confirmé) ; requête avec "mot de passe" → reste local qwen2.5:14b
+#   (garde de sensibilité intacte) ; critique testée 3× sur réponse dangereuse (mot de
+#   passe root vidé) → détectée à chaque fois ; testée 2× sur réponse propre (install
+#   nginx) → aucun faux positif après resserrage du prompt.
+#
+# v2.142 (🚀 « surpasser le payant » — 4 fonctionnalités + 1 BUG RACINE majeur trouvé
+#   en cours de route) : sur demande explicite (« continue de faire en sorte que le
+#   chat devienne meilleur que les modèles payants [...] propose-moi des améliorations
+#   de fonctionnalité et d'intelligence » puis « fait tout »), suite à une recherche
+#   web sur les fonctionnalités phares 2026 de ChatGPT/Claude/Gemini/Perplexity,
+#   croisée avec un audit du code existant (pas juste supposé).
+#
+#   1. **Sécurité `code_python` + vrai Code Interpreter** : l'ancien `execute_code_python`
+#      tournait par `exec()` DANS le process du backend, avec `os` importé SANS
+#      CONDITION et une liste noire par SOUS-CHAÎNE littérale — contournable
+#      (`getattr(os,'sys'+'tem')(...)` ne contient aucune chaîne interdite). Réécrit :
+#      exécution dans un SOUS-PROCESSUS isolé (`.venv` python, cwd dédié), analyse AST
+#      STRUCTURELLE avant exécution (`_scan_code_ast` — détecte tout `import`/`eval`/
+#      `exec`/`open` quelle que soit l'obfuscation, puisque sans l'import le nom
+#      n'existe simplement pas). Bonus : tout fichier écrit (graphique matplotlib, CSV)
+#      est automatiquement détecté et affiché cliquable dans le chat (réutilise
+#      GeneratedFileCard v2.128, étendu aux images avec vignette inline + tableau de
+#      fichiers multiples).
+#   2. **`web_deep_research`** : recherche multi-passes (recherche → juge les trous →
+#      recherche complémentaire ciblée, jusqu'à 6 fois) avec rapport structuré à
+#      citations numérotées — équivalent Deep Research de tous les concurrents payants.
+#      Outil séparé de `web_research` (déclenché uniquement sur demande explicite,
+#      plusieurs minutes d'exécution).
+#   3. **Projects avec instructions persistantes** : un projet n'était jusqu'ici qu'un
+#      NOM. Colonne `instructions` ajoutée, injectée automatiquement dans le prompt
+#      système de toute conversation du projet (`PUT /api/projects/{id}`, panneau ⚙️
+#      dans la sidebar) — équivalent Claude/ChatGPT Projects.
+#   4. **`ai_model_council`** : interroge plusieurs modèles cloud DIFFÉRENTS en
+#      parallèle sur la même question et synthétise accord/désaccord — équivalent
+#      Model Council de Perplexity (fév. 2026). Marvin a plus de diversité de modèles
+#      (7 cloud installés) que le conseil à 3 de Perplexity. Explicite, jamais par défaut.
+#
+#   🔴 BUG RACINE TROUVÉ EN DIAGNOSTIQUANT LE POINT 3 (pas cherché délibérément) : les
+#      instructions de projet n'avaient AUCUN effet malgré une injection confirmée
+#      correcte dans `system_prompt`. Isolé par test direct contre Ollama : le champ
+#      TOP-LEVEL `"system"` de `/api/chat` est SILENCIEUSEMENT IGNORÉ — reproduit 0/3
+#      sur glm-5.2, deepseek-v4-flash ET qwen2.5:14b LOCAL (donc pas spécifique à un
+#      modèle ni au cloud), avec et sans `tools` (donc pas spécifique au tool-calling).
+#      Le MÊME contenu placé comme message `{"role":"system", ...}` en tête de
+#      `messages[]` fonctionne 3/3. Corrigé aux 2 points d'appel Ollama dans
+#      `agent.py::run_agent` (champ `system` gardé en redondance défensive, ne coûte
+#      rien). IMPACT : ce bug affectait potentiellement TOUTES les règles d'or de
+#      `_build_system_prompt` depuis leur introduction (français forcé, anti-
+#      hallucination, sécurité #7-13...) — explique en partie le "plafond de fiabilité
+#      du prompt engineering" observé et documenté à plusieurs reprises cette session
+#      (v2.125-2.133). Un commentaire de code déjà présent (v2.123, mémoire/recall
+#      injecté dans le dernier message utilisateur "sinon noyée dans le long prompt
+#      système et ignorée par le modèle") avait déjà touché du doigt le symptôme sans
+#      identifier la cause exacte (attribué à la dilution, pas à un champ ignoré).
+#   Testé en réel : régression vérifiée après le fix (règle française toujours
+#   respectée sur question anglaise, tool-calling toujours fonctionnel 2/2 outils
+#   appelés) + `scripts/smoke_test_chat.py` 5/5 ; instructions de projet confirmées
+#   appliquées de bout en bout via vrai chat (tag exact retrouvé dans la réponse) ;
+#   `code_python` : import os/eval/exec/__import__ tous bloqués sans confirmation,
+#   code propre exécuté directement, graphique matplotlib capturé et chemin renvoyé ;
+#   `web_deep_research` : rapport réel généré (4 sources, 1 passe) ; `ai_model_council` :
+#   2 modèles consultés en parallèle, synthèse cohérente produite.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -2243,6 +2352,7 @@ async def list_projects():
 
 class ProjectCreate(BaseModel):
     name: str
+    instructions: str | None = None
 
 
 @app.post("/api/projects")
@@ -2250,7 +2360,23 @@ async def create_project(body: ProjectCreate):
     name = body.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Le nom du projet est requis")
-    return db.create_project(name)
+    return db.create_project(name, instructions=(body.instructions or None))
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    instructions: str | None = None
+
+
+@app.put("/api/projects/{pid}")
+async def update_project_route(pid: str, body: ProjectUpdate):
+    # v2.142 — « Projects » avec instructions persistantes (équivalent Claude/ChatGPT
+    # Projects), injectées automatiquement dans le prompt système de toute conversation
+    # rattachée au projet (agent.py::run_agent). Jusqu'ici un projet n'était qu'un nom.
+    updated = db.update_project(pid, name=body.name, instructions=body.instructions)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+    return updated
 
 
 @app.delete("/api/projects/{pid}")
@@ -6424,7 +6550,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.140.0",
+            "version":         "2.142.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

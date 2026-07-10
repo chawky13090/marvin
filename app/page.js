@@ -19,6 +19,9 @@ export default function ChatPage() {
   const [showConv, setShowConv] = useState(false);   // tiroir des conversations (mobile)
   const [convSearch, setConvSearch] = useState('');  // recherche dans les conversations
   const [collapsed, setCollapsed] = useState(false); // sidebar des conversations repliée (desktop)
+  // v2.142 — instructions persistantes de projet (équivalent Claude/ChatGPT Projects)
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [projectInstructionsDraft, setProjectInstructionsDraft] = useState('');
 
   // Repli persistant (revient au prochain chargement tel qu'on l'a laissé)
   useEffect(() => {
@@ -214,6 +217,28 @@ export default function ChatPage() {
     }
   };
 
+  // v2.142 — instructions persistantes de projet, injectées automatiquement dans le
+  // prompt système de toute conversation du projet (agent.py::run_agent).
+  const openProjectInstructions = (e, proj) => {
+    e.stopPropagation();
+    setEditingProjectId(proj.id);
+    setProjectInstructionsDraft(proj.instructions || '');
+  };
+
+  const saveProjectInstructions = async () => {
+    try {
+      await fetch(`/api/projects/${editingProjectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instructions: projectInstructionsDraft }),
+      });
+      setEditingProjectId(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const assignProject = async (convId, projectId) => {
     try {
       await fetch(`/api/conversations/${convId}`, {
@@ -339,9 +364,33 @@ export default function ChatPage() {
             {projects.map(proj => (
               <div key={proj.id} style={{ marginBottom: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'var(--bg-glass)', borderRadius: '4px', marginBottom: '4px' }}>
-                  <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>📁 {proj.name}</strong>
-                  <button onClick={(e) => deleteProject(e, proj.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: 0.5 }}>🗑️</button>
+                  <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }} title={proj.instructions ? 'Instructions actives' : ''}>
+                    📁 {proj.name}{proj.instructions ? ' 📋' : ''}
+                  </strong>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button onClick={(e) => openProjectInstructions(e, proj)} title="Instructions du projet" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: 0.5 }}>⚙️</button>
+                    <button onClick={(e) => deleteProject(e, proj.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: 0.5 }}>🗑️</button>
+                  </div>
                 </div>
+                {editingProjectId === proj.id && (
+                  <div style={{ padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '6px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      Instructions appliquées automatiquement à toutes les conversations de ce projet :
+                    </div>
+                    <textarea
+                      value={projectInstructionsDraft}
+                      onChange={(e) => setProjectInstructionsDraft(e.target.value)}
+                      placeholder="Ex. : Ce projet concerne le client X — utilise toujours le vouvoiement, mentionne le contrat de maintenance en cours..."
+                      rows={4}
+                      autoFocus
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '12px', resize: 'vertical', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'flex-end' }}>
+                      <button onClick={() => setEditingProjectId(null)} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Annuler</button>
+                      <button onClick={saveProjectInstructions} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '4px', border: 'none', background: 'var(--accent-primary)', color: '#fff', cursor: 'pointer' }}>Enregistrer</button>
+                    </div>
+                  </div>
+                )}
                 <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {(byProject[proj.id] || []).length === 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vide</span>}
                   {(byProject[proj.id] || []).map(conv => (
