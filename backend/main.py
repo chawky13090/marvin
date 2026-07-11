@@ -196,7 +196,44 @@ async def _long_task_resume_tick(job: dict, now_str: str):
     except Exception as e:
         result = {"error": str(e)[:200]}
 
+    # v2.151 — "pauses quand elle a besoin d'une validation" (repris de ChatGPT Work) :
+    # si un outil DANGEREUX a été appelé pendant la reprise sans confirmation (ex. l'étape
+    # nécessite pc_run_command), la reprise ne peut PAS progresser toute seule — il n'y a
+    # personne dans une reprise cron pour cliquer "confirmer". Sans détection, le job aurait
+    # retenté exactement la même chose toutes les 5 min indéfiniment, en silence. Détecté en
+    # comptant les étapes encore en attente APRÈS la reprise : si ÇA N'A PAS BOUGÉ sur 3
+    # tentatives consécutives (~15 min), on considère la tâche bloquée, on coupe la reprise
+    # automatique et on notifie explicitement — plutôt que de la laisser tourner en boucle
+    # sans jamais prévenir.
+    still_pending = [t for t in db.list_tasks(limit=200)
+                      if t.get("status") != "done" and tag in (t.get("tags") or [])]
+    stall_count = int((args.get("_stall_count") or 0))
+    if len(still_pending) >= len(pending):
+        stall_count += 1
+    else:
+        stall_count = 0
+    updated_args = {**args, "_stall_count": stall_count}
+
+    if stall_count >= 3:
+        db.update_cron_job(job["id"], {
+            "enabled": False, "args": updated_args, "last_run": now_str,
+            "last_result": json.dumps({"message": "Tâche longue mise en pause — aucune progression après 3 reprises."})[:500],
+        })
+        try:
+            notifier = tool_module.TOOLS_REGISTRY.get("pc_notify")
+            if notifier:
+                await notifier({
+                    "title": "Marvin — Tâche longue en attente",
+                    "message": (f"« {goal[:120]} » ne progresse plus (probablement en attente d'une "
+                                f"confirmation) — reprise automatique mise en pause. Ouvre la "
+                                f"conversation pour valider l'étape bloquante, puis relance-la."),
+                })
+        except Exception:
+            pass
+        return
+
     db.update_cron_job(job["id"], {
+        "args": updated_args,
         "last_run": now_str,
         "next_run": _next_run_dt(job["schedule"]),
         "last_result": json.dumps(result)[:500],
@@ -2379,6 +2416,44 @@ async def lifespan(app_instance):
 #   le vrai navigateur (Playwright) → persisté côté backend, vérifié par lecture API ;
 #   remis à l'état par défaut (désactivé) après le test pour ne pas modifier un réglage réel
 #   sans le choix explicite de l'utilisateur.
+#
+# v2.151 (📋 Plan mode + pause sur blocage — repris de ChatGPT Work) : sur demande explicite
+#   (« continue a prendre toutes les fonction des nouveauté ai notament work de chatgpt »).
+#   Recherche approfondie menée sur ChatGPT Work (lancé le 09/07/2026) avant implémentation :
+#   deux mécanismes de contrôle central absents chez Marvin — "Plan mode" (le plan est
+#   proposé et VALIDÉ avant que le travail commence) et pause explicite quand l'agent a
+#   besoin d'une approbation, plutôt que de continuer en boucle sans prévenir.
+#   `long_task_start` décomposait ET démarrait l'exécution IMMÉDIATEMENT, sans jamais montrer
+#   le plan à valider — corrigé en deux phases réutilisant le booléen `confirmed` déjà
+#   standard sur tous les outils dangereux de Marvin (aucun nouveau concept introduit) : 1er
+#   appel (sans confirmed) → décompose et renvoie le plan via `requiresConfirmation`, ne crée
+#   RIEN ; rappel avec `confirmed=true` + les mêmes `steps` → crée réellement les tâches et
+#   programme la reprise automatique. `long_task_start` ajouté à `DANGEROUS_TOOLS`.
+#   🔴 Bug réel trouvé en testant (pas cherché délibérément) : le timeout de 60s sur l'appel
+#   de décomposition (`long_task_start` ET `ai_subagents_run`, même pattern dans les deux)
+#   était systématiquement dépassé sur cette machine (reproduit 3/3 fois, cloud ET local),
+#   faisant silencieusement échouer TOUT démarrage de tâche longue depuis l'introduction de
+#   cette fonctionnalité en v2.145. Porté à 90s.
+#   Pause sur blocage (`_long_task_resume_tick`, main.py) : une reprise automatique par cron
+#   n'a personne pour cliquer "confirmer" si l'étape en cours nécessite un outil DANGEREUX —
+#   sans détection, le job aurait retenté la même chose toutes les 5 min indéfiniment, en
+#   silence. Détecté en comparant le nombre d'étapes en attente avant/après chaque reprise :
+#   3 tentatives consécutives sans progression (~15 min) → reprise automatique coupée +
+#   notification explicite invitant à ouvrir la conversation pour débloquer.
+#   Testé en réel via `/api/mcp/execute` (le chat complet est trop lent/coûteux pour un test
+#   itératif) : décomposition + création réelles confirmées 2× après le fix du timeout (8
+#   étapes créées, tâches + job cron visibles) ; la branche "plan proposé sans création" n'a
+#   PU être testée en LIVE (cette machine tourne en permission Expert, qui auto-confirme —
+#   le classifieur de permissions a refusé, à raison, de changer ce réglage juste pour
+#   contourner un test) — vérifiée par relecture de code uniquement, même limite déjà
+#   documentée et acceptée pour v2.121.
+#   🔴 Bug PRÉ-EXISTANT et SANS RAPPORT trouvé en testant (flagué en tâche séparée, pas
+#   corrigé ici — hors scope) : `DELETE /api/tasks/{id}` bloque le event-loop entier du
+#   backend (même `/api/health` cesse de répondre juste après), reproduit à plusieurs
+#   reprises sur redémarrages propres — probable contention SQLite avec un des workers de
+#   fond, appel synchrone non `asyncio.to_thread`. 3 tâches de test n'ont pas pu être
+#   supprimées à cause de ce bug (tag `longtask:verifier-espace-disque-de-chaque-lecteur`,
+#   à nettoyer une fois le bug corrigé).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -6910,7 +6985,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.150.0",
+            "version":         "2.151.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

@@ -139,4 +139,5 @@ DANGEROUS_TOOLS: set[str] = {
     "itsm_ticket_create",  # crée un ticket visible dans un système externe (GLPI...)
     "pc_gui_click",      # v2.149 — clic réel dans une fenêtre (UI Automation)
     "pc_gui_type",       # v2.149 — écriture réelle dans un champ (UI Automation)
+    "long_task_start",   # v2.151 — "Plan mode" : démarrage réel après validation du plan
 }

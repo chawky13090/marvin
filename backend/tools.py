@@ -8436,7 +8436,7 @@ async def execute_ai_subagents_run(args: dict) -> dict:
             "rien d'autre (pas de préambule, pas de numérotation autre que les puces)."
         )
         try:
-            raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=60) or "")
+            raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=90) or "")
         except Exception:
             raw = ""
         subtasks = [
@@ -8497,7 +8497,10 @@ async def execute_long_task_start(args: dict) -> dict:
     une reprise automatique (toutes les 5 min) jusqu'à ce que tout soit fait. Pour un
     objectif qui prend plusieurs étapes/outils et peut continuer sans supervision constante
     (« occupe-toi de X en tâche de fond », « fais avancer ce projet pendant que je fais
-    autre chose »). PAS pour une question simple ou une action en un seul appel d'outil."""
+    autre chose »). PAS pour une question simple ou une action en un seul appel d'outil.
+    ÉTAPE 1 (sans confirmed) : propose le plan pour validation — ne crée RIEN encore.
+    ÉTAPE 2 (avec confirmed=true, mêmes 'goal'/'steps' que le plan proposé) : crée
+    réellement les tâches et programme la reprise automatique."""
     goal = (args.get("goal") or "").strip()
     conversation_id = args.get("_conversation_id")
     if not goal:
@@ -8505,28 +8508,44 @@ async def execute_long_task_start(args: dict) -> dict:
     if not conversation_id:
         return {"error": "Cette tâche longue doit être démarrée depuis une conversation active."}
 
-    decompose_prompt = (
-        f"Objectif : {goal}\n\n"
-        "Décompose en 2 à 8 ÉTAPES concrètes, dans l'ordre logique. IMPORTANT : ces étapes "
-        "seront exécutées PAR UN ASSISTANT IA AUTONOME disposant d'outils (fichiers, "
-        "commandes système, SSH, web, documents...) — PAS par un humain qui suit un mode "
-        "d'emploi. Formule chaque étape comme une action que l'IA peut accomplir elle-même "
-        "avec ses outils (ex. « lister les fichiers de X », « vérifier l'espace disque via "
-        "une commande système »), jamais une instruction manuelle du type « cliquez sur », "
-        "« appuyez sur la touche ». Réponds UNIQUEMENT par une liste à puces, une étape par "
-        "ligne — rien d'autre."
-    )
-    try:
-        raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=60) or "")
-    except Exception:
-        raw = ""
-    steps = [
-        line.lstrip("-•* ").strip()
-        for line in raw.splitlines()
-        if line.strip() and line.lstrip().startswith(("-", "•", "*"))
-    ][:8]
-    if not steps:
-        return {"error": "Impossible de décomposer cet objectif en étapes claires — reformule plus précisément."}
+    # v2.151 — "Plan mode" (repris de ChatGPT Work, recherche menée avant implémentation) :
+    # un plan proposé puis approuvé avant exécution, plutôt qu'exécuté aveuglément dès la
+    # décomposition. Réutilise le même booléen `confirmed` que TOUS les autres outils
+    # dangereux de Marvin (pc_run_command, pc_gui_click...) — aucun nouveau concept introduit.
+    steps = [s.strip() for s in (args.get("steps") or []) if isinstance(s, str) and s.strip()][:8]
+    if not (args.get("confirmed") and steps):
+        decompose_prompt = (
+            f"Objectif : {goal}\n\n"
+            "Décompose en 2 à 8 ÉTAPES concrètes, dans l'ordre logique. IMPORTANT : ces étapes "
+            "seront exécutées PAR UN ASSISTANT IA AUTONOME disposant d'outils (fichiers, "
+            "commandes système, SSH, web, documents...) — PAS par un humain qui suit un mode "
+            "d'emploi. Formule chaque étape comme une action que l'IA peut accomplir elle-même "
+            "avec ses outils (ex. « lister les fichiers de X », « vérifier l'espace disque via "
+            "une commande système »), jamais une instruction manuelle du type « cliquez sur », "
+            "« appuyez sur la touche ». Réponds UNIQUEMENT par une liste à puces, une étape par "
+            "ligne — rien d'autre."
+        )
+        try:
+            raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=90) or "")
+        except Exception:
+            raw = ""
+        steps = [
+            line.lstrip("-•* ").strip()
+            for line in raw.splitlines()
+            if line.strip() and line.lstrip().startswith(("-", "•", "*"))
+        ][:8]
+        if not steps:
+            return {"error": "Impossible de décomposer cet objectif en étapes claires — reformule plus précisément."}
+
+    if not args.get("confirmed"):
+        plan_text = "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
+        return {
+            "requiresConfirmation": True,
+            "goal": goal, "steps": steps,
+            "message": (f"Plan proposé pour « {goal} » ({len(steps)} étape(s)) :\n{plan_text}\n\n"
+                        "Confirme pour démarrer la tâche longue (les mêmes 'steps' seront repris "
+                        "tels quels), ou reformule l'objectif pour un plan différent."),
+        }
 
     import re as _re, uuid as _uuid
     slug = _re.sub(r"[^a-z0-9]+", "-", goal.lower())[:40].strip("-") or _uuid.uuid4().hex[:8]
@@ -18152,8 +18171,14 @@ TOOLS_SPEC = [
        "fait — même après la fin de cette conversation. Pour « occupe-toi de X en tâche de "
        "fond », « fais avancer ce projet pendant que je fais autre chose », un objectif à "
        "plusieurs étapes qui n'a pas besoin de supervision constante. PAS pour une question "
-       "simple ou une action en un seul appel d'outil (équivalent ChatGPT Work, en plus léger).",
-       {"goal": {"type": "string", "description": "L'objectif à accomplir en tâche de fond"}},
+       "simple ou une action en un seul appel d'outil (équivalent ChatGPT Work, en plus léger). "
+       "PLAN MODE : le 1er appel (sans confirmed) renvoie un PLAN proposé sans rien créer — "
+       "présente-le à l'utilisateur, puis si accepté, RAPPELLE cet outil avec confirmed=true "
+       "et les MÊMES 'steps' reçus pour démarrer réellement.",
+       {"goal": {"type": "string", "description": "L'objectif à accomplir en tâche de fond"},
+        "steps": {"type": "array", "items": {"type": "string"},
+                  "description": "Étapes du plan déjà proposé (à fournir identiques lors du rappel confirmé — sinon un nouveau plan est généré)"},
+        "confirmed": {"type": "boolean", "description": "true pour démarrer réellement après validation du plan par l'utilisateur"}},
        ["goal"]),
     _t("long_task_status", "Vérifie l'avancement d'une ou de toutes les tâches longues en cours (voir long_task_start).",
        {"tag": {"type": "string", "description": "Tag précis (ex. longtask:xxx) — optionnel, toutes si absent"}},
