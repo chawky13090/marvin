@@ -247,19 +247,25 @@ export default function ChatContainer({
               width: '100%',
             }}>
               {[
-                { icon: '📧', label: 'Gérer vos emails', desc: 'Lire, répondre, classer' },
-                { icon: '📅', label: 'Organiser votre agenda', desc: 'RDV, disponibilités' },
-                { icon: '📁', label: 'Classer vos fichiers', desc: 'Lire, créer, organiser' },
-                { icon: '🖥️', label: 'Contrôler votre PC', desc: 'Apps, processus, commandes' },
+                { icon: '📧', label: 'Gérer vos emails', desc: 'Lire, répondre, classer', prompt: 'Résume mes emails non lus' },
+                { icon: '📅', label: 'Organiser votre agenda', desc: 'RDV, disponibilités', prompt: "Qu'ai-je à l'agenda aujourd'hui ?" },
+                { icon: '📁', label: 'Classer vos fichiers', desc: 'Lire, créer, organiser', prompt: 'Trouve les plus gros fichiers de mon disque C' },
+                { icon: '🖥️', label: 'Contrôler votre PC', desc: 'Apps, processus, commandes', prompt: 'Fais un diagnostic complet de mon PC' },
               ].map((item) => (
-                <div key={item.label} className="card" style={{
-                  textAlign: 'center', padding: '20px', cursor: 'default',
-                  animation: 'slideUp 0.5s ease forwards',
-                }}>
+                <button
+                  key={item.label}
+                  className="card suggestion-card"
+                  onClick={() => sendMessage({ text: item.prompt })}
+                  style={{
+                    textAlign: 'center', padding: '20px', cursor: 'pointer',
+                    animation: 'slideUp 0.5s ease forwards',
+                    font: 'inherit', color: 'inherit', width: '100%',
+                  }}
+                >
                   <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{item.icon}</div>
                   <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)', marginBottom: '4px' }}>{item.label}</div>
                   <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-secondary)' }}>{item.desc}</div>
-                </div>
+                </button>
               ))}
             </div>
           </div>

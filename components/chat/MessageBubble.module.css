@@ -13,6 +13,11 @@
 
 .wrapperAssistant {
   align-self: flex-start;
+  /* v2.167 — 85% seul peut dépasser 1000px sur un écran large, bien au-delà des
+     ~65-72 caractères par ligne recommandés pour la lisibilité longue durée.
+     min() garde 85% sur mobile/tablette et plafonne à une largeur de lecture
+     confortable sur desktop. */
+  max-width: min(85%, 720px);
 }
 
 .avatar {

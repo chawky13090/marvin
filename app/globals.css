@@ -345,6 +345,19 @@ img { max-width: 100%; display: block; }
   box-shadow: var(--shadow-sm);
 }
 
+/* Cartes de suggestion de l'accueil chat (v2.167) — <button> cliquable stylé en carte */
+.suggestion-card {
+  appearance: none;
+  -webkit-appearance: none;
+}
+.suggestion-card:hover {
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+}
+.suggestion-card:active {
+  transform: translateY(0);
+}
+
 .card-title {
   font-size: var(--font-md);
   font-weight: 600;

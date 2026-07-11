@@ -47,6 +47,12 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
     setAttachedFiles(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // ── Menu "+" groupé (image/document/compétence) — v2.167 ────────────────────
+  // Décongestionne la barre de saisie (5 icônes en dur → 1 bouton "+" qui ouvre
+  // un petit menu), pattern Claude/ChatGPT. Micro et mode vocal restent visibles
+  // en direct (actions fréquentes, un seul clic).
+  const [attachMenu, setAttachMenu] = useState(false);
+
   // ── Menu compétences (insérer une skill dans le chat) ───────────────────────
   const [skillMenu, setSkillMenu] = useState(false);
   const [skills, setSkills] = useState([]);
@@ -418,7 +424,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
         e.currentTarget.style.boxShadow = 'none';
       }}
       >
-        {/* Bouton upload image */}
+        {/* Entrées fichier cachées — inchangées, juste déclenchées depuis le menu "+" */}
         <input
           ref={fileInputRef}
           type="file"
@@ -427,64 +433,66 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           style={{ display: 'none' }}
           onChange={handleFileSelect}
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          title="Joindre une image"
-          style={{
-            width: '34px', height: '34px', borderRadius: '8px',
-            background: attachedImages.length > 0 ? 'rgba(79, 140, 255,0.15)' : 'transparent',
-            border: `1px solid ${attachedImages.length > 0 ? 'rgba(79, 140, 255,0.4)' : 'transparent'}`,
-            color: attachedImages.length > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
-            fontSize: '1rem', cursor: uploading ? 'wait' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 0.2s', flexShrink: 0,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; }}
-          onMouseLeave={(e) => { if (!attachedImages.length) e.currentTarget.style.color = 'var(--text-muted)'; }}
-        >
-          {uploading ? '⏳' : '🖼️'}
-        </button>
-
-        {/* Bouton document — joindre un ou plusieurs fichiers (PDF/Word/Excel/texte) */}
         <input ref={docInputRef} type="file" multiple accept=".pdf,.docx,.doc,.txt,.md,.markdown,.csv,.tsv,.xlsx,.xls,.pptx,.json,.log,.xml,.html,.htm,.rtf" style={{ display: 'none' }} onChange={handleDocSelect} />
-        <button
-          type="button"
-          onClick={() => docInputRef.current?.click()}
-          disabled={fileBusy}
-          title="Joindre un ou plusieurs documents (PDF, Word, Excel, texte…) — Marvin lira leur contenu"
-          style={{
-            width: '34px', height: '34px', borderRadius: '8px',
-            background: attachedFiles.length > 0 ? 'rgba(96,165,250,0.15)' : 'transparent',
-            border: `1px solid ${attachedFiles.length > 0 ? 'rgba(96,165,250,0.4)' : 'transparent'}`,
-            color: attachedFiles.length > 0 ? '#60a5fa' : 'var(--text-muted)',
-            fontSize: '1rem', cursor: fileBusy ? 'wait' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 0.2s', flexShrink: 0,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#60a5fa'; }}
-          onMouseLeave={(e) => { if (!attachedFiles.length) e.currentTarget.style.color = 'var(--text-muted)'; }}
-        >{fileBusy ? '⏳' : '📎'}</button>
 
-        {/* Bouton compétences — insérer une skill dans le chat */}
+        {/* Bouton "+" groupé — image / document / compétence (v2.167) */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             type="button"
-            onClick={() => setSkillMenu(v => !v)}
-            title="Insérer une compétence dans le message"
+            onClick={() => setAttachMenu(v => !v)}
+            title="Joindre ou insérer (image, document, compétence)"
             style={{
               width: '34px', height: '34px', borderRadius: '8px',
-              background: skillMenu ? 'rgba(45,212,191,0.15)' : 'transparent',
-              border: `1px solid ${skillMenu ? 'rgba(45,212,191,0.4)' : 'transparent'}`,
-              color: skillMenu ? '#2dd4bf' : 'var(--text-muted)',
-              fontSize: '1rem', cursor: 'pointer',
+              background: (attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'rgba(79, 140, 255,0.15)' : 'transparent',
+              border: `1px solid ${(attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'rgba(79, 140, 255,0.4)' : 'transparent'}`,
+              color: (attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'var(--accent-primary)' : 'var(--text-muted)',
+              fontSize: '1.25rem', lineHeight: 1, cursor: (uploading || fileBusy) ? 'wait' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s',
+              transition: 'all 0.2s', position: 'relative',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#2dd4bf'; }}
-            onMouseLeave={(e) => { if (!skillMenu) e.currentTarget.style.color = 'var(--text-muted)'; }}
-          >🧩</button>
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; }}
+            onMouseLeave={(e) => { if (!attachMenu && !attachedImages.length && !attachedFiles.length) e.currentTarget.style.color = 'var(--text-muted)'; }}
+          >
+            {(uploading || fileBusy) ? '⏳' : '+'}
+            {(attachedImages.length + attachedFiles.length) > 0 && (
+              <span style={{
+                position: 'absolute', top: '-3px', right: '-3px', minWidth: '14px', height: '14px',
+                padding: '0 3px', borderRadius: '999px', background: 'var(--accent-primary)',
+                color: '#0a0a0d', fontSize: '9px', fontWeight: 700, lineHeight: '14px', textAlign: 'center',
+              }}>{attachedImages.length + attachedFiles.length}</span>
+            )}
+          </button>
+
+          {attachMenu && (
+            <>
+              <div onClick={() => setAttachMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+              <div style={{
+                position: 'absolute', bottom: '42px', left: 0, zIndex: 100,
+                width: '220px', display: 'flex', flexDirection: 'column', gap: 2, padding: 6,
+                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                borderRadius: '12px', boxShadow: 'var(--shadow-lg)',
+              }}>
+                <button type="button" onClick={() => { fileInputRef.current?.click(); setAttachMenu(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 8, color: 'var(--text-primary)', fontSize: 13 }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-glass)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  🖼️ Image{attachedImages.length > 0 ? ` (${attachedImages.length})` : ''}
+                </button>
+                <button type="button" onClick={() => { docInputRef.current?.click(); setAttachMenu(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 8, color: 'var(--text-primary)', fontSize: 13 }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-glass)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  📎 Document{attachedFiles.length > 0 ? ` (${attachedFiles.length})` : ''}
+                </button>
+                <button type="button" onClick={() => { setAttachMenu(false); setSkillMenu(true); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 8, color: 'var(--text-primary)', fontSize: 13 }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-glass)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  🧩 Compétence
+                </button>
+              </div>
+            </>
+          )}
 
           {skillMenu && (
             <>

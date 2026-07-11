@@ -2804,6 +2804,32 @@ async def lifespan(app_instance):
 #   (etait 0.0.0.0:8890 avant), `netstat` confirme l'ecoute uniquement en loopback,
 #   web_search de Marvin fonctionne toujours normalement (provider:SearXNG) apres
 #   recreation du conteneur -- aucune regression fonctionnelle.
+#
+# v2.167 (interface chat plus vivante et lisible) : demande explicite ("l'interface actuel
+#   du chat marvin me parait peu jolie et atrayante... regarde sur le web, propose des
+#   solutions" puis "fait tout"). Recherche web menee sur les patterns UI 2026 des grands
+#   chatbots IA (Claude/ChatGPT/Perplexity/Gemini) + guides UX chat (interligne, largeur de
+#   lecture) avant de proposer -- mockup montre avant/apres, 3 axes retenus (les moins
+#   couteux, les plus grounded dans le code reel) :
+#   1. Cartes de suggestion de l'ecran d'accueil (ChatContainer.jsx) : etaient purement
+#      decoratives (cursor:default, aucun onClick) malgre une apparence de bouton -- pattern
+#      etabli chez Claude/ChatGPT/Perplexity, cliquer envoie directement un prompt pertinent
+#      via sendMessage(). Nouvelle classe .suggestion-card (globals.css) pour le hover/lift.
+#   2. Largeur de lecture des messages assistant (MessageBubble.module.css) : 85% seul peut
+#      depasser 1000px sur un ecran large, bien au-dela des ~65-72 caracteres/ligne
+#      recommandes -- max-width: min(85%, 720px) sur .wrapperAssistant (messages utilisateur
+#      inchanges, generalement courts). line-height 1.65 deja correct, pas touche.
+#   3. Barre de saisie decongestionnee (ChatInput.jsx) : 3 boutons (image/document/
+#      competence) fusionnes en un seul bouton "+" avec menu deroulant -- micro et mode
+#      vocal restent visibles en direct (actions frequentes, un clic). Aucun changement de
+#      logique sous-jacente (memes refs de fichiers caches, meme etat skillMenu), juste le
+#      point d'entree visuel.
+#   Teste en reel (Playwright + pilotage JS direct, contournement d'un souci de rendu
+#   screenshot cette session) : clic reel sur la carte "Gerer vos emails" -> message
+#   "Resume mes emails non lus" envoye et reponse agent declenchee (confirme via lecture du
+#   DOM des messages) ; regle CSS max-width:min(85%,720px) confirmee compilee dans la
+#   feuille de style live ; barre de saisie confirmee a 1 bouton "+" au lieu de 3, 0 erreur
+#   console sur les 3 changements.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7341,7 +7367,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.166.0",
+            "version":         "2.167.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
