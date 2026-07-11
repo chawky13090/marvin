@@ -2454,6 +2454,27 @@ async def lifespan(app_instance):
 #   fond, appel synchrone non `asyncio.to_thread`. 3 tâches de test n'ont pas pu être
 #   supprimées à cause de ce bug (tag `longtask:verifier-espace-disque-de-chaque-lecteur`,
 #   à nettoyer une fois le bug corrigé).
+#
+# v2.152 (🩹 Correctif DELETE /api/tasks bloquait l'event-loop) : sur demande explicite
+#   (« ok fait le », donnant suite au bug flagué en v2.151). Cause racine trouvée en lisant
+#   `database.py::get_conn()` : chaque appel `db()` ouvre une NOUVELLE connexion SQLite
+#   synchrone (`sqlite3.connect(...)`, jamais `asyncio.to_thread`), invoquée directement
+#   depuis des routes FastAPI async — sur un backend mono-thread (asyncio), un blocage même
+#   bref (contention WAL avec un worker de fond, antivirus scannant `.db-wal` sous Windows)
+#   gèle donc TOUT l'event-loop, pas seulement la requête en cours — expliquant pourquoi
+#   `/api/health` (qui ne touche pourtant pas la DB) cessait aussi de répondre juste après
+#   un DELETE. Corrigé : `delete_task` (le symptôme précisément rapporté) déporté sur un
+#   thread via `asyncio.to_thread` — même pattern déjà établi pour `subprocess.run` (v2.96).
+#   `get_conn()` reçoit aussi un `timeout=10.0` explicite (busy_timeout SQLite) en défense
+#   complémentaire.
+#   ⚠️ Portée volontairement limitée : 28 routes `@app.delete` (et un nombre comparable de
+#   POST/PUT) partagent la MÊME exposition structurelle — les corriger toutes aurait été un
+#   refactor bien plus large que le bug rapporté. Documenté ici comme piste connue pour un
+#   futur passage plus large, pas traité en silence ni oublié.
+#   Testé en réel : 15 cycles create+delete+health en boucle après le fix → 0 blocage,
+#   pire cas 5ms (delete) / 28ms (health) — contre un blocage reproduit à plusieurs reprises
+#   avant. `scripts/smoke_test_pages.py` 34/34. Les 3 tâches de test bloquées depuis v2.151
+#   supprimées avec succès (preuve directe que le fix résout le cas qui les avait bloquées).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -2850,7 +2871,11 @@ async def update_task(tid: str, body: TaskUpdate):
 
 @app.delete("/api/tasks/{tid}")
 async def delete_task(tid: str):
-    db.delete_task(tid)
+    # v2.152 — bloquait tout l'event-loop (même /api/health) en cas de contention SQLite
+    # avec un des workers de fond (proactive/cron/skill learning), db.delete_task() étant
+    # un appel synchrone jamais déporté sur un thread. asyncio.to_thread() isole le blocage
+    # éventuel sur un thread séparé — même pattern déjà établi pour subprocess.run (v2.96).
+    await _asyncio.to_thread(db.delete_task, tid)
     return {"success": True}
 
 
@@ -6985,7 +7010,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.151.0",
+            "version":         "2.152.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

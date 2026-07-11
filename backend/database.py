@@ -17,8 +17,13 @@ from config import DB_PATH
 # ── Connexion ─────────────────────────────────────────────────────────────────
 
 def get_conn() -> sqlite3.Connection:
-    """Ouvre une connexion WAL à la base de données partagée."""
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    """Ouvre une connexion WAL à la base de données partagée.
+    v2.152 — timeout explicite (Python fixe 5s par défaut si non précisé) : sur Windows,
+    l'ouverture/fermeture fréquente de connexions par les workers de fond peut occasionnellement
+    contendre (verrou WAL bref, antivirus scannant .db-wal) ; ce timeout laisse sqlite3
+    RÉESSAYER plusieurs secondes au lieu d'échouer/bloquer sec. Complète (ne remplace pas)
+    le passage en asyncio.to_thread() des appels db.* les plus exposés (ex. delete_task)."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
