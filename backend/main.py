@@ -2491,6 +2491,59 @@ async def lifespan(app_instance):
 #   Testé en réel (Playwright) : message forçant un lien markdown dans la réponse →
 #   `target="_blank"` et `rel="noopener noreferrer"` confirmés sur l'élément `<a>` réellement
 #   rendu (DOM inspecté directement, pas supposé), 0 erreur console.
+#
+# v2.154 (🌐 2 outils réseau sysadmin/étudiant) : sur demande explicite (« continue à rendre
+#   Marvin plus efficace et intelligent, je veux plus d'outils en rapport avec mes recherches
+#   sur l'informatique et le fait que je suis en train de devenir admin système et réseau »).
+#   Audit préalable des outils réseau existants (net_*/ssh_*/win_*, déjà nombreux) + recoupé
+#   avec l'activité réelle visible dans les fichiers de l'utilisateur (TrueNAS, Zabbix,
+#   GitLab CE, Nextcloud, Tailscale — un vrai homelab, pas que des études théoriques).
+#   `net_subnet_calc` : calculateur de sous-réseau VLSM/CIDR (adresse réseau, broadcast,
+#   masque, wildcard, plage d'hôtes utilisables, découpage en sous-réseaux) — utile à la
+#   fois pour réviser le subnetting (Network+/CCNA) et planifier un vrai plan d'adressage.
+#   `net_tls_check_bulk` : contrôle TLS/certificat sur plusieurs hôtes en parallèle (réutilise
+#   `net_tls_check` par hôte), signale ceux qui expirent sous 30 jours — utile avec plusieurs
+#   services auto-hébergés en TLS.
+#   🔴 Bug réel trouvé en testant (pas en devinant) : le calcul de `next_subnet` (via
+#   `supernet()/subnets()[1]`) retournait le sous-réseau LUI-MÊME quand il occupait la 2e
+#   moitié de son supernet (ex. 192.168.1.0/24 → "192.168.1.0/24" au lieu de 192.168.2.0/24).
+#   Corrigé par calcul arithmétique direct (adresse réseau + nombre d'adresses) plutôt que
+#   la manipulation supernet/subnets, vérifié sur plusieurs CIDR après coup.
+#   Testé en réel : `net_subnet_calc` vérifié sur 192.168.1.0/24 (avec découpage VLSM en
+#   4×/26) et 10.20.30.0/27, tous les champs corrects ; `net_tls_check_bulk` testé contre
+#   google.com/github.com (certificats réels, jours restants corrects) + un hôte injoignable
+#   (erreur gérée proprement sans faire échouer les autres). `scripts/smoke_test_pages.py`
+#   34/34.
+#
+# v2.155 (🌐 SNMP + diagramme topologie + 🧠 fiches de révision) : sur demande explicite
+#   (« fait tout diagramme de topologie réseau visuel, requêtes SNMP, ou un mode fiches de
+#   révision/quiz pour tes certifs »), suite directe de v2.154.
+#   `net_snmp_query` (pysnmp 7, hlapi v3arch asyncio, SNMPv2c) : action='sysinfo' (nom/
+#   description/uptime/contact/localisation en un appel), 'interfaces' (walk borné IF-MIB,
+#   état up/down), 'get' (OID précis). `net_topology_diagram` : diagramme PNG (matplotlib,
+#   déjà une dépendance) affiché directement dans le chat via le mécanisme `result.image`
+#   déjà existant (pc_screenshot) — passerelle au centre, appareils autour, scan local
+#   automatique si 'hosts' omis.
+#   🔴 2 bugs réels trouvés en testant (pas en devinant, en regardant l'image générée) :
+#   (1) `net_scan_local` n'a JAMAIS eu de champ "gateway"/"hostname"/"vendor" — j'avais
+#   halluciné ces clés en écrivant le code sans vérifier ; corrigé en récupérant la vraie
+#   passerelle via `win_network_config` (Get-NetIPConfiguration). (2) Les icônes emoji (🌐/🖥)
+#   s'affichaient en "tofu" (glyphe manquant, police par défaut matplotlib DejaVu Sans sans
+#   couverture emoji) — remplacées par des libellés texte courts (GW/PC) garantis lisibles.
+#   `net_snmp_query` action='interfaces' durci aussi : distingue maintenant "0 réponse SNMP"
+#   (erreur explicite) de "0 interface légitime" (succès vide) — la version initiale
+#   renvoyait un succès trompeur dans les deux cas.
+#   🧠 Fiches de révision (`quiz_generate`/`quiz_next`/`quiz_answer`/`quiz_stats`, nouvelle
+#   table `flashcards`) : répétition espacée minimale (bonne réponse → intervalle double
+#   plafonné à 60j, mauvaise réponse → repasse le lendemain) — délibérément plus simple qu'un
+#   moteur SM-2 complet, cohérent avec le reste de Marvin (pas de sur-ingénierie pour un
+#   besoin d'étude personnelle). `quiz_next` ne révèle jamais la réponse avant `quiz_answer`.
+#   Testé en réel de bout en bout : diagramme généré sur le vrai réseau local (13→11
+#   appareils après exclusion correcte de la passerelle, labels lisibles, IP passerelle
+#   réelle affichée) ; SNMP testé contre un hôte sans agent (erreur propre, pas de hang) ;
+#   cycle complet fiches (génération de 3 vraies questions sur le modèle OSI, réponse
+#   correcte → intervalle 1→2 jours, carte suivante correctement différente, stats exactes
+#   due_now 2/3) — fiches de test supprimées après coup. `scripts/smoke_test_pages.py` 34/34.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7026,7 +7079,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.153.0",
+            "version":         "2.155.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

@@ -1116,7 +1116,19 @@ _KEYWORD_TOOLS = {
         {"net_ping", "net_port_scan", "net_dns_lookup", "net_traceroute",
          "net_whois", "net_scan_local", "ip_info", "win_network_config",
          "net_nmap_scan", "net_service_detect", "net_http_probe", "net_tls_check",
+         "net_tls_check_bulk", "net_subnet_calc",
          "net_subnet_sweep", "net_route_diagnostics"},
+
+    # SNMP + topologie réseau (v2.155)
+    ("snmp", "topologie", "topologie réseau", "schéma réseau", "diagramme réseau",
+     "diagramme de topologie", "interfaces du switch", "interfaces du routeur"):
+        {"net_snmp_query", "net_topology_diagram"},
+
+    # Fiches de révision / quiz (v2.155)
+    ("fiche de révision", "fiches de révision", "quiz", "révise", "réviser", "flashcard",
+     "flashcards", "teste-moi", "teste moi", "certification", "certif", "prépare mon examen",
+     "réviser pour"):
+        {"quiz_generate", "quiz_next", "quiz_answer", "quiz_stats"},
 
     # Inventaire matériel
     ("caractéristiques matérielles", "caractéristique matérielle", "specs du pc", "specs pc",

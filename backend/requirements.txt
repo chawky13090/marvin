@@ -55,6 +55,7 @@ comtypes==1.4.16         # dépendance de pywinauto (backend uia)
 
 # --- Réseau / SSH / web ---
 paramiko==5.0.0
+pysnmp==7.1.27            # v2.155 — requêtes SNMP (net_snmp_query)
 beautifulsoup4==4.14.3
 lxml==6.1.1
 

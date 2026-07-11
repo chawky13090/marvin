@@ -5416,6 +5416,305 @@ async def execute_net_tls_check(args: dict) -> dict:
         return {"error": str(e)}
 
 
+async def execute_net_tls_check_bulk(args: dict) -> dict:
+    """Contrôle TLS/certificat sur PLUSIEURS hôtes en une fois (réutilise net_tls_check par
+    hôte, en parallèle) — pour surveiller les expirations d'un parc de services (ex. plusieurs
+    services auto-hébergés) sans un appel par hôte."""
+    hosts_raw = args.get("hosts")
+    if isinstance(hosts_raw, str):
+        hosts = [h.strip() for h in hosts_raw.split(",") if h.strip()]
+    elif isinstance(hosts_raw, list):
+        hosts = [str(h).strip() for h in hosts_raw if str(h).strip()]
+    else:
+        hosts = []
+    if not hosts:
+        return {"error": "Paramètre 'hosts' requis (liste ou chaîne séparée par des virgules)."}
+    hosts = hosts[:25]  # borne raisonnable
+    port = int(args.get("port") or 443)
+    timeout = max(2.0, min(float(args.get("timeout", 5.0)), 15.0))
+
+    results = await asyncio.gather(
+        *[execute_net_tls_check({"host": h, "port": port, "timeout": timeout}) for h in hosts],
+        return_exceptions=True,
+    )
+    out = []
+    expiring_soon = []
+    for h, r in zip(hosts, results):
+        if isinstance(r, Exception) or r.get("error"):
+            out.append({"host": h, "error": (r.get("error") if isinstance(r, dict) else str(r))})
+            continue
+        entry = {"host": h, "days_left": r.get("days_left"), "expires_at": r.get("expires_at"),
+                  "issuer": r.get("issuer", {}).get("organizationName") or r.get("issuer", {}).get("commonName", ""),
+                  "protocol": r.get("protocol")}
+        out.append(entry)
+        if isinstance(r.get("days_left"), int) and r["days_left"] <= 30:
+            expiring_soon.append(f"{h} ({r['days_left']}j)")
+    return {
+        "success": True, "count": len(out), "results": out,
+        "expiring_soon": expiring_soon,
+        "message": (f"{len(expiring_soon)} certificat(s) expirent sous 30 jours : {', '.join(expiring_soon)}"
+                    if expiring_soon else f"{len(out)} hôte(s) vérifié(s), aucun certificat proche de l'expiration."),
+    }
+
+
+def _subnet_calc_sync(cidr: str) -> dict:
+    import ipaddress
+    net = ipaddress.ip_network(cidr, strict=False)
+    hosts = list(net.hosts()) if net.num_addresses > 2 else []
+    result = {
+        "cidr": str(net),
+        "network_address": str(net.network_address),
+        "broadcast_address": str(net.broadcast_address) if net.version == 4 else None,
+        "netmask": str(net.netmask),
+        "wildcard_mask": str(net.hostmask),
+        "prefix_length": net.prefixlen,
+        "total_addresses": net.num_addresses,
+        "usable_hosts": max(net.num_addresses - 2, 0) if net.version == 4 else net.num_addresses,
+        "first_usable": str(hosts[0]) if hosts else None,
+        "last_usable": str(hosts[-1]) if hosts else None,
+        "is_private": net.is_private,
+        "version": net.version,
+    }
+    try:
+        # v2.154 — bug réel trouvé en testant : la version précédente (via supernet()/subnets())
+        # retournait le sous-réseau LUI-MÊME quand il occupait la 2e moitié de son supernet
+        # (ex. 192.168.1.0/24 → "192.168.1.0/24" au lieu de 192.168.2.0/24). Le calcul correct
+        # du sous-réseau CONTIGU suivant est arithmétique : adresse réseau + nombre d'adresses.
+        next_addr = int(net.network_address) + net.num_addresses
+        max_addr = (2 ** (32 if net.version == 4 else 128)) - 1
+        result["next_subnet"] = (
+            str(ipaddress.ip_network((ipaddress.ip_address(next_addr), net.prefixlen), strict=False))
+            if next_addr <= max_addr else None
+        )
+    except Exception:
+        result["next_subnet"] = None
+    return result
+
+
+async def execute_net_subnet_calc(args: dict) -> dict:
+    """Calculateur de sous-réseau (VLSM/CIDR) : adresse réseau, broadcast, masque, masque
+    générique, plage d'hôtes utilisables, nombre d'adresses. Accepte aussi 'new_prefix' pour
+    découper le CIDR donné en sous-réseaux de cette taille (VLSM)."""
+    cidr = (args.get("cidr") or "").strip()
+    if not cidr:
+        return {"error": "Paramètre 'cidr' requis (ex: 192.168.1.0/24 ou 10.0.0.0/8)."}
+    try:
+        base = _subnet_calc_sync(cidr)
+    except Exception as e:
+        return {"error": f"CIDR invalide : {e}"}
+
+    new_prefix = args.get("new_prefix")
+    if new_prefix:
+        try:
+            import ipaddress
+            net = ipaddress.ip_network(cidr, strict=False)
+            new_prefix = int(new_prefix)
+            if new_prefix <= net.prefixlen:
+                return {"error": f"new_prefix ({new_prefix}) doit être PLUS GRAND que le préfixe actuel ({net.prefixlen})."}
+            subnets = list(net.subnets(new_prefix=new_prefix))
+            if len(subnets) > 256:
+                return {"error": f"Découpage en {len(subnets)} sous-réseaux — trop grand, précise un new_prefix plus proche."}
+            base["subnets"] = [
+                {"cidr": str(s), "network_address": str(s.network_address),
+                 "broadcast_address": str(s.broadcast_address) if s.version == 4 else None,
+                 "usable_hosts": max(s.num_addresses - 2, 0)}
+                for s in subnets
+            ]
+            base["subnet_count"] = len(subnets)
+        except Exception as e:
+            return {"error": f"Paramètre new_prefix invalide : {e}"}
+
+    base["success"] = True
+    base["message"] = (f"{base['cidr']} — {base['usable_hosts']} hôte(s) utilisable(s) "
+                        f"({base.get('first_usable', 'N/A')} → {base.get('last_usable', 'N/A')})")
+    return base
+
+
+_SNMP_SYSTEM_OIDS = {
+    "sysDescr": "1.3.6.1.2.1.1.1.0", "sysUpTime": "1.3.6.1.2.1.1.3.0",
+    "sysContact": "1.3.6.1.2.1.1.4.0", "sysName": "1.3.6.1.2.1.1.5.0",
+    "sysLocation": "1.3.6.1.2.1.1.6.0",
+}
+_SNMP_IF_TABLE_OIDS = {"ifDescr": "1.3.6.1.2.1.2.2.1.2", "ifOperStatus": "1.3.6.1.2.1.2.2.1.8"}
+
+
+async def execute_net_snmp_query(args: dict) -> dict:
+    """Interroge un équipement via SNMP (v2c) — 'action'="sysinfo" (infos système : nom,
+    description, uptime, contact, localisation, en un seul appel) ou "interfaces" (liste des
+    interfaces réseau + état up/down, via un walk borné) ou "get" avec un OID précis. Utile
+    pour un switch/routeur/serveur exposant SNMP (souvent activé par défaut sur les
+    équipements réseau pro — community 'public' en lecture seule fréquente en labo)."""
+    host = (args.get("host") or "").strip()
+    if not host:
+        return {"error": "Paramètre 'host' requis."}
+    community = (args.get("community") or "public").strip()
+    port = int(args.get("port") or 161)
+    timeout = max(1, min(int(args.get("timeout", 4)), 10))
+    action = (args.get("action") or "sysinfo").strip().lower()
+    oid = (args.get("oid") or "").strip()
+
+    try:
+        from pysnmp.hlapi.v3arch.asyncio import (
+            SnmpEngine, CommunityData, UdpTransportTarget, ContextData,
+            ObjectType, ObjectIdentity, get_cmd, walk_cmd,
+        )
+    except ImportError:
+        return {"error": "Module pysnmp non installé côté backend."}
+
+    engine = SnmpEngine()
+    auth = CommunityData(community, mpModel=1)  # mpModel=1 → SNMPv2c
+    try:
+        transport = await UdpTransportTarget.create((host, port), timeout=timeout, retries=1)
+    except Exception as e:
+        return {"error": f"Cible SNMP injoignable : {e}"}
+
+    if action == "interfaces":
+        results = []
+        # v2.155 — bug trouvé en testant contre un hôte sans agent SNMP : sans distinguer
+        # "erreur dès le 1er paquet" de "0 résultat légitime", l'outil renvoyait un succès
+        # trompeur ("0 interface trouvée") au lieu de signaler l'absence de réponse SNMP.
+        got_any_response = False
+        try:
+            for base_name, base_oid in _SNMP_IF_TABLE_OIDS.items():
+                count = 0
+                async for errind, errstat, errix, varbinds in walk_cmd(
+                        engine, auth, transport, ContextData(), ObjectType(ObjectIdentity(base_oid))):
+                    if errind or errstat:
+                        break
+                    got_any_response = True
+                    for vb in varbinds:
+                        oid_str, val = str(vb[0]), str(vb[1])
+                        idx = oid_str.rsplit(".", 1)[-1]
+                        entry = next((r for r in results if r["index"] == idx), None)
+                        if not entry:
+                            entry = {"index": idx}
+                            results.append(entry)
+                        entry[base_name] = val
+                        count += 1
+                    if count >= 40:
+                        break
+        except Exception as e:
+            return {"error": f"Échec du walk SNMP (community/port corrects ? SNMP activé sur la cible ?) : {e}"}
+        if not got_any_response:
+            return {"error": f"Aucune réponse SNMP de {host} (community/port corrects ? SNMP activé sur la cible ?)."}
+        for r in results:
+            r["status"] = {"1": "up", "2": "down", "3": "testing"}.get(r.get("ifOperStatus", ""), r.get("ifOperStatus", "?"))
+        return {"success": True, "host": host, "count": len(results), "interfaces": results,
+                "message": f"{len(results)} interface(s) trouvée(s) sur {host}."}
+
+    # sysinfo (défaut) ou get(oid) : requête simple via get_cmd
+    if action == "get":
+        if not oid:
+            return {"error": "Paramètre 'oid' requis pour action='get'."}
+        targets = {"value": oid}
+    else:
+        targets = _SNMP_SYSTEM_OIDS
+
+    try:
+        errind, errstat, errix, varbinds = await get_cmd(
+            engine, auth, transport, ContextData(),
+            *[ObjectType(ObjectIdentity(o)) for o in targets.values()],
+        )
+    except Exception as e:
+        return {"error": f"Échec de la requête SNMP : {e}"}
+    if errind:
+        return {"error": f"SNMP : {errind} (community/port corrects ? SNMP activé sur la cible ?)"}
+    if errstat:
+        return {"error": f"SNMP : {errstat.prettyPrint()}"}
+
+    values = {name: str(vb[1]) for name, vb in zip(targets.keys(), varbinds)}
+    return {"success": True, "host": host, "values": values,
+            "message": f"Réponse SNMP reçue de {host}."}
+
+
+async def execute_net_topology_diagram(args: dict) -> dict:
+    """Génère un diagramme visuel de topologie réseau (image PNG affichée dans le chat) à
+    partir d'une liste d'hôtes (ou d'un scan réseau local si 'hosts' est omis). Passerelle/
+    routeur au centre, appareils autour — utile pour documenter ou réviser une architecture
+    réseau."""
+    hosts_arg = args.get("hosts")
+    gateway_ip = (args.get("gateway") or "").strip()
+    if hosts_arg:
+        if isinstance(hosts_arg, str):
+            devices = [{"ip": h.strip(), "mac": ""} for h in hosts_arg.split(",") if h.strip()]
+        else:
+            devices = [{"ip": str(h), "mac": ""} for h in hosts_arg]
+    else:
+        scan = await execute_net_scan_local({})
+        if scan.get("error"):
+            return scan
+        devices = [{"ip": d.get("ip", ""), "mac": d.get("mac", "")}
+                   for d in scan.get("devices", []) if d.get("ip")]
+        if not gateway_ip:
+            # v2.155 — bug trouvé en testant : net_scan_local n'a jamais eu de champ "gateway"
+            # (juste une liste ip/mac/type issue de `arp -a`) — la passerelle réelle vient de
+            # win_network_config (Get-NetIPConfiguration), pas d'un champ halluciné ici.
+            try:
+                netcfg = await execute_win_network_config({})
+                for a in (netcfg.get("adapters") or []):
+                    gw = (a.get("Gateway") or "").strip()
+                    if gw:
+                        gateway_ip = gw
+                        break
+            except Exception:
+                pass
+
+    if not devices:
+        return {"error": "Aucun appareil à représenter (scan vide ou 'hosts' non fourni)."}
+    devices = devices[:20]  # borne raisonnable pour la lisibilité
+    # La passerelle ne doit pas aussi apparaître comme un "appareil" autour d'elle-même
+    if gateway_ip:
+        devices = [d for d in devices if d.get("ip") != gateway_ip]
+
+    def draw() -> str:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import math, io, base64 as _b64
+
+        n = len(devices)
+        fig, ax = plt.subplots(figsize=(9, 9))
+        fig.patch.set_facecolor("#0b0f19")
+        ax.set_facecolor("#0b0f19")
+        ax.set_xlim(-1.3, 1.3)
+        ax.set_ylim(-1.3, 1.3)
+        ax.axis("off")
+
+        # Centre = passerelle. v2.155 — bug trouvé en testant : les emoji (🌐/🖥) s'affichent
+        # en "tofu" (glyphe manquant) avec la police par défaut de matplotlib (DejaVu Sans, pas
+        # de couverture emoji) — remplacés par des libellés texte courts, garantis lisibles.
+        ax.scatter([0], [0], s=1800, c="#4f8cff", edgecolors="white", linewidths=1.5, zorder=3)
+        ax.text(0, 0, "GW", ha="center", va="center", fontsize=13, fontweight="bold", color="white", zorder=4)
+        ax.text(0, -0.16, gateway_ip or "Passerelle", ha="center", va="top", color="white", fontsize=9, zorder=4)
+
+        for i, dev in enumerate(devices):
+            angle = 2 * math.pi * i / max(n, 1)
+            x, y = math.cos(angle), math.sin(angle)
+            ax.plot([0, x], [0, y], color="#334155", linewidth=1, zorder=1)
+            ax.scatter([x], [y], s=900, c="#1e293b", edgecolors="#38bdf8", linewidths=1.5, zorder=3)
+            ax.text(x, y, "PC", ha="center", va="center", fontsize=10, fontweight="bold", color="#38bdf8", zorder=4)
+            ip = dev.get("ip", "")
+            offset = 0.14 if y >= 0 else -0.14
+            va = "bottom" if y >= 0 else "top"
+            ax.text(x, y + offset, ip[:22], ha="center", va=va, color="white", fontsize=8, zorder=4)
+            if dev.get("mac"):
+                ax.text(x, y + offset + (0.05 if y >= 0 else -0.05), dev["mac"][:22], ha="center", va=va,
+                        color="#94a3b8", fontsize=7, zorder=4)
+
+        ax.set_title(f"Topologie réseau — {n} appareil(s)", color="white", fontsize=12, pad=14)
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=130, bbox_inches="tight", facecolor=fig.get_facecolor())
+        plt.close(fig)
+        return "data:image/png;base64," + _b64.b64encode(buf.getvalue()).decode("ascii")
+
+    try:
+        img = await asyncio.get_running_loop().run_in_executor(None, draw)
+    except Exception as e:
+        return {"error": f"Échec de la génération du diagramme : {e}"}
+    return {"success": True, "image": img, "device_count": len(devices),
+            "message": f"Diagramme généré — {len(devices)} appareil(s) autour de {gateway_ip or 'la passerelle'}."}
+
+
 async def execute_net_subnet_sweep(args: dict) -> dict:
     """Sweep TCP borné d'un CIDR pour repérer les hôtes actifs sur ports courants."""
     cidr = (args.get("cidr") or args.get("target") or "").strip()
@@ -16927,10 +17226,100 @@ async def execute_system_self_test(args: dict) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Fiches de révision / quiz (v2.155) — répétition espacée minimale (voir database.py)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def execute_quiz_generate(args: dict) -> dict:
+    """Génère des fiches de révision (question/réponse) sur un sujet et les enregistre pour
+    une révision espacée (quiz_next/quiz_answer les reproposeront au bon rythme). Pour
+    préparer une certification (Network+, CCNA, Security+...) ou réviser un sujet technique
+    étudié récemment."""
+    topic = (args.get("topic") or "").strip()
+    if not topic:
+        return {"error": "Paramètre 'topic' requis (ex: 'Modèle OSI', 'Sous-réseaux IPv4')."}
+    count = max(1, min(int(args.get("count", 5)), 15))
+
+    prompt = (
+        f"Sujet : {topic}\n\n"
+        f"Génère exactement {count} questions de révision de niveau technique (type certification "
+        "informatique), avec leur réponse concise et correcte. Réponds UNIQUEMENT en JSON, une liste "
+        "d'objets {\"question\": \"...\", \"answer\": \"...\"} — rien d'autre, pas de texte autour."
+    )
+    try:
+        raw = await _ollama_generate(prompt, model=args.get("model"), timeout=90)
+    except Exception as e:
+        return {"error": f"Génération impossible : {e}"}
+
+    import re as _re
+    match = _re.search(r"\[.*\]", raw or "", _re.S)
+    if not match:
+        return {"error": "Réponse du modèle non exploitable (pas de JSON trouvé) — réessaie."}
+    try:
+        items = json.loads(match.group(0))
+    except Exception as e:
+        return {"error": f"JSON invalide généré par le modèle : {e}"}
+
+    created = []
+    for it in items[:count]:
+        q, a = (it.get("question") or "").strip(), (it.get("answer") or "").strip()
+        if q and a:
+            created.append(db.create_flashcard(topic, q, a))
+    if not created:
+        return {"error": "Aucune fiche exploitable générée — réessaie ou reformule le sujet."}
+    return {"success": True, "topic": topic, "count": len(created), "cards": created,
+            "message": f"{len(created)} fiche(s) créée(s) sur « {topic} », disponibles via quiz_next."}
+
+
+async def execute_quiz_next(args: dict) -> dict:
+    """Renvoie la PROCHAINE fiche de révision à réviser (priorité aux fiches dues, sinon une
+    au hasard) — NE montre PAS la réponse tant que l'utilisateur n'a pas répondu, puis appelle
+    quiz_answer avec le résultat pour programmer la prochaine révision."""
+    topic = (args.get("topic") or "").strip() or None
+    card = db.get_next_flashcard(topic)
+    if not card:
+        return {"success": True, "card": None,
+                "message": ("Aucune fiche" + (f" pour « {topic} »" if topic else "") +
+                            " — crée-en avec quiz_generate.")}
+    return {"success": True, "card": {"id": card["id"], "topic": card["topic"], "question": card["question"]},
+            "message": f"Question ({card['topic']}) : {card['question']}"}
+
+
+async def execute_quiz_answer(args: dict) -> dict:
+    """Enregistre si l'utilisateur a bien répondu à une fiche (id renvoyé par quiz_next) —
+    programme la prochaine révision (bonne réponse = intervalle plus long, mauvaise = repasse
+    demain) et révèle la réponse correcte pour comparaison."""
+    fid = (args.get("id") or "").strip()
+    correct = bool(args.get("correct"))
+    if not fid:
+        return {"error": "Paramètre 'id' requis (voir quiz_next)."}
+    updated = db.answer_flashcard(fid, correct)
+    if not updated:
+        return {"error": "Fiche introuvable — vérifie l'id renvoyé par quiz_next."}
+    return {"success": True, "correct": correct, "correct_answer": updated["answer"],
+            "next_review_in_days": updated["interval_days"],
+            "message": (f"{'✅ Correct' if correct else '❌ Incorrect'} — réponse attendue : {updated['answer']}. "
+                        f"Prochaine révision dans {updated['interval_days']} jour(s).")}
+
+
+async def execute_quiz_stats(args: dict) -> dict:
+    """Statistiques de révision par sujet : nombre de fiches, fiches dues maintenant, taux de
+    réussite cumulé."""
+    stats = db.flashcard_stats()
+    if not stats:
+        return {"success": True, "topics": [], "message": "Aucune fiche de révision créée pour l'instant."}
+    return {"success": True, "topics": stats,
+            "message": f"{len(stats)} sujet(s) de révision, {sum(s.get('due_now') or 0 for s in stats)} fiche(s) due(s) maintenant."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # REGISTRE DES OUTILS
 # ══════════════════════════════════════════════════════════════════════════════
 
 TOOLS_REGISTRY: dict[str, Any] = {
+    "quiz_generate": execute_quiz_generate,
+    "quiz_next":     execute_quiz_next,
+    "quiz_answer":   execute_quiz_answer,
+    "quiz_stats":    execute_quiz_stats,
     "system_self_test": execute_system_self_test,
     "file_list": execute_file_list,
     "file_info": execute_file_info,
@@ -17035,8 +17424,12 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "net_service_detect":    execute_net_service_detect,
     "net_http_probe":        execute_net_http_probe,
     "net_tls_check":         execute_net_tls_check,
+    "net_tls_check_bulk":    execute_net_tls_check_bulk,
+    "net_subnet_calc":       execute_net_subnet_calc,
     "net_subnet_sweep":      execute_net_subnet_sweep,
     "net_route_diagnostics": execute_net_route_diagnostics,
+    "net_snmp_query":        execute_net_snmp_query,
+    "net_topology_diagram":  execute_net_topology_diagram,
     "pc_hardware_specs":     execute_pc_hardware_specs,
     "pc_gpu_status":         execute_pc_gpu_status,
     "pc_hardware_temps":     execute_pc_hardware_temps,
@@ -17848,6 +18241,63 @@ TOOLS_SPEC = [
         "port":    {"type": "integer", "description": "Port TLS, défaut 443"},
         "timeout": {"type": "number",  "description": "Timeout en secondes"}},
        ["host"]),
+
+    _t("net_tls_check_bulk", "Contrôle TLS/certificat sur PLUSIEURS hôtes en une fois (parallèle) — pour surveiller "
+                              "les expirations d'un parc de services auto-hébergés sans un appel par hôte. Signale "
+                              "ceux qui expirent sous 30 jours.",
+       {"hosts":   {"type": "array", "items": {"type": "string"}, "description": "Liste de domaines/IP (max 25)"},
+        "port":    {"type": "integer", "description": "Port TLS, défaut 443"},
+        "timeout": {"type": "number",  "description": "Timeout par hôte en secondes"}},
+       ["hosts"]),
+
+    _t("net_subnet_calc", "Calculateur de sous-réseau (VLSM/CIDR) : adresse réseau, broadcast, masque, masque "
+                           "générique (wildcard), plage d'hôtes utilisables, nombre d'adresses. Avec new_prefix, "
+                           "découpe le CIDR en sous-réseaux de cette taille (VLSM) — utile pour étudier le "
+                           "subnetting ou planifier un plan d'adressage réel.",
+       {"cidr":       {"type": "string",  "description": "CIDR, ex: 192.168.1.0/24 ou 10.0.0.0/8"},
+        "new_prefix": {"type": "integer", "description": "Préfixe cible pour découper en sous-réseaux (VLSM), doit être > au préfixe actuel"}},
+       ["cidr"]),
+
+    _t("net_snmp_query", "Interroge un équipement réseau via SNMP (v2c) — action='sysinfo' (défaut : nom, "
+                          "description, uptime, contact, localisation), action='interfaces' (liste des "
+                          "interfaces réseau + état up/down), ou action='get' avec un OID précis. Utile pour "
+                          "un switch/routeur/serveur exposant SNMP (souvent activé par défaut sur du matériel "
+                          "réseau pro/labo, community 'public' fréquente en lecture seule).",
+       {"host":      {"type": "string",  "description": "IP ou nom de l'équipement SNMP"},
+        "community": {"type": "string",  "description": "Community SNMP (défaut 'public')"},
+        "port":      {"type": "integer", "description": "Port SNMP, défaut 161"},
+        "action":    {"type": "string",  "enum": ["sysinfo", "interfaces", "get"], "description": "Type de requête (défaut sysinfo)"},
+        "oid":       {"type": "string",  "description": "OID précis pour action='get' (ex: 1.3.6.1.2.1.1.1.0)"},
+        "timeout":   {"type": "integer", "description": "Timeout en secondes (défaut 4)"}},
+       ["host"]),
+
+    _t("net_topology_diagram", "Génère un diagramme visuel de topologie réseau (image affichée directement dans "
+                                "le chat) — passerelle au centre, appareils autour. Sans 'hosts', scanne le réseau "
+                                "local automatiquement. Utile pour documenter ou réviser une architecture réseau.",
+       {"hosts":   {"type": "array", "items": {"type": "string"}, "description": "IPs/noms à représenter (optionnel, sinon scan local automatique, max 20)"},
+        "gateway": {"type": "string", "description": "IP de la passerelle à afficher au centre (optionnel si 'hosts' fourni)"}},
+       []),
+
+    _t("quiz_generate", "Génère des fiches de révision (question/réponse) sur un sujet technique et les enregistre "
+                         "pour une révision espacée — pour préparer une certification (Network+, CCNA, Security+...) "
+                         "ou réviser un sujet étudié récemment.",
+       {"topic": {"type": "string",  "description": "Sujet des fiches, ex: 'Modèle OSI', 'Sous-réseaux IPv4', 'Protocoles de routage'"},
+        "count": {"type": "integer", "description": "Nombre de fiches à générer (défaut 5, max 15)"}},
+       ["topic"]),
+
+    _t("quiz_next", "Renvoie la PROCHAINE fiche de révision à réviser (priorité aux fiches dues, sinon au hasard) — "
+                     "ne montre PAS la réponse, pose la question à l'utilisateur puis appelle quiz_answer avec le résultat.",
+       {"topic": {"type": "string", "description": "Limiter à un sujet précis (optionnel, sinon toutes fiches confondues)"}},
+       []),
+
+    _t("quiz_answer", "Enregistre si l'utilisateur a bien répondu à une fiche (id renvoyé par quiz_next) — "
+                       "programme la prochaine révision et révèle la réponse correcte.",
+       {"id":      {"type": "string",  "description": "id de la fiche (renvoyé par quiz_next)"},
+        "correct": {"type": "boolean", "description": "true si l'utilisateur a bien répondu"}},
+       ["id", "correct"]),
+
+    _t("quiz_stats", "Statistiques de révision par sujet : nombre de fiches, fiches dues maintenant, réussite cumulée.",
+       {}, []),
 
     _t("net_subnet_sweep", "Sweep TCP borné d'un CIDR local pour repérer les hôtes actifs sur des ports courants.",
        {"cidr":      {"type": "string",  "description": "CIDR, ex: 192.168.1.0/24"},
