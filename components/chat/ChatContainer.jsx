@@ -9,6 +9,17 @@ import LivingAvatar from '@/components/avatar/LivingAvatar';
 
 const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
 
+// v2.169 — salutation dynamique (façon Claude/ChatGPT) au lieu d'un titre "MARVIN" figé +
+// tagline marketing datée ("25 ans d'expérience"). Pas de prénom en dur : Marvin est pensé
+// distribuable à d'autres utilisateurs (voir CLAUDE.md), aucun réglage "nom" n'existe encore.
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 5) return 'Bonne nuit';
+  if (h < 12) return 'Bonjour';
+  if (h < 18) return 'Bon après-midi';
+  return 'Bonsoir';
+}
+
 /**
  * ChatContainer — View-only component.
  *
@@ -232,13 +243,11 @@ export default function ChatContainer({
             <div style={{ marginBottom: 6 }}>
               <LivingAvatar size={148} thinking={isLoading} />
             </div>
-            <div className="empty-state-title holo-text" style={{ letterSpacing: '0.18em' }}>MARVIN</div>
+            <div className="empty-state-title holo-text" style={{ letterSpacing: '-0.01em' }}>
+              {getGreeting()}.
+            </div>
             <div className="empty-state-text">
-              Je suis <strong style={{ color: '#4f8cff' }}>Marvin</strong>, votre assistant informatique.<br />
-              <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
-                PLUS DE 25 ANS D&apos;EXPÉRIENCE
-              </span><br /><br />
-              Je peux vous aider à :
+              Comment puis-je vous aider aujourd&apos;hui ?
             </div>
             <div style={{
               display: 'grid',

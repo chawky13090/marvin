@@ -2847,6 +2847,23 @@ async def lifespan(app_instance):
 #   navigation cote client instantanee.
 #   Teste en reel (Playwright + JS direct) : clic sur "Classer vos fichiers" -> navigation
 #   confirmee vers /fichiers (window.location.pathname), 0 erreur console.
+#
+# v2.169 (salutation dynamique + logo retravaille) : demande explicite ("message de
+#   bienvenue plus dans l'air du temps, inspire-toi de ce que font les meilleurs AI, le
+#   logo doit etre engageant, meilleur et plus travaille"). Le titre "MARVIN" fige en
+#   majuscules + tagline "PLUS DE 25 ANS D'EXPERIENCE" (registre pub/vitrine, date mal) a
+#   ete remplace par une salutation dynamique selon l'heure (Bonjour/Bon apres-midi/Bonsoir/
+#   Bonne nuit) + une question directe -- pattern etabli chez Claude/ChatGPT. Pas de prenom
+#   en dur (Marvin reste distribuable a d'autres utilisateurs, aucun reglage "nom" n'existe
+#   encore -- voir CLAUDE.md doctrine de distribution).
+#   LivingAvatar.jsx retravaille : double halo bicolore (bleu+cyan, les 2 couleurs d'accent
+#   deja dans le theme), coeur en dégradé 2 tons avec reflet au lieu d'un bleu plat, eclat
+#   orbital qui tourne en continu (accelere quand Marvin reflechit), anneau au tracé plus
+#   fin -- meme concept "vivant" (battement de coeur) deja etabli depuis v2.85, juste plus
+#   de profondeur visuelle.
+#   Teste en reel (Playwright + JS direct) : salutation confirmee dynamique ("Bonne nuit."
+#   affiche a l'heure reelle du test) ; nouveaux elements SVG (eclat orbital, 2e halo,
+#   3 degrades) confirmes presents dans le DOM ; 0 erreur console.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7384,7 +7401,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.168.0",
+            "version":         "2.169.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
