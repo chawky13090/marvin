@@ -2672,6 +2672,35 @@ async def lifespan(app_instance):
 #   propre (200 + {"error":...}) sur les mêmes arguments qui plantaient avant ; preuve directe
 #   du fix event-loop — /api/health répond en 31ms alors qu'un file_large_finder complet
 #   (158s, 132 Go, home réel) tourne en parallèle sur un thread séparé.
+#
+# v2.161 (recherche web plus résiliente à l'anti-bot) : signalé directement par
+#   l'utilisateur (« lors de ma dernière conversation Marvin a été bloqué sur le web à
+#   cause de l'anti-bot, comment éviter cela ? »). Confirmé dans l'historique réel : le
+#   scraping HTML DuckDuckGo (seul provider gratuit sans clé) se fait bloquer par
+#   intermittence, plusieurs fois documenté (03/06, et à nouveau la veille du jour de
+#   cette correction). Reproduit en direct pendant l'investigation : un blocage réel
+#   était toujours actif sur cette IP au moment du test.
+#   1. Retry DuckDuckGo durci : 1 seule tentative (1,6s) -> 3 tentatives avec backoff
+#      croissant (2s/5s/9s, ~16s cumulés) — le blocage anti-bot DDG dure typiquement
+#      quelques dizaines de secondes, un seul retry rapide tombait souvent encore dedans.
+#   2. Sur demande explicite (« trouve une solution, cherche sur le web, innove ») :
+#      recherche menée sur les alternatives 2026 — le plan gratuit de Brave Search s'est
+#      dégradé (5000/mois en 2025 -> 2000/mois, et les nouveaux comptes n'ont même plus
+#      de vrai palier gratuit, juste un crédit de $5). La vraie solution robuste et
+#      cohérente avec la doctrine "100% local" de Marvin : SearXNG, un méta-moteur open
+#      source auto-hébergeable (Docker) qui agrège plusieurs moteurs sans jamais exposer
+#      Marvin directement à leur anti-bot, sans clé ni quota — gratuit et illimité une
+#      fois hébergé (adapté au profil homelab de l'utilisateur : TrueNAS/GitLab/Docker
+#      déjà en place). Nouveau provider `_searxng()` dans execute_web_search, nouveau
+#      réglage `searxng_url` (credentials_manager.py, groupe "search", visible dans
+#      Réglages > Connexions) — prioritaire en mode auto quand configuré (avant
+#      brave/google/serpapi/duckduckgo), sinon la cascade existante est inchangée.
+#   Testé en réel : `searxng_url` confirmé visible via `GET /api/credentials` (groupe
+#   search) ; `provider=searxng` sans configuration renvoie une erreur claire (pas de
+#   crash) ; mode `auto` sans SearXNG configuré retombe bien sur la cascade existante,
+#   confirmé jusqu'à DuckDuckGo qui répond effectivement en ~17s (3 tentatives) avec le
+#   nouveau message d'erreur orientant vers les alternatives — comportement exact
+#   observé qui a motivé le correctif, reproduit en direct pendant la vérification.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7209,7 +7238,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.160.0",
+            "version":         "2.161.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

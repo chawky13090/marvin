@@ -144,7 +144,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.160.0)
+## 9. État actuel (v2.161.0)
+
+**v2.161 (recherche web plus résiliente à l'anti-bot)** : signalé directement par l'utilisateur (« lors de ma dernière conversation Marvin a été bloqué sur le web à cause de l'anti-bot, comment éviter cela ? »). Confirmé dans l'historique réel : le scraping HTML DuckDuckGo (seul provider gratuit sans clé) se fait bloquer par intermittence — documenté à plusieurs reprises (03/06 et la veille de cette correction). Reproduit en direct pendant l'investigation : un blocage réel était toujours actif sur cette IP au moment du test.
+
+1. **Retry DuckDuckGo durci** : 1 seule tentative (1,6s) → 3 tentatives avec backoff croissant (2s/5s/9s, ~16s cumulés) — le blocage anti-bot dure typiquement quelques dizaines de secondes, un seul retry rapide tombait souvent encore dedans.
+2. Sur demande explicite (« trouve une solution, cherche sur le web, innove ») : recherche menée sur les alternatives 2026 — le plan gratuit de Brave Search s'est dégradé (5000/mois en 2025 → 2000/mois, et les nouveaux comptes n'ont même plus de vrai palier gratuit). Solution retenue, cohérente avec la doctrine « 100% local » de Marvin : **SearXNG**, méta-moteur open source auto-hébergeable (Docker) qui agrège plusieurs moteurs sans jamais exposer Marvin directement à leur anti-bot, sans clé ni quota — adapté au profil homelab de l'utilisateur (TrueNAS/GitLab/Docker déjà en place). Nouveau provider `_searxng()` + réglage `searxng_url` (Réglages > Connexions, groupe "search") — prioritaire en mode auto quand configuré, sinon la cascade existante (brave/google/serpapi/duckduckgo) est inchangée.
+
+Testé en réel : `searxng_url` visible via `GET /api/credentials` ; `provider=searxng` sans config renvoie une erreur claire ; mode `auto` sans SearXNG configuré retombe sur la cascade existante, confirmé jusqu'à DuckDuckGo qui répond en ~17s (3 tentatives) avec le nouveau message orientant vers les alternatives — comportement exact qui a motivé le correctif, reproduit en direct pendant la vérification.
+
+## 9bis. État antérieur (v2.160.0)
 
 **v2.160 (🧪 Test réel des ~280 outils non destructeurs)** : sur demande explicite (« tu n'as qu'à tester tout les outils pour voir s'il fonctionne et on voit après »), suite directe de v2.159. Script jetable qui appelle chaque outil du catalogue `/api/tools/list` avec des arguments minimaux dérivés de son schéma JSON, via `POST /api/tools` (le vrai chemin d'exécution) — 47 outils destructeurs/coûteux (SSH exec, envoi email, suppression, winget install, génération vidéo/LLM lourde...) explicitement exclus de l'automatisation, jamais invoqués en aveugle.
 
@@ -154,7 +163,7 @@ Résultat sur 327 outils : 139 OK, 111 rejets de validation corrects (comporteme
 
 Testé en réel après correctif (backend redémarré) : les 3 renvoient une erreur propre sur les mêmes arguments qui plantaient avant ; preuve directe du fix event-loop — `/api/health` répond en 31ms alors qu'un `file_large_finder` complet (158s, 132 Go, home réel) tourne en parallèle sur un thread séparé.
 
-## 9bis. État antérieur (v2.159.0)
+## 9ter. État antérieur (v2.159.0)
 
 **v2.159 (🩺 Tableau de bord de fiabilité — signal récent vs historique)** : sur demande explicite (« quel serait le meilleur pour que tous les outils soient fonctionnels... que proposes-tu ? » → « ok »). Utilisé le tableau de bord de fiabilité (v2.138) pour cibler data-driven, puis vérifié chaque "pire outil" un par un en conditions réelles.
 
@@ -164,7 +173,7 @@ Corrigé : `db.get_tool_reliability` calcule maintenant aussi un taux récent (7
 
 `scripts/smoke_test_pages.py` 34/34.
 
-## 9ter. État antérieur (v2.158.0)
+## 9quater. État antérieur (v2.158.0)
 
 **v2.158 (🗂️ /outils — auto-catégorisation par préfixe)** : sur demande explicite (« attaque le [option 2] mais ne casse rien... prépare un plan réfléchi »). Passé par un vrai Plan mode, approuvé avant d'écrire du code.
 
@@ -174,7 +183,7 @@ Remplace le vrac "Autres outils" (v2.157, 186 outils non triés) par une répart
 
 Testé en réel : plus de groupe "Autres outils" ; catégories curées inchangées ; "Fiches de révision"/"Facturation" apparaissent sous Organisation ; `quiz_stats` exécuté pour de vrai → résultat réel (10 fiches dues, données d'une conversation antérieure) ; 0 erreur console. `scripts/smoke_test_pages.py` 34/34.
 
-## 9quater. État antérieur (v2.157.0)
+## 9quinquies. État antérieur (v2.157.0)
 
 **v2.157 (🧩 Catalogue /outils complété automatiquement)** : sur demande explicite (« corrige ce que tu as trouvé comme bug »), suite du bug flagué en v2.156.
 
@@ -182,7 +191,7 @@ Plutôt qu'un remplacement complet du catalogue (aurait perdu le regroupement en
 
 Testé en réel (Playwright) : 141→328 outils affichés, recherche de "topologie" passe de 0 à 1 résultat ; formulaire auto-généré exécuté pour de vrai → diagramme réel généré et affiché, 0 erreur console ; les 4 familles d'origine vérifiées inchangées. `scripts/smoke_test_pages.py` 34/34.
 
-## 9quinquies. État antérieur (v2.156.0)
+## 9sexies. État antérieur (v2.156.0)
 
 **v2.156 (🎨 Présentation du diagramme de topologie réseau revue)** : sur demande explicite (« pouvons-nous améliorer la présentation des schémas réseau ? »).
 
@@ -194,7 +203,7 @@ Refonte de `net_topology_diagram` : couleurs calées exactement sur `app/globals
 
 Testé à 3 échelles : réseau local réel (13 appareils), synthétique à 12 et 20 appareils (le plafond) — plus aucun rognage. `scripts/smoke_test_pages.py` 34/34.
 
-## 9sexies. État antérieur (v2.155.0)
+## 9septies. État antérieur (v2.155.0)
 
 **v2.155 (🌐 SNMP + diagramme topologie + 🧠 fiches de révision)** : sur demande explicite (« fait tout diagramme de topologie réseau visuel, requêtes SNMP, ou un mode fiches de révision/quiz pour tes certifs »), suite directe de v2.154.
 
@@ -206,7 +215,7 @@ Testé à 3 échelles : réseau local réel (13 appareils), synthétique à 12 e
 
 Testé en réel de bout en bout : diagramme sur le vrai réseau local (passerelle réelle affichée, labels lisibles) ; SNMP contre un hôte sans agent (erreur propre) ; cycle complet fiches (3 vraies questions OSI, réponse correcte → intervalle 1→2j, stats exactes) — données de test supprimées après coup. `scripts/smoke_test_pages.py` 34/34.
 
-## 9septies. État antérieur (v2.154.0)
+## 9octies. État antérieur (v2.154.0)
 
 **v2.154 (🌐 2 outils réseau sysadmin/étudiant)** : sur demande explicite (« continue à rendre Marvin plus efficace et intelligent, je veux plus d'outils en rapport avec mes recherches sur l'informatique et le fait que je suis en train de devenir admin système et réseau »). Audit préalable des outils réseau existants (déjà nombreux) recoupé avec l'activité réelle visible dans les fichiers de l'utilisateur (TrueNAS, Zabbix, GitLab CE, Nextcloud, Tailscale — vrai homelab, pas que des études théoriques).
 
@@ -216,7 +225,7 @@ Testé en réel de bout en bout : diagramme sur le vrai réseau local (passerell
 
 Testé en réel : `net_subnet_calc` vérifié sur 192.168.1.0/24 (VLSM 4×/26) et 10.20.30.0/27, tous les champs corrects. `net_tls_check_bulk` testé contre google.com/github.com (certificats réels) + un hôte injoignable (erreur gérée proprement). `scripts/smoke_test_pages.py` 34/34.
 
-## 9octies. État antérieur (v2.153.0)
+## 9novies. État antérieur (v2.153.0)
 
 **v2.153 (🔗 liens du chat ouverts dans un nouvel onglet)** : signalé directement par l'utilisateur (« marvin ma indiqué des lien très pertinent mais quand on clic dessus cela nous amène directement à la page et quitte marvin »).
 
@@ -226,7 +235,7 @@ Corrigé via un hook DOMPurify (`afterSanitizeAttributes`) plutôt qu'un rendere
 
 Testé en réel (Playwright) : message forçant un lien markdown dans la réponse → `target="_blank"` et `rel="noopener noreferrer"` confirmés sur l'élément `<a>` réellement rendu (DOM inspecté directement), 0 erreur console.
 
-## 9novies. État antérieur (v2.152.0)
+## 9decies. État antérieur (v2.152.0)
 
 **v2.152 (🩹 Correctif DELETE /api/tasks bloquait l'event-loop)** : sur demande explicite (« ok fait le »), suite du bug flagué en v2.151 (chip de tâche de fond, task_487bbf10, dismiss après prise en charge directe).
 
@@ -238,7 +247,7 @@ Corrigé : `delete_task` (le symptôme précisément rapporté) déporté sur un
 
 Testé en réel : 15 cycles create+delete+health en boucle après le fix → 0 blocage, pire cas 5ms (delete) / 28ms (health), contre un blocage reproduit à plusieurs reprises avant. `scripts/smoke_test_pages.py` 34/34. Les 3 tâches de test bloquées depuis v2.151 supprimées avec succès — preuve directe que le fix résout le cas qui les avait bloquées.
 
-## 9decies. État antérieur (v2.151.0)
+## 9undecies. État antérieur (v2.151.0)
 
 **v2.151 (📋 Plan mode + pause sur blocage — repris de ChatGPT Work)** : sur demande explicite (« continue a prendre toutes les fonction des nouveauté ai notament work de chatgpt »). Recherche approfondie sur ChatGPT Work avant implémentation : deux mécanismes de contrôle absents chez Marvin — "Plan mode" (plan proposé et validé AVANT le début du travail) et pause explicite quand l'agent a besoin d'une approbation.
 
@@ -250,7 +259,7 @@ Testé en réel : 15 cycles create+delete+health en boucle après le fix → 0 b
 
 Testé en réel via `/api/mcp/execute` : décomposition + création confirmées 2× après le fix du timeout. La branche "plan sans création" vérifiée par relecture de code uniquement (cette machine est en permission Expert, auto-confirme — le classifieur a refusé de changer ce réglage pour un test, à raison). Bug pré-existant et sans rapport trouvé en testant : `DELETE /api/tasks/{id}` bloque le event-loop entier — flagué en tâche séparée, pas corrigé ici.
 
-## 9undecies. État antérieur (v2.150.0)
+## 9duodecies. État antérieur (v2.150.0)
 
 **v2.150 (🔒 durcissement pc_gui_* + 🌙 heures calmes)** : sur demande explicite (« continue et cherche à corriger, améliorer, sécuriser et prendre les nouveautés AI de chatgpt et claude »).
 
@@ -260,7 +269,7 @@ Testé en réel via `/api/mcp/execute` : décomposition + création confirmées 
 
 Testé en réel : `_in_quiet_hours()` unit-testé sur les cas limites (plage à cheval sur minuit) — 7/7 corrects ; toggle cliqué dans le vrai navigateur → persisté côté backend, vérifié par lecture API ; remis à l'état par défaut après le test.
 
-## 9duodecies. État antérieur (v2.149.0)
+## 9terdecies. État antérieur (v2.149.0)
 
 **v2.149 (🖱️ Agent GUI local — lecture/clic/frappe via UI Automation)** : sur demande explicite (« cherche et creuse encore » puis « vas-y, lance l'implémentation » après discussion du scope). Vrai trou d'architecture trouvé en auditant AVANT de proposer : Marvin avait déjà les "yeux" (`pc_screenshot`, `screen_ocr`, `pc_window_list`/`focus`) mais ZÉRO "main" — aucun moyen de cliquer/taper dans une fenêtre.
 
@@ -274,7 +283,7 @@ Testé en réel : `_in_quiet_hours()` unit-testé sur les cas limites (plage à 
 
 Testé en réel de bout en bout sur une vraie fenêtre Bloc-notes : `pc_gui_read` a listé 40+ éléments réels ; `pc_gui_click` sur un onglet a réellement changé l'onglet actif (titre de fenêtre vérifié avant/après) ; `pc_gui_type` a réellement inséré du texte (contenu relu après coup) ; fenêtre fermée sans sauvegarder pour ne rien laisser dans les vrais fichiers de l'utilisateur. Incident sans rapport avec le code livré : un script de test maison a fait planter le backend ~20 min (deux process de test lancés par erreur, connexions SSE tuées en plein streaming) — diagnostiqué, backend redémarré proprement, documenté par transparence. Limite connue et assumée : UI Automation ne franchit pas la frontière UAC (fenêtre élevée/admin inaccessible) — échec explicite, pas de contournement.
 
-## 9terdecies. État antérieur (v2.148.0)
+## 9quaterdecies. État antérieur (v2.148.0)
 
 **v2.148 (🎯 UI — chrono en direct + garde-fou repli/confirmation)** : sur demande explicite (« continue dans cette voie, inspire-toi des dernières nouveautés AI »), recherche menée (architecture de statut en 4 couches — ambiant/progression/attention/résumé — et affichage du temps par sous-agent, tendances agent UI 2026).
 
@@ -284,7 +293,7 @@ Testé en réel de bout en bout sur une vraie fenêtre Bloc-notes : `pc_gui_read
 
 Testé en réel (Playwright) : `ai_model_council` (appel bloquant unique, fenêtre large) → "Exécution... (12s)" capturé affiché correctement en cours d'exécution ; 0 erreur console. `scripts/smoke_test_chat.py` 5/5.
 
-## 9quaterdecies. État antérieur (v2.147.0)
+## 9quindecies. État antérieur (v2.147.0)
 
 **v2.147 (🎯 UI — rendus dédiés pour les 5 outils "mode" v2.141-145)** : sur demande explicite (« continue les améliorations sur cette voie »), suite directe de v2.146. Audité `MessageBubble.jsx::renderToolResult` : `web_deep_research`, `ai_model_council`, `ai_subagents_run`, `long_task_start`, `long_task_status` retombaient sur le JSON générique malgré des résultats riches — exactement le détail que le bandeau de mode (v2.146) donne envie d'explorer une fois la carte dépliée.
 
@@ -292,7 +301,7 @@ Testé en réel (Playwright) : `ai_model_council` (appel bloquant unique, fenêt
 
 Testé en réel (Playwright) : requête "démarre une tâche longue" → badge affiché, carte rendue sans erreur sur 3 passes de test (0 erreur console). Les formes de données utilisées sont celles déjà validées côté backend lors de leur implémentation v2.141-145 — changement purement d'affichage. `scripts/smoke_test_chat.py` 5/5.
 
-## 9quindecies. État antérieur (v2.146.0)
+## 9sedecies. État antérieur (v2.146.0)
 
 **v2.146 (🎯 UI — bandeau de MODE + langage clair + repli d'étapes + tâche de fond visible)** : sur demande explicite (« retravaille l'UI du chat pour que l'on sache que Marvin selon nos requêtes travaille d'une certaine manière précise »), recherche menée sur les patterns 2026 (Perplexity Pro Search : étapes en langage clair, repliées par défaut, réponse prioritaire). Changement 100% frontend, aucune logique Python modifiée.
 
@@ -303,7 +312,7 @@ Testé en réel (Playwright) : requête "démarre une tâche longue" → badge a
 
 Testé en réel (Playwright, channel="chrome") : requête code_python → badge "🐍 Code Interpreter" affiché, carte renommée, résultat correct, 0 erreur console ; requête à 4 outils → repli "3/4 étape(s) en cours ▼ Afficher" confirmé fonctionnel en direct (capture d'écran, tour encore en cours) ; page fraîche rechargée → 0 requête réseau en échec. `scripts/smoke_test_chat.py` 5/5.
 
-## 9sedecies. État antérieur (v2.145.0)
+## 9septendecies. État antérieur (v2.145.0)
 
 **v2.145 (🚀 3 idées de GPT-5.6 Sol/ChatGPT Work — Sites, Ultra mode, tâche longue)** : sur demande explicite (« regarde les nouveautés [ChatGPT Sol] et dis-moi ce qu'on peut reprendre » puis « les 3 »), recherche web menée avant implémentation.
 
@@ -315,7 +324,7 @@ Testé en réel (Playwright, channel="chrome") : requête code_python → badge 
 
 Testé en réel de bout en bout (2 fois, avec fix) : conversation réelle, tâche longue démarrée, job cron déclenché par le vrai worker, reprise complétée dans le délai borné, backend resté réactif tout du long. `ai_subagents_run` et `webapp_create` testés séparément en réel. `scripts/smoke_test_chat.py` 5/5, tous les artefacts de test nettoyés.
 
-## 9septendecies. État antérieur (v2.144.0)
+## 9duodevicies. État antérieur (v2.144.0)
 
 **v2.144 (🔐 SSH ad hoc + garde-fou « écrire ≠ exécuter » + règle d'or #14)** : audit d'une vraie conversation demandé explicitement (« regarde les dernières conversations et dis-moi ce que tu penses de ce comportement »). Trouvé (pas supposé) : sur « script d'installation de zabbix server sur debian 13 avec mariadb », l'agent avait appelé `pc_run_command` avec un script RHEL/CentOS (dnf, systemctl) SUR LA MACHINE WINDOWS LOCALE — sans dégât (dnf n'existe pas sous Windows) mais révélateur d'une confusion « écrire une commande » / « l'exécuter ICI ».
 
@@ -326,7 +335,7 @@ Testé en réel de bout en bout (2 fois, avec fix) : conversation réelle, tâch
 
 Testé en réel : détecteur de motifs 5/5 commandes Linux détectées, 3/3 Windows silencieuses ; SSH ad hoc — validation des paramètres, contenu catastrophique bloqué AVANT toute tentative SFTP, connexion vers IP injoignable tentée pour de vrai et échoue proprement ; reproduction du bug d'origine → 0 appel d'outil. `scripts/smoke_test_chat.py` 5/5.
 
-## 9duodevicies. État antérieur (v2.143.0)
+## 9undevicies. État antérieur (v2.143.0)
 
 **v2.143 (🧠 RAG agentique pour document_ask)** : sur demande explicite (« continue sur cette voie pour augmenter le niveau d'intelligence de Marvin »), suite directe de v2.142. `document_ask` faisait une recherche UNIQUE et figée (naive RAG) — même limite que celle corrigée pour `web_research`→`web_deep_research` en v2.142, jamais appliquée au RAG documentaire local.
 
@@ -336,7 +345,7 @@ Après la 1ʳᵉ recherche, un petit modèle JUGE si le contexte récupéré suf
 
 Testé en réel : document de test à 2 sections de vocabulaire disjoint (installation technique / code de facturation) indexé, question portant sur les deux → réponse complète et correcte, citée, fusion de plusieurs passes de recherche confirmée (champ `sources` enrichi) ; document de test retiré de l'index après coup. `scripts/smoke_test_chat.py` 5/5.
 
-## 9undevicies. État antérieur (v2.142.0)
+## 9vicies. État antérieur (v2.142.0)
 
 **v2.142 (🚀 « surpasser le payant » — 4 fonctionnalités + 1 bug racine majeur)** : sur demande explicite (« continue de faire en sorte que le chat devienne meilleur que les modèles payants [...] propose-moi des améliorations » puis « fait tout »), suite à une recherche web sur les fonctionnalités phares 2026 (Canvas/Code Interpreter/Deep Research/Projects/Model Council) croisée avec un audit du code existant.
 
@@ -349,7 +358,7 @@ Testé en réel : document de test à 2 sections de vocabulaire disjoint (instal
 
 Testé en réel : régression vérifiée après le fix (règle française toujours respectée, tool-calling 2/2) + smoke-test 5/5 ; instructions de projet confirmées de bout en bout (tag exact retrouvé dans la réponse) ; `code_python` (import os/eval/exec bloqués, code propre exécuté, graphique capturé) ; `web_deep_research` (rapport réel, 4 sources) ; `ai_model_council` (2 modèles consultés, synthèse cohérente).
 
-## 9vicies. État antérieur (v2.141.0)
+## 9unvicies. État antérieur (v2.141.0)
 
 **v2.141 (☁️ routage cloud par TÂCHE + 🧠 passe de critique 2ᵉ modèle)** : sur demande explicite (« je préfère que l'on travail le plus possible avec les models cloud [...] fait aussi la critique [...] revue critique d'un autre llm avant d'envoyer la réponse »), suite à une recherche web sur les benchmarks agentiques 2026 des modèles cloud Ollama disponibles chez l'utilisateur.
 
@@ -362,7 +371,7 @@ Testé en réel : régression vérifiée après le fix (règle française toujou
 
 Testé en réel (curl SSE + appels directs à `_run_critique_pass`) : "quelle heure est-il" → `glm-5.2:cloud` ; "script bash installation nginx" → `qwen3-coder:480b-cloud` (routage tâche confirmé) ; requête avec "mot de passe" → reste local `qwen2.5:14b` (garde de sensibilité intacte) ; critique testée 3× sur réponse dangereuse (mot de passe root vidé) → détectée à chaque fois ; testée 2× sur réponse propre (install nginx) → aucun faux positif après resserrage du prompt.
 
-## 9unvicies. État antérieur (v2.140.0)
+## 9duovicies. État antérieur (v2.140.0)
 
 **v2.140 (📎 glisser-déposer + pièces jointes multiples dans le chat)** : sur demande explicite (« fait le glisser-déposer et les pièces jointes multiples »), 2 des 3 items frontend laissés de côté en v2.139 (le 3e, templates de prompt, non demandé — reste à faire sur demande séparée). Changement 100% frontend (`components/chat/ChatInput.jsx`), aucune logique Python modifiée.
 
@@ -370,7 +379,7 @@ Testé en réel (curl SSE + appels directs à `_run_critique_pass`) : "quelle he
 
 Testé en réel (Playwright, channel="chrome") : 0 erreur console au chargement ; 2 fichiers `.txt` réels attachés via l'input caché → 2 cartes distinctes avec comptage de caractères exact (35/36) ; `dragenter` synthétique → overlay rendu correctement ; `drop` synthétique avec fichier réel → traité et affiché ; test de bout en bout (2 fichiers + question + soumission) → message combiné correct avec les 2 documents étiquetés séparément, Marvin traite normalement derrière. `scripts/smoke_test_chat.py` : 5/5.
 
-## 9duovicies. État antérieur (v2.139.0)
+## 9tervicies. État antérieur (v2.139.0)
 
 **v2.139 (📡 traçabilité par conversation + inventaire réseau + connecteurs ITSM multi-produit + git init)** : sur demande explicite (« fait tout à ceci près que les connecteurs doivent couvrir une large gamme de produits qui me seront utiles »).
 
@@ -385,7 +394,7 @@ Testé en réel : `net_inventory_scan` a trouvé et enregistré 10 vrais apparei
 
 **Non fait, signalé plutôt que bâclé** : les 3 items frontend du backlog (glisser-déposer, pièces jointes multiples, templates de prompt) nécessitent un vrai test navigateur — laissés de côté pour ne pas livrer du JSX non vérifié, à reprendre en session dédiée.
 
-## 9tervicies. État antérieur (v2.138.0)
+## 9quatervicies. État antérieur (v2.138.0)
 
 **v2.138 (🧱 4 piliers de fiabilité + un vrai bug trouvé grâce au 3ᵉ)** : sur demande explicite (« fait le tout les points »), suite à une recherche web sur le tool-calling agentique et le monitoring IT 2026, puis un refus clair de l'utilisateur d'accepter une « réparation juste comme ça » — exigence de vérification rigoureuse, pas de promesses.
 
@@ -398,7 +407,7 @@ Testé en réel : `net_inventory_scan` a trouvé et enregistré 10 vrais apparei
 
 Testé en réel : validation d'arguments vérifiée en direct (paramètre manquant → erreur propre) ; `pc_health_trend` a capturé un vrai instantané au démarrage du worker ; `pc_tool_reliability` a immédiatement révélé le bug docx→PDF ; la conversion docx→PDF re-testée 3/3 fois avec succès après le fix (PDF réel généré et vérifié sur disque) ; `_long_tool_chain` confirmé dans `audit.jsonl` sur une vraie conversation à 9 appels. Smoke-test 5/5, self-test 43/43.
 
-## 9quatervicies. État antérieur (v2.137.0)
+## 9quinvicies. État antérieur (v2.137.0)
 
 **v2.137 (🔧 3 nouveaux outils + correctif retry Ollama)** : sur demande explicite (« fait les 3 et corrige skills/suggest »), suite à l'audit v2.136 (905 exécutions réelles : 43/43 outils OK, `calendar_list` avait un pic de 60 échecs historiques mais auto-résolu depuis 3 semaines).
 
@@ -408,7 +417,7 @@ Testé en réel : validation d'arguments vérifiée en direct (paramètre manqua
 
 Testé en réel : `win_firewall_status` et `pc_driver_check` donnent des résultats réels et corrects ; le repli OAuth de `calendar_list` s'exécute sans erreur (testé avec un ID de calendrier invalide — les deux tentatives échouent proprement plutôt que de crasher) et l'appel réel (calendrier existant) fonctionne toujours sans régression. Smoke-test chat 5/5.
 
-## 9quinvicies. État antérieur (v2.136.0)
+## 9sevicies. État antérieur (v2.136.0)
 
 **v2.134-136 (🩺 diagnostic PC réel + compétence dédiée + lisibilité + correctifs)** : demandé sur une VRAIE conversation ("contrôle du pc pour connaître les problèmes logiciels et physiques") — « fait tout et améliore la lisibilité de tout cela et fait en sorte que Marvin crée les compétences au besoin ». Audit préalable : le rapport affirmait « aucune alerte de surchauffe détectée » alors qu'AUCUN outil ne lit jamais de capteur de température (hallucination règle #3, rendue possible par l'absence de la donnée).
 
@@ -420,7 +429,7 @@ Testé en réel : `win_firewall_status` et `pc_driver_check` donnent des résult
 
 Testé en réel de bout en bout (Playwright + SSE) : rendu dashboard confirmé (jauges/barres/couleurs correctes, 0 erreur console), mojibake éliminé (vérifié sur `pc_event_log_errors`), frontend down détecté et relancé proprement (`npm run dev`, aucune erreur de compilation liée aux changements JSX). Smoke-test 5/5.
 
-## 9sevicies. État antérieur (v2.133.0)
+## 9septvicies. État antérieur (v2.133.0)
 
 **v2.133 (🛡️ filet déterministe étendu au CONTENU des documents générés)** : suite de « continue sur cette voie ». Angle mort trouvé en relisant le filet v2.131 : il ne scannait que la réponse de CHAT visible, jamais les arguments passés aux outils de génération de document (`file_create_pdf`, `document_generate`, `billing_quote_pdf`, `file_convert_docx_to_pdf`). Or le PDF GLPI qui a motivé TOUT ce chantier (v2.127 — mot de passe root vidé, `$(date...)` littéral) avait ses défauts dans le contenu du DOCUMENT, jamais dans le texte de chat lui-même — le scanner v2.131 tel quel ne l'aurait donc **pas** attrapé.
 
@@ -428,13 +437,13 @@ Corrigé : scan de `tool_args["content"]`/`["body"]` juste après l'exécution r
 
 Testé en réel de bout en bout : reproduction exacte du bug GLPI d'origine (PDF avec `ALTER USER root IDENTIFIED BY ''`) → bandeau détecté et affiché correctement (Playwright, 0 erreur console). Smoke-test chat 5/5.
 
-## 9septvicies. État antérieur (v2.132.0)
+## 9duodetricies. État antérieur (v2.132.0)
 
 **v2.132 (🌡️ température profil analysis abaissée 0.3→0.15)** : question directe de l'utilisateur (« peut-on changer la température via des commandes ollama pour le modèle cloud ? »). Réponse donnée avant action : techniquement possible via `ollama create` + Modelfile, mais **inutile pour Marvin** — vérifié dans le code que `agent.py` envoie déjà `system` et `options.temperature` explicitement à CHAQUE appel `/api/chat`, quel que soit le modèle (local ou `:cloud`), ce qui prime toujours sur un Modelfile figé côté Ollama. Proposé de baisser directement la température de Marvin à la place — accepté (« oui, teste ça »).
 
 `config.py::MODEL_PROFILES["analysis"]["temperature"]` 0.3→0.15 (même doctrine que le profil `agent`, déjà à 0.1). Testé en réel : 10 nouvelles générations (2 formulations différentes de script touchant MariaDB) après la baisse → 1/10 a encore modifié le mot de passe root (vs ~2/3 avant), et le filet déterministe v2.131 l'a correctement flaguée. Confirme que la température seule ne garantit jamais 100% — complément au filet déterministe, pas un remplacement. Smoke-test chat 5/5.
 
-## 9duodetricies. État antérieur (v2.131.0)
+## 9undetricies. État antérieur (v2.131.0)
 
 **v2.131 (🛡️ filet de sécurité DÉTERMINISTE — le rappel textuel a un plafond d'efficacité)** : testé en réel (3 requêtes identiques « script d'installation Zabbix + MariaDB » contre le modèle cloud actif APRÈS le durcissement v2.130 de la règle #11) — le script a QUAND MÊME modifié le mot de passe root MariaDB dans **2 générations sur 3**, malgré une interdiction explicite et sans exception dans le prompt système. Conclusion actée avec l'utilisateur (« je veux pouvoir travailler avec Marvin sans risque ») : un rappel textuel, même très explicite, ne garantit JAMAIS un comportement 100% fiable sur un LLM probabiliste — durcir encore le texte n'aurait fait que repousser le problème.
 
@@ -442,13 +451,13 @@ Ajout d'un filet **déterministe** (`agent.py::_scan_dangerous_script_patterns`)
 
 Revérifié après coup : 3 nouvelles requêtes identiques → le scanner s'est déclenché correctement sur les 2 générations où le modèle a quand même touché root, et est resté silencieux sur la 3ᵉ (script déjà propre) — **0 faux positif, 0 faux négatif** sur ce test. Smoke-test chat 5/5.
 
-## 9undetricies. État antérieur (v2.130.0)
+## 9tricies. État antérieur (v2.130.0)
 
 **v2.130 (🔒 règle #11 étendue — ne touche pas à un compte d'admin qui n'a rien demandé)** : demandé explicitement après vérification du fix v2.129 (« je veux pouvoir travailler avec Marvin sans risque sur ses procédures/scripts/demandes techniques qui doivent être de niveau professionnel »). Le test réel du fix v2.129 (script Nextcloud) avait montré une nette amélioration mais un résidu : le script changeait toujours l'authentification root MariaDB d'unix_socket (sûr par défaut sur Debian) vers un mot de passe — plus une régression grave (mot de passe FORT généré, pas vide) mais toujours une modification non nécessaire.
 
 Règle #11 étendue avec un principe plus large : si un compte/service a déjà une authentification sûre par défaut, ne pas la modifier même pour la "renforcer" — créer un compte applicatif dédié pour l'usage demandé et laisser le compte d'administration du service inchangé. Durcie une 2ᵉ fois dans la foulée (interdiction explicite et nommée de `ALTER USER 'root'@'localhost' IDENTIFIED BY` sur MariaDB/MySQL, sans exception) après un premier test resté positif. **Insuffisant à lui seul** — voir v2.131 ci-dessus pour le filet déterministe ajouté juste après.
 
-## 9tricies. État antérieur (v2.129.0)
+## 9untricies. État antérieur (v2.129.0)
 
 **v2.129 (📐 règle d'or #13 — structuré + sécurisé + complet par défaut)** : demandé explicitement après l'audit du script GLPI v2.127 (« fait en sorte que ce que je demande à Marvin soit toujours structuré et bien sécurisé et complet comme avec toi »). Les règles #7/#8/#11/#12 couvraient déjà des symptômes précis (hallucination d'identifiant, info périmée, régression de sécurité déguisée, syntaxe non évaluée) mais rien n'énonçait le niveau de qualité ATTENDU PAR DÉFAUT sur toute réponse technique.
 
@@ -456,7 +465,7 @@ Nouvelle règle #13 (`agent.py`) qui consolide 3 exigences explicites pour toute
 
 Testé en réel avec une requête du même type que le cas GLPI (« script d'installation de Nextcloud sur Debian 13 »telle même famille de risque) : nette amélioration mesurée — mot de passe admin généré aléatoirement (au lieu d'identifiants par défaut faibles), en-têtes de sécurité HTTP ajoutés au VirtualHost, pare-feu UFW configuré, fichier de credentials en permissions 600, plus de mot de passe root MariaDB vidé (reste perfectible : le script change quand même l'auth root vers un mot de passe au lieu de préserver unix_socket, mais ce n'est plus une régression vers un mot de passe VIDE). Smoke-test chat : 4/5 réel + 1 faux positif du script de test lui-même (regex JSON qui matche un literal `--value='{"host":...}'` légitime À L'INTÉRIEUR du script bash généré, vérifié via Playwright que c'est bien du contenu de code block, pas un dump JSON brut).
 
-## 9untricies. État antérieur (v2.128.0)
+## 9duotricies. État antérieur (v2.128.0)
 
 **v2.128 (📂 documents générés cliquables dans le chat)** : demandé explicitement (« j'aimerais pouvoir cliquer et ouvrir les documents générés directement depuis le chat »), sur la même conversation GLPI que v2.127. Les outils de génération de document (`file_create_pdf`, `document_generate`, `billing_quote_pdf`, `file_convert_docx_to_pdf`...) renvoient tous la même forme `{success, message, path}` — jusqu'ici rendue par le fallback « succès générique » de `MessageBubble.jsx` (un simple ✅ + message texte), obligeant à aller chercher le fichier soi-même sur le disque.
 
@@ -464,7 +473,7 @@ Nouveau composant `GeneratedFileCard` (`components/chat/MessageBubble.jsx`) : d�
 
 Testé en réel (Playwright + appel direct `pc_open_file` sur le chemin exact affiché) : la carte s'affiche sans erreur console sur la conversation GLPI réelle, le clic déclenche bien l'appel `/api/tools`, `pc_open_file` confirmé retourner `success:true` sur ce chemin.
 
-## 9duotricies. État antérieur (v2.127.0)
+## 9tertricies. État antérieur (v2.127.0)
 
 **v2.127 (🛡️ 2 règles d'or — sécurité dégradée par erreur + syntaxe non évaluée dans les docs)** : demandé par l'utilisateur (« que penses-tu de la dernière conversation ? corrige tout ce qui ne va pas ») sur une VRAIE conversation (script d'installation GLPI sur Debian 13 + PDF généré). Audit ligne par ligne, 3 défauts réels trouvés — pas de bug logiciel Marvin ici, un défaut de génération du LLM :
 
@@ -476,7 +485,7 @@ Testé en réel (Playwright + appel direct `pc_open_file` sur le chemin exact af
 
 Smoke-test chat 5/5 après coup.
 
-## 9tertricies. État antérieur (v2.126.0)
+## 9quatertricies. État antérieur (v2.126.0)
 
 **v2.126 (🇫🇷 réponse toujours en français + 🎯 fin du silence à MAX_TOOL_STEPS)** : signalé directement par l'utilisateur juste après la mise en prod de v2.125 (« je ne trouve pas ça très pertinent et je voudrais que le résultat soit toujours en français »), sur sa propre conversation en cours. Diagnostiqué sur cette VRAIE conversation (demande de certificat HTTPS AD CS→Wazuh) : le modèle cloud actif avait fait 3 `web_browse` puis appelé `ssh_list` (totalement hors sujet) et conclu par une réponse ENTIÈREMENT EN ANGLAIS listant les connexions SSH — sans jamais répondre à la question posée. 2 causes réelles :
 
@@ -485,7 +494,7 @@ Smoke-test chat 5/5 après coup.
 
 Testé en réel de bout en bout (curl SSE, requête forcée à englober des sources anglaises — doc nginx.org) : réponse finale intégralement en français, correctement traduite/synthétisée, 7 appels d'outils sans dérive hors-sujet. Smoke-test chat 5/5 après coup.
 
-## 9quatertricies. État antérieur (v2.125.0)
+## 9quinquagies. État antérieur (v2.125.0)
 
 **v2.125 (🧠 "Marvin reste à réfléchir" — 3 correctifs)** : signalé directement par l'utilisateur (« je trouve souvent que Marvin continue de réfléchir sans rien faire et je suis obligé d'arrêter »). Diagnostiqué sur les VRAIES conversations récentes (agent Explore sur `secretary.db`) : tour d'outil silencieux de 3min10 mesuré sur une vraie conversation, plusieurs conversations coupées net en plein tool_call sans suite (signature d'un arrêt manuel pendant le silence).
 
@@ -497,7 +506,7 @@ Testé en réel de bout en bout (curl SSE, requête forcée à englober des sour
 
 Testé en réel de bout en bout : SSE brut confirme le streaming `thinking` fonctionnel ; Playwright confirme le rendu visuel sans erreur console ; les 2 questions-pièges ne matchent plus aucune compétence tandis que `depannage-wifi` et `veille-recherche-informatique` matchent toujours correctement. Smoke-tests 34/34 pages + 5/5 conversations.
 
-## 9quinquagies. État antérieur (v2.124.0)
+## 9sexagies. État antérieur (v2.124.0)
 
 **v2.124 (🧠 Compétences — recherche web + 3 améliorations + 5 nouvelles compétences)** : suite directe de v2.123, sur demande explicite (« regarde sur le web, github, forums spécialisé AI... pour rendre cela plus puissant » + « pense à me faire de nouvelles compétences liées à mon métier d'admin système/réseau et d'étudiant en recherche informatique »). Recherche menée avant implémentation (Anthropic Agent Skills/SKILL.md — le standard officiel du même type de système —, Voyager, littérature 2026 SkillOS/SkillBrew). Bonne nouvelle validée par la recherche : l'architecture de Marvin est déjà proche de l'état de l'art, pas de refonte nécessaire — 3 ajustements ciblés :
 
@@ -511,7 +520,7 @@ Testé en réel de bout en bout : SSE brut confirme le streaming `thinking` fonc
 
 Testé en réel (curl contre le backend live) : 31 compétences chargées confirmées via `/api/skills`. Scan de chevauchement exécuté pour de vrai. Journal de matching vérifié avec 2 requêtes réelles : "mon wifi se déconnecte tout le temps" → `depannage-wifi` gagne net (1.258 vs 0.805) ; "veille sur les dernières avancées en sécurité réseau" → `veille-recherche-informatique` gagne (0.989 vs 0.916). Smoke-tests 34/34 pages + 5/5 conversations.
 
-## 9sexagies. État antérieur (v2.123.0)
+## 9septuagies. État antérieur (v2.123.0)
 
 **v2.123 (🧩 4 correctifs du système de Compétences)** : demandé explicitement (« la partie compétence peut être revue, améliorée, car dans l'état actuel ils ne sont pas très fonctionnels ni opérationnels »). Avis donné avant implémentation, audité via agent Explore plutôt que deviné : l'hypothèse initiale de l'utilisateur (un modèle cloud plus puissant générerait de meilleures compétences) ne correspondait **pas** aux données réelles — les 26 fichiers sont bien rédigés, les 36 outils qu'ils référencent existent tous. Le vrai problème : **16/26 (62%) n'ont jamais été déclenchées une seule fois**, et les 10 qui le sont affichent un taux de succès suspicieusement parfait (100%, jamais mises à l'épreuve) — un problème d'**activation**, pas de génération.
 
@@ -524,7 +533,7 @@ Testé en réel (curl contre le backend live) : 31 compétences chargées confir
 
 Testé en réel (pas de simulation) : `record_success_trace` unit-testé (8 identiques→1 ; trace normale à 3 étapes→3, inchangé) ; `match()` testé sur les vraies compétences ; `consolidate_obsolete_skills()` exécuté contre les données réelles (aucun fichier >20j, donc aucun archivage, confirmé sans erreur) ; requête chat live "mon imprimante ne répond plus du tout" → `depannage-imprimante` (jamais déclenchée avant) se déclenche désormais correctement. Smoke-tests 34/34 pages + 5/5 conversations.
 
-## 9septuagies. État antérieur (v2.122.0)
+## 9octogies. État antérieur (v2.122.0)
 
 **v2.122 (☁️ Routage cloud étendu aux outils + 🌐 fraîcheur web)** : demandé explicitement (« nous devons améliorer tous les outils et l'embedding de Marvin pour qu'il profite de sa nouvelle puissance cloud » + « qu'il consulte le web plus souvent pour être sûr que l'info n'est pas outdated »). Avis donné avant implémentation (demandé explicitement) :
 
@@ -538,7 +547,7 @@ Testé en réel (pas de simulation) : `record_success_trace` unit-testé (8 iden
 
 Testé en réel (curl direct contre le backend live) : `resolve_model()` unit-testé (non-sensible→cloud, sensible→local, images→local, cloud désactivé→local) ; requête "dernière version de Python actuellement disponible" → `web_search` RÉELLEMENT appelé (DuckDuckGo, Python 3.14.6, sources citées) sans mot "web"/"internet" dans la question. Smoke-tests pages (34/34) + chat (5/5), aucune régression.
 
-## 9octogies. État antérieur (v2.121.0)
+## 9nonagies. État antérieur (v2.121.0)
 
 **v2.121 (☠️ Mode Ultra débridé — 4ᵉ préréglage)** : demandé explicitement (« je veux un quatrième mode ultra débridé qui a le droit à tout sans aucun filtre de sécurité »). Discussion préalable AVANT implémentation (l'utilisateur a demandé mon avis) : distinction posée entre deux catégories de garde-fous totalement différentes —
 
@@ -551,7 +560,7 @@ Testé en réel (curl direct contre le backend live) : `resolve_model()` unit-te
 
 **Vérification partiellement bloquée par le classifieur de permissions Claude Code lui-même** : deux tentatives d'activer `ultra_unrestricted=true` via des appels backend directs ont été refusées en dur (« hard block », « user authorization cannot clear ») — signal pris au sérieux, aucune tentative de contournement. Vérifié à la place : logique de code relue et tracée manuellement (bypass correct aux deux points de contrôle), dialogue de confirmation vérifié en réel (Playwright, texte exact affiché, clic « Annuler » n'active bien rien, 0 erreur console), primitives sous-jacentes déjà validées en v2.119. Le chemin d'activation réel (clic « Confirmer ») n'a pas été testé en direct — à valider par l'utilisateur lui-même la première fois.
 
-## 9nonagies. État antérieur (v2.120.0)
+## 9centies. État antérieur (v2.120.0)
 
 **v2.120 (🎚️ 3 préréglages cloud — Normal / Hyper sécurisé / Tout cloud)** : demandé explicitement après v2.119 (« je voudrais quand même avoir l'option tout cloud et tout local en plus de ce qui existe [...] pour appliquer rapidement un setup global »).
 
@@ -563,7 +572,7 @@ Preset « Tout cloud » : active `cloud_enabled` + peuple `cloud_overrides` pour
 
 Testé en réel (curl direct contre le backend live) : avec `local_only_lockdown=true`, un `POST /api/chat` avec `model="glm-5.2:cloud"` (sélection manuelle explicite) rebascule bien sur `qwen2.5:14b` local. UI vérifiée (Playwright, 0 erreur console) : les 3 cartes de preset s'affichent, chaque clic applique la config attendue (badge ACTIF correct, sélecteur "Agent" pré-rempli avec `deepseek-v4-flash:cloud` après "Tout cloud", toggle grisé + message après "Hyper sécurisé"). Remis en mode Normal (cloud désactivé) après les tests.
 
-## 9centies. État antérieur (v2.119.0)
+## 9centiesetbis. État antérieur (v2.119.0)
 
 **v2.119 (☁️ Ollama Cloud — routage local/cloud par SENSIBILITÉ)** : demandé après souscription de l'utilisateur à Ollama Cloud (« rester purement local est pertinent pour les données sensibles [emails, mots de passe...] mais pour optimiser Marvin l'option cloud est très utile [...] sans hallucination ni limite matérielle »).
 
@@ -575,7 +584,7 @@ Testé en réel (curl direct contre le backend live) : avec `local_only_lockdown
 
 Testé en réel (curl SSE contre le backend live) : avec `cloud_enabled` + override sur TOUS les profils (agent/chat/analysis), « résume mes emails » reste sur `qwen2.5:14b` (local, déclenche `email_digest`) tandis que « quelle heure est-il » bascule sur `glm-5.2:cloud` — même override cloud présent sur le profil `agent` dans les deux cas, seule la sensibilité du contenu change le résultat. UI vérifiée (Playwright, 0 erreur console). `cloud_enabled` remis à `false` après les tests (réglage opt-in).
 
-## 9centiesetbis. État antérieur (v2.118.0)
+## 9centiesetter. État antérieur (v2.118.0)
 
 **v2.118 (🖥️ Terminal SSH interactif RÉEL — PTY + xterm.js)** : demandé explicitement (« je veux que peu importe que je sois sur un ssh qui donne sur un Windows ou Linux, que je voie le terminal comme si j'y étais »). L'ancien modèle exec/stream (v2.117 : une commande = une requête SSE, attend la fin, pas d'invite interactive) ne pouvait pas donner cette sensation.
 
@@ -587,7 +596,7 @@ Testé en réel (curl SSE contre le backend live) : avec `cloud_enabled` + overr
 
 Testé en réel (Playwright) contre une vraie connexion SSH Linux : bannière MOTD complète affichée à la connexion, `echo` tapé au clavier répond instantanément, bouton raccourci `pwd` exécuté directement dans le shell — zéro erreur console fonctionnelle.
 
-## 9centiesetter. État antérieur (v2.117.0)
+## 9centiesetquater. État antérieur (v2.117.0)
 
 **v2.117 (🔗 SSH — sécurité + fonctionnalité + ergonomie)** : demandé explicitement (« l'onglet ssh devrait etre ameliorer en fonctionalité et en ergonomie, recherche aussi sur le web de quel maniere il peut etre amaliorer »). Recherche web menée (webssh/Terminus Web/ttyd : SFTP intégré, xterm.js, diagnostics serveur — tendances 2026 des gestionnaires SSH web).
 
@@ -599,7 +608,7 @@ Vérifié en réel : garde de sécurité testé en isolation (`security.guard_re
 
 **Correctif ergonomie post-livraison** : l'utilisateur a signalé un `ls` sans sortie visible (« je suis bien connecté mais je ne vois pas réellement le terminal »). Diagnostiqué en isolation (script Python direct, hors HTTP) — PAS un bug : le dossier distant ne contenait que des fichiers cachés, `ls` sans `-a` renvoie légitimement une sortie vide (`ls -la` sur la même connexion listait bien les fichiers). Le vrai problème était ergonomique : rien ne distinguait "en cours" de "terminé sans rien à afficher" — corrigé avec une ligne `(terminé, aucune sortie)` quand une commande se termine en exit 0 sans aucune ligne stdout/stderr.
 
-## 9centiesetquater. État antérieur (v2.116.0)
+## 9centies-et-unus. État antérieur (v2.116.0)
 
 **v2.116 (📊 Monitoring actionnable)** : demandé explicitement (« ameliore monitoring, rend le plus interactif et utils car dans l'etat actuel il ne sert pas a grand chose, inspire toi en cherchant sur le web »). Recherche web menée (Netdata/Glances/htop, tendances dashboard 2026 : progressive disclosure, panneaux actionnables plutôt que jauges passives). La page affichait déjà CPU/RAM/réseau/disques/historique d'outils mais **aucune action possible** — corrigé sur 4 axes, tous en étendant le payload SSE existant + le frontend (aucun nouvel endpoint REST, kill/retry passent par `/api/tools` déjà gated par confirmation) :
 
@@ -610,7 +619,7 @@ Vérifié en réel : garde de sécurité testé en isolation (`security.guard_re
 
 Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien présents), page rechargée via Playwright (0 erreur console, GPU/alerte/processus visibles sur capture), `scripts/smoke_test_pages.py` → 34/34 pages OK. Le clic live sur le bouton "Relancer" (filtré sur les échecs) a été refusé par le classifieur de permissions (sélecteur `❌` jugé ambigu sur données réelles, cohérent avec l'incident documenté en v2.110) — non forcé, le composant réutilise le pattern déjà vérifié visuellement du bouton "Tuer processus".
 
-## 9centies-et-unus. État antérieur (v2.115.0)
+## 9centiesetquinquies. État antérieur (v2.115.0)
 
 **v2.115 (🔎 Recherche sémantique améliorée + 🧠 consolidation mémoire)** : suite d'une recherche web sur les bonnes pratiques 2026 (RAG, mémoire d'agent, tool-calling local), demandée explicitement puis « je te laisse libre go » sur les axes proposés.
 
@@ -620,7 +629,7 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Consolidation mémoire** (`memory_consolidation.py`, nouveau) : fusion périodique des souvenirs quasi-identiques, même esprit que le Learning Log des compétences (v2.95) mais VOLONTAIREMENT déterministe (recouvrement de sous-chaîne, même heuristique que le dédoublonnage à l'enregistrement) plutôt que piloté par un LLM — évite le risque de fusion erronée. Worker quotidien + endpoints preview/exécution. Testé en réel avec deux souvenirs quasi-identiques créés exprès : détection correcte, fusion garde le plus détaillé, aucun des vrais souvenirs touché.
 
-## 9centiesetquinquies. État antérieur (v2.114.0)
+## 9centiesetsex. État antérieur (v2.114.0)
 
 **v2.114 (🔍 Audit de conversations réelles)** : suite directe de v2.113, même méthode — examiner les vraies conversations plutôt que deviner. 2 bugs de plus trouvés en balayant les 19 conversations existantes.
 
@@ -628,7 +637,7 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Bug 2** : le LLM a appelé `billing_quote_email` avec `quote_id: 'ID_DU_DEVIS'` — un placeholder littéral au lieu d'un vrai identifiant, sur une demande vague, alors que `billing_quote_list` était pourtant déjà disponible. La règle d'or #7 anti-hallucination (v2.106) ne couvrait que les paramètres optionnels — étendue pour couvrir explicitement les paramètres obligatoires inconnus : chercher le vrai identifiant via l'outil de liste approprié, ou demander une clarification, jamais écrire un texte de substitution.
 
-## 9centiesetsex. État antérieur (v2.113.0)
+## 9centiesetsept. État antérieur (v2.113.0)
 
 **v2.113 (🔧 Winget "installe X" réparé de bout en bout)** : signalé par l'utilisateur (« regarde la dernière conversation où je demande l'installation de victoria, il sait que c'est le bon logiciel mais ne l'installe pas »). Deux vrais bugs trouvés en remontant la conversation réelle, pas en devinant.
 
@@ -638,13 +647,13 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Testé en conditions réelles jusqu'au bout**, sur autorisation explicite (AskUserQuestion posée proactivement) : conversation rejouée avec le message original → recherche puis installation réussie (code 0), confirmée présente sur la machine via `winget_list_installed`.
 
-## 9centiesetsept. État antérieur (v2.112.0)
+## 9centiesethuit. État antérieur (v2.112.0)
 
 **v2.112 (💾 Restauration de sauvegarde)** : complète v2.111 — une sauvegarde qu'on ne sait pas restaurer ne vaut rien. `backup.py::restore_backup(filename)` : valide le nom de fichier contre le dossier de sauvegardes (anti-traversée de chemin), prend automatiquement une sauvegarde de sécurité de l'état actuel AVANT de restaurer (la restauration devient elle-même réversible), puis copie la sauvegarde choisie par-dessus la base live via `Connection.backup()`. Endpoint `POST /api/backups/restore` (confirmation explicite obligatoire, hors du registre d'outils — pas pilotable depuis le chat).
 
 **Test réalisé avec prudence, puis en conditions réelles sur autorisation explicite** : créé une note jetable, sauvegardé, supprimé la note (perte simulée) — la restauration EN CONDITIONS RÉELLES a d'abord été bloquée par le classifieur de permissions (jugé trop risqué d'auto-tester un restore sur la base live juste après l'incident de suppression accidentelle de cette même session, v2.110). Plutôt que d'insister, le mécanisme sous-jacent a été vérifié séparément sur une **copie isolée** de la base (jamais la live) : la note supprimée revenait bien, intégrité SQLite confirmée. **L'utilisateur a ensuite demandé explicitement d'être sollicité via une question (AskUserQuestion) chaque fois qu'une action risque d'être bloquée, plutôt que de découvrir le blocage après coup** — appliqué immédiatement : question posée nommant précisément l'action (restore réel sur `data/secretary.db`), acceptée, test relancé contre la **vraie base live** cette fois → succès confirmé (note bien restaurée, backend toujours sain après coup, note de test nettoyée).
 
-## 9centiesethuit. État antérieur (v2.111.0)
+## 9centiesetneuf. État antérieur (v2.111.0)
 
 **v2.111 (💾 Sauvegarde auto + 🗂️ Fin de la dualité fichiers + 🧪 Smoke-test pages)** : 3 propositions faites après le point précédent, toutes acceptées explicitement par l'utilisateur.
 
@@ -654,13 +663,13 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **`scripts/smoke_test_pages.py`** (nouveau) : formalise le balayage manuel de pages fait plusieurs fois cette session — 34 pages couvertes, toutes vertes.
 
-## 9centiesetneuf. État antérieur (v2.110.0)
+## 9centiesetdix. État antérieur (v2.110.0)
 
 **v2.110 (🧹 Suppression du 2ᵉ moteur d'agent JS mort)** : suite de v2.108/v2.109. `app/api/tools/route.js` + `lib/agent/tools.js` (1344 lignes, confirmés 100% morts depuis v2.108) supprimés — sur **confirmation explicite via AskUserQuestion**, après 2 refus du classifieur de permissions Claude Code sur des directives génériques (« continue », « tu es libre ») jugées insuffisamment spécifiques pour une action destructive. Vérifié après coup : compilation Next.js propre, `scripts/smoke_test_chat.py` toujours vert.
 
 **Incident survenu pendant la session, à retenir** : en testant la suppression d'un projet de test via un clic Playwright automatisé, un sélecteur DOM imprécis (`ancestor` + « dernier bouton du conteneur ») a supprimé **une vraie conversation utilisateur** au lieu du projet ciblé — détecté en recoupant le compteur de conversations avant/après (16→15), pas par une erreur visible. Aucune sauvegarde automatique de `data/secretary.db` trouvée pour la récupérer ; pas de tentative de récupération manuelle sur le fichier WAL (backend actif dessus, trop risqué). **Règle retenue pour toute suite : ne jamais tester une action destructive (delete/clear) via clic UI automatisé sur des données réelles** — sélecteur univoque (`title`/`id` exact) sur données jetables uniquement, ou suppression par ID exact via `curl`/API directe (zéro ambiguïté de ciblage).
 
-## 9centiesetdix. État antérieur (v2.109.0)
+## 9centiesetonze. État antérieur (v2.109.0)
 
 **v2.109 (🕐 Bug de fuseau horaire sur les timestamps)** : trouvé en continuant l'audit v2.108 sur demande explicite (« continue le travail »), pas en le cherchant délibérément — repéré en testant la création de note via l'**UI réelle** (clic, pas juste curl) : une note tout juste créée affichait « il y a 2h » au lieu d'« à l'instant ».
 
@@ -670,7 +679,7 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Leçon générale, déjà pressentie mais reconfirmée ici** : tester un CRUD via `curl` valide la plomberie API, mais **teste toujours le rendu final via un vrai clic dans l'UI** (Playwright) avant de considérer une migration terminée — c'est uniquement en regardant l'écran après un clic réel que ce bug (silencieux côté API, un timestamp `curl` "a l'air correct" en JSON brut) est devenu visible.
 
-## 9centiesetonze. État antérieur (v2.108.0)
+## 9centiesetdouze. État antérieur (v2.108.0)
 
 **v2.108 (🧹 Dualité JS/Python éliminée — notes/tâches/projets/mémoire)** : suite directe de v2.107, sur demande explicite (« continue sur cette voie » puis « fait les 5 » sur une liste de propositions).
 
@@ -682,7 +691,7 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Méthode** : chaque proxy testé en réel bout-en-bout (create/update/delete via curl + `scripts/smoke_test_chat.py`) avant de passer au suivant, jamais juste relu. **Piège de méthode rencontré** : un premier test de mise à jour de statut de tâche avec `status: "completed"` a fait planter l'endpoint Python (`CHECK constraint failed`) — fausse alerte, la vraie page utilise `"done"` (les 4 valeurs valides du schéma), pas "completed" ; vérifié en relisant le composant avant de conclure à un bug.
 
-## 9centiesetdouze. État antérieur (v2.107.0)
+## 9centiesettreize. État antérieur (v2.107.0)
 
 **v2.107 (🧹 JSON hors du chat + 5 axes)** : suite auto-proposée après l'audit v2.106, sur demande explicite (« tout format json doit disparaitre du chat (json uniquement sur demande sinon de base human read) » puis « fait tout »).
 
@@ -692,7 +701,7 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Non traité, signalé plutôt que forcé** : `app/api/chat/route.js` (255 lignes, route Next.js legacy confirmée 100% morte — le chat live appelle toujours `${BACKEND_URL}/api/chat` en Python) — sa suppression a été bloquée par le classifieur de permissions Claude Code (action destructive non explicitement demandée) ; laissé en place, à supprimer sur demande explicite si voulu.
 
-## 9centiesettreize. État antérieur (v2.106.0)
+## 9centiesetquatorze. État antérieur (v2.106.0)
 
 **v2.106 (🩺 Audit complet — outils + anti-hallucination Ollama)** : sur demande explicite (« revois tout les chats et vois ce qui n'a pas fonctionné, règle la température Ollama à la racine pour éviter les hallucinations, tout les outils doivent être testés/corrigés/améliorés, ne t'arrête pas avant d'avoir fini »). Méthode : requêter directement `data/secretary.db::tool_executions` (754 exécutions réelles, 141 échecs historiques) plutôt que deviner, trier chaque échec un par un (déjà corrigé / comportement attendu / vrai bug).
 
@@ -704,15 +713,15 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Revue des mémoires de sessions passées** → 1 vraie dette de sécurité trouvée et corrigée : `audit.py::log_action` ne filtrait les secrets que par égalité stricte de nom de clé (`password`/`token`/`secret`) → ratait `owner_password`, `bot_token`, `api_key`, `client_secret`, `private_key`, etc., qui finissaient en clair dans le fichier `audit.jsonl` (décrit comme « git-able » dans son propre docstring). Filtre passé en **sous-chaîne insensible à la casse** sur une liste élargie. Les autres pistes des mémoires (COM/`asyncio.to_thread` sur les opérations lentes, sauvegarde registre avant chaque tweak) ont été vérifiées et étaient **déjà correctement en place** — pas de correction nécessaire, juste confirmées.
 
-## 9centiesetquatorze. État antérieur (v2.105.0)
+## 9centiesetquinze. État antérieur (v2.105.0)
 
 **v2.105 (🧹 3 petites dettes refermées)** : 1) Marvin Doctor vérifie maintenant le serveur MCP (paquet `mcp` installé + `mcp_server.py` syntaxiquement valide). 2) Palette de commandes (Ctrl+K) indexe maintenant aussi les 294 outils (chargés à la 1ʳᵉ ouverture, pas au chargement de page) — sélectionner un outil navigue vers `/outils?q=<nom>`, que la page Outils lit désormais au montage pour préremplir sa recherche (nécessite `Suspense` autour du composant, requis par `useSearchParams`). 3) `CircleGauge` (`DashboardKit.jsx`) gagne une option `invert` (pour un score où haut = bon, ex. Santé) et `suffix` personnalisable — la page Santé utilise maintenant ce composant partagé au lieu d'un `conic-gradient` fait main.
 
-## 9centiesetquinze. État antérieur (v2.104.0)
+## 9centiesetseize. État antérieur (v2.104.0)
 
 **v2.104 (🔌 Page /mcp — guide de connexion)** : sur demande explicite (« ajouter un onglet qui explique le MCP », avec l'exigence « les chemins doivent être dynamiques, si j'installe Marvin sur une autre machine le MCP doit être sur le bon chemin »). Nouveau `GET /api/mcp/config` : renvoie les chemins RÉELS de l'installation courante — `sys.executable` (python.exe du venv réellement utilisé) + `config.BACKEND_DIR / "mcp_server.py"` (déjà dynamique via `Path(__file__).parent`), jamais codés en dur. Nouvelle page `/mcp` (sidebar → Réglages, même esprit que `/mobile` existante) : statut backend en direct, niveau de permission actuel avec son impact expliqué, JSON prêt à copier avec toast de confirmation. **Piège re-attrapé** : `useToast()` renvoie `{toast}` pas les méthodes directement — déjà documenté depuis v2.101 mais reproduit en écrivant ce nouveau composant ; corrigé et vérifié avant de considérer la tâche finie. **Leçon générale : toujours vérifier visuellement (Playwright) un nouveau composant qui utilise `useToast()`, l'erreur est silencieuse à l'écriture.**
 
-## 9centiesetseize. État antérieur (v2.103.0)
+## 9centiesetdixsept. État antérieur (v2.103.0)
 
 **v2.103 (🔌 Marvin en serveur MCP)** : sur demande explicite (« explore MCP plus en profondeur, n'oublie pas la sécurité »). Recherche web menée d'abord : MCP est devenu LE standard 2026 (Claude/ChatGPT/Gemini/Copilot/Cursor, 10 000+ serveurs) mais l'écosystème a une crise de sécurité documentée (faille SDK officielle ~200k instances, 38% des serveurs sans authentification, 30+ CVE injection shell en 2 mois, attaques "rug pull"). **Décision : Marvin = serveur MCP uniquement, jamais client MCP** (pas de consommation de serveurs tiers non audités — décision séparée à prendre au cas par cas si besoin concret un jour).
 
@@ -720,13 +729,13 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Testé en réel de bout en bout** (protocole MCP complet via le SDK officiel, pas juste des appels REST) : 294 outils découverts via `session.list_tools()`, appel réel via `session.call_tool()` (calculator, memory_search — confirmé sans conflit de verrou Qdrant), et confirmé que le garde-fou de confirmation fonctionne (`pc_run_command` sans `confirmed` renvoie bien `requiresConfirmation` quand on simule un niveau non-Expert).
 
-## 9centiesetdixsept. État antérieur (v2.102.0)
+## 9centiesetdixhuit. État antérieur (v2.102.0)
 
 **v2.102 (🔧 Boîte à outils regroupée par familles)** : signalé par l'utilisateur (« je vois plus catharsis et les autres » → en fait fusionnés dans PC & Système depuis v2.98, mais l'occasion a révélé que `/outils` avait le même problème structurel : 17 catégories en une rangée d'onglets qui débordait déjà l'écran). Ajout d'un niveau intermédiaire `GROUPS` dans `app/outils/page.jsx` (même logique que les sections de la sidebar) : 4 familles (📄 Contenu & Documents, 🖥️ Système & Réseau, 🗂️ Organisation, 🌐 Web & Données) puis les catégories du groupe sélectionné en sous-onglets. La recherche globale (déjà correcte) n'est pas affectée. 141 outils inchangés, réorganisation d'affichage uniquement. `system_cleanup` (outil rapide) renvoie maintenant vers PC & Système → Nettoyage pour la version détaillée.
 
 **Pattern à retenir** : dès qu'une liste d'onglets dépasse ~6-8 éléments, ajouter un niveau de regroupement (voir aussi v2.98 pour la sidebar principale) plutôt que de laisser une rangée déborder.
 
-## 9centiesetdixhuit. État antérieur (v2.101.0)
+## 9centiesetdixneuf. État antérieur (v2.101.0)
 
 **v2.101 (🎯 4 propositions d'ergonomie)** : validées par l'utilisateur (« je suis ok pour tes 4 propositions go »).
 1. **Toasts unifiés** — `components/ui/Toast.jsx` (`ToastProvider`/`useToast()`) existait déjà mais n'était monté nulle part ; **12 pages** réinventaient chacune leur propre bandeau `useState`+`setTimeout` (emporium, pantheon, catharsis, codex, sante, skills, documents, indexation, devis, docs, cron). Toutes migrées. **Piège découvert** : `useToast()` renvoie `{ addToast, removeToast, toast }` — les méthodes `success/error/warning/info` sont sur `.toast`, pas sur l'objet renvoyé directement (`const { toast } = useToast()`, pas `const toast = useToast()`). Bug annexe corrigé dans `Toast.jsx` : `useAutoClose` utilisait `useState(() => {...})` au lieu de `useEffect` → le timer n'était jamais nettoyé au démontage. `ToastProvider` monté une fois dans `layout.js`. `FileExplorerCard.jsx` gardé à part intentionnellement (toast positionné à côté du fichier dans l'arbre, pas un bandeau générique).
@@ -736,15 +745,15 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 **Règle pour tout nouveau composant avec feedback utilisateur : utiliser `useToast()`, jamais un `useState` + bandeau fait main.**
 
-## 9centiesetdixneuf. État antérieur (v2.100.0)
+## 9centiesetvingt. État antérieur (v2.100.0)
 
 **v2.100 (📊 Refonte Monitoring)** : signalé par l'utilisateur — `/monitoring` n'avait aucun scroll (bug : conteneur racine `minHeight:'100vh'` sans `overflowY`, alors que `.main-content` parent est en `overflow:hidden`). Au-delà du correctif, refonte du concept : **panneaux à défilement indépendant** (`Panel`, maxHeight fixe + overflow interne) au lieu d'une seule longue page — les jauges système restent groupées et visibles, « Dernières exécutions » et « Statistiques » défilent chacun dans leur propre zone. Historique d'outils enfin exploitable : recherche par nom + filtre Tout/Succès/Échec (composables), chaque ligne se déplie pour montrer arguments + résultat/erreur via `PrettyResult` (donnée déjà en base, jamais affichée avant). Taux d'échec (%) ajouté aux stats. **Pattern à retenir pour tout futur dashboard** : `height:'100%', overflowY:'auto'` sur le conteneur racine (jamais `minHeight:'100vh'` seul sous `.main-content`), et des panneaux à hauteur/scroll propres plutôt qu'une page qui s'étire à l'infini.
 
-## 9centiesetvingt. État antérieur (v2.99.0)
+## 9centiesetvingtetun. État antérieur (v2.99.0)
 
 **v2.99 (⏳ Retour visuel "Marvin travaille")** : sur demande explicite (« je dois savoir que Marvin travaille »). `TopLoadingBar` (`components/ui/TopLoadingBar.jsx`) : fine barre de progression animée en haut de l'écran, branchée sur `useChatStatus().isLoading` → visible sur **n'importe quelle page**, même après avoir navigué loin du chat pendant que Marvin répond. `Spinner`/`LoadingRow` (`components/ui/Spinner.jsx`) : sablier CSS réutilisable (classe `.spinner-ring`) qui remplace 13 textes "Chargement..." bruts (sans aucun signal visuel) répartis sur 12 fichiers. Pattern pour toute nouvelle page : `import { LoadingRow } from '@/components/ui/Spinner'` et `{loading ? <LoadingRow /> : ...}` au lieu d'un `<div>Chargement…</div>` texte seul.
 
-## 9centiesetvingtetun. État antérieur (v2.98.0)
+## 9centiesetvingtdeux. État antérieur (v2.98.0)
 
 **v2.98 (🗂️ Refonte navigation — regroupement par sujet + vocal fusionné au chat)** : sur demande explicite (« regroupe ce qui est du même sujet de façon pro, intuitif »). ~30 destinations plates dans la sidebar, dont 8 pour « PC & Système » et 3 pour les fichiers qui se recoupaient sans logique claire. **2 hubs à onglets créés** (zéro fonctionnalité perdue) :
 - **`/systeme`** (🖥️ PC & Système) : onglets Santé/Logiciels/Optimisation/Nettoyage/Système — regroupe emporium/pantheon/catharsis/codex/sante. SSH et Monitoring restent séparés (sujet différent).
@@ -758,15 +767,15 @@ Vérifié en réel : `/api/monitor` inspecté via curl (top_processes + gpu bien
 
 Vérifié en réel (Playwright) : redirects OK, hub Santé affiche 294 outils cohérents, hub Fichiers affiche le vrai disque, repli/dépli fonctionne, zéro erreur console.
 
-## 9centiesetvingtdeux. État antérieur (v2.97.0)
+## 9centiesetvingttrois. État antérieur (v2.97.0)
 
 **v2.97 (🎨 Refonte UI complète — console IA professionnelle)** : sur demande explicite de l'utilisateur (« je veux que l'UI ressemble à celle d'une IA pro »). Pivot du thème « Oracle » (or/mystique, aurore animée, cœur qui bat, hexagones antiques) vers une **palette graphite neutre + bleu électrique/cyan** (`app/globals.css` : `--bg-primary #0a0a0d`, `--accent-primary #4f8cff`, `--accent-secondary #38bdf8`). Fond fixe opaque (plus d'aurore radiale animée), rayons de bordure resserrés, police mono ajoutée pour les accents techniques. Classes `.holo-text`/`.living-card`/`.breathe`/`.float-y` **conservées** (utilisées dans 7+ fichiers) mais redéfinies en version calme. **Migration mécanique** de toutes les couleurs or codées en dur (32 fichiers, `sed` sur les hex + rgba) vers la nouvelle palette — zéro résidu vérifié par grep. `LivingAvatar.jsx` réécrit en badge de statut géométrique sobre (anneau + cœur qui pulse) au lieu de l'avatar antique doré. Sidebar : suppression de l'icône robot morte, nettoyage des mentions « Oracle ». **Vérifié en réel** (Playwright, 3 pages) : zéro erreur console, rendu cohérent. **Piège pour la suite** : toute nouvelle page/composant doit utiliser les `var(--accent-*)`/`var(--border)` plutôt que des hex en dur, sinon elle réintroduira de l'incohérence visuelle au prochain changement de palette.
 
-## 9centiesetvingttrois. État antérieur (v2.96.0)
+## 9centiesetvingtquatre. État antérieur (v2.96.0)
 
 **v2.96 (🩹 Event-loop débloquée + 🎯 outil explicite respecté)** : audit du fork Codex/Grok. Trouvé un vrai bug : `subprocess.run()` était appelé **de façon synchrone** dans des `async def execute_*` de `tools.py` → gèle **tout** FastAPI (chat, `/api/health`) pendant la commande, jusqu'à **30 minutes** pour `winget upgrade --all` (timeout=1800s). 12 sites `subprocess.run` directs + 6 appels `_winget_run` corrigés (`await asyncio.to_thread(...)`) : `pc_run_command`, `pc_run_powershell`, tous les `winget_*`, `_reg_backup` (avant chaque tweak Pantheon), clipboard get/set, `pc_notify`, `pc_window_list`, `net_scan_local`, `git_info`. **Preuve réelle** : `ping -n 8` (7,3s) lancé via `pc_run_command`, `/api/health` interrogé PENDANT → répond en 24ms puis 1,6ms (avant le correctif, aurait attendu les 7,3s). `net_ping` accepte `target`/`ip` en alias de `host`. + `agent.py` détecte les noms d'outils cités EXPLICITEMENT (`_exact_tool_mentions_from_text`) : l'outil nommé est imposé pour le tour, toute substitution est bloquée à l'exécution. 294 outils (inchangé, corrections internes).
 
-## 9centiesetvingtquatre. État antérieur (v2.95.0)
+## 9centiesetvingtcinq. État antérieur (v2.95.0)
 
 **v2.95 (📖🌙 Learning Log + consolidation nocturne)** : transplanté du fork Codex/Grok. Marvin apprenait déjà des échecs/réussites **par compétence** (auto-upgrade sur échec d'outil, golden path sur succès — v2.79-81) mais rien ne consolidait cet apprentissage **au niveau global**, et rien ne tournait la nuit. Nouveau `skills.log_learning_event`/`get_learning_log` : journal persistant (`data/skills_learning_log.json`, 200 derniers événements avec diffs) de toute création/upgrade/consolidation/oubli, câblé aux 3 points de création + à `upgrade_skill`. `review_and_consolidate_learnings` (le LLM relit son log par compétence et peut proposer une fusion/consolidation si un vrai pattern se dégage) + `consolidate_obsolete_skills` (archive — jamais supprime — les compétences >30j sans usage et <3 usages, rollback possible). Worker de fond `_skill_night_learning_worker` : **15 min la nuit (22h-6h) vs 25 min le jour**. Endpoints `/api/skills/learning_log` + `/api/skills/consolidate` + outil chat `skill_learning_log` (introspection). **Testé en réel** : création → événement loggé et relu via endpoint + outil chat ; consolidation manuelle déclenchée sans erreur ; worker tourne sans exception. 293 → 294 outils.
 
@@ -774,7 +783,7 @@ Vérifié en réel (Playwright) : redirects OK, hub Santé affiche 294 outils co
 
 **v2.93 (🪟 Windows+ + 🎮 GPU temps réel)** : `local_video.get_device_info()` passe d'un cache figé (permanent) à un **TTL court (20s)** — l'utilisateur change souvent de carte graphique (test de cartes clients), le cache doit suivre sans redémarrage. Nouvel outil `pc_gpu_status(refresh=true)` pour forcer une redétection immédiate. Amorce DirectML (`_detect_directml_gpu`) pour un futur support AMD natif sous Windows — **mais `torch-directml` n'a aucune version compatible Python 3.14** (ce venv) : constat honnête, pas de solution silencieuse, nécessiterait un venv dédié Python 3.10/3.11 à discuter avec l'utilisateur. + Catalogue **Windows+** (`win_quick_launch`/`win_quick_launch_list`, 29 raccourcis : God Mode, `ms-settings:*`, panneaux legacy, outils admin `.msc`, dossiers utiles) — porté du fork Codex/Grok, navigation seulement (pas de tweaks, chevaucherait Pantheon). 291 → 293 outils. **Leçon apprise cette session** : un outil enregistré mais absent du dictionnaire `_KEYWORD_TOOLS` (agent.py) n'est JAMAIS proposé au LLM sur les profils filtrés (chat/agent) → **toujours ajouter une entrée de routage par mots-clés pour tout nouvel outil**. Bug annexe corrigé : les mots-clés accentués ne matchaient pas un message sans accents (`_strip_accents` + `_KEYWORD_TOOLS_NORM`, bénéficie à tout le dictionnaire existant).
 
-## 9centiesetvingtcinq. État antérieur (v2.91.0)
+## 9centiesetvingtsix. État antérieur (v2.91.0)
 
 **v2.91 (🌐 Réseau Pro + 🧾 Inventaire matériel — transplant depuis un fork)** : l'utilisateur a développé en parallèle un fork (`secretary-ai-codex-groky-alpha`, via Codex/Grok, divergé au même point que ce projet, poussé jusqu'à v3.8.1). Audit du fork puis **transplant manuel sélectif** (pas de fusion en bloc — le fork a une architecture parallèle qui chevauche Catharsis/Codex/registry_*/tweak_* existants, fusionner créerait des doublons). Récupéré : 6 outils réseau (`net_nmap_scan` avec repli TCP si nmap absent, `net_service_detect`, `net_http_probe`, `net_tls_check`, `net_subnet_sweep`, `net_route_diagnostics` — scans larges → confirmation via `_net_targets`) + `pc_hardware_specs` (inventaire matériel + liens officiels support/pilotes selon le fabricant CIM détecté). **Testés en réel** sur cette machine (pas juste importés) : TLS google.com réel, ports détectés localement, inventaire matériel exact. 283 → 290 outils. Ce qui n'a PAS été repris (dette identifiée dans le fork) : leur `pc_system_service.py` (système de tweaks/panneaux parallèle), leur dualité JS/Python legacy (routes Next.js mortes écrivant dans la même DB).
 

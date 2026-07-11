@@ -3760,7 +3760,13 @@ async def execute_web_search(args: dict) -> dict:
                         "snippet": snips[i].get_text(strip=True) if i < len(snips) else ""})
         return out
 
-    async def _ddg(retry=True):
+    async def _ddg(attempt=0):
+        # v2.161 : le blocage anti-bot de DuckDuckGo est généralement de courte durée
+        # (quelques dizaines de secondes) — 1 seul retry à 1,6s (avant) échouait souvent
+        # encore dedans. Passé à 3 tentatives avec un backoff croissant (2s/5s/9s,
+        # ~16s cumulés) pour couvrir la fenêtre réelle du blocage sans faire attendre
+        # indéfiniment l'utilisateur.
+        _BACKOFFS = (2.0, 5.0, 9.0)
         try:
             client = _get_http_client()                       # client partagé (pooling)
             # endpoint principal puis 'lite' (profil anti-bot différent) en secours
@@ -3772,19 +3778,51 @@ async def execute_web_search(args: dict) -> dict:
                 results = parser(resp.text)
                 if results:
                     break
-            if not results and retry:
+            if not results and attempt < len(_BACKOFFS):
                 # 0 résultat sur une requête non vide → souvent une limite anti-bot
-                # temporaire → une seule nouvelle tentative espacée.
-                await asyncio.sleep(1.6)
-                return await _ddg(retry=False)
+                # temporaire → nouvelle tentative espacée.
+                await asyncio.sleep(_BACKOFFS[attempt])
+                return await _ddg(attempt=attempt + 1)
             if not results:
                 return {"success": False, "provider": "DuckDuckGo", "query": query,
                         "count": 0, "results": [], "rate_limited": True,
-                        "error": "Recherche web temporairement limitée (anti-bot). Réessayez dans un instant."}
+                        "error": "Recherche web temporairement limitée (anti-bot). Réessayez dans un instant, "
+                                 "ou configurez un provider alternatif (SearXNG auto-hébergé, Brave, Google) "
+                                 "dans Réglages > Connexions pour ne plus dépendre de DuckDuckGo."}
             return {"success": True, "provider": "DuckDuckGo", "query": query,
                     "count": len(results), "results": results}
         except Exception as e:
             return _net_error(e, "DuckDuckGo")
+
+    # ── SearXNG auto-hébergé (v2.161) ────────────────────────────────────────
+    # Méta-moteur open source qu'on héberge soi-même (Docker) — agrège plusieurs
+    # moteurs (Google, Bing, Brave, Qwant...) sans jamais exposer NOTRE IP directement
+    # à leur anti-bot (SearXNG gère ça lui-même), et sans aucune limite de quota
+    # puisqu'on ne dépend d'aucune clé API tierce. Prioritaire en mode auto quand
+    # configuré : gratuit, illimité, 100% cohérent avec la doctrine "local d'abord"
+    # de Marvin. Nécessite `searxng_url` (Réglages > Connexions) pointant vers une
+    # instance avec `formats: [html, json]` activé dans son settings.yml (le JSON
+    # n'est PAS activé par défaut sur une install SearXNG standard).
+    async def _searxng():
+        base = cm.get_credential("searxng_url")
+        if not base:
+            return None
+        try:
+            client = _get_http_client()
+            resp = await client.get(base.rstrip("/") + "/search",
+                                     params={"q": query, "format": "json"})
+            resp.raise_for_status()
+            data = resp.json()
+            results = []
+            for item in (data.get("results") or [])[:max_results]:
+                results.append({"title": item.get("title", ""), "url": item.get("url", ""),
+                                 "snippet": item.get("content", "")})
+            if not results:
+                return {"error": "SearXNG : 0 résultat (instance mal configurée ou JSON désactivé ?)"}
+            return {"success": True, "provider": "SearXNG", "query": query,
+                    "count": len(results), "results": results}
+        except Exception as e:
+            return {"error": f"SearXNG ({base}) : {e}"}
 
     # ── Brave Search ──────────────────────────────────────────────────────────
     async def _brave():
@@ -3853,6 +3891,9 @@ async def execute_web_search(args: dict) -> dict:
             return {"error": f"SerpAPI: {e}"}
 
     # ── Sélection du provider ─────────────────────────────────────────────────
+    if provider == "searxng":
+        result = await _searxng()
+        return result or {"error": "Instance SearXNG non configurée (réglage 'searxng_url')."}
     if provider == "brave":
         result = await _brave()
         return result or {"error": "Clé Brave Search non configurée"}
@@ -3868,8 +3909,10 @@ async def execute_web_search(args: dict) -> dict:
             _wcache_set(_ck, r)
         return r
 
-    # Auto: essayer dans l'ordre brave → google → serpapi → duckduckgo
-    for fn in (_brave, _google, _serpapi):
+    # Auto : SearXNG d'abord (auto-hébergé → gratuit, illimité, aucun anti-bot tiers
+    # si configuré), puis brave → google → serpapi → duckduckgo (scraping HTML, en
+    # dernier recours seulement — le plus fragile face à l'anti-bot).
+    for fn in (_searxng, _brave, _google, _serpapi):
         r = await fn()
         if r and r.get("success"):
             _wcache_set(_ck, r)
@@ -18151,9 +18194,9 @@ TOOLS_SPEC = [
         "limit": {"type": "integer", "description": "Nombre de résultats (défaut 5)"}},
        ["query"]),
 
-    _t("web_search", "Effectue une recherche web (DuckDuckGo gratuit, ou Brave/Google/SerpAPI si clés configurées).",
+    _t("web_search", "Effectue une recherche web (DuckDuckGo gratuit mais sujet à un anti-bot occasionnel, ou SearXNG auto-hébergé/Brave/Google/SerpAPI si configurés — priorité à SearXNG en mode auto, gratuit et illimité).",
        {"query": {"type": "string", "description": "Requête de recherche"},
-        "provider": {"type": "string", "enum": ["auto", "duckduckgo", "brave", "google", "serpapi"], "description": "Moteur de recherche (auto = meilleur disponible)"},
+        "provider": {"type": "string", "enum": ["auto", "searxng", "duckduckgo", "brave", "google", "serpapi"], "description": "Moteur de recherche (auto = meilleur disponible, SearXNG en premier si configuré)"},
         "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"}},
        ["query"]),
 
