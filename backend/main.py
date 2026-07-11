@@ -2737,6 +2737,20 @@ async def lifespan(app_instance):
 #   (CAPTCHA/429) pendant le test reel -- comportement attendu d'un meta-moteur, les
 #   autres moteurs (Google CSE, Startpage...) ont pris le relais sans interruption
 #   visible cote utilisateur, exactement l'effet de resilience recherche.
+#
+# v2.163 (event-loop : 5 outils supplementaires corriges) : suite directe de v2.160
+#   (file_large_finder), sur demande explicite apres avoir cherche systematiquement la
+#   meme classe de bug ailleurs dans tools.py (grep os.walk/subprocess.run non wrappe
+#   en asyncio.to_thread). 5 outils trouves et corriges : file_find (fallback os.walk
+#   quand l'index Windows Search est indisponible sur une recherche "tout le PC"),
+#   file_search_text (scan par defaut sur le home si aucun dossier precise),
+#   document_index, file_duplicate_finder, system_cleanup (scan des dossiers Temp).
+#   git_info et net_traceroute etaient deja corrects (verifie avant de toucher au code).
+#   Meme pattern a chaque fois : extraction de la partie bloquante (os.walk, hash MD5...)
+#   dans une fonction sync dediee, appelee via await asyncio.to_thread(...).
+#   Teste en reel : les 5 outils repondent correctement sur des dossiers reels ; preuve
+#   directe du non-blocage -- /api/health repond en 34ms pendant qu'un file_find lourd
+#   (scan complet de backend/.venv, plusieurs milliers de fichiers) tourne en parallele.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7274,7 +7288,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.162.0",
+            "version":         "2.163.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

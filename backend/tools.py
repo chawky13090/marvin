@@ -973,6 +973,17 @@ async def execute_document_generate(args: dict) -> dict:
     return result
 
 
+def _file_search_text_collect_candidates(directory: str, extensions: list) -> list:
+    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, ne bloque jamais l'event loop."""
+    candidates = []
+    for root, _, files in os.walk(directory):
+        for fname in files:
+            fpath = Path(root) / fname
+            if fpath.suffix.lower() in extensions:
+                candidates.append(fpath)
+    return candidates
+
+
 async def execute_file_search_text(args: dict) -> dict:
     # Accept "directory" (agent) or "path" (UI) for the search root
     _dir_raw = args.get("directory") or args.get("path") or os.path.expanduser("~")
@@ -989,33 +1000,32 @@ async def execute_file_search_text(args: dict) -> dict:
     search_term = query if case_sensitive else query.lower()
 
     try:
-        for root, _, files in os.walk(directory):
+        # v2.163 : l'énumération récursive du dossier (os.walk, peut prendre plusieurs
+        # dizaines de secondes sans dossier précisé — même classe de bug que
+        # file_large_finder v2.160) est déportée sur un thread ; seule la lecture de
+        # chaque fichier candidat (déjà async) reste dans la boucle principale.
+        candidates = await asyncio.to_thread(_file_search_text_collect_candidates, directory, extensions)
+        for fpath in candidates:
             if len(results) >= max_results:
                 break
-            for fname in files:
-                if len(results) >= max_results:
-                    break
-                fpath = Path(root) / fname
-                if fpath.suffix.lower() not in extensions:
+            try:
+                content_result = await execute_file_read({"path": str(fpath)})
+                text = content_result.get("content", "")
+                if not text:
                     continue
-                try:
-                    content_result = await execute_file_read({"path": str(fpath)})
-                    text = content_result.get("content", "")
-                    if not text:
-                        continue
-                    haystack = text if case_sensitive else text.lower()
-                    if search_term in haystack:
-                        idx = haystack.find(search_term)
-                        start = max(0, idx - 80)
-                        end = min(len(text), idx + len(query) + 80)
-                        snippet = "..." + text[start:end].strip() + "..."
-                        results.append({
-                            "name": fname,
-                            "path": str(fpath),
-                            "snippet": snippet,
-                        })
-                except Exception:
-                    pass
+                haystack = text if case_sensitive else text.lower()
+                if search_term in haystack:
+                    idx = haystack.find(search_term)
+                    start = max(0, idx - 80)
+                    end = min(len(text), idx + len(query) + 80)
+                    snippet = "..." + text[start:end].strip() + "..."
+                    results.append({
+                        "name": fpath.name,
+                        "path": str(fpath),
+                        "snippet": snippet,
+                    })
+            except Exception:
+                pass
 
         return {
             "success": True,
@@ -1158,6 +1168,33 @@ def _search_windows_index(pattern: str, max_results: int = 100, path_filter: str
             except Exception: pass
 
 
+def _file_find_walk_scan(root: str, pattern: str, include_dirs: bool, max_results: int) -> tuple[list, int]:
+    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, jamais directement dans l'event loop."""
+    import fnmatch as _fn
+    results = []
+    total_scanned = 0
+    _SKIP_DIRS = {'$RECYCLE.BIN', 'System Volume Information', 'AppData',
+                  'node_modules', '__pycache__', '.git', '.venv',
+                  'Windows.old', 'Windows', 'Program Files', 'Program Files (x86)'}
+    for dp, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in _SKIP_DIRS]
+        entries = files + (dirs if include_dirs else [])
+        for name in entries:
+            if _fn.fnmatch(name.lower(), pattern.lower()):
+                full = os.path.join(dp, name)
+                try:
+                    stat = os.stat(full)
+                    results.append({"name": name, "path": full, "size": stat.st_size, "modified": stat.st_mtime})
+                except Exception:
+                    results.append({"name": name, "path": full})
+                if len(results) >= max_results:
+                    break
+            total_scanned += 1
+        if len(results) >= max_results:
+            break
+    return results, total_scanned
+
+
 async def execute_file_find(args: dict) -> dict:
     """Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (rapide)
     ou os.walk en fallback. Pour une recherche sur TOUT le PC, utilisez 'path=all' ou omettez path."""
@@ -1214,35 +1251,13 @@ async def execute_file_find(args: dict) -> dict:
             }
 
     # ── Fallback : os.walk classique ──────────────────────────────────────────
+    # v2.163 : scan déporté sur un thread (asyncio.to_thread) — cette voie se déclenche
+    # notamment quand l'index Windows Search est indisponible sur une recherche "tout le
+    # PC" (path omis), même risque que file_large_finder v2.160 (blocage de l'event loop
+    # pendant potentiellement plusieurs dizaines de secondes).
     try:
-        import fnmatch as _fn
-        results = []
-        total_scanned = 0
-        _SKIP_DIRS = {'$RECYCLE.BIN', 'System Volume Information', 'AppData',
-                      'node_modules', '__pycache__', '.git', '.venv',
-                      'Windows.old', 'Windows', 'Program Files', 'Program Files (x86)'}
-        for root, dirs, files in os.walk(str(resolved)):
-            # Skip hidden/system/heavy dirs
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in _SKIP_DIRS]
-            entries = files + (dirs if include_dirs else [])
-            for name in entries:
-                if _fn.fnmatch(name.lower(), pattern.lower()):
-                    full = os.path.join(root, name)
-                    try:
-                        stat = os.stat(full)
-                        results.append({
-                            "name":     name,
-                            "path":     full,
-                            "size":     stat.st_size,
-                            "modified": stat.st_mtime,
-                        })
-                    except Exception:
-                        results.append({"name": name, "path": full})
-                    if len(results) >= max_results:
-                        break
-                total_scanned += 1
-            if len(results) >= max_results:
-                break
+        results, total_scanned = await asyncio.to_thread(
+            _file_find_walk_scan, str(resolved), pattern, include_dirs, max_results)
         return {
             "success":  True,
             "pattern":  pattern,
@@ -8124,6 +8139,18 @@ def _extract_document_text(path: str) -> str:
     return raw
 
 
+def _document_index_collect_targets(path: str) -> list:
+    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, jamais directement dans l'event loop."""
+    targets = []
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            if os.path.splitext(f)[1].lower() in _DOC_EXTS:
+                targets.append(os.path.join(root, f))
+        if len(targets) > 200:
+            break
+    return targets
+
+
 async def execute_document_index(args: dict) -> dict:
     """Indexe un fichier (ou tous les fichiers d'un dossier) pour pouvoir l'interroger ensuite."""
     import vector_store as vs, uuid as _uuid
@@ -8136,12 +8163,10 @@ async def execute_document_index(args: dict) -> dict:
 
     targets = []
     if os.path.isdir(path):
-        for root, _dirs, files in os.walk(path):
-            for f in files:
-                if os.path.splitext(f)[1].lower() in _DOC_EXTS:
-                    targets.append(os.path.join(root, f))
-            if len(targets) > 200:
-                break
+        # v2.163 : os.walk déporté sur un thread (même risque que file_large_finder v2.160
+        # si le dossier indexé est volumineux — la boucle break>200 ne coupe qu'APRÈS
+        # avoir déjà walké potentiellement beaucoup de fichiers).
+        targets = await asyncio.to_thread(_document_index_collect_targets, path)
     elif os.path.splitext(path)[1].lower() in _DOC_EXTS:
         targets = [path]
     else:
@@ -11164,6 +11189,33 @@ async def execute_file_large_finder(args: dict) -> dict:
         return {"error": str(e)}
 
 
+def _system_cleanup_scan(candidates: list, cutoff: float, do_delete: bool) -> dict:
+    """Scan bloquant (os.walk + éventuelle suppression) — appelé via asyncio.to_thread,
+    jamais directement dans l'event loop (Temp peut contenir énormément de petits
+    fichiers, même risque que file_large_finder v2.160)."""
+    report = []
+    grand_total = 0; grand_files = 0; freed = 0; freed_files = 0
+    for d in candidates:
+        dtotal = 0; dfiles = 0
+        for dp, dns, fns in os.walk(d):
+            for fn in fns:
+                fp = os.path.join(dp, fn)
+                try:
+                    st = os.stat(fp)
+                    dtotal += st.st_size; dfiles += 1
+                    if do_delete and st.st_mtime < cutoff:
+                        try:
+                            os.remove(fp); freed += st.st_size; freed_files += 1
+                        except Exception:
+                            pass
+                except Exception:
+                    continue
+        grand_total += dtotal; grand_files += dfiles
+        report.append({"dir": d, "size_human": _fmt_bytes(dtotal), "files": dfiles})
+    return {"report": report, "grand_total": grand_total, "grand_files": grand_files,
+            "freed": freed, "freed_files": freed_files}
+
+
 async def execute_system_cleanup(args: dict) -> dict:
     """Analyse (et, si delete=true, vide) les fichiers temporaires pour libérer de l'espace.
     Sans delete=true : rapport seulement (aucune suppression). delete=true est une action sensible."""
@@ -11182,26 +11234,10 @@ async def execute_system_cleanup(args: dict) -> dict:
         min_age_days = float(args.get("min_age_days", 1))
         cutoff = time.time() - min_age_days * 86400
         do_delete = bool(args.get("delete", False))
-        report = []
-        grand_total = 0; grand_files = 0; freed = 0; freed_files = 0
-        for d in candidates:
-            dtotal = 0; dfiles = 0
-            for dp, dns, fns in os.walk(d):
-                for fn in fns:
-                    fp = os.path.join(dp, fn)
-                    try:
-                        st = os.stat(fp)
-                        dtotal += st.st_size; dfiles += 1
-                        if do_delete and st.st_mtime < cutoff:
-                            try:
-                                os.remove(fp); freed += st.st_size; freed_files += 1
-                            except Exception:
-                                pass
-                    except Exception:
-                        continue
-            grand_total += dtotal; grand_files += dfiles
-            report.append({"dir": d, "size_human": _fmt_bytes(dtotal), "files": dfiles})
-        res = {"success": True, "locations": report,
+        scan = await asyncio.to_thread(_system_cleanup_scan, candidates, cutoff, do_delete)
+        grand_total, grand_files = scan["grand_total"], scan["grand_files"]
+        freed, freed_files = scan["freed"], scan["freed_files"]
+        res = {"success": True, "locations": scan["report"],
                "reclaimable_human": _fmt_bytes(grand_total), "total_files": grand_files,
                "deleted": do_delete}
         if do_delete:
@@ -14879,6 +14915,59 @@ async def execute_win_system_report(args: dict) -> dict:
         return {"error": str(e)}
 
 
+def _file_duplicate_finder_scan(resolved: Path, min_size: int, max_files: int) -> dict:
+    """Scan bloquant (os.walk + hash MD5) — appelé via asyncio.to_thread, jamais
+    directement dans l'event loop (même risque que file_large_finder v2.160 : un gros
+    dossier peut prendre plusieurs dizaines de secondes)."""
+    import hashlib as _hl
+    # 1. Group by size (fast pre-filter)
+    size_map = {}
+    scanned = 0
+    for root, dirs, files in os.walk(str(resolved)):
+        dirs[:] = [d for d in dirs if d not in ('$RECYCLE.BIN', 'System Volume Information', 'node_modules', '.git')]
+        for fname in files:
+            if scanned >= max_files:
+                break
+            fpath = os.path.join(root, fname)
+            try:
+                sz = os.path.getsize(fpath)
+                if sz >= min_size:
+                    size_map.setdefault(sz, []).append(fpath)
+                    scanned += 1
+            except Exception:
+                pass
+        if scanned >= max_files:
+            break
+
+    # 2. For sizes with >1 file, compute hash
+    duplicates = []
+    total_wasted = 0
+    for sz, paths in size_map.items():
+        if len(paths) < 2:
+            continue
+        hash_map = {}
+        for p in paths:
+            try:
+                h = _hl.md5()
+                with open(p, "rb") as f:
+                    # Hash first 64KB for speed (good enough for dedup detection)
+                    h.update(f.read(65536))
+                hash_map.setdefault(h.hexdigest(), []).append(p)
+            except Exception:
+                pass
+        for hsh, dups in hash_map.items():
+            if len(dups) > 1:
+                duplicates.append({
+                    "size_kb": round(sz/1024, 1),
+                    "count": len(dups),
+                    "files": dups,
+                })
+                total_wasted += sz * (len(dups) - 1)
+
+    duplicates.sort(key=lambda d: d["size_kb"] * d["count"], reverse=True)
+    return {"scanned": scanned, "duplicates": duplicates, "total_wasted": total_wasted}
+
+
 async def execute_file_duplicate_finder(args: dict) -> dict:
     """
     Trouve les fichiers en double dans un dossier (par taille puis hash MD5).
@@ -14894,58 +14983,14 @@ async def execute_file_duplicate_finder(args: dict) -> dict:
     max_files = int(args.get("max_files", 5000))
 
     try:
-        import hashlib as _hl
-        # 1. Group by size (fast pre-filter)
-        size_map = {}
-        scanned = 0
-        for root, dirs, files in os.walk(str(resolved)):
-            dirs[:] = [d for d in dirs if d not in ('$RECYCLE.BIN', 'System Volume Information', 'node_modules', '.git')]
-            for fname in files:
-                if scanned >= max_files:
-                    break
-                fpath = os.path.join(root, fname)
-                try:
-                    sz = os.path.getsize(fpath)
-                    if sz >= min_size:
-                        size_map.setdefault(sz, []).append(fpath)
-                        scanned += 1
-                except Exception:
-                    pass
-            if scanned >= max_files:
-                break
-
-        # 2. For sizes with >1 file, compute hash
-        duplicates = []
-        total_wasted = 0
-        for sz, paths in size_map.items():
-            if len(paths) < 2:
-                continue
-            hash_map = {}
-            for p in paths:
-                try:
-                    h = _hl.md5()
-                    with open(p, "rb") as f:
-                        # Hash first 64KB for speed (good enough for dedup detection)
-                        h.update(f.read(65536))
-                    hash_map.setdefault(h.hexdigest(), []).append(p)
-                except Exception:
-                    pass
-            for hsh, dups in hash_map.items():
-                if len(dups) > 1:
-                    duplicates.append({
-                        "size_kb": round(sz/1024, 1),
-                        "count": len(dups),
-                        "files": dups,
-                    })
-                    total_wasted += sz * (len(dups) - 1)
-
-        duplicates.sort(key=lambda d: d["size_kb"] * d["count"], reverse=True)
+        scan = await asyncio.to_thread(_file_duplicate_finder_scan, resolved, min_size, max_files)
+        duplicates = scan["duplicates"]
         return {
             "success": True,
             "root": str(resolved),
-            "scanned": scanned,
+            "scanned": scan["scanned"],
             "duplicate_groups": len(duplicates),
-            "wasted_space_mb": round(total_wasted/1024**2, 1),
+            "wasted_space_mb": round(scan["total_wasted"]/1024**2, 1),
             "duplicates": duplicates[:50],
             "hint": "Hash sur les 64 premiers Ko (rapide). Vérifiez avant toute suppression.",
         }
