@@ -260,11 +260,17 @@ export function ChatProvider({ children }) {
               break;
 
             case 'tool_start': {
+              // v2.148 — horodatage de départ, utilisé par ToolCallInline pour afficher un
+              // chrono en direct sur les outils lents (recherche approfondie, panel
+              // d'experts, tâche longue...) — sans ça, la carte reste sur "⟳ Exécution..."
+              // plusieurs minutes sans aucun repère de temps, symptôme déjà documenté
+              // (v2.125/v2.136 — impression que Marvin reste bloqué).
               const inv = {
                 state: 'call',
                 toolCallId: event.toolCallId,
                 toolName: event.toolName,
                 args: event.args || {},
+                startedAt: Date.now(),
               };
               setMessages(prev => prev.map(m => {
                 if (m.id !== assistantId) return m;

@@ -2286,6 +2286,28 @@ async def lifespan(app_instance):
 #   celles déjà validées en réel côté backend lors de leur implémentation (v2.141-145) —
 #   changement purement d'affichage, aucun risque de désynchronisation. `scripts/
 #   smoke_test_chat.py` 5/5.
+#
+# v2.148 (🎯 UI — chrono en direct + garde-fou repli/confirmation) : sur demande explicite
+#   (« continue dans cet voie, inspire-toi des dernières nouveautés AI »), recherche menée
+#   (patterns d'architecture de statut en 4 couches — ambiant/progression/attention/
+#   résumé — et affichage du temps écoulé par sous-agent, tendances agent UI 2026).
+#   🔴 BUG TROUVÉ EN AUDITANT (pas cherché délibérément) AVANT d'ajouter la nouvelle
+#   fonctionnalité : le repli d'étapes ajouté en v2.146 (`shouldCollapse` dès 3 outils)
+#   pouvait cacher par défaut un outil CRITIQUE en attente de confirmation (ex. supprimer
+#   un fichier, envoyer un email) derrière "▼ Afficher" — une confirmation d'action
+#   potentiellement dangereuse ne doit JAMAIS être masquée. Corrigé : nouvelle fonction
+#   `toolNeedsAttention()` (couche "attention" du pattern à 4 niveaux) désactive le repli
+#   dès qu'un des outils du tour en a besoin.
+#   **Chrono en direct** (`ChatContext.jsx::tool_start` horodate `startedAt`, `ToolCallInline`
+#   affiche "⟳ Exécution... (Ns)" au-delà de 3s) : les outils lents (recherche approfondie,
+#   panel d'experts, tâche longue) restaient sur "⟳ Exécution..." plusieurs minutes sans
+#   AUCUN repère de temps — symptôme déjà documenté (v2.125/v2.136, "Marvin reste
+#   bloqué"). Complète le compteur déjà existant sur le `TypingIndicator` (les "trous"
+#   entre outils), qui ne couvrait pas la carte d'un outil UNIQUE en cours d'exécution.
+#   Testé en réel (Playwright) : `ai_model_council` (appel bloquant unique, la fenêtre la
+#   plus large pour observer) → carte capturée avec "Exécution... (12s)" affiché
+#   correctement en cours d'exécution ; 0 erreur console sur l'ensemble des tests.
+#   `scripts/smoke_test_chat.py` 5/5.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -6799,7 +6821,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.147.0",
+            "version":         "2.148.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

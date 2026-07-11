@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { marked } from 'marked';
 import styles from './MessageBubble.module.css';
 import FileExplorerCard from './FileExplorerCard';
@@ -259,7 +259,11 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
     // v2.146 — replié par défaut au-delà de 3 étapes (pattern Perplexity Pro Search :
     // la réponse reste prioritaire, le détail se déplie à la demande) — en dessous, montrer
     // directement les cartes ne surcharge pas assez pour justifier un clic supplémentaire.
-    const shouldCollapse = toolInvocations.length >= 3;
+    // v2.148 — SAUF si un outil critique attend une confirmation : ça ne doit JAMAIS être
+    // caché par défaut (trouvé en auditant ce même repli après coup — un vrai risque de
+    // régression, pas juste une amélioration cosmétique).
+    const anyNeedsAttention = toolInvocations.some(toolNeedsAttention);
+    const shouldCollapse = toolInvocations.length >= 3 && !anyNeedsAttention;
     return (
       <div className={`${styles.wrapper} ${styles.wrapperAssistant}`} style={{ flexDirection: 'column', gap: '8px', opacity: 1, maxWidth: '100%' }}>
         <TurnModeBadge mode={turnMode} />
@@ -425,6 +429,28 @@ function detectTurnMode(toolInvocations, modelInfo) {
     return { icon: '🛠️', label: 'Agent (outils)', color: 'var(--accent-primary)' };
   }
   return null;
+}
+
+// v2.148 — trouvé en auditant le repli d'étapes (v2.146) : un outil CRITIQUE en attente de
+// confirmation (ex. supprimer un fichier, envoyer un email) pouvait se retrouver caché
+// derrière "▼ Afficher" si le tour comptait 3 outils ou plus — une confirmation d'action
+// potentiellement dangereuse ne doit JAMAIS être masquée par défaut. Extrait en fonction
+// autonome (réutilisée par ToolCallInline ET par le calcul du repli) pour ne dupliquer
+// cette logique de détection nulle part.
+function toolNeedsAttention(tool) {
+  const toolName = tool.toolName || '';
+  if (!CRITICAL_TOOLS.includes(toolName)) return false;
+  const state = tool.state || (tool.result !== undefined ? 'result' : 'pending');
+  if (state !== 'result' && state !== 'error' && (state === 'call' || state === 'pending')) return true;
+  if (state === 'result' && tool.result) {
+    let resObj = tool.result;
+    if (typeof resObj === 'string') {
+      try { resObj = JSON.parse(resObj); } catch { return false; }
+    }
+    if (resObj && resObj.type === 'json' && resObj.value !== undefined) resObj = resObj.value;
+    return !!(resObj && resObj.requiresConfirmation);
+  }
+  return false;
 }
 
 function TurnModeBadge({ mode }) {
@@ -1038,6 +1064,18 @@ function renderToolResult(toolName, result) {
 }
 
 function ToolCallInline({ tool, onConfirm, onCancel }) {
+  // v2.148 — chrono en direct pendant l'exécution (voir ChatContext.jsx::tool_start pour
+  // l'horodatage `startedAt`). Hook appelé INCONDITIONNELLEMENT avant le early-return
+  // `if (!tool)` ci-dessous (règle des hooks React) — la garde se fait à l'intérieur.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!tool || tool.state === 'result' || tool.state === 'error' || !tool.startedAt) return undefined;
+    const update = () => setElapsed(Math.floor((Date.now() - tool.startedAt) / 1000));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [tool?.startedAt, tool?.state]);
+
   if (!tool) return null;
   const toolName = tool.toolName || '';
   const icon = getToolIcon(toolName);
@@ -1176,7 +1214,10 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
     : state === 'result' ? '✓ Terminé'
     : state === 'error' ? '✗ Erreur'
     : state === 'call' && isCritical ? '⏳ En attente de votre confirmation'
-    : state === 'call' ? '⟳ Exécution...'
+    // v2.148 — chrono ajouté au-delà de 3s : sans lui, un outil lent (recherche
+    // approfondie, panel d'experts, tâche longue...) reste sur "⟳ Exécution..." plusieurs
+    // minutes sans aucun repère — symptôme déjà documenté (v2.125/v2.136).
+    : state === 'call' ? `⟳ Exécution...${elapsed > 3 ? ` (${elapsed >= 60 ? `${Math.floor(elapsed / 60)}min ${elapsed % 60}s` : `${elapsed}s`})` : ''}`
     : state === 'partial-call' ? '⟳ Préparation...'
     : isCritical ? '⏳ En attente de votre confirmation'
     : '⟳ En cours...';
