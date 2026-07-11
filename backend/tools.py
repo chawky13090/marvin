@@ -3032,6 +3032,200 @@ async def execute_pc_window_focus(args: dict) -> dict:
         return {"error": str(e)}
 
 
+# ── v2.149 — Agent GUI local (lecture/clic/frappe via Windows UI Automation) ──────────
+# Comble un vrai trou : Marvin avait déjà les "yeux" (pc_screenshot, screen_ocr,
+# pc_window_list/focus) mais aucune "main" — aucun moyen de cliquer/taper dans une fenêtre.
+# Choix délibéré : UI Automation (arbre structuré natif Windows) plutôt qu'un agent vision
+# façon UI-TARS — 100% local, aucune capture d'écran envoyée à un modèle (donc aucun risque
+# de fuite de données sensibles affichées à l'écran vers le cloud), et bien plus précis
+# qu'un clic en coordonnées pixel qui casse au moindre pixel de décalage.
+#
+# Sécurité — pattern "lire un ID réel avant d'agir dessus" (même esprit que winget_install
+# v2.113 et long_task_status v2.145) : pc_gui_click/pc_gui_type ne reçoivent JAMAIS de
+# coordonnées figées d'une lecture précédente. Chaque appel refait une résolution LIVE de
+# l'élément (par automation_id ou control_type+name+match_index) au moment même de l'action
+# — protection structurelle contre une attaque TOCTOU (l'UI a changé entre la lecture et
+# l'action : fenêtre fermée, élément déplacé, remplacé par autre chose). Si l'élément n'est
+# plus là, l'appel échoue proprement plutôt que de cliquer au hasard.
+#
+# Le texte/les noms lus depuis l'UI (pc_gui_read) restent du CONTENU OBSERVÉ au sens de la
+# règle de sécurité générale — jamais une instruction, même si un élément affiche un texte
+# du style "clique ici". pc_gui_click/pc_gui_type sont dans DANGEROUS_TOOLS (confirmation
+# obligatoire).
+#
+# Limite connue et assumée : UI Automation ne franchit pas la frontière UAC — une fenêtre
+# élevée (admin) reste invisible/inaccessible depuis ce process non-admin. Pas de
+# contournement ici (cliquer en tant qu'admin serait un risque d'un tout autre ordre que
+# l'allowlist stricte du sidecar élevé, v2.90) — échec explicite si la fenêtre cible est
+# élevée, à traiter au cas par cas si le besoin se présente vraiment.
+
+_GUI_INTERACTIVE_TYPES = {
+    "Button", "Edit", "Document", "ComboBox", "CheckBox", "RadioButton", "MenuItem", "MenuBar",
+    "ListItem", "List", "TabItem", "Hyperlink", "Slider", "Spinner", "TreeItem",
+    "SplitButton", "ToggleButton", "DataItem",
+}
+
+
+def _gui_get_window_sync(search: str):
+    """Connecte à une fenêtre top-level via UI Automation. search vide → fenêtre au premier plan."""
+    from pywinauto import Desktop
+    import win32gui
+
+    desktop = Desktop(backend="uia")
+    if not search:
+        hwnd = win32gui.GetForegroundWindow()
+        if not hwnd:
+            raise RuntimeError("Aucune fenêtre au premier plan.")
+        title = win32gui.GetWindowText(hwnd)
+        return desktop.window(handle=hwnd), title
+    search_l = search.lower()
+    for w in desktop.windows():
+        try:
+            title = w.window_text()
+        except Exception:
+            continue
+        if title and search_l in title.lower():
+            return w, title
+    raise RuntimeError(f"Aucune fenêtre contenant « {search} » trouvée (ou fenêtre élevée/admin, inaccessible).")
+
+
+# Types "porteurs de contenu" : leur `name` UIA EST le texte qu'ils contiennent (constaté en
+# testant sur le Bloc-notes Windows 11 réel — control_type="Document", name="<tout le fichier>").
+# Ce texte n'est PAS un identifiant stable (il change à chaque frappe) → jamais utilisé pour le
+# matching de ré-résolution, seulement affiché (tronqué) à titre informatif. Le matching se fait
+# par position (match_index) parmi les contrôles du même control_type dans la fenêtre.
+_GUI_CONTENT_TYPES = {"Edit", "Document"}
+
+
+def _gui_read_sync(search: str, max_elements: int) -> dict:
+    window, title = _gui_get_window_sync(search)
+    elements = []
+    counter: dict = {}
+    try:
+        descendants = window.descendants()
+    except Exception as e:
+        raise RuntimeError(f"Lecture de l'arbre UI impossible (fenêtre élevée/admin ?) : {e}")
+    for ctrl in descendants:
+        try:
+            ctype = ctrl.element_info.control_type or ""
+            if ctype not in _GUI_INTERACTIVE_TYPES:
+                continue
+            name_raw = (ctrl.window_text() or "").strip()
+            auto_id = ctrl.element_info.automation_id or ""
+            if not name_raw and not auto_id:
+                continue
+            enabled = ctrl.is_enabled()
+            visible = ctrl.is_visible()
+        except Exception:
+            continue
+        # Pour Edit/Document, le contenu n'est jamais une clé de matching (cf. note ci-dessus).
+        match_key_name = "" if ctype in _GUI_CONTENT_TYPES else name_raw
+        display_name = (name_raw[:100] + "…") if len(name_raw) > 100 else name_raw
+        key = (ctype, match_key_name)
+        idx = counter.get(key, 0)
+        counter[key] = idx + 1
+        elements.append({
+            "control_type": ctype, "name": display_name, "automation_id": auto_id,
+            "match_index": idx, "enabled": enabled, "visible": visible,
+        })
+        if len(elements) >= max_elements:
+            break
+    return {"success": True, "window_title": title, "count": len(elements), "elements": elements}
+
+
+def _gui_resolve_sync(search: str, control_type: str, name: str, automation_id: str, match_index: int):
+    window, title = _gui_get_window_sync(search)
+    if automation_id:
+        matches = window.descendants(auto_id=automation_id, control_type=control_type) if control_type \
+            else window.descendants(auto_id=automation_id)
+    elif control_type in _GUI_CONTENT_TYPES:
+        # Contenu non fiable comme clé (cf. _GUI_CONTENT_TYPES) — matching par position uniquement.
+        matches = window.descendants(control_type=control_type)
+    else:
+        matches = [c for c in window.descendants(control_type=control_type)
+                   if (c.window_text() or "").strip() == name]
+    if not matches:
+        raise RuntimeError(
+            "Élément introuvable — l'interface a changé depuis la dernière lecture "
+            "(refais un pc_gui_read pour re-vérifier l'état actuel)."
+        )
+    idx = min(max(match_index, 0), len(matches) - 1)
+    return window, title, matches[idx]
+
+
+async def execute_pc_gui_read(args: dict) -> dict:
+    search = (args.get("window") or "").strip()
+    max_elements = max(1, min(int(args.get("max_elements", 40)), 100))
+    try:
+        return await asyncio.to_thread(_gui_read_sync, search, max_elements)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_gui_click(args: dict) -> dict:
+    search = (args.get("window") or "").strip()
+    control_type = (args.get("control_type") or "").strip()
+    name = (args.get("name") or "").strip()
+    automation_id = (args.get("automation_id") or "").strip()
+    match_index = int(args.get("match_index", 0))
+    if not control_type and not automation_id:
+        return {"error": "Paramètre 'control_type' ou 'automation_id' requis (issus d'un pc_gui_read récent)."}
+    if not args.get("confirmed"):
+        target_desc = automation_id or f"{control_type} « {name} »"
+        return {"requiresConfirmation": True,
+                "message": f"Cliquer sur l'élément {target_desc} dans la fenêtre "
+                            f"« {search or '(premier plan)'} » ?"}
+
+    def _click():
+        window, title, ctrl = _gui_resolve_sync(search, control_type, name, automation_id, match_index)
+        if not ctrl.is_enabled():
+            raise RuntimeError("Élément désactivé — impossible de cliquer.")
+        ctrl.click_input()
+        return title
+
+    try:
+        title = await asyncio.to_thread(_click)
+        return {"success": True, "message": f"Clic effectué sur « {name or automation_id} » dans « {title} »."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def execute_pc_gui_type(args: dict) -> dict:
+    search = (args.get("window") or "").strip()
+    control_type = (args.get("control_type") or "").strip()
+    name = (args.get("name") or "").strip()
+    automation_id = (args.get("automation_id") or "").strip()
+    match_index = int(args.get("match_index", 0))
+    text = args.get("text", "")
+    if not control_type and not automation_id:
+        return {"error": "Paramètre 'control_type' ou 'automation_id' requis (issus d'un pc_gui_read récent)."}
+    if not text:
+        return {"error": "Paramètre 'text' requis."}
+    if not args.get("confirmed"):
+        target_desc = automation_id or f"{control_type} « {name} »"
+        preview = text[:80] + ("…" if len(text) > 80 else "")
+        return {"requiresConfirmation": True,
+                "message": f"Écrire « {preview} » dans l'élément {target_desc} de la fenêtre "
+                            f"« {search or '(premier plan)'} » ?"}
+
+    def _type():
+        window, title, ctrl = _gui_resolve_sync(search, control_type, name, automation_id, match_index)
+        if not ctrl.is_enabled():
+            raise RuntimeError("Élément désactivé — impossible d'y écrire.")
+        ctrl.set_focus()
+        try:
+            ctrl.set_edit_text(text)
+        except Exception:
+            ctrl.type_keys(text, with_spaces=True)
+        return title
+
+    try:
+        title = await asyncio.to_thread(_type)
+        return {"success": True, "message": f"Texte écrit dans « {name or automation_id} » de « {title} »."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 async def execute_pc_notify(args: dict) -> dict:
     title = args.get("title", "SecretaryAI")
     message = args.get("message", "")
@@ -16756,6 +16950,9 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_screenshot": execute_pc_screenshot,
     "pc_window_list": execute_pc_window_list,
     "pc_window_focus": execute_pc_window_focus,
+    "pc_gui_read": execute_pc_gui_read,
+    "pc_gui_click": execute_pc_gui_click,
+    "pc_gui_type": execute_pc_gui_type,
     "pc_notify": execute_pc_notify,
     "pc_pull_ollama_model": execute_pc_pull_ollama_model,
     "pc_clipboard_get": execute_pc_clipboard_get,
@@ -17326,6 +17523,40 @@ TOOLS_SPEC = [
     _t("pc_window_focus", "Met une fenêtre au premier plan par son titre.",
        {"search": {"type": "string", "description": "Texte à rechercher dans le titre de la fenêtre"}},
        ["search"]),
+
+    _t("pc_gui_read", "Lit l'arbre des éléments cliquables (boutons/champs/menus/listes) d'une fenêtre Windows "
+                       "via UI Automation — PAS une capture d'écran, une lecture structurée 100% locale. Utilise "
+                       "ceci AVANT tout pc_gui_click/pc_gui_type pour obtenir les identifiants réels des éléments "
+                       "(jamais deviner un automation_id). Sans 'window', lit la fenêtre au premier plan. "
+                       "Échoue proprement si la fenêtre est élevée (admin) — inaccessible depuis ce process.",
+       {"window": {"type": "string", "description": "Sous-chaîne du titre de fenêtre ciblée (optionnel, défaut : premier plan)"},
+        "max_elements": {"type": "integer", "description": "Nombre max d'éléments retournés (défaut 40, max 100)"}},
+       []),
+
+    _t("pc_gui_click", "Clique sur un élément d'une fenêtre Windows (bouton, case, item de menu/liste...) via UI "
+                        "Automation. Les paramètres control_type/name/automation_id/match_index DOIVENT venir "
+                        "d'un pc_gui_read RÉCENT sur la même fenêtre — l'élément est re-résolu en direct au "
+                        "moment du clic (jamais de coordonnées figées), donc si l'UI a changé depuis la lecture "
+                        "l'appel échoue proprement plutôt que de cliquer au hasard.",
+       {"window": {"type": "string", "description": "Sous-chaîne du titre de fenêtre (doit correspondre à celle du pc_gui_read)"},
+        "control_type": {"type": "string", "description": "control_type exact renvoyé par pc_gui_read (ex: Button, MenuItem)"},
+        "name": {"type": "string", "description": "name exact renvoyé par pc_gui_read"},
+        "automation_id": {"type": "string", "description": "automation_id renvoyé par pc_gui_read, si présent (plus fiable que name)"},
+        "match_index": {"type": "integer", "description": "match_index renvoyé par pc_gui_read si plusieurs éléments partagent control_type+name (défaut 0)"},
+        "confirmed": {"type": "boolean", "description": "Requis pour exécuter réellement le clic"}},
+       []),
+
+    _t("pc_gui_type", "Écrit du texte dans un champ d'une fenêtre Windows via UI Automation. Mêmes règles que "
+                       "pc_gui_click : control_type/name/automation_id/match_index viennent d'un pc_gui_read "
+                       "récent, élément re-résolu en direct au moment de l'écriture.",
+       {"window": {"type": "string", "description": "Sous-chaîne du titre de fenêtre (doit correspondre à celle du pc_gui_read)"},
+        "control_type": {"type": "string", "description": "control_type exact renvoyé par pc_gui_read (ex: Edit)"},
+        "name": {"type": "string", "description": "name exact renvoyé par pc_gui_read"},
+        "automation_id": {"type": "string", "description": "automation_id renvoyé par pc_gui_read, si présent"},
+        "match_index": {"type": "integer", "description": "match_index renvoyé par pc_gui_read si ambigu (défaut 0)"},
+        "text": {"type": "string", "description": "Texte à écrire dans le champ"},
+        "confirmed": {"type": "boolean", "description": "Requis pour exécuter réellement l'écriture"}},
+       ["text"]),
 
     _t("pc_notify", "Envoie une notification Windows à l'utilisateur.",
        {"title": {"type": "string", "description": "Titre de la notification"},

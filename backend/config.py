@@ -137,4 +137,6 @@ DANGEROUS_TOOLS: set[str] = {
     "ssh_write_and_run",  # écriture + exécution d'un script sur un serveur distant
     "system_cleanup",   # suppression de fichiers temporaires (delete=true)
     "itsm_ticket_create",  # crée un ticket visible dans un système externe (GLPI...)
+    "pc_gui_click",      # v2.149 — clic réel dans une fenêtre (UI Automation)
+    "pc_gui_type",       # v2.149 — écriture réelle dans un champ (UI Automation)
 }
