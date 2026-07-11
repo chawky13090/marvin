@@ -2830,6 +2830,23 @@ async def lifespan(app_instance):
 #   DOM des messages) ; regle CSS max-width:min(85%,720px) confirmee compilee dans la
 #   feuille de style live ; barre de saisie confirmee a 1 bouton "+" au lieu de 3, 0 erreur
 #   console sur les 3 changements.
+#
+# v2.168 (cartes d'accueil : navigation directe au lieu d'une requete chat lourde) : suite
+#   directe de v2.167, signale par l'utilisateur en testant les cartes tout juste ajoutees
+#   ("c'est trop long a attendre"). Diagnostic confirme en relisant les 2 vraies
+#   conversations de test : "Trouve les plus gros fichiers de mon disque C" a declenche
+#   file_large_finder SANS dossier precise -> scan complet ~150s (meme risque documente en
+#   v2.160/v2.163, jamais resolu cote temps d'attente utilisateur, seulement cote blocage de
+#   l'event-loop) ; "Resume mes emails non lus" a declenche email_digest ~54s. Les deux
+#   appels sont restes en etat "call" (jamais resolus) dans les messages persistes -- signe
+#   direct que l'utilisateur a du abandonner/attendre.
+#   Proposition retenue de l'utilisateur, meilleure que la v2.167 : chaque carte navigue
+#   directement vers sa page dediee (deja riche, deja rapide, zero aller-retour LLM) au lieu
+#   de lancer un prompt chat -- Gerer vos emails -> /emails, Organiser l'agenda -> /calendar,
+#   Classer vos fichiers -> /fichiers, Controler le PC -> /systeme. router.push() (Next.js),
+#   navigation cote client instantanee.
+#   Teste en reel (Playwright + JS direct) : clic sur "Classer vos fichiers" -> navigation
+#   confirmee vers /fichiers (window.location.pathname), 0 erreur console.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7367,7 +7384,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.167.0",
+            "version":         "2.168.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

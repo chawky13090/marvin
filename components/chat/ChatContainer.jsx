@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useChat } from '@/lib/contexts/ChatContext';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
@@ -30,6 +31,7 @@ export default function ChatContainer({
 }) {
   const [localInput, setLocalInput] = useState('');
   const scrollRef = useRef(null);
+  const router = useRouter();
 
   const {
     messages, status, isLoading, error,
@@ -247,15 +249,20 @@ export default function ChatContainer({
               width: '100%',
             }}>
               {[
-                { icon: '📧', label: 'Gérer vos emails', desc: 'Lire, répondre, classer', prompt: 'Résume mes emails non lus' },
-                { icon: '📅', label: 'Organiser votre agenda', desc: 'RDV, disponibilités', prompt: "Qu'ai-je à l'agenda aujourd'hui ?" },
-                { icon: '📁', label: 'Classer vos fichiers', desc: 'Lire, créer, organiser', prompt: 'Trouve les plus gros fichiers de mon disque C' },
-                { icon: '🖥️', label: 'Contrôler votre PC', desc: 'Apps, processus, commandes', prompt: 'Fais un diagnostic complet de mon PC' },
+                // v2.168 — navigue vers la page dédiée plutôt que de lancer une requête
+                // chat : signalé par l'utilisateur (les prompts v2.167 déclenchaient des
+                // outils lourds — file_large_finder ~150s, email_digest ~54s — beaucoup
+                // trop long pour un premier clic). Chaque page a déjà une UI pensée pour
+                // ça (listes, filtres, actions rapides), instantané côté client.
+                { icon: '📧', label: 'Gérer vos emails', desc: 'Lire, répondre, classer', href: '/emails' },
+                { icon: '📅', label: 'Organiser votre agenda', desc: 'RDV, disponibilités', href: '/calendar' },
+                { icon: '📁', label: 'Classer vos fichiers', desc: 'Parcourir, rechercher, organiser', href: '/fichiers' },
+                { icon: '🖥️', label: 'Contrôler votre PC', desc: 'Santé, logiciels, nettoyage', href: '/systeme' },
               ].map((item) => (
                 <button
                   key={item.label}
                   className="card suggestion-card"
-                  onClick={() => sendMessage({ text: item.prompt })}
+                  onClick={() => router.push(item.href)}
                   style={{
                     textAlign: 'center', padding: '20px', cursor: 'pointer',
                     animation: 'slideUp 0.5s ease forwards',
