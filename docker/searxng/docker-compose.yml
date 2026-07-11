@@ -4,13 +4,19 @@
 # Port hôte volontairement hors des défauts courants (8080/9000/3000...) pour éviter
 # tout conflit avec d'autres services d'un homelab (Portainer, Zabbix, Tomcat...).
 # Modifiable ci-dessous si 8890 est déjà pris sur la machine cible.
+#
+# v2.166 — lié à 127.0.0.1 uniquement (pas 0.0.0.0) : ce service n'a JAMAIS besoin
+# d'être joignable depuis le réseau local, seul le backend Marvin (même machine) le
+# consomme. Sans ce binding, "8890:8080" expose SearXNG en clair (HTTP) à tout le LAN
+# — pas de certificat à gérer pour un service purement loopback, la vraie protection
+# est de ne jamais sortir du binding local.
 services:
   searxng:
     image: searxng/searxng:latest
     container_name: marvin-searxng
     restart: unless-stopped
     ports:
-      - "8890:8080"
+      - "127.0.0.1:8890:8080"
     volumes:
       - ./settings.yml:/etc/searxng/settings.yml:ro
     environment:

@@ -2790,6 +2790,20 @@ async def lifespan(app_instance):
 #   a B apparait proprement, aucune trace de A, 0 erreur console (AbortError avale par
 #   le catch existant comme prevu). Conversation de test laissee en place (suppression
 #   par ID recent refusee par le classifieur de securite -- regle anti-incident v2.110).
+#
+# v2.166 (durcissement SearXNG : liaison 127.0.0.1 au lieu de 0.0.0.0) : question directe
+#   de l'utilisateur ("garde searxng en http c'est pas top non ?"). Analyse : le vrai
+#   probleme n'etait pas HTTP en soi (le trafic Marvin<->SearXNG reste en boucle locale,
+#   meme machine) mais le fait que "8890:8080" en docker-compose lie par defaut sur
+#   TOUTES les interfaces (0.0.0.0) -- n'importe quel appareil du LAN pouvait donc
+#   atteindre l'instance en clair. Plutot que d'ajouter du HTTPS (certificat auto-signe,
+#   complexite inutile pour un service qui n'a jamais besoin de sortir de la machine),
+#   restreint le binding a 127.0.0.1 -- elimine l'exposition reseau a la racine.
+#   docker-compose.yml : "127.0.0.1:8890:8080" au lieu de "8890:8080".
+#   Applique et verifie en reel : `docker port marvin-searxng` confirme 127.0.0.1:8890
+#   (etait 0.0.0.0:8890 avant), `netstat` confirme l'ecoute uniquement en loopback,
+#   web_search de Marvin fonctionne toujours normalement (provider:SearXNG) apres
+#   recreation du conteneur -- aucune regression fonctionnelle.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7327,7 +7341,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.165.0",
+            "version":         "2.166.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
