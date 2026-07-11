@@ -2768,6 +2768,28 @@ async def lifespan(app_instance):
 #   MAIS ssh_exec/ssh_download/ssh_write_and_run/email_read/email_list/billing_client_list/
 #   credential_get restent tous True -- la garde de securite reste intacte pour tout ce qui
 #   touche du contenu reel, seul le carve-out precis change.
+#
+# v2.165 (frontend : envoi d'un message n'annulait jamais le precedent en cours) : suite
+#   directe de v2.164, l'utilisateur a precise que le script genere avait ete visible dans
+#   le chat puis avait disparu apres avoir renvoye son message. Trouve dans
+#   lib/contexts/ChatContext.jsx::sendMessage : un nouvel envoi creait un nouvel
+#   AbortController SANS jamais annuler le precedent -- si le premier tour tournait
+#   encore (recherche web bloquee, outil lent...), DEUX flux SSE concurrents pour la
+#   MEME conversation s'executaient en parallele cote serveur ET cote React, chacun
+#   appelant setMessages(prev => ...) avec un `prev` potentiellement obsolete -- le
+#   contenu deja genere (script visible a l'ecran) pouvait etre perdu au prochain
+#   rendu/rechargement sans jamais avoir ete correctement sauvegarde en base.
+#   Fix : abortRef.current?.abort() AVANT de creer le nouveau controller. Le catch
+#   existant ignorait deja err.name==='AbortError' (ecrit pour le bouton Stop) -- en
+#   beneficie automatiquement, aucun changement de gestion d'erreur necessaire.
+#   Comportement volontairement PAS touche : pas d'abort au demontage du composant
+#   (continuer en fond si on navigue ailleurs reste voulu) -- seul un NOUVEL envoi
+#   coupe l'ancien, pas une simple navigation.
+#   Teste en reel (Playwright, JS direct pour fiabilite) : message A envoye (reponse
+#   longue), message B envoye immediatement apres -- resultat final : SEULE la reponse
+#   a B apparait proprement, aucune trace de A, 0 erreur console (AbortError avale par
+#   le catch existant comme prevu). Conversation de test laissee en place (suppression
+#   par ID recent refusee par le classifieur de securite -- regle anti-incident v2.110).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7305,7 +7327,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.164.0",
+            "version":         "2.165.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

@@ -124,6 +124,17 @@ export function ChatProvider({ children }) {
     if (liveVoice.voiceMode && liveVoice.stopSpeaking) liveVoice.stopSpeaking();  // coupe l'ancienne lecture
     const voiceStream = { text: '', spoken: 0, active: !!liveVoice.voiceMode };
 
+    // v2.165 — un envoi précédent encore en cours (l'utilisateur retape/renvoie le
+    // même message pendant qu'une recherche web ou un outil traîne) partait en
+    // PARALLÈLE du nouveau sans jamais être annulé : deux flux SSE concurrents pour
+    // la même conversation se marchaient dessus côté état React (des mises à jour
+    // setMessages(prev => ...) capturant un `prev` obsolète), et le contenu déjà
+    // généré (ex. un script) pouvait disparaître au premier re-rendu/rechargement.
+    // On coupe l'ancien flux avant d'en démarrer un nouveau — sans effet sur le
+    // comportement voulu "continue en fond si on quitte la page" (ça, c'est
+    // l'absence d'abort au démontage du composant, inchangé).
+    abortRef.current?.abort();
+
     const controller = new AbortController();
     abortRef.current = controller;
 
