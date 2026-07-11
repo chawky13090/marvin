@@ -2751,6 +2751,23 @@ async def lifespan(app_instance):
 #   Teste en reel : les 5 outils repondent correctement sur des dossiers reels ; preuve
 #   directe du non-blocage -- /api/health repond en 34ms pendant qu'un file_find lourd
 #   (scan complet de backend/.venv, plusieurs milliers de fichiers) tourne en parallele.
+#
+# v2.164 (repli local mid-boucle trop large sur ssh_list) : signale par l'utilisateur sur
+#   une vraie conversation ("script audit securite serveur linux") ou la reponse finale
+#   n'avait rien a voir avec la demande (juste la liste des connexions SSH). Diagnostic :
+#   web_search bloque par l'anti-bot DDG (deja corrige v2.161) a fait derailer l'agent sur
+#   ssh_list -- outil totalement hors-sujet -- qui a DECLENCHE le repli local mid-boucle
+#   (v2.119, badge "Repli local (donnee sensible detectee)") car son nom commence par
+#   "ssh_". Or ssh_list ne renvoie JAMAIS de secret (host/port/username, has_password et
+#   has_key en BOOLEEN, jamais la valeur) -- verifie dans le code reel avant de conclure.
+#   Carve-out precis et nomme (pas un affaiblissement du prefixe "ssh_"/"email_" en
+#   general) : SENSITIVE_TOOL_EXEMPTIONS = {ssh_list, email_accounts} dans
+#   cloud_routing.py::is_sensitive_tool -- les deux ne listent QUE des metadonnees de
+#   configuration, jamais un contenu reel (email, sortie de commande, mot de passe).
+#   Teste en reel : is_sensitive_tool('ssh_list')=False, is_sensitive_tool('email_accounts')=False,
+#   MAIS ssh_exec/ssh_download/ssh_write_and_run/email_read/email_list/billing_client_list/
+#   credential_get restent tous True -- la garde de securite reste intacte pour tout ce qui
+#   touche du contenu reel, seul le carve-out precis change.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7288,7 +7305,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.163.0",
+            "version":         "2.164.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

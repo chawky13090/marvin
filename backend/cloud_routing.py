@@ -35,6 +35,20 @@ SENSITIVE_KEYWORDS = (
 )
 SENSITIVE_TOOL_PREFIXES = ("email_", "ssh_", "billing_", "credential_")
 
+# v2.164 — outils "métadonnées uniquement" explicitement exemptés du repli local
+# mid-boucle (agent.py) : leur nom commence par un préfixe sensible mais ils ne
+# renvoient JAMAIS de contenu réel (mot de passe, corps d'email, sortie de commande
+# distante...) — juste une liste de ce qui est configuré. Carve-out volontairement
+# étroit et nommé outil par outil (jamais un préfixe entier) pour ne pas affaiblir
+# la garde ailleurs. Signalé par l'utilisateur : "ssh_list" déclenchait le repli
+# local ("🔒 Repli local (donnée sensible détectée)") sur une simple demande de
+# script, dégradant la qualité de réponse sans aucune raison de confidentialité
+# réelle (has_password/has_key restent des booléens, jamais la valeur).
+SENSITIVE_TOOL_EXEMPTIONS = frozenset({
+    "ssh_list",        # connexions enregistrées : host/port/username, has_password/has_key en booléen
+    "email_accounts",  # comptes configurés : adresse seulement, jamais un contenu de message
+})
+
 
 def is_sensitive_text(text: str) -> bool:
     """True si le texte (prompt d'un appel LLM interne, message utilisateur...)
@@ -44,7 +58,10 @@ def is_sensitive_text(text: str) -> bool:
 
 
 def is_sensitive_tool(name: str) -> bool:
-    return any((name or "").startswith(p) for p in SENSITIVE_TOOL_PREFIXES)
+    n = name or ""
+    if n in SENSITIVE_TOOL_EXEMPTIONS:
+        return False
+    return any(n.startswith(p) for p in SENSITIVE_TOOL_PREFIXES)
 
 
 def is_cloud_model(name: str) -> bool:
