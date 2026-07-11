@@ -3112,7 +3112,17 @@ def _gui_read_sync(search: str, max_elements: int) -> dict:
                 continue
             name_raw = (ctrl.window_text() or "").strip()
             auto_id = ctrl.element_info.automation_id or ""
-            if not name_raw and not auto_id:
+            # v2.150 — Windows masque déjà le contenu des champs mot de passe au niveau UI
+            # Automation lui-même (vérifié en réel : IsPassword=True → window_text()/get_value()
+            # renvoient tous deux "" pour un WinForms PasswordChar) — rien à faire pour empêcher
+            # une fuite ici. On étiquette juste explicitement le champ pour que ni le LLM ni
+            # l'utilisateur ne confondent un name vide "masqué par l'OS" avec un champ inconnu.
+            is_password = False
+            try:
+                is_password = bool(ctrl.element_info.element.CurrentIsPassword)
+            except Exception:
+                pass
+            if not name_raw and not auto_id and not is_password:
                 continue
             enabled = ctrl.is_enabled()
             visible = ctrl.is_visible()
@@ -3120,13 +3130,14 @@ def _gui_read_sync(search: str, max_elements: int) -> dict:
             continue
         # Pour Edit/Document, le contenu n'est jamais une clé de matching (cf. note ci-dessus).
         match_key_name = "" if ctype in _GUI_CONTENT_TYPES else name_raw
-        display_name = (name_raw[:100] + "…") if len(name_raw) > 100 else name_raw
+        display_name = "(champ mot de passe — masqué par Windows)" if is_password else \
+            ((name_raw[:100] + "…") if len(name_raw) > 100 else name_raw)
         key = (ctype, match_key_name)
         idx = counter.get(key, 0)
         counter[key] = idx + 1
         elements.append({
             "control_type": ctype, "name": display_name, "automation_id": auto_id,
-            "match_index": idx, "enabled": enabled, "visible": visible,
+            "match_index": idx, "enabled": enabled, "visible": visible, "is_password": is_password,
         })
         if len(elements) >= max_elements:
             break

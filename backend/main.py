@@ -564,19 +564,22 @@ async def _proactive_worker():
             now = _dt.now()
             hm = now.strftime("%H:%M")
             day = now.strftime("%Y-%m-%d")
+            quiet = _in_quiet_hours(cfg, hm)  # v2.150 — "heures calmes" : aucune notif proactive
             # Briefing matinal
             mb = cfg.get("morning_briefing", {})
             if mb.get("enabled") and hm == mb.get("time", "08:00") and _last_briefing_date["d"] != day:
                 _last_briefing_date["d"] = day
-                await run_morning_briefing(mb)
+                if not quiet:
+                    await run_morning_briefing(mb)
             # Bilan du soir
             er = cfg.get("evening_recap", {})
             if er.get("enabled") and hm == er.get("time", "18:30") and _last_recap_date["d"] != day:
                 _last_recap_date["d"] = day
-                await run_evening_recap(er)
+                if not quiet:
+                    await run_evening_recap(er)
             # Anticipation (toutes les N minutes)
             an = cfg.get("anticipation", {})
-            if an.get("enabled"):
+            if an.get("enabled") and not quiet:
                 interval = max(5, int(an.get("interval_min", 30))) * 60
                 if _time.time() - _last_anticip["t"] >= interval:
                     _last_anticip["t"] = _time.time()
@@ -2354,6 +2357,28 @@ async def lifespan(app_instance):
 #   UAC (fenêtre élevée/admin inaccessible depuis ce process non-admin) — échec explicite,
 #   pas de contournement (cliquer en tant qu'admin serait un risque d'un tout autre ordre
 #   que l'allowlist stricte du sidecar élevé, v2.90).
+#
+# v2.150 (🔒 durcissement pc_gui_* + 🌙 heures calmes) : sur demande explicite (« continue et
+#   cherche à corriger, améliorer, sécuriser et prendre les nouveautés AI de chatgpt et
+#   claude »).
+#   🛡️ Vérifié en conditions réelles (pas supposé) sur les outils GUI livrés en v2.149 :
+#   un champ mot de passe peut-il fuiter via `pc_gui_read` ? Test réel avec une vraie
+#   fenêtre WinForms (`PasswordChar` + `IsPassword=True`) → Windows UI Automation masque
+#   déjà `window_text()` ET `get_value()` (tous deux vides) — rien à corriger côté fuite,
+#   c'est une garantie de l'OS. Durci quand même : le champ est désormais étiqueté
+#   explicitement `"(champ mot de passe — masqué par Windows)"` + `is_password: true` au
+#   lieu d'un `name` vide silencieux qui aurait pu passer pour un bug ou un élément inconnu.
+#   🌙 Nouveauté reprise de Claude (recherche menée : "Focus settings" 2026 — heures calmes/
+#   pauses/récap) : réglage `quiet_hours` (désactivé par défaut, 22h-7h si activé) qui coupe
+#   TOUTE notification proactive (briefing matinal, bilan du soir, anticipation) sur une
+#   plage horaire — jamais les demandes faites directement dans le chat, uniquement le
+#   déclenchement automatique en arrière-plan. Nouvel onglet dans `/jour` (même pattern que
+#   les 3 blocs existants : `saveBlock`/état local/round-trip `/api/proactive`).
+#   Testé en réel de bout en bout : `_in_quiet_hours()` unit-testé sur les cas limites
+#   (plage à cheval sur minuit, bornes incluses/exclues) — 7/7 corrects ; toggle cliqué dans
+#   le vrai navigateur (Playwright) → persisté côté backend, vérifié par lecture API ;
+#   remis à l'état par défaut (désactivé) après le test pour ne pas modifier un réglage réel
+#   sans le choix explicite de l'utilisateur.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -4362,7 +4387,22 @@ def _proactive_with_defaults(cfg: dict) -> dict:
     cfg.setdefault("evening_recap", {"enabled": False, "time": "18:30", "voice": False, "voice_name": "henri"})
     cfg.setdefault("anticipation", {"enabled": False, "interval_min": 30, "overdue_tasks": True,
                                     "upcoming_events": True, "upcoming_events_min": 30, "max_notify": 5})
+    # v2.150 — "Focus settings" (heures calmes), inspiré des réglages de repos/heures calmes
+    # ajoutés par Claude en 2026 (recap mensuel + quiet hours). Coupe TOUTE notification
+    # proactive (briefing/bilan/anticipation) sur une plage horaire — désactivé par défaut,
+    # 22h-7h si activé (couvre la nuit, pas de sur-supposition sur les horaires de l'utilisateur).
+    cfg.setdefault("quiet_hours", {"enabled": False, "start": "22:00", "end": "07:00"})
     return cfg
+
+
+def _in_quiet_hours(cfg: dict, hm: str) -> bool:
+    qh = cfg.get("quiet_hours", {})
+    if not qh.get("enabled"):
+        return False
+    start, end = qh.get("start", "22:00"), qh.get("end", "07:00")
+    if start <= end:
+        return start <= hm < end
+    return hm >= start or hm < end  # plage à cheval sur minuit (ex. 22:00 → 07:00)
 
 
 @app.get("/api/proactive")
@@ -4391,6 +4431,9 @@ async def set_proactive(body: dict = Body(...)):
         an = cfg["anticipation"]; inc = body["anticipation"]
         an.update({k: inc[k] for k in ("enabled", "interval_min", "overdue_tasks", "upcoming_events",
                                        "upcoming_events_min", "max_notify") if k in inc})
+    if "quiet_hours" in body:
+        qh = cfg["quiet_hours"]; inc = body["quiet_hours"]
+        qh.update({k: inc[k] for k in ("enabled", "start", "end") if k in inc})
     db.set_setting("proactive_config", cfg)
     return {"success": True, "config": cfg}
 
@@ -6867,7 +6910,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.149.0",
+            "version":         "2.150.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

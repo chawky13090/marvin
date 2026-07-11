@@ -40,6 +40,7 @@ export default function JourPage() {
   const [pcfg, setPcfg] = useState(null);     // morning_briefing
   const [ecfg, setEcfg] = useState(null);     // evening_recap
   const [acfg, setAcfg] = useState(null);     // anticipation
+  const [qcfg, setQcfg] = useState(null);     // quiet_hours (v2.150 — "heures calmes")
   const [showSettings, setShowSettings] = useState(false);
   const [testMsg, setTestMsg] = useState('');
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function JourPage() {
         setPcfg(r.morning_briefing || { enabled: false, time: '08:00', voice: false });
         setEcfg(r.evening_recap || { enabled: false, time: '18:30', voice: false });
         setAcfg(r.anticipation || { enabled: false, interval_min: 30, overdue_tasks: true, upcoming_events: true, upcoming_events_min: 30 });
+        setQcfg(r.quiet_hours || { enabled: false, start: '22:00', end: '07:00' });
       })
       .catch(() => {});
   }, []);
@@ -58,6 +60,7 @@ export default function JourPage() {
   const saveProactive = (next) => saveBlock('morning_briefing', next, setPcfg);
   const saveEvening = (next) => saveBlock('evening_recap', next, setEcfg);
   const saveAnticip = (next) => saveBlock('anticipation', next, setAcfg);
+  const saveQuiet = (next) => saveBlock('quiet_hours', next, setQcfg);
   async function testProactive(kind = 'morning') {
     setTestMsg('⏳ Génération…');
     try {
@@ -203,6 +206,29 @@ export default function JourPage() {
                   </label>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>Notifications (et Telegram si activé) dédupliquées : un même item ne te prévient qu'une fois par jour.</div>
+              </div>
+            )}
+
+            {/* Heures calmes (v2.150) */}
+            {qcfg && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 10 }}>🌙 Heures calmes</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!qcfg.enabled} onChange={e => saveQuiet({ ...qcfg, enabled: e.target.checked })} /> Activer
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    De
+                    <input type="time" value={qcfg.start || '22:00'} onChange={e => saveQuiet({ ...qcfg, start: e.target.value })}
+                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 8px' }} />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    à
+                    <input type="time" value={qcfg.end || '07:00'} onChange={e => saveQuiet({ ...qcfg, end: e.target.value })}
+                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 8px' }} />
+                  </label>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>Aucune notification proactive (briefing, bilan, anticipation) sur cette plage horaire — les demandes que tu fais toi-même dans le chat ne sont jamais bloquées.</div>
               </div>
             )}
 
