@@ -2786,37 +2786,54 @@ def get_execution_stats() -> dict:
     }
 
 
-def get_tool_reliability(min_calls: int = 3, days: int = 90) -> list[dict]:
+def get_tool_reliability(min_calls: int = 3, days: int = 90, recent_days: int = 7) -> list[dict]:
     """v2.138 — taux d'ÉCHEC par outil (pas juste le volume comme `get_execution_stats`) : les
     données existaient déjà dans `tool_executions` mais n'étaient jamais agrégées par fiabilité,
     seulement par volume d'appels. Sert de tableau de bord pour repérer les outils qui échouent
     SYSTÉMATIQUEMENT (candidats à une correction) plutôt que ceux qui échouent juste souvent
     parce qu'ils sont beaucoup appelés. `min_calls` filtre le bruit statistique (1 échec sur 1
-    appel = 100% mais non significatif)."""
+    appel = 100% mais non significatif).
+    v2.159 — trouvé en auditant les "pires" outils de ce tableau de bord un par un (pas en
+    devinant) : les 5 pires étaient TOUS déjà corrigés (fix de repli OCR, OAuth calendrier...)
+    ou n'étaient jamais de vrais bugs (rejet de validation correct, appel de test contre une IP
+    volontairement injoignable) — mais la fenêtre de 90 jours les faisait encore ressortir en
+    tête, aucun moyen de distinguer "cassé maintenant" de "cassé il y a 3 semaines, corrigé
+    depuis". Ajout d'un second taux calculé sur `recent_days` (7j par défaut) dans LA MÊME
+    requête — un outil avec un mauvais taux sur 90j mais un taux récent à 0% est un signal de
+    "déjà réglé", pas une priorité de correction."""
     with db() as conn:
         _ensure_tool_tables(conn)
         rows = conn.execute(
             """SELECT tool_name,
                       COUNT(*) as total,
-                      SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count
+                      SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
+                      SUM(CASE WHEN created_at >= datetime('now', ?) THEN 1 ELSE 0 END) as recent_total,
+                      SUM(CASE WHEN created_at >= datetime('now', ?) AND success = 1 THEN 1 ELSE 0 END) as recent_success_count
                FROM tool_executions
                WHERE created_at >= datetime('now', ?)
                GROUP BY tool_name
                HAVING total >= ?
                ORDER BY (1.0 * (total - success_count) / total) DESC, total DESC""",
-            (f"-{int(days)} days", min_calls)
+            (f"-{int(recent_days)} days", f"-{int(recent_days)} days", f"-{int(days)} days", min_calls)
         ).fetchall()
     out = []
     for r in rows:
         total = r["total"]
         success_count = r["success_count"]
         failed = total - success_count
+        recent_total = r["recent_total"] or 0
+        recent_success = r["recent_success_count"] or 0
+        recent_failed = recent_total - recent_success
         out.append({
             "tool": r["tool_name"],
             "total_calls": total,
             "success_count": success_count,
             "failed_count": failed,
             "failure_rate_pct": round(100.0 * failed / total, 1) if total else 0.0,
+            "recent_days": recent_days,
+            "recent_calls": recent_total,
+            "recent_failure_rate_pct": round(100.0 * recent_failed / recent_total, 1) if recent_total else None,
+            "likely_already_fixed": failed > 0 and recent_total >= min_calls and recent_failed == 0,
         })
     return out
 

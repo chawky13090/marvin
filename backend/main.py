@@ -2544,6 +2544,108 @@ async def lifespan(app_instance):
 #   cycle complet fiches (génération de 3 vraies questions sur le modèle OSI, réponse
 #   correcte → intervalle 1→2 jours, carte suivante correctement différente, stats exactes
 #   due_now 2/3) — fiches de test supprimées après coup. `scripts/smoke_test_pages.py` 34/34.
+#
+# v2.156 (🎨 Présentation du diagramme de topologie réseau revue) : sur demande explicite
+#   (« pouvons-nous améliorer la présentation des schémas réseau ? »), après avoir audité une
+#   conversation réelle et constaté qu'aucune n'utilisait encore l'outil via le chat (seuls
+#   mes propres appels de test v2.155) — l'utilisateur faisait référence aux images déjà
+#   montrées pendant les tests.
+#   Trouvaille annexe en cherchant la conversation : la page `/outils` a un catalogue
+#   d'outils ENTIÈREMENT codé en dur (`app/outils/page.jsx`, ~3250 lignes), complètement
+#   déconnecté du vrai `TOOLS_REGISTRY` backend — "141 outils" affichés contre 327 réels,
+#   recherche de "topologie" → 0 résultat alors que l'outil existe et fonctionne. Pas corrigé
+#   ici (portée bien plus large qu'une amélioration de présentation) — flagué en tâche de
+#   fond séparée (task_9af62ef6).
+#   Refonte de `net_topology_diagram` (tools.py) : couleurs calées EXACTEMENT sur
+#   `app/globals.css` (--bg-primary/--accent-primary/--accent-secondary/--text-muted) au
+#   lieu d'une palette approximative ; disposition en ANNEAUX CONCENTRIQUES au-delà de 8
+#   appareils (un seul cercle surchargeait les libellés dès qu'un réseau réel dépassait une
+#   dizaine d'hôtes) ; légende (passerelle/appareil) + horodatage en pied de diagramme.
+#   🔴 2 bugs de mise en page trouvés en testant à l'échelle réelle (20 appareils, 3
+#   anneaux) — pas en devinant, en regardant l'image rendue : l'anneau extérieur était
+#   ROGNÉ par les bords de la figure (le calcul de marge n'avait pas été mis à jour après
+#   l'augmentation du rayon de base), et le libellé IP de la passerelle empiétait sur
+#   l'anneau intérieur. Les deux corrigés et revérifiés par un nouveau rendu.
+#   Testé en réel à 3 échelles : réseau local réel (13 appareils, 2 anneaux), synthétique à
+#   12 (2 anneaux) et 20 appareils (3 anneaux, le plafond) — plus aucun rognage, légende et
+#   horodatage lisibles, couleurs cohérentes avec le reste de l'interface.
+#   `scripts/smoke_test_pages.py` 34/34.
+#
+# v2.157 (🧩 Catalogue /outils complété automatiquement) : sur demande explicite (« corrige
+#   ce que tu as trouvé comme bug »), suite du bug flagué en v2.156 (chip de tâche de fond,
+#   task_9af62ef6, dismiss après prise en charge directe).
+#   Plutôt qu'un remplacement complet du catalogue (aurait perdu le regroupement en 4
+#   familles/17 catégories et les 141 formulaires soigneusement conçus à la main), la page
+#   `app/outils/page.jsx` COMPLÈTE désormais le catalogue statique : au chargement, un appel
+#   à `GET /api/tools/list` (déjà existant, utilisé par le serveur MCP) récupère la liste
+#   réelle des 327 outils backend, et tout outil absent du catalogue codé en dur atterrit
+#   dans une nouvelle catégorie "🧩 Autres outils" avec un formulaire généré automatiquement
+#   depuis son schéma JSON (`schemaToParams` — string→texte, integer/number→nombre,
+#   boolean→case à cocher, array de string→tags, enum→menu déroulant). Moins soigné que les
+#   formulaires à la main, mais au moins DÉCOUVRABLE et exécutable — c'était le vrai manque.
+#   Best-effort : si l'appel à `/api/tools/list` échoue, le catalogue statique reste
+#   utilisable tel quel (aucune régression possible).
+#   Testé en réel (Playwright) : 141→328 outils affichés, recherche de "topologie" passe de
+#   0 à 1 résultat (`net_topology_diagram`, absent du catalogue codé en dur) ; formulaire
+#   auto-généré (champs Hosts/Gateway avec les vraies descriptions en placeholder) exécuté
+#   pour de vrai depuis la page → diagramme réel généré et affiché, 0 erreur console ; les 4
+#   familles/17 catégories d'origine vérifiées inchangées après coup (pas de régression).
+#   `scripts/smoke_test_pages.py` 34/34.
+#
+# v2.158 (🗂️ /outils — auto-catégorisation par préfixe) : sur demande explicite (« attaque
+#   le [option 2] mais ne casse rien... prépare un plan réfléchi »). Passé par un vrai Plan
+#   mode (EnterPlanMode/ExitPlanMode) avant d'écrire du code, approuvé par l'utilisateur.
+#   Remplace le vrac "Autres outils" (v2.157, 186 outils non triés) par une répartition dans
+#   les catégories EXISTANTES par préfixe (`pickCategoryId` : `ssh_`→SSH, `net_`→Réseau,
+#   `win_`/`pc_`→PC, `email_`→Email... repli sur `utilitaires`, déjà pensée pour les outils
+#   génériques ambigus). Icônes aussi dérivées du préfixe (`pickAutoIcon`) au lieu du 🧩
+#   uniforme. 2 nouvelles catégories légères pour des familles backend entières qui
+#   n'avaient encore AUCUNE place ici : Facturation (`billing_`/`client_`, 27 outils — /devis
+#   existe côté produit, jamais relié à /outils) et Fiches de révision (`quiz_`, 4 outils).
+#   `TOOL_OVERRIDES` (vide au démarrage) : point d'extension pour curer un outil
+#   auto-généré à la main plus tard sans dupliquer toute son entrée — concrétise le principe
+#   « la curation est l'exception, pas la règle par défaut » pour tout nouvel outil futur,
+#   sans toucher aux 141 entrées déjà curées (jamais dérivées, rien à gagner à les migrer).
+#   Contrainte respectée : le tableau `CATEGORIES` statique (~3250 lignes) n'est PAS modifié
+#   — tout le travail se fait dans la petite couche dynamique ajoutée en v2.157, qui fusionne
+#   par-dessus sans jamais muter l'original.
+#   Testé en réel (Playwright) : plus de groupe "Autres outils" ; catégories curées
+#   vérifiées inchangées (Infographie garde son outil curé en tête de liste, les auto
+#   ajoutés après) ; "Fiches de révision" (4) et "Facturation" (27) apparaissent sous
+#   Organisation ; recherche "topologie" trouve toujours l'outil avec sa nouvelle icône 🌐 ;
+#   `quiz_stats` exécuté pour de vrai depuis sa nouvelle catégorie → résultat réel affiché
+#   (10 fiches dues, données réelles d'une conversation antérieure) ; 0 erreur console.
+#   `scripts/smoke_test_pages.py` 34/34.
+#
+# v2.159 (🩺 Tableau de bord de fiabilité — signal récent vs historique) : sur demande
+#   explicite (« quel serait le meilleur pour que tous les outils soient fonctionnels et bien
+#   exploités... que proposes-tu ? » → « ok »). Plutôt qu'une réécriture aveugle des 327
+#   outils, utilisé le tableau de bord de fiabilité déjà existant (v2.138) pour cibler
+#   data-driven les vrais problèmes — puis vérifié chaque "pire outil" un par un en conditions
+#   réelles plutôt que de faire confiance à l'agrégat brut.
+#   🔴 Trouvaille inattendue en auditant (pas cherchée délibérément) : les 5 pires outils du
+#   classement (`git_info`, `ssh_exec`, `ssh_write_and_run`, `ocr_extract`, `calendar_list`)
+#   se sont TOUS révélés déjà fonctionnels en testant en direct — `git_info` et `ocr_extract`
+#   marchent parfaitement (le repli de modèle OCR halluciné de v2.106 fonctionne bien, testé
+#   avec `model:"llava:13b"` explicitement) ; `calendar_list` renvoie de vrais événements ;
+#   `ssh_exec`/`ssh_write_and_run` n'ont JAMAIS vraiment échoué — leurs "100% d'échec" sont 2
+#   rejets de validation corrects (paramètre manquant, message d'erreur clair) + 1 appel de
+#   test délibéré contre `192.0.2.1` (TEST-NET-1, plage RFC 5737 réservée aux tests,
+#   injoignable par définition). Le vrai bug n'était donc PAS dans ces 5 outils — il était
+#   dans le TABLEAU DE BORD lui-même : `get_tool_reliability` (v2.138) agrège sur 90 jours
+#   sans aucune pondération temporelle, donc un bug corrigé il y a 3 semaines (le cas de
+#   `calendar_list` : 64% d'échec sur 90j À CAUSE d'un repli OAuth ajouté depuis, v2.137)
+#   traîne indéfiniment en tête du classement — rendant le tableau de bord de moins en moins
+#   fiable avec le temps, à l'inverse de son but.
+#   Corrigé : `db.get_tool_reliability` calcule maintenant AUSSI un taux récent
+#   (`recent_days`, 7j par défaut) dans la même requête, plus un flag `likely_already_fixed`
+#   (mauvais taux global mais 0 échec récent avec assez d'appels récents pour être
+#   significatif). `pc_tool_reliability` et `GET /api/history/reliability` exposent les deux
+#   axes — un outil avec un mauvais taux global mais un taux récent proche de 0% n'est plus
+#   une fausse priorité.
+#   Testé en réel : `calendar_list` passe de "64,2% d'échec (95 appels)" à "3,4% d'échec sur
+#   les 7 derniers jours (29 appels)" — la vraie histoire, invisible avant ce correctif.
+#   `scripts/smoke_test_pages.py` 34/34.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -3571,10 +3673,12 @@ async def history_stats():
 
 
 @app.get("/api/history/reliability")
-async def history_reliability(min_calls: int = 3, days: int = 90):
+async def history_reliability(min_calls: int = 3, days: int = 90, recent_days: int = 7):
     """v2.138 — taux d'échec PAR OUTIL (pas juste le volume) : ferme la boucle repérée en
-    auditant `calendar_list` (60 échecs invisibles jusqu'à interrogation manuelle de la DB)."""
-    return {"tools": db.get_tool_reliability(min_calls=min_calls, days=days)}
+    auditant `calendar_list` (60 échecs invisibles jusqu'à interrogation manuelle de la DB).
+    v2.159 — ajoute un taux récent (recent_days) pour distinguer "cassé maintenant" de
+    "cassé il y a des semaines, déjà corrigé depuis"."""
+    return {"tools": db.get_tool_reliability(min_calls=min_calls, days=days, recent_days=recent_days)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -7079,7 +7183,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.155.0",
+            "version":         "2.159.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

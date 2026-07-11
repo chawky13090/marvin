@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { LoadingRow } from '@/components/ui/Spinner';
 import PrettyResult from '@/components/chat/PrettyResult';
@@ -1749,6 +1749,103 @@ const CATEGORIES = [
   },
 ];
 
+// ── v2.157 — outils manquants au catalogue codé en dur ────────────────────────
+// Trouvé en auditant (pas en devinant) : ce catalogue est entièrement statique et avait
+// dérivé du vrai TOOLS_REGISTRY backend (141 listés ici contre 327 réels — recherche de
+// "topologie" ne trouvait même pas net_topology_diagram, pourtant fonctionnel). Plutôt que
+// de tout reconstruire à partir de l'API (perdrait le regroupement/les formulaires
+// soigneusement conçus des 141 outils déjà présents), on COMPLÈTE : tout outil renvoyé par
+// GET /api/tools/list absent d'ici est ajouté automatiquement dans une catégorie
+// "Autres outils" à part, avec un formulaire généré depuis son schéma JSON (moins soigné
+// que les formulaires à la main, mais au moins DÉCOUVRABLE et utilisable).
+function schemaToParams(schema) {
+  const props = schema?.properties || {};
+  const required = new Set(schema?.required || []);
+  return Object.entries(props).map(([name, def]) => {
+    let type = 'text';
+    if (def.type === 'boolean') type = 'checkbox';
+    else if (def.type === 'integer' || def.type === 'number') type = 'number';
+    else if (def.type === 'array') type = def.items?.type === 'string' ? 'tags' : 'jsonarray';
+    const label = name.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+    const param = { name, label, type, required: required.has(name), placeholder: def.description || '' };
+    if (Array.isArray(def.enum)) {
+      param.type = 'select';
+      param.options = def.enum.map(v => ({ value: v, label: String(v) }));
+    }
+    return param;
+  });
+}
+function prettifyToolId(id) {
+  return id.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+}
+
+// ── v2.158 — auto-catégorisation par préfixe (au lieu d'un vrac "Autres outils") ──
+// La v2.157 comblait l'écart avec le backend mais entassait les 186 outils manquants dans
+// UNE catégorie non triée. Ici, chaque outil manquant est rangé dans la catégorie EXISTANTE
+// la plus pertinente par préfixe (ssh_* → SSH, net_* → Réseau...) — mêmes tools[] que les
+// outils curés, juste ajoutés à la fin. Repli sur 'utilitaires' (déjà pensée pour ça :
+// calculatrice, QR, hash...) pour tout préfixe ambigu ou non reconnu. Deux familles
+// backend entières n'avaient encore AUCUNE catégorie ici : facturation (billing_*/client_*,
+// 27 outils — /devis existe côté produit mais n'a jamais été relié à /outils) et fiches de
+// révision (quiz_*, nouveauté de cette session) — elles reçoivent chacune une petite
+// catégorie dédiée plutôt que d'être noyées dans 'utilitaires'.
+const PREFIX_CATEGORY_MAP = [
+  ['ssh_', 'ssh'], ['net_', 'reseau'], ['ip_', 'reseau'],
+  ['winget_', 'pc'], ['win_', 'pc'], ['os_', 'pc'], ['system_', 'pc'], ['cmd_', 'pc'], ['pc_', 'pc'],
+  ['tweak_', 'utilitaires'], ['registry_', 'utilitaires'], ['catharsis_', 'utilitaires'],
+  ['email_', 'email'],
+  ['calendar_', 'calendar'], ['event_', 'calendar'],
+  ['google_', 'cloud'], ['onedrive_', 'cloud'],
+  ['memory_', 'memoire'],
+  ['pdf_', 'documents'], ['docx', 'documents'], ['pptx', 'documents'], ['xlsx', 'documents'],
+  ['csv_', 'documents'], ['document_', 'documents'],
+  ['image_', 'infographie'], ['images_', 'infographie'], ['gif_', 'infographie'],
+  ['video_', 'voix'], ['audio_', 'voix'], ['voice_', 'voix'],
+  ['web_', 'web'], ['webapp_', 'web'],
+  ['file_', 'fichiers'], ['zip_', 'archives'],
+  ['billing_', 'facturation'], ['client_', 'facturation'],
+  ['quiz_', 'quiz'],
+  ['task_', 'taches'], ['note_', 'taches'], ['long_', 'taches'],
+  ['itsm_', 'utilitaires'], ['it_', 'utilitaires'], ['ops_', 'utilitaires'], ['ai_', 'utilitaires'],
+  ['code_', 'utilitaires'], ['skill_', 'utilitaires'], ['telegram_', 'utilitaires'],
+];
+function pickCategoryId(id) {
+  for (const [prefix, catId] of PREFIX_CATEGORY_MAP) {
+    if (id.startsWith(prefix)) return catId;
+  }
+  return 'utilitaires';
+}
+const PREFIX_ICON_MAP = [
+  ['ssh_', '🔐'], ['net_', '🌐'], ['win_', '🖥️'], ['winget_', '📦'], ['pc_', '🖥️'],
+  ['email_', '📧'], ['calendar_', '📅'], ['event_', '📅'], ['memory_', '🧠'],
+  ['pdf_', '📄'], ['docx', '📝'], ['pptx', '📊'], ['xlsx', '📈'],
+  ['image_', '🖼️'], ['video_', '🎬'], ['audio_', '🎙️'], ['voice_', '🎙️'],
+  ['web_', '🌐'], ['webapp_', '🌐'], ['file_', '📁'],
+  ['billing_', '💰'], ['client_', '💰'], ['quiz_', '🎓'], ['task_', '✅'], ['note_', '📝'],
+];
+function pickAutoIcon(id) {
+  for (const [prefix, icon] of PREFIX_ICON_MAP) {
+    if (id.startsWith(prefix)) return icon;
+  }
+  return '🧩';
+}
+// Point d'extension pour curer à la main un outil auto-généré, sans dupliquer toute son
+// entrée (contrairement au catalogue statique) — vide au départ, la "curation" devient
+// l'exception plutôt que la règle par défaut pour tout nouvel outil futur.
+const TOOL_OVERRIDES = {};
+function applyOverride(autoTool) {
+  const ov = TOOL_OVERRIDES[autoTool.id];
+  return ov ? { ...autoTool, ...ov } : autoTool;
+}
+// Catégories synthétiques pour les préfixes sans catégorie existante (facturation, quiz) —
+// créées seulement si au moins un outil y atterrit réellement (voir buildDynamicCatalog).
+const SYNTHETIC_CATEGORIES = {
+  facturation: { id: 'facturation', label: 'Facturation', icon: '💰', color: '#22c55e',
+                 description: 'Devis, factures, clients (voir aussi la page Devis & Factu).' },
+  quiz:        { id: 'quiz', label: 'Fiches de révision', icon: '🎓', color: '#eab308',
+                 description: 'Génération et révision de fiches Q/R avec répétition espacée.' },
+};
+
 // ── Regroupement des 17 catégories en 4 familles ──────────────────────────────
 // 17 onglets à plat débordait déjà la barre horizontale (illisible). Un niveau
 // intermédiaire (même logique que les sections de la sidebar) : on choisit une
@@ -3034,20 +3131,79 @@ function OutilsPageInner() {
   const [activeTab, setActiveTab] = useState('infographie');
   const [activeGroup, setActiveGroup] = useState(() => groupOf('infographie'));
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
-  const activeCategory = CATEGORIES.find(c => c.id === activeTab) || CATEGORIES[0];
-  const totalTools = CATEGORIES.reduce((acc, c) => acc + c.tools.length, 0);
-  const groupCategories = CATEGORIES.filter(c => GROUPS.find(g => g.id === activeGroup)?.categories.includes(c.id));
+
+  // v2.157/v2.158 — complète le catalogue statique avec les outils backend absents d'ici,
+  // auto-catégorisés par préfixe (voir pickCategoryId/pickAutoIcon ci-dessus) plutôt que
+  // dans un vrac unique. Best-effort : si l'appel échoue, le catalogue statique reste
+  // utilisable tel quel, rien ne casse.
+  const [extraTools, setExtraTools] = useState([]);
+  useEffect(() => {
+    const curatedIds = new Set(CATEGORIES.flatMap(c => c.tools.map(t => t.id)));
+    fetch(`${BACKEND_URL}/api/tools/list`)
+      .then(r => r.json())
+      .then(d => {
+        const extra = (d.tools || [])
+          .map(t => t.function)
+          .filter(f => f && f.name && !curatedIds.has(f.name))
+          .map(f => applyOverride({
+            id: f.name, icon: pickAutoIcon(f.name), name: prettifyToolId(f.name),
+            description: f.description || '', params: schemaToParams(f.parameters),
+            _categoryId: pickCategoryId(f.name),
+          }));
+        setExtraTools(extra);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Regroupe les outils manquants par catégorie cible, puis fusionne CHAQUE catégorie
+  // statique concernée (copie, tools[] curatés d'abord + auto ajoutés ensuite — le tableau
+  // CATEGORIES original n'est jamais muté). Les catégories synthétiques (facturation, quiz)
+  // ne sont créées que si au moins un outil y atterrit réellement.
+  const categories = useMemo(() => {
+    if (!extraTools.length) return CATEGORIES;
+    const byCategory = new Map();
+    for (const t of extraTools) {
+      const { _categoryId, ...tool } = t;
+      if (!byCategory.has(_categoryId)) byCategory.set(_categoryId, []);
+      byCategory.get(_categoryId).push(tool);
+    }
+    const merged = CATEGORIES.map(cat => {
+      const extras = byCategory.get(cat.id);
+      return extras ? { ...cat, tools: [...cat.tools, ...extras] } : cat;
+    });
+    const staticIds = new Set(CATEGORIES.map(c => c.id));
+    for (const [catId, tools] of byCategory) {
+      if (!staticIds.has(catId) && SYNTHETIC_CATEGORIES[catId]) {
+        merged.push({ ...SYNTHETIC_CATEGORIES[catId], tools });
+      }
+    }
+    return merged;
+  }, [extraTools]);
+
+  const groups = useMemo(() => {
+    if (!extraTools.length) return GROUPS;
+    const presentIds = new Set(categories.map(c => c.id));
+    return GROUPS.map(g => {
+      const toAdd = Object.keys(SYNTHETIC_CATEGORIES).filter(id => presentIds.has(id) && !g.categories.includes(id));
+      // Les deux catégories synthétiques actuelles (facturation, quiz) sont de l'organisation.
+      return g.id === 'organisation' && toAdd.length ? { ...g, categories: [...g.categories, ...toAdd] } : g;
+    });
+  }, [extraTools, categories]);
+
+  const activeCategory = categories.find(c => c.id === activeTab) || categories[0];
+  const totalTools = categories.reduce((acc, c) => acc + c.tools.length, 0);
+  const groupCategories = categories.filter(c => groups.find(g => g.id === activeGroup)?.categories.includes(c.id));
 
   const selectGroup = (groupId) => {
     setActiveGroup(groupId);
-    const first = GROUPS.find(g => g.id === groupId)?.categories[0];
+    const first = groups.find(g => g.id === groupId)?.categories[0];
     if (first) setActiveTab(first);
   };
 
   // Search: filter across all categories
   const searchLower = search.trim().toLowerCase();
   const searchResults = searchLower
-    ? CATEGORIES.flatMap(cat =>
+    ? categories.flatMap(cat =>
         cat.tools
           .filter(t =>
             t.name.toLowerCase().includes(searchLower) ||
@@ -3106,9 +3262,9 @@ function OutilsPageInner() {
         display: searchResults !== null ? 'none' : 'flex',
         gap: '6px', padding: '12px 24px 0', flexShrink: 0,
       }}>
-        {GROUPS.map(g => {
+        {groups.map(g => {
           const isActive = g.id === activeGroup;
-          const count = g.categories.reduce((acc, cid) => acc + (CATEGORIES.find(c => c.id === cid)?.tools.length || 0), 0);
+          const count = g.categories.reduce((acc, cid) => acc + (categories.find(c => c.id === cid)?.tools.length || 0), 0);
           return (
             <button
               key={g.id}

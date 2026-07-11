@@ -5671,39 +5671,79 @@ async def execute_net_topology_diagram(args: dict) -> dict:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import math, io, base64 as _b64
+        from datetime import datetime as _dt
 
+        # v2.156 — présentation revue (retour utilisateur : « pouvons-nous améliorer la
+        # présentation ? »). Couleurs exactement calées sur app/globals.css (--bg-primary
+        # #0a0a0d, --accent-primary #4f8cff, --accent-secondary #38bdf8, --text-muted
+        # #5f606a) plutôt qu'une palette approximative. Disposition en ANNEAUX CONCENTRIQUES
+        # au-delà de 8 appareils — un seul cercle surchargeait les libellés en réseau dense
+        # (le cas réel testé, 11 appareils, montrait déjà des libellés serrés).
+        BG, INK, MUTED, ACCENT, ACCENT2, BORDER = "#0a0a0d", "#e4e4e7", "#8b8d98", "#4f8cff", "#38bdf8", "#2a2d3a"
         n = len(devices)
-        fig, ax = plt.subplots(figsize=(9, 9))
-        fig.patch.set_facecolor("#0b0f19")
-        ax.set_facecolor("#0b0f19")
-        ax.set_xlim(-1.3, 1.3)
-        ax.set_ylim(-1.3, 1.3)
+        RING_CAPACITY = 8
+        rings: list[list[dict]] = []
+        for i in range(0, n, RING_CAPACITY):
+            rings.append(devices[i:i + RING_CAPACITY])
+
+        size = 9.5 if n <= RING_CAPACITY else 11.5
+        fig, ax = plt.subplots(figsize=(size, size))
+        fig.patch.set_facecolor(BG)
+        ax.set_facecolor(BG)
+        max_radius = 1.35 + 0.95 * (len(rings) - 1)
+        extent = max_radius + 0.65  # marge pour le nœud, ses libellés (IP+MAC) et la légende
+        ax.set_xlim(-extent, extent)
+        ax.set_ylim(-extent, extent)
+        ax.set_aspect("equal")
         ax.axis("off")
 
-        # Centre = passerelle. v2.155 — bug trouvé en testant : les emoji (🌐/🖥) s'affichent
-        # en "tofu" (glyphe manquant) avec la police par défaut de matplotlib (DejaVu Sans, pas
-        # de couverture emoji) — remplacés par des libellés texte courts, garantis lisibles.
-        ax.scatter([0], [0], s=1800, c="#4f8cff", edgecolors="white", linewidths=1.5, zorder=3)
-        ax.text(0, 0, "GW", ha="center", va="center", fontsize=13, fontweight="bold", color="white", zorder=4)
-        ax.text(0, -0.16, gateway_ip or "Passerelle", ha="center", va="top", color="white", fontsize=9, zorder=4)
+        # Centre = passerelle. Les emoji (🌐/🖥) s'affichaient en "tofu" (glyphe manquant,
+        # police par défaut matplotlib DejaVu Sans sans couverture emoji) — remplacés par des
+        # libellés texte courts, garantis lisibles quelle que soit la police système.
+        ax.scatter([0], [0], s=2000, c=ACCENT, edgecolors=INK, linewidths=1.5, zorder=4)
+        ax.text(0, 0, "GW", ha="center", va="center", fontsize=14, fontweight="bold", color=BG, zorder=5)
+        ax.text(0, -0.26, gateway_ip or "Passerelle", ha="center", va="top", color=INK, fontsize=9.5,
+                fontweight="bold", zorder=5)
 
-        for i, dev in enumerate(devices):
-            angle = 2 * math.pi * i / max(n, 1)
-            x, y = math.cos(angle), math.sin(angle)
-            ax.plot([0, x], [0, y], color="#334155", linewidth=1, zorder=1)
-            ax.scatter([x], [y], s=900, c="#1e293b", edgecolors="#38bdf8", linewidths=1.5, zorder=3)
-            ax.text(x, y, "PC", ha="center", va="center", fontsize=10, fontweight="bold", color="#38bdf8", zorder=4)
-            ip = dev.get("ip", "")
-            offset = 0.14 if y >= 0 else -0.14
-            va = "bottom" if y >= 0 else "top"
-            ax.text(x, y + offset, ip[:22], ha="center", va=va, color="white", fontsize=8, zorder=4)
-            if dev.get("mac"):
-                ax.text(x, y + offset + (0.05 if y >= 0 else -0.05), dev["mac"][:22], ha="center", va=va,
-                        color="#94a3b8", fontsize=7, zorder=4)
+        for ring_idx, ring_devices in enumerate(rings):
+            radius = 1.35 + ring_idx * 0.95
+            m = len(ring_devices)
+            # Décale chaque anneau d'un demi-pas pour éviter que les nœuds se retrouvent
+            # exactement alignés radialement d'un anneau à l'autre (lisibilité).
+            phase = (math.pi / max(m, 1)) if ring_idx % 2 else 0
+            for i, dev in enumerate(ring_devices):
+                angle = 2 * math.pi * i / max(m, 1) + phase
+                x, y = radius * math.cos(angle), radius * math.sin(angle)
+                # Trait jusqu'au centre pour le 1er anneau, jusqu'au nœud parent le plus proche
+                # du côté centre pour les anneaux suivants — évite un enchevêtrement de traits
+                # tous tirés vers (0,0) quand il y a plusieurs anneaux.
+                inner = (radius - 0.95) * math.cos(angle), (radius - 0.95) * math.sin(angle) if ring_idx else (0, 0)
+                ax.plot([0 if ring_idx == 0 else inner[0], x], [0 if ring_idx == 0 else inner[1], y],
+                        color=BORDER, linewidth=1, zorder=1)
+                ax.scatter([x], [y], s=950, c="#161821", edgecolors=ACCENT2, linewidths=1.5, zorder=3)
+                ax.text(x, y, "PC", ha="center", va="center", fontsize=9.5, fontweight="bold", color=ACCENT2, zorder=4)
+                ip = dev.get("ip", "")
+                label_out = y >= 0 or n <= RING_CAPACITY
+                offset = 0.16 if label_out else -0.16
+                va = "bottom" if label_out else "top"
+                ax.text(x, y + offset, ip[:22], ha="center", va=va, color=INK, fontsize=8, zorder=4)
+                if dev.get("mac"):
+                    ax.text(x, y + offset + (0.055 if label_out else -0.055), dev["mac"][:22], ha="center", va=va,
+                            color=MUTED, fontsize=6.5, zorder=4)
 
-        ax.set_title(f"Topologie réseau — {n} appareil(s)", color="white", fontsize=12, pad=14)
+        ax.set_title(f"Topologie réseau — {n} appareil(s)", color=INK, fontsize=13, fontweight="bold", pad=16)
+        # Légende + horodatage, pour situer le diagramme (utile si on le garde/partage pour
+        # documenter une architecture, cf. demande initiale).
+        legend_y = -extent + 0.25
+        ax.scatter([-extent + 0.3], [legend_y], s=200, c=ACCENT, edgecolors=INK, linewidths=1, zorder=5)
+        ax.text(-extent + 0.5, legend_y, "Passerelle", ha="left", va="center", color=MUTED, fontsize=8, zorder=5)
+        ax.scatter([-extent + 2.1], [legend_y], s=200, c="#161821", edgecolors=ACCENT2, linewidths=1, zorder=5)
+        ax.text(-extent + 2.3, legend_y, "Appareil", ha="left", va="center", color=MUTED, fontsize=8, zorder=5)
+        ax.text(extent - 0.3, legend_y, _dt.now().strftime("%d/%m/%Y %H:%M"), ha="right", va="center",
+                color=MUTED, fontsize=7.5, zorder=5)
+
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=130, bbox_inches="tight", facecolor=fig.get_facecolor())
+        fig.savefig(buf, format="png", dpi=140, bbox_inches="tight", facecolor=fig.get_facecolor())
         plt.close(fig)
         return "data:image/png;base64," + _b64.b64encode(buf.getvalue()).decode("ascii")
 
@@ -6295,17 +6335,26 @@ async def capture_system_snapshot() -> dict:
 
 async def execute_pc_tool_reliability(args: dict) -> dict:
     """Introspection : taux d'échec RÉEL de chaque outil Marvin sur les N derniers jours (pas
-    une estimation) — sépare le volume d'appels de la fiabilité. Utilise ceci quand l'utilisateur
-    demande quels outils échouent le plus, ou pour un audit de fiabilité auto-critique."""
+    une estimation) — sépare le volume d'appels de la fiabilité. Chaque outil a aussi un taux
+    RÉCENT (7 jours par défaut) et un flag likely_already_fixed : un mauvais taux sur la longue
+    période mais 0 échec récemment est probablement déjà réglé, pas une priorité. Utilise ceci
+    quand l'utilisateur demande quels outils échouent le plus, ou pour un audit de fiabilité
+    auto-critique — privilégie les outils avec un mauvais taux RÉCENT, pas juste global."""
     min_calls = max(1, int(args.get("min_calls", 3)))
     days = max(1, min(int(args.get("days", 90)), 365))
-    rows = db.get_tool_reliability(min_calls=min_calls, days=days)
+    recent_days = max(1, min(int(args.get("recent_days", 7)), 90))
+    rows = db.get_tool_reliability(min_calls=min_calls, days=days, recent_days=recent_days)
+    still_concerning = [r for r in rows if not r["likely_already_fixed"]]
     return {
         "success": True,
         "period_days": days,
+        "recent_days": recent_days,
         "count": len(rows),
         "tools": rows[:20],
-        "note": "Trié par taux d'échec décroissant — les premiers de la liste méritent le plus d'attention.",
+        "note": (f"Trié par taux d'échec global décroissant. {len(rows) - len(still_concerning)} outil(s) "
+                 f"ont un mauvais taux global mais 0 échec sur les {recent_days} derniers jours "
+                 "(likely_already_fixed=true) — probablement déjà réglés, pas une priorité. "
+                 "Concentre-toi sur ceux avec likely_already_fixed=false ET recent_failure_rate_pct élevé."),
     }
 
 
@@ -18341,9 +18390,10 @@ TOOLS_SPEC = [
        {"days": {"type": "number", "description": "Nombre de jours d'historique à analyser (défaut 30, max 90)"}},
        []),
 
-    _t("pc_tool_reliability", "Taux d'échec RÉEL de chaque outil Marvin (pas une estimation) — sépare le volume d'appels de la fiabilité. Utilise ceci quand l'utilisateur demande quels outils échouent le plus, ou pour un audit de fiabilité.",
+    _t("pc_tool_reliability", "Taux d'échec RÉEL de chaque outil Marvin (pas une estimation) — sépare le volume d'appels de la fiabilité. Inclut aussi un taux RÉCENT (7j par défaut) et un flag likely_already_fixed pour distinguer un outil cassé maintenant d'un outil déjà corrigé mais qui traîne encore en tête du classement global. Utilise ceci quand l'utilisateur demande quels outils échouent le plus, ou pour un audit de fiabilité.",
        {"min_calls": {"type": "number", "description": "Nombre minimum d'appels pour qu'un outil soit inclus (défaut 3, évite le bruit statistique)"},
-        "days": {"type": "number", "description": "Période analysée en jours (défaut 90)"}},
+        "days": {"type": "number", "description": "Période analysée en jours (défaut 90)"},
+        "recent_days": {"type": "number", "description": "Fenêtre récente pour détecter les bugs déjà corrigés (défaut 7)"}},
        []),
 
     _t("pc_conversation_trace", "Chronologie complète des appels d'outils d'UNE conversation (durée réelle de chacun, ordre, succès/échec). Utilise ceci quand l'utilisateur demande pourquoi une réponse a été lente.",
