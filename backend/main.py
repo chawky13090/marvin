@@ -2646,6 +2646,32 @@ async def lifespan(app_instance):
 #   Testé en réel : `calendar_list` passe de "64,2% d'échec (95 appels)" à "3,4% d'échec sur
 #   les 7 derniers jours (29 appels)" — la vraie histoire, invisible avant ce correctif.
 #   `scripts/smoke_test_pages.py` 34/34.
+#
+# v2.160 (Test réel des ~280 outils non destructeurs) : sur demande explicite (« tu n'as
+#   qu'à tester tout les outils pour voir s'il fonctionne et on voit après »), suite directe
+#   de v2.159. Script jetable (scratchpad) qui appelle chaque outil du catalogue /api/tools/list
+#   avec des arguments minimaux dérivés de son schéma JSON, via POST /api/tools (le vrai
+#   chemin d'exécution, pas une simulation) — 47 outils destructeurs/coûteux (SSH exec, envoi
+#   email, suppression, winget install, génération vidéo/LLM lourde...) explicitement exclus
+#   de l'automatisation, jamais invoqués en aveugle.
+#   Résultat sur 327 outils : 139 OK, 111 rejets de validation corrects (comportement attendu
+#   sur des arguments bidons), 69 volontairement écartés, 8 échecs à investiguer.
+#   Sur les 8 : 4 étaient des faux positifs (email_digest 54s / daily_briefing 87s /
+#   document_ask 28s — juste plus lents que le plafond de 45s du script de test, pas cassés ;
+#   pptx_read — anomalie transitoire, marche parfaitement en re-test isolé).
+#   3 VRAIS BUGS trouvés et corrigés :
+#   1. file_large_finder sans dossier précisé scanne tout le home (os.walk synchrone,
+#      132 Go réels sur cette machine) — 145 SECONDES pendant lesquelles TOUT le backend
+#      était gelé (même classe de bug que v2.96/v2.152 : blocage synchrone dans une fonction
+#      async, jamais repérée pour celle-ci). Déporté sur un thread (asyncio.to_thread).
+#   2. calendar_create avec une date start non parseable levait une ValueError non
+#      rattrapée -> 500 brut au lieu d'un message clair.
+#   3. email_attachment_summary avec un uid invalide faisait planter la commande IMAP
+#      FETCH (exception non rattrapée) -> 500 brut au lieu d'un message clair.
+#   Testé en réel après correctif (backend redémarré) : les 3 renvoient maintenant une erreur
+#   propre (200 + {"error":...}) sur les mêmes arguments qui plantaient avant ; preuve directe
+#   du fix event-loop — /api/health répond en 31ms alors qu'un file_large_finder complet
+#   (158s, 132 Go, home réel) tourne en parallèle sur un thread séparé.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7183,7 +7209,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.159.0",
+            "version":         "2.160.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

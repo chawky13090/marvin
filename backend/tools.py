@@ -4497,16 +4497,21 @@ async def execute_calendar_create(args: dict) -> dict:
     # Déterminer si c'est un événement toute-journée ou avec heure précise
     all_day = "T" not in start
     if not end:
-        if all_day:
-            # Toute la journée → fin = jour suivant
-            from datetime import datetime, timedelta
-            d = datetime.strptime(start, "%Y-%m-%d")
-            end = (d + timedelta(days=1)).strftime("%Y-%m-%d")
-        else:
-            # 1 heure par défaut
-            from datetime import datetime, timedelta
-            d = datetime.fromisoformat(start)
-            end = (d + timedelta(hours=1)).isoformat()
+        # v2.160 : 'start' mal formé (ex. valeur non-date) levait une ValueError non
+        # rattrapée → 500 au lieu d'une erreur de validation propre.
+        try:
+            if all_day:
+                # Toute la journée → fin = jour suivant
+                from datetime import datetime, timedelta
+                d = datetime.strptime(start, "%Y-%m-%d")
+                end = (d + timedelta(days=1)).strftime("%Y-%m-%d")
+            else:
+                # 1 heure par défaut
+                from datetime import datetime, timedelta
+                d = datetime.fromisoformat(start)
+                end = (d + timedelta(hours=1)).isoformat()
+        except ValueError:
+            return {"error": f"Date 'start' invalide : « {start} ». Format attendu : YYYY-MM-DDTHH:MM:SS ou YYYY-MM-DD."}
 
     def _create():
         service = _get_google_calendar_service()
@@ -7288,9 +7293,14 @@ async def execute_email_attachment_summary(args: dict) -> dict:
         return {"error": "Email non configuré."}
     import email_manager as _em, tempfile as _tmp, os as _os, uuid as _uuid
     loop = asyncio.get_running_loop()
-    att = await loop.run_in_executor(None, lambda: _em.fetch_attachment(
-        cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
-        uid=uid, name=name, folder=args.get("folder", "INBOX")))
+    try:
+        # v2.160 : un uid invalide/mal formé faisait planter la commande IMAP FETCH
+        # (exception non rattrapée → 500) au lieu d'un message d'erreur propre.
+        att = await loop.run_in_executor(None, lambda: _em.fetch_attachment(
+            cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
+            uid=uid, name=name, folder=args.get("folder", "INBOX")))
+    except Exception as e:
+        return {"error": f"Pièce jointe introuvable (uid invalide ou email inaccessible) : {e}"}
     if not att or not att.get("data"):
         return {"error": "Pièce jointe introuvable."}
     fname = att["name"]
@@ -11065,6 +11075,29 @@ async def execute_image_compress(args: dict) -> dict:
         return {"error": str(e)}
 
 
+def _file_large_finder_scan(root: Path, top: int, threshold: float) -> tuple[list, int]:
+    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, jamais directement dans l'event loop."""
+    import heapq
+    # Tas borné : on ne garde JAMAIS plus de `top` fichiers en mémoire (anti-OOM sur gros disques)
+    heap = []  # min-heap de (taille, chemin)
+    scanned = 0
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if d.lower() not in ("$recycle.bin", "system volume information")]
+        for fn in fns:
+            try:
+                fp = os.path.join(dp, fn)
+                sz = os.path.getsize(fp)
+                scanned += 1
+                if sz >= threshold:
+                    if len(heap) < top:
+                        heapq.heappush(heap, (sz, fp))
+                    elif sz > heap[0][0]:
+                        heapq.heapreplace(heap, (sz, fp))
+            except Exception:
+                continue
+    return sorted(heap, reverse=True), scanned
+
+
 async def execute_file_large_finder(args: dict) -> dict:
     """Trouve les plus gros fichiers d'un dossier (récursif) — pour repérer ce qui prend de la place."""
     directory = args.get("directory") or args.get("path") or _HOME
@@ -11072,27 +11105,13 @@ async def execute_file_large_finder(args: dict) -> dict:
         root = Path(_resolve_path(directory))
         if not root.exists():
             return {"error": f"Dossier introuvable : {root}"}
-        import heapq
         top = max(1, min(int(args.get("top", 20)), 500))
         threshold = float(args.get("min_mb", 0)) * 1024 * 1024
-        # Tas borné : on ne garde JAMAIS plus de `top` fichiers en mémoire (anti-OOM sur gros disques)
-        heap = []  # min-heap de (taille, chemin)
-        scanned = 0
-        for dp, dns, fns in os.walk(root):
-            dns[:] = [d for d in dns if d.lower() not in ("$recycle.bin", "system volume information")]
-            for fn in fns:
-                try:
-                    fp = os.path.join(dp, fn)
-                    sz = os.path.getsize(fp)
-                    scanned += 1
-                    if sz >= threshold:
-                        if len(heap) < top:
-                            heapq.heappush(heap, (sz, fp))
-                        elif sz > heap[0][0]:
-                            heapq.heapreplace(heap, (sz, fp))
-                except Exception:
-                    continue
-        items = sorted(heap, reverse=True)
+        # v2.160 : le scan récursif (os.walk) peut prendre plusieurs minutes sur un gros
+        # dossier (mesuré 145s sur le home réel de l'utilisateur, 132 Go) — déporté sur un
+        # thread pour ne pas geler tout le backend pendant ce temps (même classe de bug que
+        # v2.96/v2.152 : jamais de blocage synchrone dans une fonction async).
+        items, scanned = await asyncio.to_thread(_file_large_finder_scan, root, top, threshold)
         total = sum(s for s, _ in items)
         return {"success": True, "directory": str(root), "count": len(items),
                 "total_human": _fmt_bytes(total),
