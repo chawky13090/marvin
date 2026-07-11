@@ -46,12 +46,21 @@ export const NAV_SECTIONS = [
 ];
 const NAV_ITEMS = NAV_SECTIONS.flatMap(s => s.items);
 
+const BACKEND_URL = (typeof window !== 'undefined' && window.location)
+  ? window.location.protocol + '//' + window.location.hostname + ':8005'
+  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005');
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState('checking');
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // v2.146 — indicateur ambiant de tâche(s) longue(s) en cours (long_task_start, v2.145) :
+  // demandé explicitement (« que l'on sache que Marvin travaille d'une certaine manière »).
+  // Jusqu'ici totalement invisible tant qu'on ne demandait pas explicitement long_task_status
+  // — une tâche pouvait tourner en arrière-plan (reprise cron) sans AUCUN signal ambiant.
+  const [longTaskCount, setLongTaskCount] = useState(0);
   const chatStatus = useChatStatus();   // { isLoading, status, conversationId, messageCount }
 
   // Détecte le mobile/tactile (tiroir au lieu du survol) — couvre aussi le « mode bureau »
@@ -80,6 +89,26 @@ export default function Sidebar() {
       setOllamaStatus(res.ok ? 'connected' : 'disconnected');
     } catch {
       setOllamaStatus('disconnected');
+    }
+  }
+
+  useEffect(() => {
+    checkLongTasks();
+    const interval = setInterval(checkLongTasks, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function checkLongTasks() {
+    try {
+      // Compte directement les jobs cron de reprise (_long_task_resume) — pas besoin de
+      // passer par l'exécution d'outil, /api/cron est un endpoint REST simple.
+      const res = await fetch(`${BACKEND_URL}/api/cron`, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return;
+      const jobs = await res.json();
+      const count = Array.isArray(jobs) ? jobs.filter(j => j.tool_name === '_long_task_resume' && j.enabled).length : 0;
+      setLongTaskCount(count);
+    } catch {
+      // silencieux — l'indicateur reste simplement à son dernier état connu
     }
   }
 
@@ -320,6 +349,35 @@ export default function Sidebar() {
          </div>
         ))}
       </nav>
+
+      {/* ── Tâche(s) longue(s) en cours en arrière-plan (v2.145/v2.146) ──────── */}
+      {longTaskCount > 0 && (
+        <Link
+          href="/tasks"
+          title={`${longTaskCount} tâche(s) longue(s) en cours en arrière-plan`}
+          style={{
+            padding: '10px 20px',
+            borderTop: '1px solid rgba(228, 228, 231,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            textDecoration: 'none',
+            color: 'var(--success)',
+          }}
+        >
+          <span style={{ fontSize: '14px', flexShrink: 0 }}>🗂️</span>
+          <span style={{
+            fontSize: '10px',
+            whiteSpace: 'nowrap',
+            opacity: open ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+            letterSpacing: '0.03em',
+            fontWeight: 600,
+          }}>
+            {longTaskCount} tâche{longTaskCount > 1 ? 's' : ''} de fond en cours
+          </span>
+        </Link>
+      )}
 
       {/* ── Status Ollama ──────────────────────────────────────── */}
       <div style={{

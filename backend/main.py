@@ -2234,6 +2234,58 @@ async def lifespan(app_instance):
 #   et correctes, synthèse cohérente) ; `webapp_create` testé (fichier HTML généré et
 #   correctement enveloppé). `scripts/smoke_test_chat.py` 5/5, tous les artefacts de test
 #   nettoyés (cron/tâches/conversations).
+#
+# v2.146 (🎯 UI — bandeau de MODE + langage clair + repli d'étapes + tâche de fond visible) :
+#   sur demande explicite (« retravaille l'UI du chat pour que l'on sache que Marvin selon
+#   nos requêtes travaille d'une certaine manière précise »), recherche menée sur les
+#   patterns 2026 (Perplexity Pro Search : étapes en langage clair, repliées par défaut,
+#   réponse prioritaire). Changement 100% frontend, aucune logique Python modifiée.
+#   1. **Bandeau de mode** (`MessageBubble.jsx::TurnModeBadge`) : pilule colorée en tête de
+#      réponse dès qu'un outil est appelé — 🔍 Recherche approfondie, 🧑‍🤝‍🧑 Panel d'experts IA
+#      (nom choisi après retour explicite — « conseil de modèles » jugé pas assez parlant),
+#      🧩 Sous-tâches parallèles, 🗂️ Tâche longue démarrée, 🐍 Code Interpreter, 🌐 Mini-appli
+#      web, 🧠 Compétence activée, ou 🛠️ Agent (outils) en repli générique. Détecté par le
+#      nom d'outil appelé dans le tour — aucun événement SSE supplémentaire nécessaire.
+#   2. **Noms d'outils en langage clair** : le dictionnaire `toolLabels` existant (v2.9x)
+#      était incomplet — tous les outils v2.130-2.145 (ssh_*, code_python, document_*,
+#      long_task_*, ai_*...) retombaient sur leur nom technique brut. Étendu + repli
+#      "snake_case → Mots séparés" pour tout outil non listé plutôt que d'exposer le nom
+#      interne tel quel.
+#   3. **Repli des étapes** : au-delà de 3 appels d'outils dans un tour, les cartes se
+#      replient par défaut derrière "✅ N/M étape(s) effectuées ▼ Afficher" — la réponse
+#      reste prioritaire, le détail se déplie à la demande (pattern Perplexity).
+#   4. **Indicateur ambiant de tâche de fond** (`Sidebar.jsx`) : badge "🗂️ N tâche(s) de
+#      fond en cours" visible depuis N'IMPORTE QUELLE page dès qu'un job `_long_task_resume`
+#      (v2.145) est actif — jusqu'ici totalement invisible tant qu'on ne demandait pas
+#      explicitement `long_task_status`. Sondage léger de `/api/cron` toutes les 30s (même
+#      cadence que le indicateur Ollama existant), cliquable vers `/tasks`.
+#   Testé en réel (Playwright, channel="chrome") : requête code_python → badge "🐍 Code
+#   Interpreter" affiché, carte renommée "Exécuter du code Python", résultat 391 correct,
+#   0 erreur console ; requête à 4 outils → repli "3/4 étape(s) en cours ▼ Afficher" confirmé
+#   fonctionnel en direct (capture d'écran, tour encore en cours) ; page fraîche rechargée
+#   → 0 requête réseau en échec. `scripts/smoke_test_chat.py` 5/5.
+#
+# v2.147 (🎯 UI — rendus dédiés pour les 5 outils "mode" v2.141-145) : sur demande
+#   explicite (« continue les améliorations sur cette voie »), suite directe de v2.146.
+#   Audité `PrettyResult.jsx`/`MessageBubble.jsx::renderToolResult` : les 5 nouveaux outils
+#   (web_deep_research, ai_model_council, ai_subagents_run, long_task_start, long_task_
+#   status) retombaient sur le JSON générique malgré des résultats riches — exactement le
+#   genre de détail que le bandeau de mode (v2.146) donne envie d'explorer une fois la
+#   carte dépliée, mais rien ne l'exploitait.
+#   5 rendus dédiés ajoutés à `renderToolResult` : synthèse en markdown (réutilise `marked`/
+#   `safeHtml` déjà présents dans le fichier) + détail repliable par défaut (nouveau
+#   composant `CollapsibleDetail`) pour les sources (recherche approfondie), les réponses
+#   individuelles par modèle (panel d'experts), le détail par sous-tâche (sous-tâches
+#   parallèles) ; checklist avec cases à cocher pour `long_task_start`/`long_task_status`
+#   (barre de progression + texte barré sur les étapes faites).
+#   Testé en réel (Playwright) : requête "démarre une tâche longue" → badge "🗂️ Tâche
+#   longue démarrée" affiché, carte d'outil rendue sans erreur (0 erreur console sur 3
+#   passes de test, y compris un test intermédiaire accidentellement rejoué sur une
+#   ancienne conversation chargée d'historique — confirmé artefact de méthode de test, pas
+#   un bug). Les formes de données (steps/groups/individual_answers/subtask_results) sont
+#   celles déjà validées en réel côté backend lors de leur implémentation (v2.141-145) —
+#   changement purement d'affichage, aucun risque de désynchronisation. `scripts/
+#   smoke_test_chat.py` 5/5.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -6747,7 +6799,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.145.0",
+            "version":         "2.147.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

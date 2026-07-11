@@ -160,6 +160,7 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
   const isUser = message.role === 'user';
   const isToolResult = message.role === 'tool';
   const [showReasoning, setShowReasoning] = useState(false);
+  const [stepsCollapsed, setStepsCollapsed] = useState(true);
 
   // Extraire le texte depuis parts (v6) ou content (fallback)
   const textParts = message.parts?.filter(p => p.type === 'text') || [];
@@ -253,24 +254,47 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
 
   // Messages avec tool invocations
   if (toolInvocations.length > 0) {
+    const turnMode = detectTurnMode(toolInvocations, message.modelInfo);
+    const doneCount = toolInvocations.filter(t => (t.state || (t.result !== undefined ? 'result' : 'pending')) === 'result').length;
+    // v2.146 — replié par défaut au-delà de 3 étapes (pattern Perplexity Pro Search :
+    // la réponse reste prioritaire, le détail se déplie à la demande) — en dessous, montrer
+    // directement les cartes ne surcharge pas assez pour justifier un clic supplémentaire.
+    const shouldCollapse = toolInvocations.length >= 3;
     return (
       <div className={`${styles.wrapper} ${styles.wrapperAssistant}`} style={{ flexDirection: 'column', gap: '8px', opacity: 1, maxWidth: '100%' }}>
+        <TurnModeBadge mode={turnMode} />
         {reasoningBlock}
         {textContent && (
           <BubbleWrapper isUser={false}>
             <div className={styles.content} dangerouslySetInnerHTML={{ __html: htmlContent }} />
           </BubbleWrapper>
         )}
-        <div className={styles.toolCalls}>
-          {toolInvocations.map((tool, i) => (
-            <ToolCallInline
-              key={tool.toolCallId || i}
-              tool={tool}
-              onConfirm={onConfirmTool}
-              onCancel={onCancelTool}
-            />
-          ))}
-        </div>
+        {shouldCollapse && (
+          <div
+            onClick={() => setStepsCollapsed(!stepsCollapsed)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              marginLeft: '40px', width: 'fit-content', cursor: 'pointer', userSelect: 'none',
+              fontSize: '11px', color: 'var(--text-muted)', padding: '2px 0',
+            }}
+          >
+            <span>{doneCount === toolInvocations.length ? '✅' : '⟳'}</span>
+            <span>{doneCount}/{toolInvocations.length} étape(s) {doneCount === toolInvocations.length ? 'effectuées' : 'en cours'}</span>
+            <span style={{ opacity: 0.6 }}>{stepsCollapsed ? '▼ Afficher' : '▲ Masquer'}</span>
+          </div>
+        )}
+        {(!shouldCollapse || !stepsCollapsed) && (
+          <div className={styles.toolCalls}>
+            {toolInvocations.map((tool, i) => (
+              <ToolCallInline
+                key={tool.toolCallId || i}
+                tool={tool}
+                onConfirm={onConfirmTool}
+                onCancel={onCancelTool}
+              />
+            ))}
+          </div>
+        )}
         {modelBadge}
       </div>
     );
@@ -374,6 +398,53 @@ const CRITICAL_TOOLS = [
   'pc_open_file', 'pc_run_command', 'pc_process_kill', 'pc_pull_ollama_model'
 ];
 
+// v2.146 — Bandeau de MODE en tête de réponse : demandé explicitement (« que l'on sache
+// que Marvin selon nos requêtes travaille d'une certaine manière précise »). Jusqu'ici
+// tous les tours (réponse rapide, agent à outils, recherche approfondie, panel d'experts,
+// sous-tâches parallèles, tâche longue, Code Interpreter) rendaient EXACTEMENT la même
+// bulle générique — invisible à l'œil nu qu'un mode différent était utilisé. Inspiré du
+// pattern Perplexity Pro Search (bandeau d'étapes en langage clair, priorité à la
+// réponse) : détecté par le nom d'outil appelé, pas de changement backend nécessaire.
+const SPECIAL_MODES = [
+  { match: 'web_deep_research', icon: '🔍', label: 'Recherche approfondie', color: '#0ea5e9' },
+  { match: 'ai_model_council', icon: '🧑‍🤝‍🧑', label: "Panel d'experts IA", color: '#a855f7' },
+  { match: 'ai_subagents_run', icon: '🧩', label: 'Sous-tâches parallèles', color: '#f59e0b' },
+  { match: 'long_task_start', icon: '🗂️', label: 'Tâche longue démarrée', color: '#10b981' },
+  { match: 'code_python', icon: '🐍', label: 'Code Interpreter', color: '#3b82f6' },
+  { match: 'webapp_create', icon: '🌐', label: 'Mini-appli web', color: '#3b82f6' },
+];
+
+function detectTurnMode(toolInvocations, modelInfo) {
+  for (const mode of SPECIAL_MODES) {
+    if (toolInvocations.some(t => t.toolName === mode.match)) return mode;
+  }
+  if (modelInfo?.label && modelInfo.label.includes('Compétence')) {
+    return { icon: '🧠', label: modelInfo.label.replace(/^🛠️\s*/, ''), color: '#8b5cf6' };
+  }
+  if (toolInvocations.length > 0) {
+    return { icon: '🛠️', label: 'Agent (outils)', color: 'var(--accent-primary)' };
+  }
+  return null;
+}
+
+function TurnModeBadge({ mode }) {
+  if (!mode) return null;
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: '6px',
+      marginLeft: '40px', marginBottom: '2px', width: 'fit-content',
+      padding: '3px 10px', borderRadius: '999px',
+      background: `color-mix(in srgb, ${mode.color} 14%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${mode.color} 35%, transparent)`,
+      fontSize: '11px', fontWeight: 600, color: mode.color,
+      letterSpacing: '0.02em',
+    }}>
+      <span>{mode.icon}</span>
+      <span>{mode.label}</span>
+    </div>
+  );
+}
+
 // ─── Icônes par catégorie d'outil ───
 function getToolIcon(toolName) {
   if (toolName.startsWith('file_')) return '📁';
@@ -389,6 +460,30 @@ function getToolIcon(toolName) {
   if (toolName.startsWith('task_')) return '✅';
   if (toolName.startsWith('note_')) return '📝';
   return '🔧';
+}
+
+// v2.147 — rendus dédiés pour les 5 nouveaux outils "mode" (v2.141-145) : jusqu'ici
+// retombaient sur le JSON générique malgré des résultats riches et structurés (sources,
+// réponses par modèle, sous-tâches, checklist) — exactement le genre de détail que le
+// bandeau de mode (v2.146) donne envie d'explorer une fois la carte dépliée.
+function CollapsibleDetail({ label, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: '8px' }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{ cursor: 'pointer', userSelect: 'none', fontSize: '11px', color: 'var(--accent-primary)', fontWeight: 600 }}
+      >
+        {open ? '▲' : '▼'} {label}
+      </div>
+      {open && <div style={{ marginTop: '6px' }}>{children}</div>}
+    </div>
+  );
+}
+
+function MarkdownBlock({ text }) {
+  const html = useMemo(() => safeHtml(marked.parse(text || '')), [text]);
+  return <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-primary)', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 // ─── Rendu structuré des résultats d'outils ───
@@ -425,6 +520,116 @@ function renderToolResult(toolName, result) {
           style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer' }}
           onClick={() => window.open(result.image, '_blank')}
         />
+      </div>
+    );
+  }
+
+  // ── web_deep_research (v2.142) ─────
+  if (toolName === 'web_deep_research' && result.answer) {
+    return (
+      <div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          🔍 {result.rounds || 1} passe(s) de recherche · {(result.sources || []).length} source(s)
+        </div>
+        <MarkdownBlock text={result.answer} />
+        {(result.sources || []).length > 0 && (
+          <CollapsibleDetail label={`Sources (${result.sources.length})`}>
+            {result.sources.map((s, i) => (
+              <div key={i} style={{ fontSize: '11px', marginBottom: '4px' }}>
+                <a href={s.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                  [{i + 1}] {s.title || s.url}
+                </a>
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+      </div>
+    );
+  }
+
+  // ── ai_model_council (v2.141) — Panel d'experts IA ─────
+  if (toolName === 'ai_model_council' && result.answer) {
+    return (
+      <div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          🧑‍🤝‍🧑 {(result.models_consulted || []).length} modèle(s) consulté(s) en parallèle
+        </div>
+        <MarkdownBlock text={result.answer} />
+        {(result.individual_answers || []).length > 0 && (
+          <CollapsibleDetail label="Voir les réponses individuelles">
+            {result.individual_answers.map((a, i) => (
+              <div key={i} style={{ padding: '8px 10px', marginBottom: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px', borderLeft: '3px solid var(--accent-primary)' }}>
+                <div style={{ fontWeight: 600, fontSize: '11px', color: 'var(--accent-primary)', marginBottom: '4px', fontFamily: 'monospace' }}>{a.model}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{a.answer}</div>
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+      </div>
+    );
+  }
+
+  // ── ai_subagents_run (v2.145) — sous-tâches parallèles ─────
+  if (toolName === 'ai_subagents_run' && result.answer) {
+    return (
+      <div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          🧩 {(result.subtasks || []).length} sous-tâche(s) traitée(s) en parallèle
+        </div>
+        <MarkdownBlock text={result.answer} />
+        {(result.subtask_results || []).length > 0 && (
+          <CollapsibleDetail label="Voir le détail par sous-tâche">
+            {result.subtask_results.map((s, i) => (
+              <div key={i} style={{ padding: '8px 10px', marginBottom: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px', borderLeft: '3px solid var(--accent-primary)' }}>
+                <div style={{ fontWeight: 600, fontSize: '11px', color: 'var(--text-primary)', marginBottom: '4px' }}>{s.subtask}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{s.result}</div>
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+      </div>
+    );
+  }
+
+  // ── long_task_start (v2.145) — checklist de la tâche longue ─────
+  if (toolName === 'long_task_start' && Array.isArray(result.steps)) {
+    return (
+      <div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          🗂️ {result.steps.length} étape(s) — reprise automatique toutes les 5 min
+        </div>
+        {result.steps.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '11px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+            <span>☐</span><span>{s}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── long_task_status (v2.145) — avancement des tâches longues ─────
+  if (toolName === 'long_task_status' && Array.isArray(result.groups)) {
+    if (result.groups.length === 0) {
+      return <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)' }}>Aucune tâche longue en cours.</span>;
+    }
+    return (
+      <div>
+        {result.groups.map((g, gi) => (
+          <div key={gi} style={{ marginBottom: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+              <span>{g.tag}</span>
+              <span>{g.done}/{g.total}</span>
+            </div>
+            <div style={{ height: '4px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden', marginBottom: '6px' }}>
+              <div style={{ height: '100%', width: `${g.total ? (g.done / g.total) * 100 : 0}%`, background: 'var(--success)' }} />
+            </div>
+            {(g.steps || []).map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '11px', marginBottom: '2px', color: s.status === 'done' ? 'var(--text-muted)' : 'var(--text-secondary)', textDecoration: s.status === 'done' ? 'line-through' : 'none' }}>
+                <span>{s.status === 'done' ? '☑' : '☐'}</span><span>{s.title}</span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     );
   }
@@ -896,7 +1101,56 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
     onedrive_list: 'OneDrive — Lister',
     onedrive_read: 'OneDrive — Lire',
     onedrive_upload: 'OneDrive — Uploader',
+    // v2.146 — noms manquants trouvés en auditant le dictionnaire (repli sur le nom
+    // technique brut jusqu'ici pour tous ces outils, contraire au principe "langage
+    // clair" — cf. Perplexity Pro Search).
+    code_python: 'Exécuter du code Python',
+    webapp_create: 'Créer une mini-appli web',
+    web_research: 'Recherche web approfondie',
+    web_deep_research: 'Recherche approfondie multi-passes',
+    ai_model_council: "Consulter un panel d'experts IA",
+    ai_subagents_run: 'Décomposer en sous-tâches',
+    long_task_start: 'Démarrer une tâche longue',
+    long_task_status: 'Vérifier une tâche longue',
+    long_task_stop: 'Arrêter une tâche longue',
+    document_ask: 'Interroger les documents',
+    document_generate: 'Générer un document',
+    document_index: 'Indexer un document',
+    document_list: 'Lister les documents',
+    document_refine_section: 'Affiner une section',
+    memory_search: 'Chercher dans la mémoire',
+    memory_save: 'Mémoriser',
+    memory_list: 'Lister les souvenirs',
+    task_create: 'Créer une tâche',
+    task_update: 'Mettre à jour une tâche',
+    task_list: 'Lister les tâches',
+    ssh_list: 'Lister les connexions SSH',
+    ssh_exec: 'Exécuter une commande SSH',
+    ssh_exec_multi: 'Exécuter sur plusieurs serveurs',
+    ssh_write_and_run: 'Écrire et lancer un script distant',
+    ssh_upload: 'Envoyer un fichier (SFTP)',
+    ssh_download: 'Télécharger un fichier (SFTP)',
+    ssh_server_info: 'Diagnostic serveur',
+    net_ping: 'Ping',
+    net_port_scan: 'Scanner les ports',
+    net_scan_local: 'Scanner le réseau local',
+    net_dns_lookup: 'Recherche DNS',
+    csv_analyze: 'Analyser un fichier CSV',
+    system_cleanup: 'Nettoyer le système',
+    pc_hardware_specs: 'Caractéristiques matérielles',
+    pc_hardware_temps: 'Températures matérielles',
+    pc_disk_smart_health: 'Santé disque (SMART)',
+    pc_tool_reliability: 'Fiabilité des outils',
+    billing_client_create: 'Créer un client',
+    billing_quote_pdf: 'Générer un devis PDF',
+    winget_install: 'Installer un logiciel',
+    winget_search: 'Chercher un logiciel',
   };
+
+  // v2.146 — repli : un nom d'outil non listé ci-dessus s'affichait tel quel
+  // (snake_case brut) — traduit au minimum en mots séparés avec majuscule initiale
+  // plutôt que d'exposer le nom technique interne.
+  const prettyFallback = (n) => n.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
 
   // Déterminer si on doit afficher les boutons de confirmation
   let hasPendingResultConfirmation = false;
@@ -948,7 +1202,7 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
         <span>{icon}</span>
         <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-          {toolLabels[toolName] || toolName}
+          {toolLabels[toolName] || prettyFallback(toolName)}
         </span>
         <span className={`badge badge-${statusBadgeClass}`}>
           {statusLabel}
