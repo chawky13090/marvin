@@ -145,11 +145,26 @@ function GeneratedFileCard({ path, message, securityWarning }) {
 marked.setOptions({ gfm: true, breaks: true });
 
 // Safe HTML render — strips script/event-handler XSS from LLM output
+let _dompurifyLinksHooked = false;
 function safeHtml(raw) {
   if (typeof window === 'undefined') return raw; // SSR: skip
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const DOMPurify = require('dompurify');
+    // Liens cliquables dans le chat = ouverture dans un NOUVEL onglet, jamais en quittant
+    // Marvin — signalé par l'utilisateur (liens pertinents cités par Marvin qui faisaient
+    // perdre la conversation). Hook DOMPurify plutôt qu'un renderer marked personnalisé :
+    // couvre aussi bien les liens markdown [texte](url) que du HTML <a> brut éventuel dans
+    // la réponse du modèle, indépendamment de la version de marked.
+    if (!_dompurifyLinksHooked) {
+      DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+        if (node.tagName === 'A' && node.hasAttribute('href')) {
+          node.setAttribute('target', '_blank');
+          node.setAttribute('rel', 'noopener noreferrer');
+        }
+      });
+      _dompurifyLinksHooked = true;
+    }
     return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
   } catch {
     return raw; // fallback if dompurify unavailable

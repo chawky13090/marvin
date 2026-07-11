@@ -2475,6 +2475,22 @@ async def lifespan(app_instance):
 #   pire cas 5ms (delete) / 28ms (health) — contre un blocage reproduit à plusieurs reprises
 #   avant. `scripts/smoke_test_pages.py` 34/34. Les 3 tâches de test bloquées depuis v2.151
 #   supprimées avec succès (preuve directe que le fix résout le cas qui les avait bloquées).
+#
+# v2.153 (🔗 liens du chat ouverts dans un nouvel onglet) : signalé directement par
+#   l'utilisateur (« marvin ma indiqué des lien très pertinent mais quand on clic dessus
+#   cela nous amène directement à la page et quitte marvin »). Cause trouvée : les liens
+#   `[texte](url)` markdown de la réponse de chat passent par `marked.parse` + `safeHtml`
+#   (DOMPurify) — contrairement aux liens des composants dédiés (sources web_search,
+#   résultats de recherche) qui avaient déjà `target="_blank"` en dur, ceux générés depuis
+#   le markdown de la réponse n'avaient AUCUN attribut cible, donc ouverture dans l'onglet
+#   courant = quitte Marvin. Corrigé via un hook DOMPurify (`afterSanitizeAttributes`)
+#   plutôt qu'un renderer `marked` personnalisé — couvre uniformément le markdown ET tout
+#   HTML `<a>` brut que le modèle aurait pu produire, indépendamment de la version de
+#   `marked`. `target="_blank"` + `rel="noopener noreferrer"` (sécurité : empêche la page
+#   ouverte d'accéder à `window.opener`).
+#   Testé en réel (Playwright) : message forçant un lien markdown dans la réponse →
+#   `target="_blank"` et `rel="noopener noreferrer"` confirmés sur l'élément `<a>` réellement
+#   rendu (DOM inspecté directement, pas supposé), 0 erreur console.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7010,7 +7026,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.152.0",
+            "version":         "2.153.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
