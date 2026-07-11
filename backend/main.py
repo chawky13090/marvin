@@ -2701,6 +2701,42 @@ async def lifespan(app_instance):
 #   confirmé jusqu'à DuckDuckGo qui répond effectivement en ~17s (3 tentatives) avec le
 #   nouveau message d'erreur orientant vers les alternatives — comportement exact
 #   observé qui a motivé le correctif, reproduit en direct pendant la vérification.
+#
+# v2.162 (deploiement SearXNG automatise + integration installeur) : suite directe de
+#   v2.161, sur demande explicite (« fait tout et pense a utiliser des ports autres [...]
+#   et pense que tout cela doit etre dans marvin pour faciliter le deploiement futur sur
+#   d'autre machine de facon facile »).
+#   Nouveaux fichiers portables (docker/searxng/) : docker-compose.yml (port hote 8890,
+#   volontairement hors des defauts courants 8080/9000/3000 pour eviter tout conflit
+#   homelab), settings.yml.example (modele versionne, JSON active, secret_key placeholder),
+#   start-searxng.ps1 (idempotent : demarre Docker Desktop si besoin, genere un secret
+#   local au 1er lancement, docker compose up -d, attend que l'API JSON reponde vraiment,
+#   puis configure searxng_url dans Marvin via PUT /api/credentials automatiquement).
+#   settings.yml (avec le secret genere) est gitignore -- jamais committe, propre a
+#   chaque machine (meme doctrine que data/, deja gitignore pour les secrets reels).
+#   Integration dynamique dans start.bat (nouvelle etape optionnelle : Docker detecte ->
+#   lance start-searxng.ps1 en arriere-plan dans sa propre fenetre, sinon ignore
+#   silencieusement -> DuckDuckGo/autres restent le comportement par defaut) et
+#   INSTALLER-NOUVEAU-PC.bat (etape [4/9] informative, n'installe pas Docker de force --
+#   trop lourd/disruptif pour un installeur non supervise, juste signale la commande
+#   winget si l'utilisateur veut l'ajouter). INSTALLER-SEARXNG.bat (racine) : point
+#   d'entree manuel si besoin de relancer/reconfigurer sans passer par start.bat.
+#   Incident rencontre pendant le deploiement reel (documente par transparence, pas un
+#   bug de ce code) : Docker Desktop a d'abord refuse de demarrer ("Virtualization
+#   support not detected") -- cause : hypervisorlaunchtype avait ete desactive pour
+#   optimiser VMware, coupant la virtualisation dont WSL2/Docker a besoin. Diagnostique
+#   et corrige par l'utilisateur lui-meme (bcdedit /set hypervisorlaunchtype auto +
+#   reactivation VirtualMachinePlatform/Hyper-V + redemarrage) -- modification systeme
+#   volontairement laissee a l'utilisateur, jamais executee par Marvin/Claude Code.
+#   Testes en reel de bout en bout : conteneur marvin-searxng demarre et repond
+#   (`GET /search?format=json` -> vrais resultats) ; searxng_url confirme configure via
+#   l'API Marvin ; `web_search` (l'outil chat reel) route bien vers SearXNG en priorite
+#   sur une vraie requete ("actualite cybersecurite juillet 2026" -> 5 resultats reels et
+#   pertinents, provider:"SearXNG" confirme dans la reponse). Observation annexe, pas un
+#   bug : certains moteurs internes de SearXNG (duckduckgo, brave) se sont fait bloquer
+#   (CAPTCHA/429) pendant le test reel -- comportement attendu d'un meta-moteur, les
+#   autres moteurs (Google CSE, Startpage...) ont pris le relais sans interruption
+#   visible cote utilisateur, exactement l'effet de resilience recherche.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7238,7 +7274,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.161.0",
+            "version":         "2.162.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

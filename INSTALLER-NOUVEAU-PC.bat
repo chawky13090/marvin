@@ -70,8 +70,21 @@ if errorlevel 1 (
 )
 echo.
 
-:: ============================================================ [4/8] Nettoyage
-echo [4/8] Nettoyage des environnements copies de l'autre PC...
+:: ============================================================ [4/9] Docker (optionnel - recherche web SearXNG)
+echo [4/9] Verification de Docker ^(optionnel - recherche web auto-hebergee^)...
+where docker >nul 2>&1
+if errorlevel 1 (
+    echo   [INFO] Docker non detecte - optionnel, uniquement pour la recherche web
+    echo   auto-hebergee ^(SearXNG, evite les blocages anti-bot DuckDuckGo^).
+    echo   Installable plus tard : winget install -e --id Docker.DockerDesktop
+    echo   Une fois installe, start.bat le configure tout seul ^(rien d'autre a faire^).
+) else (
+    echo   [OK] Docker detecte - start.bat configurera SearXNG automatiquement.
+)
+echo.
+
+:: ============================================================ [5/9] Nettoyage
+echo [5/9] Nettoyage des environnements copies de l'autre PC...
 if exist "backend\.venv" ( rmdir /s /q "backend\.venv" & echo   - backend\.venv supprime )
 if exist ".next" ( rmdir /s /q ".next" & echo   - .next supprime )
 :: node_modules contient des binaires NATIFS (better-sqlite3) compiles pour le Node
@@ -80,8 +93,8 @@ if exist "node_modules" ( rmdir /s /q "node_modules" & echo   - node_modules sup
 echo   [OK] Pret pour une installation propre.
 echo.
 
-:: ============================================================ [5/8] Backend Python
-echo [5/8] Creation de l'environnement Python et installation des dependances...
+:: ============================================================ [6/9] Backend Python
+echo [6/9] Creation de l'environnement Python et installation des dependances...
 echo   ^(cela peut prendre quelques minutes^)
 pushd backend
 python -m venv .venv
@@ -95,8 +108,8 @@ popd
 echo   [OK] Backend Python pret.
 echo.
 
-:: ============================================================ [6/8] Frontend Node
-echo [6/8] Installation des dependances du frontend ^(npm install^)...
+:: ============================================================ [7/9] Frontend Node
+echo [7/9] Installation des dependances du frontend ^(npm install^)...
 call npm install
 if errorlevel 1 ( echo   [ERREUR] npm install a echoue. & popd & pause & exit /b 1 )
 echo   [OK] Frontend pret.
@@ -116,8 +129,8 @@ pushd backend
 popd
 echo.
 
-:: ============================================================ [7/8] Modeles IA
-echo [7/8] Telechargement des modeles IA via Ollama ^(le plus long^)...
+:: ============================================================ [8/9] Modeles IA
+echo [8/9] Telechargement des modeles IA via Ollama ^(le plus long^)...
 echo   Demarrage du service Ollama...
 start "" /B "!OLLAMA!" serve >nul 2>&1
 timeout /t 4 /nobreak >nul
@@ -128,8 +141,8 @@ echo   - llava-phi3 ^(vision / OCR, ~2.9 Go^)...
 echo   [INFO] PC peu puissant ? Modele plus leger : "!OLLAMA!" pull qwen2.5:3b
 echo.
 
-:: ============================================================ [8/8] Config
-echo [8/8] Configuration...
+:: ============================================================ [9/9] Config
+echo [9/9] Configuration...
 if not exist ".env.local" if exist ".env.local.example" (
     copy ".env.local.example" ".env.local" >nul
     echo   [OK] .env.local cree ^(modifiez-le pour vos comptes Google/Outlook si besoin^).

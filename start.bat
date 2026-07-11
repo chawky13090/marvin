@@ -29,7 +29,20 @@ if %ERRORLEVEL% NEQ 0 (
     echo [2/3] Backend Python tourne deja sur le port 8005.
 )
 
-echo [3/3] Demarrage du frontend Next.js...
+:: Recherche web auto-hebergee (SearXNG) - entierement optionnelle et dynamique :
+:: ignoree silencieusement si Docker n'est pas installe (Marvin retombe sur
+:: DuckDuckGo/autres providers configures). Idempotent (reglages/conteneur deja
+:: prets = redemarrage quasi instantane) - lancee dans sa propre fenetre pour ne
+:: jamais bloquer le demarrage du reste (Docker Desktop peut prendre 1-2 min).
+where docker >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    echo [3/4] Recherche web auto-hebergee ^(SearXNG^) en arriere-plan...
+    start "SecretaryAI - SearXNG" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0docker\searxng\start-searxng.ps1"
+) else (
+    echo [3/4] Docker non detecte - recherche web via DuckDuckGo ^(voir docker\searxng pour l'ameliorer^)
+)
+
+echo [4/4] Demarrage du frontend Next.js...
 echo.
 echo  Frontend : http://localhost:3000
 echo  Backend  : http://localhost:8005

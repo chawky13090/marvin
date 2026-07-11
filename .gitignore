@@ -66,3 +66,7 @@ last-event.json
 streamText.txt
 test_ai.js
 _mining_ui.png
+
+# SearXNG (recherche web auto-hébergée, v2.162) — settings.yml généré localement contient
+# une clé secrète propre à la machine (start-searxng.ps1 la génère depuis settings.yml.example).
+docker/searxng/settings.yml

@@ -1,0 +1,17 @@
+# SearXNG auto-hébergé pour Marvin — méta-moteur de recherche gratuit et illimité,
+# utilisé par l'outil web_search en priorité quand configuré (voir CLAUDE.md §"Recherche web").
+#
+# Port hôte volontairement hors des défauts courants (8080/9000/3000...) pour éviter
+# tout conflit avec d'autres services d'un homelab (Portainer, Zabbix, Tomcat...).
+# Modifiable ci-dessous si 8890 est déjà pris sur la machine cible.
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: marvin-searxng
+    restart: unless-stopped
+    ports:
+      - "8890:8080"
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8890/

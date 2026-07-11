@@ -1,0 +1,21 @@
+# Modèle de configuration SearXNG pour Marvin.
+# start-searxng.ps1 copie ce fichier vers settings.yml (gitignoré — contient un secret
+# généré localement) et remplace CHANGE_ME_AUTO_GENERATED par une clé aléatoire au
+# premier lancement. Ne pas éditer settings.yml directement si tu veux que ce modèle
+# reste la source de vérité versionnée.
+use_default_settings: true
+
+general:
+  instance_name: "Marvin SearXNG"
+
+search:
+  # 'json' est désactivé par défaut sur une install SearXNG standard — indispensable
+  # pour que Marvin (execute_web_search -> provider searxng) puisse parser les résultats.
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "CHANGE_ME_AUTO_GENERATED"
+  limiter: false   # pas de Redis nécessaire pour un usage local mono-utilisateur
+  image_proxy: false
