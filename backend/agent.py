@@ -1417,6 +1417,18 @@ async def _filter_relevant_tools(messages: list[dict], profile_name: str) -> lis
     return [s for s in TOOLS_SPEC if s.get("function", {}).get("name") in relevant]
 
 
+def _autotitle_from_text(text: str) -> str:
+    """Titre court dérivé du premier message utilisateur — v2.170. Nettoie la ponctuation
+    finale résiduelle (une troncature à N mots peut couper en plein milieu d'une virgule/
+    point) et plafonne à 6 mots avec ellipse, comme avant, mais appelé désormais dès
+    l'envoi du message plutôt qu'après une réponse complète (voir run_agent)."""
+    words = text.strip().split()
+    title = " ".join(words[:6]).strip(" ,.;:!?-")
+    if len(words) > 6:
+        title += "…"
+    return title or "Nouvelle conversation"
+
+
 def _exact_tool_mentions_from_text(text: str) -> set:
     """Détecte les noms d'outils cités EXPLICITEMENT par l'utilisateur (ex : « utilise
     file_find », « appelle net_ping »). Si un nom exact apparaît, cet outil est IMPOSÉ pour
@@ -1666,6 +1678,19 @@ async def run_agent(
             )
         db.create_message(conversation_id, "user", content)
         _user_query = content
+        # v2.170 — titrer la conversation IMMÉDIATEMENT depuis le message utilisateur,
+        # avant même que l'assistant réponde. Avant ce correctif, le titre n'était posé
+        # qu'après une réponse COMPLÈTE (voir plus bas) — si le tour était interrompu en
+        # route (flux abandonné, MAX_TOOL_STEPS, crash...) la conversation restait
+        # "Nouvelle conversation" pour toujours. Signalé par l'utilisateur (capture d'écran
+        # de la barre latérale — une grande partie des entrées jamais titrées). Indépendant
+        # de la réussite du tour, comme chez Claude/ChatGPT (le titre apparaît dès l'envoi).
+        try:
+            conv = db.get_conversation(conversation_id)
+            if conv and conv.get("title") == "Nouvelle conversation" and content.strip():
+                db.update_conversation_title(conversation_id, _autotitle_from_text(content))
+        except Exception:
+            pass
     # Outil(s) cité(s) explicitement par leur nom exact → imposés ce tour-ci, pas de substitution.
     _explicit_tool_names = _exact_tool_mentions_from_text(_user_query)
 
@@ -2455,31 +2480,9 @@ async def run_agent(
 
             db.create_message(conversation_id, "assistant", full_content)
 
-            # Auto-titre de la conversation si encore « Nouvelle conversation »
-            try:
-                conv = db.get_conversation(conversation_id)
-                if conv and conv.get("title") == "Nouvelle conversation":
-                    first_user = next(
-                        (m for m in messages if m.get("role") == "user"), None
-                    )
-                    if first_user:
-                        text = ""
-                        if isinstance(first_user.get("content"), str):
-                            text = first_user["content"]
-                        elif isinstance(first_user.get("parts"), list):
-                            text = "".join(
-                                p.get("text", "")
-                                for p in first_user["parts"]
-                                if p.get("type") == "text"
-                            )
-                        words = text.strip().split()
-                        title = " ".join(words[:6])
-                        if len(words) > 6:
-                            title += "..."
-                        if title:
-                            db.update_conversation_title(conversation_id, title)
-            except Exception:
-                pass
+            # v2.170 — le titrage se fait désormais immédiatement à l'envoi du message
+            # utilisateur (voir plus haut, _autotitle_from_text) — bloc post-hoc retiré,
+            # devenu redondant et surtout jamais atteint si le tour est interrompu avant.
 
             # Apprentissage en arrière-plan (sans bloquer) : le LLM « professeur »
             # extrait les faits durables + une Q/R réutilisable de cet échange.

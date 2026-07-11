@@ -2864,6 +2864,25 @@ async def lifespan(app_instance):
 #   Teste en reel (Playwright + JS direct) : salutation confirmee dynamique ("Bonne nuit."
 #   affiche a l'heure reelle du test) ; nouveaux elements SVG (eclat orbital, 2e halo,
 #   3 degrades) confirmes presents dans le DOM ; 0 erreur console.
+#
+# v2.170 (titrage instantane des conversations + retroactif) : demande explicite (capture
+#   d'ecran de la barre laterale, "rendre cette partie meilleure en s'inspirant des
+#   meilleures pratiques des meilleurs AI du monde") -- une grande partie de la liste
+#   n'etait jamais titree ("Nouvelle conversation" repete a l'infini, illisible).
+#   Cause racine trouvee : l'auto-titrage n'existait qu'a UN seul des 3 points de
+#   sauvegarde du message assistant (agent.py) -- si le tour etait interrompu avant
+#   (flux abandonne, MAX_TOOL_STEPS, crash...) la conversation restait titree "Nouvelle
+#   conversation" DEFINITIVEMENT, meme apres coup. Corrige a la racine : le titre est
+#   desormais pose IMMEDIATEMENT a l'enregistrement du message UTILISATEUR (avant meme
+#   que l'assistant reponde) -- independant de la reussite du tour, comme chez
+#   Claude/ChatGPT (le titre apparait des l'envoi). Bloc post-hoc devenu redondant retire.
+#   Backfill retroactif execute sur la base reelle (via l'API, pas d'acces DB direct) :
+#   29 conversations existantes encore "Nouvelle conversation" retitrees a partir de
+#   leur premier message utilisateur reel.
+#   Teste en reel : appel direct a /api/chat, titre confirme pose (~2s apres l'envoi,
+#   AVANT la fin de la reponse de l'assistant) -- preuve directe de l'independance vis-a-vis
+#   de l'achevement du tour. Les 29 conversations retroactives verifiees avec des titres
+#   coherents (ex. "fais un audit de securite de…", "mon wifi se deconnecte tout le…").
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7401,7 +7420,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.169.0",
+            "version":         "2.170.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
