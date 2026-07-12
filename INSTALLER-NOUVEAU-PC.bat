@@ -51,6 +51,27 @@ if errorlevel 1 (
     popd & pause & exit /b 1
 )
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo   [OK] %%v
+
+:: v2.182 -- certaines installations Python (notamment le paquet officiel sur
+:: Windows Server, constate en reel : Python 3.14.6 sans pip) n'embarquent pas
+:: pip par defaut. python -m pip --version est en LECTURE SEULE (ne modifie
+:: rien) -- seul le repli ensurepip ecrit quelque chose, et seulement si pip
+:: est reellement absent.
+python -m pip --version >nul 2>&1
+if errorlevel 1 (
+    echo   [ATTENTION] pip introuvable pour cet interpreteur Python. Reparation via ensurepip...
+    python -m ensurepip --upgrade >nul 2>&1
+    python -m pip --version >nul 2>&1
+    if errorlevel 1 (
+        echo   [ERREUR] ensurepip n'a pas pu installer pip. Reinstallez Python depuis
+        echo   https://www.python.org/downloads/windows/ en cochant "pip" dans les
+        echo   composants optionnels de l'installeur.
+        popd & pause & exit /b 1
+    )
+    echo   [OK] pip reinstalle avec succes.
+) else (
+    echo   [OK] pip present.
+)
 echo.
 
 :: ============================================================ [2/8] Node.js

@@ -60,6 +60,11 @@ ni `[X]` au-dessus.
 > fois, c'est normal — **fermez la fenêtre et relancez le script** (le `PATH` doit
 > être rechargé).
 
+> Certaines installations Python (constaté sur un Windows Server réel) n'incluent
+> pas `pip` par défaut. Le script le détecte et le répare automatiquement
+> (`ensurepip`, sans téléchargement) — vous verrez `[ATTENTION] pip introuvable...`
+> suivi de `[OK] pip réinstallé avec succès` si c'était le cas, rien à faire de plus.
+
 ---
 
 ## 2. Vérifier l'installation

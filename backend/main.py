@@ -3208,6 +3208,27 @@ async def lifespan(app_instance):
 #   (32,8 Mo) ; cas d'echec force (domaine invalide) -> code d'erreur correctement capture et
 #   propage, message clair affiche -- les deux chemins verifies fonctionnels, plus de fermeture
 #   brutale de la fenetre.
+# v2.182 -- INSTALLER-NOUVEAU-PC.bat : reparation automatique d'un pip manquant.
+#   Suite directe du v2.181 : l'utilisateur a confirme (via `python -m pip --version` correctement
+#   invoque depuis l'invite, pas une erreur de contexte REPL comme sa premiere tentative) que pip
+#   est reellement absent de l'installation Python 3.14.6 de son Windows Server ("No module named
+#   pip"). L'etape [1/9] Python du script ne verifiait jusqu'ici QUE la presence de l'executable
+#   `python`, jamais celle de pip -- laissant l'etape [6/9] (creation du venv + pip install) planter
+#   plus loin avec une erreur moins claire.
+#   Fix : verification en lecture seule (`python -m pip --version`, ne modifie rien) juste apres la
+#   detection de Python ; si absent, reparation via `python -m ensurepip --upgrade` (methode
+#   officielle, integree a la stdlib, ne telecharge rien depuis internet) ; erreur claire si meme
+#   ensurepip echoue (repli : reinstaller Python en cochant "pip" dans les composants optionnels).
+#   Contrainte explicite de l'utilisateur respectee : AUCUNE commande de reparation (ensurepip)
+#   executee sur cette machine de developpement (son pip fonctionne deja) -- seule la verification
+#   en LECTURE SEULE a ete testee ici (`python -m pip --version`, confirme pip 26.1.2 present, zero
+#   modification). La logique de branchement (pip present / absent-repare / absent-ensurepip-echoue)
+#   testee en isolation via un script batch jetable simulant les 3 codes de sortie, hors de toute
+#   invocation Python reelle. Bug cosmetique trouve et corrige pendant ce test isole : un `!` isole
+#   dans `[!]` a l'interieur d'un bloc parenthese sous `enabledelayedexpansion` est silencieusement
+#   avale par le parseur cmd.exe (affiche `[]` au lieu de `[!]`) -- remplace par `[ATTENTION]`, deja
+#   la convention etablie ailleurs dans ce meme fichier, qui n'a pas ce probleme.
+
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7770,7 +7791,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.181.0",
+            "version":         "2.182.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
