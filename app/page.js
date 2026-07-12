@@ -721,7 +721,7 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
         transition: 'background 0.15s ease', marginBottom: '2px',
       }}
     >
-      {!editing && conv.pinned && (
+      {!editing && !!conv.pinned && (
         <span title="Épinglée" style={{ fontSize: '11px', flexShrink: 0, opacity: 0.85 }}>📌</span>
       )}
       {editing ? (
