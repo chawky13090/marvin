@@ -40,6 +40,13 @@ Double-cliquez sur **`INSTALLER-NOUVEAU-PC.bat`** (pas besoin d'être administra
 sauf si `winget` est absent et qu'une installation directe est nécessaire — dans ce
 cas, exécutez-le via clic droit → *Exécuter en tant qu'administrateur*).
 
+> ⚠️ **Ne l'ouvrez/exécutez JAMAIS depuis PowerShell ISE ou en collant son contenu
+> dans une console PowerShell** — c'est un script **batch** (`cmd.exe`), pas du
+> PowerShell ; ISE essaierait d'interpréter `@echo off` et le reste comme du code
+> PowerShell et échouerait avec des erreurs de syntaxe. Sur un Windows Server sans
+> Explorateur (Server Core), lancez-le depuis une invite avec `cmd /c "chemin\vers\
+> INSTALLER-NOUVEAU-PC.bat"` ou, depuis PowerShell, `.\INSTALLER-NOUVEAU-PC.bat`.
+
 Le script :
 1. Vérifie/installe Python, Node.js et Ollama (via `winget`, ou en repli direct si
    `winget` est absent — fréquent sur Windows Server).

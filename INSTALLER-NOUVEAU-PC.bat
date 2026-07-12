@@ -64,9 +64,22 @@ if errorlevel 1 (
         echo   [!] Node.js introuvable et winget absent. Telechargement direct
         echo   de la derniere version LTS ^(resolue en direct, jamais figee en dur^)...
         set "NODE_MSI=%TEMP%\node-installer.msi"
-        powershell -NoProfile -Command ^
-            "$ErrorActionPreference='Stop'; $idx = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json'; $lts = $idx | Where-Object { $_.lts -ne $false } | Select-Object -First 1; $url = \"https://nodejs.org/dist/$($lts.version)/node-$($lts.version)-x64.msi\"; Write-Host \"   Version LTS detectee : $($lts.version)\"; Invoke-WebRequest -Uri $url -OutFile '!NODE_MSI!' -UseBasicParsing"
-        if errorlevel 1 (
+        :: v2.181 -- ecrit dans un VRAI fichier .ps1 plutot qu'une ligne -Command avec des
+        :: guillemets echappes imbriques (\"..\") : ce motif fait planter net le parseur de
+        :: cmd.exe sur certaines installations Windows Server (constate en reel -- la fenetre
+        :: se fermait sans message des cette ligne). Ecrire le script dans un fichier evite
+        :: totalement ce piege de quoting cmd.exe/PowerShell.
+        set "NODE_PS1=%TEMP%\marvin_node_lts.ps1"
+        > "!NODE_PS1!" echo $idx = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json'
+        >>"!NODE_PS1!" echo $lts = $idx ^| Where-Object { $_.lts -ne $false } ^| Select-Object -First 1
+        >>"!NODE_PS1!" echo $ver = $lts.version
+        >>"!NODE_PS1!" echo $url = 'https://nodejs.org/dist/' + $ver + '/node-' + $ver + '-x64.msi'
+        >>"!NODE_PS1!" echo Write-Host ^('   Version LTS detectee : ' + $ver^)
+        >>"!NODE_PS1!" echo Invoke-WebRequest -Uri $url -OutFile '!NODE_MSI!' -UseBasicParsing
+        powershell -NoProfile -ExecutionPolicy Bypass -File "!NODE_PS1!"
+        set "NODE_PS1_RC=!ERRORLEVEL!"
+        del "!NODE_PS1!" >nul 2>&1
+        if not "!NODE_PS1_RC!"=="0" (
             echo   [ERREUR] Telechargement automatique echoue. Installez manuellement : https://nodejs.org  ^(version LTS^)
             popd & pause & exit /b 1
         )

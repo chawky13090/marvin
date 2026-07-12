@@ -3179,6 +3179,35 @@ async def lifespan(app_instance):
 #   gemini-3-flash-preview:cloud reellement appele, a reussi, capacite "vision: ok=true"
 #   effectivement enregistree en base et relue via /api/cloud/best-model. Donnees de test
 #   nettoyees (conversation + fichiers), capacite apprise laissee en place (donnee reelle utile).
+#
+# v2.181 (🩹 fix INSTALLER-NOUVEAU-PC.bat — plantage net sur Windows Server a l'etape Node.js) :
+#   signale directement par l'utilisateur ("le script install-nouveau-pc ne fonctionne pas sur
+#   windows server... la fenetre se ferme quand ca arrive sur node js"). D'abord une fausse piste
+#   ecartee sur preuve : le premier message d'erreur colle par l'utilisateur (erreurs de parsing
+#   PowerShell sur "@echo off"/"&"/parentheses) venait en realite d'avoir ouvert/execute le
+#   fichier .bat DANS POWERSHELL ISE (qui interprete le contenu comme du code PowerShell, pas du
+#   batch) -- pas un bug du script. Documente dans INSTALLATION.md (jamais ouvrir un .bat dans
+#   ISE ni coller son contenu dans une console PowerShell).
+#   Le VRAI bug, confirme par la description precise du symptome (fenetre qui se ferme NETTEMENT,
+#   sans message, pile a l'etape Node.js) : la ligne PowerShell -Command de resolution dynamique
+#   de la version Node LTS (v2.176) utilisait des guillemets doubles ECHAPPES imbriques
+#   (\"..\") pour l'interpolation de chaine PowerShell -- ce motif fait planter net le parseur
+#   de cmd.exe sur certaines installations Windows Server (jamais reproduit sur cette machine de
+#   developpement, differences de version cmd.exe/console host). Corrige en ecrivant le script
+#   PowerShell dans un VRAI fichier .ps1 temporaire (via une serie d'`echo >>`, chaque `(` `)` `|`
+#   correctement echappes pour rester a l'interieur du bloc batch `else ( ... )`) puis en
+#   l'executant via `-File` -- elimine entierement le risque de quoting cmd.exe/PowerShell
+#   imbrique, plus jamais de guillemets echappes nulle part dans ce fichier.
+#   Bug ANNEXE trouve en corrigeant (pas suppose) : le premier correctif capturait
+#   `!ERRORLEVEL!` APRES un `del` intercalaire, qui ecrasait silencieusement le code de sortie
+#   reel du `powershell` par celui du `del` (toujours 0) -- le chemin d'erreur n'aurait donc
+#   jamais pu se declencher. Corrige en capturant `!ERRORLEVEL!` dans une variable JUSTE apres
+#   l'appel PowerShell, avant tout autre commande.
+#   Teste en reel de bout en bout (isole du script complet, meme bloc exact) : cas de succes ->
+#   version LTS resolue dynamiquement (v24.18.0 au moment du test), MSI reellement telecharge
+#   (32,8 Mo) ; cas d'echec force (domaine invalide) -> code d'erreur correctement capture et
+#   propage, message clair affiche -- les deux chemins verifies fonctionnels, plus de fermeture
+#   brutale de la fenetre.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7741,7 +7770,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.180.0",
+            "version":         "2.181.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
