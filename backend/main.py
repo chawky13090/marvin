@@ -3025,6 +3025,41 @@ async def lifespan(app_instance):
 #   100% exacts (serveur/IP/commande PowerShell/statut) -> doc_generate_from_screenshots (docx
 #   ET pdf) -> converti en PDF via Word/COM reel -> images bien integrees, sommaire correct,
 #   pagination correcte. Donnees de test nettoyees apres verification.
+#
+# v2.176 (📦 kit de deploiement Windows Server pour un poste boutique) : demande explicite
+#   ("je vais telecharger le dossier marvin pour l'installer sur un windows server prevu pour
+#   la boutique... que tout les dependances soit contenu... qu'un fichier d'installation
+#   procedural puisse etre suivi"). Audit des scripts existants (INSTALLER-NOUVEAU-PC.bat,
+#   start.bat, VERIFIER-INSTALLATION.bat, deja solides) AVANT tout changement : 4 vrais risques
+#   trouves specifiques a une cible Windows Server (pas juste un PC client) -- winget souvent
+#   absent par defaut sur Server, acces internet incertain en arriere-boutique, next dev (pas
+#   next build+start) inadapte a un serveur sans surveillance, rien ne relance Marvin apres un
+#   reboot. Questions posees a l'utilisateur avant de coder (AskUserQuestion) : acces internet
+#   confirme solide -> pas besoin du kit 100% hors-ligne envisage initialement ; droits admin
+#   confirmes -> installation classique au niveau systeme.
+#   1. INSTALLER-NOUVEAU-PC.bat : detecte l'absence de winget une fois, et pour Node.js resout
+#      dynamiquement la derniere version LTS via l'API JSON officielle nodejs.org/dist/index.json
+#      (jamais un numero de version fige en dur qui deviendrait faux avec le temps) puis
+#      telecharge+installe silencieusement ; meme principe pour Ollama (URL stable
+#      ollama.com/download/OllamaSetup.exe) ; pour Python (pas d'equivalent JSON simple),
+#      ouverture de la page officielle plutot que de deviner une URL de version precise.
+#   2. START-PRODUCTION.bat (nouveau) : construit le frontend une fois (`npm run build`, requiert
+#      `next start -H 0.0.0.0` ajoute a package.json pour l'ecoute reseau) puis le sert en mode
+#      PRODUCTION -- delibrement separe de start.bat (mode developpement, reste inchange pour les
+#      machines de dev). Argument "rebuild" pour reconstruire apres une mise a jour du code.
+#   3. INSTALLER-DEMARRAGE-AUTO.bat (nouveau) : enregistre une tache planifiee Windows (`schtasks`,
+#      declencheur au demarrage, compte SYSTEM) pour que Marvin reparte seul apres un reboot/une
+#      coupure -- important pour un serveur de boutique sans surveillance permanente. Contrepartie
+#      documentee (pas de session de bureau interactive sous SYSTEM -> notifications/presse-papiers
+#      indisponibles dans ce mode) plutot que laissee decouvrir en silence.
+#   4. INSTALLATION.md (nouveau) : procedure numerotee en francais, une commande par etape avec le
+#      resultat attendu, incluant l'ouverture du pare-feu Windows pour l'acces depuis le reseau de
+#      la boutique (etape absente des scripts existants, oubliee jusqu'ici).
+#   Teste en reel sur cette machine (le seul test possible sans un vrai Windows Server sous la
+#   main) : `npm run build` execute reellement sur le code actuel -> 51 routes compilees sans
+#   erreur ; `npm run start` demarre et repond HTTP 200 + `/api/status` correct ; chemin winget-
+#   present verifie intact (aucune regression sur le flux existant, ce PC a winget) ; etat du
+#   serveur de dev restaure a l'identique apres le test (aucun residu).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7576,7 +7611,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.175.0",
+            "version":         "2.176.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

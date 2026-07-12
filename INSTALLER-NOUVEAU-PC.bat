@@ -21,16 +21,33 @@ echo.
 pause
 echo.
 
+:: v2.176 -- winget est absent par defaut sur beaucoup d'installations Windows Server
+:: (contrairement a Windows 10/11 client) : ne plus en dependre aveuglement. Detecte
+:: sa presence UNE fois ; s'il manque, Node et Ollama basculent sur un telechargement
+:: direct + installation silencieuse (URL resolue dynamiquement pour Node -- jamais de
+:: numero de version fige en dur qui deviendrait faux avec le temps). Python n'a pas
+:: d'equivalent JSON officiel simple a interroger en script -- repli sur l'ouverture
+:: de la page de telechargement officielle plutot que de deviner une URL de version.
+where winget >nul 2>&1
+if errorlevel 1 ( set "HAS_WINGET=0" ) else ( set "HAS_WINGET=1" )
+
 :: ============================================================ [1/8] Python
 echo [1/8] Verification de Python...
 where python >nul 2>&1
 if errorlevel 1 (
-    echo   [!] Python introuvable. Tentative d'installation via winget...
-    winget install -e --id Python.Python.3.13 --accept-package-agreements --accept-source-agreements
+    if "!HAS_WINGET!"=="1" (
+        echo   [!] Python introuvable. Installation via winget...
+        winget install -e --id Python.Python.3.13 --accept-package-agreements --accept-source-agreements
+    ) else (
+        echo   [!] Python introuvable et winget absent ^(frequent sur Windows Server^).
+        echo   Ouverture de la page de telechargement officielle dans le navigateur...
+        start "" "https://www.python.org/downloads/windows/"
+        echo   -^> Telechargez la version stable la plus recente, lancez l'installeur,
+        echo      et cochez IMPERATIVEMENT "Add python.exe to PATH".
+    )
     echo.
-    echo   [IMPORTANT] Python vient d'etre installe.
+    echo   [IMPORTANT] Une fois Python installe ^(ou apres le winget ci-dessus^) :
     echo   FERMEZ cette fenetre et RELANCEZ ce script ^(le PATH doit etre recharge^).
-    echo   Si winget est absent : https://www.python.org/downloads/  ^(cochez "Add to PATH"^)
     popd & pause & exit /b 1
 )
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo   [OK] %%v
@@ -40,12 +57,26 @@ echo.
 echo [2/8] Verification de Node.js...
 where node >nul 2>&1
 if errorlevel 1 (
-    echo   [!] Node.js introuvable. Tentative d'installation via winget...
-    winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    if "!HAS_WINGET!"=="1" (
+        echo   [!] Node.js introuvable. Installation via winget...
+        winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    ) else (
+        echo   [!] Node.js introuvable et winget absent. Telechargement direct
+        echo   de la derniere version LTS ^(resolue en direct, jamais figee en dur^)...
+        set "NODE_MSI=%TEMP%\node-installer.msi"
+        powershell -NoProfile -Command ^
+            "$ErrorActionPreference='Stop'; $idx = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json'; $lts = $idx | Where-Object { $_.lts -ne $false } | Select-Object -First 1; $url = \"https://nodejs.org/dist/$($lts.version)/node-$($lts.version)-x64.msi\"; Write-Host \"   Version LTS detectee : $($lts.version)\"; Invoke-WebRequest -Uri $url -OutFile '!NODE_MSI!' -UseBasicParsing"
+        if errorlevel 1 (
+            echo   [ERREUR] Telechargement automatique echoue. Installez manuellement : https://nodejs.org  ^(version LTS^)
+            popd & pause & exit /b 1
+        )
+        echo   Installation silencieuse...
+        msiexec /i "!NODE_MSI!" /quiet /norestart
+        del "!NODE_MSI!" >nul 2>&1
+    )
     echo.
     echo   [IMPORTANT] Node.js vient d'etre installe.
     echo   FERMEZ cette fenetre et RELANCEZ ce script.
-    echo   Si winget est absent : https://nodejs.org  ^(version LTS^)
     popd & pause & exit /b 1
 )
 for /f "tokens=*" %%v in ('node --version 2^>^&1') do echo   [OK] Node %%v
@@ -59,11 +90,22 @@ if errorlevel 1 (
     if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" (
         set "OLLAMA=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
         echo   [OK] Ollama trouve dans LOCALAPPDATA.
-    ) else (
-        echo   [!] Ollama introuvable. Tentative d'installation via winget...
+    ) else if "!HAS_WINGET!"=="1" (
+        echo   [!] Ollama introuvable. Installation via winget...
         winget install -e --id Ollama.Ollama --accept-package-agreements --accept-source-agreements
         set "OLLAMA=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
-        echo   [INFO] Si l'install echoue : https://ollama.com/download
+    ) else (
+        echo   [!] Ollama introuvable et winget absent. Telechargement direct...
+        set "OLLAMA_EXE=%TEMP%\OllamaSetup.exe"
+        powershell -NoProfile -Command "try { Invoke-WebRequest -Uri 'https://ollama.com/download/OllamaSetup.exe' -OutFile '!OLLAMA_EXE!' -UseBasicParsing } catch { exit 1 }"
+        if errorlevel 1 (
+            echo   [ERREUR] Telechargement echoue. Installez manuellement : https://ollama.com/download
+            popd & pause & exit /b 1
+        )
+        echo   Installation silencieuse...
+        "!OLLAMA_EXE!" /VERYSILENT /SUPPRESSMSGBOXES
+        del "!OLLAMA_EXE!" >nul 2>&1
+        set "OLLAMA=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
     )
 ) else (
     echo   [OK] Ollama detecte dans le PATH.
