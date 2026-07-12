@@ -116,12 +116,48 @@ export default function SettingsPage() {
   const [credSaving, setCredSaving] = useState({});    // loading par clé
   const [credVisible, setCredVisible] = useState({});  // afficher/masquer
 
+  // v2.174 — Identité document par défaut (auteur/organisation/en-tête/pied de page),
+  // réutilisée automatiquement par Marvin pour tout document généré (PDF/Word) sans avoir
+  // à la redemander à chaque fois.
+  const [docIdentity, setDocIdentity] = useState({
+    author: '', org: '', address: '', phone: '', email: '', website: '',
+    logo: '', footer_text: '', confidentiality: '',
+  });
+  const [docIdentitySaving, setDocIdentitySaving] = useState(false);
+
+  async function fetchDocIdentity() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/settings/document_identity`);
+      const data = await res.json();
+      if (data.value && typeof data.value === 'object') {
+        setDocIdentity(v => ({ ...v, ...data.value }));
+      }
+    } catch { }
+  }
+
+  async function handleSaveDocIdentity() {
+    setDocIdentitySaving(true);
+    try {
+      await fetch(`${BACKEND_URL}/api/settings/document_identity`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: docIdentity }),
+      });
+      showNotification('✅ Identité document enregistrée');
+    } catch (err) {
+      showNotification(`❌ Erreur : ${err.message}`);
+    } finally {
+      setDocIdentitySaving(false);
+    }
+  }
+
   useEffect(() => {
     fetchStatus();
     fetchMemories();
     fetchPermissionLevel();
     fetchCredentials();
     fetchCloudConfig();
+    fetchDocIdentity();
     // Lire tab depuis l'URL (callback OAuth)
     const tab = searchParams?.get('tab');
     if (tab) setActiveTab(tab);
@@ -1012,6 +1048,59 @@ export default function SettingsPage() {
               }}>
                 🔑 Entrez vos clés API et identifiants OAuth pour connecter Marvin aux services externes.
                 Tout est stocké localement dans la base de données SQLite — aucune donnée n&apos;est transmise.
+              </div>
+
+              {/* ── Identité document (v2.174) ────────────────────────────────── */}
+              <div style={{
+                padding: '16px', background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+              }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)', marginBottom: '4px' }}>
+                  📄 Identité des documents
+                </div>
+                <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
+                  Renseigné une fois, réutilisé automatiquement par Marvin pour tout PDF/Word généré
+                  depuis le chat (auteur, en-tête, pied de page) — plus besoin de le redonner à chaque fois.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {[
+                    ['author', 'Auteur (votre nom)'],
+                    ['org', 'Organisation'],
+                    ['address', 'Adresse'],
+                    ['phone', 'Téléphone'],
+                    ['email', 'Email'],
+                    ['website', 'Site web'],
+                    ['logo', 'Chemin du logo (image)'],
+                    ['footer_text', 'Texte de pied de page'],
+                    ['confidentiality', 'Mention de confidentialité'],
+                  ].map(([key, label]) => (
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: 'var(--font-xs)', color: 'var(--text-secondary)' }}>{label}</label>
+                      <input
+                        type="text"
+                        value={docIdentity[key] || ''}
+                        onChange={e => setDocIdentity(v => ({ ...v, [key]: e.target.value }))}
+                        style={{
+                          padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border)', background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)', fontSize: 'var(--font-sm)',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={handleSaveDocIdentity}
+                  disabled={docIdentitySaving}
+                  style={{
+                    marginTop: '12px', padding: '8px 16px', borderRadius: 'var(--radius-sm)',
+                    border: 'none', background: 'var(--accent-primary)', color: '#fff',
+                    fontSize: 'var(--font-sm)', fontWeight: 600, cursor: docIdentitySaving ? 'default' : 'pointer',
+                    opacity: docIdentitySaving ? 0.6 : 1,
+                  }}
+                >
+                  {docIdentitySaving ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
               </div>
 
               {/* ── Google ─────────────────────────────────────────────────────── */}

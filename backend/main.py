@@ -2914,6 +2914,84 @@ async def lifespan(app_instance):
 #   par transparence) : le serveur Next.js dev avait un cache fige affichant une ERREUR DE
 #   SYNTAXE PERIMEE (contenu different du fichier reel sur disque, confirme invalide via
 #   babel) -- resolu en videant .next/ et redemarrant le process, pas un bug du code livre.
+#
+# v2.172 (fix file_create_pdf : schemas ASCII "boite" illisibles) : signale directement par
+#   l'utilisateur sur une VRAIE conversation ("Schema reseau multi-VLANs" -> genere un PDF du
+#   schema -> "je trouve la partie schema illisible est moche"). Diagnostique en rendant le
+#   vrai PDF genere en image (pypdfium2, pas suppose) : chaque caractere de dessin de boite
+#   (═ ║ ╔ ╗ ┌ ┐ ...) s'affichait en CARRE NOIR PLEIN -- les polices PDF standard de reportlab
+#   (Courier/Helvetica, encodage WinAnsi/Latin-1) n'ont AUCUN glyphe pour le bloc Unicode
+#   U+2500-257F, et meme corrige la largeur de page (Courier 9pt) aurait fait deborder/
+#   s'envelopper les lignes de ~100 caracteres, cassant l'alignement de toute facon.
+#   Corrige dans execute_file_create_pdf (tools.py) : les blocs de code detectes comme "art
+#   ASCII boite" (regex sur la plage Unicode) sont desormais rendus en image PNG (police
+#   Consolas -- couverture Unicode complete verifiee, presente sur Windows) via PIL, integres
+#   au PDF en flowable Image mis a l'echelle de la largeur de page -- au lieu d'un Paragraph
+#   texte. Les blocs de code NORMAUX (sans dessin de boite) gardent le rendu Courier existant,
+#   inchange.
+#   Teste en reel : meme contenu exact que le PDF defaillant original renvoye au tool via
+#   /api/tools -> PDF rendu en image (pypdfium2) -> boites parfaitement lisibles et alignees ;
+#   bloc de code JS normal juste en dessous confirme toujours rendu en texte Courier classique
+#   (aucune regression sur le chemin existant).
+#
+# v2.173 (fix file_create_pdf : 2 bugs trouves EN REJOUANT la vraie conversation de l'utilisateur
+#   apres coup) : l'utilisateur a continue la conversation "Schema reseau multi-VLANs" et
+#   signale "il a eu un bug avant [de fournir le schema]". Rejoue via /api/history + le contenu
+#   EXACT du tool call qui avait echoue -- pas une supposition, le vrai payload qui a plante.
+#   1. LayoutError "too large on page" : le fix v2.172 ne mettait l'image a l'echelle QUE par
+#      la LARGEUR (doc.width) -- un schema haut (15 PC + 2 serveurs + 4 switches, ~50 lignes)
+#      depassait la hauteur utile de la page, et un flowable Image ne se scinde jamais sur 2
+#      pages -> crash. Corrige : scale = min(1, largeur_dispo/iw, hauteur_dispo/ih), -12pt de
+#      marge (padding par defaut du frame reportlab, 6pt x 2 cotes).
+#   2. Tofu residuel sur les EMOJI dans le schema (✅❌🌍🔴🟢, statuts de matrice VLAN + icones
+#      de noeud) : meme cause que v2.172 (Consolas ne les couvre pas non plus) mais pas
+#      detecte au premier passage (le test initial n'avait pas d'emoji). Remplacement
+#      caractere-par-caractere (jamais multi-caracteres, casserait l'alignement des colonnes/
+#      bordures) : table figee pour les cas frequents (✅/❌ -> V/X, coincide avec la legende
+#      deja presente dans le contenu original "V=autorise, X=bloque") + verification de
+#      couverture de glyphe generique (font.getmask) en repli pour tout futur symbole non
+#      anticipe -> remplace par un espace plutot qu'un tofu.
+#   Testes en reel avec le contenu EXACT du tour qui avait plante dans la vraie conversation :
+#   PDF genere sans erreur (18 pages), schema haut confirme tenir sur une seule page (rendu
+#   image via pypdfium2), matrice VLAN confirmee lisible avec V/X propres -- coherent avec la
+#   legende du document.
+#
+# v2.174 (identite document persistante + sommaire auto + en-tete/pied de page complets) :
+#   demande explicite de l'utilisateur ("je veut qu'il demande automatiquement quel est le nom
+#   de l'auteur, quel sera le haut de page, le bas de page, qu'il fasse un sommaire... inspire
+#   toi sur le web, cherche et propose") -- recherche web menee (best practices document
+#   generation), suivie d'un audit du code reel qui a revele que file_create_docx avait DEJA
+#   en-tete/references/signature depuis des versions anterieures mais JAMAIS exposes dans
+#   TOOLS_SPEC -- invisibles du LLM, donc jamais utilises. Le vrai trou n'etait pas la capacite
+#   mais sa DECOUVRABILITE + l'absence totale de sommaire/identite persistante/pied de page libre.
+#   1. `document_identity_set` (nouvel outil, 328e) : enregistre auteur/organisation/coordonnees/
+#      logo/pied de page/confidentialite par defaut (db.get_setting("document_identity"), JSON).
+#      Reutilise automatiquement en repli par file_create_pdf/file_create_docx si l'appelant ne
+#      precise pas author/header/letterhead/footer_text pour CE document -- jamais ecrase.
+#   2. Regle d'or #16 (agent.py) : avant de generer un document STRUCTURE/officiel sans identite
+#      deja connue, Marvin pose UNE question groupee (auteur/organisation/sommaire) puis appelle
+#      document_identity_set -- jamais pour un memo/export rapide (defaults silencieux). L'identite
+#      deja connue est injectee dans le system prompt (meme pattern que les instructions de
+#      Projects v2.142) pour que le modele SACHE qu'il n'a pas a redemander.
+#   3. Sommaire auto : Word -- champ TOC natif (`w:updateFields` force la mise a jour a
+#      l'ouverture, sinon Word affiche un placeholder jusqu'au clic droit). PDF -- reportlab
+#      TableOfContents + doc.multiBuild() (2 passes, page reelle inconnue avant mise en page
+#      complete) + sous-classe SimpleDocTemplate.afterFlowable() qui pose un signet PDF cliquable
+#      par titre h1/h2 (bonus navigation, gratuit).
+#   4. En-tete personnalise porte sur PDF (jusque-la reserve a Word) + pied de page en texte
+#      libre + "Page X / Y" (pas juste "X") sur les deux formats via la recette reportlab
+#      standard "NumberedCanvas" (le total de pages n'est connu qu'apres mise en page complete).
+#   BUGS TROUVES ET CORRIGES EN TESTANT (pas supposes) : (a) "Index entries not resolved after
+#   10 passes" -- le compteur de cles de signet (_toc_seq) n'etait jamais reinitialise entre les
+#   passes de multiBuild(), donc les cles differaient a chaque passe et la convergence
+#   n'aboutissait jamais -- corrige en resettant le compteur au debut de build().
+#   Testes en reel de bout en bout : document_identity_set + PDF avec toc=true SANS auteur/en-tete
+#   explicites -> repli identite confirme (org/email en en-tete, auteur sur la page de titre,
+#   pied de page "texte · confidentialite" + "Page X / Y"), sommaire cliquable avec les bonnes
+#   pages ; meme test sur Word -- converti en PDF via Word/COM reel (preuve que le fichier n'est
+#   pas corrompu) -- TOC recalcule automatiquement a l'ouverture, identique au PDF. Reglages ->
+#   Connexions verifie en reel (Playwright) : champs pre-remplis au chargement, sauvegarde
+#   confirmee par relecture directe de l'API apres clic.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7465,7 +7543,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.171.0",
+            "version":         "2.174.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

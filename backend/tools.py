@@ -614,18 +614,49 @@ def _md_inline_to_rl(text: str) -> str:
     return t
 
 
+# v2.174 — Identité document persistante (auteur/organisation/en-tête/pied de page par
+# défaut) : demandé explicitement par l'utilisateur pour que Marvin n'ait plus à redemander
+# ces infos à chaque génération. Réglée une fois via document_identity_set, réutilisée
+# automatiquement par file_create_docx ET file_create_pdf comme repli si l'appelant (le LLM)
+# ne précise pas explicitement author/header/footer_text pour CE document.
+def _document_identity() -> dict:
+    try:
+        val = db.get_setting("document_identity")
+        return val if isinstance(val, dict) else {}
+    except Exception:
+        return {}
+
+
+async def execute_document_identity_set(args: dict) -> dict:
+    """Enregistre/à jour l'identité document par défaut (auteur, organisation, en-tête,
+    pied de page) — réutilisée automatiquement par file_create_docx/file_create_pdf."""
+    current = _document_identity()
+    fields = ("author", "org", "address", "phone", "email", "website", "logo",
+              "footer_text", "confidentiality")
+    for f in fields:
+        if args.get(f) is not None:
+            current[f] = args[f]
+    db.set_setting("document_identity", current)
+    return {"success": True, "message": "Identité document enregistrée.", "identity": current}
+
+
 async def execute_file_create_docx(args: dict) -> dict:
     path = _resolve_path(args.get("path", ""))
     title = args.get("title", "Document")
     subtitle = args.get("subtitle", "")
     content = args.get("content", "")
-    author = args.get("author", "Marvin")
+    _identity = _document_identity()
+    author = args.get("author") or _identity.get("author") or "Marvin"
     accent = args.get("accent", "#c9a84c").lstrip("#")
+    footer_text = args.get("footer_text") or _identity.get("footer_text") or ""
+    confidentiality = args.get("confidentiality") or _identity.get("confidentiality") or ""
+    want_toc = bool(args.get("toc"))
     try:
         from docx import Document
         from docx.shared import Pt, RGBColor, Cm
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.enum.table import WD_TABLE_ALIGNMENT
+        from docx.enum.text import WD_BREAK
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
         from datetime import datetime as _dt
@@ -640,9 +671,21 @@ async def execute_file_create_docx(args: dict) -> dict:
         normal.font.size = Pt(11)
         doc.core_properties.author = author
         doc.core_properties.title = title
+        if want_toc:
+            # Word ne recalcule un champ TOC qu'à la demande (clic droit > Mettre à jour) sauf
+            # si le document est marqué "à mettre à jour à l'ouverture" — évite un sommaire
+            # vide/périmé au premier affichage.
+            try:
+                settings_el = doc.settings.element
+                upd = OxmlElement("w:updateFields"); upd.set(qn("w:val"), "true")
+                settings_el.append(upd)
+            except Exception:
+                pass
 
         # ── En-tête PERSONNALISABLE (choisi par le rédacteur, sur toutes les pages) ──
-        lh = args.get("letterhead") or {}
+        lh = args.get("letterhead") or {k: _identity[k] for k in
+                                         ("org", "address", "phone", "email", "website", "logo")
+                                         if _identity.get(k)}
         if any(lh.get(k) for k in ("org", "address", "phone", "email", "website", "logo")):
             try:
                 hdr = doc.sections[0].header
@@ -688,6 +731,26 @@ async def execute_file_create_docx(args: dict) -> dict:
         if ref_line:
             rp = doc.add_paragraph(ref_line); rp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             rp.runs[0].font.size = Pt(9); rp.runs[0].font.color.rgb = RGBColor(0x77, 0x77, 0x77)
+
+        # ── Sommaire (champ TOC natif Word — se recalcule à l'ouverture grâce à
+        # updateFields ci-dessus, ou via clic droit > Mettre à jour les champs) ──
+        if want_toc:
+            doc.add_page_break()
+            toc_h = doc.add_heading("Sommaire", level=1)
+            for run in toc_h.runs:
+                run.font.color.rgb = ACCENT
+            toc_p = doc.add_paragraph()
+            run = toc_p.add_run()
+            fld_begin = OxmlElement("w:fldChar"); fld_begin.set(qn("w:fldCharType"), "begin")
+            instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve")
+            instr.text = 'TOC \\o "1-3" \\h \\z \\u'
+            fld_sep = OxmlElement("w:fldChar"); fld_sep.set(qn("w:fldCharType"), "separate")
+            placeholder = OxmlElement("w:t")
+            placeholder.text = "Clic droit → Mettre à jour les champs pour générer le sommaire."
+            fld_end = OxmlElement("w:fldChar"); fld_end.set(qn("w:fldCharType"), "end")
+            run._r.append(fld_begin); run._r.append(instr); run._r.append(fld_sep)
+            run._r.append(placeholder); run._r.append(fld_end)
+            doc.add_page_break()
 
         def _inline_runs(paragraph, text):
             """Ajoute des runs en interprétant **gras** *italique* `code`."""
@@ -755,13 +818,28 @@ async def execute_file_create_docx(args: dict) -> dict:
                     tp = doc.add_paragraph(sig["title"]); tp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                     tp.runs[0].font.size = Pt(9); tp.runs[0].font.color.rgb = RGBColor(0x77, 0x77, 0x77)
 
-        # ── Numéro de page en pied ───────────────────────────────────────────
+        # ── Pied de page : texte libre + confidentialité (optionnels) + Page X / Y ──
         try:
-            footer = doc.sections[0].footer.paragraphs[0]
-            footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = footer.add_run()
-            fld1 = OxmlElement("w:fldSimple"); fld1.set(qn("w:instr"), "PAGE")
-            run._r.append(fld1)
+            foot_section = doc.sections[0].footer
+            foot_line = "  ·  ".join(x for x in [footer_text, confidentiality] if x)
+            if foot_line:
+                fp = foot_section.paragraphs[0]
+                fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                fr = fp.add_run(foot_line)
+                fr.font.size = Pt(8); fr.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+                page_p = foot_section.add_paragraph()
+            else:
+                page_p = foot_section.paragraphs[0]
+            page_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for instr in ("PAGE", None, "NUMPAGES"):
+                if instr is None:
+                    page_p.add_run(" / ")
+                    continue
+                r = page_p.add_run()
+                fld = OxmlElement("w:fldSimple"); fld.set(qn("w:instr"), instr)
+                r._r.append(fld)
+            for r in page_p.runs:
+                r.font.size = Pt(8); r.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
         except Exception:
             pass
 
@@ -4237,14 +4315,23 @@ async def execute_file_create_pdf(args: dict) -> dict:
     path = _resolve_path(_path_raw) if _path_raw else str(Path(os.path.expanduser("~")) / "Desktop" / f"document_{int(time.time())}.pdf")
     title = args.get("title", "Document")
     content = args.get("content", "")
-    author = args.get("author", "Marvin")
+    _identity = _document_identity()
+    author = args.get("author") or _identity.get("author") or "Marvin"
+    header = args.get("header") or {k: _identity[k] for k in
+                                      ("org", "address", "phone", "email", "website", "logo")
+                                      if _identity.get(k)}
+    footer_text = args.get("footer_text") or _identity.get("footer_text") or ""
+    confidentiality = args.get("confidentiality") or _identity.get("confidentiality") or ""
+    want_toc = bool(args.get("toc"))
 
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
         from reportlab.lib import colors
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Image as RLImage, PageBreak
+        from reportlab.platypus.tableofcontents import TableOfContents
+        from reportlab.pdfgen import canvas as _canvas_mod
         from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
         GOLD_COLOR = colors.HexColor("#c9a84c")
@@ -4256,10 +4343,38 @@ async def execute_file_create_pdf(args: dict) -> dict:
             out = out.with_suffix(".pdf")
         out.parent.mkdir(parents=True, exist_ok=True)
 
-        doc = SimpleDocTemplate(
+        # v2.174 — sommaire (TOC) : nécessite d'intercepter chaque titre h1/h2 rendu
+        # (afterFlowable) pour poser un signet + une entrée TOC avec son VRAI numéro de page
+        # (connu seulement après mise en page) — SimpleDocTemplate.afterFlowable() est un
+        # no-op par défaut, d'où la sous-classe.
+        class _TocDocTemplate(SimpleDocTemplate):
+            def build(self, flowables, **kw):
+                # multiBuild() refait plusieurs passes jusqu'à ce que les entrées TOC notifiées
+                # soient IDENTIQUES d'une passe à l'autre — sans ce reset, les clés de signet
+                # ("tocentry1", "tocentry2"...) continuaient de s'incrémenter à chaque passe et
+                # ne convergeaient jamais ("Index entries not resolved after 10 passes").
+                self._toc_seq = 0
+                SimpleDocTemplate.build(self, flowables, **kw)
+
+            def afterFlowable(self, flowable):
+                try:
+                    if isinstance(flowable, Paragraph):
+                        style_name = getattr(flowable.style, "name", "")
+                        if style_name in ("h1", "h2"):
+                            text = flowable.getPlainText()
+                            level = 0 if style_name == "h1" else 1
+                            self._toc_seq = getattr(self, "_toc_seq", 0) + 1
+                            key = f"tocentry{self._toc_seq}"
+                            self.canv.bookmarkPage(key)
+                            self.canv.addOutlineEntry(text, key, level=level, closed=False)
+                            self.notify("TOCEntry", (level, text, self.page, key))
+                except Exception:
+                    pass
+
+        doc = _TocDocTemplate(
             str(out), pagesize=A4,
             rightMargin=2.5*cm, leftMargin=2.5*cm,
-            topMargin=2.5*cm, bottomMargin=2.5*cm,
+            topMargin=(3.4*cm if header else 2.5*cm), bottomMargin=2.5*cm,
             title=title, author=author,
         )
 
@@ -4294,6 +4409,88 @@ async def execute_file_create_pdf(args: dict) -> dict:
         story.append(Paragraph(f"{author} &nbsp;·&nbsp; {_dt.now().strftime('%d/%m/%Y')}", meta_style))
         story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD_COLOR, spaceAfter=14))
 
+        # ── Sommaire (rempli automatiquement via afterFlowable ci-dessus, résolu par le
+        # 2e passage de doc.multiBuild) ──────────────────────────────────────────────
+        if want_toc:
+            story.append(PageBreak())
+            story.append(Paragraph("Sommaire", h1_style))
+            toc = TableOfContents()
+            toc.levelStyles = [
+                ParagraphStyle("TOCH1", fontName="Helvetica-Bold", fontSize=11, leftIndent=0,
+                               firstLineIndent=0, spaceBefore=8, leading=16, textColor=TEXT_COLOR),
+                ParagraphStyle("TOCH2", fontName="Helvetica", fontSize=9.5, leftIndent=16,
+                               firstLineIndent=0, spaceBefore=2, leading=13, textColor=LIGHT_COLOR),
+            ]
+            story.append(toc)
+            story.append(PageBreak())
+
+        # v2.172 — les blocs "dessin de boîte" (═ ║ ╔ ╗ ┌ ┐ ...) n'ont AUCUN glyphe dans
+        # les polices PDF standard (Courier/Helvetica, encodage WinAnsi) : reportlab les
+        # remplace par des carrés noirs pleins (illisible). Détectés via leur plage Unicode
+        # (U+2500-257F) et rendus en image PNG (police Consolas, glyphes Unicode complets)
+        # plutôt qu'en Paragraph texte — seul moyen fiable de préserver l'alignement ASCII.
+        _box_drawing_re = _re.compile(r"[─-╿]")
+        _tmp_art_files = []
+
+        # v2.173 — emoji trouvés en conditions réelles dans des schémas ASCII (✅❌🌍🔴🟢, statuts
+        # de matrice VLAN + icônes de nœud) : Consolas ne les couvre pas non plus -> même tofu
+        # que les caractères de dessin de boîte à l'origine du bug v2.172. Remplacement 1-pour-1
+        # (jamais multi-caractères) pour ne PAS décaler l'alignement des colonnes/bordures.
+        _EMOJI_ASCII_MAP = {"✅": "V", "❌": "X", "⚠️": "!", "⚠": "!", "🌍": "*", "🔴": "*",
+                             "🟢": "*", "🟡": "*", "🔵": "*", "⭐": "*", "🎓": "*", "✔": "V", "✖": "X"}
+
+        def _sanitize_for_font(text: str, font) -> str:
+            cache = {}
+            out = []
+            for ch in text:
+                if ch == "\n" or ch.isspace():
+                    out.append(ch); continue
+                repl = cache.get(ch)
+                if repl is None:
+                    repl = _EMOJI_ASCII_MAP.get(ch)
+                    if repl is None:
+                        bbox = font.getmask(ch).getbbox()
+                        repl = ch if bbox is not None else " "
+                    cache[ch] = repl
+                out.append(repl)
+            return "".join(out)
+
+        def _render_ascii_art_image(text: str):
+            from PIL import Image as _PILImage, ImageDraw, ImageFont
+            import uuid as _uuid
+            font_size = 20
+            font = None
+            for fname in ("consola.ttf", "lucon.ttf", "cour.ttf"):
+                try:
+                    font = ImageFont.truetype(fname, font_size)
+                    break
+                except Exception:
+                    continue
+            if font is None:
+                font = ImageFont.load_default()
+            text = _sanitize_for_font(text, font)
+            lines = text.split("\n")
+            dummy = _PILImage.new("RGB", (10, 10))
+            d = ImageDraw.Draw(dummy)
+            bbox_ref = font.getbbox("Hg")
+            line_h = (bbox_ref[3] - bbox_ref[1]) + 8
+            pad = 20
+            max_w = 1
+            for ln in lines:
+                bb = d.textbbox((0, 0), ln if ln else " ", font=font)
+                max_w = max(max_w, bb[2] - bb[0])
+            W, H = max_w + pad * 2, line_h * len(lines) + pad * 2
+            img = _PILImage.new("RGB", (W, H), "#f5f5f5")
+            d = ImageDraw.Draw(img)
+            y = pad
+            for ln in lines:
+                d.text((pad, y), ln, font=font, fill="#1a1a1a")
+                y += line_h
+            tmp_path = Path(tempfile.gettempdir()) / f"marvin_asciiart_{_uuid.uuid4().hex}.png"
+            img.save(tmp_path)
+            _tmp_art_files.append(tmp_path)
+            return str(tmp_path), W, H
+
         for kind, payload in _parse_md_blocks(content):
             if kind in hmap:
                 story.append(Paragraph(_md_inline_to_rl(payload), hmap[kind]))
@@ -4303,6 +4500,20 @@ async def execute_file_create_pdf(args: dict) -> dict:
                 story.append(Paragraph(_md_inline_to_rl(payload), bullet_style))
             elif kind == "quote":
                 story.append(Paragraph(_md_inline_to_rl(payload), quote_style))
+            elif kind == "code" and _box_drawing_re.search(payload):
+                try:
+                    img_path, iw, ih = _render_ascii_art_image(payload)
+                    # v2.173 — un flowable Image n'est jamais scindé sur 2 pages : contraindre
+                    # aussi par la HAUTEUR (pas seulement la largeur, bug trouvé en conditions
+                    # réelles) sous peine de LayoutError "too large on page" sur un schéma haut.
+                    # -12pt de marge de sécurité = padding par défaut du frame reportlab (6pt x2).
+                    avail_w, avail_h = doc.width - 12, doc.height - 12
+                    scale = min(1.0, avail_w / iw, avail_h / ih)
+                    story.append(Spacer(1, 4))
+                    story.append(RLImage(img_path, width=iw * scale, height=ih * scale))
+                    story.append(Spacer(1, 8))
+                except Exception:
+                    story.append(Paragraph(payload.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>"), code_style))
             elif kind == "code":
                 story.append(Paragraph(payload.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>"), code_style))
             elif kind == "hr":
@@ -4328,16 +4539,72 @@ async def execute_file_create_pdf(args: dict) -> dict:
             else:
                 story.append(Paragraph(_md_inline_to_rl(payload), body_style))
 
-        # ── Numéro de page en pied ───────────────────────────────────────────
-        def _footer(canvas, docu):
-            canvas.saveState()
-            canvas.setFont("Helvetica", 8)
-            canvas.setFillColor(colors.HexColor("#999999"))
-            canvas.drawCentredString(A4[0] / 2, 1.2 * cm, f"{docu.page}")
-            canvas.drawRightString(A4[0] - 2.5 * cm, 1.2 * cm, title[:50])
-            canvas.restoreState()
+        # ── En-tête personnalisé + pied de page (texte libre + confidentialité + "Page X / Y")
+        # Recette standard reportlab "NumberedCanvas" : le total de pages n'est connu qu'APRÈS
+        # la mise en page complète -> on bufferise chaque page (showPage) et on ne dessine
+        # vraiment qu'au save(), une fois le total connu.
+        class _NumberedCanvas(_canvas_mod.Canvas):
+            def __init__(self, *a, **kw):
+                _canvas_mod.Canvas.__init__(self, *a, **kw)
+                self._saved_states = []
 
-        doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
+            def showPage(self):
+                self._saved_states.append(dict(self.__dict__))
+                self._startPage()
+
+            def save(self):
+                total = len(self._saved_states)
+                for state in self._saved_states:
+                    self.__dict__.update(state)
+                    self._draw_decorations(total)
+                    _canvas_mod.Canvas.showPage(self)
+                _canvas_mod.Canvas.save(self)
+
+            def _draw_decorations(self, total):
+                self.saveState()
+                if header:
+                    x, y = 2.5 * cm, A4[1] - 1.3 * cm
+                    logo = header.get("logo")
+                    if logo:
+                        lp = _resolve_path(logo)
+                        if os.path.exists(lp):
+                            try:
+                                self.drawImage(lp, x, y - 0.55 * cm, height=1.1 * cm,
+                                                preserveAspectRatio=True, mask="auto")
+                                x += 1.6 * cm
+                            except Exception:
+                                pass
+                    if header.get("org"):
+                        self.setFont("Helvetica-Bold", 11)
+                        self.setFillColor(GOLD_COLOR)
+                        self.drawString(x, y, header["org"])
+                    info = "  ·  ".join(v for v in [header.get("address"), header.get("phone"),
+                                                     header.get("email"), header.get("website")] if v)
+                    if info:
+                        self.setFont("Helvetica", 7)
+                        self.setFillColor(colors.HexColor("#888888"))
+                        self.drawString(x, y - 0.4 * cm, info)
+                    self.setStrokeColor(GOLD_COLOR)
+                    self.setLineWidth(0.8)
+                    self.line(2.5 * cm, A4[1] - 2.9 * cm, A4[0] - 2.5 * cm, A4[1] - 2.9 * cm)
+                self.setFont("Helvetica", 8)
+                self.setFillColor(colors.HexColor("#999999"))
+                foot_line = "  ·  ".join(v for v in [footer_text, confidentiality] if v)
+                if foot_line:
+                    self.drawCentredString(A4[0] / 2, 1.55 * cm, foot_line)
+                self.drawCentredString(A4[0] / 2, 1.2 * cm, f"Page {self.getPageNumber()} / {total}")
+                self.drawRightString(A4[0] - 2.5 * cm, 1.2 * cm, title[:50])
+                self.restoreState()
+
+        if want_toc:
+            doc.multiBuild(story, canvasmaker=_NumberedCanvas)
+        else:
+            doc.build(story, canvasmaker=_NumberedCanvas)
+        for _p in _tmp_art_files:
+            try:
+                Path(_p).unlink(missing_ok=True)
+            except Exception:
+                pass
         return {"success": True, "message": f"PDF créé : {out}", "path": str(out)}
     except Exception as e:
         return {"error": str(e)}
@@ -17487,6 +17754,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "file_copy": execute_file_copy,
     "file_create_folder": execute_file_create_folder,
     "file_create_docx": execute_file_create_docx,
+    "document_identity_set": execute_document_identity_set,
     "file_convert_docx_to_pdf": execute_file_convert_docx_to_pdf,
     "file_search_text": execute_file_search_text,
     "file_find":        execute_file_find,
@@ -17909,13 +18177,33 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin du dossier à créer"}},
        ["path"]),
 
-    _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, numéros de page.",
+    _t("document_identity_set", "Enregistre l'identité document par défaut (auteur, organisation, coordonnées, logo, pied de page, mention de confidentialité) — réutilisée AUTOMATIQUEMENT par file_create_docx/file_create_pdf pour tout futur document sans avoir à la répéter. Appelle-le quand l'utilisateur te communique ces infos (dans ce message ou en réponse à ta question), pour qu'il n'ait plus jamais à te les redonner.",
+       {"author": {"type": "string", "description": "Nom de l'auteur par défaut"},
+        "org": {"type": "string", "description": "Nom de l'organisation"},
+        "address": {"type": "string"}, "phone": {"type": "string"}, "email": {"type": "string"},
+        "website": {"type": "string"}, "logo": {"type": "string", "description": "Chemin d'une image logo"},
+        "footer_text": {"type": "string", "description": "Texte libre par défaut en pied de page"},
+        "confidentiality": {"type": "string", "description": "Mention de confidentialité par défaut (ex. 'Confidentiel — usage interne')"}},
+       []),
+
+    _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, en-tête/pied de page personnalisables, sommaire auto, bloc signature. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
        {"path": {"type": "string", "description": "Chemin du fichier Word à créer (.docx)"},
         "title": {"type": "string", "description": "Titre principal du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
         "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, ``` code"},
-        "author": {"type": "string", "description": "Auteur du document"},
-        "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"}},
+        "author": {"type": "string", "description": "Auteur du document (sinon : identité document par défaut, sinon 'Marvin')"},
+        "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"},
+        "toc": {"type": "boolean", "description": "Insère un sommaire auto-généré (champ Word natif) après la page de titre — recommandé pour un document de plusieurs sections"},
+        "footer_text": {"type": "string", "description": "Texte libre en pied de page, à côté du numéro de page (ex. nom d'organisation, référence)"},
+        "confidentiality": {"type": "string", "description": "Mention de confidentialité en pied de page (ex. 'Confidentiel — usage interne')"},
+        "letterhead": {"type": "object", "description": "En-tête personnalisé sur toutes les pages", "properties": {
+            "org": {"type": "string", "description": "Nom de l'organisation"},
+            "address": {"type": "string"}, "phone": {"type": "string"}, "email": {"type": "string"},
+            "website": {"type": "string"}, "logo": {"type": "string", "description": "Chemin d'une image logo"}}},
+        "references": {"type": "object", "description": "Référence document affichée sous le titre", "properties": {
+            "client": {"type": "string"}, "reference": {"type": "string"}}},
+        "signature": {"type": "object", "description": "Bloc signature en fin de document", "properties": {
+            "lieu": {"type": "string"}, "name": {"type": "string"}, "title": {"type": "string"}}}},
        ["path", "title", "content"]),
 
     _t("file_convert_docx_to_pdf", "Convertit un document Word (.docx/.doc) en PDF.",
@@ -18271,13 +18559,20 @@ TOOLS_SPEC = [
         "sheet_name": {"type": "string", "description": "Nom de la feuille"}},
        ["headers", "rows"]),
 
-    _t("file_create_pdf", "Crée un PDF PROFESSIONNEL (sans Word) : page de titre, **gras**/*italique*/`code`, tableaux markdown stylés, citations, blocs de code, liens, numéros de page.",
+    _t("file_create_pdf", "Crée un PDF PROFESSIONNEL (sans Word) : page de titre, **gras**/*italique*/`code`, tableaux markdown stylés, citations, blocs de code, liens, en-tête/pied de page personnalisables, sommaire auto. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
        {"path": {"type": "string", "description": "Chemin du PDF à créer"},
         "title": {"type": "string", "description": "Titre du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
         "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, [lien](url)"},
-        "author": {"type": "string", "description": "Auteur"},
-        "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"}},
+        "author": {"type": "string", "description": "Auteur (sinon : identité document par défaut, sinon 'Marvin')"},
+        "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"},
+        "toc": {"type": "boolean", "description": "Insère un sommaire auto-généré (cliquable, avec signets PDF) après la page de titre — recommandé pour un document de plusieurs sections"},
+        "footer_text": {"type": "string", "description": "Texte libre en pied de page (ex. nom d'organisation, référence)"},
+        "confidentiality": {"type": "string", "description": "Mention de confidentialité en pied de page (ex. 'Confidentiel — usage interne')"},
+        "header": {"type": "object", "description": "En-tête personnalisé sur toutes les pages", "properties": {
+            "org": {"type": "string", "description": "Nom de l'organisation"},
+            "address": {"type": "string"}, "phone": {"type": "string"}, "email": {"type": "string"},
+            "website": {"type": "string"}, "logo": {"type": "string", "description": "Chemin d'une image logo"}}}},
        ["title", "content"]),
 
     # ── Google Calendar ───────────────────────────────────────────────────────
