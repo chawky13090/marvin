@@ -3060,6 +3060,30 @@ async def lifespan(app_instance):
 #   erreur ; `npm run start` demarre et repond HTTP 200 + `/api/status` correct ; chemin winget-
 #   present verifie intact (aucune regression sur le flux existant, ce PC a winget) ; etat du
 #   serveur de dev restaure a l'identique apres le test (aucun residu).
+#
+# v2.177 (🧹 paquet de deploiement propre — sans donnees personnelles) : remarque directe de
+#   l'utilisateur juste apres v2.176 ("pense que nouvelle installations vide la memoire de mes
+#   souvenir clean") -- signal a prendre au serieux : "je vais telecharger le dossier marvin"
+#   (copie brute du dossier, pas un `git clone`) aurait embarque `data/` (conversations,
+#   memoires, captures d'ecran v2.175, sauvegardes, jeton eleve) ET `backend/data/` (cle de
+#   compte de service Google) tel quel sur le serveur boutique -- ces dossiers sont exclus de
+#   GIT (.gitignore) mais RIEN n'empeche un copier-coller brut de les inclure.
+#   Nouveau `PREPARER-PAQUET-BOUTIQUE.bat` : robocopy vers un dossier voisin en excluant
+#   `data/`, `backend/data/`, `.venv`, `node_modules`, `.next`, `.git`, `.env.local`, et les
+#   fichiers de debug/scratch deja listes dans .gitignore (`*.log`, `last-event.json`,
+#   `_mining_ui.png`...) -- verification explicite affichee a la fin (aucun `data/` present).
+#   `INSTALLATION.md` mis a jour : etape 0 recommande desormais ce script en premier ; l'ancienne
+#   phrase "data/ DOIT etre copie" (ambigue, ecrite pour le cas migration) reformulee pour
+#   distinguer clairement nouvelle installation (par defaut, ne PAS copier data/) de migration
+#   (cas explicite et volontaire, a part).
+#   Bug reel trouve EN TESTANT le script (pas suppose) : toutes les references `!DEST!` du
+#   script se retrouvaient traitees comme du texte LITTERAL par cmd.exe (un dossier nomme
+#   `!DEST!` etait cree au lieu du chemin resolu) -- diagnostique par isolation (la delayed
+#   expansion seule fonctionne en test isole ; recherche caractere par caractere a trouve un
+#   seul mot accentue "competences" reste dans le fichier, malgre la convention ASCII-only deja
+#   respectee partout ailleurs dans les .bat du projet precisement pour cette classe de bug
+#   `chcp 65001`/encodage). Corrige (ASCII), reverifie en reel (dossier bien nomme cette fois,
+#   data/backend-data/.env.local bien absents du paquet).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7611,7 +7635,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.176.0",
+            "version":         "2.177.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

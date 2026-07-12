@@ -11,12 +11,26 @@ le résultat attendu avant de passer à la suivante.
 - [ ] Windows Server (2019, 2022 ou 2025 — Desktop Experience ou Core), avec accès administrateur.
 - [ ] Accès internet sortant (téléchargement de Python/Node/Ollama + des modèles IA, plusieurs Go).
 - [ ] Au moins **20 Go d'espace disque libre** (dépendances + modèles IA + marge).
-- [ ] Le dossier `secretary-ai` copié sur le serveur (clé USB, partage réseau, ou `git clone`).
 
-> ⚠️ Ne copiez **jamais** les dossiers `.venv`, `node_modules` ou `.next` d'une autre
+> ⚠️ **Ne copiez jamais** les dossiers `.venv`, `node_modules` ou `.next` d'une autre
 > machine — ils contiennent des binaires compilés pour CET ordinateur précis et
-> provoqueront des erreurs. Le dossier `data/` en revanche **doit** être copié s'il
-> existe déjà (réglages, compétences, mémoire, clé Google) — voir étape 6.
+> provoqueront des erreurs.
+>
+> ⚠️ **Attention au dossier `data/`** (et `backend\data\`) : il contient VOS conversations,
+> mémoires, captures d'écran, sauvegardes et éventuellement une clé de compte de service
+> Google — des données personnelles/sensibles, pas du code. Pour un **nouveau** déploiement
+> (comme un serveur boutique qui doit démarrer propre), il ne faut **surtout pas** le copier.
+> Un simple copier-coller du dossier `secretary-ai` l'embarquerait par erreur.
+
+### Préparer un paquet propre à transférer
+
+Depuis CE poste (celui qui a le projet actuellement), lancez
+**`PREPARER-PAQUET-BOUTIQUE.bat`** — il crée une copie du projet à côté, sans `data/`,
+`backend\data\`, `.venv`, `node_modules`, `.next`, ni `.env.local`. C'est CE dossier
+qu'il faut transférer sur le serveur (clé USB, partage réseau) — pas l'original.
+
+**Résultat attendu** : `[OK] Aucun dossier data\` / `[OK] Aucun backend\data\` /
+`[OK] Aucun .env.local` affichés à la fin.
 
 ---
 
@@ -112,9 +126,12 @@ vérifiez que `http://localhost:3000` répond une minute après.
 - [ ] **Comptes connectés** (Google Agenda/Gmail, Outlook, recherche web...) : à
       configurer dans *Réglages → Connexions*, propre à chaque déploiement — jamais
       copié d'une autre machine.
-- [ ] **Ancien `data/`** (si migration depuis un autre poste) : copiez le dossier
-      `data/` complet AVANT le premier démarrage pour récupérer réglages, compétences,
-      mémoire et clé de compte de service Google.
+- [ ] **Cas particulier — migration** (PAS le cas d'un nouveau serveur boutique, à
+      ignorer par défaut) : si le but est de reprendre l'historique d'un poste
+      existant plutôt que de démarrer propre, copiez alors SON dossier `data/`
+      complet AVANT le premier démarrage (réglages, compétences, mémoire, clé de
+      compte de service Google). `PREPARER-PAQUET-BOUTIQUE.bat` l'exclut exprès —
+      dans ce cas de migration, recopiez-le manuellement à la place.
 - [ ] **Niveau de performance** : Marvin détecte automatiquement le matériel du
       serveur (CPU/RAM/GPU) et adapte les modèles/leviers — rien à faire ici.
 
