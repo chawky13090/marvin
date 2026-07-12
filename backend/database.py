@@ -728,6 +728,44 @@ def list_screenshots(conversation_id: str | None = None, limit: int = 100) -> li
     return [row_to_dict(r) for r in rows]
 
 
+# ── Logos générés (v2.183) ──────────────────────────────────────────────────
+# Registre des logos générés localement (local_image.py) — permet de les RÉUTILISER
+# pour un client/contexte déjà rencontré au lieu de regénérer à chaque document (né d'un
+# vrai échec : Marvin n'avait aucun moyen de créer/retrouver un logo, cf. mémoire session).
+
+def _ensure_logos_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS logos (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            prompt TEXT,
+            path TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+
+def create_logo(name: str, prompt: str, path: str) -> dict:
+    lid = str(uuid.uuid4())
+    with db() as conn:
+        _ensure_logos_table(conn)
+        conn.execute(
+            "INSERT INTO logos (id, name, prompt, path) VALUES (?, ?, ?, ?)",
+            (lid, name, prompt, path)
+        )
+        row = conn.execute("SELECT * FROM logos WHERE id = ?", (lid,)).fetchone()
+    return row_to_dict(row)
+
+
+def list_logos(limit: int = 100) -> list[dict]:
+    with db() as conn:
+        _ensure_logos_table(conn)
+        rows = conn.execute(
+            "SELECT * FROM logos ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
 # ── Historique d'exécution ────────────────────────────────────────────────────
 
 def _ensure_tool_tables(conn):

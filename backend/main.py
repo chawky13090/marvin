@@ -3228,6 +3228,48 @@ async def lifespan(app_instance):
 #   dans `[!]` a l'interieur d'un bloc parenthese sous `enabledelayedexpansion` est silencieusement
 #   avale par le parseur cmd.exe (affiche `[]` au lieu de `[!]`) -- remplace par `[ATTENTION]`, deja
 #   la convention etablie ailleurs dans ce meme fichier, qui n'a pas ce probleme.
+# v2.183 -- Audit d'une vraie conversation (echec total de generation de logo) : 4 correctifs.
+#   Demande explicite de l'utilisateur (« regarde la derniere conversation ... corrige tout cela
+#   et rend marvin meilleur »). Rejoue la conversation "Message de salutation" via /api/conversations
+#   au lieu de deviner -- a revele 7 tentatives consecutives echouees de generer un logo via
+#   PowerShell/System.Drawing, un PDF avec 2 pages quasi vides, et le scroll du chat qui se
+#   faisait kidnapper pendant le streaming.
+#   1. BUG RACINE trouve (tools.py::execute_pc_run_command) : une commande qui invoque DEJA
+#      explicitement `powershell -Command "..."` et contient un cmdlet (New-Object...) etait
+#      auto-routee vers execute_pc_run_powershell, qui l'encode ENTIEREMENT (guillemets inclus)
+#      comme -EncodedCommand -- le powershell EXTERIEUR interpole alors les `$variable` a
+#      l'interieur de la chaine entre guillemets AVANT de lancer le powershell imbrique voulu,
+#      les videant silencieusement (`$bmp = New-Object ...` -> ` = New-Object ...`). Exactement
+#      le symptome observe sur les 7 tentatives. Corrige (_PWSH_ALREADY_INVOKED_RE) : une commande
+#      qui invoque deja powershell.exe/pwsh n'est plus re-emballee, lancee directement (cmd.exe
+#      n'interprete jamais `$`). Verifie en reel : `powershell -Command "$x='hello';Write-Output $x"`
+#      renvoie maintenant "hello" (renvoyait vide/erreur avant).
+#   2. Marvin n'avait AUCUN outil de generation d'image -- seul recours du LLM face a "invente un
+#      logo" : ecrire du System.Drawing a la main (fragile, cause du bug ci-dessus). Nouveau
+#      `local_image.py` (stabilityai/sd-turbo, reutilise la detection GPU dynamique de
+#      local_video.py) + outils `logo_generate`/`logo_list` (table `logos`, reutilisable sans
+#      regenerer). Teste en reel : logo genere en 49s (RTX 2060), integre avec succes dans l'en-tete
+#      d'un PDF (deja supporte par `header.logo`, aucune plomberie supplementaire necessaire).
+#   3. PDF (`file_create_pdf`) : (a) le bloc titre restait colle en haut avec ~70% de page blanche
+#      en dessous quand `toc=True` force une page dediee (signale : "une ou deux page assez vide")
+#      -- corrige par un espaceur qui centre visuellement le bloc. (b) Les emoji dans les titres
+#      h1/h2 (aucun glyphe dans les polices PDF standard) se rendaient en carres noirs -- un emoji
+#      multi-codepoint (🖥️ = DESKTOP COMPUTER + VARIATION SELECTOR-16) produisait DEUX carres colles
+#      ("■■ Inventaire des Serveurs" dans le sommaire, repere exactement dans le PDF audite).
+#      Corrige (_EMOJI_STRIP_RE dans _md_inline_to_rl) : retire les emoji des titres/paragraphes
+#      PDF plutot que de les substituer (pure decoration, pas de substitut 1-pour-1 satisfaisant).
+#   4. Chat (ChatContainer.jsx) : l'effet d'auto-scroll forcait `scrollTop=scrollHeight` a CHAQUE
+#      token pendant le streaming, kidnappant le scroll des que l'utilisateur remontait lire un
+#      passage (demande explicite : "je doit pouvoir scroll... meme quand marvin est en train de
+#      generer sa reponse"). Corrige (stickToBottomRef, seuil 80px) : ne force le scroll que si
+#      l'utilisateur etait deja "colle" au bas -- un nouvel envoi recolle toujours. Verifie en reel
+#      (Playwright) : capture d'ecran prise EN PLEIN STREAMING ("Marvin ecrit... 6s" visible) montre
+#      la vue restee scrollee sur un ancien message, le contenu en cours de generation hors champ.
+#   5. Bonus (demande explicite "laisse le choix du format... et pouvoir le changer meme une fois
+#      genere") : nouvel outil `document_convert_format` (docx<->pdf, sans regenerer le contenu --
+#      docx->pdf reutilise Word/docx2pdf deja existant, pdf->docx via la nouvelle dependance
+#      pdf2docx) + bouton "⇄ En .pdf/.docx" sur la carte de fichier genere dans le chat. Teste en
+#      reel dans les deux sens (PDF avec logo -> Word, image + texte preserves ; Word -> PDF).
 
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
@@ -7791,7 +7833,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.182.0",
+            "version":         "2.183.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

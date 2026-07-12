@@ -612,9 +612,31 @@ def _parse_md_blocks(content: str):
         i += 1
 
 
+# v2.183 -- les polices PDF standard de reportlab (Helvetica/Times, encodage WinAnsi) n'ont
+# AUCUN glyphe emoji -- chaque emoji laissé dans un titre/paragraphe se rend en carré noir
+# ("tofu"), et un emoji multi-codepoint (ex. 🖥️ = DESKTOP COMPUTER + VARIATION SELECTOR-16)
+# produit DEUX carrés collés (constaté en reel : "🖥️ Inventaire des Serveurs" -> "■■ Inventaire
+# des Serveurs" dans le sommaire, qui reprend le meme texte que le titre). Contrairement aux
+# tableaux ASCII (v2.172/173, rendus en image Consolas car l'alignement compte), les emoji de
+# titre sont de la pure decoration sans substitut 1-pour-1 satisfaisant -- on les retire plutot
+# que de les remplacer.
+_EMOJI_STRIP_RE = _re.compile(
+    "["
+    "\U0001F1E6-\U0001F1FF"  # drapeaux (indicateurs régionaux)
+    "\U0001F300-\U0001FAFF"  # émoji/pictogrammes (blocs principaux)
+    "\U00002600-\U000027BF"  # symboles divers & dingbats
+    "\U00002B00-\U00002BFF"  # symboles/flèches divers
+    "\U0000FE0F"             # variation selector-16 (force le rendu emoji)
+    "\U0000200D"             # zero-width joiner
+    "]+"
+)
+
+
 def _md_inline_to_rl(text: str) -> str:
     """Markdown inline → balises reportlab (<b> <i> <font> <a>). Échappe le HTML."""
     t = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    t = _EMOJI_STRIP_RE.sub("", t)
+    t = _re.sub(r"[ \t]{2,}", " ", t).strip()
     t = _re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r'<a href="\2" color="#2563eb"><u>\1</u></a>', t)
     t = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
     t = _re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<i>\1</i>", t)
@@ -915,6 +937,46 @@ async def execute_file_convert_docx_to_pdf(args: dict) -> dict:
         return {"success": True, "message": f"PDF créé : {out / pdf_name}", "path": str(out / pdf_name)}
     except Exception as e:
         return {"error": f"Erreur conversion PDF : {e}. Vérifiez que Microsoft Word est installé."}
+
+
+async def execute_document_convert_format(args: dict) -> dict:
+    """Convertit un document déjà généré vers un AUTRE format (docx<->pdf) -- pour laisser le
+    choix du format même APRÈS génération, sans faire regénérer le contenu depuis zéro par
+    le LLM (risque d'incohérence). docx->pdf réutilise Word (docx2pdf) ; pdf->docx utilise
+    pdf2docx (mise en page reconstituée, pas garantie identique à 100% -- normal pour un
+    format d'origine non-éditable)."""
+    path = _resolve_path(args.get("path", ""))
+    p = Path(path)
+    if not p.exists():
+        return {"error": f"Fichier introuvable : {path}"}
+    target = (args.get("target_format") or "").strip(".").lower()
+    if target not in ("pdf", "docx"):
+        return {"error": "Paramètre 'target_format' requis : 'pdf' ou 'docx'."}
+    src_ext = p.suffix.lower().lstrip(".")
+    if src_ext == target:
+        return {"error": f"Le fichier est déjà au format {target}."}
+
+    if src_ext == "docx" and target == "pdf":
+        return await execute_file_convert_docx_to_pdf({"path": str(p)})
+
+    if src_ext == "pdf" and target == "docx":
+        out_path = p.with_suffix(".docx")
+
+        def _convert_sync():
+            from pdf2docx import Converter
+            cv = Converter(str(p))
+            try:
+                cv.convert(str(out_path))
+            finally:
+                cv.close()
+
+        try:
+            await asyncio.to_thread(_convert_sync)
+            return {"success": True, "message": f"Word créé : {out_path}", "path": str(out_path)}
+        except Exception as e:
+            return {"error": f"Erreur conversion Word : {e}"}
+
+    return {"error": f"Conversion {src_ext} → {target} non supportée (formats gérés : docx<->pdf)."}
 
 
 # ── Générateur de documentation IA (notes brutes → document Word complet) ───────
@@ -2058,6 +2120,11 @@ async def execute_pc_app_launch(args: dict) -> dict:
         return {"error": f"Impossible de lancer « {app_name} » : {e}"}
 
 
+_PWSH_ALREADY_INVOKED_RE = _re.compile(
+    r'^\s*"?(?:[a-zA-Z]:\\[^"]*\\)?(?:powershell|pwsh)(?:\.exe)?"?(?:\s|$)', _re.I
+)
+
+
 def _looks_like_powershell(command: str) -> bool:
     """Détecte une commande qui est en réalité du PowerShell (cmdlets Verb-Noun,
     opérateurs/pipelines PS, variables $_). Évite l'erreur classique « Get-ChildItem
@@ -2094,7 +2161,18 @@ async def execute_pc_run_command(args: dict) -> dict:
     timeout = args.get("timeout", 30)
     # Auto-routage : si la commande est en fait du PowerShell, on l'exécute via PowerShell
     # (sinon cmd.exe renvoie « commande introuvable »). Rend les compétences robustes.
-    if _looks_like_powershell(command):
+    # v2.183 -- SAUF si la commande invoque DEJA explicitement powershell.exe/pwsh (ex.
+    # `powershell -Command "..."` ou `powershell -File script.ps1`) : dans ce cas, la router
+    # quand meme vers execute_pc_run_powershell la ferait executer comme -EncodedCommand,
+    # c-a-d que TOUT le texte -- y compris le `powershell -Command "..."` d'origine -- devient
+    # le CONTENU du script. PowerShell interpole alors les `$variable` a l'interieur de cette
+    # chaine entre guillemets AVANT meme de lancer le powershell imbrique voulu, les vidant
+    # silencieusement (`$bmp = New-Object ...` devient ` = New-Object ...`). Bug reel trouve en
+    # rejouant une conversation ou 7 tentatives consecutives de generation de logo ont echoue
+    # avec exactement ce symptome. Une commande qui invoque deja powershell.exe est deja bien
+    # formee pour un lancement direct via cmd.exe (qui n'interprete jamais `$`) -- pas besoin
+    # (et dangereux) de la re-emballer.
+    if _looks_like_powershell(command) and not _PWSH_ALREADY_INVOKED_RE.match(command):
         ps_res = await execute_pc_run_powershell({"script": command, "timeout": timeout, "confirmed": True})
         if isinstance(ps_res, dict):
             ps_res["shell"] = "powershell (auto)"
@@ -4426,6 +4504,15 @@ async def execute_file_create_pdf(args: dict) -> dict:
         hmap = {"h1": h1_style, "h2": h2_style, "h3": h3_style}
 
         # ── Bloc de titre ────────────────────────────────────────────────────
+        # v2.183 -- avec `toc=True`, le titre est forcé sur sa PROPRE page (PageBreak juste
+        # avant le Sommaire) : sans ce spacer, le bloc titre restait collé en haut avec ~70%
+        # de page blanche en dessous (signalé par l'utilisateur : "une ou deux page assez
+        # vide"). Un espaceur fixe pousse le bloc vers le centre visuel de la page -- pas un
+        # centrage exact (la hauteur du Paragraph n'est connue qu'après mise en page), mais
+        # suffisant pour ne plus lire comme une page de contenu à moitié vide. Sans `toc`, le
+        # titre enchaîne directement sur le corps du document (pas de page dédiée) -> inutile.
+        if want_toc:
+            story.append(Spacer(1, 8*cm))
         story.append(Paragraph(title, h0_style))
         if subtitle:
             story.append(Paragraph(_md_inline_to_rl(subtitle), sub_style))
@@ -7148,6 +7235,53 @@ async def execute_screenshot_list(args: dict) -> dict:
              "ocr_text": s.get("ocr_text", ""), "created_at": s.get("created_at")}
             for s in shots
         ],
+    }
+
+
+async def execute_logo_generate(args: dict) -> dict:
+    """Génère un logo localement (GPU, sd-turbo) à partir d'une description, l'enregistre
+    dans data/logos/ et le référence en base pour réutilisation future (logo_list). Né d'un
+    échec réel : sans cet outil, le seul recours était d'écrire du code System.Drawing à la
+    main via PowerShell -- fragile et lent. Jamais de génération d'image via un shell."""
+    name = (args.get("name") or "logo").strip()
+    prompt = (args.get("prompt") or args.get("description") or "").strip()
+    if not prompt:
+        return {"error": "Paramètre 'prompt' requis (description visuelle du logo à générer)."}
+    size = int(args.get("size") or 512)
+
+    import local_image as _limg
+    import uuid as _uuid
+    from config import DATA_DIR as _DATA_DIR
+    avail = _limg.is_available()
+    if not avail["ok"]:
+        return {"error": avail["reason"]}
+
+    slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "logo"
+    out_path = str(Path(_DATA_DIR) / "logos" / f"{slug}-{_uuid.uuid4().hex[:8]}.png")
+
+    result = await asyncio.to_thread(_limg.generate_logo_image, prompt, out_path, size)
+    if not result.get("success"):
+        return {"error": result.get("error", "Échec de la génération d'image.")}
+
+    db.create_logo(name, prompt, result["path"])
+    return {
+        "success": True,
+        "message": f"Logo généré en {result['generation_seconds']}s ({result['device']}) : {result['path']}",
+        "path": result["path"],
+        "name": name,
+    }
+
+
+async def execute_logo_list(args: dict) -> dict:
+    """Liste les logos déjà générés (nom, prompt, chemin) — à consulter avant d'en régénérer
+    un pour un client/contexte déjà rencontré, pour réutiliser au lieu de dupliquer."""
+    limit = int(args.get("limit") or 50)
+    logos = db.list_logos(limit=limit)
+    return {
+        "success": True,
+        "count": len(logos),
+        "logos": [{"id": l["id"], "name": l["name"], "prompt": l.get("prompt", ""),
+                   "path": l["path"], "created_at": l.get("created_at")} for l in logos],
     }
 
 
@@ -17964,7 +18098,10 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "document_identity_set": execute_document_identity_set,
     "screenshot_list": execute_screenshot_list,
     "doc_generate_from_screenshots": execute_doc_generate_from_screenshots,
+    "logo_generate": execute_logo_generate,
+    "logo_list": execute_logo_list,
     "file_convert_docx_to_pdf": execute_file_convert_docx_to_pdf,
+    "document_convert_format": execute_document_convert_format,
     "file_search_text": execute_file_search_text,
     "file_find":        execute_file_find,
     "system_search":    execute_system_search,
@@ -18408,6 +18545,16 @@ TOOLS_SPEC = [
         "author": {"type": "string", "description": "Auteur (sinon : identité document par défaut)"}},
        []),
 
+    _t("logo_generate", "Génère un LOGO/icône localement (GPU, aucune donnée envoyée au cloud) à partir d'une description visuelle, l'enregistre dans une base réutilisable. À utiliser chaque fois qu'un logo/icône de marque est demandé pour un document ou une mise en page — JAMAIS en écrivant du code (PowerShell/System.Drawing, Python...) à la main : lent, fragile, et ce n'est pas le rôle d'un shell. Vérifie d'abord logo_list si un logo existe déjà pour ce nom/contexte.",
+       {"name": {"type": "string", "description": "Nom court identifiant ce logo (ex. nom de l'entreprise/du projet) — sert de clé de réutilisation"},
+        "prompt": {"type": "string", "description": "Description visuelle du logo souhaité (style, symbole, couleurs) — en anglais de préférence, le modèle de génération d'image le comprend mieux"},
+        "size": {"type": "integer", "description": "Taille en pixels, carré (défaut 512)"}},
+       ["name", "prompt"]),
+
+    _t("logo_list", "Liste les logos déjà générés localement (nom, description, chemin) — à consulter AVANT logo_generate pour réutiliser un logo existant plutôt que d'en régénérer un nouveau pour le même client/contexte.",
+       {"limit": {"type": "integer", "description": "Nombre max à lister (défaut 50)"}},
+       []),
+
     _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, en-tête/pied de page personnalisables, sommaire auto, bloc signature. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
        {"path": {"type": "string", "description": "Chemin du fichier Word à créer (.docx)"},
         "title": {"type": "string", "description": "Titre principal du document"},
@@ -18432,6 +18579,11 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin du fichier Word"},
         "output_dir": {"type": "string", "description": "Répertoire de sortie (optionnel)"}},
        ["path"]),
+
+    _t("document_convert_format", "Convertit un document déjà généré vers un AUTRE format (docx<->pdf), SANS regénérer le contenu depuis zéro. À utiliser quand l'utilisateur demande 'plutôt en Word'/'plutôt en PDF' après avoir déjà reçu un document dans l'autre format.",
+       {"path": {"type": "string", "description": "Chemin du document déjà généré (.docx ou .pdf)"},
+        "target_format": {"type": "string", "enum": ["pdf", "docx"], "description": "Format cible"}},
+       ["path", "target_format"]),
 
     _t("file_search_text", "Recherche un texte ou mot-clé dans le contenu des fichiers d'un répertoire.",
        {"directory": {"type": "string", "description": "Répertoire où chercher"},

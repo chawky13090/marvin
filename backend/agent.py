@@ -795,6 +795,18 @@ _COMMON_TOOLS = {
 # Mapping keyword → tools relevant for that keyword
 # When user message contains these words, we include the matching tools
 _KEYWORD_TOOLS = {
+    # v2.183 — Génération de logo locale (GPU) : sans cette entrée, logo_generate/logo_list
+    # sont enregistrés mais INVISIBLES sur les profils filtrés chat/agent (leçon répétée
+    # cette session, cf. v2.93/v2.113 — un outil hors _KEYWORD_TOOLS n'est jamais proposé).
+    ("logo", "logotype", "icône de marque", "icone de marque"):
+        {"logo_generate", "logo_list"},
+
+    # v2.183 — changer le format d'un document déjà généré (docx<->pdf), sans le regénérer.
+    ("plutot en word", "plutôt en word", "plutot en pdf", "plutôt en pdf", "convertis en word",
+     "convertis en pdf", "convertir en word", "convertir en pdf", "en format word",
+     "en format pdf", "change le format", "changer le format"):
+        {"document_convert_format", "file_convert_docx_to_pdf"},
+
     # Météo
     ("météo", "meteo", "temps", "température", "temperature", "pluie", "neige",
      "vent", "prévision", "previsions", "il fait", "il pleut", "demain", "weather"):

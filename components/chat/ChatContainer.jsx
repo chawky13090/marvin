@@ -42,6 +42,11 @@ export default function ChatContainer({
 }) {
   const [localInput, setLocalInput] = useState('');
   const scrollRef = useRef(null);
+  // v2.183 — "coller au bas" façon Claude/ChatGPT : l'ancien effet forçait scrollTop=scrollHeight
+  // à CHAQUE frappe de token pendant le streaming, kidnappant le scroll dès que l'utilisateur
+  // remontait pour relire un passage. Ne force plus le scroll que si l'utilisateur était déjà
+  // proche du bas juste avant la mise à jour (seuil 80px) — sinon sa position est respectée.
+  const stickToBottomRef = useRef(true);
   const router = useRouter();
 
   const {
@@ -98,15 +103,32 @@ export default function ChatContainer({
     }
   }, [conversationId, initialMessages, setMessages]);
 
-  // ── Auto-scroll vers le bas à chaque nouveau message ──────────────────────
+  // ── Auto-scroll vers le bas à chaque nouveau message — SEULEMENT si l'utilisateur
+  // était déjà collé au bas (voir stickToBottomRef ci-dessus). ────────────────────
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !stickToBottomRef.current) return;
     const raf = requestAnimationFrame(() => {
       if (el) el.scrollTop = el.scrollHeight;
     });
     return () => cancelAnimationFrame(raf);
   }, [messages, isLoading]);
+
+  // Détecte un scroll manuel de l'utilisateur : à moins de 80px du bas → on reste collé
+  // (comportement historique) ; plus haut → on laisse sa position tranquille, même en
+  // plein streaming.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom < 80;
+  }, []);
+
+  // Un nouvel envoi recolle toujours au bas (même si l'utilisateur avait remonté lire
+  // un ancien message) — comportement attendu quand on relance une conversation.
+  const stickToBottomOnSend = useCallback(() => {
+    stickToBottomRef.current = true;
+  }, []);
 
   // ── Confirmation d'outils critiques (appel direct au backend Python) ───────
   const handleConfirmTool = useCallback(async (toolCallId, toolName, args) => {
@@ -155,6 +177,7 @@ export default function ChatContainer({
     setPendingImages([]);
     if (!voiceText) setLocalInput('');   // don't clear if voice already cleared it
 
+    stickToBottomOnSend();
     if (images.length > 0) {
       sendMessage({ text, images });
     } else {
@@ -229,6 +252,7 @@ export default function ChatContainer({
       {/* Messages */}
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -357,7 +381,7 @@ export default function ChatContainer({
                 const lastUser = [...messages].reverse().find(m => m.role === 'user');
                 if (lastUser) {
                   const text = lastUser.content || lastUser.parts?.find(p => p.type === 'text')?.text || '';
-                  if (text) sendMessage({ text });
+                  if (text) { stickToBottomOnSend(); sendMessage({ text }); }
                 }
               }}
               style={{

@@ -1,5 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# OPTIONNEL — Génération de VIDÉO locale par IA (AnimateLCM sur GPU NVIDIA).
+# OPTIONNEL — Génération de VIDÉO locale par IA (AnimateLCM sur GPU NVIDIA) ET de LOGOS/
+# icônes (v2.183, sd-turbo — local_image.py). Même stack diffusers/torch, mêmes deps.
 # ⚠️ Lourd (~3-5 Go de téléchargement) et nécessite un GPU NVIDIA + CUDA.
 # Non requis pour tester l'agent : tous les autres outils marchent sans ça.
 #

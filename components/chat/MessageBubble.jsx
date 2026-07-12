@@ -6,6 +6,7 @@ import FileExplorerCard from './FileExplorerCard';
 import SpeakButton from './SpeakButton';
 import PrettyResult from './PrettyResult';
 import { CircleGauge, BarRow, StatCard } from '@/components/ui/DashboardKit';
+import { useToast } from '@/components/ui/Toast';
 
 const BACKEND_URL = (typeof window !== 'undefined' && window.location)
   ? window.location.protocol + '//' + window.location.hostname + ':8005'
@@ -40,11 +41,18 @@ function docIcon(ext) {
   return map[ext] || '📄';
 }
 
+// v2.183 — laisser le choix du format même APRÈS génération (demandé explicitement) :
+// docx<->pdf uniquement pour l'instant (voir document_convert_format côté backend).
+const CONVERTIBLE_TARGET = { docx: 'pdf', pdf: 'docx' };
+
 function GeneratedFileCard({ path, message, securityWarning }) {
   const [status, setStatus] = useState('idle'); // idle | opening | error
+  const [converting, setConverting] = useState(false);
+  const { toast } = useToast();
   const fileName = path.split(/[\\/]/).pop() || path;
   const ext = (fileName.split('.').pop() || '').toLowerCase();
   const isImage = IMAGE_EXTENSIONS.has(ext);
+  const convertTarget = CONVERTIBLE_TARGET[ext];
 
   const handleOpen = async () => {
     setStatus('opening');
@@ -58,6 +66,32 @@ function GeneratedFileCard({ path, message, securityWarning }) {
       setStatus(data?.result?.success ? 'idle' : 'error');
     } catch {
       setStatus('error');
+    }
+  };
+
+  const handleConvert = async (e) => {
+    e.stopPropagation();
+    if (!convertTarget || converting) return;
+    setConverting(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tools`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'document_convert_format',
+          args: { path, target_format: convertTarget, confirmed: true },
+        }),
+      });
+      const data = await res.json();
+      if (data?.result?.success) {
+        toast.success(`Converti en ${convertTarget.toUpperCase()}`, data.result.path.split(/[\\/]/).pop());
+      } else {
+        toast.error('Échec de la conversion', data?.result?.error || data?.error || '');
+      }
+    } catch (err) {
+      toast.error('Échec de la conversion', err.message);
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -124,6 +158,18 @@ function GeneratedFileCard({ path, message, securityWarning }) {
         <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {status === 'opening' ? '⏳ Ouverture...' : '📂 Ouvrir'}
         </span>
+        {convertTarget && (
+          <span
+            onClick={handleConvert}
+            title={`Convertir en .${convertTarget}`}
+            style={{
+              fontSize: 'var(--font-xs)', color: 'var(--accent-secondary)', whiteSpace: 'nowrap',
+              cursor: converting ? 'wait' : 'pointer', borderLeft: '1px solid var(--border)', paddingLeft: '10px',
+            }}
+          >
+            {converting ? '⏳ Conversion...' : `⇄ En .${convertTarget}`}
+          </span>
+        )}
       </div>
       {/* v2.133 — filet déterministe étendu au CONTENU des documents générés (pas seulement
           la réponse de chat visible) : le PDF GLPI qui a motivé ce chantier avait son problème
