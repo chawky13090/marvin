@@ -2883,6 +2883,37 @@ async def lifespan(app_instance):
 #   AVANT la fin de la reponse de l'assistant) -- preuve directe de l'independance vis-a-vis
 #   de l'achevement du tour. Les 29 conversations retroactives verifiees avec des titres
 #   coherents (ex. "fais un audit de securite de…", "mon wifi se deconnecte tout le…").
+#
+# v2.171 (recherche full-text + epinglage + titres intelligents) : suite directe de v2.170,
+#   demande explicite ("comment pouvons-nous rendre cette sidebar meilleure ? regarde ce que
+#   font les meilleurs AI et propose-moi" -> "fait les 3"). 3 lacunes trouvees en lisant le
+#   code reel (pas supposees) compares a Claude/ChatGPT :
+#   1. Recherche full-text (etait limitee au titre tronque a 6 mots) : nouvelle fonction
+#      db.search_conversations() (JOIN messages, LIKE sur titre ET contenu) + endpoint
+#      GET /api/conversations/search (DOIT etre declare AVANT /api/conversations/{cid} --
+#      sinon FastAPI route "search" comme un cid litteral) + proxy Next.js
+#      app/api/conversations/search/route.js + debounce cote frontend (app/page.js).
+#   2. Epinglage (pattern Claude/ChatGPT) : colonne `pinned` ajoutee a la table conversations
+#      (migration PRAGMA+ALTER, meme motif que le reste du fichier -- la table elle-meme est
+#      historiquement creee cote JS, Python n'en a jamais eu la propriete complete du
+#      schema). Nouvelle section "EPINGLEES" en haut de la sidebar, exclue des groupes
+#      projet/date pour eviter les doublons visuels.
+#   3. Titres intelligents en arriere-plan : la troncature immediate (v2.170) reste affichee
+#      tout de suite, puis remplacee quelques secondes apres par un titre genere par un LLM
+#      leger (_smart_title_upgrade, agent.py) -- passe par _ollama_generate (tools.py) donc
+#      beneficie automatiquement du meme routage cloud/sensibilite que tout appel LLM
+#      interne (v2.122), sans logique dupliquee. upgrade_conversation_title_silent() ne
+#      touche PAS updated_at (sinon la conversation resauterait en haut de la liste une 2e
+#      fois juste pour un changement de titre).
+#   Teste en reel : recherche "wifi" a trouve un match sur le CONTENU d'un resultat
+#   web_research stocke en base (pas le titre) -- preuve directe que le full-text fonctionne
+#   au-dela du titre ; epinglage teste via l'API (conversation remonte en tete, pinned:1) ;
+#   titre intelligent verifie de bout en bout ("peux tu me faire un script..." -> "Script
+#   verification espace disque" en ~15s) ; recherche testee dans l'UI reelle (3 resultats
+#   corrects affiches, dont le match content-only). Incident de session annexe (documente
+#   par transparence) : le serveur Next.js dev avait un cache fige affichant une ERREUR DE
+#   SYNTAXE PERIMEE (contenu different du fichier reel sur disque, confirme invalide via
+#   babel) -- resolu en videant .next/ et redemarrant le process, pas un bug du code livre.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -3110,6 +3141,17 @@ async def list_conversations(limit: int = 50, offset: int = 0):
     return db.list_conversations(limit, offset)
 
 
+@app.get("/api/conversations/search")
+async def search_conversations_endpoint(q: str, limit: int = 50):
+    """v2.171 — recherche full-text (titre + contenu des messages), demandée
+    explicitement (la recherche existante ne portait que sur le titre tronqué à 6 mots).
+    IMPORTANT : doit rester déclarée AVANT /api/conversations/{cid} ci-dessous, sinon
+    FastAPI route "search" comme un cid littéral (ordre d'enregistrement des routes)."""
+    if not q.strip():
+        return []
+    return db.search_conversations(q, limit)
+
+
 @app.get("/api/conversations/{cid}")
 async def get_conversation(cid: str):
     conv = db.get_conversation(cid)
@@ -3177,6 +3219,7 @@ async def delete_conversation(cid: str):
 class ConversationUpdate(BaseModel):
     title: str | None = None
     projectId: str | None = None
+    pinned: bool | None = None
 
 
 @app.put("/api/conversations/{cid}")
@@ -3188,6 +3231,8 @@ async def update_conversation(cid: str, body: ConversationUpdate):
         db.update_conversation_title(cid, fields["title"])
     if "projectId" in fields:
         db.update_conversation_project(cid, fields["projectId"])
+    if "pinned" in fields and fields["pinned"] is not None:
+        db.set_conversation_pinned(cid, fields["pinned"])
     return {"success": True}
 
 
@@ -7420,7 +7465,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.170.0",
+            "version":         "2.171.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

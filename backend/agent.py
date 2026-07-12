@@ -1417,6 +1417,27 @@ async def _filter_relevant_tools(messages: list[dict], profile_name: str) -> lis
     return [s for s in TOOLS_SPEC if s.get("function", {}).get("name") in relevant]
 
 
+async def _smart_title_upgrade(conversation_id: str, user_text: str):
+    """v2.171 — titre plus soigné qu'une simple troncature, généré en arrière-plan (ne
+    bloque jamais l'envoi). Passe par _ollama_generate (tools.py), donc bénéficie
+    automatiquement du même routage cloud/sensibilité que tout appel LLM interne (v2.122) —
+    si le message contient un mot-clé sensible, l'appel reste local comme n'importe où
+    ailleurs, sans logique dupliquée ici."""
+    try:
+        import tools as _tm
+        prompt = (
+            "Résume cette demande en un titre TRÈS court (3 à 5 mots), en français, sans "
+            "guillemets ni point final, comme un titre d'onglet de navigateur. Réponds "
+            "UNIQUEMENT le titre, rien d'autre.\n\nDemande : " + user_text[:500]
+        )
+        raw = await _tm._ollama_generate(prompt, timeout=25)
+        title = (raw or "").strip().strip('"“”«»').split("\n")[0].strip(" .")[:60]
+        if title:
+            db.upgrade_conversation_title_silent(conversation_id, title)
+    except Exception:
+        pass
+
+
 def _autotitle_from_text(text: str) -> str:
     """Titre court dérivé du premier message utilisateur — v2.170. Nettoie la ponctuation
     finale résiduelle (une troncature à N mots peut couper en plein milieu d'une virgule/
@@ -1689,6 +1710,12 @@ async def run_agent(
             conv = db.get_conversation(conversation_id)
             if conv and conv.get("title") == "Nouvelle conversation" and content.strip():
                 db.update_conversation_title(conversation_id, _autotitle_from_text(content))
+                # v2.171 — titre intelligent (LLM léger) en arrière-plan, sans jamais
+                # retarder l'envoi : la troncature ci-dessus s'affiche tout de suite,
+                # remplacée par un titre plus soigné quelques secondes après.
+                _tt = asyncio.create_task(_smart_title_upgrade(conversation_id, content))
+                _BG_LEARN_TASKS.add(_tt)
+                _tt.add_done_callback(_BG_LEARN_TASKS.discard)
         except Exception:
             pass
     # Outil(s) cité(s) explicitement par leur nom exact → imposés ce tour-ci, pas de substitution.

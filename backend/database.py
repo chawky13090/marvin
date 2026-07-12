@@ -52,9 +52,20 @@ def row_to_dict(row) -> dict | None:
 
 # ── Conversations ─────────────────────────────────────────────────────────────
 
+def _ensure_conversations_pinned_column(conn):
+    """v2.171 — épinglage de conversation (demandé explicitement, pattern Claude/ChatGPT).
+    Migration transparente, même motif que le reste du fichier (PRAGMA table_info +
+    ALTER conditionnel) — la table `conversations` elle-même est historiquement créée côté
+    JS (lib/database/init.js), Python n'en a jamais eu la propriété du schéma complet."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()}
+    if "pinned" not in cols:
+        conn.execute("ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0")
+
+
 def create_conversation(title: str = "Nouvelle conversation") -> dict:
     cid = str(uuid.uuid4())
     with db() as conn:
+        _ensure_conversations_pinned_column(conn)
         conn.execute(
             "INSERT INTO conversations (id, title) VALUES (?, ?)",
             (cid, title)
@@ -64,15 +75,43 @@ def create_conversation(title: str = "Nouvelle conversation") -> dict:
 
 def get_conversation(cid: str) -> dict | None:
     with db() as conn:
+        _ensure_conversations_pinned_column(conn)
         row = conn.execute("SELECT * FROM conversations WHERE id = ?", (cid,)).fetchone()
     return row_to_dict(row)
 
 
 def list_conversations(limit: int = 50, offset: int = 0) -> list[dict]:
     with db() as conn:
+        _ensure_conversations_pinned_column(conn)
         rows = conn.execute(
-            "SELECT * FROM conversations ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+            "SELECT * FROM conversations ORDER BY pinned DESC, updated_at DESC LIMIT ? OFFSET ?",
             (limit, offset)
+        ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
+def set_conversation_pinned(cid: str, pinned: bool):
+    with db() as conn:
+        _ensure_conversations_pinned_column(conn)
+        conn.execute(
+            "UPDATE conversations SET pinned = ? WHERE id = ?",
+            (1 if pinned else 0, cid)
+        )
+
+
+def search_conversations(query: str, limit: int = 50) -> list[dict]:
+    """v2.171 — recherche FULL-TEXT (titre + contenu des messages), pas juste le titre
+    tronqué à 6 mots. Chez Claude/ChatGPT, la recherche couvre tout le contenu — un mot
+    mentionné en plein milieu d'une conversation doit pouvoir la faire remonter."""
+    q = f"%{query.strip()}%"
+    with db() as conn:
+        _ensure_conversations_pinned_column(conn)
+        rows = conn.execute(
+            """SELECT DISTINCT c.* FROM conversations c
+               LEFT JOIN messages m ON m.conversation_id = c.id
+               WHERE c.title LIKE ? OR m.content LIKE ?
+               ORDER BY c.pinned DESC, c.updated_at DESC LIMIT ?""",
+            (q, q, limit)
         ).fetchall()
     return [row_to_dict(r) for r in rows]
 
@@ -83,6 +122,16 @@ def update_conversation_title(cid: str, title: str):
             "UPDATE conversations SET title = ?, updated_at = datetime('now') WHERE id = ?",
             (title, cid)
         )
+
+
+def upgrade_conversation_title_silent(cid: str, title: str):
+    """v2.171 — même chose que update_conversation_title mais SANS toucher updated_at.
+    Utilisé par le titrage intelligent en arrière-plan (voir agent.py) : le titre
+    provisoire (troncature) est déjà posé et a déjà mis à jour updated_at au moment de
+    l'envoi ; le remplacer par un titre plus soigné quelques secondes après ne doit pas
+    faire sauter la conversation en haut de la liste une 2e fois."""
+    with db() as conn:
+        conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, cid))
 
 
 def update_conversation_project(cid: str, project_id: str | None):

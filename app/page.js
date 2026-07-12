@@ -261,6 +261,38 @@ export default function ChatPage() {
     } catch (err) { console.error(err); }
   };
 
+  // v2.171 — épinglage (pattern Claude/ChatGPT) : garder une conversation en haut de la
+  // liste indépendamment de sa date, sans avoir à la ranger dans un projet pour ça.
+  const togglePin = async (e, id, pinned) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinned: !pinned }) });
+      fetchData();
+    } catch (err) { console.error(err); }
+  };
+
+  // v2.171 — recherche FULL-TEXT (titre + contenu des messages) côté backend, débounced.
+  // Avant : filtre client sur le titre tronqué à 6 mots seulement (voir matchesQ ci-dessous,
+  // conservé comme repli tant que la recherche serveur n'a pas encore répondu).
+  const [searchResults, setSearchResults] = useState(null); // null = pas de recherche active
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    const term = convSearch.trim();
+    if (!term) { setSearchResults(null); setSearching(false); return; }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/conversations/search?q=${encodeURIComponent(term)}`);
+        if (res.ok) setSearchResults(await res.json());
+      } catch (err) {
+        console.error('Erreur recherche conversations:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [convSearch]);
+
   // Recherche + groupement par date des conversations
   const q = convSearch.trim().toLowerCase();
   const matchesQ = (c) => !q || (c.title || '').toLowerCase().includes(q);
@@ -280,12 +312,22 @@ export default function ChatPage() {
   };
   const BUCKET_ORDER = ["Aujourd'hui", '7 derniers jours', '30 derniers jours', 'Plus ancien'];
 
+  // v2.171 — mode recherche : liste plate des résultats serveur (full-text), pas de
+  // groupement par projet/date — pattern Claude/ChatGPT (les résultats de recherche ne
+  // sont jamais imbriqués dans la hiérarchie normale).
+  const isSearching = q.length > 0;
+  const searchList = searchResults || [];
+
+  // Épinglées : montrées à part, en haut, retirées des autres groupes pour éviter les
+  // doublons visuels (indépendant du rangement par projet).
+  const pinnedConvs = conversations.filter(c => c.pinned);
+
   // Grouper les conversations par projet
-  const unassigned = conversations.filter(c => !c.project_id);
+  const unassigned = conversations.filter(c => !c.project_id && !c.pinned);
   const byProject = {};
   projects.forEach(p => byProject[p.id] = []);
   conversations.forEach(c => {
-    if (c.project_id && byProject[c.project_id]) {
+    if (c.project_id && byProject[c.project_id] && !c.pinned) {
       byProject[c.project_id].push(c);
     }
   });
@@ -341,6 +383,32 @@ export default function ChatPage() {
           flex: 1, overflowY: 'auto', padding: '0 12px',
           display: 'flex', flexDirection: 'column', gap: '12px'
         }}>
+          {isSearching ? (
+            /* v2.171 — mode recherche : liste plate des résultats full-text (titre +
+               contenu), pas de groupement — pattern Claude/ChatGPT. */
+            <div>
+              {searching ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '8px' }}>Recherche…</div>
+              ) : searchList.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '8px' }}>Aucun résultat.</div>
+              ) : (
+                searchList.map(conv => (
+                  <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
+                ))
+              )}
+            </div>
+          ) : (
+          <>
+          {/* Épinglées */}
+          {pinnedConvs.length > 0 && (
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', paddingLeft: '4px' }}>📌 ÉPINGLÉES</div>
+              {pinnedConvs.map(conv => (
+                <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
+              ))}
+            </div>
+          )}
+
           {/* Projets */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingLeft: '4px' }}>
@@ -394,7 +462,7 @@ export default function ChatPage() {
                 <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {(byProject[proj.id] || []).length === 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vide</span>}
                   {(byProject[proj.id] || []).map(conv => (
-                    <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} projects={projects} />
+                    <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
                   ))}
                 </div>
               </div>
@@ -412,12 +480,14 @@ export default function ChatPage() {
                 <div key={b} style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent-primary)', opacity: 0.55, marginBottom: '5px', paddingLeft: '4px' }}>{b}</div>
                   {buckets[b].map(conv => (
-                    <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} projects={projects} />
+                    <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
                   ))}
                 </div>
               ))
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
       </div>
@@ -632,7 +702,7 @@ export default function ChatPage() {
 }
 
 // ─── Composant conversation dans la sidebar (renommage inline + actions au survol) ───
-function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRename, projects }) {
+function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRename, onTogglePin, projects }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(conv.title || '');
   const [hover, setHover] = useState(false);
@@ -651,6 +721,9 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
         transition: 'background 0.15s ease', marginBottom: '2px',
       }}
     >
+      {!editing && conv.pinned && (
+        <span title="Épinglée" style={{ fontSize: '11px', flexShrink: 0, opacity: 0.85 }}>📌</span>
+      )}
       {editing ? (
         <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
           onClick={(e) => e.stopPropagation()}
@@ -661,7 +734,7 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{conv.title || 'Sans titre'}</span>
       )}
       {!editing && (
-        <div style={{ display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0, opacity: hover || isActive ? 1 : 0, transition: 'opacity 0.15s' }}>
+        <div style={{ display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0, opacity: hover || isActive || conv.pinned ? 1 : 0, transition: 'opacity 0.15s' }}>
           {projects.length > 0 && (
             <select value={conv.project_id || 'none'} onChange={(e) => onAssign(conv.id, e.target.value)} onClick={(e) => e.stopPropagation()} title="Ranger dans un projet"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text-muted)', fontSize: '10px', cursor: 'pointer', maxWidth: 54 }}>
@@ -669,6 +742,8 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           )}
+          <button onClick={(e) => onTogglePin?.(e, conv.id, conv.pinned)} title={conv.pinned ? 'Désépingler' : 'Épingler'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: conv.pinned ? 'var(--accent-primary)' : 'var(--text-muted)', padding: '2px' }}>{conv.pinned ? '📌' : '📍'}</button>
           <button onClick={(e) => { e.stopPropagation(); setDraft(conv.title || ''); setEditing(true); }} title="Renommer"
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)', padding: '2px' }}>✏️</button>
           <button onClick={(e) => onDelete(e, conv.id)} title="Supprimer"
