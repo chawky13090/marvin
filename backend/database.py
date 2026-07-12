@@ -682,6 +682,52 @@ def delete_project(pid: str):
         conn.execute("DELETE FROM projects WHERE id = ?", (pid,))
 
 
+# ── Captures d'écran (v2.175) ───────────────────────────────────────────────
+# Persiste chaque capture attachée au chat (jusqu'ici jetée après un seul tour,
+# cf. mémoire document-identity-toc-v2174) + son analyse (légende + texte relevé)
+# pour permettre plus tard une génération de documentation à partir de plusieurs
+# captures d'une même conversation.
+
+def _ensure_screenshots_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS screenshots (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT,
+            path TEXT NOT NULL,
+            caption TEXT,
+            ocr_text TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+
+def create_screenshot(conversation_id: str | None, path: str, caption: str = "", ocr_text: str = "") -> dict:
+    sid = str(uuid.uuid4())
+    with db() as conn:
+        _ensure_screenshots_table(conn)
+        conn.execute(
+            "INSERT INTO screenshots (id, conversation_id, path, caption, ocr_text) VALUES (?, ?, ?, ?, ?)",
+            (sid, conversation_id, path, caption, ocr_text)
+        )
+        row = conn.execute("SELECT * FROM screenshots WHERE id = ?", (sid,)).fetchone()
+    return row_to_dict(row)
+
+
+def list_screenshots(conversation_id: str | None = None, limit: int = 100) -> list[dict]:
+    with db() as conn:
+        _ensure_screenshots_table(conn)
+        if conversation_id:
+            rows = conn.execute(
+                "SELECT * FROM screenshots WHERE conversation_id = ? ORDER BY created_at ASC LIMIT ?",
+                (conversation_id, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM screenshots ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
 # ── Historique d'exécution ────────────────────────────────────────────────────
 
 def _ensure_tool_tables(conn):

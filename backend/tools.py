@@ -592,6 +592,14 @@ def _parse_md_blocks(content: str):
             i += 1
             yield ("code", "\n".join(code))
             continue
+        # v2.175 — image ![légende](chemin), pour embarquer une VRAIE image dans le
+        # document (ex. captures d'écran de doc_generate_from_screenshots) plutôt qu'un
+        # simple lien texte.
+        _img_m = _re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", s)
+        if _img_m:
+            yield ("image", (_img_m.group(1).strip(), _img_m.group(2).strip()))
+            i += 1
+            continue
         if s.startswith("### "):   yield ("h3", s[4:])
         elif s.startswith("## "):  yield ("h2", s[3:])
         elif s.startswith("# "):   yield ("h1", s[2:])
@@ -780,6 +788,21 @@ async def execute_file_create_docx(args: dict) -> dict:
             elif kind == "quote":
                 q = doc.add_paragraph(); q.paragraph_format.left_indent = Cm(0.8)
                 rr = q.add_run(payload); rr.italic = True; rr.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+            elif kind == "image":
+                _alt, _img_path = payload
+                _resolved_img = _resolve_path(_img_path)
+                if os.path.exists(_resolved_img):
+                    try:
+                        ip = doc.add_paragraph(); ip.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        ip.add_run().add_picture(_resolved_img, width=Cm(15))
+                        if _alt:
+                            cap = doc.add_paragraph(_alt); cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            cap.runs[0].italic = True; cap.runs[0].font.size = Pt(9)
+                            cap.runs[0].font.color.rgb = RGBColor(0x77, 0x77, 0x77)
+                    except Exception:
+                        doc.add_paragraph(f"[Image introuvable : {_img_path}]")
+                else:
+                    doc.add_paragraph(f"[Image introuvable : {_img_path}]")
             elif kind == "code":
                 cp = doc.add_paragraph(); rr = cp.add_run(payload)
                 rr.font.name = "Consolas"; rr.font.size = Pt(9)
@@ -4500,6 +4523,29 @@ async def execute_file_create_pdf(args: dict) -> dict:
                 story.append(Paragraph(_md_inline_to_rl(payload), bullet_style))
             elif kind == "quote":
                 story.append(Paragraph(_md_inline_to_rl(payload), quote_style))
+            elif kind == "image":
+                alt, img_rel_path = payload
+                resolved_img = _resolve_path(img_rel_path)
+                if os.path.exists(resolved_img):
+                    try:
+                        from PIL import Image as _PILImageCheck
+                        with _PILImageCheck.open(resolved_img) as _pi:
+                            iw, ih = _pi.size
+                        # même garde largeur+hauteur que le fix v2.173 (schémas ASCII) — un
+                        # flowable Image ne se scinde jamais sur 2 pages.
+                        avail_w, avail_h = doc.width - 12, doc.height - 12
+                        scale = min(1.0, avail_w / iw, avail_h / ih)
+                        story.append(Spacer(1, 4))
+                        story.append(RLImage(resolved_img, width=iw * scale, height=ih * scale))
+                        if alt:
+                            story.append(Paragraph(_md_inline_to_rl(alt),
+                                         ParagraphStyle("imgcap", parent=body_style, fontSize=8.5,
+                                                        textColor=LIGHT_COLOR, alignment=TA_CENTER, spaceAfter=4)))
+                        story.append(Spacer(1, 8))
+                    except Exception:
+                        story.append(Paragraph(f"[Image introuvable : {img_rel_path}]", body_style))
+                else:
+                    story.append(Paragraph(f"[Image introuvable : {img_rel_path}]", body_style))
             elif kind == "code" and _box_drawing_re.search(payload):
                 try:
                     img_path, iw, ih = _render_ascii_art_image(payload)
@@ -6986,6 +7032,143 @@ async def execute_ocr_extract(args: dict) -> dict:
             }
     except Exception as e:
         return {"error": f"Erreur OCR : {e}. Vérifiez que le modèle {model} est installé dans Ollama."}
+
+
+# v2.175 — Analyse de capture d'écran pour la documentation (screenshot_list /
+# doc_generate_from_screenshots). DÉLIBÉRÉMENT SÉPARÉ de ocr_extract ci-dessus : ocr_extract
+# reste 100% local par doctrine (v2.122, contenu potentiellement le plus sensible). Ici,
+# l'utilisateur a explicitement autorisé le cloud pour CE pipeine précis après un benchmark
+# réel (llava-phi3 local a HALLUCINÉ des données DNS fictives sur une image de test — preuve
+# concrète, pas une supposition — alors que gemini-3-flash-preview:cloud/gemma4:31b-cloud/
+# qwen3.5:397b-cloud ont extrait les 4 détails exacts en ~6s). `local_only_lockdown` (Hyper
+# sécurisé) reste un plafond dur JAMAIS contourné ; le cloud n'est utilisé que si
+# `cloud_enabled` (opt-in existant) est actif, sinon repli local silencieux sur llava-phi3.
+_SCREENSHOT_VISION_CANDIDATES = ["gemini-3-flash-preview:cloud", "gemma4:31b-cloud", "qwen3.5:397b-cloud"]
+
+_SCREENSHOT_ANALYZE_PROMPT = (
+    "Tu analyses une capture d'écran technique (contexte informatique/administration système). "
+    "Réponds en français, en respectant EXACTEMENT ce format à 2 sections :\n"
+    "LÉGENDE: <une phrase décrivant ce que montre la capture>\n"
+    "TEXTE RELEVÉ: <tout le texte visible dans l'image, transcrit fidèlement : messages, "
+    "codes d'erreur, adresses IP, chemins, valeurs de configuration — verbatim, pas de résumé>\n"
+    "N'invente rien : si un détail n'est pas lisible, ne le mentionne pas."
+)
+
+
+def _read_image_b64(resolved_path: str, max_dim: int = 1920) -> tuple[str, bool]:
+    """Lit une image et la renvoie en base64, redimensionnée si besoin. Réutilisé par
+    ocr_extract et _analyze_screenshot pour un comportement cohérent."""
+    from PIL import Image as _PILImage
+    import io as _io
+    with _PILImage.open(resolved_path) as _raw_img:
+        img = _raw_img.copy()
+        orig_fmt = _raw_img.format
+    orig_size = img.size
+    if max(img.size) > max_dim:
+        ratio = max_dim / max(img.size)
+        img = img.resize((int(img.width * ratio), int(img.height * ratio)), _PILImage.LANCZOS)
+    buf = _io.BytesIO()
+    fmt = orig_fmt if orig_fmt in ("PNG", "JPEG", "WEBP") else "PNG"
+    img.save(buf, format=fmt)
+    return _base64.b64encode(buf.getvalue()).decode(), img.size != orig_size
+
+
+async def _analyze_screenshot(resolved_path: str) -> dict:
+    """Analyse une capture (légende + texte relevé). Retourne {caption, ocr_text, model}."""
+    import httpx
+    image_b64, _ = _read_image_b64(resolved_path)
+
+    lockdown = False
+    cloud_enabled = False
+    try:
+        import cloud_routing as _cr
+        lockdown = _cr.is_local_only_lockdown()
+        cloud_enabled, _overrides = _cr.get_cloud_config()
+    except Exception:
+        pass
+
+    candidates = list(_SCREENSHOT_VISION_CANDIDATES) if (cloud_enabled and not lockdown) else []
+    candidates.append("llava-phi3")  # repli local final, toujours présent
+
+    last_err = None
+    for model in candidates:
+        try:
+            payload = {"model": model, "prompt": _SCREENSHOT_ANALYZE_PROMPT,
+                       "images": [image_b64], "stream": False, "options": {"temperature": 0.1}}
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
+                resp.raise_for_status()
+                text = resp.json().get("response", "").strip()
+            caption, ocr_text = text, ""
+            m = _re.search(r"L[ÉE]GENDE\s*:\s*(.+?)\n\s*TEXTE RELEV[ÉE]\s*:\s*(.+)", text, _re.S | _re.I)
+            if m:
+                caption, ocr_text = m.group(1).strip(), m.group(2).strip()
+            return {"caption": caption, "ocr_text": ocr_text, "model": model}
+        except Exception as e:
+            last_err = e
+            continue
+    return {"caption": "", "ocr_text": "", "model": None, "error": str(last_err) if last_err else "aucun modèle vision disponible"}
+
+
+async def execute_screenshot_list(args: dict) -> dict:
+    """Liste les captures d'écran déjà analysées pour une conversation (ou toutes, si aucune
+    précisée) — utile pour savoir ce qui est disponible avant de générer une documentation."""
+    conv_id = args.get("conversation_id") or args.get("_conversation_id")
+    limit = int(args.get("limit") or 100)
+    shots = db.list_screenshots(conv_id, limit=limit)
+    return {
+        "success": True,
+        "count": len(shots),
+        "screenshots": [
+            {"id": s["id"], "path": s["path"], "caption": s.get("caption", ""),
+             "ocr_text": s.get("ocr_text", ""), "created_at": s.get("created_at")}
+            for s in shots
+        ],
+    }
+
+
+async def execute_doc_generate_from_screenshots(args: dict) -> dict:
+    """Génère un document Word/PDF structuré à partir des captures d'écran enregistrées
+    (une section par capture : image intégrée + légende + texte relevé)."""
+    conv_id = args.get("conversation_id") or args.get("_conversation_id")
+    if not conv_id:
+        return {"error": "Aucune conversation_id disponible — cet outil doit être appelé depuis une conversation."}
+    shots = db.list_screenshots(conv_id, limit=int(args.get("limit") or 200))
+    if not shots:
+        return {"error": "Aucune capture d'écran enregistrée pour cette conversation. "
+                          "Demande à l'utilisateur d'attacher ses captures au chat d'abord."}
+
+    title = args.get("title") or "Documentation technique"
+    fmt = (args.get("format") or "docx").lower()
+
+    parts = []
+    intro = args.get("intro") or ""
+    if intro:
+        parts.append(intro); parts.append("")
+    for idx, s in enumerate(shots, 1):
+        cap = (s.get("caption") or f"Capture {idx}").strip()
+        parts.append(f"## {idx}. {cap}")
+        parts.append(f"![{cap}]({s['path']})")
+        if s.get("ocr_text"):
+            parts.append("**Texte relevé :**")
+            parts.append(f"```\n{s['ocr_text']}\n```")
+        parts.append("")
+    content = "\n".join(parts)
+
+    path = args.get("path")
+    if not path:
+        safe_title = _re.sub(r"[^\w\- ]", "", title).strip().replace(" ", "_")[:60] or "documentation"
+        ext = "pdf" if fmt == "pdf" else "docx"
+        path = str(Path(os.path.expanduser("~")) / "Desktop" / f"{safe_title}.{ext}")
+
+    call_args = {"path": path, "title": title, "content": content, "toc": True}
+    if args.get("author"): call_args["author"] = args["author"]
+    if args.get("subtitle"): call_args["subtitle"] = args["subtitle"]
+
+    result = await (execute_file_create_pdf(call_args) if fmt == "pdf" else execute_file_create_docx(call_args))
+    if result.get("success"):
+        result["screenshots_used"] = len(shots)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -17755,6 +17938,8 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "file_create_folder": execute_file_create_folder,
     "file_create_docx": execute_file_create_docx,
     "document_identity_set": execute_document_identity_set,
+    "screenshot_list": execute_screenshot_list,
+    "doc_generate_from_screenshots": execute_doc_generate_from_screenshots,
     "file_convert_docx_to_pdf": execute_file_convert_docx_to_pdf,
     "file_search_text": execute_file_search_text,
     "file_find":        execute_file_find,
@@ -18186,11 +18371,24 @@ TOOLS_SPEC = [
         "confidentiality": {"type": "string", "description": "Mention de confidentialité par défaut (ex. 'Confidentiel — usage interne')"}},
        []),
 
+    _t("screenshot_list", "Liste les captures d'écran attachées au chat dans cette conversation et déjà analysées (légende + texte relevé pour chacune). Utilise-le pour savoir ce qui est disponible avant de proposer une documentation.",
+       {"limit": {"type": "integer", "description": "Nombre max de captures à lister (défaut 100)"}},
+       []),
+
+    _t("doc_generate_from_screenshots", "Génère un document Word ou PDF de documentation à partir de TOUTES les captures d'écran attachées au chat dans cette conversation (une section par capture : image intégrée + légende + texte relevé), avec sommaire automatique. Utilise-le quand l'utilisateur demande de compiler/documenter son travail à partir de ses captures d'écran.",
+       {"title": {"type": "string", "description": "Titre du document (défaut 'Documentation technique')"},
+        "subtitle": {"type": "string", "description": "Sous-titre optionnel"},
+        "intro": {"type": "string", "description": "Paragraphe d'introduction optionnel, avant la liste des captures"},
+        "format": {"type": "string", "enum": ["docx", "pdf"], "description": "Format de sortie (défaut docx)"},
+        "path": {"type": "string", "description": "Chemin du fichier à créer (défaut : Bureau, nommé d'après le titre)"},
+        "author": {"type": "string", "description": "Auteur (sinon : identité document par défaut)"}},
+       []),
+
     _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, en-tête/pied de page personnalisables, sommaire auto, bloc signature. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
        {"path": {"type": "string", "description": "Chemin du fichier Word à créer (.docx)"},
         "title": {"type": "string", "description": "Titre principal du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
-        "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, ``` code"},
+        "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, ``` code, ![légende](chemin) pour embarquer une vraie image (ex. une capture d'écran)"},
         "author": {"type": "string", "description": "Auteur du document (sinon : identité document par défaut, sinon 'Marvin')"},
         "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"},
         "toc": {"type": "boolean", "description": "Insère un sommaire auto-généré (champ Word natif) après la page de titre — recommandé pour un document de plusieurs sections"},
@@ -18563,7 +18761,7 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin du PDF à créer"},
         "title": {"type": "string", "description": "Titre du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
-        "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, [lien](url)"},
+        "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, [lien](url), ![légende](chemin) pour embarquer une vraie image (ex. une capture d'écran)"},
         "author": {"type": "string", "description": "Auteur (sinon : identité document par défaut, sinon 'Marvin')"},
         "accent": {"type": "string", "description": "Couleur d'accent hex (défaut #c9a84c)"},
         "toc": {"type": "boolean", "description": "Insère un sommaire auto-généré (cliquable, avec signets PDF) après la page de titre — recommandé pour un document de plusieurs sections"},

@@ -4,6 +4,7 @@ Appelle Ollama directement (HTTP), gère la boucle d'appel d'outils,
 et produit des événements SSE pour le frontend.
 """
 import asyncio
+import base64
 import json
 import os
 import re
@@ -19,9 +20,10 @@ from config import (
     OLLAMA_URL, DEFAULT_MODEL, MAX_TOOL_STEPS, MAX_CONTEXT_MESSAGES,
     PERMISSION_SECURE, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
     SECURE_BLOCKED_TOOLS, DANGEROUS_TOOLS,
-    MODEL_PROFILES, AUTO_MODE_FALLBACKS,
+    MODEL_PROFILES, AUTO_MODE_FALLBACKS, DATA_DIR,
 )
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
+import tools as _tools_mod
 
 # Conserve les références des tâches d'apprentissage en arrière-plan (anti-GC).
 _BG_LEARN_TASKS: set = set()
@@ -947,6 +949,11 @@ _KEYWORD_TOOLS = {
      "procédure technique", "cahier des charges", "compte-rendu", "compte rendu",
      "génère une doc", "rédige une doc"):
         {"document_generate"},
+    # v2.175 — documentation à partir des captures d'écran attachées au chat
+    ("mes captures", "mes screenshots", "mes screens", "compile mes captures",
+     "documente mon travail", "documentation de mon travail", "captures d'écran",
+     "captures d ecran", "capture d'écran", "capture d ecran", "screenshot", "screenshots"):
+        {"screenshot_list", "doc_generate_from_screenshots"},
     # Affiner une section d'un document généré
     ("développe la partie", "developpe la partie", "développe la section", "complète la section",
      "complete la section", "approfondis", "étoffe", "etoffe", "raccourcis la section",
@@ -1662,6 +1669,59 @@ def _salvage_text_tool_calls(content: str, allowed_names: set) -> list:
     return calls
 
 
+# v2.175 — jusqu'ici, une image attachée au chat n'était utilisée QUE pour ce tour (vision
+# ponctuelle) puis jetée : agent.py extrayait le texte du message multimodal et écrivait
+# `content` seul en base, sans jamais toucher les images (cf. mémoire document-identity-toc-v2174
+# et le pipeline documenté à l'époque de l'ajout du multi-attach v2.140). Pour « ingurgiter
+# beaucoup de captures et en faire de la documentation », il faut d'abord qu'elles SURVIVENT
+# au tour — persistées sur disque + analysées une fois (légende + texte relevé) + indexées
+# dans la table `screenshots`, pour qu'un outil ultérieur (doc_generate_from_screenshots)
+# puisse les récupérer sans jamais renvoyer les octets bruts au modèle à chaque nouveau tour.
+_MIME_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg",
+             "image/gif": ".gif", "image/webp": ".webp"}
+
+
+async def _persist_and_analyze_one_screenshot(conversation_id: str, data_url: str) -> dict | None:
+    try:
+        header, b64data = data_url.split(",", 1)
+        mime = header.split(";")[0].replace("data:", "") if ":" in header else "image/png"
+        ext = _MIME_EXT.get(mime, ".png")
+        raw = base64.b64decode(b64data)
+
+        conv_dir = DATA_DIR / "screenshots" / conversation_id
+        conv_dir.mkdir(parents=True, exist_ok=True)
+        fname = f"{uuid.uuid4().hex}{ext}"
+        fpath = conv_dir / fname
+        fpath.write_bytes(raw)
+
+        analysis = await _tools_mod._analyze_screenshot(str(fpath))
+        row = db.create_screenshot(conversation_id, str(fpath),
+                                    analysis.get("caption", ""), analysis.get("ocr_text", ""))
+        return row
+    except Exception:
+        return None
+
+
+async def _persist_and_analyze_screenshots(conversation_id: str, content_parts: list) -> list[dict]:
+    """Best-effort, jamais bloquant pour le tour : une erreur d'analyse d'UNE capture ne doit
+    pas empêcher le reste de la conversation. Traitées en parallèle (asyncio.gather) — avec
+    plusieurs captures, les analyser en série aurait ajouté plusieurs x le temps d'un appel
+    vision (~6s en cloud, jusqu'à 90s en repli local) au tour en cours."""
+    urls = []
+    for part in content_parts or []:
+        if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
+            url = part.get("image_url", {}).get("url", "") or part.get("url", "")
+            if url.startswith("data:"):
+                urls.append(url)
+    if not urls:
+        return []
+    results = await asyncio.gather(
+        *[_persist_and_analyze_one_screenshot(conversation_id, u) for u in urls],
+        return_exceptions=False,
+    )
+    return [r for r in results if r]
+
+
 async def run_agent(
     messages: list[dict],
     conversation_id: str | None,
@@ -1700,6 +1760,16 @@ async def run_agent(
             )
         db.create_message(conversation_id, "user", content)
         _user_query = content
+
+        # v2.175 — persiste + analyse (légende + texte relevé) toute image jointe à CE message,
+        # avant qu'elle ne soit perdue (jusqu'ici jamais sauvegardée au-delà du tour courant).
+        if isinstance(last_msg.get("content"), list):
+            try:
+                _saved_shots = await _persist_and_analyze_screenshots(conversation_id, last_msg["content"])
+                if _saved_shots:
+                    yield _sse({"type": "screenshots_saved", "count": len(_saved_shots)})
+            except Exception:
+                pass
         # v2.170 — titrer la conversation IMMÉDIATEMENT depuis le message utilisateur,
         # avant même que l'assistant réponde. Avant ce correctif, le titre n'était posé
         # qu'après une réponse COMPLÈTE (voir plus bas) — si le tour était interrompu en
@@ -2294,6 +2364,11 @@ async def run_agent(
                 # conversation) — injecté ici plutôt que demandé au LLM (qui n'a de toute
                 # façon pas une vision fiable de son propre conversation_id).
                 if tool_name == "long_task_start":
+                    tool_args["_conversation_id"] = conversation_id
+                # v2.175 — même principe : le modèle n'a pas de vision fiable de son propre
+                # conversation_id (règle d'or #7, jamais d'ID inventé) — injecté ici pour les
+                # outils qui portent sur "cette conversation" par défaut.
+                if tool_name in ("screenshot_list", "doc_generate_from_screenshots") and "conversation_id" not in tool_args:
                     tool_args["_conversation_id"] = conversation_id
                 # ── Outil explicite : bloque toute substitution ────────────────
                 # Le modèle propose parfois un outil "proche" au lieu de celui demandé par

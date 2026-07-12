@@ -2992,6 +2992,39 @@ async def lifespan(app_instance):
 #   pas corrompu) -- TOC recalcule automatiquement a l'ouverture, identique au PDF. Reglages ->
 #   Connexions verifie en reel (Playwright) : champs pre-remplis au chargement, sauvegarde
 #   confirmee par relecture directe de l'API apres clic.
+#
+# v2.175 (📸 captures d'ecran persistees + analysees + documentation auto-generee) : demande
+#   explicite ("je voudrais que marvin puisse ingurgiter beaucoup de screen dans la conversation
+#   et de bien les analyse pour pouvoir faire des documentation sur mon travail"). Audit du
+#   pipeline existant AVANT tout code : une image attachee au chat n'etait utilisee QUE pour CE
+#   tour (agent.py extrayait le texte, jetait les images avant `db.create_message`) -- aucune
+#   persistance, aucun moyen de les retrouver pour un tour ulterieur. Le modele vision local
+#   (llava-phi3) a en plus ete pris en flagrant delit d'hallucination sur un benchmark reel
+#   (image de test avec IP/code d'erreur/heure verifiables) : il a invente des enregistrements
+#   DNS totalement fictifs. 3 modeles cloud installes (gemini-3-flash-preview, gemma4:31b,
+#   qwen3.5:397b) ont extrait les 4 details EXACTS en ~6s -- preuve chiffree, l'utilisateur a
+#   explicitement autorise le cloud pour ce pipeline precis apres avoir vu le resultat.
+#   1. Persistance + analyse automatique (agent.py::_persist_and_analyze_screenshots) : chaque
+#      image d'un message multimodal est sauvegardee sur disque (data/screenshots/<conv_id>/)
+#      et analysee UNE FOIS (legende + texte relevé verbatim) via un nouveau pipeline vision
+#      DEDIE (tools.py::_analyze_screenshot) — deliberement SEPARE de ocr_extract (qui reste
+#      100% local par doctrine, v2.122, contenu potentiellement le plus sensible) : le cloud
+#      n'est utilise ici QUE si cloud_enabled (opt-in existant) est actif, et local_only_lockdown
+#      (Hyper securise) reste un plafond dur jamais contourne. Nouvelle table `screenshots`.
+#   2. Support image ![legende](chemin) dans _parse_md_blocks -> embarque une VRAIE image dans
+#      file_create_docx/file_create_pdf (jusqu'ici seuls texte/tableaux/code etaient supportes)
+#      -- meme garde largeur+hauteur que le fix v2.173 pour eviter un LayoutError PDF.
+#   3. 2 nouveaux outils (330e/331e) : screenshot_list (liste ce qui est deja analyse pour la
+#      conversation courante) et doc_generate_from_screenshots (compile toutes les captures en
+#      un Word/PDF structure — une section par capture, image + legende + texte releve — avec
+#      sommaire auto v2.174). conversation_id injecte automatiquement par agent.py (meme
+#      pattern que long_task_start v2.145) — jamais devine par le modele (regle d'or #7).
+#   Teste en reel de bout en bout : 2 captures synthetiques (jamais le vrai bureau de
+#   l'utilisateur — action bloquee par le classifieur, a raison, contournee avec une image
+#   generee) envoyees via /api/chat -> "screenshots_saved: 2" confirme, legende ET texte releve
+#   100% exacts (serveur/IP/commande PowerShell/statut) -> doc_generate_from_screenshots (docx
+#   ET pdf) -> converti en PDF via Word/COM reel -> images bien integrees, sommaire correct,
+#   pagination correcte. Donnees de test nettoyees apres verification.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7543,7 +7576,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.174.0",
+            "version":         "2.175.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
