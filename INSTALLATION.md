@@ -82,32 +82,27 @@ affichées, et `http://localhost:3000` accessible dans un navigateur sur le serv
 
 ---
 
-## 4. Ouvrir l'accès depuis le réseau de la boutique
+## 4. Accès depuis le réseau de la boutique + démarrage automatique
 
-Par défaut, le pare-feu Windows peut bloquer les connexions entrantes depuis les
-autres postes de la boutique. Ouvrez une invite PowerShell **administrateur** sur
-le serveur et exécutez :
-
-```powershell
-New-NetFirewallRule -DisplayName "Marvin - Frontend" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "Marvin - Backend"  -Direction Inbound -LocalPort 8005 -Protocol TCP -Action Allow
-```
-
-**Résultat attendu** : depuis un autre poste de la boutique, `http://<IP-DU-SERVEUR>:3000`
-s'ouvre correctement. Trouvez l'IP du serveur avec `ipconfig` (champ "Adresse IPv4").
-
----
-
-## 5. Démarrage automatique après un redémarrage
-
-Pour que Marvin reparte **tout seul** après un reboot ou une coupure de courant
-(recommandé sur un serveur boutique), exécutez **en tant qu'administrateur** :
+Marvin doit être accessible depuis les autres postes de la boutique (pas seulement
+en local sur le serveur), et doit repartir **tout seul** après un reboot ou une
+coupure de courant. Les deux sont gérés par le même script — exécutez **en tant
+qu'administrateur** :
 
 **`INSTALLER-DEMARRAGE-AUTO.bat`**
 
-**Résultat attendu** : `[OK] Tâche planifiée créée`. Testez immédiatement sans
-redémarrer avec la commande affichée à l'écran (`schtasks /run /tn "..."`), puis
-vérifiez que `http://localhost:3000` répond une minute après.
+Il fait deux choses :
+1. **Ouvre le pare-feu Windows** (ports 3000 frontend / 8005 backend) pour l'accès
+   réseau — sans ça, seul le serveur lui-même pourrait accéder à Marvin.
+2. **Enregistre une tâche planifiée** qui relance Marvin automatiquement à chaque
+   démarrage du serveur.
+
+**Résultat attendu** : `[OK] Ports 3000 (frontend) et 8005 (backend) ouverts` puis
+`[OK] Tâche planifiée créée`. Testez immédiatement sans redémarrer avec la commande
+affichée à l'écran (`schtasks /run /tn "..."`), puis :
+- `http://localhost:3000` répond depuis le serveur lui-même une minute après ;
+- `http://<IP-DU-SERVEUR>:3000` répond depuis un **autre poste de la boutique**
+  (trouvez l'IP du serveur avec `ipconfig`, champ « Adresse IPv4 »).
 
 > ℹ️ Cette tâche tourne sous le compte SYSTEM (aucune session utilisateur requise,
 > démarre avant même l'écran de connexion). Contrepartie : les fonctionnalités qui
@@ -118,7 +113,7 @@ vérifiez que `http://localhost:3000` répond une minute après.
 
 ---
 
-## 5bis. Serveur SANS GPU → mode Cloud Total
+## 4bis. Serveur SANS GPU → mode Cloud Total
 
 > ⚠️ **Cette étape est spécifique à un serveur SANS carte graphique** (comme celui de
 > la boutique). Elle envoie toutes les données au cloud sans exception, y compris

@@ -157,40 +157,87 @@ def list_installed_cloud_models() -> list[str]:
         return []
 
 
+# v2.180 — apprentissage PASSIF des capacités réelles (« que Marvin connaisse tous les
+# modèles et leur utilité de façon autonome »). Volontairement PAS de sonde proactive
+# (appeler chaque modèle installé juste pour tester coûterait du quota cloud réel pour
+# aucun bénéfice utilisateur) : Marvin apprend de ses VRAIS appels — si un modèle échoue
+# réellement sur un besoin (ex. refuse une image, erreur 4xx = incapacité, pas un incident
+# réseau), c'est mémorisé et il n'est plus jamais retenté pour CE besoin. Même doctrine que
+# l'auto-réparation des compétences (skills.py) : apprendre de l'échec réel, pas deviner.
+def get_model_capabilities() -> dict:
+    """{modèle: {besoin: {"ok": bool, "at": iso}}} — appris, jamais sondé à l'avance."""
+    try:
+        v = db.get_setting("cloud_model_capabilities") or {}
+        return v if isinstance(v, dict) else {}
+    except Exception:
+        return {}
+
+
+def record_model_capability(model: str, need: str, ok: bool):
+    """À appeler après un VRAI appel réel à `model` pour `need`. `ok=False` UNIQUEMENT sur
+    une erreur de CAPACITÉ constatée (ex. HTTP 4xx = le modèle refuse ce type de contenu) —
+    jamais sur un incident transitoire (timeout, 5xx, réseau), pour ne pas exclure à tort un
+    modèle qui a juste eu un problème ponctuel."""
+    try:
+        from datetime import datetime as _dt
+        caps = get_model_capabilities()
+        caps.setdefault(model, {})[need] = {"ok": bool(ok), "at": _dt.now().isoformat()}
+        db.set_setting("cloud_model_capabilities", caps)
+    except Exception:
+        pass
+
+
+def _apply_learned_capabilities(installed: list[str], need: str) -> list[str]:
+    """Exclut les modèles appris INCAPABLES pour ce besoin, et fait remonter en tête ceux
+    appris CAPABLES (expérience réelle prioritaire sur la simple heuristique de famille)."""
+    caps = get_model_capabilities()
+    known_ok = lambda m: caps.get(m, {}).get(need, {}).get("ok")
+    installed = [m for m in installed if known_ok(m) is not False]
+    proven = [m for m in installed if known_ok(m) is True]
+    if proven:
+        installed = proven + [m for m in installed if m not in proven]
+    return installed
+
+
 def pick_best_cloud_model(need: str = "general", exclude: frozenset = frozenset()) -> str | None:
     """Choisit le meilleur modèle cloud INSTALLÉ pour un besoin donné (general/code/vision),
-    par famille (préfixe/marqueur dans le nom), jamais par tag exact figé en dur — résilient
-    à la rotation/au retrait des modèles cloud. Retourne None si aucun candidat installé pour
-    ce besoin (l'appelant décide alors du repli, ex. local pour la vision)."""
+    par famille (préfixe/marqueur dans le nom) affinée par l'expérience réelle apprise, jamais
+    par tag exact figé en dur — résilient à la rotation/au retrait des modèles cloud. Retourne
+    None si aucun candidat installé pour ce besoin (l'appelant décide alors du repli, ex. local
+    pour la vision)."""
     installed = [m for m in list_installed_cloud_models() if m not in exclude]
     if not installed:
         return None
     if need == "code":
-        coder = next((m for m in installed if any(k in m.lower() for k in _CODE_SPECIALIST_MARKERS)), None)
+        candidates = _apply_learned_capabilities(installed, "code")
+        coder = next((m for m in candidates if any(k in m.lower() for k in _CODE_SPECIALIST_MARKERS)), None)
         if coder:
             return coder
         need = "general"  # pas de spécialiste installé -> repli propre sur le généraliste
     if need == "vision":
+        candidates = _apply_learned_capabilities(installed, "vision")
         for fam in _VISION_CAPABLE_FAMILIES:
-            m = next((m for m in installed if m.lower().startswith(fam)), None)
+            m = next((m for m in candidates if m.lower().startswith(fam)), None)
             if m:
                 return m
-        return None
+        return candidates[0] if candidates else None
+    candidates = _apply_learned_capabilities(installed, "general")
     for fam in _GENERAL_PREFERENCE_FAMILIES:
-        m = next((m for m in installed if m.lower().startswith(fam)), None)
+        m = next((m for m in candidates if m.lower().startswith(fam)), None)
         if m:
             return m
-    return installed[0]
+    return candidates[0] if candidates else None
 
 
 def list_vision_candidates() -> list[str]:
     """TOUS les modèles cloud installés réputés capables de vision (pas seulement le
-    meilleur) — dans l'ordre de préférence des familles, pour permettre à l'appelant
-    d'essayer le suivant si le premier échoue à l'exécution (réseau, quota...)."""
-    installed = list_installed_cloud_models()
+    meilleur) — dans l'ordre de préférence des familles PUIS de l'expérience apprise, pour
+    permettre à l'appelant d'essayer le suivant si le premier échoue à l'exécution."""
+    installed = _apply_learned_capabilities(list_installed_cloud_models(), "vision")
     out = []
     for fam in _VISION_CAPABLE_FAMILIES:
         out.extend(m for m in installed if m.lower().startswith(fam) and m not in out)
+    out.extend(m for m in installed if m not in out)  # modèles appris capables hors familles connues
     return out
 
 

@@ -7109,8 +7109,26 @@ async def _analyze_screenshot(resolved_path: str) -> dict:
             m = _re.search(r"L[ÉE]GENDE\s*:\s*(.+?)\n\s*TEXTE RELEV[ÉE]\s*:\s*(.+)", text, _re.S | _re.I)
             if m:
                 caption, ocr_text = m.group(1).strip(), m.group(2).strip()
+            # v2.180 — apprentissage passif : ce modèle vient de PROUVER qu'il gère la vision,
+            # mémorisé pour que les prochains appels le préfèrent (expérience réelle > famille).
+            if model != "llava-phi3":
+                try:
+                    _cr.record_model_capability(model, "vision", True)
+                except Exception:
+                    pass
             return {"caption": caption, "ocr_text": ocr_text, "model": model}
         except Exception as e:
+            # Erreur de CAPACITÉ constatée (4xx = le modèle refuse ce contenu, ex. pas de
+            # support multimodal) -> mémorisé pour ne plus jamais le retenter en vision.
+            # Un incident transitoire (timeout, 5xx, réseau) n'est PAS mémorisé comme un
+            # échec de capacité — ce serait exclure à tort un modèle valide.
+            if model != "llava-phi3":
+                status = getattr(getattr(e, "response", None), "status_code", None)
+                if status is not None and 400 <= status < 500:
+                    try:
+                        _cr.record_model_capability(model, "vision", False)
+                    except Exception:
+                        pass
             last_err = e
             continue
     return {"caption": "", "ocr_text": "", "model": None, "error": str(last_err) if last_err else "aucun modèle vision disponible"}

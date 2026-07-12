@@ -3151,6 +3151,34 @@ async def lifespan(app_instance):
 #   Detection GPU verifiee en isolation (carte integree Intel detectee correctement comme
 #   "un GPU present" sur cette machine de developpement). Page Reglages > Modele IA rechargee
 #   en reel apres redemarrage backend, 0 erreur console.
+#
+# v2.180 (📡 acces LAN automatise + apprentissage passif des capacites modeles) : 2 demandes
+#   dans le meme message. (1) "marvin doit etre accessible sur le lan de la boutique...
+#   incorporer cela dans les reglages de la version installable" -- l'ouverture du pare-feu
+#   (New-NetFirewallRule, ports 3000/8005) etait jusqu'ici une commande PowerShell a copier-
+#   coller a la main dans INSTALLATION.md. Deplacee dans INSTALLER-DEMARRAGE-AUTO.bat (deja
+#   admin-only), idempotente (supprime puis recree les regles -- relancer plusieurs fois ne
+#   cree pas de doublons). INSTALLATION.md restructure (etapes 4/4bis fusionnees en une seule
+#   section coherente "acces LAN + demarrage auto").
+#   (2) "que les meilleurs models cloud soit utiliser automatiquement selon le contexte...
+#   que marvin connaisse tous les modeles et leur utilite de facon autonome" -- rejete
+#   deliberement le sondage proactif (tester chaque modele installe a l'avance couterait du
+#   quota cloud reel pour zero benefice utilisateur, l'abonnement Ollama Cloud a un plafond de
+#   session visible cote utilisateur). A la place : apprentissage PASSIF depuis les VRAIS
+#   appels -- `cloud_routing.py::record_model_capability(model, need, ok)` memorise le
+#   resultat REEL de chaque appel vision (succes ou echec 4xx = incapacite constatee ; un
+#   timeout/5xx transitoire n'est PAS memorise comme un echec de capacite, pour ne pas exclure
+#   a tort un modele valide). `pick_best_cloud_model()`/`list_vision_candidates()` consultent
+#   cet historique appris : exclut les modeles constates incapables, fait remonter en tete
+#   ceux constates capables (experience reelle prioritaire sur la simple heuristique de
+#   famille v2.179). Meme doctrine que l'auto-reparation des competences (skills.py) :
+#   apprendre de l'echec/succes reel, jamais deviner ni sonder a l'avance.
+#   Teste en reel de bout en bout : ouverture pare-feu testee en isolation (erreur "Acces
+#   refuse" attendue en non-admin, confirme la syntaxe correcte -- gerable proprement par le
+#   script) ; pipeline vision declenche pour de vrai via /api/chat avec une image de test ->
+#   gemini-3-flash-preview:cloud reellement appele, a reussi, capacite "vision: ok=true"
+#   effectivement enregistree en base et relue via /api/cloud/best-model. Donnees de test
+#   nettoyees (conversation + fichiers), capacite apprise laissee en place (donnee reelle utile).
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -7713,7 +7741,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.179.0",
+            "version":         "2.180.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
