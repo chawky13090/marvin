@@ -118,6 +118,46 @@ vérifiez que `http://localhost:3000` répond une minute après.
 
 ---
 
+## 5bis. Serveur SANS GPU → mode Cloud Total
+
+> ⚠️ **Cette étape est spécifique à un serveur SANS carte graphique** (comme celui de
+> la boutique). Elle envoie toutes les données au cloud sans exception, y compris
+> les données sensibles (emails, mots de passe, SSH) normalement gardées en local.
+> **Ne l'appliquez jamais sur un poste de travail normal qui a un GPU** — sur une
+> machine avec GPU, Marvin fonctionne déjà bien en local, ce mode n'y apporterait
+> rien et enverrait inutilement des données au cloud. Le script détecte lui-même la
+> présence d'un GPU et demande une confirmation explicite s'il en trouve un.
+
+Ce serveur n'a pas de carte graphique : faire tourner les modèles IA localement
+(sur CPU) serait trop lent pour un usage quotidien. Une fois Marvin démarré et un
+modèle cloud installé (`ollama pull deepseek-v4-flash:cloud` ou équivalent),
+exécutez **`CONFIGURER-CLOUD-TOTAL.bat`**.
+
+Ce script bascule tout (agent/chat/analyse) vers le cloud, **sans exception de
+sensibilité** — équivalent au préréglage *Ultra débridé* de *Réglages → Modèle IA*,
+appliqué directement via l'API (pratique sans navigateur à portée de main sur un
+serveur). Deux choses **ne changent jamais**, quel que soit ce réglage :
+- Le garde-fou système contre les commandes destructrices (formatage disque,
+  suppression système...) — aucun mode ne le désactive.
+- L'OCR/vision généraliste (photos, scans de documents) reste **local** par défaut
+  — plus lent sans GPU, mais rien d'envoyé au cloud pour ce type de contenu
+  potentiellement sensible (factures clients...). Seul le pipeline dédié
+  « captures d'écran → documentation » (v2.175) utilise le cloud pour l'analyse
+  d'images, en connaissance de cause.
+
+**Résultat attendu** : `[OK] Configuration appliquée`, avec le nom du modèle cloud
+choisi affiché. Vérifiable ensuite dans *Réglages → Modèle IA* (carte *Ultra
+débridé* affichée comme active).
+
+> ℹ️ Le modèle cloud est choisi **automatiquement parmi ceux réellement installés**
+> (jamais un nom figé en dur) — les fournisseurs cloud retirent/renomment des
+> modèles régulièrement (constaté en réel : deux modèles recommandés dans une
+> session de développement ont été retirés ~2 jours plus tard). Si vous ajoutez ou
+> retirez des modèles cloud plus tard (`ollama pull`/`ollama rm`), relancez
+> simplement le script pour ré-appliquer le meilleur choix disponible.
+
+---
+
 ## 6. Configuration propre à cette installation
 
 - [ ] **Identité document** (auteur, organisation, logo, pied de page) : demandez

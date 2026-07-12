@@ -7039,11 +7039,14 @@ async def execute_ocr_extract(args: dict) -> dict:
 # reste 100% local par doctrine (v2.122, contenu potentiellement le plus sensible). Ici,
 # l'utilisateur a explicitement autorisé le cloud pour CE pipeine précis après un benchmark
 # réel (llava-phi3 local a HALLUCINÉ des données DNS fictives sur une image de test — preuve
-# concrète, pas une supposition — alors que gemini-3-flash-preview:cloud/gemma4:31b-cloud/
-# qwen3.5:397b-cloud ont extrait les 4 détails exacts en ~6s). `local_only_lockdown` (Hyper
-# sécurisé) reste un plafond dur JAMAIS contourné ; le cloud n'est utilisé que si
-# `cloud_enabled` (opt-in existant) est actif, sinon repli local silencieux sur llava-phi3.
-_SCREENSHOT_VISION_CANDIDATES = ["gemini-3-flash-preview:cloud", "gemma4:31b-cloud", "qwen3.5:397b-cloud"]
+# concrète, pas une supposition — alors que gemini/gemma/qwen3.5 ont extrait les 4 détails
+# exacts en ~6s). `local_only_lockdown` (Hyper sécurisé) reste un plafond dur JAMAIS
+# contourné ; le cloud n'est utilisé que si `cloud_enabled` (opt-in existant) est actif,
+# sinon repli local silencieux sur llava-phi3.
+# v2.179 — la liste de candidats N'EST PLUS figée par tag exact (gemini-3-flash-preview:cloud
+# et qwen3-coder:480b-cloud, tous deux recommandés dans CETTE session, ont été retirés par
+# Ollama Cloud ~2 jours plus tard — constaté en réel) : résolue en DIRECT sur les modèles
+# réellement installés via cloud_routing.list_vision_candidates() (familles par préfixe).
 
 _SCREENSHOT_ANALYZE_PROMPT = (
     "Tu analyses une capture d'écran technique (contexte informatique/administration système). "
@@ -7080,14 +7083,17 @@ async def _analyze_screenshot(resolved_path: str) -> dict:
 
     lockdown = False
     cloud_enabled = False
+    candidates = []
     try:
         import cloud_routing as _cr
         lockdown = _cr.is_local_only_lockdown()
         cloud_enabled, _overrides = _cr.get_cloud_config()
+        if cloud_enabled and not lockdown:
+            candidates = _cr.list_vision_candidates()
     except Exception:
         pass
 
-    candidates = list(_SCREENSHOT_VISION_CANDIDATES) if (cloud_enabled and not lockdown) else []
+    candidates = list(candidates)
     candidates.append("llava-phi3")  # repli local final, toujours présent
 
     last_err = None

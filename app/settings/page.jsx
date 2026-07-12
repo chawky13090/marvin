@@ -383,11 +383,13 @@ export default function SettingsPage() {
         nextEnabled = false;
         nextUltra = false;
       } else if (preset === 'cloud_max' || preset === 'ultra') {
-        const cloudModels = models.filter(m => m.endsWith(':cloud'));
-        const best = cloudModels.find(m => m.startsWith('deepseek'))
-          || cloudModels.find(m => m.startsWith('glm'))
-          || cloudModels.find(m => m.startsWith('kimi'))
-          || cloudModels[0];
+        // v2.179 — résolu côté backend (cloud_routing.pick_best_cloud_model), plus de liste
+        // dupliquée ici : un modèle cloud recommandé peut être retiré par le fournisseur en
+        // quelques jours (constaté en réel), la logique de choix vit maintenant à un seul
+        // endroit (partagé avec CONFIGURER-CLOUD-TOTAL.bat).
+        const bestRes = await fetch(`${BACKEND_URL}/api/cloud/best-model?need=general`);
+        const bestData = await bestRes.json();
+        const best = bestData.model;
         if (!best) { showNotification('⚠️ Aucun modèle cloud installé — téléchargez-en un via `ollama pull`.'); setPresetApplying(false); return; }
         nextLockdown = false;
         nextEnabled = true;

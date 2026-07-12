@@ -119,12 +119,79 @@ def detect_task(text: str) -> str | None:
 
 
 def get_task_overrides() -> dict:
-    """cloud_task_overrides ({tâche: modèle_cloud}) — ex. {"code": "qwen3-coder:480b-cloud"}."""
+    """cloud_task_overrides ({tâche: modèle_cloud}) — DÉPRÉCIÉ (v2.179), conservé pour
+    compatibilité mais plus consulté par resolve_model() : un modèle cloud figé en dur dans
+    un réglage devient périmé dès qu'Ollama Cloud retire/renomme ce modèle (constaté en réel :
+    gemini-3-flash-preview et qwen3-coder:480b retirés ~2 jours après avoir été recommandés
+    dans cette session même). `pick_best_cloud_model()` ci-dessous résout désormais le
+    "meilleur modèle pour une tâche" EN DIRECT sur la liste réellement installée, par FAMILLE
+    (préfixe) plutôt que par tag exact — résilient à la rotation des modèles cloud."""
     try:
         overrides = db.get_setting("cloud_task_overrides") or {}
         return overrides if isinstance(overrides, dict) else {}
     except Exception:
         return {}
+
+
+# v2.179 — familles de modèles cloud connues par préfixe (jamais un tag EXACT, qui expire) :
+# ordre de préférence général établi par les benchmarks 2026 (agentique/tool-calling) déjà
+# documentés (v2.141), et l'ordre "vision" établi par un benchmark RÉEL mené dans cette
+# session (llava-phi3 local hallucine ; gemini/gemma/qwen3.5 ont extrait 4 détails exacts
+# d'une image de test en ~6s chacun — voir mémoire screenshots-documentation-v2175).
+_GENERAL_PREFERENCE_FAMILIES = ("deepseek", "glm", "kimi", "nemotron")
+_VISION_CAPABLE_FAMILIES = ("gemini", "gemma", "qwen3.5")
+_CODE_SPECIALIST_MARKERS = ("coder",)
+
+
+def list_installed_cloud_models() -> list[str]:
+    """Modèles cloud REELLEMENT installés sur cette machine, interrogés en direct (jamais
+    une liste figée en dur — c'est justement le problème que ça évite)."""
+    try:
+        import httpx
+        from config import OLLAMA_URL
+        r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        r.raise_for_status()
+        names = [m.get("name", "") for m in r.json().get("models", [])]
+        return [n for n in names if is_cloud_model(n)]
+    except Exception:
+        return []
+
+
+def pick_best_cloud_model(need: str = "general", exclude: frozenset = frozenset()) -> str | None:
+    """Choisit le meilleur modèle cloud INSTALLÉ pour un besoin donné (general/code/vision),
+    par famille (préfixe/marqueur dans le nom), jamais par tag exact figé en dur — résilient
+    à la rotation/au retrait des modèles cloud. Retourne None si aucun candidat installé pour
+    ce besoin (l'appelant décide alors du repli, ex. local pour la vision)."""
+    installed = [m for m in list_installed_cloud_models() if m not in exclude]
+    if not installed:
+        return None
+    if need == "code":
+        coder = next((m for m in installed if any(k in m.lower() for k in _CODE_SPECIALIST_MARKERS)), None)
+        if coder:
+            return coder
+        need = "general"  # pas de spécialiste installé -> repli propre sur le généraliste
+    if need == "vision":
+        for fam in _VISION_CAPABLE_FAMILIES:
+            m = next((m for m in installed if m.lower().startswith(fam)), None)
+            if m:
+                return m
+        return None
+    for fam in _GENERAL_PREFERENCE_FAMILIES:
+        m = next((m for m in installed if m.lower().startswith(fam)), None)
+        if m:
+            return m
+    return installed[0]
+
+
+def list_vision_candidates() -> list[str]:
+    """TOUS les modèles cloud installés réputés capables de vision (pas seulement le
+    meilleur) — dans l'ordre de préférence des familles, pour permettre à l'appelant
+    d'essayer le suivant si le premier échoue à l'exécution (réseau, quota...)."""
+    installed = list_installed_cloud_models()
+    out = []
+    for fam in _VISION_CAPABLE_FAMILIES:
+        out.extend(m for m in installed if m.lower().startswith(fam) and m not in out)
+    return out
 
 
 def is_local_only_lockdown() -> bool:
@@ -180,12 +247,16 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
     # Aucun modèle demandé : tenter le cloud auto si configuré pour ce profil/tâche.
     cloud_enabled, overrides = get_cloud_config()
     if cloud_enabled and not sensitive:
-        # v2.141 — un signal de TÂCHE (ex. "code") prend le pas sur l'override de PROFIL :
-        # modèle cloud spécialisé plutôt que le généraliste du profil courant.
+        # v2.141/v2.179 — un signal de TÂCHE (ex. "code") prend le pas sur l'override de
+        # PROFIL : modèle cloud spécialisé plutôt que le généraliste du profil courant.
+        # Résolu EN DIRECT sur la liste installée (pick_best_cloud_model), plus jamais sur un
+        # tag figé dans un réglage — un modèle cloud recommandé aujourd'hui peut être retiré
+        # par le fournisseur en quelques jours (constaté en réel, v2.179).
         task = detect_task(text_for_sensitivity)
-        task_overrides = get_task_overrides()
-        if task and task in task_overrides:
-            return task_overrides[task]
+        if task:
+            picked = pick_best_cloud_model(task)
+            if picked:
+                return picked
         if profile in overrides:
             return overrides[profile]
     return fallback

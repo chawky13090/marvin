@@ -3084,6 +3084,73 @@ async def lifespan(app_instance):
 #   respectee partout ailleurs dans les .bat du projet precisement pour cette classe de bug
 #   `chcp 65001`/encodage). Corrige (ASCII), reverifie en reel (dossier bien nomme cette fois,
 #   data/backend-data/.env.local bien absents du paquet).
+#
+# v2.178 (☁️ Mode Cloud Total scripte pour serveur boutique sans GPU) : demande explicite
+#   ("le serveur qui va accueillir marvin n'a pas de gpu donc faudrait faire un mode full
+#   cloud sans blocage de securite... on n'a pas le choix"). Avant de coder, question posee
+#   (AskUserQuestion) pour lever une ambiguite critique sur "sans blocage de securite" -- deux
+#   garde-fous COMPLETEMENT differents dans Marvin portent ce nom en usage courant : (1) le
+#   routage cloud/local par SENSIBILITE (emails/SSH/mdp/factures -> local par defaut) et (2) le
+#   garde-fou SYSTEME de security.py (formatage disque, rm -rf...). Confirme : seulement (1),
+#   jamais (2) -- coherent avec la doctrine du projet (jamais affaiblir security.py, deja
+#   documente a plusieurs reprises). 2e question posee : l'OCR/vision generaliste doit-il aussi
+#   basculer au cloud sur cette machine ? Reponse : non, reste local par defaut (contenu
+#   potentiellement sensible, factures clients) -- seul le pipeline captures->documentation
+#   v2.175 (deja opt-in via cloud_enabled) en beneficie.
+#   Trouvaille en auditant AVANT de coder : le mode demande EXISTE DEJA integralement --
+#   le preset "Ultra debride" (v2.121, app/settings/page.jsx::applyPreset) fait deja
+#   EXACTEMENT ca (cloud_enabled=true + cloud_overrides sur les 3 profils + ultra_unrestricted=
+#   true + local_only_lockdown=false), avec le garde systeme explicitement documente comme
+#   jamais touche des sa conception. Aucune nouvelle logique de routage necessaire.
+#   Seul vrai manque : ce preset necessite un clic dans l'UI + une boite de confirmation
+#   navigateur (window.confirm) -- peu pratique pour un serveur deploye sans interaction UI
+#   prevue. Nouveau `CONFIGURER-CLOUD-TOTAL.bat` : applique la MEME configuration directement
+#   via l'API (/api/settings/*), avec la meme logique de choix du meilleur modele cloud
+#   installe (deepseek > glm > kimi > premier disponible) que l'UI.
+#   Teste PARTIELLEMENT en reel, par prudence delibérée : le classifieur de permissions a
+#   bloque une tentative de tester meme la SYNTAXE des appels PUT contre une URL FICTIVE,
+#   reconnaissant a raison le meme mecanisme qu'une vraie activation d'ultra_unrestricted sur
+#   la configuration reelle de cette machine (deja bloque une fois en v2.121 pour la meme
+#   raison) -- respecte sans contournement. Verifie a la place, en isolation et sans effet de
+#   bord : la capture de sortie PowerShell via for/f usebackq+backticks (testee et confirmee
+#   fonctionnelle), et la resolution du meilleur modele cloud installe sur cette machine
+#   (deepseek-v4-flash:cloud correctement selectionne parmi 7 modeles cloud installes).
+#
+# v2.179 (🔮 selection de modele cloud resiliente au retrait — plus jamais un tag fige) :
+#   preuve concrete apportee par l'utilisateur (capture d'ecran du compte Ollama Cloud) : 2
+#   modeles recommandes DANS CETTE SESSION (gemini-3-flash-preview pour la vision v2.175,
+#   qwen3-coder:480b pour le routage code v2.141) seront retires par le fournisseur dans 2
+#   jours. Confirme que coder un nom de modele exact en dur (meme "juste" recommande, pas
+#   la ligne officielle de securite) est fragile par nature avec des modeles cloud qui
+#   tournent -- exactement la classe de probleme que la regle d'or #7 (jamais halluciner un
+#   identifiant technique non verifie) anticipait deja pour d'autres cas.
+#   `cloud_routing.py` : nouveau `pick_best_cloud_model(need)` + `list_vision_candidates()` --
+#   resolvent le meilleur modele EN DIRECT sur `ollama_models` (jamais une liste figee), par
+#   FAMILLE (prefixe : deepseek/glm/kimi/nemotron en general, gemini/gemma/qwen3.5 en vision,
+#   tout modele contenant "coder" en code) plutot que par tag exact -- survit automatiquement
+#   a un retrait/renommage futur sans modification de code, puisque `list_installed_cloud_models()`
+#   reflete toujours ce qui est REELLEMENT installe au moment de l'appel.
+#   Nouvel endpoint `GET /api/cloud/best-model?need=...` : point d'entree UNIQUE partage par
+#   `tools.py::_analyze_screenshot` (vision), `agent.py::run_agent` (routage par tache, code),
+#   `app/settings/page.jsx::applyPreset` (UI) ET `CONFIGURER-CLOUD-TOTAL.bat` (deploiement
+#   serveur boutique v2.178) -- fini les 3 implementations dupliquees et desynchronisees
+#   trouvees en auditant (une seule cote UI ne detectait meme pas correctement les tags
+#   `-cloud` vs `:cloud`, bug de la meme famille que celui deja corrige en v2.141 ailleurs).
+#   Reglage `cloud_task_overrides` devenu obsolete (plus aucun consommateur) -- nettoye sur
+#   cette machine (pointait vers qwen3-coder:480b-cloud, le modele qui va retirer).
+#   `CONFIGURER-CLOUD-TOTAL.bat` durci sur un point separe, demande explicitement par
+#   l'utilisateur ("differencie bien l'installation sur le serveur et l'installation sur
+#   n'importe quel autre windows comme le mien") : detection GPU (Get-CimInstance
+#   Win32_VideoController) avec confirmation tapee obligatoire si une VRAIE carte graphique
+#   est trouvee -- empeche d'appliquer par erreur ce mode "tout cloud, sensibilite ignoree"
+#   sur un poste de travail normal qui a deja un GPU et fonctionne bien en local.
+#   Teste en reel : endpoint /api/cloud/best-model verifie sur les 3 besoins (general ->
+#   deepseek-v4-flash:cloud, vision -> gemini-3-flash-preview:cloud, code -> qwen3-coder:480b-cloud
+#   -- tous deux encore installes AUJOURD'HUI, la resolution bascule automatiquement sur le
+#   suivant de la famille des que le fournisseur les retire reellement, sans intervention).
+#   Detection GPU verifiee en isolation (carte integree Intel detectee correctement comme
+#   "un GPU present" sur cette machine de developpement). Page Reglages > Modele IA rechargee
+#   en reel apres redemarrage backend, 0 erreur console.
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -3593,6 +3660,17 @@ async def set_setting(key: str, request: Request):
     value = body.get("value")
     db.set_setting(key, value)
     return {"success": True}
+
+
+# v2.179 — point d'entrée UNIQUE pour "quel est le meilleur modèle cloud installé pour X ?"
+# (general/code/vision), résolu EN DIRECT sur les modèles réellement installés (jamais un tag
+# figé) — partagé par Réglages (app/settings/page.jsx::applyPreset) ET CONFIGURER-CLOUD-TOTAL.bat
+# (déploiement serveur boutique), pour ne plus dupliquer/désynchroniser la logique de choix.
+@app.get("/api/cloud/best-model")
+async def get_best_cloud_model(need: str = "general"):
+    import cloud_routing as _cr
+    model = _cr.pick_best_cloud_model(need)
+    return {"need": need, "model": model, "installed": _cr.list_installed_cloud_models()}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -7635,7 +7713,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.177.0",
+            "version":         "2.179.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

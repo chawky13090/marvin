@@ -1818,14 +1818,17 @@ async def run_agent(
             _text_norm = _strip_accents((_user_query or "").lower())
             if _ultra or not _is_sensitive_request(messages, _text_norm):
                 active_model = _cloud_overrides[profile_name]
-                # v2.141 — routage par TÂCHE prioritaire sur le routage par PROFIL : un
+                # v2.141/v2.179 — routage par TÂCHE prioritaire sur le routage par PROFIL : un
                 # signal clair (ex. demande de script/procédure) route vers le modèle
                 # cloud le plus fort en code plutôt que le généraliste agentique du
-                # profil (« privilégier le cloud pour la puissance, mais le BON cloud »).
+                # profil. Résolu EN DIRECT sur les modèles installés (pick_best_cloud_model),
+                # plus jamais via un tag figé dans un réglage — un modèle cloud peut être
+                # retiré par le fournisseur en quelques jours (constaté en réel, v2.179).
                 _task = _cr.detect_task(_user_query)
-                _task_overrides = _cr.get_task_overrides()
-                if _task and _task in _task_overrides:
-                    active_model = _task_overrides[_task]
+                if _task:
+                    _picked = _cr.pick_best_cloud_model(_task)
+                    if _picked:
+                        active_model = _picked
     else:
         # Modèle forcé manuellement par l'utilisateur
         active_model = model
