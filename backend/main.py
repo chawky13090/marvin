@@ -3287,6 +3287,26 @@ async def lifespan(app_instance):
 #   argument sensible correctement filtre ("***"), relue via bug_log_list en conditions reelles
 #   par l'API /api/tools ; handler global confirme enregistre sur l'app FastAPI. Entree de test
 #   nettoyee du journal apres verification (data/bug_log.jsonl vide au demarrage de l'usage reel).
+# v2.185 -- « donne-moi la commande » executait la commande au lieu de juste l'ecrire.
+#   Signale directement par l'utilisateur (« quand je demande une commande marvin me la donne
+#   mais tente de se connecter en ssh et/ou de la faire sur le pc »). Confirme en rejouant une
+#   vraie conversation ("Installer Hyper-V et activer WSL 2") : sur "la commande...pour que
+#   hyper v soit active toujours", Marvin a appele ssh_list PUIS reellement execute la commande
+#   localement (pc_run_powershell, escalade jusqu'a pc_run_elevated) -- alors que meme le tour
+#   suivant, ou l'utilisateur precisait explicitement "et ne lance rien", Marvin a quand meme
+#   appele ssh_list. La regle d'or #14 existante couvrait deja "ecrire != executer" pour un OS
+#   different/une machine distante, mais pas ce cas precis (meme OS, machine locale, aucun verbe
+#   d'execution) -- le prompt seul n'a pas suffi (plafond deja documente ailleurs cette session).
+#   Fix en 2 couches : (1) regle #14 etendue avec le cas precis signale, verifie en reel sur les
+#   2 formulations exactes de la conversation -- le raisonnement visible du modele cite desormais
+#   explicitement "rule #14" et repond en texte, 0 appel d'outil sur les 2 cas. (2) Filet
+#   deterministe complementaire (_wants_command_text_only) : si le dernier message correspond a
+#   "donne-moi/quelle est la commande" SANS verbe d'execution, pc_run_command/pc_run_powershell/
+#   pc_run_elevated/ssh_exec*/ssh_write_and_run/ssh_list/ssh_server_info sont bloques ce tour --
+#   meme mecanisme deja eprouve que le blocage d'outil explicite (regle #6). Piege trouve ET
+#   corrige en testant sur le texte REEL de la conversation : "...et ne lance rien" contient
+#   "lance" et se lisait comme un verbe d'AUTORISATION -- l'exact inverse de l'intention -- corrige
+#   avec une detection de negation dediee. scripts/smoke_test_chat.py 5/5, smoke_test_pages.py 34/34.
 
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
@@ -7886,7 +7906,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.184.0",
+            "version":         "2.185.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
