@@ -3307,6 +3307,18 @@ async def lifespan(app_instance):
 #   corrige en testant sur le texte REEL de la conversation : "...et ne lance rien" contient
 #   "lance" et se lisait comme un verbe d'AUTORISATION -- l'exact inverse de l'intention -- corrige
 #   avec une detection de negation dediee. scripts/smoke_test_chat.py 5/5, smoke_test_pages.py 34/34.
+# v2.186 -- Selecteur de voix restaure dans la barre de saisie (visible en permanence).
+#   Signale directement (« je ne vois plus l'option pour changer la voix de marvin »). Trouve en
+#   auditant ChatContainer.jsx : le <select> de choix de voix existe toujours, mais il n'etait
+#   rendu QUE dans le bandeau "Mode vocal actif" (mains-libres) -- donc invisible des que ce mode
+#   n'est pas active, ce qui est le cas la plupart du temps (l'utilisateur utilise surtout le
+#   bouton 🔊 "Ecouter la reponse" par message, pas le mode continu). Corrige en ajoutant un bouton
+#   "▾" persistant dans ChatInput.jsx, juste a cote du bouton haut-parleur -- meme pattern deja
+#   eprouve que le choix du micro juste au-dessus (menu deroulant, fermeture Echap/clic exterieur).
+#   voiceList est deja charge sans condition au montage (useVoice.js), aucun changement backend
+#   necessaire. Teste en reel (Playwright) : bouton trouve et fonctionnel, menu affiche les 7
+#   voix installees, selection d'une voix (Sylvie) persistee dans localStorage ET confirmee apres
+#   rechargement complet de la page. scripts/smoke_test_pages.py 34/34.
 
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
@@ -7906,7 +7918,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.185.0",
+            "version":         "2.186.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }

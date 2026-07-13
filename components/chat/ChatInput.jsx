@@ -108,6 +108,11 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
   const [voiceState, setVoiceState] = useState('idle'); // 'idle' | 'recording' | 'transcribing'
   const [micError, setMicError] = useState('');
   const [showMicMenu, setShowMicMenu] = useState(false);
+  // v2.186 — le sélecteur de voix n'était visible que DANS le bandeau "Mode vocal actif"
+  // (ChatContainer.jsx), donc invisible dès qu'on n'active pas le mode mains-libres. Signalé
+  // directement ("je ne vois plus l'option pour changer la voix") — ajouté ici en permanence,
+  // à côté du bouton haut-parleur, même pattern que le choix du micro juste au-dessus.
+  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
 
   const startRecording = useCallback(async () => {
     setMicError('');
@@ -206,6 +211,14 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, [showMicMenu]);
+
+  // Échap ferme le menu de sélection de la voix s'il est ouvert
+  useEffect(() => {
+    if (!showVoiceMenu) return;
+    const onEsc = (e) => { if (e.key === 'Escape') setShowVoiceMenu(false); };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [showVoiceMenu]);
 
   // Auto-resize du textarea
   useEffect(() => {
@@ -695,6 +708,45 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
               </svg>
             )}
           </button>
+        )}
+
+        {/* Choix de la voix — toujours visible, pas seulement en mode vocal mains-libres */}
+        {voiceCtx && voiceCtx.voiceList?.length > 0 && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setShowVoiceMenu(s => !s)}
+              title={`Voix : ${voiceCtx.voiceList.find(v => v.key === voiceCtx.currentVoice)?.label?.split('(')[0]?.trim() || voiceCtx.currentVoice}`}
+              style={{
+                width: '20px', height: '34px', borderRadius: '8px',
+                background: 'transparent', border: 'none', color: 'var(--text-muted)',
+                cursor: 'pointer', fontSize: '9px', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >▾</button>
+
+            {showVoiceMenu && (
+              <>
+                <div onClick={() => setShowVoiceMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                <div style={{
+                  position: 'absolute', bottom: '100%', left: 0, marginBottom: 8,
+                  background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10,
+                  minWidth: 200, maxWidth: 280, zIndex: 41, boxShadow: 'var(--shadow-lg)', padding: 6,
+                }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 8px', fontWeight: 600, textTransform: 'uppercase' }}>Voix de Marvin</div>
+                  {voiceCtx.voiceList.map(v => (
+                    <button key={v.key} type="button" onClick={() => { voiceCtx.setVoice(v.key); setShowVoiceMenu(false); }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 8px', borderRadius: 6, border: 'none',
+                        background: voiceCtx.currentVoice === v.key ? 'rgba(79, 140, 255,0.12)' : 'transparent',
+                        color: voiceCtx.currentVoice === v.key ? 'var(--accent-primary)' : 'var(--text-primary)', cursor: 'pointer', fontSize: 12.5,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {voiceCtx.currentVoice === v.key ? '✓ ' : ''}🔊 {v.label?.split('(')[0]?.trim() || v.key}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         <textarea
