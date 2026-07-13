@@ -3319,6 +3319,29 @@ async def lifespan(app_instance):
 #   necessaire. Teste en reel (Playwright) : bouton trouve et fonctionnel, menu affiche les 7
 #   voix installees, selection d'une voix (Sylvie) persistee dans localStorage ET confirmee apres
 #   rechargement complet de la page. scripts/smoke_test_pages.py 34/34.
+# v2.187 -- Fix : plusieurs voix TTS se melangeaient (lecture concurrente).
+#   Signale directement (« j'ai l'impression que parfois j'entends plusieurs voix se
+#   melanger »), juste apres l'ajout du selecteur de voix v2.186. Cause racine trouvee dans
+#   lib/hooks/useVoice.js::runPlayer() : deux appels rapproches a speak()/stopSpeaking() (ex.
+#   cliquer "Ecouter" deux fois vite, ou sur deux messages differents) pouvaient laisser DEUX
+#   boucles de lecture actives simultanement. stopSpeaking() coupe l'audio en cours via
+#   `audio.src = ''`, ce qui declenche un `onerror` ASYNCHRONE -- le temps qu'il arrive, la
+#   NOUVELLE boucle a deja remis `playingRef.current` a true et rempli la file PARTAGEE
+#   (queueRef). L'ANCIENNE boucle, en reprenant apres son await, voit alors `playingRef.current`
+#   de nouveau a true et continue a consommer/jouer un morceau de la NOUVELLE file en parallele
+#   de la nouvelle boucle -> deux <audio> lus en meme temps (voix qui se chevauchent).
+#   Trouvaille frappante : un garde-fou de generation (`speakSeqRef`) existait DEJA dans le
+#   code (commentaire "incremente a chaque speak -> annule les precedents") mais n'etait
+#   JAMAIS incremente ni verifie nulle part -- implementation a moitie faite. Cable pour de
+#   vrai : chaque `runPlayer()` capture son numero de generation au demarrage et abandonne
+#   immediatement, sans toucher aux refs partagees, des que ce numero ne correspond plus a la
+#   generation courante (bumpee par `stopSpeaking()`).
+#   Teste en reel (Playwright, pas suppose) : instrumentation de `window.Audio` pour compter
+#   les lectures concurrentes -- sur le code D'ORIGINE (git stash), 3 clics rapproches sur
+#   "Ecouter" produisent bien un pic a 3 audios joues SIMULTANEMENT (reproduit le bug a
+#   l'identique) ; avec le correctif restaure, le meme scenario exact ne depasse jamais 1 audio
+#   concurrent. Verifie aussi /api/voice/speak et /api/voice/voices en reel (200, MP3 valide),
+#   bug_log_list vide (aucun crash serveur cote pipeline vocal). scripts/smoke_test_pages.py 34/34.
 
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
@@ -7918,7 +7941,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.186.0",
+            "version":         "2.187.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
