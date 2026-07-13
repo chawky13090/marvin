@@ -6821,6 +6821,23 @@ async def execute_pc_tool_reliability(args: dict) -> dict:
     }
 
 
+async def execute_bug_log_list(args: dict) -> dict:
+    """Liste les VRAIS bugs récents (exceptions Python avec traceback complet, capturées
+    automatiquement dès qu'un outil ou une route plante) — pour un audit/débogage a posteriori,
+    typiquement après une période d'usage sans supervision. Différent de pc_tool_reliability
+    (qui trace les TAUX d'échec) : ceci donne le détail exploitable de chaque crash individuel."""
+    limit = max(1, min(int(args.get("limit", 20)), 100))
+    kind = args.get("kind")  # 'tool_exception' | 'http_exception' | None (tous)
+    import bug_log as _bug_log
+    bugs = _bug_log.recent(limit=limit, kind=kind)
+    return {
+        "success": True,
+        "count": len(bugs),
+        "bugs": bugs,
+        "note": "Chaque entrée a un traceback complet dans son champ 'traceback' — lis-le avant de proposer un correctif." if bugs else "Aucun bug enregistré sur la période.",
+    }
+
+
 async def execute_pc_conversation_trace(args: dict) -> dict:
     """Chronologie complète des appels d'outils d'UNE conversation (durée de chacun, succès/
     échec, ordre réel) — remplace le recomptage manuel des appels fait pour diagnostiquer une
@@ -18209,6 +18226,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_driver_check":       execute_pc_driver_check,
     "pc_health_trend":       execute_pc_health_trend,
     "pc_tool_reliability":   execute_pc_tool_reliability,
+    "bug_log_list":          execute_bug_log_list,
     "pc_conversation_trace": execute_pc_conversation_trace,
     "net_inventory_scan":    execute_net_inventory_scan,
     "net_inventory_list":    execute_net_inventory_list,
@@ -19170,6 +19188,11 @@ TOOLS_SPEC = [
        {"min_calls": {"type": "number", "description": "Nombre minimum d'appels pour qu'un outil soit inclus (défaut 3, évite le bruit statistique)"},
         "days": {"type": "number", "description": "Période analysée en jours (défaut 90)"},
         "recent_days": {"type": "number", "description": "Fenêtre récente pour détecter les bugs déjà corrigés (défaut 7)"}},
+       []),
+
+    _t("bug_log_list", "Liste les VRAIS bugs récents (exceptions Python avec traceback complet, capturées automatiquement dès qu'un outil ou une route plante) — pour un audit/débogage a posteriori après une période d'usage sans supervision. Chaque entrée contient le traceback complet, à lire avant de proposer un correctif.",
+       {"limit": {"type": "number", "description": "Nombre max de bugs à lister (défaut 20, max 100)"},
+        "kind": {"type": "string", "enum": ["tool_exception", "http_exception"], "description": "Filtre par type (par défaut : tous)"}},
        []),
 
     _t("pc_conversation_trace", "Chronologie complète des appels d'outils d'UNE conversation (durée réelle de chacun, ordre, succès/échec). Utilise ceci quand l'utilisateur demande pourquoi une réponse a été lente.",

@@ -602,6 +602,23 @@ def _sse(data: dict) -> str:
 _TOOLS_SPEC_BY_NAME: dict = {}
 
 
+def _log_tool_exception(tool_name: str, tool_args: dict, ex: Exception, conversation_id: str | None) -> dict:
+    """v2.184 — un outil qui LÈVE une exception (pas un {"error": ...} propre) est plus
+    probablement un vrai bug qu'un cas géré — capture le traceback COMPLET dans bug_log.jsonl
+    (tool_executions/audit.jsonl ne gardent que str(ex), jamais la stack) pour un débogage
+    effectif plus tard, sans avoir à reproduire. Best-effort, ne doit jamais lever à son tour."""
+    try:
+        import traceback as _tb
+        import bug_log as _bug_log
+        _bug_log.log_bug(
+            "tool_exception", str(ex), context={"args": tool_args},
+            traceback_str=_tb.format_exc(), conversation_id=conversation_id, tool_name=tool_name,
+        )
+    except Exception:
+        pass
+    return {"error": str(ex)}
+
+
 def _validate_tool_args(tool_name: str, args: dict) -> str | None:
     """Retourne un message d'erreur si un paramètre OBLIGATOIRE déclaré dans TOOLS_SPEC est
     absent ou vide, sinon None. Best-effort : n'importe pas TOOLS_SPEC tant que non nécessaire
@@ -800,6 +817,13 @@ _KEYWORD_TOOLS = {
     # cette session, cf. v2.93/v2.113 — un outil hors _KEYWORD_TOOLS n'est jamais proposé).
     ("logo", "logotype", "icône de marque", "icone de marque"):
         {"logo_generate", "logo_list"},
+
+    # v2.184 — journal des vrais bugs (exceptions + traceback), pour un audit après usage
+    # intensif sans supervision.
+    ("journal des bugs", "liste les bugs", "quels bugs", "bug log", "erreurs recentes",
+     "erreurs récentes", "qu'est ce qui a plante", "qu'est-ce qui a planté",
+     "qu'est ce qui a bug", "qu'est-ce qui a buggé"):
+        {"bug_log_list"},
 
     # v2.183 — changer le format d'un document déjà généré (docx<->pdf), sans le regénérer.
     ("plutot en word", "plutôt en word", "plutot en pdf", "plutôt en pdf", "convertis en word",
@@ -2420,7 +2444,7 @@ async def run_agent(
                         try:
                             result = await executor(tool_args)
                         except Exception as ex:
-                            result = {"error": str(ex)}
+                            result = _log_tool_exception(tool_name, tool_args, ex, conversation_id)
                     else:
                         result = {"error": f"Outil inconnu : {tool_name}"}
                 else:
@@ -2430,7 +2454,7 @@ async def run_agent(
                         try:
                             result = await executor(tool_args)
                         except Exception as ex:
-                            result = {"error": str(ex)}
+                            result = _log_tool_exception(tool_name, tool_args, ex, conversation_id)
                     else:
                         result = {"error": f"Outil inconnu : {tool_name}"}
 

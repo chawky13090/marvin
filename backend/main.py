@@ -3270,6 +3270,23 @@ async def lifespan(app_instance):
 #      docx->pdf reutilise Word/docx2pdf deja existant, pdf->docx via la nouvelle dependance
 #      pdf2docx) + bouton "⇄ En .pdf/.docx" sur la carte de fichier genere dans le chat. Teste en
 #      reel dans les deux sens (PDF avec logo -> Word, image + texte preserves ; Word -> PDF).
+# v2.184 -- Journal des VRAIS bugs (exceptions + traceback complet), demande explicitement avant
+#   une periode d'usage intensif sans nouvelle fonctionnalite (« tout probleme doit etre logue
+#   pour pouvoir le debugger »). Ce qui existait deja (audit.jsonl, tool_executions) trace QUI a
+#   fait QUOI et le taux de succes/echec, mais AUCUN des deux ne garde la stack trace Python --
+#   juste str(exception). Nouveau `backend/bug_log.py` (data/bug_log.jsonl, filtre les secrets
+#   comme audit.py) : capture le traceback COMPLET a 3 points -- (1) les 2 endroits ou la boucle
+#   agent execute un outil (`except Exception as ex` ne gardait que str(ex)), (2) les 2 endpoints
+#   /api/tools (UI + MCP) qui levaient une HTTPException sans rien logger, (3) un handler
+#   d'exception GLOBAL FastAPI (@app.exception_handler(Exception)) qui attrape tout crash qui
+#   s'echapperait d'une route sans passer par les 2 points precedents -- sans intercepter les
+#   HTTPException normales (deja gerees par Starlette). Nouvel outil chat-usable `bug_log_list`
+#   pour consulter ces bugs plus tard (moi ou l'utilisateur), distinct de `pc_tool_reliability`
+#   (taux d'echec agrege) -- celui-ci donne le detail exploitable de chaque crash individuel.
+#   Teste en reel : exception forcee (division par zero) -> capturee avec traceback complet,
+#   argument sensible correctement filtre ("***"), relue via bug_log_list en conditions reelles
+#   par l'API /api/tools ; handler global confirme enregistre sur l'app FastAPI. Entree de test
+#   nettoyee du journal apres verification (data/bug_log.jsonl vide au demarrage de l'usage reel).
 
 app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
 
@@ -3282,6 +3299,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# v2.184 — filet GLOBAL pour toute exception qui s'échapperait d'une route SANS passer par
+# le try/except dédié de /api/tools ou de la boucle agent (ex. un bug dans un endpoint qui
+# n'a pas encore ce genre de garde). N'intercepte PAS les HTTPException (déjà gérées par
+# Starlette avec leur propre code de statut) — seulement les crashes VRAIMENT non prévus,
+# qui deviendraient sinon un 500 sec sans aucune trace nulle part. Demandé explicitement
+# (« tout problème doit être logué pour pouvoir le debugger ») avant une période d'usage
+# intensif sans nouvelle fonctionnalité.
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    try:
+        import traceback as _tb
+        import bug_log as _bug_log
+        _bug_log.log_bug(
+            "http_exception", str(exc),
+            context={"path": str(request.url.path), "method": request.method},
+            traceback_str=_tb.format_exc(),
+        )
+    except Exception:
+        pass
+    return JSONResponse(status_code=500, content={"detail": f"Erreur interne : {exc}"})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3367,6 +3406,13 @@ async def execute_tool_endpoint(req: ToolExecuteRequest):
             pass
         return {"result": result}
     except Exception as e:
+        try:
+            import traceback as _tb
+            import bug_log as _bug_log
+            _bug_log.log_bug("tool_exception", str(e), context={"args": req.args},
+                              traceback_str=_tb.format_exc(), tool_name=req.toolName)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -3442,6 +3488,13 @@ async def execute_tool_mcp(req: ToolExecuteRequest):
             pass
         return {"result": result}
     except Exception as e:
+        try:
+            import traceback as _tb
+            import bug_log as _bug_log
+            _bug_log.log_bug("tool_exception", str(e), context={"args": req.args},
+                              traceback_str=_tb.format_exc(), tool_name=req.toolName)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -7833,7 +7886,7 @@ async def health():
             "ollama":          ollama_ok,
             "ollama_models":   ollama_models,
             "backend":         "python-fastapi",
-            "version":         "2.183.0",
+            "version":         "2.184.0",
             "tools_count":     len(tool_module.TOOLS_REGISTRY),
             "tools_spec_count": len(tool_module.TOOLS_SPEC),
         }
