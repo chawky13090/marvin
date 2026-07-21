@@ -1,0 +1,23 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #09090b; color: #f4f4f5; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% 25%, rgba(79,140,255,.22), transparent 42%), #09090b; }
+header { -webkit-app-region: drag; display: flex; justify-content: space-between; align-items: center; padding: 16px; font-size: 12px; letter-spacing: .08em; }
+header button { -webkit-app-region: no-drag; width: 26px; height: 26px; border: 1px solid #27272a; border-radius: 7px; color: #fff; background: #111116; cursor: pointer; }
+main { display: grid; justify-items: center; gap: 10px; padding: 35px 24px; text-align: center; }
+.edge, .corner { -webkit-app-region: no-drag; position: fixed; z-index: 20; }
+.edge-n { top: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.edge-s { bottom: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.edge-w { left: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.edge-e { right: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.corner { width: 12px; height: 12px; }
+.corner-nw { top: 0; left: 0; cursor: nwse-resize; }
+.corner-se { bottom: 0; right: 0; cursor: nwse-resize; }
+.corner-ne { top: 0; right: 0; cursor: nesw-resize; }
+.corner-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.avatar { width: 116px; height: 116px; border: 2px solid #4f8cff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 35px rgba(79,140,255,.3); animation: pulse 2.6s ease-in-out infinite; }
+.avatar span { width: 42px; height: 42px; border-radius: 14px; transform: rotate(45deg); background: linear-gradient(135deg,#4f8cff,#38bdf8); }
+h1 { margin: 15px 0 0; font-size: 18px; }
+p { min-height: 38px; margin: 0; color: #a1a1aa; font-size: 13px; }
+main button { margin-top: 8px; border: 0; border-radius: 10px; padding: 11px 18px; color: #fff; background: #4f8cff; font-weight: 750; cursor: pointer; }
+main button:disabled { opacity: .6; cursor: wait; }
+@keyframes pulse { 50% { transform: scale(.94); opacity: .82; } }

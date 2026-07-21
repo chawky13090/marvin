@@ -168,6 +168,107 @@
   gap: var(--space-sm);
 }
 
+.activityToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 40px;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-tertiary) 72%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  text-align: left;
+}
+
+.activityToggle:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border));
+  color: var(--text-primary);
+}
+
+.activityToggleAction {
+  color: var(--accent-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.activityError {
+  max-width: 36ch;
+  overflow: hidden;
+  color: var(--danger);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readableResponse {
+  position: relative;
+  width: 100%;
+}
+
+.contentCollapsed {
+  max-height: 460px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 82%, transparent 100%);
+}
+
+.readMoreButton,
+.technicalDetailsButton {
+  border: 0;
+  background: transparent;
+  color: var(--accent-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 6px 0 0;
+}
+
+.readMoreButton:hover,
+.technicalDetailsButton:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.toolSummary,
+.toolSummaryError {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.toolSummaryError {
+  color: var(--danger);
+}
+
+.technicalDetails {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .activityToggle {
+    margin-left: 0;
+    max-width: 100%;
+    border-radius: var(--radius-md);
+    flex-wrap: wrap;
+  }
+
+  .activityError {
+    max-width: 100%;
+  }
+
+  .contentCollapsed {
+    max-height: 380px;
+  }
+}
+
 /* Premium GFM Tables */
 .content table {
   width: 100%;

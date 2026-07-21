@@ -6,7 +6,7 @@ import PrettyResult from '@/components/chat/PrettyResult';
 import { CircleGauge, BarRow, StatCard, Sparkline, Panel } from '@/components/ui/DashboardKit';
 import { useToast } from '@/components/ui/Toast';
 
-const BACKEND = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // ── Ligne de processus (bouton Tuer, confirmation avant appel) ─────────────
 function ProcessRow({ proc, onKilled }) {

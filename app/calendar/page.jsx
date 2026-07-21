@@ -5,7 +5,7 @@ import { LoadingRow } from '@/components/ui/Spinner';
 const DAYS_FR   = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
-const BACKEND = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 const pad = (n) => String(n).padStart(2, '0');
 
 export default function CalendarPage() {

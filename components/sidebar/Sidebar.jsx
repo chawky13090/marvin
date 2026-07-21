@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
+import { BACKEND_URL } from '@/lib/backend';
 
 export const NAV_SECTIONS = [
   { title: 'Assistant', items: [
@@ -33,8 +34,13 @@ export const NAV_SECTIONS = [
     { href: '/memoire',    icon: '🧠', label: 'Mémoire' },
   ]},
   { title: 'Automatisation', items: [
+    { href: '/code',       icon: '</>', label: 'Code Workspace' },
     { href: '/workflows',  icon: '⚡', label: 'Workflows' },
     { href: '/agents',     icon: '🤖', label: 'Multi-Agents' },
+    { href: '/market',     icon: 'M', label: 'Model Market' },
+    { href: '/evolution',  icon: 'E', label: 'Evolution Lab' },
+    { href: '/missions',   icon: 'C', label: 'Mission Canvas' },
+    { href: '/forge',      icon: 'F', label: 'Forge' },
     { href: '/cron',       icon: '⏰', label: 'Planificateur' },
   ]},
   { title: 'Réglages', items: [
@@ -45,10 +51,7 @@ export const NAV_SECTIONS = [
   ]},
 ];
 const NAV_ITEMS = NAV_SECTIONS.flatMap(s => s.items);
-
-const BACKEND_URL = (typeof window !== 'undefined' && window.location)
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005');
+const OLLAMA_PORT = process.env.NEXT_PUBLIC_OLLAMA_PORT || '11434';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -56,6 +59,7 @@ export default function Sidebar() {
   const [ollamaStatus, setOllamaStatus] = useState('checking');
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [avatarStatus, setAvatarStatus] = useState('checking');
   // v2.146 — indicateur ambiant de tâche(s) longue(s) en cours (long_task_start, v2.145) :
   // demandé explicitement (« que l'on sache que Marvin travaille d'une certaine manière »).
   // Jusqu'ici totalement invisible tant qu'on ne demandait pas explicitement long_task_status
@@ -85,7 +89,7 @@ export default function Sidebar() {
     try {
       // Même hôte que la page (marche aussi depuis le téléphone si Ollama est exposé)
       const host = (typeof window !== 'undefined' && window.location) ? window.location.hostname : '127.0.0.1';
-      const res = await fetch(`http://${host}:11434/api/tags`, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(`http://${host}:${OLLAMA_PORT}/api/tags`, { signal: AbortSignal.timeout(8000) });
       setOllamaStatus(res.ok ? 'connected' : 'disconnected');
     } catch {
       setOllamaStatus('disconnected');
@@ -110,6 +114,30 @@ export default function Sidebar() {
     } catch {
       // silencieux — l'indicateur reste simplement à son dernier état connu
     }
+  }
+
+  useEffect(() => {
+    checkAvatar();
+    const interval = setInterval(checkAvatar, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function checkAvatar() {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/avatar/status`, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.json();
+      setAvatarStatus(data.running ? 'running' : data.available ? 'available' : 'unavailable');
+    } catch { setAvatarStatus('unavailable'); }
+  }
+
+  async function activateAvatar() {
+    setAvatarStatus('starting');
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/avatar/activate`, { method: 'POST', signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error(String(response.status));
+      setAvatarStatus('running');
+    } catch { setAvatarStatus('unavailable'); }
   }
 
   // Sur mobile : barre déployée (240px) en tiroir, masquée hors écran sauf si ouverte.
@@ -169,24 +197,26 @@ export default function Sidebar() {
         minHeight: '70px',
       }}>
         {/* Statut de Marvin (s'accélère quand il traite une demande) */}
-        <div style={{
+        <button type="button" onClick={activateAvatar} style={{
           width: '44px',
           height: '44px',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-        }} title="Marvin">
+          padding: 0, border: 0, background: 'transparent', cursor: 'pointer',
+        }} title={avatarStatus === 'running' ? 'Afficher l’avatar de bureau' : 'Activer l’avatar de bureau'}>
           <LivingAvatar size={44} thinking={chatStatus.isLoading} />
-        </div>
+        </button>
 
         {/* Brand text */}
-        <div style={{
+        <button type="button" onClick={activateAvatar} aria-label="Ouvrir l’avatar de bureau Marvin" style={{
           opacity: open ? 1 : 0,
           transform: open ? 'translateX(0)' : 'translateX(-8px)',
           transition: 'all 0.22s ease',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
+          textAlign: 'left', border: 0, padding: 0, background: 'transparent', cursor: 'pointer',
         }}>
           <div className="holo-text" style={{
             fontWeight: 800,
@@ -203,9 +233,9 @@ export default function Sidebar() {
             textTransform: 'uppercase',
             lineHeight: 1.3,
           }}>
-            Assistance Informatique
+            {avatarStatus === 'starting' ? 'Ouverture avatar…' : avatarStatus === 'running' ? 'Avatar actif — cliquer pour afficher' : 'Avatar bureau — cliquer pour ouvrir'}
           </div>
-        </div>
+        </button>
       </div>
 
       {/* ── Palette de commandes (Ctrl+K) ──────────────────────── */}

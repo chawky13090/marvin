@@ -1,14 +1,14 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useChat } from '@/lib/contexts/ChatContext';
+import { useOptionalChat } from '@/lib/contexts/ChatContext';
 import { openMicStream, createRecorder, startVAD as startVADShared } from '@/lib/voice/voiceRecorder';
-
-const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL } from '@/lib/backend';
+import CortexControl from '@/components/chat/CortexControl';
 
 export default function ChatInput({ input = '', setInput, handleInputChange, handleSubmit, isLoading, onStop, onImageAttach, messages = [] }) {
   // Voice context (TTS + voice mode)
-  let voiceCtx = null;
-  try { voiceCtx = useChat()?.voice; } catch { /* no provider in some tests */ }
+  const chatCtx = useOptionalChat();
+  const voiceCtx = chatCtx?.voice;
   const voiceMode = voiceCtx?.voiceMode || false;
   const isSpeaking = voiceCtx?.isSpeaking || false;
   const textareaRef = useRef(null);
@@ -416,6 +416,12 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           ))}
         </div>
       )}
+
+      <CortexControl
+        contract={chatCtx?.cortexContract}
+        onChange={chatCtx?.setCortexContract}
+        disabled={isLoading}
+      />
 
       <div style={{
         display: 'flex',

@@ -82,11 +82,7 @@ echo.
 
 echo [3/3] Application de la configuration...
 powershell -NoProfile -Command ^
-    "$best = '%BEST_MODEL%'; " ^
-    "Invoke-RestMethod -Method Put -Uri 'http://127.0.0.1:8005/api/settings/local_only_lockdown' -ContentType 'application/json' -Body (@{value=$false} | ConvertTo-Json) | Out-Null; " ^
-    "Invoke-RestMethod -Method Put -Uri 'http://127.0.0.1:8005/api/settings/cloud_enabled' -ContentType 'application/json' -Body (@{value=$true} | ConvertTo-Json) | Out-Null; " ^
-    "Invoke-RestMethod -Method Put -Uri 'http://127.0.0.1:8005/api/settings/cloud_overrides' -ContentType 'application/json' -Body (@{value=@{agent=$best; chat=$best; analysis=$best}} | ConvertTo-Json) | Out-Null; " ^
-    "Invoke-RestMethod -Method Put -Uri 'http://127.0.0.1:8005/api/settings/ultra_unrestricted' -ContentType 'application/json' -Body (@{value=$true} | ConvertTo-Json) | Out-Null; " ^
+    "Invoke-RestMethod -Method Put -Uri 'http://127.0.0.1:8005/api/settings/privacy-preset' -ContentType 'application/json' -Body (@{preset='ultra'} | ConvertTo-Json) | Out-Null; " ^
     "Write-Host '  [OK] Configuration appliquee.'"
 if errorlevel 1 (
     echo   [ERREUR] L'application de la configuration a echoue.

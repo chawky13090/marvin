@@ -12,6 +12,11 @@ const nextConfig = {
   // package-lock.json traîne ailleurs (ex. dans C:\Users\<toi>\).
   turbopack: { root: __dirname },
 
+  // L'avatar de bureau Electron charge http://127.0.0.1:3000 (pas localhost). Sans cette
+  // entrée, le serveur de dev bloque le websocket HMR comme "cross-origin" → la page ne finit
+  // jamais son hydratation et boucle en rechargement complet (aucun bouton ne répond).
+  allowedDevOrigins: ['127.0.0.1'],
+
   // Configuration des en-têtes pour la sécurité
   async headers() {
     return [

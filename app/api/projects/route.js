@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // v2.107 — proxy pur vers le backend Python (voir app/api/conversations/route.js).
 // Python n'avait qu'une fonction de lecture (get_projects) ; create_project/delete_project
 // + les endpoints POST/DELETE ont été ajoutés côté Python pour permettre ce proxy.
-const BACKEND = (typeof window !== 'undefined' && window.location
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
-
 export const dynamic = 'force-dynamic';
 
 export async function GET() {

@@ -619,7 +619,11 @@ def _cos(a, b) -> float:
 
 _STOP = {"le", "la", "les", "un", "une", "des", "de", "du", "et", "ou", "aux", "ce", "cet", "cette",
          "mon", "ma", "mes", "est", "sont", "plus", "pas", "sur", "dans", "pour", "avec", "que", "qui",
-         "son", "sa", "ses", "the", "via", "par", "aide", "moi", "mon", "fait", "faire", "veux", "dois"}
+         "son", "sa", "ses", "the", "via", "par", "aide", "moi", "mon", "fait", "faire", "veux", "dois",
+         # v2.190 — les mots interrogatifs ne constituent jamais un ancrage métier. « quelles »
+         # était commun à « quelles conditions de certification PASSI » et au trigger
+         # « quelles machines sont actives », ce qui lançait à tort un audit réseau.
+         "quel", "quels", "quelle", "quelles", "quoi", "comment", "pourquoi", "quand", "combien"}
 
 
 def _norm(s: str) -> str:
@@ -649,6 +653,15 @@ async def match(query: str, threshold: float = 0.72) -> dict | None:
     best, best_score = None, 0.0
     runner_up, runner_up_score = None, 0.0
     for s in skills:
+        skw = _keywords(s["name"].replace("-", " ") + " " + (s["description"] or "")) | _keywords(" ".join(s.get("triggers") or []))
+        overlap = len(qkw & skw)
+        # v2.190 — l'embedding classe des compétences déjà plausibles, il ne donne plus
+        # à lui seul l'autorisation d'activer une procédure outillée. C'est ce qui avait
+        # associé « conditions de certification » à diagnostic-vpn sans aucun mot commun.
+        nq = _norm(query)
+        trig = 0.25 if any(_norm(t) and _norm(t) in nq for t in (s.get("triggers") or [])) else 0.0
+        if overlap == 0 and trig == 0.0:
+            continue
         sv = None
         if qv:
             h = hashlib.md5((s["description"] or s["name"]).encode("utf-8")).hexdigest()
@@ -663,12 +676,8 @@ async def match(query: str, threshold: float = 0.72) -> dict | None:
                 if sv:
                     _emb_cache[s["name"]] = (h, sv)
         sem = _cos(qv, sv) if (qv and sv) else 0.0
-        skw = _keywords(s["name"].replace("-", " ") + " " + (s["description"] or "")) | _keywords(" ".join(s.get("triggers") or []))
-        overlap = len(qkw & skw)
         lex = min(0.35, overlap * 0.10)          # bonus lexical plafonné
         # Déclencheurs explicites : si une expression 'trigger' est présente telle quelle → bonus fort
-        nq = _norm(query)
-        trig = 0.25 if any(_norm(t) and _norm(t) in nq for t in (s.get("triggers") or [])) else 0.0
         if sem:
             score = sem + lex + trig
         else:
@@ -689,9 +698,7 @@ async def match(query: str, threshold: float = 0.72) -> dict | None:
             best, best_score = s, score
         elif score > runner_up_score:
             runner_up, runner_up_score = s, score
-    _log_match_attempt(query, best, best_score, runner_up, runner_up_score, threshold)
-    if best is None or best_score < threshold:
-        return None
+    accepted = best if (best is not None and best_score >= threshold) else None
     # v2.125 — anti-bruit : trouvé en conditions réelles grâce au journal du dauphin
     # (v2.124) juste construit — deux questions anodines ("combien font 47*53", "quelle
     # est la capitale de la France") déclenchaient des compétences totalement hors sujet
@@ -707,9 +714,10 @@ async def match(query: str, threshold: float = 0.72) -> dict | None:
     # (ex. "veille-recherche-informatique" vs "veille-vulnerabilites-logiciels", écart 0.073
     # observé en réel — score du gagnant déjà élevé à 0.989, pas du bruit).
     MIN_GAP = 0.05
-    if runner_up is not None and (best_score - runner_up_score) < MIN_GAP:
-        return None
-    return best
+    if accepted is not None and runner_up is not None and (best_score - runner_up_score) < MIN_GAP:
+        accepted = None
+    _log_match_attempt(query, accepted, best, best_score, runner_up, runner_up_score)
+    return accepted
 
 
 # v2.124 — journal des tentatives de matching (gagnant + dauphin + scores), pour avoir de
@@ -721,12 +729,12 @@ _MATCH_LOG_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "skills_
 _MATCH_LOG_MAX = 500
 
 
-def _log_match_attempt(query: str, best, best_score: float, runner_up, runner_up_score: float, threshold: float):
+def _log_match_attempt(query: str, accepted, best, best_score: float, runner_up, runner_up_score: float):
     try:
         entry = {
             "at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "query": (query or "")[:160],
-            "winner": best["name"] if (best and best_score >= threshold) else None,
+            "winner": accepted["name"] if accepted else None,
             "winner_score": round(best_score, 3) if best else 0.0,
             "runner_up": runner_up["name"] if runner_up else None,
             "runner_up_score": round(runner_up_score, 3) if runner_up else 0.0,

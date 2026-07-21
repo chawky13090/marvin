@@ -1,33 +1,24 @@
 <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-  <!-- Headset band -->
-  <path d="M22 58 Q24 24 60 20 Q96 24 98 58" stroke="#1a1a1a" stroke-width="7" fill="none" stroke-linecap="round"/>
-
-  <!-- Headset left cup -->
-  <rect x="8" y="49" width="16" height="22" rx="7" fill="#1a1a1a"/>
-  <!-- Headset right cup -->
-  <rect x="96" y="49" width="16" height="22" rx="7" fill="#1a1a1a"/>
-  <!-- Mic boom -->
-  <path d="M98 66 Q112 74 110 84" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-  <circle cx="110" cy="85" r="4.5" fill="#1a1a1a"/>
-
-  <!-- Head (white circle) -->
-  <circle cx="60" cy="64" r="44" fill="white"/>
-
-  <!-- Visor strip (black band) -->
-  <rect x="22" y="51" width="76" height="26" rx="9" fill="#0f0f0f"/>
-
-  <!-- Left eye (happy crescent) -->
-  <path d="M34 67 Q43 58 52 67" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <!-- Right eye (happy crescent) -->
-  <path d="M68 67 Q77 58 86 67" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-
-  <!-- Antenna stem -->
-  <rect x="57.5" y="16" width="5" height="12" rx="2.5" fill="#1a1a1a"/>
-  <!-- Antenna ball -->
-  <circle cx="60" cy="14" r="6.5" fill="#1a1a1a"/>
-  <!-- Antenna ball highlight -->
-  <circle cx="57.5" cy="11.5" r="2" fill="rgba(255,255,255,0.25)"/>
-
-  <!-- Smile arc (gold) -->
-  <path d="M40 96 Q60 109 80 96" stroke="#c9a84c" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="ribbon" x1="18" y1="34" x2="102" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2357d8"/>
+      <stop offset=".28" stop-color="#4f8cff"/>
+      <stop offset=".53" stop-color="#d7f3ff"/>
+      <stop offset=".72" stop-color="#35c8f5"/>
+      <stop offset="1" stop-color="#3563e9"/>
+    </linearGradient>
+    <radialGradient id="halo"><stop stop-color="#4f8cff" stop-opacity=".4"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="#09090b"/>
+  <ellipse cx="60" cy="60" rx="50" ry="37" fill="url(#halo)"/>
+  <path d="M33 35 Q60 22 87 35 Q96 42 96 61 Q96 82 85 91 Q60 101 35 91 Q24 82 24 61 Q24 42 33 35Z" fill="#0c111d" stroke="#90c8ff" stroke-opacity=".22" stroke-width="1.4"/>
+  <path d="M60 29V19" stroke="#6aa9ff" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="16" r="3.5" fill="#8fe3ff" stroke="#3563e9" stroke-width="1.5"/>
+  <path d="M20 60 C31 31 45 31 60 60 C75 89 89 89 100 60 C89 31 75 31 60 60 C45 89 31 89 20 60" fill="none" stroke="#07101f" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 60 C31 31 45 31 60 60 C75 89 89 89 100 60 C89 31 75 31 60 60 C45 89 31 89 20 60" fill="none" stroke="url(#ribbon)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M51 43 C54 48 57 54 60 60 C63 66 66 72 70 77" fill="none" stroke="#07101f" stroke-width="19" stroke-linecap="round"/>
+  <path d="M51 43 C54 48 57 54 60 60 C63 66 66 72 70 77" fill="none" stroke="url(#ribbon)" stroke-width="13" stroke-linecap="round"/>
+  <path d="M52 42 C56 49 58 55 61 60" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" opacity=".58"/>
+  <ellipse cx="41" cy="59" rx="7" ry="5" fill="#07101f" stroke="#8fe3ff" stroke-width="1.2"/><circle cx="43" cy="58" r="2.2" fill="#d9f5ff"/>
+  <path d="M73 60 Q79 54 86 58 Q80 64 73 60Z" fill="#07101f" stroke="#8fe3ff" stroke-width="1.2"/><circle cx="80" cy="58.5" r="1.8" fill="#d9f5ff"/>
+  <path d="M72 50Q80 46 87 50" fill="none" stroke="#8fe3ff" stroke-width="1.8" stroke-linecap="round" opacity=".72"/><path d="M51 83Q60 87 70 81" fill="none" stroke="#4f8cff" stroke-width="1.8" stroke-linecap="round" opacity=".65"/>
 </svg>

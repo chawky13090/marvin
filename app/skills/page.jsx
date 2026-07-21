@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/components/ui/Toast';
 
-const BACKEND = (typeof window !== 'undefined' && window.location ? window.location.protocol + '//' + window.location.hostname + ':8005' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 const EMPTY = { name: '', description: '', triggers: '', tools: '', body: '' };
 

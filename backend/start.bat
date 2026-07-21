@@ -1,27 +1,31 @@
 @echo off
 title SecretaryAI - Backend Python
 cd /d "%~dp0"
+:: Les journaux Marvin contiennent des accents et emojis. Sans UTF-8, certaines consoles
+:: Windows CP1252 font échouer FastAPI dès le premier print du lifespan.
+set "PYTHONIOENCODING=utf-8"
+set "PYTHONUTF8=1"
 echo.
 echo  ====================================
 echo    SecretaryAI - Backend Python
 echo  ====================================
 echo.
 
-:: Vérifier si Python est installé
-python --version >NUL 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERREUR] Python n'est pas installé ou pas dans le PATH.
-    echo Téléchargez-le sur https://www.python.org/downloads/
-    pause
-    exit /b 1
-)
-
 :: Installer les dépendances si besoin
-if not exist ".venv" (
+if not exist ".venv\Scripts\python.exe" (
+    :: Python systeme n'est requis que pour CREER le venv. Une fois le venv pret,
+    :: Marvin demarre directement avec son interpreteur isole.
+    python --version >NUL 2>&1
+    if %ERRORLEVEL% NEQ 0 (
+        echo [ERREUR] Python est requis pour creer backend\.venv.
+        echo Lancez INSTALLER-NOUVEAU-PC.bat.
+        pause
+        exit /b 1
+    )
     echo [1/3] Création de l'environnement virtuel Python...
     python -m venv .venv
     echo [2/3] Installation des dépendances...
-    .venv\Scripts\pip install -r requirements.txt
+    .venv\Scripts\python -m pip install -r requirements.txt
     echo [3/3] Post-installation pywin32...
     .venv\Scripts\python .venv\Scripts\pywin32_postinstall.py -install 2>NUL
     echo       Installation terminée.
@@ -35,6 +39,14 @@ echo  Documentation API      : http://localhost:8005/docs
 echo  Appuyez sur Ctrl+C pour arrêter.
 echo.
 
-.venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8005
+.venv\Scripts\python -c "import fastapi, uvicorn, qdrant_client" >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERREUR] Le venv existe mais des dependances backend manquent.
+    echo Lancez INSTALLER-NOUVEAU-PC.bat pour le regenerer proprement.
+    pause
+    exit /b 1
+)
+
+.venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8005
 
 pause

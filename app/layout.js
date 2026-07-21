@@ -1,6 +1,6 @@
 import { Inter } from 'next/font/google';
 import './globals.css';
-import Sidebar from '@/components/sidebar/Sidebar';
+import AppFrame from '@/components/layout/AppFrame';
 import TopLoadingBar from '@/components/ui/TopLoadingBar';
 import CommandPalette from '@/components/ui/CommandPalette';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -40,12 +40,7 @@ export default function RootLayout({ children }) {
           <ChatProvider>
             <TopLoadingBar />
             <CommandPalette />
-            <div className="app-layout">
-              <Sidebar />
-              <main className="main-content">
-                {children}
-              </main>
-            </div>
+            <AppFrame>{children}</AppFrame>
           </ChatProvider>
         </ToastProvider>
       </body>

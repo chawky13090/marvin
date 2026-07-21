@@ -45,6 +45,8 @@ async def check_conversation(page, title_snippet: str) -> dict:
     await page.wait_for_timeout(2000)
 
     body_text = await page.locator("body").inner_text()
+    if await page.locator(".empty-state").count():
+        issues.append("conversation ouverte mais contenu absent (état vide affiché)")
     if RAW_JSON_RE.search(body_text):
         issues.append("JSON brut détecté dans le texte visible de la page")
 

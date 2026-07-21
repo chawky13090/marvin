@@ -7,6 +7,7 @@ import json
 import base64
 import re as _re
 import asyncio as _asyncio
+import sys
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Body, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,708 +18,191 @@ from typing import Any
 import database as db
 import tools as tool_module
 from agent import run_agent, _refresh_model_cache
+from api.backups import router as backups_router
+from api.billing import router as billing_router
+from api.calendar import router as calendar_router
+from api.coding import router as coding_router
+from api.conversations import router as conversations_router
+from api.content import router as content_router
+from api.connections import router as connections_router
+from api.cortex import router as cortex_router
+from api.cron_monitor import router as cron_monitor_router
+from api.ssh import router as ssh_router
+from api.storage import router as storage_router
+from api.health import router as health_router
+from api.diagnostics import router as diagnostics_router
+from api.doctor import router as doctor_router
+from api.documents import router as documents_router
+from api.forge import router as forge_router
+from api.evolution import router as evolution_router
+from api.history import router as history_router
+from api.knowledge import router as knowledge_router
+from api.memories import router as memories_router
+from api.missions import router as missions_router
+from api.model_market import router as model_market_router
+from api.multi_agents import router as multi_agents_router
+from api.notes import router as notes_router
+from api.operations import router as operations_router
+from api.projects import router as projects_router
+from api.runtime_config import router as runtime_config_router
+from api.settings import router as settings_router
+from api.skills import router as skills_router
+from api.system_tools import router as system_tools_router
+from api.tasks import router as tasks_router
+from api.technical_docs import router as technical_docs_router
+from api.templates import router as templates_router
+from api.voice import prewarm_whisper
+from api.voice import router as voice_router
+from api.avatar import router as avatar_router
+from api.vm_lab import router as vm_lab_router
+from api.workflows import router as workflows_router
+from app_version import APP_VERSION
 from config import (
     FRONTEND_URL, BACKEND_PORT, DANGEROUS_TOOLS,
     PERMISSION_SECURE, PERMISSION_STANDARD, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
     SECURE_BLOCKED_TOOLS, BACKEND_DIR,
 )
+from runtime_supervisor import RuntimeSupervisor
+from runtime_workers import (
+    build_tool_index as _build_tool_index,
+    database_backup_worker as _db_backup_worker,
+    health_trend_worker as _health_trend_worker,
+    memory_consolidation_worker as _memory_consolidation_worker,
+    prewarm_default_models as _prewarm_default_model,
+    skill_night_learning_worker as _skill_night_learning_worker,
+)
+from communication_workers import (
+    background_scale as _bg_scale,
+    calendar_sync_worker as _calendar_sync_worker,
+    email_automation_worker as _email_automation_worker,
+    email_watch_worker as _email_watch_worker,
+    event_reminder_worker as _event_reminder_worker,
+)
+from proactive_service import (
+    get_config as _get_proactive_cfg,
+    in_quiet_hours as _in_quiet_hours,
+    proactive_worker as _proactive_worker,
+    run_anticipation,
+    run_evening_recap,
+    run_morning_briefing,
+    with_defaults as _proactive_with_defaults,
+)
+from cron_runtime import (
+    cron_worker as _cron_worker,
+    drain_run_agent as _drain_run_agent,
+    long_task_resume_tick as _long_task_resume_tick,
+)
 
-# URI de callback OAuth — utilise BACKEND_PORT pour être cohérent avec le serveur réel
-_GOOGLE_CALLBACK  = f"http://localhost:{BACKEND_PORT}/api/oauth/google/callback"
-_MS_CALLBACK      = f"http://localhost:{BACKEND_PORT}/api/oauth/microsoft/callback"
+# v2.267 — trois fuites de connexions SQLite OAuth/Google corrigées; invariant AST
+# interdisant désormais toute ouverture directe non bornée hors de db_connection.py.
+# v2.266 — premières politiques pures extraites d'agent.py : intention commande/texte,
+# titrage provisoire et détection exacte d'outils, avec alias de boucle inchangés.
+# v2.265 — connexion SQLite centralisée et premier repository conversations/messages;
+# la façade database.py, les transactions et tous les contrats publics restent compatibles.
+# v2.264 — migrations SQLite versionnées, checksumées et transactionnelles; schéma cœur
+# Python autonome et initialiseur Next.js neuf corrigé sans modifier les données existantes.
+# v2.263 — domaine Base de connaissances IT extrait sous tool_domains/it_knowledge.py;
+# recherche, classement déterministe, usage et ajout restent derrière la façade tools.py.
+# v2.262 — premier domaine de tools.py extrait : quiz et répétition espacée sous
+# tool_domains/quiz.py avec injection du générateur et registre public inchangé.
+# v2.261 — moteur cron et reprise agentique longue extraits dans cron_runtime.py;
+# exécution, délai, persistance, détection de stagnation et notifications conservés.
+# v2.260 — service proactif extrait, dépendance des voix rétablie et lecture ffmpeg bornée;
+# les endpoints historiques utilisent les mêmes alias et contrats de réponse.
+# v2.259 — workers e-mail, automatisation, rappels et synchronisation agenda extraits dans
+# communication_workers.py avec façade historique et cadence préservées.
+# v2.258 — six workers transverses extraits dans runtime_workers.py derrière leurs alias
+# historiques : préchauffage, index outils, apprentissage, sauvegarde, mémoire et santé.
+# v2.257 — cycle de vie consolidé : superviseur idempotent et observable des workers,
+# collecte des erreurs et arrêt garanti par le bloc finally du lifespan FastAPI.
+# v2.256 — démarrage avatar fiabilisé et audit global consigné sans extraction de modules.
+# v2.250 — Suivi persistant des Coding Missions dans le chat, progression et corrections
+# visibles après navigation; reprise du dernier snapshot et diagnostics natifs ciblés renforcés.
+# Avatar Electron conversation/compact, activation locale, suivi Code et voix sérialisée par
+# génération pour empêcher tout chevauchement. Contrôles UFW réels renforcés dans Code Forge.
+# v2.249 — Continuité Chat/Code Workspace : reprise déterministe de la dernière mission,
+# lecture des livrables refusés depuis leur snapshot durable, statut terminal piloté par le
+# job Auto et diagnostics Bats visibles. Aucun outil ni aucune capacité existante supprimés.
+# v2.248 — Engineering Runtime : contrat universel additif des outils, événements Coding Mission
+#   persistants diffusés en SSE vers Chat/Workspace, réparations ciblées, Definition of Done
+#   déterministe et Delivery Pack. L'acceptation Forge reste provisoire jusqu'aux validations
+#   natives finales et trois causes différentes ne bloquent plus une mission until_success.
+# v2.247 — continuité du flux chat pendant la navigation, snapshots Code Workspace lisibles,
+# capacités Docker/VM factuelles et transfert Debian natif verrouillé et validé en réel.
+# v2.246 — restauration fiable des historiques après navigation; cache de routes Turbopack
+# auto-réparé au démarrage et build simultané bloqué avant toute corruption.
+# v2.245 — vues globales Lecture, Technique et Audit; export local JSON/Markdown expurgé.
+# v2.244 — conversation human-first : activités regroupées, résultats techniques repliés et
+# réponses longues lisibles sans suppression du détail ni des preuves.
+# v2.243 — Ultra débridé strictement cloud sans repli local; Test Forge escalade les scripts
+# systemd vers une VM Debian restaurée et conserve un snapshot temporaire inspectable.
+# v2.242 — Code Workspace prompt-first depuis l'UI et le chat, Test Forge Debian prouvé,
+# blocage déterministe des faux succès Forge et onglets d'accès rapide réellement interactifs.
+# v2.241 — installations Debian/Windows sans assistance pilotées par Marvin, jobs persistants,
+# toolchains Windows, UI Automation Hyper-V et smoke natif checkpointé.
+# v2.240 — VM Lab : vérification cryptographique des ISO, profils Hyper-V Generation 2,
+# planification de capacité et provisionneur explicite sans altérer les anciennes VM.
+# v2.239 — bibliothèque Marvin classifiée : ISO/VM/workspaces locaux, exports utilisateur,
+# inventaire, racines portables et refus des disques réseau ou synchronisés pour les VHDX.
 
-# Scopes Google complets (Drive + Gmail + Calendar)
-_GOOGLE_SCOPES = [
-    "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/calendar",
-]
+# v2.238 — chemins portables : Known Folders Windows, redirections OneDrive/entreprise,
+# alias de saisie et configuration MCP générée depuis l'installation courante.
+# v2.237 — runner Windows natif Hyper-V : checkpoints, PowerShell Direct, secret DPAPI,
+# compte invité non administrateur et réseau coupé pendant l'exécution des tests.
+# v2.236 — superviseur Auto persistant : file durable, reprise au démarrage, annulation,
+# budgets, contexte borné du dépôt et application transactionnelle dans le worktree isolé.
+# v2.235 — Repository Intelligence et mode Auto borné : contrat de dépôt, règles AGENTS/CLAUDE
+# hiérarchiques, worktree Git isolé, budgets et routage strict des validations Windows natives.
+# v2.234 — Code Workspace : supervision des Coding Missions, snapshots, preuves, matrice
+# de toolchains et documentation officielle, avec préparation/reprise contrôlée via le chat.
+# v2.233 — Engineering Knowledge Radar : documentation officielle ciblée par langage,
+# fraîcheur/ETag/hash, source firewall et injection contrôlée dans Code Forge.
+# v2.232 — Go Forge 1.26.5 et Advanced Coding Mission : exécution Linux, cross-build Windows,
+# matrice honnête des toolchains, snapshots durables et reprise optimiste des projets longs.
+# v2.231 — Production Contract Gate : preuves déterministes d'analyse/tests, API Python
+# typée, installation jetable des dépendances et SBOM CycloneDX avant acceptation finale.
+# v2.230 — Deliverable Bundle : Code Forge conserve les projets multi-fichiers, refuse les
+# chemins dangereux et les dépendances non verrouillées, puis transmet tout le workspace
+# aux analyseurs et runners Windows/Linux avant toute certification production.
+# v2.229 — Windows Test Forge validé réellement : suivi du client 24H2, installation
+# PowerShellGet non interactive, filtrage LAN par processus et smoke test Pester live.
+# v2.228 — Test Forge Windows Sandbox et intégrations Linux connectées : dépendances
+#   réellement installées, tests relancés par le runner, réseaux privés bloqués sous Windows.
+# v2.227 — Model Market spécialisé par rôle, sélection adaptative par phase et parc
+#   Ollama Cloud recommandé auto-synchronisé ; tous les tags cloud valides restent ajoutables.
+# v2.226 — Test Forge : tests générés, exécution Docker hors ligne et intégration
+# Internet dans Debian 13 jetable avant toute livraison de code de production.
+# v2.225 — Code Forge : architecture, implémentation, double revue, réparation,
+#   gatekeeper final et validation syntaxique sans exécuter le code généré.
+# v2.224 — vérification sémantique contradictoire et Adaptive Team Runtime :
+#   composition bornée de Research Swarm, Cortex Search et Council.
+# v2.223 — Evidence Fabric 2 et Arena aveugle : fraîcheur, corroboration, duels
+#   anonymisés, notes structurées et influence humaine après trois comparaisons.
+# v2.222 — Frontier Arena et Evidence Fabric : comparaison neutre, provenance par
+#   affirmation, dette épistémique et Source Firewall déterministe.
+# v2.221 — parcours UI complets : SSE Swarm, cycle Evolution et checkpoints Canvas.
+# v2.220 — Evolution Lab, Mission Canvas et Research Swarm durable.
+# v2.217 — Model Market et Research Swarm : scorecards passives et recherche parallèle sourcée.
+# v2.216 — Memory Mesh et Truth Ledger : mémoires typées et affirmations reliées aux preuves.
+# v2.215 — Mission OS et Proof-Carrying Actions : état durable, checkpoints et preuves expurgées.
+# v2.214 — Cortex Search : stratégies concurrentes, cinq vérificateurs spécialisés et arbitrage.
+# v2.213 — Marvin Forge : corpus agentique, graders déterministes, pass^k, API et tableau de bord.
+# Le démarrage détecte aussi les ports exclus par Docker/Hyper-V et déplace Ollama localement.
+# v2.212 — un lancement sans console UTF-8 (Start-Process/WMI/Planificateur Windows)
+# ne doit jamais faire échouer FastAPI parce qu'un message de diagnostic contient un emoji.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except (AttributeError, OSError):
+        pass
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Moteur CRON — exécution planifiée des outils
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _parse_schedule_seconds(schedule: str) -> int:
-    """
-    Convertit une expression de planning en nombre de secondes entre deux exécutions.
-    Supporte :
-      - "every N seconds/minutes/hours/days"
-      - "every minute / every hour / every day"
-      - "*/N * * * *"  (cron simplifié — minutes seulement)
-      - "daily at HH:MM"
-    Retourne 60 par défaut si format inconnu.
-    """
-    s = schedule.lower().strip()
-
-    # every N unit
-    m = _re.match(r'every\s+(\d+)\s+(second|minute|hour|day)s?', s)
-    if m:
-        n, unit = int(m.group(1)), m.group(2)
-        return n * {"second": 1, "minute": 60, "hour": 3600, "day": 86400}[unit]
-
-    # every minute / every hour / every day
-    if s in ("every minute", "chaque minute"):  return 60
-    if s in ("every hour", "chaque heure"):     return 3600
-    if s in ("every day", "chaque jour"):       return 86400
-
-    # */N * * * *  (N en minutes)
-    m = _re.match(r'\*/(\d+)\s+\*', s)
-    if m:
-        return int(m.group(1)) * 60
-
-    # daily at HH:MM → secondes jusqu'à la prochaine occurrence
-    m = _re.match(r'daily at (\d{1,2}):(\d{2})', s)
-    if m:
-        return 86400  # relance toutes les 24h ; next_run est calculé séparément
-
-    return 60  # défaut : chaque minute
-
-
-# Convention cron : dimanche=0, lundi=1, … samedi=6
-_DOW = {"sunday": 0, "dimanche": 0, "monday": 1, "lundi": 1, "tuesday": 2, "mardi": 2,
-        "wednesday": 3, "mercredi": 3, "thursday": 4, "jeudi": 4, "friday": 5, "vendredi": 5,
-        "saturday": 6, "samedi": 6}
-
-
-def _to_cron(s: str):
-    """Traduit une expression en clair en cron 5 champs si possible (sinon None).
-    Gère : 'daily at HH:MM', 'weekdays/weekends at HH:MM', 'every <jour> at HH:MM',
-    'weekly on <jour> at HH:MM', 'monthly on day D at HH:MM', et le cron brut."""
-    s = s.lower().strip()
-    # Déjà un cron 5 champs ?
-    if _re.fullmatch(r'[\d*/,\-]+(\s+[\d*/,\-]+){4}', s):
-        return s
-    def hm(t):
-        return int(t[1]), int(t[0]) if False else (int(t[0]), int(t[1]))
-    m = _re.search(r'(?:at|à)\s+(\d{1,2})[:h](\d{2})', s)
-    H, M = (int(m.group(1)), int(m.group(2))) if m else (9, 0)
-    if "weekday" in s or "semaine" in s or "ouvré" in s:
-        return f"{M} {H} * * 1-5"
-    if "weekend" in s or "week-end" in s:
-        return f"{M} {H} * * 0,6"
-    mm = _re.search(r'monthly.*day\s+(\d{1,2})|mensuel.*(\d{1,2})', s)
-    if mm:
-        d = mm.group(1) or mm.group(2)
-        return f"{M} {H} {d} * *"
-    for name, dow in _DOW.items():
-        if name in s:
-            return f"{M} {H} * * {dow}"
-    if ("daily" in s or "chaque jour" in s or "tous les jours" in s) and m:
-        return f"{M} {H} * * *"
-    if m and ("every day" in s or "daily" in s or not any(k in s for k in ("every", "chaque"))):
-        return f"{M} {H} * * *"
-    return None
-
-
-def _next_run_dt(schedule: str) -> str:
-    """Prochaine exécution en HEURE LOCALE. Supporte cron, jours nommés, intervalles."""
-    now = datetime.now()
-    cron = _to_cron(schedule)
-    if cron:
-        try:
-            from croniter import croniter
-            return croniter(cron, now).get_next(datetime).strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            pass
-    secs = _parse_schedule_seconds(schedule)
-    return (now + timedelta(seconds=secs)).strftime("%Y-%m-%d %H:%M:%S")
-
-
-async def _drain_run_agent(message: str, conv_id: str):
-    """Consomme un tour `run_agent` complet (les messages/outils sont déjà sauvegardés par
-    run_agent lui-même, rien à faire du flux SSE ici) — factorisé pour pouvoir le borner
-    avec asyncio.wait_for depuis _long_task_resume_tick."""
-    async for _ in run_agent([{"role": "user", "content": message}], conv_id, None):
-        pass
-
-
-async def _long_task_resume_tick(job: dict, now_str: str):
-    """v2.145 — reprise d'une tâche longue (`long_task_start`) : contrairement aux jobs cron
-    normaux (1 outil, args fixes), celui-ci relance un VRAI tour d'agent complet (`run_agent`,
-    outils inclus) sur la conversation d'origine — pas juste un appel d'outil isolé. S'arrête
-    tout seul (désactive le job) une fois toutes les étapes de la checklist marquées 'done'."""
-    args = job.get("args") or {}
-    conv_id = args.get("conversation_id")
-    slug = args.get("slug")
-    goal = args.get("goal", "")
-    if not conv_id or not slug:
-        db.update_cron_job(job["id"], {"enabled": False, "last_run": now_str,
-                                        "last_result": json.dumps({"error": "job long_task mal formé"})[:500]})
-        return
-
-    tag = f"longtask:{slug}"
-    pending = [t for t in db.list_tasks(limit=200)
-               if t.get("status") != "done" and tag in (t.get("tags") or [])]
-    if not pending:
-        db.update_cron_job(job["id"], {
-            "enabled": False, "last_run": now_str,
-            "last_result": json.dumps({"message": f"Tâche longue « {goal[:80]} » terminée."})[:500],
-        })
-        try:
-            notifier = tool_module.TOOLS_REGISTRY.get("pc_notify")
-            if notifier:
-                await notifier({"title": "Marvin — Tâche longue terminée",
-                                 "message": goal[:200] or "Toutes les étapes sont faites."})
-        except Exception:
-            pass
-        return
-
-    # v2.145 — 2 bugs trouvés en testant en réel :
-    #   1. Nommer littéralement "long_task_status"/"task_update" dans le nudge déclenchait
-    #      la règle d'or #6 (outil explicite cité = SEUL outil autorisé ce tour), bloquant
-    #      l'accès aux VRAIS outils nécessaires pour avancer (file_large_finder, etc.) —
-    #      corrigé en décrivant l'étape en PROSE, sans jamais nommer un outil précis.
-    #   2. Le modèle n'avait aucun moyen fiable de connaître l'ID exact de la tâche à
-    #      marquer terminée (inventait le tag ou un numéro de position) — corrigé en
-    #      donnant l'ID exact de la PROCHAINE étape directement dans le nudge.
-    next_step = pending[0]
-    nudge = (
-        f"[Reprise automatique de tâche longue « {goal} »] Étape à traiter maintenant : "
-        f"« {next_step['title']} » (identifiant de tâche : {next_step['id']}). Avance "
-        "dessus avec les outils appropriés à cette étape précise — reste sur une action "
-        "CIBLÉE et RAPIDE, évite un scan récursif ou une opération lourde qui prendrait "
-        "plusieurs minutes — puis mets à jour le statut de cette tâche à 'done' une fois "
-        f"terminée. Il reste {len(pending)} étape(s) au total sur cette tâche longue."
-    )
-    # v2.145 — 3e bug trouvé en testant en réel : une reprise SANS limite de temps peut
-    # enchaîner suffisamment d'appels d'outils/cloud pour prendre plusieurs MINUTES (même
-    # symptôme déjà documenté en v2.136 — un tour d'agent normal peut être lent), ce qui
-    # retarde TOUS les autres jobs cron suivants (le worker traite les jobs séquentiellement)
-    # et peut bloquer la réactivité perçue du backend le temps que ça tourne. Borné à 3 min
-    # (buffer confortable avant le prochain cycle à 5 min) — la progression déjà faite dans
-    # ce délai reste sauvegardée (run_agent écrit chaque message au fil de l'eau), seule la
-    # suite est coupée et reprise au cycle suivant.
-    try:
-        await _asyncio.wait_for(_drain_run_agent(nudge, conv_id), timeout=180)
-        result = {"message": "Reprise exécutée."}
-    except _asyncio.TimeoutError:
-        result = {"message": "Reprise interrompue après 3 min (progression déjà faite conservée) — continuera au prochain cycle."}
-    except Exception as e:
-        result = {"error": str(e)[:200]}
-
-    # v2.151 — "pauses quand elle a besoin d'une validation" (repris de ChatGPT Work) :
-    # si un outil DANGEREUX a été appelé pendant la reprise sans confirmation (ex. l'étape
-    # nécessite pc_run_command), la reprise ne peut PAS progresser toute seule — il n'y a
-    # personne dans une reprise cron pour cliquer "confirmer". Sans détection, le job aurait
-    # retenté exactement la même chose toutes les 5 min indéfiniment, en silence. Détecté en
-    # comptant les étapes encore en attente APRÈS la reprise : si ÇA N'A PAS BOUGÉ sur 3
-    # tentatives consécutives (~15 min), on considère la tâche bloquée, on coupe la reprise
-    # automatique et on notifie explicitement — plutôt que de la laisser tourner en boucle
-    # sans jamais prévenir.
-    still_pending = [t for t in db.list_tasks(limit=200)
-                      if t.get("status") != "done" and tag in (t.get("tags") or [])]
-    stall_count = int((args.get("_stall_count") or 0))
-    if len(still_pending) >= len(pending):
-        stall_count += 1
-    else:
-        stall_count = 0
-    updated_args = {**args, "_stall_count": stall_count}
-
-    if stall_count >= 3:
-        db.update_cron_job(job["id"], {
-            "enabled": False, "args": updated_args, "last_run": now_str,
-            "last_result": json.dumps({"message": "Tâche longue mise en pause — aucune progression après 3 reprises."})[:500],
-        })
-        try:
-            notifier = tool_module.TOOLS_REGISTRY.get("pc_notify")
-            if notifier:
-                await notifier({
-                    "title": "Marvin — Tâche longue en attente",
-                    "message": (f"« {goal[:120]} » ne progresse plus (probablement en attente d'une "
-                                f"confirmation) — reprise automatique mise en pause. Ouvre la "
-                                f"conversation pour valider l'étape bloquante, puis relance-la."),
-                })
-        except Exception:
-            pass
-        return
-
-    db.update_cron_job(job["id"], {
-        "args": updated_args,
-        "last_run": now_str,
-        "next_run": _next_run_dt(job["schedule"]),
-        "last_result": json.dumps(result)[:500],
-        "run_count": True,
-    })
-
-
-async def _cron_worker():
-    """Tâche de fond : vérifie et exécute les jobs cron toutes les 30 secondes."""
-    while True:
-        try:
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")   # heure LOCALE
-            jobs = db.list_cron_jobs(enabled_only=True)
-            for job in jobs:
-                next_run = job.get("next_run")
-                if not next_run or next_run <= now_str:
-                    # v2.145 — les jobs de reprise de tâche longue relancent un tour d'agent
-                    # complet, pas un simple appel d'outil (cf. _long_task_resume_tick).
-                    if job["tool_name"] == "_long_task_resume":
-                        await _long_task_resume_tick(job, now_str)
-                        continue
-                    # Exécuter l'outil
-                    executor = tool_module.TOOLS_REGISTRY.get(job["tool_name"])
-                    result = {"error": f"Outil '{job['tool_name']}' introuvable"}
-                    duration_ms = 0
-                    if executor:
-                        import time as _t
-                        t0 = _t.monotonic()
-                        try:
-                            args = dict(job.get("args") or {})
-                            result = await executor(args)
-                        except Exception as e:
-                            result = {"error": str(e)}
-                        duration_ms = int((_t.monotonic() - t0) * 1000)
-                        try:
-                            db.log_execution(job["tool_name"], job.get("args", {}), result, duration_ms)
-                        except Exception:
-                            pass
-
-                    # Mettre à jour le job
-                    db.update_cron_job(job["id"], {
-                        "last_run": now_str,
-                        "next_run": _next_run_dt(job["schedule"]),
-                        "last_result": json.dumps(result)[:500],
-                        "run_count": True,  # incrémente run_count
-                    })
-        except Exception as e:
-            print(f"[CRON] Erreur worker: {e}")
-
-        await _asyncio.sleep(30)
-
-
-# ── App ───────────────────────────────────────────────────────────────────────
 from contextlib import asynccontextmanager
 
-async def _prewarm_default_model():
-    """
-    Pre-load the default models (agent + chat) into Ollama's RAM at startup.
-    Eliminates the 10-30s cold-load delay on user's first message.
-    Runs in background — doesn't block startup.
-    """
-    import httpx as _httpx
-    from config import OLLAMA_URL, MODEL_PROFILES
-    # Pre-warm agent first (most used), then chat (for short messages)
-    models_to_warm = [
-        MODEL_PROFILES.get("agent", {}).get("model", "qwen2.5:7b"),
-        MODEL_PROFILES.get("chat", {}).get("model", "qwen2.5:3b"),
-    ]
-    seen = set()
-    async with _httpx.AsyncClient(timeout=120.0) as client:
-        for model in models_to_warm:
-            if model in seen:
-                continue
-            seen.add(model)
-            try:
-                await client.post(
-                    f"{OLLAMA_URL}/api/chat",
-                    json={
-                        "model": model,
-                        "messages": [{"role": "user", "content": "."}],
-                        "stream": False,
-                        "keep_alive": "30m",   # 30 min keepalive — survives most idle periods
-                        "options": {"num_predict": 1},
-                    },
-                )
-                print(f"[Marvin] ✅ Modèle '{model}' pré-chargé en mémoire")
-            except Exception as e:
-                print(f"[Marvin] ⚠️ Pré-chargement '{model}' échoué : {e}")
-
-
-async def _email_watch_worker():
-    """Boucle de fond : surveille périodiquement les mails importants et notifie (si activé)."""
-    await _asyncio.sleep(30)  # laisser le démarrage se terminer
-    while True:
-        interval = 5
-        try:
-            cfg = db.get_setting("email_watch")
-            if isinstance(cfg, str):
-                import json as _json
-                try: cfg = _json.loads(cfg)
-                except Exception: cfg = {}
-            cfg = cfg if isinstance(cfg, dict) else {}
-            interval = max(2, int(cfg.get("interval_min", 5)))
-            if cfg.get("enabled"):
-                # 1) classer automatiquement selon les règles, 2) notifier les importants restants
-                try:
-                    await tool_module.TOOLS_REGISTRY["email_apply_rules"]({})
-                except Exception:
-                    pass
-                await tool_module.TOOLS_REGISTRY["email_watch_check"]({})
-        except Exception:
-            pass
-        await _asyncio.sleep(interval * 60)
-
-
-async def _event_reminder_worker():
-    """Boucle de fond : notifie les rappels d'agenda à l'heure dite (toast Windows)."""
-    await _asyncio.sleep(20)
-    from datetime import datetime as _dt
-    while True:
-        try:
-            now = _dt.now().strftime("%Y-%m-%d %H:%M")
-            for ev in db.events_needing_reminder(now):
-                try:
-                    when = (ev.get("start_at") or "")[11:16] or "aujourd'hui"
-                    loc = f" ({ev['location']})" if ev.get("location") else ""
-                    await tool_module.TOOLS_REGISTRY["pc_notify"]({
-                        "title": f"📅 Rappel : {ev.get('title', 'Rendez-vous')}",
-                        "message": f"À {when}{loc}",
-                    })
-                    db.update_event(ev["id"], {"reminded": True})
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        await _asyncio.sleep(60)
-
-
-async def _build_tool_index():
-    """Indexe les descriptions d'outils pour le routing sémantique (et préchauffe
-    le modèle d'embeddings). Une seule fois ; réindexe si le set d'outils change."""
-    await _asyncio.sleep(8)
-    try:
-        import tool_router
-        ok = await tool_router.ensure_tool_index(tool_module.TOOLS_SPEC)
-        print(f"[Marvin] {'✅ Index sémantique des outils prêt' if ok else '⚠️ Index outils indisponible (embeddings/Qdrant)'}")
-    except Exception as e:
-        print(f"[Marvin] ⚠️ Index outils échoué : {e}")
-
-
-def _bg_scale() -> float:
-    """Facteur d'intervalle des tâches de fond, piloté par le mode (2.0 = 2× moins souvent)."""
-    try:
-        return max(0.25, float(db.get_setting("bg_scale") or 1.0))
-    except Exception:
-        return 1.0
-
-
-async def _calendar_sync_worker():
-    """Resynchronise périodiquement les agendas connectés (abonnements iCal + Google)."""
-    await _asyncio.sleep(15)   # première synchro peu après le démarrage
-    while True:
-        try:
-            subs = db.get_setting("calendar_subscriptions")
-            sa = tool_module._google_calendar_ready()
-            if subs or sa:   # tourne s'il y a un abonnement iCal OU un Google connecté
-                await tool_module.TOOLS_REGISTRY["calendar_sync"]({})
-        except Exception:
-            pass
-        await _asyncio.sleep(int(30 * 60 * _bg_scale()))   # ~30 min × facteur du mode
-
-
 # ── Marvin proactif : briefing matinal automatique ──────────────────────────────
-def _get_proactive_cfg() -> dict:
-    cfg = db.get_setting("proactive_config")
-    if isinstance(cfg, str):
-        import json as _json
-        try: cfg = _json.loads(cfg)
-        except Exception: cfg = {}
-    return cfg if isinstance(cfg, dict) else {}
-
-
-async def _tts_bytes(text: str, voice: str = "henri") -> bytes:
-    """Synthèse vocale → MP3 (edge-tts), pour la lecture côté backend."""
-    import edge_tts, re as _re
-    vid = DEFAULT_TTS_VOICES.get(voice, {}).get("id", "fr-FR-HenriNeural")
-    t = _re.sub(r"[*#`_>]+", "", text or "").strip()
-    if not t:
-        return b""
-    comm = edge_tts.Communicate(t[:1500], vid)
-    chunks = []
-    async for c in comm.stream():
-        if c["type"] == "audio":
-            chunks.append(c["data"])
-    return b"".join(chunks)
-
-
-def _play_mp3_bytes_sync(mp3: bytes):
-    """Joue un MP3 sur les haut-parleurs du PC (ffmpeg→wav→winsound), sans dépendance externe."""
-    import tempfile, os as _os, subprocess
-    try:
-        import winsound, imageio_ffmpeg
-    except Exception:
-        return
-    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    mp3p = tempfile.mktemp(suffix=".mp3"); wavp = tempfile.mktemp(suffix=".wav")
-    try:
-        with open(mp3p, "wb") as f:
-            f.write(mp3)
-        subprocess.run([ffmpeg, "-y", "-i", mp3p, "-ar", "22050", "-ac", "1", wavp],
-                       capture_output=True, creationflags=0x08000000)  # CREATE_NO_WINDOW
-        if _os.path.exists(wavp):
-            winsound.PlaySound(wavp, winsound.SND_FILENAME)  # synchrone (on est dans un thread)
-    except Exception:
-        pass
-    finally:
-        for p in (mp3p, wavp):
-            try: _os.unlink(p)
-            except Exception: pass
-
-
-async def _speak_backend(text: str, voice: str = "henri"):
-    try:
-        mp3 = await _tts_bytes(text, voice)
-        if mp3:
-            await _asyncio.get_running_loop().run_in_executor(None, _play_mp3_bytes_sync, mp3)
-    except Exception:
-        pass
-
-
-async def run_morning_briefing(mb: dict) -> dict:
-    """Génère le briefing, envoie une notification concise, et le lit à voix haute si demandé."""
-    res = await tool_module.TOOLS_REGISTRY["daily_briefing"]({})
-    if not res.get("success"):
-        return {"error": res.get("error", "briefing indisponible")}
-    ev = res.get("events_today") or []
-    parts = [f"{len(ev)} rendez-vous" if ev else "aucun rendez-vous"]
-    if res.get("tasks_urgent"): parts.append(f"{res['tasks_urgent']} tâche(s) urgente(s)")
-    elif res.get("tasks_pending"): parts.append(f"{res['tasks_pending']} tâche(s)")
-    if res.get("unread"): parts.append(f"{res['unread']} mail(s) non lus")
-    summary = "Aujourd'hui : " + ", ".join(parts) + "."
-    try:
-        await tool_module.TOOLS_REGISTRY["pc_notify"]({"title": "🌅 Votre briefing du jour", "message": summary})
-    except Exception:
-        pass
-    try:
-        await tool_module._telegram_notify("🌅 <b>Briefing du jour</b>\n" + summary)
-    except Exception:
-        pass
-    if mb.get("voice"):
-        spoken = "Bonjour ! " + (res.get("briefing") or summary)
-        await _speak_backend(spoken, mb.get("voice_name", "henri"))
-    return {"success": True, "summary": summary}
-
-
-async def run_evening_recap(er: dict) -> dict:
-    """Bilan de fin de journée : tâches en attente, RDV de demain, mails non lus."""
-    reg = tool_module.TOOLS_REGISTRY
-    res = await reg["daily_briefing"]({})
-    try:
-        tomo = await reg["event_list"]({"period": "tomorrow"})
-        ev_tomo = tomo.get("events") or []
-    except Exception:
-        ev_tomo = []
-    parts = []
-    if res.get("tasks_urgent"):
-        parts.append(f"{res['tasks_urgent']} tâche(s) urgente(s) en attente")
-    elif res.get("tasks_pending"):
-        parts.append(f"{res['tasks_pending']} tâche(s) en attente")
-    parts.append(f"{len(ev_tomo)} RDV demain" if ev_tomo else "rien de prévu demain")
-    if res.get("unread"):
-        parts.append(f"{res['unread']} mail(s) non lus")
-    summary = "Bilan du soir — " + ", ".join(parts) + "."
-    try: await reg["pc_notify"]({"title": "🌙 Bilan du soir", "message": summary})
-    except Exception: pass
-    try: await tool_module._telegram_notify("🌙 <b>Bilan du soir</b>\n" + summary)
-    except Exception: pass
-    if er.get("voice"):
-        await _speak_backend("Bonsoir ! " + summary, er.get("voice_name", "henri"))
-    return {"success": True, "summary": summary}
-
-
-# Anticipation : alertes proactives (dédupliquées par jour) — signaux LOCAUX, sans coût LLM
-_anticip_seen = {"date": None, "ids": set()}
-
-async def run_anticipation(an: dict, *, force: bool = False) -> dict:
-    """Repère ce qui va coincer (tâches en retard, RDV imminent) et prévient — une fois par item/jour."""
-    from datetime import datetime as _dt
-    reg = tool_module.TOOLS_REGISTRY
-    now = _dt.now()
-    today = now.strftime("%Y-%m-%d")
-    if _anticip_seen["date"] != today:
-        _anticip_seen["date"] = today
-        _anticip_seen["ids"] = set()
-    seen = _anticip_seen["ids"]
-    alerts = []
-
-    # 1) Tâches en retard (échéance passée, non terminées)
-    if an.get("overdue_tasks", True):
-        try:
-            tl = await reg["task_list"]({})
-            for t in (tl.get("tasks") or []):
-                due = (t.get("due_date") or "")[:10]
-                if due and due < today and (t.get("status") not in ("done", "completed", "cancelled")):
-                    key = "ovd_" + str(t.get("id"))
-                    if force or key not in seen:
-                        seen.add(key)
-                        alerts.append({"type": "task_overdue", "key": key,
-                                       "text": f"⏰ En retard : « {t.get('title','tâche')} » (échéance {due})"})
-        except Exception:
-            pass
-
-    # 2) RDV imminent (commence dans <= lead minutes)
-    if an.get("upcoming_events", True):
-        lead = int(an.get("upcoming_events_min", 30))
-        try:
-            el = await reg["event_list"]({"period": "today"})
-            for e in (el.get("events") or []):
-                raw = e.get("start_at") or e.get("start") or ""
-                try:
-                    from dateutil import parser as _dtp
-                    st = _dtp.parse(raw)
-                    if st.tzinfo:
-                        st = st.replace(tzinfo=None)
-                    mins = (st - now).total_seconds() / 60
-                except Exception:
-                    continue
-                if 0 <= mins <= lead:
-                    key = "evt_" + str(e.get("id") or raw)
-                    if force or key not in seen:
-                        seen.add(key)
-                        alerts.append({"type": "event_soon", "key": key,
-                                       "text": f"📅 Dans {int(mins)} min : {e.get('title') or e.get('summary','RDV')}"})
-        except Exception:
-            pass
-
-    max_notify = int(an.get("max_notify", 5))
-    for a in alerts[:max_notify]:
-        try: await reg["pc_notify"]({"title": "🔔 Marvin anticipe", "message": a["text"]})
-        except Exception: pass
-        try: await tool_module._telegram_notify("🔔 " + a["text"])
-        except Exception: pass
-    if alerts[:max_notify]:
-        try:
-            import audit
-            audit.log_action("anticipation_notify", {"alertes": len(alerts[:max_notify])},
-                             {"message": "; ".join(a["text"] for a in alerts[:max_notify])[:200]}, source="proactif")
-        except Exception:
-            pass
-    return {"success": True, "alerts": alerts, "count": len(alerts)}
-
-
-_last_briefing_date = {"d": None}
-_last_recap_date = {"d": None}
-
-async def _proactive_worker():
-    """Briefing matinal, bilan du soir (1×/jour chacun) + anticipation périodique."""
-    await _asyncio.sleep(25)
-    from datetime import datetime as _dt
-    _last_anticip = {"t": 0.0}
-    import time as _time
-    while True:
-        try:
-            cfg = _get_proactive_cfg()
-            now = _dt.now()
-            hm = now.strftime("%H:%M")
-            day = now.strftime("%Y-%m-%d")
-            quiet = _in_quiet_hours(cfg, hm)  # v2.150 — "heures calmes" : aucune notif proactive
-            # Briefing matinal
-            mb = cfg.get("morning_briefing", {})
-            if mb.get("enabled") and hm == mb.get("time", "08:00") and _last_briefing_date["d"] != day:
-                _last_briefing_date["d"] = day
-                if not quiet:
-                    await run_morning_briefing(mb)
-            # Bilan du soir
-            er = cfg.get("evening_recap", {})
-            if er.get("enabled") and hm == er.get("time", "18:30") and _last_recap_date["d"] != day:
-                _last_recap_date["d"] = day
-                if not quiet:
-                    await run_evening_recap(er)
-            # Anticipation (toutes les N minutes)
-            an = cfg.get("anticipation", {})
-            if an.get("enabled") and not quiet:
-                interval = max(5, int(an.get("interval_min", 30))) * 60
-                if _time.time() - _last_anticip["t"] >= interval:
-                    _last_anticip["t"] = _time.time()
-                    await run_anticipation(an)
-        except Exception:
-            pass
-        await _asyncio.sleep(30)
-
-
-async def _skill_night_learning_worker():
-    """📖🌙 Consolidation du Learning Log des compétences — s'exécute en continu, PLUS
-    SOUVENT LA NUIT (22h-6h : toutes les 15 min) que le jour (toutes les 25 min). Marvin
-    relit son propre historique d'apprentissage par compétence et peut le consolider
-    (fusion/sous-compétence dédiée) sans intervention de l'utilisateur, puis archive les
-    compétences anciennes et peu utilisées (`consolidate_obsolete_skills`, réversible)."""
-    await _asyncio.sleep(45)
-    import time as _time
-    last_run = 0.0
-    while True:
-        try:
-            now_h = _time.localtime().tm_hour
-            interval = 900 if (now_h >= 22 or now_h <= 6) else 1500   # 15 min nuit, 25 min jour
-            if _time.time() - last_run >= interval:
-                last_run = _time.time()
-                import skills
-
-                async def _g(p):
-                    # v2.122 — model=None : cloud_routing.resolve_model() décide selon le
-                    # réglage Ollama Cloud + la sensibilité du prompt réel, au lieu de
-                    # pré-résoudre en local à l'aveugle.
-                    return await tool_module._ollama_generate(p, model=None, timeout=180)
-
-                consolidated = 0
-                for sk in skills.list_skills():
-                    if len(skills.get_learning_log(8, sk["name"])) < 2:
-                        continue   # pas assez d'historique réel pour en tirer quelque chose
-                    res = await skills.review_and_consolidate_learnings(_g, sk["name"])
-                    if res:
-                        consolidated += 1
-                if consolidated:
-                    print(f"[Marvin] 📖 Consolidation nocturne : {consolidated} compétence(s).")
-                forgotten = skills.consolidate_obsolete_skills()
-                if forgotten:
-                    print(f"[Marvin] 🗄️ Compétences archivées (inactives) : {forgotten}")
-        except Exception as e:
-            print(f"[Marvin] ⚠️ Consolidation nocturne échouée : {e}")
-        await _asyncio.sleep(60)
-
-
-async def _db_backup_worker():
-    """💾 Sauvegarde automatique quotidienne de data/secretary.db (v2.111). Une sauvegarde
-    immédiate au démarrage garantit qu'une install fraîche ou un redémarrage récent a
-    toujours un point de restauration, puis une toutes les 24h. Rotation : 14 dernières
-    conservées (backup.py::KEEP_LAST). Best-effort, ne bloque jamais le démarrage."""
-    await _asyncio.sleep(20)
-    import backup as _backup
-    while True:
-        try:
-            r = _backup.create_backup()
-            if r.get("success"):
-                print(f"[Marvin] 💾 Sauvegarde DB : {r['path']} ({r['size_kb']} Ko)")
-            else:
-                print(f"[Marvin] ⚠️ Sauvegarde DB échouée : {r.get('error')}")
-        except Exception as e:
-            print(f"[Marvin] ⚠️ Sauvegarde DB échouée : {e}")
-        await _asyncio.sleep(86400)  # 24h
-
-
-async def _memory_consolidation_worker():
-    """🧠 Consolidation périodique de la mémoire générale (v2.115) — même esprit que le
-    Learning Log des compétences, mais déterministe (recouvrement de texte, pas de
-    jugement LLM) pour éviter tout risque de fusion erronée. Une fois par jour suffit :
-    le volume de nouveaux souvenirs est faible d'une session à l'autre."""
-    await _asyncio.sleep(40)
-    import memory_consolidation as _memconsol
-    while True:
-        try:
-            r = _memconsol.consolidate_memories()
-            if r.get("merged_count"):
-                print(f"[Marvin] 🧠 Mémoire consolidée : {r['merged_count']} doublon(s) fusionné(s).")
-        except Exception as e:
-            print(f"[Marvin] ⚠️ Consolidation mémoire échouée : {e}")
-        await _asyncio.sleep(86400)  # 24h
-
-
-async def _health_trend_worker():
-    """📈 Instantané quotidien de santé système (RAM/disque/usure SSD/erreurs récurrentes) —
-    v2.138, suite d'une recherche web sur les tendances 2026 du monitoring IT (passage du
-    réactif au PRÉDICTIF : détecter une dérive avant qu'elle devienne un problème, pas
-    seulement un seuil statique instantané). Un point immédiat au démarrage puis un toutes les
-    24h, consommé par l'outil `pc_health_trend`. Best-effort, ne bloque jamais le démarrage."""
-    await _asyncio.sleep(60)
-    import tools as _tm
-    while True:
-        try:
-            r = await _tm.capture_system_snapshot()
-            print(f"[Marvin] 📈 Instantané de santé système enregistré ({r.get('id', '?')[:8]}).")
-        except Exception as e:
-            print(f"[Marvin] ⚠️ Instantané de santé système échoué : {e}")
-        await _asyncio.sleep(86400)  # 24h
-
-
 @asynccontextmanager
 async def lifespan(app_instance):
     """Initialisation au démarrage : cache des modèles + worker cron + surveillance email + pré-chargement."""
@@ -731,48 +215,46 @@ async def lifespan(app_instance):
     except Exception as e:
         print(f"[Marvin] ⚠️ Auto-config échouée : {e}")
     await _refresh_model_cache()
-    cron_task = _asyncio.create_task(_cron_worker())
-    # Pre-warm the default model in the background (doesn't block startup)
-    prewarm_task = _asyncio.create_task(_prewarm_default_model())
-    # Pré-charge Whisper (STT) en arrière-plan → 1ère transcription instantanée
-    whisper_task = _asyncio.create_task(_prewarm_whisper())
-    # Surveillance des mails importants (notifications) — boucle de fond
-    watch_task = _asyncio.create_task(_email_watch_worker())
-    # Rappels d'agenda (notifications à l'heure dite) — boucle de fond
-    reminder_task = _asyncio.create_task(_event_reminder_worker())
-    # Synchro des agendas connectés (iCal) — boucle de fond
-    calsync_task = _asyncio.create_task(_calendar_sync_worker())
-    # Briefing matinal proactif — boucle de fond
-    proactive_task = _asyncio.create_task(_proactive_worker())
-    # Apprentissage : consolidation du Learning Log des compétences, plus agressive la nuit
-    night_learning_task = _asyncio.create_task(_skill_night_learning_worker())
-    # Index sémantique des outils (routing intelligent) — tâche unique au démarrage
-    toolidx_task = _asyncio.create_task(_build_tool_index())
-    # Sauvegarde automatique de data/secretary.db — immédiate puis toutes les 24h
-    backup_task = _asyncio.create_task(_db_backup_worker())
-    # Consolidation de la mémoire générale (fusion des doublons) — une fois par jour
-    memconsol_task = _asyncio.create_task(_memory_consolidation_worker())
-    # Instantané quotidien de santé système (RAM/disque/usure/erreurs) — suivi de tendance
-    healthtrend_task = _asyncio.create_task(_health_trend_worker())
-    # Skills : crée les exemples si le dossier est vide (montre le format)
+    import coding_jobs as _coding_jobs
+    import engineering_radar as _engineering_radar
+    import model_market as _model_market
+
+    supervisor = RuntimeSupervisor()
+    app_instance.state.runtime_supervisor = supervisor
+    coding_jobs_started = False
     try:
-        import skills
-        skills.seed_examples()
-    except Exception:
-        pass
-    yield
-    try:
-        import web_browser
-        await web_browser.close()
-    except Exception:
-        pass
-    for _t in (cron_task, prewarm_task, whisper_task, watch_task, reminder_task, calsync_task, proactive_task, night_learning_task, toolidx_task, backup_task, memconsol_task):
-        _t.cancel()
-    for _t in (cron_task, prewarm_task, whisper_task, watch_task, reminder_task, calsync_task, proactive_task, night_learning_task, toolidx_task, backup_task, memconsol_task):
+        supervisor.start("cron", _cron_worker)
+        supervisor.start("ollama-prewarm", _prewarm_default_model)
+        supervisor.start("whisper-prewarm", prewarm_whisper)
+        supervisor.start("email-watch", _email_watch_worker)
+        supervisor.start("email-automation", _email_automation_worker)
+        supervisor.start("event-reminders", _event_reminder_worker)
+        supervisor.start("calendar-sync", _calendar_sync_worker)
+        supervisor.start("proactive-briefing", _proactive_worker)
+        supervisor.start("skill-night-learning", _skill_night_learning_worker)
+        supervisor.start("tool-index", _build_tool_index)
+        supervisor.start("database-backup", _db_backup_worker)
+        supervisor.start("memory-consolidation", _memory_consolidation_worker)
+        supervisor.start("health-trend", _health_trend_worker)
+        supervisor.start("cloud-model-fleet", _model_market.sync_recommended_cloud_models)
+        supervisor.start("engineering-radar", _engineering_radar.background_worker)
+        _coding_jobs.start_pending()
+        coding_jobs_started = True
         try:
-            await _t
-        except _asyncio.CancelledError:
+            import skills
+            skills.seed_examples()
+        except Exception:
             pass
+        yield
+    finally:
+        try:
+            import web_browser
+            await web_browser.close()
+        except Exception:
+            pass
+        if coding_jobs_started:
+            await _coding_jobs.shutdown()
+        await supervisor.shutdown()
 
 # v2.79.0 — Compétences fiabilisées : (1) nomic-embed-text requis pour le matching
 #   sémantique (sinon dégradé en lexical) ; (2) les compétences EXÉCUTENT vraiment les
@@ -2434,7 +1916,7 @@ async def lifespan(app_instance):
 #   était systématiquement dépassé sur cette machine (reproduit 3/3 fois, cloud ET local),
 #   faisant silencieusement échouer TOUT démarrage de tâche longue depuis l'introduction de
 #   cette fonctionnalité en v2.145. Porté à 90s.
-#   Pause sur blocage (`_long_task_resume_tick`, main.py) : une reprise automatique par cron
+#   Pause sur blocage (`long_task_resume_tick`, cron_runtime.py) : une reprise automatique par cron
 #   n'a personne pour cliquer "confirmer" si l'étape en cours nécessite un outil DANGEREUX —
 #   sans détection, le job aurait retenté la même chose toutes les 5 min indéfiniment, en
 #   silence. Détecté en comparant le nombre d'étapes en attente avant/après chaque reprise :
@@ -3342,8 +2824,65 @@ async def lifespan(app_instance):
 #   l'identique) ; avec le correctif restaure, le meme scenario exact ne depasse jamais 1 audio
 #   concurrent. Verifie aussi /api/voice/speak et /api/voice/voices en reel (200, MP3 valide),
 #   bug_log_list vide (aucun crash serveur cote pipeline vocal). scripts/smoke_test_pages.py 34/34.
+# v2.188 -- Consolidation structurelle : version publique centralisee dans app_version.py,
+#   URL FastAPI partagee cote frontend, controle statique des invariants d'architecture et
+#   documentation remise au niveau du produit reel. Aucun outil ni comportement supprime.
+# v2.189 -- Socle de validation reproductible : orchestrateur quick/build/live sans second
+#   processus Qdrant, controle ABI Node, smoke test HTTP, preflight de demarrage et arret
+#   controle des services. Extraction pilote des routes Doctor vers api/doctor.py avec
+#   verification automatique du montage des routeurs avant le decoupage par domaines.
+# v2.190 -- Garde-fous d'intention avant le LLM : reponses de quiz, demandes sans outil et
+#   questionnaires texte restent conversationnels. Matching des competences ancre dans les
+#   mots/declencheurs reels et contexte precedent reserve aux follow-ups explicites.
+# v2.191 -- Extraction des routes conversations vers api/conversations.py, avec contrat HTTP
+#   de reconstruction des messages et controle automatique du montage du routeur.
+# v2.192 -- Extraction des CRUD projets, taches et notes dans trois routeurs dedies ;
+#   contrats GET en lecture seule et listes Pydantic avec default_factory.
+# v2.193 -- Extraction des memoires, parametres et sauvegardes ; confirmation de restauration
+#   preservee hors du registre d'outils et contrats live strictement en lecture seule.
+# v2.194 -- Extraction de l'historique d'execution, des statistiques de fiabilite et des
+#   templates d'outils ; contrats live sans creation ni suppression de donnees.
+# v2.195 -- Extraction des domaines facturation, documentation technique et operations ;
+#   routes de decision conservees avec leurs validations et contrats live en lecture seule.
+# v2.196 -- Adaptateurs HTTP Winget, Pantheon, Catharsis et Codex extraits ; confirmations
+#   issues des interfaces conservees a l'identique sur toutes les actions mutantes.
+# v2.197 -- Diagnostic de routage, acces reseau mobile et routes documents/RAG extraits ;
+#   racine data calculee depuis le backend pour preserver les emplacements historiques.
+# v2.198 -- Routes d'evenements et abonnements iCal extraites ; les trois modes de connexion
+#   agenda restent portes par les outils existants sans changement de priorite.
+# v2.199 -- Execution parallele multi-agents extraite avec contrat SSE preserve et execution
+#   vide testable sans declencher le moindre outil.
+# v2.200 -- CRUD et moteur de workflows extraits avec templating type, conditions, retries,
+#   continue-on-error et traces d'execution preserves.
+# v2.201 -- Transcription Whisper et synthese Edge-TTS extraites ; prechauffage reconnecte au
+#   lifespan pour conserver la latence faible du premier enregistrement.
+# v2.202 -- Telegram, apprentissage, auto-configuration et audit extraits ; lecture Telegram
+#   continue de masquer le token et aucun test sortant n'est lance par les contrats.
+# v2.203 -- API complete des competences Markdown extraite : generation, ressources, versions,
+#   statistiques, suggestions et consolidation, sans rendre le contenu executable.
+# v2.204 -- Recherche semantique/unifiee, chemins PC, apercus, pieces jointes et images du chat
+#   extraits dans un domaine contenu unique, avec les limites de taille historiques.
+# v2.205 -- Identifiants masques et flux OAuth Google/Microsoft extraits ; compte de service,
+#   OAuth utilisateur et iCal restent tous disponibles sans changement de priorite.
+# v2.209 -- Saisie multi-expéditeurs de l'automatisation email corrigée côté interface.
+# v2.210 -- Orchestrateur email multiboîte : OAuth2 Gmail/XOAUTH2 par compte, profils
+#   indépendants, simulation sans effet de bord, garde-fous anti-boucle, threading RFC,
+#   planificateur explicitement confirmé et envoi différé annulable.
+# v2.211 -- Council v2 et corrections fondees sur les conversations des 13-15 juillet :
+#   cinq familles Ollama Cloud distinctes, cinq roles independants, critique anonymisee,
+#   arbitrage inverse et provenance exacte sans repli local maquille. « Mode Council » force
+#   desormais l'appel reel. Overrides cloud valides en direct, historique sensible pris en
+#   compte, sorties/suppressions toujours confirmees meme en Expert, compatibilite command->
+#   script pour PowerShell et enregistrement d'une cible SSH sans secret depuis le chat.
+# v2.212 -- Marvin Cortex : contrat de mission structure a six axes transmis hors du texte,
+#   routage explicable et retrocompatible, controle local par message, verification/Council
+#   sur desaccord, graphe SSE, provenance des preuves et recettes persistantes mesurees.
+# v2.208 -- Endpoint de santé et cache Ollama isolés dans api/health.py.
+# v2.207 -- Domaine SSH isolé dans api/ssh.py (CRUD, SSE, WebSocket et SFTP).
+# v2.206 -- Calcul des plannings centralise dans scheduling.py, routes Cron et monitoring SSE
+#   extraites ; le worker et l'API partagent desormais strictement le meme calcul.
 
-app = FastAPI(title="Marvin — Assistance Informatique", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Marvin — Assistance Informatique", version=APP_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -3354,6 +2893,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(doctor_router)
+app.include_router(cortex_router)
+app.include_router(forge_router)
+app.include_router(evolution_router)
+app.include_router(missions_router)
+app.include_router(model_market_router)
+app.include_router(knowledge_router)
+app.include_router(conversations_router)
+app.include_router(projects_router)
+app.include_router(tasks_router)
+app.include_router(notes_router)
+app.include_router(memories_router)
+app.include_router(settings_router)
+app.include_router(backups_router)
+app.include_router(history_router)
+app.include_router(templates_router)
+app.include_router(billing_router)
+app.include_router(technical_docs_router)
+app.include_router(operations_router)
+app.include_router(system_tools_router)
+app.include_router(diagnostics_router)
+app.include_router(documents_router)
+app.include_router(calendar_router)
+app.include_router(coding_router)
+app.include_router(multi_agents_router)
+app.include_router(workflows_router)
+app.include_router(voice_router)
+app.include_router(avatar_router)
+app.include_router(vm_lab_router)
+app.include_router(runtime_config_router)
+app.include_router(skills_router)
+app.include_router(content_router)
+app.include_router(connections_router)
+app.include_router(cron_monitor_router)
+app.include_router(ssh_router)
+app.include_router(storage_router)
+app.include_router(health_router)
 
 
 # v2.184 — filet GLOBAL pour toute exception qui s'échapperait d'une route SANS passer par
@@ -3386,12 +2963,13 @@ class ChatRequest(BaseModel):
     messages: list[dict]
     conversationId: str | None = None
     model: str | None = None
+    cortex: dict | None = None
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
     async def event_stream():
-        async for chunk in run_agent(req.messages, req.conversationId, req.model):
+        async for chunk in run_agent(req.messages, req.conversationId, req.model, req.cortex):
             yield chunk
 
     return StreamingResponse(
@@ -3450,6 +3028,13 @@ async def execute_tool_endpoint(req: ToolExecuteRequest):
     try:
         result = await executor(args)
         duration_ms = int((_time.monotonic() - t0) * 1000)
+        try:
+            import engineering_runtime as _engineering_runtime
+            result = _engineering_runtime.normalize_tool_result(
+                req.toolName, result, duration_ms=duration_ms,
+            )
+        except Exception:
+            pass
         try:
             db.log_execution(req.toolName, req.args, result, duration_ms)
         except Exception:
@@ -3598,297 +3183,12 @@ async def mcp_config():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Conversations
-# ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/conversations")
-async def list_conversations(limit: int = 50, offset: int = 0):
-    return db.list_conversations(limit, offset)
-
-
-@app.get("/api/conversations/search")
-async def search_conversations_endpoint(q: str, limit: int = 50):
-    """v2.171 — recherche full-text (titre + contenu des messages), demandée
-    explicitement (la recherche existante ne portait que sur le titre tronqué à 6 mots).
-    IMPORTANT : doit rester déclarée AVANT /api/conversations/{cid} ci-dessous, sinon
-    FastAPI route "search" comme un cid littéral (ordre d'enregistrement des routes)."""
-    if not q.strip():
-        return []
-    return db.search_conversations(q, limit)
-
-
-@app.get("/api/conversations/{cid}")
-async def get_conversation(cid: str):
-    conv = db.get_conversation(cid)
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation introuvable")
-    messages_raw = db.get_messages_by_conversation(cid)
-
-    # Construire les messages au format frontend (parts + toolInvocations)
-    formatted = []
-    for msg in messages_raw:
-        if msg["role"] == "tool":
-            # Fusionner les résultats d'outils dans le dernier message assistant
-            last_asst = next((m for m in reversed(formatted) if m["role"] == "assistant"), None)
-            if last_asst:
-                try:
-                    results = json.loads(msg["content"]) if isinstance(msg["content"], str) else msg["content"]
-                    if isinstance(results, list):
-                        for r in results:
-                            for inv in last_asst.get("toolInvocations", []):
-                                if inv.get("toolCallId") == r.get("toolCallId"):
-                                    inv["state"] = "result"
-                                    inv["result"] = r.get("result")
-                            for part in last_asst.get("parts", []):
-                                if (part.get("type") == "tool-invocation"
-                                        and part.get("toolInvocation", {}).get("toolCallId") == r.get("toolCallId")):
-                                    part["toolInvocation"]["state"] = "result"
-                                    part["toolInvocation"]["result"] = r.get("result")
-                except Exception:
-                    pass
-            continue
-
-        parts: list = []
-        if msg.get("content"):
-            parts.append({"type": "text", "text": msg["content"]})
-
-        invocations = []
-        if msg["role"] == "assistant" and msg.get("tool_calls"):
-            for tc in msg["tool_calls"]:
-                inv = {
-                    "state": "call",
-                    "toolCallId": tc.get("toolCallId", ""),
-                    "toolName": tc.get("toolName", ""),
-                    "args": tc.get("args", {}),
-                }
-                parts.append({"type": "tool-invocation", "toolInvocation": inv})
-                invocations.append(inv)
-
-        formatted.append({
-            "id": msg["id"],
-            "role": msg["role"],
-            "content": msg.get("content", ""),
-            "parts": parts,
-            "toolInvocations": invocations,
-        })
-
-    return {"conversation": conv, "messages": formatted}
-
-
-@app.delete("/api/conversations/{cid}")
-async def delete_conversation(cid: str):
-    db.delete_conversation(cid)
-    return {"success": True}
-
-
-class ConversationUpdate(BaseModel):
-    title: str | None = None
-    projectId: str | None = None
-    pinned: bool | None = None
-
-
-@app.put("/api/conversations/{cid}")
-async def update_conversation(cid: str, body: ConversationUpdate):
-    # exclude_unset (pas `is not None`) : désassigner un projet envoie
-    # explicitement projectId=null, qu'il faut distinguer de "champ absent".
-    fields = body.model_dump(exclude_unset=True)
-    if "title" in fields and fields["title"] is not None:
-        db.update_conversation_title(cid, fields["title"])
-    if "projectId" in fields:
-        db.update_conversation_project(cid, fields["projectId"])
-    if "pinned" in fields and fields["pinned"] is not None:
-        db.set_conversation_pinned(cid, fields["pinned"])
-    return {"success": True}
-
-
-@app.get("/api/projects")
-async def list_projects():
-    return db.get_projects()
-
-
-class ProjectCreate(BaseModel):
-    name: str
-    instructions: str | None = None
-
-
-@app.post("/api/projects")
-async def create_project(body: ProjectCreate):
-    name = body.name.strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Le nom du projet est requis")
-    return db.create_project(name, instructions=(body.instructions or None))
-
-
-class ProjectUpdate(BaseModel):
-    name: str | None = None
-    instructions: str | None = None
-
-
-@app.put("/api/projects/{pid}")
-async def update_project_route(pid: str, body: ProjectUpdate):
-    # v2.142 — « Projects » avec instructions persistantes (équivalent Claude/ChatGPT
-    # Projects), injectées automatiquement dans le prompt système de toute conversation
-    # rattachée au projet (agent.py::run_agent). Jusqu'ici un projet n'était qu'un nom.
-    updated = db.update_project(pid, name=body.name, instructions=body.instructions)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Projet introuvable")
-    return updated
-
-
-@app.delete("/api/projects/{pid}")
-async def delete_project(pid: str):
-    db.delete_project(pid)
-    return {"success": True}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Tâches
-# ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/tasks")
-async def list_tasks(status: str | None = None, priority: str | None = None):
-    return db.list_tasks(status=status, priority=priority)
-
-
-class TaskCreate(BaseModel):
-    title: str
-    description: str = ""
-    priority: str = "medium"
-    due_date: str | None = None
-    tags: list[str] = []
-
-
-@app.post("/api/tasks")
-async def create_task(body: TaskCreate):
-    task = db.create_task(
-        title=body.title,
-        description=body.description,
-        priority=body.priority,
-        due_date=body.due_date,
-        tags=body.tags,
-    )
-    return task
-
-
-class TaskUpdate(BaseModel):
-    title: str | None = None
-    description: str | None = None
-    status: str | None = None
-    priority: str | None = None
-    due_date: str | None = None
-    tags: list[str] | None = None
-
-
-@app.put("/api/tasks/{tid}")
-async def update_task(tid: str, body: TaskUpdate):
-    task = db.update_task(tid, body.model_dump(exclude_none=True))
-    if not task:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-    return task
-
-
-@app.delete("/api/tasks/{tid}")
-async def delete_task(tid: str):
-    # v2.152 — bloquait tout l'event-loop (même /api/health) en cas de contention SQLite
-    # avec un des workers de fond (proactive/cron/skill learning), db.delete_task() étant
-    # un appel synchrone jamais déporté sur un thread. asyncio.to_thread() isole le blocage
-    # éventuel sur un thread séparé — même pattern déjà établi pour subprocess.run (v2.96).
-    await _asyncio.to_thread(db.delete_task, tid)
-    return {"success": True}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Notes
-# ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/notes")
-async def list_notes(search: str | None = None, pinned: bool | None = None):
-    return db.list_notes(search=search, pinned=pinned)
-
-
-class NoteCreate(BaseModel):
-    title: str
-    content: str = ""
-    tags: list[str] = []
-    pinned: bool = False
-
-
-@app.post("/api/notes")
-async def create_note(body: NoteCreate):
-    note = db.create_note(body.title, body.content, body.tags, body.pinned)
-    return note
-
-
-class NoteUpdate(BaseModel):
-    title: str | None = None
-    content: str | None = None
-    tags: list[str] | None = None
-    pinned: bool | None = None
-
-
-@app.put("/api/notes/{nid}")
-async def update_note(nid: str, body: NoteUpdate):
-    note = db.update_note(nid, body.model_dump(exclude_none=True))
-    if not note:
-        raise HTTPException(status_code=404, detail="Note introuvable")
-    return note
-
-
-@app.delete("/api/notes/{nid}")
-async def delete_note(nid: str):
-    db.delete_note(nid)
-    return {"success": True}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # Mémoires
 # ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/memories")
-async def list_memories():
-    return db.get_memories()
-
-
-class MemoryCreate(BaseModel):
-    content: str
-    category: str = "fact"
-
-
-@app.post("/api/memories")
-async def create_memory(body: MemoryCreate):
-    if not body.content.strip():
-        raise HTTPException(status_code=400, detail="content requis")
-    return db.create_memory(body.content, body.category)
-
-
-@app.delete("/api/memories")
-async def clear_memories():
-    db.clear_all_memories()
-    return {"success": True}
-
-
-@app.delete("/api/memories/{mid}")
-async def delete_memory(mid: str):
-    db.delete_memory(mid)
-    return {"success": True}
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Paramètres
 # ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/settings/{key}")
-async def get_setting(key: str):
-    return {"key": key, "value": db.get_setting(key)}
-
-
-@app.put("/api/settings/{key}")
-async def set_setting(key: str, request: Request):
-    body = await request.json()
-    value = body.get("value")
-    db.set_setting(key, value)
-    return {"success": True}
-
 
 # v2.179 — point d'entrée UNIQUE pour "quel est le meilleur modèle cloud installé pour X ?"
 # (general/code/vision), résolu EN DIRECT sur les modèles réellement installés (jamais un tag
@@ -3905,741 +3205,46 @@ async def get_best_cloud_model(need: str = "general"):
 # Sauvegardes (data/secretary.db) — v2.111
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/api/backups")
-async def list_backups():
-    import backup as _backup
-    return _backup.list_backups()
-
-
-@app.post("/api/backups")
-async def create_backup_now():
-    import backup as _backup
-    r = await _asyncio.to_thread(_backup.create_backup)
-    if r.get("error"):
-        raise HTTPException(status_code=500, detail=r["error"])
-    return r
-
-
-class RestoreRequest(BaseModel):
-    filename: str
-    confirmed: bool = False
-
-
-@app.post("/api/backups/restore")
-async def restore_backup_now(body: RestoreRequest):
-    # Écrase toutes les données actuelles par celles de la sauvegarde — irréversible sans
-    # la sauvegarde de sécurité auto-créée par restore_backup() elle-même. Confirmation
-    # explicite obligatoire (même esprit que DANGEROUS_TOOLS, mais route dédiée hors du
-    # registre d'outils : ce n'est pas une action pilotable par le LLM depuis le chat).
-    if not body.confirmed:
-        raise HTTPException(status_code=400, detail="Confirmation requise (confirmed=true).")
-    import backup as _backup
-    r = await _asyncio.to_thread(_backup.restore_backup, body.filename)
-    if r.get("error"):
-        raise HTTPException(status_code=500, detail=r["error"])
-    return r
-
-
-@app.get("/api/memories/consolidate/preview")
-async def preview_memory_consolidation():
-    """Aperçu des fusions de souvenirs proposées, sans rien supprimer (dry_run)."""
-    import memory_consolidation as _memconsol
-    return _memconsol.consolidate_memories(dry_run=True)
-
-
-@app.post("/api/memories/consolidate")
-async def run_memory_consolidation():
-    """Déclenche la consolidation immédiatement (fusionne les doublons trouvés)."""
-    import memory_consolidation as _memconsol
-    return _memconsol.consolidate_memories(dry_run=False)
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Recherche sémantique
 # ══════════════════════════════════════════════════════════════════════════════
-
-class SearchRequest(BaseModel):
-    query: str
-    collections: list[str] | None = None
-    limit: int = 5
-
-
-@app.post("/api/search")
-async def semantic_search(req: SearchRequest):
-    from vector_store import search
-    results = await search(req.query, req.collections, req.limit)
-    return {"query": req.query, "count": len(results), "results": results}
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Santé
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/api/system/paths")
-async def system_paths():
-    """Retourne les chemins réels du PC courant (home, bureau, documents, téléchargements)."""
-    import os
-    from pathlib import Path as P
-    home = os.path.expanduser("~")
-    return {
-        "home": home,
-        "desktop": str(P(home) / "Desktop"),
-        "documents": str(P(home) / "Documents"),
-        "downloads": str(P(home) / "Downloads"),
-        "pictures": str(P(home) / "Pictures"),
-        "username": os.path.basename(home),
-    }
-
-
-@app.get("/api/system/search")
-async def system_search_endpoint(query: str = "", file_type: str = "", max_results: int = 30):
-    """Recherche par NOM sur tout le PC (index Windows Search)."""
-    return await tool_module.TOOLS_REGISTRY["system_search"](
-        {"query": query, "file_type": file_type, "max_results": max_results})
-
-
-@app.get("/api/system/search-content")
-async def system_search_content_endpoint(query: str = "", file_type: str = "", max_results: int = 25):
-    """Recherche par CONTENU sur tout le PC (index plein-texte Windows Search)."""
-    return await tool_module.TOOLS_REGISTRY["system_search_content"](
-        {"query": query, "file_type": file_type, "max_results": max_results})
-
-
 # ── Aperçu & lecture de fichiers (visionneuse intégrée à Marvin) ─────────────────────
-_IMG_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".ico", ".avif"}
-_TEXT_EXTS = {".txt", ".md", ".markdown", ".csv", ".tsv", ".log", ".json", ".xml", ".yaml",
-              ".yml", ".ini", ".cfg", ".conf", ".env", ".py", ".js", ".ts", ".jsx", ".tsx",
-              ".html", ".htm", ".css", ".scss", ".sh", ".bat", ".ps1", ".sql", ".rs", ".go",
-              ".java", ".c", ".cpp", ".h", ".rst", ".toml"}
-
-
-@app.get("/api/files/raw")
-async def file_raw(path: str):
-    """Sert le contenu BRUT d'un fichier (image, PDF…) pour l'afficher dans Marvin."""
-    import os as _os, mimetypes
-    p = _os.path.abspath(path)
-    if not _os.path.isfile(p):
-        raise HTTPException(status_code=404, detail="Fichier introuvable")
-    mt = mimetypes.guess_type(p)[0] or "application/octet-stream"
-    return FileResponse(p, media_type=mt, filename=_os.path.basename(p))
-
-
-@app.get("/api/files/preview")
-async def file_preview(path: str):
-    """Aperçu d'un fichier pour la visionneuse : image / pdf / texte extrait / binaire."""
-    import os as _os
-    p = _os.path.abspath(path)
-    if not _os.path.isfile(p):
-        raise HTTPException(status_code=404, detail="Fichier introuvable")
-    ext = _os.path.splitext(p)[1].lower()
-    info = {"name": _os.path.basename(p), "size": _os.path.getsize(p), "ext": ext, "path": p}
-    if ext in _IMG_EXTS:
-        return {**info, "kind": "image"}
-    if ext == ".pdf":
-        return {**info, "kind": "pdf"}
-    if ext == ".docx":
-        try:
-            r = await tool_module.TOOLS_REGISTRY["docx_to_text"]({"path": p, "format": "markdown"})
-            return {**info, "kind": "text", "lang": "markdown",
-                    "content": (r.get("text") or r.get("content") or r.get("markdown") or "")[:200000]}
-        except Exception as e:
-            return {**info, "kind": "binary", "error": str(e)[:120]}
-    if ext in (".xlsx", ".xls"):
-        try:
-            r = await tool_module.TOOLS_REGISTRY["xlsx_read"]({"path": p})
-            return {**info, "kind": "table", "data": r}
-        except Exception:
-            return {**info, "kind": "binary"}
-    if ext in _TEXT_EXTS:
-        try:
-            with open(p, encoding="utf-8", errors="replace") as f:
-                content = f.read(300000)
-            return {**info, "kind": "text", "lang": ext.lstrip("."), "content": content}
-        except Exception as e:
-            return {**info, "kind": "binary", "error": str(e)[:120]}
-    return {**info, "kind": "binary"}
-
-
-@app.post("/api/chat/attach")
-async def chat_attach(file: UploadFile = File(...)):
-    """Joindre un document au chat : sauvegarde + extrait le TEXTE pour que Marvin le lise."""
-    import os as _os
-    up_dir = _os.path.join(_os.path.dirname(tool_module.__file__), "..", "data", "chat_uploads")
-    _os.makedirs(up_dir, exist_ok=True)
-    name = _os.path.basename(file.filename or "fichier")
-    dest = _os.path.join(up_dir, name)
-    with open(dest, "wb") as f:
-        f.write(await file.read())
-    ext = _os.path.splitext(name)[1].lower()
-    content = ""
-    try:
-        if ext == ".pdf":
-            r = await tool_module.TOOLS_REGISTRY["pdf_read"]({"path": dest})
-            content = r.get("text") or r.get("content") or ""
-        elif ext == ".docx":
-            r = await tool_module.TOOLS_REGISTRY["docx_to_text"]({"path": dest, "format": "markdown"})
-            content = r.get("text") or r.get("content") or r.get("markdown") or ""
-        elif ext == ".pptx":
-            r = await tool_module.TOOLS_REGISTRY["pptx_read"]({"path": dest})
-            content = r.get("text") or r.get("content") or ""
-        elif ext in (".xlsx", ".xls"):
-            r = await tool_module.TOOLS_REGISTRY["xlsx_read"]({"path": dest})
-            rows = r.get("data") or []
-            heads = r.get("headers") or []
-            lines = [" | ".join(str(h) for h in heads)] if heads else []
-            for row in (rows[:200] if isinstance(rows, list) else []):
-                if isinstance(row, dict):
-                    lines.append(" | ".join(str(row.get(h, "")) for h in heads))
-                elif isinstance(row, list):
-                    lines.append(" | ".join(str(c) for c in row))
-            content = "\n".join(lines)
-        elif ext in _TEXT_EXTS:
-            with open(dest, encoding="utf-8", errors="replace") as f:
-                content = f.read(40000)
-        else:
-            return {"success": True, "name": name, "kind": "binary", "content": "", "chars": 0,
-                    "message": "Type non lisible directement — joins un PDF, Word, Excel, PowerPoint ou texte."}
-    except Exception as e:
-        return {"success": False, "error": f"Lecture impossible : {str(e)[:160]}"}
-    full = len(content or "")
-    excerpt = (content or "")[:12000]
-    return {"success": True, "name": name, "path": dest, "kind": "text",
-            "content": excerpt, "chars": full, "truncated": full > len(excerpt)}
-
-
-@app.get("/api/search/unified")
-async def unified_search_endpoint(query: str = "", scope: str = "", limit: int = 5):
-    """Recherche unifiée (tout à la fois). scope = liste de sources séparées par des virgules, ou 'all'."""
-    sc = [s.strip() for s in scope.split(",") if s.strip()] if scope else None
-    args = {"query": query, "limit": limit}
-    if sc:
-        args["scope"] = sc
-    return await tool_module.TOOLS_REGISTRY["unified_search"](args)
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Screenshot — retourne PNG base64 directement dans la web UI
 # ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/screenshot")
-async def take_screenshot():
-    """Prend une capture d'écran et retourne l'image en base64."""
-    try:
-        from PIL import ImageGrab
-        import io
-        screenshot = ImageGrab.grab()
-        buf = io.BytesIO()
-        screenshot.save(buf, format="PNG")
-        b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-        return {"success": True, "image": f"data:image/png;base64,{b64}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Upload image pour le chat
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.post("/api/upload-image")
-async def upload_image(file: UploadFile = File(...)):
-    """Reçoit une image et retourne son contenu base64 + type MIME."""
-    try:
-        allowed = {"image/jpeg", "image/png", "image/gif", "image/webp"}
-        if file.content_type not in allowed:
-            raise HTTPException(status_code=400, detail=f"Type de fichier non supporté : {file.content_type}")
-        data = await file.read()
-        if len(data) > 20 * 1024 * 1024:  # 20 Mo max
-            raise HTTPException(status_code=400, detail="Image trop volumineuse (max 20 Mo)")
-        b64 = base64.b64encode(data).decode("utf-8")
-        return {
-            "success": True,
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "size": len(data),
-            "data": f"data:{file.content_type};base64,{b64}",
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Credentials OAuth & API Keys
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/api/credentials")
-async def get_credentials():
-    import credentials_manager as cm
-    return {"credentials": cm.get_all_credentials(), "groups": cm.get_group_status()}
-
-
-class CredentialSetRequest(BaseModel):
-    value: str
-
-
-@app.put("/api/credentials/{name}")
-async def set_credential(name: str, body: CredentialSetRequest):
-    import credentials_manager as cm
-    if name not in cm.CREDENTIAL_DEFINITIONS:
-        raise HTTPException(status_code=404, detail=f"Credential inconnu : {name}")
-    cm.set_credential(name, body.value)
-    return {"success": True}
-
-
-@app.delete("/api/credentials/{name}")
-async def delete_credential(name: str):
-    import credentials_manager as cm
-    cm.delete_credential(name)
-    return {"success": True}
-
-
 # ── Google OAuth flow ─────────────────────────────────────────────────────────
 
-@app.get("/api/oauth/google/start")
-async def google_oauth_start():
-    """Génère l'URL d'autorisation Google OAuth2."""
-    import credentials_manager as cm
-    from google_auth_oauthlib.flow import Flow
-
-    client_id = cm.get_credential("google_client_id")
-    client_secret = cm.get_credential("google_client_secret")
-    if not client_id or not client_secret:
-        raise HTTPException(status_code=400, detail="Client ID et Client Secret Google requis")
-
-    flow = Flow.from_client_config(
-        client_config={
-            "web": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [_GOOGLE_CALLBACK],
-            }
-        },
-        scopes=_GOOGLE_SCOPES,
-    )
-    flow.redirect_uri = _GOOGLE_CALLBACK
-    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
-    return {"auth_url": auth_url}
-
-
-@app.get("/api/oauth/google/connect")
-async def google_oauth_connect():
-    """Redirige DIRECTEMENT vers l'écran de consentement Google (1 seul lien à ouvrir)."""
-    from fastapi.responses import RedirectResponse
-    res = await google_oauth_start()
-    if isinstance(res, dict) and res.get("auth_url"):
-        return RedirectResponse(url=res["auth_url"])
-    raise HTTPException(status_code=400, detail="Impossible de générer l'URL d'autorisation Google.")
-
-
-@app.get("/api/oauth/google/callback")
-async def google_oauth_callback(code: str, request: Request):
-    """Reçoit le callback OAuth Google et stocke les tokens."""
-    import credentials_manager as cm
-    from google_auth_oauthlib.flow import Flow
-
-    client_id = cm.get_credential("google_client_id")
-    client_secret = cm.get_credential("google_client_secret")
-
-    flow = Flow.from_client_config(
-        client_config={
-            "web": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [_GOOGLE_CALLBACK],
-            }
-        },
-        scopes=_GOOGLE_SCOPES,
-    )
-    flow.redirect_uri = _GOOGLE_CALLBACK
-    flow.fetch_token(code=code)
-    creds = flow.credentials
-    cm.set_credential("google_access_token", creds.token)
-    if creds.refresh_token:
-        cm.set_credential("google_refresh_token", creds.refresh_token)
-    # Rediriger vers l'UI
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="http://localhost:3000/settings?tab=connections&google=connected")
-
-
-@app.get("/api/oauth/google/status")
-async def google_oauth_status():
-    """État RÉEL de la connexion Google (compte de service OU OAuth) avec test live."""
-    import credentials_manager as cm
-    sa_email = tool_module._google_sa_email()
-    cal_id = db.get_setting("google_calendar_id")
-    mode = "service_account" if sa_email else "oauth"
-    connected, email, error, count = False, None, None, None
-
-    if sa_email:
-        # Mode compte de service : on teste l'accès à l'agenda PARTAGÉ (google_calendar_id)
-        if not cal_id:
-            error = "Clé de service OK, mais l'agenda cible n'est pas défini (ton email)."
-        else:
-            try:
-                svc = tool_module._get_google_calendar_service()
-                res = svc.events().list(calendarId=cal_id, maxResults=1).execute()
-                email = cal_id
-                count = len(res.get("items", []))
-                connected = True
-            except Exception as e:
-                error = str(e)[:200]
-        return {"mode": mode, "has_keys": True, "connected": connected, "email": email,
-                "sa_email": sa_email, "calendar_id": cal_id, "sample_count": count, "error": error,
-                "next_step": (None if connected else (
-                    "Définis l'agenda cible (ton email) : POST /api/google/calendar-id." if not cal_id else
-                    f"Partage ton Google Agenda avec {sa_email} (droit « Modifier les événements »).") )}
-
-    # Mode OAuth utilisateur
-    has_keys = bool(cm.get_credential("google_client_id") and cm.get_credential("google_client_secret"))
-    access = cm.get_credential("google_access_token")
-    refresh = cm.get_credential("google_refresh_token")
-    source = "backend"
-    if not access and not refresh:
-        try:
-            row = db.get_conn().execute("SELECT access_token, refresh_token FROM oauth_tokens WHERE provider='google'").fetchone()
-            if row and row["access_token"]:
-                access, refresh, source = row["access_token"], row["refresh_token"], "frontend"
-        except Exception:
-            pass
-    has_tokens = bool(access or refresh)
-    if has_tokens:
-        try:
-            svc = tool_module._get_google_calendar_service()
-            cal = svc.calendarList().get(calendarId="primary").execute()
-            email = cal.get("id")
-            connected = True
-        except Exception as e:
-            error = str(e)[:160]
-    return {"mode": mode, "has_keys": has_keys, "has_tokens": has_tokens, "connected": connected,
-            "has_refresh": bool(refresh), "email": email, "source": source if has_tokens else None,
-            "callback_uri": _GOOGLE_CALLBACK, "error": error,
-            "next_step": (None if connected else
-                          ("Termine l'autorisation : ouvre /api/oauth/google/connect." if has_keys
-                           else "Renseigne Client ID et Secret, ou utilise un compte de service."))}
-
-
-@app.post("/api/oauth/google/service-account")
-async def upload_google_service_account(file: UploadFile = File(...)):
-    """Reçoit la clé JSON d'un compte de service Google (agenda permanent, sans expiration)."""
-    import json as _json, os as _os
-    raw = await file.read()
-    try:
-        data = _json.loads(raw.decode("utf-8"))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Fichier JSON invalide.")
-    if data.get("type") != "service_account" or not data.get("client_email"):
-        raise HTTPException(status_code=400, detail="Ce n'est pas une clé de compte de service Google valide.")
-    _os.makedirs(_os.path.dirname(tool_module._GOOGLE_SA_PATH), exist_ok=True)
-    with open(tool_module._GOOGLE_SA_PATH, "wb") as f:
-        f.write(raw)
-    return {"success": True, "client_email": data["client_email"],
-            "share_hint": f"Partage maintenant ton Google Agenda avec {data['client_email']} (droit « Modifier les événements »), puis définis ton email comme agenda cible."}
-
-
-@app.delete("/api/oauth/google/service-account")
-async def delete_google_service_account():
-    import os as _os
-    try: _os.remove(tool_module._GOOGLE_SA_PATH)
-    except Exception: pass
-    return {"success": True}
-
-
-class CalendarIdBody(BaseModel):
-    calendar_id: str
-
-
-@app.post("/api/google/calendar-id")
-async def set_google_calendar_id(body: CalendarIdBody):
-    """Définit l'agenda Google cible (ton adresse email) pour le compte de service."""
-    db.set_setting("google_calendar_id", body.calendar_id.strip())
-    return {"success": True, "calendar_id": body.calendar_id.strip()}
-
-
 # ── Microsoft OAuth flow ──────────────────────────────────────────────────────
-
-@app.get("/api/oauth/microsoft/start")
-async def microsoft_oauth_start():
-    """Génère l'URL d'autorisation Microsoft OAuth2."""
-    import credentials_manager as cm
-    import urllib.parse
-
-    client_id = cm.get_credential("ms_client_id")
-    tenant_id = cm.get_credential("ms_tenant_id") or "common"
-    if not client_id:
-        raise HTTPException(status_code=400, detail="Client ID Microsoft requis")
-
-    params = {
-        "client_id": client_id,
-        "response_type": "code",
-        "redirect_uri": _MS_CALLBACK,
-        "scope": "https://graph.microsoft.com/Files.ReadWrite offline_access",
-        "response_mode": "query",
-    }
-    auth_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?" + urllib.parse.urlencode(params)
-    return {"auth_url": auth_url}
-
-
-@app.get("/api/oauth/microsoft/callback")
-async def microsoft_oauth_callback(code: str, request: Request):
-    """Reçoit le callback OAuth Microsoft et stocke les tokens."""
-    import credentials_manager as cm
-    import httpx
-
-    client_id = cm.get_credential("ms_client_id")
-    client_secret = cm.get_credential("ms_client_secret") or ""
-    tenant_id = cm.get_credential("ms_tenant_id") or "common"
-
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(
-            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": _MS_CALLBACK,
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": "https://graph.microsoft.com/Files.ReadWrite offline_access",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-    cm.set_credential("ms_access_token", data["access_token"])
-    if "refresh_token" in data:
-        cm.set_credential("ms_refresh_token", data["refresh_token"])
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="http://localhost:3000/settings?tab=connections&microsoft=connected")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Historique d'exécution
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/api/history")
-async def list_history(tool_name: str | None = None, limit: int = 50, offset: int = 0):
-    return db.list_executions(tool_name=tool_name, limit=limit, offset=offset)
-
-
-@app.get("/api/history/stats")
-async def history_stats():
-    return db.get_execution_stats()
-
-
-@app.get("/api/history/reliability")
-async def history_reliability(min_calls: int = 3, days: int = 90, recent_days: int = 7):
-    """v2.138 — taux d'échec PAR OUTIL (pas juste le volume) : ferme la boucle repérée en
-    auditant `calendar_list` (60 échecs invisibles jusqu'à interrogation manuelle de la DB).
-    v2.159 — ajoute un taux récent (recent_days) pour distinguer "cassé maintenant" de
-    "cassé il y a des semaines, déjà corrigé depuis"."""
-    return {"tools": db.get_tool_reliability(min_calls=min_calls, days=days, recent_days=recent_days)}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Templates d'outils
 # ══════════════════════════════════════════════════════════════════════════════
-
-class TemplateCreate(BaseModel):
-    name: str
-    tool_name: str
-    args: dict = Field(default_factory=dict)
-    description: str = ""
-    category: str = "general"
-
-
-@app.get("/api/templates")
-async def list_templates(tool_name: str | None = None, category: str | None = None):
-    return db.list_templates(tool_name=tool_name, category=category)
-
-
-@app.post("/api/templates")
-async def create_template(body: TemplateCreate):
-    return db.save_template(body.name, body.tool_name, body.args, body.description, body.category)
-
-
-@app.delete("/api/templates/{tid}")
-async def delete_template(tid: str):
-    db.delete_template(tid)
-    return {"success": True}
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Jobs Cron
 # ══════════════════════════════════════════════════════════════════════════════
 
-class CronJobCreate(BaseModel):
-    name: str
-    tool_name: str
-    args: dict = Field(default_factory=dict)
-    schedule: str  # ex: "every 5 minutes", "daily at 08:00", "hourly"
-
-
-class CronJobUpdate(BaseModel):
-    name: str | None = None
-    schedule: str | None = None
-    args: dict | None = None
-    enabled: bool | None = None
-
-
-@app.get("/api/cron")
-async def list_cron_jobs():
-    return db.list_cron_jobs()
-
-
-@app.post("/api/cron")
-async def create_cron_job(body: CronJobCreate):
-    job = db.create_cron_job(body.name, body.tool_name, body.args, body.schedule)
-    # Calcule la 1ère échéance (sinon le job se déclenche immédiatement)
-    db.update_cron_job(job["id"], {"next_run": _next_run_dt(body.schedule)})
-    return db.get_cron_job(job["id"])
-
-
-@app.put("/api/cron/{jid}")
-async def update_cron_job(jid: str, body: CronJobUpdate):
-    updates = body.model_dump(exclude_none=True)
-    # Si le planning change, recalcule la prochaine exécution
-    if updates.get("schedule"):
-        updates["next_run"] = _next_run_dt(updates["schedule"])
-    job = db.update_cron_job(jid, updates)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job introuvable")
-    return job
-
-
-@app.post("/api/cron/preview")
-async def cron_preview(body: dict):
-    """Prévisualise les prochaines exécutions d'un planning (aide à la saisie)."""
-    schedule = body.get("schedule", "")
-    now = datetime.now()
-    cron = _to_cron(schedule)
-    runs = []
-    if cron:
-        try:
-            from croniter import croniter
-            it = croniter(cron, now)
-            runs = [it.get_next(datetime).strftime("%a %d/%m %H:%M") for _ in range(5)]
-        except Exception:
-            pass
-    if not runs:
-        secs = _parse_schedule_seconds(schedule)
-        runs = [(now + timedelta(seconds=secs * (i + 1))).strftime("%a %d/%m %H:%M") for i in range(5)]
-    return {"schedule": schedule, "cron": cron, "next_runs": runs}
-
-
-@app.delete("/api/cron/{jid}")
-async def delete_cron_job(jid: str):
-    db.delete_cron_job(jid)
-    return {"success": True}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Monitoring Live (SSE) — CPU, RAM, Disques
 # ══════════════════════════════════════════════════════════════════════════════
-
-import asyncio as _asyncio
-import psutil as _psutil
-
-
-@app.get("/api/monitor")
-async def monitor_stream():
-    """SSE : envoie les métriques système toutes les 2 secondes."""
-
-    async def generate():
-        while True:
-            try:
-                cpu = _psutil.cpu_percent(interval=None)
-                mem = _psutil.virtual_memory()
-                disks = []
-                for part in _psutil.disk_partitions(all=False):
-                    try:
-                        usage = _psutil.disk_usage(part.mountpoint)
-                        disks.append({
-                            "device": part.device,
-                            "mountpoint": part.mountpoint,
-                            "total_gb": round(usage.total / 1024 ** 3, 1),
-                            "used_gb": round(usage.used / 1024 ** 3, 1),
-                            "free_gb": round(usage.free / 1024 ** 3, 1),
-                            "percent": usage.percent,
-                        })
-                    except Exception:
-                        pass
-                net = _psutil.net_io_counters()
-                # v2.116 — Top processus (CPU/RAM) : rend le monitoring ACTIONNABLE au lieu
-                # de juste afficher des jauges — on voit immédiatement QUI consomme, avec un
-                # bouton pour le terminer directement depuis la page (cf. pc_process_kill).
-                top_processes = []
-                try:
-                    procs = []
-                    for p in _psutil.process_iter(["pid", "name", "cpu_percent", "memory_info"]):
-                        try:
-                            info = p.info
-                            procs.append({
-                                "pid": info["pid"],
-                                "name": info["name"] or "?",
-                                "cpu_percent": round(info["cpu_percent"] or 0.0, 1),
-                                "memory_mb": round((info["memory_info"].rss if info["memory_info"] else 0) / 1024 ** 2, 1),
-                            })
-                        except (_psutil.NoSuchProcess, _psutil.AccessDenied):
-                            pass
-                    procs.sort(key=lambda x: x["cpu_percent"], reverse=True)
-                    top_processes = procs[:8]
-                except Exception:
-                    pass
-                # v2.116 — GPU : get_device_info() a déjà un TTL de 20s (local_video.py), donc
-                # l'appeler chaque cycle (2s) ne redétecte réellement que toutes les 10 itérations.
-                gpu = None
-                try:
-                    import local_video as _lv
-                    info = _lv.get_device_info()
-                    gpu = {
-                        "name": info.get("device_name") or info.get("name"),
-                        "vram_gb": info.get("vram_gb"),
-                        "backend": info.get("backend"),
-                        "vendor": info.get("vendor"),
-                    }
-                except Exception:
-                    pass
-                payload = {
-                    "cpu_percent": cpu,
-                    "cpu_count": _psutil.cpu_count(),
-                    "ram_total_gb": round(mem.total / 1024 ** 3, 1),
-                    "ram_used_gb": round(mem.used / 1024 ** 3, 1),
-                    "ram_percent": mem.percent,
-                    "disks": disks,
-                    "net_sent_mb": round(net.bytes_sent / 1024 ** 2, 1),
-                    "net_recv_mb": round(net.bytes_recv / 1024 ** 2, 1),
-                    "top_processes": top_processes,
-                    "gpu": gpu,
-                }
-                # Batterie (laptop uniquement)
-                try:
-                    bat = _psutil.sensors_battery()
-                    if bat is not None:
-                        payload["battery"] = {
-                            "percent": round(bat.percent, 1),
-                            "plugged": bat.power_plugged,
-                        }
-                except Exception:
-                    pass
-                yield f"data: {json.dumps(payload)}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            await _asyncio.sleep(2)
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SSH Manager
@@ -4675,18 +3280,18 @@ class SSHCommandRequest(BaseModel):
     timeout: int = 30
 
 
-@app.get("/api/ssh")
+# Migré vers api/ssh.py
 async def list_ssh():
     return db.list_ssh_connections()
 
 
-@app.post("/api/ssh")
+# Migré vers api/ssh.py
 async def create_ssh(body: SSHConnectionCreate):
     return db.save_ssh_connection(body.name, body.host, body.port, body.username,
                                    body.password, body.private_key, body.key_passphrase)
 
 
-@app.put("/api/ssh/{sid}")
+# Migré vers api/ssh.py
 async def edit_ssh(sid: str, body: SSHConnectionUpdate):
     """v2.117 — édition d'une connexion existante (jusqu'ici seuls add/delete existaient,
     corriger un simple typo dans l'hôte obligeait à tout ressaisir)."""
@@ -4696,7 +3301,7 @@ async def edit_ssh(sid: str, body: SSHConnectionUpdate):
     return updated
 
 
-@app.delete("/api/ssh/{sid}")
+# Migré vers api/ssh.py
 async def delete_ssh(sid: str):
     db.delete_ssh_connection(sid)
     return {"success": True}
@@ -4711,7 +3316,7 @@ async def delete_ssh(sid: str):
 # commandes de tout Marvin à ne PAS avoir le garde-fou anti-catastrophe — la version pilotée
 # par le chat (tools.py::execute_ssh_exec) l'avait déjà. Corrigé en délégant à
 # `tool_module._ssh_connect`/`_ssh_load_key` (déjà multi-format) et en ajoutant le guard ici.
-@app.post("/api/ssh/test")
+# Migré vers api/ssh.py
 async def test_ssh(body: SSHConnectionCreate):
     """Teste la connectivité SSH. Si `connection_id` est fourni et qu'aucun secret n'est
     saisi dans le formulaire, réutilise le mot de passe/clé déjà en base (permet de tester
@@ -4745,7 +3350,7 @@ async def test_ssh(body: SSHConnectionCreate):
         return {"success": False, "error": str(e)}
 
 
-@app.post("/api/ssh/exec")
+# Migré vers api/ssh.py
 async def exec_ssh(body: SSHCommandRequest):
     """Exécute une commande SSH et retourne stdout+stderr."""
     conn = db.get_ssh_connection(body.connection_id)
@@ -4777,7 +3382,7 @@ async def exec_ssh(body: SSHCommandRequest):
         return {"stdout": "", "stderr": str(e), "exit_code": -1, "command": body.command}
 
 
-@app.get("/api/ssh/exec/stream")
+# Migré vers api/ssh.py
 async def exec_ssh_stream(connection_id: str, command: str):
     """Exécute une commande SSH en streaming SSE (ligne par ligne)."""
     conn = db.get_ssh_connection(connection_id)
@@ -4832,7 +3437,7 @@ async def exec_ssh_stream(connection_id: str, command: str):
 # les chemins d'exécution AUTOMATISÉS de Marvin (chat, exec/stream ci-dessus) — ce canal-ci
 # est un clavier direct tenu par un humain déjà authentifié sur sa propre connexion SSH
 # sauvegardée, équivalent à ouvrir PuTTY.
-@app.websocket("/api/ssh/{sid}/shell")
+# Migré vers api/ssh.py
 async def ssh_shell_ws(websocket: WebSocket, sid: str):
     await websocket.accept()
     conn = db.get_ssh_connection(sid)
@@ -4909,21 +3514,21 @@ async def ssh_shell_ws(websocket: WebSocket, sid: str):
 # ── v2.117 : navigateur SFTP + diagnostic serveur — la logique existait déjà côté outils
 # chat (tools.py::execute_ssh_list_dir/server_info) mais était injoignable depuis la page
 # /ssh. Réutilisée directement (lecture seule, aucune confirmation nécessaire). ──────────
-@app.get("/api/ssh/{sid}/browse")
+# Migré vers api/ssh.py
 async def browse_ssh(sid: str, path: str = "."):
     if not db.get_ssh_connection(sid):
         raise HTTPException(status_code=404, detail="Connexion introuvable")
     return await tool_module.execute_ssh_list_dir({"connection_id": sid, "remote_path": path})
 
 
-@app.get("/api/ssh/{sid}/info")
+# Migré vers api/ssh.py
 async def ssh_server_info(sid: str):
     if not db.get_ssh_connection(sid):
         raise HTTPException(status_code=404, detail="Connexion introuvable")
     return await tool_module.execute_ssh_server_info({"connection_id": sid})
 
 
-@app.get("/api/ssh/{sid}/download")
+# Migré vers api/ssh.py
 async def download_ssh_file(sid: str, path: str):
     """Télécharge un fichier distant DIRECTEMENT dans le navigateur (pas sur le disque de
     Marvin — contrairement à l'outil chat `ssh_download` qui sauvegarde côté serveur)."""
@@ -4948,7 +3553,7 @@ async def download_ssh_file(sid: str, path: str):
                      headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-@app.post("/api/ssh/{sid}/upload")
+# Migré vers api/ssh.py
 async def upload_ssh_file(sid: str, remote_path: str = Form(...), file: UploadFile = File(...)):
     """Envoie un fichier depuis le navigateur vers le serveur distant (SFTP)."""
     conn = db.get_ssh_connection(sid)
@@ -4977,6 +3582,7 @@ async def upload_ssh_file(sid: str, remote_path: str = Form(...), file: UploadFi
 # ══════════════════════════════════════════════════════════════════════════════
 
 import email_manager as _em
+import email_accounts as _email_accounts
 
 def _coerce_json(v):
     if isinstance(v, str):
@@ -4989,46 +3595,20 @@ def _coerce_json(v):
 
 
 def _get_email_accounts() -> list[dict]:
-    """Liste des comptes email (multi-comptes). Migre l'ancienne config unique si besoin."""
-    accts = _coerce_json(db.get_setting("email_accounts"))
-    if not isinstance(accts, list):
-        accts = []
-    if not accts:
-        # Migration depuis l'ancienne config mono-compte 'email_config'
-        legacy = _coerce_json(db.get_setting("email_config"))
-        if isinstance(legacy, dict) and legacy.get("imap_host"):
-            accts = [legacy]
-            db.set_setting("email_accounts", accts)
-    return [a for a in accts if isinstance(a, dict) and a.get("imap_host")]
+    """Liste résolue des comptes email (mot de passe ou jeton OAuth frais)."""
+    return _email_accounts.list_resolved()
 
 
 def _save_email_accounts(accts: list[dict]) -> None:
-    db.set_setting("email_accounts", accts)
+    _email_accounts.save(accts)
 
 
 def _upsert_email_account(cfg: dict) -> list[dict]:
-    """Ajoute ou met à jour un compte (identifié par son username/email)."""
-    accts = _get_email_accounts()
-    idx = next((i for i, a in enumerate(accts) if a.get("username") == cfg.get("username")), None)
-    if idx is not None:
-        accts[idx] = cfg
-    else:
-        accts.append(cfg)
-    _save_email_accounts(accts)
-    return accts
+    return _email_accounts.upsert(cfg)
 
 
 def _get_email_config(account: str | None = None) -> dict | None:
-    """Config d'un compte par username/email. Sans 'account' -> le 1er compte (défaut)."""
-    accts = _get_email_accounts()
-    if not accts:
-        return None
-    if account:
-        for a in accts:
-            if a.get("username") == account:
-                return a
-        return None
-    return accts[0]
+    return _email_accounts.get(account, resolved=True)
 
 
 class EmailConfig(BaseModel):
@@ -5061,7 +3641,8 @@ async def get_email_config(account: str | None = None):
     if not cfg:
         return {"configured": False}
     # Ne pas retourner le mot de passe en clair
-    safe = {k: v for k, v in cfg.items() if k != "password"}
+    secret_fields = {"password", "access_token", "refresh_token", "oauth_client_secret"}
+    safe = {k: v for k, v in cfg.items() if k not in secret_fields and not k.startswith("_")}
     safe["configured"] = True
     safe["password_set"] = bool(cfg.get("password"))
     return safe
@@ -5070,7 +3651,7 @@ async def get_email_config(account: str | None = None):
 @app.post("/api/email/config")
 async def set_email_config(body: EmailConfig):
     # Ajoute ou met à jour le compte (multi-comptes) au lieu d'écraser.
-    _upsert_email_account(body.model_dump())
+    _upsert_email_account({**body.model_dump(), "auth_type": "app_password"})
     return {"success": True}
 
 
@@ -5078,13 +3659,9 @@ async def set_email_config(body: EmailConfig):
 @app.get("/api/email/accounts")
 async def email_accounts_list():
     """Liste des boîtes mail connectées (sans les mots de passe)."""
-    accts = _get_email_accounts()
+    accts = _email_accounts.list_raw()
     return {
-        "accounts": [
-            {"id": a.get("username"), "username": a.get("username"),
-             "provider": a.get("provider", "custom"), "imap_host": a.get("imap_host")}
-            for a in accts
-        ],
+        "accounts": [_email_accounts.public(a) for a in accts],
         "default": accts[0].get("username") if accts else None,
         "count": len(accts),
     }
@@ -5093,17 +3670,15 @@ async def email_accounts_list():
 @app.post("/api/email/accounts")
 async def email_accounts_add(body: EmailConfig):
     """Ajoute (ou met à jour) une boîte mail sans toucher aux autres."""
-    accts = _upsert_email_account(body.model_dump())
+    accts = _upsert_email_account({**body.model_dump(), "auth_type": "app_password"})
     return {"success": True, "id": body.username, "count": len(accts)}
 
 
 @app.delete("/api/email/accounts/{account_id}")
 async def email_accounts_remove(account_id: str):
     """Déconnecte une boîte mail précise."""
-    accts = _get_email_accounts()
-    remaining = [a for a in accts if a.get("username") != account_id]
-    _save_email_accounts(remaining)
-    return {"success": True, "removed": len(accts) - len(remaining), "count": len(remaining)}
+    removed = _email_accounts.remove(account_id)
+    return {"success": True, "removed": removed, "count": len(_email_accounts.list_raw())}
 
 
 @app.post("/api/email/test")
@@ -5413,29 +3988,6 @@ async def daily_briefing():
 
 
 # ── Marvin proactif (briefing matinal automatique) ─────────────────────────────
-def _proactive_with_defaults(cfg: dict) -> dict:
-    cfg.setdefault("morning_briefing", {"enabled": False, "time": "08:00", "voice": False, "voice_name": "henri"})
-    cfg.setdefault("evening_recap", {"enabled": False, "time": "18:30", "voice": False, "voice_name": "henri"})
-    cfg.setdefault("anticipation", {"enabled": False, "interval_min": 30, "overdue_tasks": True,
-                                    "upcoming_events": True, "upcoming_events_min": 30, "max_notify": 5})
-    # v2.150 — "Focus settings" (heures calmes), inspiré des réglages de repos/heures calmes
-    # ajoutés par Claude en 2026 (recap mensuel + quiet hours). Coupe TOUTE notification
-    # proactive (briefing/bilan/anticipation) sur une plage horaire — désactivé par défaut,
-    # 22h-7h si activé (couvre la nuit, pas de sur-supposition sur les horaires de l'utilisateur).
-    cfg.setdefault("quiet_hours", {"enabled": False, "start": "22:00", "end": "07:00"})
-    return cfg
-
-
-def _in_quiet_hours(cfg: dict, hm: str) -> bool:
-    qh = cfg.get("quiet_hours", {})
-    if not qh.get("enabled"):
-        return False
-    start, end = qh.get("start", "22:00"), qh.get("end", "07:00")
-    if start <= end:
-        return start <= hm < end
-    return hm >= start or hm < end  # plage à cheval sur minuit (ex. 22:00 → 07:00)
-
-
 @app.get("/api/proactive")
 async def get_proactive():
     return _proactive_with_defaults(_get_proactive_cfg())
@@ -5481,818 +4033,13 @@ async def run_proactive_now(kind: str = "morning"):
 
 
 # ── Telegram (alertes sur le téléphone) ─────────────────────────────────────────
-@app.get("/api/telegram")
-async def get_telegram():
-    cfg = tool_module._telegram_cfg()
-    # ne pas renvoyer le token en clair
-    return {"enabled": bool(cfg.get("enabled")), "chat_id": cfg.get("chat_id", ""),
-            "has_token": bool(cfg.get("bot_token"))}
-
-
-@app.post("/api/telegram")
-async def set_telegram(body: dict = Body(...)):
-    cfg = tool_module._telegram_cfg()
-    for k in ("enabled", "bot_token", "chat_id"):
-        if k in body and body[k] not in (None, ""):
-            cfg[k] = body[k]
-    if body.get("enabled") is False:
-        cfg["enabled"] = False
-    db.set_setting("telegram_config", cfg)
-    return {"success": True}
-
-
-@app.post("/api/telegram/test")
-async def test_telegram():
-    return await tool_module._send_telegram("✅ Marvin est bien connecté à ce Telegram. Vous recevrez ici vos alertes.")
-
-
 # ── Accès réseau / mobile (IP à jour automatiquement) ──────────────────────────
 # ── Apprentissage : ce que Marvin a appris ─────────────────────────────────────
-@app.get("/api/learning")
-async def learning_list():
-    import learning
-    return {"counts": learning.count_learned(),
-            "facts": learning.list_learned("facts", 200),
-            "qa": learning.list_learned("qa", 100)}
-
-
-@app.get("/api/learning/recall")
-async def learning_recall(q: str):
-    """Diagnostic : montre ce que Marvin se rappellerait pour une demande donnée."""
-    import learning
-    return await learning.recall(q)
-
-
-@app.delete("/api/learning/{kind}/{point_id}")
-async def learning_delete(kind: str, point_id: str):
-    import learning
-    learning.delete_learned("facts" if kind == "facts" else "qa", point_id)
-    return {"success": True}
-
-
-class TeachBody(BaseModel):
-    text: str
-
-
-@app.post("/api/learning/fact")
-async def learning_add_fact(body: TeachBody):
-    """Permet à l'utilisateur d'apprendre un fait à Marvin manuellement."""
-    import learning
-    await learning.add_fact(body.text)
-    return {"success": True}
-
-
 # ── Auto-configuration des modèles selon le matériel ──────────────────────────
-@app.get("/api/auto-config")
-async def get_auto_config():
-    cfg = db.get_setting("auto_config") or {}
-    en = db.get_setting("auto_model_config")
-    cfg["enabled"] = True if en is None else bool(en)
-    return cfg
-
-
-@app.post("/api/auto-config")
-async def run_auto_config(body: dict = Body(default={})):
-    import auto_config
-    if "enabled" in body:
-        db.set_setting("auto_model_config", bool(body["enabled"]))
-    if "mode" in body:
-        m = (body.get("mode") or "auto")
-        # 'auto' (ou inconnu) → l'auto choisit selon le matériel ; sinon on force le mode
-        db.set_setting("perf_mode", m if m in auto_config._MODES else "auto")
-    return await auto_config.apply_auto_config(force=True)
-
-
-@app.get("/api/perf-modes")
-async def list_perf_modes():
-    """Liste les modes de performance disponibles + le mode actif et conseillé."""
-    import auto_config
-    cfg = db.get_setting("auto_config") or {}
-    return {
-        "modes": [{"key": k, **{kk: auto_config._MODES[k][kk] for kk in ("label", "desc", "max_tools", "whisper", "learn", "doc")}}
-                  for k in auto_config._MODE_ORDER],
-        "active": cfg.get("mode"), "auto": cfg.get("auto_mode"),
-        "is_override": cfg.get("is_override", False),
-        "override_setting": db.get_setting("perf_mode") or "auto",
-    }
-
-
-@app.get("/api/audit")
-async def get_audit(limit: int = 100, source: str = ""):
-    """Journal des actions de Marvin (transparence du mode autonome)."""
-    import audit
-    return {"actions": audit.recent(limit=limit, source=source or None), "stats": audit.stats()}
-
-
-@app.post("/api/audit/clear")
-async def clear_audit():
-    import audit
-    audit.clear()
-    return {"success": True}
-
-
 # ── Skills (compétences ajoutables en Markdown, façon Claude Code, sans coder) ───────
-@app.get("/api/skills")
-async def get_skills():
-    import skills
-    return {"skills": skills.list_skills()}
-
-
-@app.post("/api/skills")
-async def save_skill_endpoint(body: dict = Body(...)):
-    import skills
-    name = (body.get("name") or "").strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Nom de la skill requis.")
-    fn = skills.save_skill(name, (body.get("description") or "").strip(),
-                           body.get("body") or "", body.get("tools") or [],
-                           bool(body.get("enabled", True)),
-                           triggers=body.get("triggers") or [], related=body.get("related") or [])
-    skills.log_learning_event("create", name, "Créée manuellement par l'utilisateur", after=body.get("body"))
-    return {"success": True, "file": fn}
-
-
-@app.delete("/api/skills/{name}")
-async def delete_skill_endpoint(name: str):
-    import skills
-    return {"success": skills.delete_skill(name)}
-
-
-# ── 🩺 Marvin Doctor : auto-diagnostic déterministe (score + correctifs) ─────────────
-@app.get("/api/doctor")
-async def get_doctor():
-    import doctor
-    return await doctor.run_diagnostics()
-
-
-@app.post("/api/doctor/fix")
-async def doctor_fix(body: dict = Body(...)):
-    import doctor
-    fix_id = (body.get("fix") or "").strip()
-    if not fix_id:
-        raise HTTPException(status_code=400, detail="Correctif (fix) requis.")
-    res = await doctor.apply_fix(fix_id)
-    res["diagnostics"] = await doctor.run_diagnostics()
-    return res
-
-
-def _parse_skill_json(raw: str) -> dict:
-    """Parser robuste de compétence (canonique dans skills.py)."""
-    import skills
-    return skills.parse_skill_json(raw)
-
-
-@app.post("/api/skills/generate")
-async def generate_skill_endpoint(body: dict = Body(...)):
-    """Marvin RÉDIGE une skill à partir d'une description (méta : il apprend à faire X)."""
-    import skills, json as _j
-    desc = (body.get("description") or "").strip()
-    if not desc:
-        raise HTTPException(status_code=400, detail="Décris ce que la skill doit faire.")
-    tool_names = [t["function"]["name"] for t in tool_module.TOOLS_SPEC]
-    prompt = (
-        "Tu crées une COMPÉTENCE (skill) AGENTIQUE pour l'assistant Marvin. Une skill = une MÉTHODE "
-        "robuste en langage naturel que Marvin suivra avec ses outils existants (PAS de code).\n"
-        "RÉDIGE TOUT EN FRANÇAIS (seuls les noms d'outils restent en anglais).\n"
-        f"Besoin de l'utilisateur : « {desc} »\n\n"
-        f"Outils disponibles (choisis-en quelques-uns de pertinents) : {', '.join(tool_names[:120])}\n\n"
-        "RÈGLE CLÉ : les étapes décrivent ce que MARVIN fait avec SES OUTILS (entre backticks), "
-        "JAMAIS des manipulations manuelles de l'utilisateur (interdit : « appuyez sur Win+R », "
-        "« ouvrez le panneau de configuration », « tapez appwiz.cpl »). Marvin AGIT lui-même via les outils. "
-        "Choisis toujours au moins un outil pertinent dans 'tools'.\n"
-        "Le 'body' doit être structuré en Markdown avec ces sections :\n"
-        "## Objectif · ## Prérequis (infos à récupérer d'abord) · ## Étapes (numérotées, avec l'outil "
-        "entre backticks) · ## Vérification (comment confirmer que c'est résolu) · ## Pièges à éviter.\n\n"
-        "Réponds UNIQUEMENT par un objet JSON valide, sans texte autour, sans balises de code :\n"
-        '{"name": "nom-court-en-kebab-case", "description": "quand utiliser cette skill (1 phrase)", '
-        '"triggers": ["3 à 6 expressions déclencheuses que dirait l\'utilisateur"], '
-        '"tools": ["outil1", "outil2"], "body": "## Objectif\\n...\\n## Prérequis\\n...\\n## Étapes\\n1. ...\\n'
-        '## Vérification\\n...\\n## Pièges à éviter\\n- ..."}'
-    )
-    # v2.122 — model=None : cloud_routing.resolve_model() décide selon le réglage Ollama
-    # Cloud + la sensibilité du prompt (contient la description utilisateur) ; repli local
-    # (profil agent) identique à avant si le cloud n'est pas configuré.
-    try:
-        raw = await tool_module._ollama_generate(prompt, model=None, timeout=240)
-    except Exception as e:
-        return {"success": False, "error": f"Génération échouée (modèle indisponible) : {str(e)[:160]}"}
-    data = _parse_skill_json(raw)
-    if not data.get("name"):
-        return {"success": False, "error": "Génération impossible, reformule la description.", "raw": raw[:300]}
-    fn = skills.save_skill(data["name"], data.get("description", desc), data.get("body", ""),
-                           [t for t in (data.get("tools") or []) if t in tool_names], True,
-                           triggers=[str(t)[:40] for t in (data.get("triggers") or [])][:8])
-    skills.log_learning_event("auto_create", data["name"], f"Générée depuis une description : « {desc[:150]} »",
-                              after=data.get("body"))
-    return {"success": True, "file": fn, "skill": skills.get_skill(data["name"])}
-
-
-@app.post("/api/skills/from-conversation")
-async def skill_from_conversation(body: dict = Body(...)):
-    """Transforme la conversation en cours en COMPÉTENCE réutilisable (la méthode qui a marché)."""
-    import skills, json as _j
-    msgs = body.get("messages") or []
-    lines = []
-    for m in msgs[-30:]:
-        role = m.get("role")
-        c = m.get("content")
-        if isinstance(c, list):
-            c = " ".join(p.get("text", "") for p in c if isinstance(p, dict) and p.get("type") == "text")
-        if c and role in ("user", "assistant"):
-            who = "Utilisateur" if role == "user" else "Marvin"
-            lines.append(f"{who}: {str(c)[:800]}")
-    transcript = "\n".join(lines)
-    if len(transcript) < 40:
-        return {"success": False, "error": "Conversation trop courte pour en tirer une compétence."}
-    tool_names = [t["function"]["name"] for t in tool_module.TOOLS_SPEC]
-    prompt = (
-        "À partir de la CONVERSATION ci-dessous, crée une COMPÉTENCE (skill) RÉUTILISABLE pour Marvin : "
-        "la MÉTHODE généralisée (étapes) qui a permis d'accomplir la tâche, pour la refaire la prochaine fois. "
-        "RÉDIGE EN FRANÇAIS (noms d'outils en anglais).\n"
-        "RÈGLE CLÉ : les étapes décrivent ce que MARVIN fait avec SES OUTILS (entre backticks), JAMAIS des "
-        "manipulations manuelles de l'utilisateur (pas de « appuyez sur Win+R », « ouvrez tel panneau »). "
-        "Choisis au moins un outil pertinent dans 'tools'. Ignore les étapes ratées de la conversation, ne garde que ce qui marche.\n\n"
-        f"CONVERSATION :\n{transcript}\n\n"
-        f"Outils disponibles : {', '.join(tool_names[:120])}\n\n"
-        "Réponds UNIQUEMENT en JSON valide, sans balises de code :\n"
-        '{"name": "nom-court-kebab", "description": "quand utiliser cette compétence (1 phrase)", '
-        '"triggers": ["expressions déclencheuses"], "tools": ["outil1"], '
-        '"body": "## Objectif\\n...\\n## Étapes\\n1. ...\\n## Vérification\\n..."}'
-    )
-    try:
-        # v2.122 — model=None : le prompt contient la conversation source en clair, le
-        # routage cloud/sensibilité (cloud_routing.resolve_model) s'applique dessus.
-        raw = await tool_module._ollama_generate(prompt, model=None, timeout=240)
-    except Exception as e:
-        return {"success": False, "error": f"Génération échouée (modèle indisponible) : {str(e)[:160]}"}
-    data = _parse_skill_json(raw)
-    if not data.get("name"):
-        return {"success": False, "error": "Impossible d'extraire une compétence de cette conversation. Réessaie après quelques échanges concrets."}
-    fn = skills.save_skill(data["name"], data.get("description", ""), data.get("body", ""),
-                           [t for t in (data.get("tools") or []) if t in tool_names], True,
-                           triggers=[str(t)[:40] for t in (data.get("triggers") or [])][:8])
-    skills.log_learning_event("auto_create", data["name"], "Extraite d'une conversation réussie",
-                              after=data.get("body"))
-    return {"success": True, "file": fn, "skill": skills.get_skill(data["name"])}
-
-
-@app.get("/api/skills/stats")
-async def skills_stats():
-    """Statistiques de performance des compétences (usages, succès, échecs, version)."""
-    import skills
-    return {"stats": skills.get_stats()}
-
-
-@app.post("/api/skills/{name}/upgrade")
-async def skill_upgrade(name: str, body: dict = Body(default={})):
-    """Améliore (ré-écrit) une compétence pour la rendre plus robuste/efficace.
-    Déclenché manuellement ; l'auto-upgrade se fait sinon tout seul après un échec."""
-    import skills
-    reason = (body or {}).get("reason", "Amélioration manuelle demandée par l'utilisateur.")
-    transcript = (body or {}).get("transcript", "")
-    tool_names = [t["function"]["name"] for t in tool_module.TOOLS_SPEC]
-
-    async def _g(p):
-        # v2.122 — model=None : le prompt inclut le transcript (peut contenir des données
-        # d'outils sensibles) — routage cloud/sensibilité appliqué dessus.
-        return await tool_module._ollama_generate(p, model=None, timeout=240)
-
-    return await skills.upgrade_skill(name, _g, reason=reason, transcript=transcript, tool_names=tool_names)
-
-
-@app.get("/api/skills/{name}/versions")
-async def skill_versions(name: str):
-    """Liste les versions archivées d'une compétence (pour rollback)."""
-    import skills
-    return {"versions": skills.list_versions(name), "stats": skills.get_stats(name)}
-
-
-@app.post("/api/skills/{name}/rollback")
-async def skill_rollback(name: str, body: dict = Body(...)):
-    """Restaure une version archivée d'une compétence."""
-    import skills
-    vf = (body or {}).get("version_file")
-    if not vf:
-        raise HTTPException(status_code=400, detail="version_file requis.")
-    ok = skills.rollback_skill(name, vf)
-    return {"success": ok, "skill": skills.get_skill(name) if ok else None}
-
-
-@app.get("/api/skills/{name}/resources")
-async def skill_resources_list(name: str):
-    """Liste les ressources (fichiers de référence) embarquées d'une compétence."""
-    import skills
-    return {"resources": skills.list_resources(name)}
-
-
-@app.post("/api/skills/{name}/resources")
-async def skill_resource_save(name: str, body: dict = Body(...)):
-    """Crée/édite une ressource TEXTE (modèle, table de prix, check-list…)."""
-    import skills
-    if not skills.get_skill(name):
-        raise HTTPException(status_code=404, detail="Compétence introuvable.")
-    fn = (body or {}).get("filename", "").strip()
-    content = (body or {}).get("content", "")
-    if not fn:
-        raise HTTPException(status_code=400, detail="filename requis.")
-    if "." not in fn:
-        fn += ".md"   # défaut Markdown
-    return skills.save_resource(name, fn, content)
-
-
-@app.post("/api/skills/{name}/resources/upload")
-async def skill_resource_upload(name: str, file: UploadFile = File(...)):
-    """Téléverse une ressource (binaire OK : PDF table de prix, modèle .docx…)."""
-    import skills
-    if not skills.get_skill(name):
-        raise HTTPException(status_code=404, detail="Compétence introuvable.")
-    data = await file.read()
-    return skills.save_resource(name, file.filename or "ressource", data)
-
-
-@app.get("/api/skills/{name}/resources/{filename}")
-async def skill_resource_get(name: str, filename: str):
-    """Contenu texte d'une ressource (aperçu/édition). None si binaire."""
-    import skills
-    return {"name": filename, "content": skills.read_resource(name, filename, max_chars=20000),
-            "path": skills.resource_path(name, filename)}
-
-
-@app.delete("/api/skills/{name}/resources/{filename}")
-async def skill_resource_delete(name: str, filename: str):
-    """Supprime une ressource d'une compétence."""
-    import skills
-    return {"success": skills.delete_resource(name, filename)}
-
-
-@app.post("/api/skills/suggest")
-async def skills_suggest(body: dict = Body(default={})):
-    """🔎 Mining proactif : analyse les demandes récentes et propose de NOUVELLES
-    compétences pour les tâches récurrentes non encore couvertes."""
-    import skills
-    limit = int((body or {}).get("limit", 120))
-    messages = db.get_recent_user_messages(limit=limit)
-    tool_names = [t["function"]["name"] for t in tool_module.TOOLS_SPEC]
-
-    async def _g(p):
-        # v2.122 — model=None : le prompt inclut jusqu'à 120 messages utilisateur récents
-        # en clair — routage cloud/sensibilité appliqué dessus.
-        return await tool_module._ollama_generate(p, model=None, timeout=240)
-
-    suggestions = await skills.suggest_skills(_g, messages, tool_names=tool_names)
-    return {"suggestions": suggestions, "analyzed": len(messages)}
-
-
-@app.post("/api/skills/suggest/dismiss")
-async def skills_suggest_dismiss(body: dict = Body(...)):
-    """Refuse une suggestion → ne plus la reproposer."""
-    import skills
-    nm = (body or {}).get("name", "").strip()
-    if not nm:
-        raise HTTPException(status_code=400, detail="name requis.")
-    skills.dismiss_suggestion(nm)
-    return {"success": True}
-
-
-@app.get("/api/skills/learning_log")
-async def skills_learning_log(limit: int = 50, skill: str = None):
-    """📖 Journal d'apprentissage persistant : créations/upgrades/consolidations/oublis
-    de compétences, avec diffs. C'est ce que la consolidation nocturne relit."""
-    import skills
-    return {"log": skills.get_learning_log(limit=limit, skill_name=skill)}
-
-
-@app.get("/api/skills/match_log")
-async def skills_match_log(limit: int = 50):
-    """🎯 v2.124 — Journal des tentatives de matching (gagnant + dauphin + scores) : sert à
-    juger si le seuil/la formule sont bien calibrés, et si un retrieval multi-compétences
-    (façon Voyager) apporterait quelque chose — cas où le score du dauphin est proche du
-    gagnant, signe d'ambiguïté réelle entre deux compétences plutôt qu'un bruit de mesure."""
-    import skills
-    return {"log": skills.get_match_log(limit=limit)}
-
-
-@app.get("/api/skills/overlaps")
-async def skills_overlaps(threshold: float = 0.85):
-    """🔍 v2.124 — Scan de similarité croisée entre TOUTES les compétences (pas seulement au
-    sein d'une même compétence) : repère les paires qui se chevauchent trop et pourraient
-    perturber le matcher ou mériteraient une fusion. Lecture seule, ne modifie rien."""
-    import skills
-    pairs = await skills.find_overlapping_skills(threshold=threshold)
-    return {"pairs": pairs, "threshold": threshold}
-
-
-@app.post("/api/skills/consolidate")
-async def skills_consolidate(body: dict = Body(default={})):
-    """Déclenche manuellement une passe de consolidation (normalement automatique,
-    plus fréquente la nuit — voir _skill_night_learning_worker)."""
-    import skills
-
-    async def _g(p):
-        # v2.122 — model=None : routage cloud/sensibilité sur le prompt réel.
-        return await tool_module._ollama_generate(p, model=None, timeout=240)
-
-    reviewed = await skills.review_and_consolidate_learnings(_g, skill_name=(body or {}).get("skill"))
-    forgotten = skills.consolidate_obsolete_skills()
-    return {"reviewed": reviewed, "forgotten": forgotten}
-
-
-@app.get("/api/winget/search")
-async def winget_search(q: str, source: str = None, limit: int = 20):
-    """📦 Emporium : recherche de logiciels installables (Winget)."""
-    args = {"query": q, "limit": limit}
-    if source:
-        args["source"] = source
-    return await tool_module.TOOLS_REGISTRY["winget_search"](args)
-
-
-@app.get("/api/winget/upgrades")
-async def winget_upgrades():
-    """Liste des logiciels ayant une mise à jour disponible."""
-    return await tool_module.TOOLS_REGISTRY["winget_list_upgrades"]({})
-
-
-@app.get("/api/winget/installed")
-async def winget_installed(q: str = None):
-    """Liste des logiciels installés (filtrable) — pour voir/désinstaller."""
-    return await tool_module.TOOLS_REGISTRY["winget_list_installed"]({"query": q} if q else {})
-
-
-@app.post("/api/winget/install")
-async def winget_install(body: dict = Body(...)):
-    """Installe un paquet (confirmation via l'UI → confirmed=True)."""
-    return await tool_module.TOOLS_REGISTRY["winget_install"]({**(body or {}), "confirmed": True})
-
-
-@app.post("/api/winget/upgrade")
-async def winget_upgrade(body: dict = Body(default={})):
-    """Met à jour un paquet (id) ou tout (all=true)."""
-    return await tool_module.TOOLS_REGISTRY["winget_upgrade"]({**(body or {}), "confirmed": True})
-
-
-@app.post("/api/winget/uninstall")
-async def winget_uninstall(body: dict = Body(...)):
-    """Désinstalle un paquet (confirmation via l'UI → confirmed=True)."""
-    return await tool_module.TOOLS_REGISTRY["winget_uninstall"]({**(body or {}), "confirmed": True})
-
-
-@app.get("/api/pantheon/telemetry")
-async def pantheon_telemetry_status():
-    return await tool_module.TOOLS_REGISTRY["tweak_telemetry"]({"action": "status"})
-
-
-@app.post("/api/pantheon/telemetry")
-async def pantheon_telemetry_set(body: dict = Body(...)):
-    action = (body or {}).get("action", "disable")
-    return await tool_module.TOOLS_REGISTRY["tweak_telemetry"]({"action": action, "confirmed": True})
-
-
-@app.get("/api/pantheon/debloat")
-async def pantheon_debloat_list():
-    return await tool_module.TOOLS_REGISTRY["tweak_debloat_list"]({})
-
-
-@app.post("/api/pantheon/debloat/remove")
-async def pantheon_debloat_remove(body: dict = Body(...)):
-    pkgs = (body or {}).get("packages") or []
-    return await tool_module.TOOLS_REGISTRY["tweak_debloat_remove"]({"packages": pkgs, "confirmed": True})
-
-
-@app.get("/api/pantheon/network")
-async def pantheon_network_status():
-    return await tool_module.TOOLS_REGISTRY["tweak_network_harden"]({"action": "status"})
-
-
-@app.post("/api/pantheon/network/apply")
-async def pantheon_network_apply():
-    return await tool_module.TOOLS_REGISTRY["tweak_network_harden"]({"action": "apply", "confirmed": True})
-
-
-@app.post("/api/pantheon/restore-point")
-async def pantheon_restore_point(body: dict = Body(default={})):
-    desc = (body or {}).get("description", "Marvin — avant optimisation")
-    return await tool_module.TOOLS_REGISTRY["system_restore_point"]({"description": desc, "confirmed": True})
-
-
-@app.get("/api/catharsis/scan")
-async def catharsis_scan():
-    """🧹 Catharsis : analyse l'espace récupérable (ne supprime rien)."""
-    return await tool_module.TOOLS_REGISTRY["catharsis_scan"]({})
-
-
-@app.post("/api/catharsis/clean")
-async def catharsis_clean(body: dict = Body(...)):
-    """Purge les catégories choisies (confirmation via l'UI)."""
-    cats = (body or {}).get("categories") or []
-    return await tool_module.TOOLS_REGISTRY["catharsis_clean"]({"categories": cats, "confirmed": True})
-
-
-@app.get("/api/codex/status")
-async def codex_status():
-    """🎛️ Codex : état agrégé des paramètres OS clés."""
-    reg = tool_module.TOOLS_REGISTRY
-    return {
-        "power":      await reg["os_power_plan"]({"action": "get"}),
-        "dark":       await reg["os_dark_mode"]({"action": "get"}),
-        "firewall":   await reg["os_firewall"]({"action": "status"}),
-        "hibernation": await reg["os_hibernation"]({"action": "status"}),
-        "adapters":   await reg["os_network_adapters"]({"action": "list"}),
-    }
-
-
-@app.post("/api/codex/power")
-async def codex_power(body: dict = Body(...)):
-    return await tool_module.TOOLS_REGISTRY["os_power_plan"]({"action": "set", "plan": (body or {}).get("plan"), "confirmed": True})
-
-
-@app.post("/api/codex/dark")
-async def codex_dark(body: dict = Body(...)):
-    return await tool_module.TOOLS_REGISTRY["os_dark_mode"]({"action": (body or {}).get("action", "toggle"), "confirmed": True})
-
-
-@app.post("/api/codex/firewall")
-async def codex_firewall(body: dict = Body(...)):
-    return await tool_module.TOOLS_REGISTRY["os_firewall"]({"action": (body or {}).get("action", "status"), "confirmed": True})
-
-
-@app.post("/api/codex/hibernation")
-async def codex_hibernation(body: dict = Body(...)):
-    return await tool_module.TOOLS_REGISTRY["os_hibernation"]({"action": (body or {}).get("action", "status"), "confirmed": True})
-
-
-@app.post("/api/codex/adapter")
-async def codex_adapter(body: dict = Body(...)):
-    b = body or {}
-    return await tool_module.TOOLS_REGISTRY["os_network_adapters"]({"action": b.get("action"), "name": b.get("name"), "confirmed": True})
-
-
-@app.get("/api/router/route")
-async def router_route(q: str):
-    """Diagnostic du routing intelligent : montre les outils choisis (mots-clés +
-    sémantique + appris) pour une demande donnée."""
-    import tool_router, agent as _agent
-    text = (q or "").lower()
-    keyword = set(_agent._ALWAYS_INCLUDE)
-    for kws, tools in _agent._KEYWORD_TOOLS.items():
-        if any(k in text for k in kws):
-            keyword.update(tools)
-    keyword -= set(_agent._ALWAYS_INCLUDE)
-    routed = await tool_router.route_tools(q)
-    return {"query": q,
-            "keyword": sorted(keyword),
-            "semantic": sorted(routed.get("semantic", set())),
-            "learned": sorted(routed.get("learned", set()))}
-
-
-@app.get("/api/network")
-async def network_info():
-    """Retourne les adresses IP ACTUELLES du PC (recalculées à chaque appel → toujours
-    à jour même si on change de lieu/réseau). Sert à l'accès mobile."""
-    import socket, psutil
-    hostname = socket.gethostname()
-    primary = None
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0.5)
-        s.connect(("8.8.8.8", 80))   # n'envoie rien, donne juste l'IP de l'interface active
-        primary = s.getsockname()[0]
-        s.close()
-    except Exception:
-        pass
-    addrs, seen = [], set()
-    try:
-        for ifname, iflist in psutil.net_if_addrs().items():
-            for a in iflist:
-                if a.family == socket.AF_INET and not a.address.startswith(("127.", "169.254.")):
-                    ip = a.address
-                    if ip in seen:
-                        continue
-                    seen.add(ip)
-                    low = ifname.lower()
-                    if ip.startswith("100.") or "tailscale" in low:
-                        kind = "tailscale"
-                    elif any(v in low for v in ("vmware", "virtualbox", "vethernet", "hyper-v", "loopback")):
-                        kind = "virtuel"
-                    elif ip.startswith(("192.168.", "10.", "172.")):
-                        kind = "lan"
-                    else:
-                        kind = "autre"
-                    addrs.append({"ip": ip, "interface": ifname, "kind": kind,
-                                  "primary": ip == primary, "url": f"http://{ip}:3000"})
-    except Exception:
-        pass
-    order = {"lan": 0, "tailscale": 1, "autre": 2, "virtuel": 3}
-    addrs.sort(key=lambda x: (0 if x["primary"] else 1, order.get(x["kind"], 9)))
-    return {"hostname": hostname, "primary_ip": primary,
-            "primary_url": f"http://{primary}:3000" if primary else None,
-            "addresses": addrs}
-
-
-@app.get("/api/network/qr")
-async def network_qr(url: str):
-    """QR code (PNG) d'une URL — pour scanner depuis le téléphone."""
-    import qrcode, io
-    img = qrcode.make(url)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return Response(content=buf.getvalue(), media_type="image/png",
-                    headers={"Cache-Control": "no-cache"})
-
-
 # ── Documents (RAG : parle à tes documents) ────────────────────────────────────
-@app.get("/api/documents")
-async def list_documents():
-    return await tool_module.TOOLS_REGISTRY["document_list"]({})
-
-
-@app.get("/api/documents/templates")
-async def document_templates():
-    return {"templates": tool_module._doc_templates_list()}
-
-
-@app.post("/api/documents/generate")
-async def generate_document(body: dict = Body(...)):
-    result = await tool_module.TOOLS_REGISTRY["document_generate"](body)
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.get("/api/documents/download")
-async def download_document(path: str):
-    import os as _os
-    base = _os.path.abspath(_os.path.join(_os.path.dirname(tool_module.__file__), "..", "data", "documents_generes"))
-    target = _os.path.abspath(path)
-    if not target.startswith(base) or not _os.path.exists(target):
-        raise HTTPException(status_code=404, detail="Fichier introuvable")
-    from fastapi.responses import FileResponse
-    return FileResponse(target, filename=_os.path.basename(target),
-                        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-
-
-@app.get("/api/documents/letterhead")
-async def get_letterhead():
-    lh = db.get_setting("doc_letterhead")
-    return lh if isinstance(lh, dict) else {}
-
-
-@app.post("/api/documents/letterhead")
-async def save_letterhead(body: dict = Body(...)):
-    db.set_setting("doc_letterhead", body)
-    return {"success": True}
-
-
-@app.post("/api/documents/logo")
-async def upload_logo(file: UploadFile = File(...)):
-    import os as _os
-    docs_dir = _os.path.join(_os.path.dirname(tool_module.__file__), "..", "data", "documents_generes")
-    _os.makedirs(docs_dir, exist_ok=True)
-    ext = (_os.path.splitext(file.filename or "logo.png")[1] or ".png").lower()
-    dest = _os.path.join(docs_dir, "letterhead_logo" + ext)
-    with open(dest, "wb") as f:
-        f.write(await file.read())
-    lh = db.get_setting("doc_letterhead")
-    lh = lh if isinstance(lh, dict) else {}
-    lh["logo"] = dest
-    db.set_setting("doc_letterhead", lh)
-    return {"success": True, "logo": dest}
-
-
-class DocIndexBody(BaseModel):
-    path: str
-
-
-@app.post("/api/documents/index")
-async def index_document(body: DocIndexBody):
-    result = await tool_module.TOOLS_REGISTRY["document_index"]({"path": body.path})
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-class DocAskBody(BaseModel):
-    question: str
-    k: int = 6
-
-
-@app.post("/api/documents/ask")
-async def ask_documents(body: DocAskBody):
-    result = await tool_module.TOOLS_REGISTRY["document_ask"]({"question": body.question, "k": body.k})
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-class DocRefineBody(BaseModel):
-    file: str
-    section: str
-    instruction: str = ""
-    notes: str = ""
-
-
-@app.post("/api/documents/refine")
-async def refine_document(body: DocRefineBody):
-    result = await tool_module.TOOLS_REGISTRY["document_refine_section"](body.dict())
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.delete("/api/documents/{doc_id}")
-async def forget_document(doc_id: str):
-    return await tool_module.TOOLS_REGISTRY["document_forget"]({"id": doc_id})
-
-
-@app.post("/api/documents/upload")
-async def upload_document(file: UploadFile = File(...)):
-    """Reçoit un fichier, l'enregistre puis l'indexe pour le RAG."""
-    import os as _os
-    docs_dir = _os.path.join(_os.path.dirname(__file__), "..", "data", "documents")
-    _os.makedirs(docs_dir, exist_ok=True)
-    safe = _os.path.basename(file.filename or "document")
-    dest = _os.path.join(docs_dir, safe)
-    data = await file.read()
-    with open(dest, "wb") as f:
-        f.write(data)
-    result = await tool_module.TOOLS_REGISTRY["document_index"]({"path": dest})
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
 # ── Agenda local (événements) ─────────────────────────────────────────────────
-@app.get("/api/events")
-async def list_events(period: str = "", start: str = "", end: str = ""):
-    args = {}
-    if period: args["period"] = period
-    if start: args["start"] = start
-    if end: args["end"] = end
-    return await tool_module.TOOLS_REGISTRY["event_list"](args)
-
-
-class EventBody(BaseModel):
-    title: str = ""
-    natural: str = ""
-    start_at: str = ""
-    end_at: str = ""
-    location: str = ""
-    description: str = ""
-    all_day: bool = False
-    reminder_minutes: int | None = None
-
-
-@app.post("/api/events")
-async def create_event(body: EventBody):
-    result = await tool_module.TOOLS_REGISTRY["event_create"](body.model_dump())
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.patch("/api/events/{event_id}")
-async def update_event(event_id: str, body: dict = Body(...)):
-    body["id"] = event_id
-    result = await tool_module.TOOLS_REGISTRY["event_update"](body)
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.delete("/api/events/{event_id}")
-async def delete_event(event_id: str):
-    return await tool_module.TOOLS_REGISTRY["event_delete"]({"id": event_id})
-
-
 # ── Agendas connectés (abonnements iCal) ────────────────────────────────────────
-@app.get("/api/calendar/subscriptions")
-async def list_calendar_subs():
-    return await tool_module.TOOLS_REGISTRY["calendar_subscriptions"]({})
-
-
-class CalendarSubBody(BaseModel):
-    url: str
-    name: str = ""
-    color: str = "#10b981"
-
-
-@app.post("/api/calendar/subscriptions")
-async def add_calendar_sub(body: CalendarSubBody):
-    result = await tool_module.TOOLS_REGISTRY["calendar_subscribe"](body.model_dump())
-    if result.get("error") and not result.get("subscription"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-@app.delete("/api/calendar/subscriptions/{sub_id}")
-async def remove_calendar_sub(sub_id: str):
-    return await tool_module.TOOLS_REGISTRY["calendar_unsubscribe"]({"id": sub_id})
-
-
-@app.post("/api/calendar/subscriptions/sync")
-async def sync_calendar_subs(sub_id: str = ""):
-    return await tool_module.TOOLS_REGISTRY["calendar_sync"]({"id": sub_id} if sub_id else {})
-
-
 class DraftReplyRequest(BaseModel):
     uid: str = ""
     body: str = ""
@@ -6352,7 +4099,7 @@ async def email_digest(account: str | None = None, limit: int = 15, folder: str 
 
 # ── Assistant email automatique (3 modes) ────────────────────────────────────
 class AutomationConfig(BaseModel):
-    mode: str = "manuel"                 # manuel | brouillon | autonome
+    mode: str = "manuel"                 # manuel | brouillon | differe | autonome
     accounts: list[str] = Field(default_factory=list)
     instructions: str = ""
     tone: str = "professionnel, clair et courtois"
@@ -6361,6 +4108,11 @@ class AutomationConfig(BaseModel):
     never_from: list[str] = Field(default_factory=list)
     skip_keywords: list[str] = Field(default_factory=list)
     max_per_run: int = 5
+    send_delay_min: int = 5
+    scheduler_enabled: bool = False
+    scheduler_confirmed: bool = False
+    interval_min: int = 5
+    profiles: dict[str, dict] = Field(default_factory=dict)
 
 
 @app.get("/api/email/automation")
@@ -6372,23 +4124,48 @@ async def get_email_automation():
         except Exception: cfg = None
     if not isinstance(cfg, dict):
         cfg = {"mode": "manuel"}
-    return cfg
+    return {"scheduler_enabled": False, "interval_min": 5, "profiles": {}, **cfg}
 
 
 @app.post("/api/email/automation")
 async def set_email_automation(body: AutomationConfig):
-    db.set_setting("email_automation", body.model_dump())
-    return {"success": True, "mode": body.mode}
+    previous = db.get_setting("email_automation") or {}
+    if isinstance(previous, str):
+        try: previous = json.loads(previous)
+        except Exception: previous = {}
+    was_enabled = bool(previous.get("scheduler_enabled")) if isinstance(previous, dict) else False
+    if body.scheduler_enabled and not was_enabled and not body.scheduler_confirmed:
+        raise HTTPException(status_code=409, detail="Confirmation explicite requise pour activer les envois automatiques en arrière-plan.")
+    data = body.model_dump(exclude={"scheduler_confirmed"})
+    data["interval_min"] = max(2, min(int(data["interval_min"]), 1440))
+    data["max_per_run"] = max(1, min(int(data["max_per_run"]), 100))
+    data["send_delay_min"] = max(1, min(int(data["send_delay_min"]), 1440))
+    db.set_setting("email_automation", data)
+    return {"success": True, "mode": body.mode, "scheduler_enabled": body.scheduler_enabled}
 
 
 @app.post("/api/email/automation/run")
 async def run_email_automation(dry_run: bool = False, mode: str | None = None):
     """Lance le traitement maintenant (brouillons ou envoi autonome selon le mode)."""
     result = await tool_module.TOOLS_REGISTRY["email_automation_run"](
-        {"dry_run": dry_run, "mode": mode})
+        {"dry_run": dry_run, "mode": mode, "source": "manual"})
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+
+@app.get("/api/email/automation/status")
+async def email_automation_status():
+    cfg = tool_module._email_automation_cfg()
+    history = db.get_setting("email_automation_runs") or []
+    if not isinstance(history, list):
+        history = []
+    return {
+        "scheduler_enabled": cfg.get("scheduler_enabled", False),
+        "interval_min": cfg.get("interval_min", 5),
+        "selected_accounts": cfg.get("accounts", []),
+        "last_run": history[-1] if history else None,
+    }
 
 
 @app.get("/api/email/automation/drafts")
@@ -6405,6 +4182,24 @@ async def get_pending_drafts():
 async def clear_pending_drafts():
     db.set_setting("email_pending_drafts", [])
     return {"success": True}
+
+
+@app.get("/api/email/automation/outbox")
+async def get_email_automation_outbox():
+    outbox = db.get_setting("email_scheduled_outbox") or []
+    return {"outbox": outbox if isinstance(outbox, list) else []}
+
+
+@app.delete("/api/email/automation/outbox/{item_id}")
+async def cancel_email_automation_outbox(item_id: str):
+    outbox = db.get_setting("email_scheduled_outbox") or []
+    if not isinstance(outbox, list):
+        outbox = []
+    remaining = [item for item in outbox if item.get("id") != item_id]
+    if len(remaining) == len(outbox):
+        raise HTTPException(status_code=404, detail="Envoi différé introuvable")
+    db.set_setting("email_scheduled_outbox", remaining)
+    return {"success": True, "cancelled": item_id}
 
 
 @app.post("/api/email/to-task")
@@ -6450,456 +4245,13 @@ async def email_attachment_summary(uid: str, name: str = "", account: str | None
 # Multi-agents — exécution parallèle d'outils avec SSE
 # ══════════════════════════════════════════════════════════════════════════════
 
-class AgentTask(BaseModel):
-    id: str
-    tool_name: str
-    args: dict = Field(default_factory=dict)
-    label: str = ""
-
-
-class AgentRunRequest(BaseModel):
-    tasks: list[AgentTask]
-
-
-@app.post("/api/agents/parallel")
-async def agents_parallel(body: AgentRunRequest):
-    """Exécute plusieurs outils en parallèle et retourne tous les résultats."""
-
-    async def _run_one(task: AgentTask) -> dict:
-        t0 = datetime.now()
-        try:
-            fn = tool_module.TOOLS_REGISTRY.get(task.tool_name)
-            if fn is None:
-                return {
-                    "id": task.id, "tool_name": task.tool_name, "label": task.label,
-                    "success": False, "result": {"error": f"Outil inconnu : {task.tool_name}"},
-                    "duration_ms": 0,
-                }
-            result = await fn(task.args)
-            ms = int((datetime.now() - t0).total_seconds() * 1000)
-            return {
-                "id": task.id, "tool_name": task.tool_name, "label": task.label,
-                "success": "error" not in result,
-                "result": result, "duration_ms": ms,
-            }
-        except Exception as e:
-            ms = int((datetime.now() - t0).total_seconds() * 1000)
-            return {
-                "id": task.id, "tool_name": task.tool_name, "label": task.label,
-                "success": False, "result": {"error": str(e)}, "duration_ms": ms,
-            }
-
-    global_t0 = datetime.now()
-    results = await _asyncio.gather(*[_run_one(t) for t in body.tasks])
-    total_ms = int((datetime.now() - global_t0).total_seconds() * 1000)
-    return {
-        "total_ms": total_ms,
-        "count": len(results),
-        "results": results,
-    }
-
-
-@app.post("/api/agents/parallel/stream")
-async def agents_parallel_stream(body: AgentRunRequest):
-    """
-    SSE : envoie chaque résultat dès qu'il est disponible (vrai parallélisme).
-    Le client reçoit des événements 'task_done' + 'all_done' en fin.
-    """
-
-    async def generate():
-        t0 = datetime.now()
-        pending = set()
-        queue: _asyncio.Queue = _asyncio.Queue()
-
-        async def _run_and_enqueue(task: AgentTask):
-            st = datetime.now()
-            try:
-                fn = tool_module.TOOLS_REGISTRY.get(task.tool_name)
-                if fn is None:
-                    result = {"error": f"Outil inconnu : {task.tool_name}"}
-                    success = False
-                else:
-                    result = await fn(task.args)
-                    success = "error" not in result
-                ms = int((datetime.now() - st).total_seconds() * 1000)
-            except Exception as e:
-                result = {"error": str(e)}
-                success = False
-                ms = int((datetime.now() - st).total_seconds() * 1000)
-            await queue.put({
-                "id": task.id, "tool_name": task.tool_name, "label": task.label,
-                "success": success, "result": result, "duration_ms": ms,
-            })
-
-        for task in body.tasks:
-            pending.add(_asyncio.create_task(_run_and_enqueue(task)))
-
-        completed = 0
-        total = len(body.tasks)
-
-        while completed < total:
-            item = await queue.get()
-            completed += 1
-            payload = json.dumps({
-                "event": "task_done",
-                "completed": completed,
-                "total": total,
-                **item,
-            })
-            yield f"data: {payload}\n\n"
-
-        total_ms = int((datetime.now() - t0).total_seconds() * 1000)
-        yield f"data: {json.dumps({'event': 'all_done', 'total_ms': total_ms, 'count': total})}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
-    )
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Workflows — enchaînement d'outils
 # ══════════════════════════════════════════════════════════════════════════════
 
-class WorkflowStep(BaseModel):
-    id: str
-    tool_name: str
-    args: dict = Field(default_factory=dict)
-    label: str = ""
-    enabled: bool = True
-    when: str | None = None              # condition d'exécution (templating)
-    retries: int = 0                     # tentatives en cas d'échec
-    continue_on_error: bool = False      # poursuivre malgré une erreur
-    save_as: str | None = None           # nomme la sortie ({{nom.path}})
-
-
-class WorkflowCreate(BaseModel):
-    name: str
-    description: str = ""
-    steps: list[WorkflowStep] = Field(default_factory=list)
-
-
-class WorkflowUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    steps: list[WorkflowStep] | None = None
-
-
-@app.get("/api/workflows")
-async def list_workflows():
-    return db.list_workflows()
-
-
-@app.post("/api/workflows")
-async def create_workflow(body: WorkflowCreate):
-    steps = [s.model_dump() for s in body.steps]
-    return db.create_workflow(body.name, body.description, steps)
-
-
-@app.get("/api/workflows/{wid}")
-async def get_workflow(wid: str):
-    wf = db.get_workflow(wid)
-    if not wf:
-        raise HTTPException(status_code=404, detail="Workflow introuvable")
-    return wf
-
-
-@app.put("/api/workflows/{wid}")
-async def update_workflow(wid: str, body: WorkflowUpdate):
-    updates = body.model_dump(exclude_none=True)
-    if "steps" in updates:
-        updates["steps"] = [s.model_dump() if hasattr(s, "model_dump") else s for s in body.steps]
-    wf = db.update_workflow(wid, updates)
-    if not wf:
-        raise HTTPException(status_code=404, detail="Workflow introuvable")
-    return wf
-
-
-@app.delete("/api/workflows/{wid}")
-async def delete_workflow(wid: str):
-    db.delete_workflow(wid)
-    return {"success": True}
-
-
-@app.get("/api/workflows/{wid}/runs")
-async def list_workflow_runs(wid: str, limit: int = 20):
-    return db.list_workflow_runs(wid, limit=limit)
-
-
-def _wf_lookup(ctx: dict, path: str):
-    """Navigue un chemin pointé dans le contexte : 'step1.path', 'prev.result.size'…"""
-    cur = ctx
-    for part in path.split("."):
-        if isinstance(cur, dict):
-            cur = cur.get(part)
-        elif isinstance(cur, (list, tuple)):
-            try:
-                cur = cur[int(part)]
-            except Exception:
-                return ""
-        else:
-            return ""
-        if cur is None:
-            return ""
-    return cur
-
-
-def _wf_resolve(value, ctx: dict):
-    """Remplace {{...}} dans une valeur (str/dict/list) à partir du contexte."""
-    import re as _re_wf
-    if isinstance(value, str):
-        # Valeur entièrement = un seul template → on préserve le type (objet/nombre)
-        m = _re_wf.fullmatch(r"\s*\{\{([^}]+)\}\}\s*", value)
-        if m:
-            return _wf_lookup(ctx, m.group(1).strip())
-        return _re_wf.sub(r"\{\{([^}]+)\}\}", lambda mm: str(_wf_lookup(ctx, mm.group(1).strip())), value)
-    if isinstance(value, dict):
-        return {k: _wf_resolve(v, ctx) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_wf_resolve(v, ctx) for v in value]
-    return value
-
-
-def _wf_condition(expr, ctx: dict) -> bool:
-    """Évalue une condition simple : truthiness ou comparaison ==, !=, >, <."""
-    if expr in (None, "", True):
-        return True
-    if expr is False:
-        return False
-    resolved = _wf_resolve(expr, ctx) if isinstance(expr, str) else expr
-    import re as _re_wf
-    if isinstance(resolved, str):
-        m = _re_wf.match(r"^(.*?)\s*(==|!=|>=|<=|>|<)\s*(.*)$", resolved.strip())
-        if m:
-            a, op, b = m.group(1).strip().strip('"\''), m.group(2), m.group(3).strip().strip('"\'')
-            try:
-                fa, fb = float(a), float(b)
-                a, b = fa, fb
-            except ValueError:
-                a, b = a.lower(), b.lower()   # comparaison de chaînes insensible à la casse
-            return {"==": a == b, "!=": a != b, ">": a > b, "<": a < b,
-                    ">=": a >= b, "<=": a <= b}.get(op, True)
-        low = resolved.strip().lower()
-        return low not in ("", "false", "0", "none", "null", "no")
-    return bool(resolved)
-
-
-@app.post("/api/workflows/{wid}/run")
-async def run_workflow(wid: str):
-    """Exécute les étapes d'un workflow : templating multi-étapes ({{step2.path}},
-    {{prev.result.key}}), conditions (when), retries, continue-on-error."""
-    wf = db.get_workflow(wid)
-    if not wf:
-        raise HTTPException(status_code=404, detail="Workflow introuvable")
-
-    run = db.create_workflow_run(wid)
-    run_id = run["id"]
-    t0 = datetime.now()
-    steps_results = []
-    overall_ok = True
-    # Contexte accessible aux templates : prev (dernier), step1..N, et leurs résultats
-    ctx = {"prev": {}, "vars": {}}
-
-    for idx, step in enumerate(wf.get("steps", []), start=1):
-        if not step.get("enabled", True):
-            steps_results.append({"step_id": step["id"], "skipped": True, "tool_name": step["tool_name"]})
-            continue
-
-        # Condition d'exécution (when)
-        if not _wf_condition(step.get("when"), ctx):
-            steps_results.append({"step_id": step["id"], "tool_name": step["tool_name"],
-                                  "skipped": True, "reason": "condition non remplie"})
-            continue
-
-        tool_name = step["tool_name"]
-        args = _wf_resolve(dict(step.get("args", {})), ctx)
-        retries = int(step.get("retries", 0) or 0)
-        cont_on_err = bool(step.get("continue_on_error", False))
-
-        step_t0 = datetime.now()
-        result, success, last_err = None, False, None
-        for attempt in range(retries + 1):
-            try:
-                fn = tool_module.TOOLS_REGISTRY.get(tool_name)
-                if fn is None:
-                    raise ValueError(f"Outil inconnu : {tool_name}")
-                result = await fn(args)
-                success = not (isinstance(result, dict) and result.get("error"))
-                if success:
-                    break
-                last_err = (result or {}).get("error", "échec")
-            except Exception as e:
-                result, last_err = {"error": str(e)}, str(e)
-            if attempt < retries:
-                await _asyncio.sleep(min(2 ** attempt, 5))
-
-        duration = int((datetime.now() - step_t0).total_seconds() * 1000)
-        entry = {"step_id": step["id"], "tool_name": tool_name, "args": args,
-                 "result": result, "success": success, "duration_ms": duration,
-                 "attempts": attempt + 1}
-        steps_results.append(entry)
-
-        # Met à jour le contexte (résultat accessible par stepN et par nom save_as)
-        ctx["prev"] = entry
-        ctx[f"step{idx}"] = entry
-        if step.get("save_as"):
-            ctx["vars"][step["save_as"]] = result
-            ctx[step["save_as"]] = entry
-
-        if not success and not cont_on_err:
-            overall_ok = False
-            break  # arrêt sauf si continue_on_error
-
-    total_ms = int((datetime.now() - t0).total_seconds() * 1000)
-    status = "success" if overall_ok else "failed"
-    finished_run = db.finish_workflow_run(run_id, status, steps_results, total_ms)
-
-    # Mise à jour compteurs
-    db.update_workflow(wid, {
-        "last_run": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "last_status": status,
-        "run_count": True,
-    })
-
-    return {
-        "run_id": run_id,
-        "workflow_id": wid,
-        "status": status,
-        "duration_ms": total_ms,
-        "steps_results": steps_results,
-    }
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Transcription vocale — Whisper local (faster-whisper)
 # ══════════════════════════════════════════════════════════════════════════════
-
-_whisper_model = None
-_whisper_lock = _asyncio.Lock()
-
-
-def _whisper_model_size() -> str:
-    """Taille du modèle Whisper, configurable (réglage DB 'whisper_model' ou env
-    WHISPER_MODEL). Défaut = 'small' : nettement plus précis que 'base' en
-    français, tout en restant fluide sur CPU pour des commandes vocales courtes.
-    Choix possibles : tiny < base < small < medium < large-v3 (plus précis = plus lent)."""
-    import os as _os
-    try:
-        s = db.get_setting("whisper_model")
-        if s and str(s).strip():
-            return str(s).strip()
-    except Exception:
-        pass
-    return _os.getenv("WHISPER_MODEL", "small")
-
-
-async def _get_whisper():
-    """Charge le modèle Whisper une seule fois (lazy, thread-safe)."""
-    global _whisper_model
-    async with _whisper_lock:
-        if _whisper_model is None:
-            def _load():
-                from faster_whisper import WhisperModel
-                import os as _os
-                size = _whisper_model_size()
-                # CPU int8 : compromis précision/vitesse sûr (le GPU 4 Go est
-                # partagé avec Ollama → on évite d'y charger Whisper).
-                threads = min(8, (_os.cpu_count() or 4))
-                try:
-                    return WhisperModel(size, device="cpu", compute_type="int8",
-                                        cpu_threads=threads, num_workers=1)
-                except Exception:
-                    # Repli sur 'base' si le modèle demandé ne se télécharge pas
-                    return WhisperModel("base", device="cpu", compute_type="int8",
-                                        cpu_threads=threads, num_workers=1)
-            _whisper_model = await _asyncio.get_running_loop().run_in_executor(None, _load)
-    return _whisper_model
-
-
-async def _prewarm_whisper():
-    """Pré-charge Whisper au démarrage pour éviter la latence de la 1ère requête."""
-    try:
-        await _asyncio.sleep(2)   # laisse le démarrage se faire d'abord
-        await _get_whisper()
-    except Exception:
-        pass
-
-
-@app.post("/api/voice/transcribe")
-async def voice_transcribe(file: UploadFile = File(...), language: str = Form("fr")):
-    """
-    Reçoit un fichier audio (webm / wav / ogg / mp3) et retourne la transcription.
-    Optimisé pour la VITESSE : décodage greedy (beam=1), langue forcée (par défaut
-    français → pas de détection), pas de conditionnement sur le contexte.
-    """
-    import tempfile, os
-
-    # Lire l'audio
-    audio_bytes = await file.read()
-    if len(audio_bytes) < 1000:
-        raise HTTPException(status_code=400, detail="Fichier audio trop court ou vide")
-
-    # Détecter l'extension depuis le content-type ou le nom de fichier
-    ext = ".webm"
-    if file.content_type:
-        ct = file.content_type.lower()
-        if "wav" in ct:    ext = ".wav"
-        elif "ogg" in ct:  ext = ".ogg"
-        elif "mp3" in ct or "mpeg" in ct: ext = ".mp3"
-        elif "mp4" in ct:  ext = ".mp4"
-        elif "webm" in ct: ext = ".webm"
-    elif file.filename:
-        _, fe = os.path.splitext(file.filename)
-        if fe: ext = fe
-
-    # Écrire dans un fichier temporaire
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
-
-        model = await _get_whisper()
-
-        lang_req = (language or "fr").strip().lower()
-        lang_arg = None if lang_req in ("auto", "", "detect") else lang_req
-
-        # Amorce française : oriente le modèle vers une orthographe correcte,
-        # avec accents et ponctuation (améliore nettement la précision en FR).
-        _fr_prompt = ("Transcription en français, avec les accents et la ponctuation. "
-                      "L'utilisateur parle à son assistant Marvin.")
-        def _transcribe():
-            segments, info = model.transcribe(
-                tmp_path,
-                beam_size=5,                    # recherche par faisceau → plus précis que greedy
-                best_of=5,
-                language=lang_arg,              # langue forcée → pas de passe de détection
-                vad_filter=True,                # coupe les silences (moins d'audio à traiter)
-                condition_on_previous_text=False,  # commandes courtes : évite la dérive
-                initial_prompt=(_fr_prompt if (lang_arg in (None, "fr")) else None),
-                no_speech_threshold=0.6,
-                temperature=0.0,                # déterministe
-            )
-            text = " ".join(seg.text.strip() for seg in segments).strip()
-            return text, info.language
-
-        text, lang = await _asyncio.get_running_loop().run_in_executor(None, _transcribe)
-
-        return {
-            "success": True,
-            "text": text,
-            "language": lang,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription échouée : {e}")
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Génération vidéo — Text-to-Video / Image-to-Video / Slideshow local
@@ -7571,379 +4923,21 @@ async def local_video_generate_image(
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Voix françaises recommandées (toutes neurales, gratuites)
-DEFAULT_TTS_VOICES = {
-    "henri":    {"id": "fr-FR-HenriNeural",    "gender": "Male",   "label": "Henri (homme, voix professionnelle)"},
-    "denise":   {"id": "fr-FR-DeniseNeural",   "gender": "Female", "label": "Denise (femme, voix naturelle)"},
-    "eloise":   {"id": "fr-FR-EloiseNeural",   "gender": "Female", "label": "Eloïse (femme, voix douce)"},
-    "vivienne": {"id": "fr-FR-VivienneMultilingualNeural", "gender": "Female", "label": "Vivienne (multilingue)"},
-    "remy":     {"id": "fr-FR-RemyMultilingualNeural",    "gender": "Male",   "label": "Rémy (multilingue)"},
-    "thierry":  {"id": "fr-CA-ThierryNeural",  "gender": "Male",   "label": "Thierry (Québec)"},
-    "sylvie":   {"id": "fr-CA-SylvieNeural",   "gender": "Female", "label": "Sylvie (Québec)"},
-}
-
-
-class TTSRequest(BaseModel):
-    text: str
-    voice: str = "henri"
-    rate: str = "+0%"
-    pitch: str = "+0Hz"
-
-
-@app.get("/api/voice/voices")
-async def voice_list_voices():
-    """Liste les voix françaises disponibles."""
-    return {
-        "voices": [{"key": k, **v} for k, v in DEFAULT_TTS_VOICES.items()],
-        "default": "henri",
-    }
-
-
-@app.post("/api/voice/speak")
-async def voice_speak(req: TTSRequest):
-    """Génère un audio MP3 à partir d'un texte avec une voix française neurale (edge-tts)."""
-    if not req.text or not req.text.strip():
-        raise HTTPException(status_code=400, detail="Texte requis")
-
-    voice_id = req.voice
-    if voice_id in DEFAULT_TTS_VOICES:
-        voice_id = DEFAULT_TTS_VOICES[voice_id]["id"]
-    elif not voice_id.startswith(("fr-", "en-", "es-", "de-", "it-")):
-        voice_id = DEFAULT_TTS_VOICES["henri"]["id"]
-
-    text = req.text.strip()
-    # Strip markdown bold/italic/code markers for cleaner speech
-    import re as _re_tts
-    text = _re_tts.sub(r"\*\*(.+?)\*\*", r"\1", text)
-    text = _re_tts.sub(r"\*(.+?)\*", r"\1", text)
-    text = _re_tts.sub(r"`([^`]+)`", r"\1", text)
-    text = _re_tts.sub(r"#{1,6}\s+", "", text)
-    text = _re_tts.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
-
-    if len(text) > 3000:
-        text = text[:3000] + "…"
-
-    try:
-        import edge_tts
-        communicate = edge_tts.Communicate(text, voice_id, rate=req.rate, pitch=req.pitch)
-        audio_chunks = []
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_chunks.append(chunk["data"])
-        audio_data = b"".join(audio_chunks)
-
-        if not audio_data:
-            raise HTTPException(status_code=500, detail="Aucun audio généré")
-
-        return Response(
-            content=audio_data,
-            media_type="audio/mpeg",
-            headers={
-                "Content-Disposition": "inline; filename=marvin_voice.mp3",
-                "Cache-Control": "no-cache",
-                "X-Voice-Used": voice_id,
-                "X-Audio-Size": str(len(audio_data)),
-            },
-        )
-    except ImportError:
-        raise HTTPException(status_code=500, detail="edge-tts non installé. pip install edge-tts")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"TTS error: {str(e)[:200]}")
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Devis / Facturation IT
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/api/billing/clients")
-async def billing_clients_list(client_type: str = None):
-    return {"clients": db.billing_client_list(client_type)}
-
-
-@app.post("/api/billing/clients")
-async def billing_clients_create(body: dict):
-    if not body.get("name"):
-        raise HTTPException(status_code=400, detail="Nom requis")
-    return db.billing_client_create(body)
-
-
-@app.get("/api/billing/clients/{cid}")
-async def billing_clients_get(cid: str):
-    client = db.billing_client_get(cid)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client introuvable")
-    return client
-
-
-@app.patch("/api/billing/clients/{cid}")
-async def billing_clients_update(cid: str, body: dict):
-    client = db.billing_client_update(cid, body)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client introuvable")
-    return client
-
-
-@app.delete("/api/billing/clients/{cid}")
-async def billing_clients_delete(cid: str):
-    db.billing_client_delete(cid)
-    return {"success": True}
-
-
-@app.get("/api/billing/quotes")
-async def billing_quotes_list(client_id: str = None, status: str = None):
-    return {"quotes": db.billing_quote_list(client_id, status)}
-
-
-@app.post("/api/billing/quotes")
-async def billing_quotes_create(body: dict):
-    if not body.get("client_id"):
-        raise HTTPException(status_code=400, detail="client_id requis")
-    return db.billing_quote_create(body)
-
-
-@app.get("/api/billing/quotes/{qid}")
-async def billing_quotes_get(qid: str):
-    quote = db.billing_quote_get(qid)
-    if not quote:
-        raise HTTPException(status_code=404, detail="Devis introuvable")
-    return quote
-
-
-@app.patch("/api/billing/quotes/{qid}")
-async def billing_quotes_update(qid: str, body: dict):
-    quote = db.billing_quote_update(qid, body)
-    if not quote:
-        raise HTTPException(status_code=404, detail="Devis introuvable")
-    return quote
-
-
-@app.delete("/api/billing/quotes/{qid}")
-async def billing_quotes_delete(qid: str):
-    db.billing_quote_delete(qid)
-    return {"success": True}
-
-
-@app.get("/api/billing/catalog")
-async def billing_catalog_get(category: str = None):
-    return {"services": db.billing_catalog_list(category)}
-
-
-@app.post("/api/billing/catalog")
-async def billing_catalog_add(body: dict):
-    if not body.get("name"):
-        raise HTTPException(status_code=400, detail="Nom requis")
-    return db.billing_catalog_create(body)
-
-
-@app.delete("/api/billing/catalog/{sid}")
-async def billing_catalog_remove(sid: str):
-    db.billing_catalog_delete(sid)
-    return {"success": True}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Agent IA Documentation Technique
 # ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/docs/interventions")
-async def docs_interventions_list(client_id: str = None, status: str = None, limit: int = 100):
-    return {"interventions": db.doc_intervention_list(client_id, status, limit)}
-
-
-@app.post("/api/docs/interventions")
-async def docs_interventions_create(body: dict):
-    if not body.get("title"):
-        raise HTTPException(status_code=400, detail="Titre requis")
-    return db.doc_intervention_create(body)
-
-
-@app.get("/api/docs/interventions/{iid}")
-async def docs_interventions_get(iid: str):
-    interv = db.doc_intervention_get(iid)
-    if not interv:
-        raise HTTPException(status_code=404, detail="Intervention introuvable")
-    return interv
-
-
-@app.patch("/api/docs/interventions/{iid}")
-async def docs_interventions_update(iid: str, body: dict):
-    interv = db.doc_intervention_update(iid, body)
-    if not interv:
-        raise HTTPException(status_code=404, detail="Intervention introuvable")
-    return interv
-
-
-@app.delete("/api/docs/interventions/{iid}")
-async def docs_interventions_delete(iid: str):
-    db.doc_intervention_delete(iid)
-    return {"success": True}
-
-
-@app.get("/api/docs/documents")
-async def docs_documents_list(intervention_id: str = None, client_id: str = None, doc_type: str = None):
-    return {"documents": db.doc_document_list(intervention_id, client_id, doc_type)}
-
-
-@app.delete("/api/docs/documents/{did}")
-async def docs_documents_delete(did: str):
-    db.doc_document_delete(did)
-    return {"success": True}
-
-
-@app.get("/api/docs/templates")
-async def docs_templates_list(doc_type: str = None):
-    return {"templates": db.doc_template_list(doc_type)}
-
-
-@app.get("/api/docs/assets")
-async def docs_assets_list(client_id: str = None):
-    return {"assets": db.doc_asset_list(client_id)}
-
-
-@app.post("/api/docs/assets")
-async def docs_assets_create(body: dict):
-    if not body.get("name"):
-        raise HTTPException(status_code=400, detail="Nom requis")
-    return db.doc_asset_create(body)
-
-
-@app.delete("/api/docs/assets/{aid}")
-async def docs_assets_delete(aid: str):
-    db.doc_asset_delete(aid)
-    return {"success": True}
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # v2.30.0 — Operations Safety : routes REST
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Pre/Post-Check ──
-@app.get("/api/ops/checks")
-async def ops_checks_list(intervention_id: str = None, check_type: str = None):
-    return {"checks": db.ops_check_list(intervention_id, check_type)}
-
-
-@app.get("/api/ops/checks/{cid}")
-async def ops_checks_get(cid: str):
-    check = db.ops_check_get(cid)
-    if not check:
-        raise HTTPException(status_code=404, detail="Checklist introuvable")
-    return check
-
-
-@app.delete("/api/ops/checks/{cid}")
-async def ops_checks_delete(cid: str):
-    db.ops_check_delete(cid)
-    return {"success": True}
-
-
-@app.get("/api/ops/evidence")
-async def ops_evidence_list_route(intervention_id: str = None, check_id: str = None):
-    return {"evidence": db.ops_evidence_list(intervention_id, check_id)}
-
-
 # ── Command Safety ──
-@app.get("/api/cmd/reviews")
-async def cmd_reviews_list(intervention_id: str = None, risk_level: str = None, limit: int = 100):
-    return {"reviews": db.cmd_review_list(intervention_id, risk_level, limit)}
-
-
-@app.get("/api/cmd/rules")
-async def cmd_rules_list_route():
-    return {"rules": db.cmd_rules_list()}
-
-
-@app.get("/api/cmd/approvals")
-async def cmd_approvals_list(status: str = None):
-    return {"approvals": db.approval_list(status)}
-
-
-@app.post("/api/cmd/approvals/{aid}/decide")
-async def cmd_approval_decide(aid: str, body: dict):
-    decision = body.get("status", "approved")
-    if decision not in ("approved", "rejected"):
-        raise HTTPException(status_code=400, detail="status doit être 'approved' ou 'rejected'")
-    res = db.approval_decide(aid, decision, body.get("approver", ""), body.get("reason", ""))
-    if not res:
-        raise HTTPException(status_code=404, detail="Demande introuvable")
-    return res
-
-
 # ── Client Health Score ── (NB: /api/client-health pour éviter collision avec /api/health système)
-@app.get("/api/client-health/{client_id}")
-async def client_health_get_route(client_id: str):
-    score = db.health_score_latest(client_id)
-    return {"score": score}
-
-
-@app.get("/api/client-health/{client_id}/history")
-async def client_health_history_route(client_id: str, limit: int = 12):
-    return {"history": db.health_score_history(client_id, limit)}
-
-
-@app.get("/api/client-health/{client_id}/recommendations")
-async def client_health_recos_route(client_id: str, status: str = None):
-    return {"recommendations": db.health_recommendations_list(client_id, status)}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Santé
 # ══════════════════════════════════════════════════════════════════════════════
-
-_health_cache: dict = {}
-_health_cache_lock = _asyncio.Lock()
-_HEALTH_CACHE_TTL = 15.0   # refresh Ollama status every 15s
-
-@app.get("/api/health")
-async def health():
-    import httpx as _httpx
-    import time as _time
-    from config import OLLAMA_URL
-
-    global _health_cache
-
-    now = _time.monotonic()
-    # Return cached result if fresh enough (avoids 500ms+ on every status poll)
-    if _health_cache and (now - _health_cache.get("_ts", 0)) < _HEALTH_CACHE_TTL:
-        cached = dict(_health_cache)
-        cached.pop("_ts", None)
-        return cached
-
-    async with _health_cache_lock:
-        # Double-check after acquiring lock
-        if _health_cache and (now - _health_cache.get("_ts", 0)) < _HEALTH_CACHE_TTL:
-            cached = dict(_health_cache)
-            cached.pop("_ts", None)
-            return cached
-
-        ollama_ok = False
-        ollama_models = []
-        try:
-            async with _httpx.AsyncClient(timeout=5.0) as c:
-                r = await c.get(f"{OLLAMA_URL}/api/tags")
-                if r.status_code == 200:
-                    ollama_ok = True
-                    data = r.json()
-                    ollama_models = [m["name"] for m in data.get("models", [])]
-        except Exception:
-            # Repli : si le port d'Ollama répond, il est bien lancé (juste occupé/lent,
-            # ex. inférence sur CPU ou chargement d'un modèle) -> on ne dit pas "offline" à tort.
-            try:
-                import socket as _socket
-                _host = OLLAMA_URL.split("//")[-1].split("/")[0].split(":")[0] or "127.0.0.1"
-                _port = int(OLLAMA_URL.rsplit(":", 1)[-1].split("/")[0])
-                with _socket.create_connection((_host, _port), timeout=1.5):
-                    ollama_ok = True
-            except Exception:
-                pass
-
-        result = {
-            "status":          "ok",
-            "ollama":          ollama_ok,
-            "ollama_models":   ollama_models,
-            "backend":         "python-fastapi",
-            "version":         "2.187.0",
-            "tools_count":     len(tool_module.TOOLS_REGISTRY),
-            "tools_spec_count": len(tool_module.TOOLS_SPEC),
-        }
-        _health_cache = {**result, "_ts": now}
-        return result

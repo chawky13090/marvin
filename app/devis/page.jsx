@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoadingRow } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 
-const BACKEND = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const card = {
@@ -667,6 +667,10 @@ function CreateQuoteBtn({ tier, result, selectedIds, clients, setView, showToast
 function QuoteView({ quote, client, catalog, reload, showToast, setView }) {
   const [q, setQ] = useState(quote);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(null);
+  const [comparison, setComparison] = useState(null);
+  const [proposal, setProposal] = useState(null);
+  const [genProp, setGenProp] = useState(false);
 
   useEffect(() => setQ(quote), [quote]);
 
@@ -730,7 +734,6 @@ function QuoteView({ quote, client, catalog, reload, showToast, setView }) {
     else showToast('PDF généré : ' + r.path.split('\\').pop(), 'success');
   };
 
-  const [emailDraft, setEmailDraft] = useState(null);
   const generateEmail = async () => {
     if (!q.id) { showToast('Enregistrez d\'abord', 'error'); return; }
     const r = await tool('billing_quote_email', { quote_id: q.id });
@@ -738,7 +741,6 @@ function QuoteView({ quote, client, catalog, reload, showToast, setView }) {
     else setEmailDraft(r);
   };
 
-  const [comparison, setComparison] = useState(null);
   const compare = async () => {
     if (!q.id) { showToast('Enregistrez d\'abord', 'error'); return; }
     const r = await tool('billing_quote_compare', { quote_id: q.id });
@@ -746,8 +748,6 @@ function QuoteView({ quote, client, catalog, reload, showToast, setView }) {
     else setComparison(r);
   };
 
-  const [proposal, setProposal] = useState(null);
-  const [genProp, setGenProp] = useState(false);
   const generateProposal = async () => {
     if (!q.id) { showToast('Enregistrez le devis d\'abord', 'error'); return; }
     setGenProp(true);

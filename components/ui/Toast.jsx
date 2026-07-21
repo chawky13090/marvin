@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 const ToastContext = createContext(null);
 
@@ -50,7 +50,10 @@ function ToastItem({ toast, onClose }) {
 
 function useAutoClose(delay, callback) {
   const callbackRef = useRef(callback);
-  callbackRef.current = callback;
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     const timer = setTimeout(() => callbackRef.current(), delay);
@@ -72,13 +75,13 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = useCallback(
-    {
+  const toast = useMemo(
+    () => ({
       success: (title, message) => addToast({ type: 'success', title, message }),
       error: (title, message) => addToast({ type: 'error', title, message }),
       warning: (title, message) => addToast({ type: 'warning', title, message }),
       info: (title, message) => addToast({ type: 'info', title, message }),
-    },
+    }),
     [addToast]
   );
 

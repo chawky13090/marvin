@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server';
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // v2.107 — proxy pur vers le backend Python (voir app/api/conversations/route.js).
 // L'ancienne implémentation dupliquait ici la reconstruction messages BD → format UI
 // (parts/toolInvocations) déjà faite côté Python dans GET /api/conversations/{cid} —
 // même logique, deux endroits à maintenir en cohérence. Le backend Python la fait
 // déjà correctement (shape identique : {conversation, messages}).
-const BACKEND = (typeof window !== 'undefined' && window.location
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
-
 export const dynamic = 'force-dynamic';
 
 export async function GET(req, { params }) {

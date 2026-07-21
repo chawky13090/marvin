@@ -24,8 +24,8 @@
  */
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { useVoice } from '@/lib/hooks/useVoice';
-
-const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL } from '@/lib/backend';
+import { DEFAULT_CORTEX_CONTRACT, resetOneShot } from '@/lib/cortex';
 
 const ChatContext = createContext(null);
 
@@ -51,6 +51,7 @@ export function ChatProvider({ children }) {
   const [conversationId, setConversationId] = useState(null);
   const [initialMessages, setInitialMessages] = useState([]);
   const [activeModel, setActiveModel] = useState('auto');
+  const [cortexContract, setCortexContract] = useState({ ...DEFAULT_CORTEX_CONTRACT });
 
   // Voice state (TTS + voice mode)
   const voice = useVoice();
@@ -88,21 +89,25 @@ export function ChatProvider({ children }) {
   conversationIdRef.current = conversationId;
   const activeModelRef = useRef(activeModel);
   activeModelRef.current = activeModel;
+  const cortexContractRef = useRef(cortexContract);
+  cortexContractRef.current = cortexContract;
   const abortRef = useRef(null);
 
   // Send a message — does NOT abort on unmount because it lives in the provider
-  const sendMessage = useCallback(async ({ text, images }) => {
+  const sendMessage = useCallback(async ({ text, images, cortex }) => {
     if (!text?.trim() && (!images || images.length === 0)) return;
 
     const textContent = text?.trim() || '';
     const imageList = images || [];
 
+    const missionContract = { ...DEFAULT_CORTEX_CONTRACT, ...(cortex || cortexContractRef.current) };
     const userMsg = {
       id: genId(),
       role: 'user',
       content: textContent,
       parts: [{ type: 'text', text: textContent }],
       images: imageList.map(img => img.data),
+      cortexRequested: missionContract,
     };
 
     const assistantId = genId();
@@ -121,8 +126,10 @@ export function ChatProvider({ children }) {
     // Mode vocal : on lit les phrases AU FIL DE LA GÉNÉRATION (pas à la fin)
     // → Marvin commence à parler dès la 1ère phrase écrite.
     const liveVoice = voiceRef.current;   // valeur LIVE (pas la capture obsolète)
-    if (liveVoice.voiceMode && liveVoice.stopSpeaking) liveVoice.stopSpeaking();  // coupe l'ancienne lecture
-    const voiceStream = { text: '', spoken: 0, active: !!liveVoice.voiceMode };
+    const voiceSequence = liveVoice.voiceMode && liveVoice.beginSpeechStream
+      ? liveVoice.beginSpeechStream()
+      : null;
+    const voiceStream = { text: '', spoken: 0, active: !!liveVoice.voiceMode, sequence: voiceSequence };
 
     // v2.165 — un envoi précédent encore en cours (l'utilisateur retape/renvoie le
     // même message pendant qu'une recherche web ou un outil traîne) partait en
@@ -169,6 +176,7 @@ export function ChatProvider({ children }) {
           }),
           conversationId: conversationIdRef.current || null,
           model: activeModelRef.current || null,
+          cortex: missionContract,
         }),
         signal: controller.signal,
       });
@@ -223,6 +231,17 @@ export function ChatProvider({ children }) {
               }));
               break;
 
+            case 'cortex_contract':
+              setMessages(prev => prev.map(m => m.id === assistantId ? {
+                ...m,
+                cortex: event.contract,
+                executionGraph: [
+                  { id: 'contract', label: 'Contrat compilé', status: 'done', detail: event.contract?.summary || 'Auto' },
+                  { id: 'reasoning', label: 'Analyse et routage', status: 'running' },
+                ],
+              } : m));
+              break;
+
             // v2.125 — certains modèles (notamment cloud) renvoient leur raisonnement dans
             // un champ SÉPARÉ de la réponse finale, avant celle-ci ou avant un appel
             // d'outil. Jusqu'ici ignoré côté backend → rien ne s'affichait pendant
@@ -264,7 +283,7 @@ export function ChatProvider({ children }) {
                 const rest = voiceStream.text.slice(voiceStream.spoken);
                 const m = rest.match(/^[\s\S]*[.!?…\n]/);   // jusqu'à la dernière fin de phrase
                 if (m && m[0].replace(/[\s*#`>_-]/g, '').length > 1) {
-                  liveVoice.enqueueSpeech(m[0]);
+                  liveVoice.enqueueSpeech(m[0], voiceStream.sequence);
                   voiceStream.spoken += m[0].length;
                 }
               }
@@ -285,10 +304,13 @@ export function ChatProvider({ children }) {
               };
               setMessages(prev => prev.map(m => {
                 if (m.id !== assistantId) return m;
+                const graph = [...(m.executionGraph || [])].map(n => n.id === 'reasoning' ? { ...n, status: 'done' } : n);
+                graph.push({ id: event.toolCallId, label: event.toolName, status: 'running', kind: 'tool' });
                 return {
                   ...m,
                   parts: [...m.parts, { type: 'tool-invocation', toolInvocation: inv }],
                   toolInvocations: [...(m.toolInvocations || []), inv],
+                  executionGraph: graph,
                 };
               }));
               break;
@@ -311,8 +333,20 @@ export function ChatProvider({ children }) {
                     ? { ...inv, state: 'result', result: event.result }
                     : inv
                 );
-                return { ...m, parts: updatedParts, toolInvocations: updatedInvocations };
+                return { ...m, parts: updatedParts, toolInvocations: updatedInvocations,
+                  executionGraph: (m.executionGraph || []).map(n => n.id === event.toolCallId ? { ...n, status: 'done' } : n) };
               }));
+              break;
+
+            case 'cortex_provenance':
+              setMessages(prev => prev.map(m => m.id === assistantId ? {
+                ...m,
+                cortexProvenance: event.provenance,
+                executionGraph: [
+                  ...(m.executionGraph || []).map(n => ({ ...n, status: n.status === 'running' ? 'done' : n.status })),
+                  { id: 'delivered', label: 'Réponse vérifiée et livrée', status: 'done', kind: 'output' },
+                ],
+              } : m));
               break;
 
             case 'done':
@@ -325,7 +359,7 @@ export function ChatProvider({ children }) {
                 const full = finalMsg?.content || voiceStream.text || '';
                 const tail = full.slice(voiceStream.spoken).trim();
                 if (tail && tail.replace(/[\s*#`>_-]/g, '').length > 1 && liveVoice.enqueueSpeech) {
-                  liveVoice.enqueueSpeech(tail);
+                  liveVoice.enqueueSpeech(tail, voiceStream.sequence);
                 } else if (voiceStream.spoken === 0 && full.trim() && liveVoice.speak) {
                   // fallback : rien n'a été lu (réponse sans ponctuation) → lit tout
                   liveVoice.speak(full).catch(() => {});
@@ -366,6 +400,7 @@ export function ChatProvider({ children }) {
     }
 
     setStatus(s => s === 'streaming' || s === 'submitted' ? 'ready' : s);
+    setCortexContract(prev => resetOneShot(prev));
   }, []);
 
   const addToolResult = useCallback(({ toolCallId, result }) => {
@@ -398,6 +433,7 @@ export function ChatProvider({ children }) {
     conversationId, setConversationId,
     initialMessages, setInitialMessages,
     activeModel, setActiveModel,
+    cortexContract, setCortexContract,
     // Actions
     sendMessage,
     addToolResult,
@@ -418,6 +454,11 @@ export function useChat() {
     throw new Error('useChat must be used within a ChatProvider (wrap your layout with <ChatProvider>)');
   }
   return ctx;
+}
+
+/** Variante optionnelle pour les composants également rendus dans des tests isolés. */
+export function useOptionalChat() {
+  return useContext(ChatContext);
 }
 
 /** Lightweight subscription for sidebar/indicator components that only need status */

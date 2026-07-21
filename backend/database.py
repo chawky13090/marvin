@@ -6,217 +6,24 @@ passent tous par ce module via des proxys /api/*, voir le changelog v2.107-111 d
 CLAUDE.md §9 pour le détail de cette consolidation).
 Utilise le module sqlite3 standard de Python (thread-safe avec check_same_thread=False).
 """
-import sqlite3
 import json
 import uuid
-from pathlib import Path
-from contextlib import contextmanager
-from config import DB_PATH
-
-
-# ── Connexion ─────────────────────────────────────────────────────────────────
-
-def get_conn() -> sqlite3.Connection:
-    """Ouvre une connexion WAL à la base de données partagée.
-    v2.152 — timeout explicite (Python fixe 5s par défaut si non précisé) : sur Windows,
-    l'ouverture/fermeture fréquente de connexions par les workers de fond peut occasionnellement
-    contendre (verrou WAL bref, antivirus scannant .db-wal) ; ce timeout laisse sqlite3
-    RÉESSAYER plusieurs secondes au lieu d'échouer/bloquer sec. Complète (ne remplace pas)
-    le passage en asyncio.to_thread() des appels db.* les plus exposés (ex. delete_task)."""
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
-
-
-@contextmanager
-def db():
-    """Context manager : ouvre une connexion, commit ou rollback automatiquement."""
-    conn = get_conn()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-def row_to_dict(row) -> dict | None:
-    if row is None:
-        return None
-    return dict(row)
-
-
-# ── Conversations ─────────────────────────────────────────────────────────────
-
-def _ensure_conversations_pinned_column(conn):
-    """v2.171 — épinglage de conversation (demandé explicitement, pattern Claude/ChatGPT).
-    Migration transparente, même motif que le reste du fichier (PRAGMA table_info +
-    ALTER conditionnel) — la table `conversations` elle-même est historiquement créée côté
-    JS (lib/database/init.js), Python n'en a jamais eu la propriété du schéma complet."""
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()}
-    if "pinned" not in cols:
-        conn.execute("ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0")
-
-
-def create_conversation(title: str = "Nouvelle conversation") -> dict:
-    cid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_conversations_pinned_column(conn)
-        conn.execute(
-            "INSERT INTO conversations (id, title) VALUES (?, ?)",
-            (cid, title)
-        )
-    return get_conversation(cid)
-
-
-def get_conversation(cid: str) -> dict | None:
-    with db() as conn:
-        _ensure_conversations_pinned_column(conn)
-        row = conn.execute("SELECT * FROM conversations WHERE id = ?", (cid,)).fetchone()
-    return row_to_dict(row)
-
-
-def list_conversations(limit: int = 50, offset: int = 0) -> list[dict]:
-    with db() as conn:
-        _ensure_conversations_pinned_column(conn)
-        rows = conn.execute(
-            "SELECT * FROM conversations ORDER BY pinned DESC, updated_at DESC LIMIT ? OFFSET ?",
-            (limit, offset)
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def set_conversation_pinned(cid: str, pinned: bool):
-    with db() as conn:
-        _ensure_conversations_pinned_column(conn)
-        conn.execute(
-            "UPDATE conversations SET pinned = ? WHERE id = ?",
-            (1 if pinned else 0, cid)
-        )
-
-
-def search_conversations(query: str, limit: int = 50) -> list[dict]:
-    """v2.171 — recherche FULL-TEXT (titre + contenu des messages), pas juste le titre
-    tronqué à 6 mots. Chez Claude/ChatGPT, la recherche couvre tout le contenu — un mot
-    mentionné en plein milieu d'une conversation doit pouvoir la faire remonter."""
-    q = f"%{query.strip()}%"
-    with db() as conn:
-        _ensure_conversations_pinned_column(conn)
-        rows = conn.execute(
-            """SELECT DISTINCT c.* FROM conversations c
-               LEFT JOIN messages m ON m.conversation_id = c.id
-               WHERE c.title LIKE ? OR m.content LIKE ?
-               ORDER BY c.pinned DESC, c.updated_at DESC LIMIT ?""",
-            (q, q, limit)
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def update_conversation_title(cid: str, title: str):
-    with db() as conn:
-        conn.execute(
-            "UPDATE conversations SET title = ?, updated_at = datetime('now') WHERE id = ?",
-            (title, cid)
-        )
-
-
-def upgrade_conversation_title_silent(cid: str, title: str):
-    """v2.171 — même chose que update_conversation_title mais SANS toucher updated_at.
-    Utilisé par le titrage intelligent en arrière-plan (voir agent.py) : le titre
-    provisoire (troncature) est déjà posé et a déjà mis à jour updated_at au moment de
-    l'envoi ; le remplacer par un titre plus soigné quelques secondes après ne doit pas
-    faire sauter la conversation en haut de la liste une 2e fois."""
-    with db() as conn:
-        conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, cid))
-
-
-def update_conversation_project(cid: str, project_id: str | None):
-    with db() as conn:
-        conn.execute(
-            "UPDATE conversations SET project_id = ?, updated_at = datetime('now') WHERE id = ?",
-            (project_id, cid)
-        )
-
-
-def delete_conversation(cid: str):
-    with db() as conn:
-        conn.execute("DELETE FROM conversations WHERE id = ?", (cid,))
-
-
-# ── Messages ──────────────────────────────────────────────────────────────────
-
-def create_message(
-    conversation_id: str,
-    role: str,
-    content: str,
-    tool_calls: list | None = None,
-    tool_results: list | None = None,
-) -> dict:
-    mid = str(uuid.uuid4())
-    tc_json = json.dumps(tool_calls) if tool_calls else None
-    tr_json = json.dumps(tool_results) if tool_results else None
-    with db() as conn:
-        conn.execute(
-            """INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_results)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (mid, conversation_id, role, content, tc_json, tr_json)
-        )
-        conn.execute(
-            "UPDATE conversations SET updated_at = datetime('now') WHERE id = ?",
-            (conversation_id,)
-        )
-        row = conn.execute("SELECT * FROM messages WHERE id = ?", (mid,)).fetchone()
-    return _parse_message(row_to_dict(row))
-
-
-def get_messages_by_conversation(conversation_id: str, limit: int = 100) -> list[dict]:
-    with db() as conn:
-        rows = conn.execute(
-            """SELECT * FROM messages WHERE conversation_id = ?
-               ORDER BY created_at ASC LIMIT ?""",
-            (conversation_id, limit)
-        ).fetchall()
-    return [_parse_message(row_to_dict(r)) for r in rows]
-
-
-def get_recent_user_messages(limit: int = 120) -> list[str]:
-    """Contenu des derniers messages UTILISATEUR (pour le mining proactif de compétences)."""
-    with db() as conn:
-        rows = conn.execute(
-            """SELECT content FROM messages WHERE role = 'user'
-               AND content IS NOT NULL AND length(content) > 6
-               ORDER BY created_at DESC LIMIT ?""",
-            (limit,)
-        ).fetchall()
-    out, seen = [], set()
-    for r in rows:
-        c = (r["content"] if isinstance(r, dict) or hasattr(r, "keys") else r[0]) or ""
-        c = str(c).strip()
-        key = c.lower()[:80]
-        if c and key not in seen:
-            seen.add(key)
-            out.append(c[:300])
-    return out
-
-
-def _parse_message(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("tool_calls") and isinstance(row["tool_calls"], str):
-        try:
-            row["tool_calls"] = json.loads(row["tool_calls"])
-        except Exception:
-            row["tool_calls"] = None
-    if row.get("tool_results") and isinstance(row["tool_results"], str):
-        try:
-            row["tool_results"] = json.loads(row["tool_results"])
-        except Exception:
-            row["tool_results"] = None
-    return row
+from db_connection import db, get_conn, row_to_dict
+from db_migrations import apply_migrations
+from repositories.conversations import (
+    create_conversation,
+    create_message,
+    delete_conversation,
+    get_conversation,
+    get_messages_by_conversation,
+    get_recent_user_messages,
+    list_conversations,
+    search_conversations,
+    set_conversation_pinned,
+    update_conversation_project,
+    update_conversation_title,
+    upgrade_conversation_title_silent,
+)
 
 
 # ── Mémoires ──────────────────────────────────────────────────────────────────
@@ -2839,13 +2646,17 @@ def _init_tables():
         _ensure_health_tables(conn)
         _ensure_it_kb_tables(conn)
         _ensure_events_tables(conn)
+        # La baseline est enregistree seulement apres la reussite de tous les
+        # initialiseurs historiques. Les prochains changements de schema seront
+        # portes par db_migrations.py sans retirer les garde-fous existants.
+        apply_migrations(conn)
 
 _init_tables()
 
 
 def log_execution(tool_name: str, args: dict, result: dict, duration_ms: int, conversation_id: str | None = None) -> dict:
     eid = str(uuid.uuid4())
-    success = 0 if "error" in result else 1
+    success = 0 if result.get("error") or result.get("success") is False else 1
     with db() as conn:
         _ensure_tool_tables(conn)
         conn.execute(

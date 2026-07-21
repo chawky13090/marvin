@@ -3,8 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { NAV_SECTIONS } from '@/components/sidebar/Sidebar';
-
-const BACKEND = (typeof window !== 'undefined' && window.location ? window.location.protocol + '//' + window.location.hostname + ':8005' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // Actions rapides, en plus de la navigation (pas des pages, des raccourcis d'action)
 const QUICK_ACTIONS = [

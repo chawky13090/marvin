@@ -5,12 +5,11 @@ import styles from './MessageBubble.module.css';
 import FileExplorerCard from './FileExplorerCard';
 import SpeakButton from './SpeakButton';
 import PrettyResult from './PrettyResult';
+import CortexTrace from './CortexTrace';
+import CodingMissionTracker from './CodingMissionTracker';
 import { CircleGauge, BarRow, StatCard } from '@/components/ui/DashboardKit';
 import { useToast } from '@/components/ui/Toast';
-
-const BACKEND_URL = (typeof window !== 'undefined' && window.location)
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005');
+import { BACKEND_URL } from '@/lib/backend';
 
 // v2.128 — les outils qui GÉNÈRENT un document (PDF/Word/Excel...) renvoyaient juste
 // { success, message, path } → rendu par le fallback "succès générique" (un simple ✅),
@@ -195,7 +194,6 @@ let _dompurifyLinksHooked = false;
 function safeHtml(raw) {
   if (typeof window === 'undefined') return raw; // SSR: skip
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const DOMPurify = require('dompurify');
     // Liens cliquables dans le chat = ouverture dans un NOUVEL onglet, jamais en quittant
     // Marvin — signalé par l'utilisateur (liens pertinents cités par Marvin qui faisaient
@@ -217,11 +215,12 @@ function safeHtml(raw) {
   }
 }
 
-export default function MessageBubble({ message, onConfirmTool, onCancelTool }) {
+export default function MessageBubble({ message, viewMode = 'reading', showMissionTracker = true, onConfirmTool, onCancelTool }) {
   const isUser = message.role === 'user';
   const isToolResult = message.role === 'tool';
   const [showReasoning, setShowReasoning] = useState(false);
-  const [stepsCollapsed, setStepsCollapsed] = useState(true);
+  const [stepsCollapsed, setStepsCollapsed] = useState(viewMode === 'reading');
+  useEffect(() => setStepsCollapsed(viewMode === 'reading'), [viewMode]);
 
   // Extraire le texte depuis parts (v6) ou content (fallback)
   const textParts = message.parts?.filter(p => p.type === 'text') || [];
@@ -316,36 +315,51 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
   // Messages avec tool invocations
   if (toolInvocations.length > 0) {
     const turnMode = detectTurnMode(toolInvocations, message.modelInfo);
-    const doneCount = toolInvocations.filter(t => (t.state || (t.result !== undefined ? 'result' : 'pending')) === 'result').length;
-    // v2.146 — replié par défaut au-delà de 3 étapes (pattern Perplexity Pro Search :
-    // la réponse reste prioritaire, le détail se déplie à la demande) — en dessous, montrer
-    // directement les cartes ne surcharge pas assez pour justifier un clic supplémentaire.
-    // v2.148 — SAUF si un outil critique attend une confirmation : ça ne doit JAMAIS être
-    // caché par défaut (trouvé en auditant ce même repli après coup — un vrai risque de
-    // régression, pas juste une amélioration cosmétique).
+    const finishedCount = toolInvocations.filter((tool) => {
+      const state = tool.state || (tool.result !== undefined ? 'result' : 'pending');
+      return state === 'result' || state === 'error';
+    }).length;
+    const errorTools = toolInvocations.filter(t => toolHasFailed(t));
+    const codingMissionTool = [...toolInvocations].reverse().find((tool) => (
+      ['code_workspace_start', 'code_workspace_status', 'code_workspace_control'].includes(tool.toolName)
+      && tool.result !== undefined
+    ));
+    // v2.244 — toute activité terminée se replie en résumé, même avec un seul outil.
+    // Une confirmation critique reste toujours ouverte afin de ne masquer aucune décision.
     const anyNeedsAttention = toolInvocations.some(toolNeedsAttention);
-    const shouldCollapse = toolInvocations.length >= 3 && !anyNeedsAttention;
+    const shouldCollapse = !anyNeedsAttention && finishedCount === toolInvocations.length;
     return (
       <div className={`${styles.wrapper} ${styles.wrapperAssistant}`} style={{ flexDirection: 'column', gap: '8px', opacity: 1, maxWidth: '100%' }}>
         <TurnModeBadge mode={turnMode} />
         {reasoningBlock}
         {textContent && (
           <BubbleWrapper isUser={false}>
-            <div className={styles.content} dangerouslySetInnerHTML={{ __html: htmlContent }} />
+            <ReadableContent html={htmlContent} text={textContent} viewMode={viewMode} />
           </BubbleWrapper>
         )}
         {shouldCollapse && (
-          <div
+          <button
+            type="button"
+            className={styles.activityToggle}
             onClick={() => setStepsCollapsed(!stepsCollapsed)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              marginLeft: '40px', width: 'fit-content', cursor: 'pointer', userSelect: 'none',
-              fontSize: '11px', color: 'var(--text-muted)', padding: '2px 0',
-            }}
+            aria-expanded={!stepsCollapsed}
           >
-            <span>{doneCount === toolInvocations.length ? '✅' : '⟳'}</span>
-            <span>{doneCount}/{toolInvocations.length} étape(s) {doneCount === toolInvocations.length ? 'effectuées' : 'en cours'}</span>
-            <span style={{ opacity: 0.6 }}>{stepsCollapsed ? '▼ Afficher' : '▲ Masquer'}</span>
+            <span aria-hidden="true">{errorTools.length > 0 ? '!' : '✓'}</span>
+            <span>
+              {toolInvocations.length} action{toolInvocations.length > 1 ? 's' : ''}
+              {errorTools.length > 0
+                ? ` · ${errorTools.length} en erreur`
+                : ` · terminée${toolInvocations.length > 1 ? 's' : ''}`}
+            </span>
+            {errorTools.length > 0 && stepsCollapsed && (
+              <span className={styles.activityError}>{summarizeToolResult(errorTools[0].toolName, errorTools[0].result)}</span>
+            )}
+            <span className={styles.activityToggleAction}>{stepsCollapsed ? 'Voir le détail' : 'Masquer'}</span>
+          </button>
+        )}
+        {codingMissionTool && showMissionTracker && (
+          <div style={{ marginLeft: '40px', width: 'calc(100% - 40px)' }}>
+            <CodingMissionTracker result={codingMissionTool.result} />
           </div>
         )}
         {(!shouldCollapse || !stepsCollapsed) && (
@@ -354,13 +368,16 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
               <ToolCallInline
                 key={tool.toolCallId || i}
                 tool={tool}
+                viewMode={viewMode}
                 onConfirm={onConfirmTool}
                 onCancel={onCancelTool}
+                showMissionTracker={false}
               />
             ))}
           </div>
         )}
         {modelBadge}
+        <CortexTrace message={message} />
       </div>
     );
   }
@@ -398,7 +415,9 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
       {(textContent || (isUser && allImages.length === 0)) && (
         <BubbleWrapper isUser={isUser}>
           <div style={{ position: 'relative', width: '100%' }}>
-            <div className={styles.content} dangerouslySetInnerHTML={{ __html: htmlContent }} />
+            {isUser
+              ? <div className={styles.content} dangerouslySetInnerHTML={{ __html: htmlContent }} />
+              : <ReadableContent html={htmlContent} text={textContent} viewMode={viewMode} />}
             {/* Speak button — only on assistant messages with text */}
             {!isUser && textContent && (
               <div style={{
@@ -427,6 +446,7 @@ export default function MessageBubble({ message, onConfirmTool, onCancelTool }) 
         </BubbleWrapper>
       ))}
       {modelBadge}
+      {!isUser && <CortexTrace message={message} />}
     </div>
   );
 }
@@ -454,6 +474,31 @@ function BubbleWrapper({ isUser, children }) {
   );
 }
 
+function ReadableContent({ html, text, viewMode }) {
+  const isLong = text.length > 2400 || text.split('\n').length > 45;
+  const [expanded, setExpanded] = useState(viewMode !== 'reading');
+  useEffect(() => setExpanded(viewMode !== 'reading'), [viewMode]);
+
+  return (
+    <div className={styles.readableResponse}>
+      <div
+        className={`${styles.content} ${isLong && !expanded ? styles.contentCollapsed : ''}`}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      {isLong && (
+        <button
+          type="button"
+          className={styles.readMoreButton}
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+        >
+          {expanded ? 'Réduire la réponse' : 'Lire la réponse complète'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Outils critiques nécessitant confirmation ───
 const CRITICAL_TOOLS = [
   'file_delete', 'file_rename', 'file_move', 'file_write', 'file_organize',
@@ -473,6 +518,10 @@ const CRITICAL_TOOLS = [
 const SPECIAL_MODES = [
   { match: 'web_deep_research', icon: '🔍', label: 'Recherche approfondie', color: '#0ea5e9' },
   { match: 'ai_model_council', icon: '🧑‍🤝‍🧑', label: "Panel d'experts IA", color: '#a855f7' },
+  { match: 'ai_research_swarm', icon: 'R', label: 'Research Swarm', color: '#14b8a6' },
+  { match: 'ai_adaptive_team', icon: 'A', label: 'Équipe adaptative', color: '#a78bfa' },
+  { match: 'ai_code_forge', icon: 'C', label: 'Code Forge', color: '#22c55e' },
+  { match: 'ai_test_forge', icon: 'T', label: 'Test Forge', color: '#06b6d4' },
   { match: 'ai_subagents_run', icon: '🧩', label: 'Sous-tâches parallèles', color: '#f59e0b' },
   { match: 'long_task_start', icon: '🗂️', label: 'Tâche longue démarrée', color: '#10b981' },
   { match: 'code_python', icon: '🐍', label: 'Code Interpreter', color: '#3b82f6' },
@@ -512,6 +561,57 @@ function toolNeedsAttention(tool) {
     return !!(resObj && resObj.requiresConfirmation);
   }
   return false;
+}
+
+function unwrapToolResult(result) {
+  let value = result;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return value; }
+  }
+  if (value && typeof value === 'object' && value.type === 'json' && value.value !== undefined) {
+    return value.value;
+  }
+  return value;
+}
+
+function compactText(value, maxLength = 180) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function toolHasFailed(tool) {
+  if (!tool) return false;
+  if (tool.state === 'error') return true;
+  const result = unwrapToolResult(tool.result);
+  return !!(result && typeof result === 'object'
+    && (result.success === false || result.ok === false || result.error));
+}
+
+function summarizeToolResult(toolName = '', rawResult) {
+  const result = unwrapToolResult(rawResult);
+  if (typeof result === 'string') return compactText(result) || 'Résultat disponible';
+  if (!result || typeof result !== 'object') return 'Résultat disponible';
+
+  const error = result.error || result.detail || (result.success === false ? result.message : '');
+  if (error) return compactText(error);
+
+  if (toolName === 'web_search' || toolName === 'web_browse' || toolName.includes('research')) {
+    const sourceCount = result.sources?.length ?? result.results?.length;
+    if (Number.isFinite(sourceCount)) return `${sourceCount} source${sourceCount > 1 ? 's' : ''} consultée${sourceCount > 1 ? 's' : ''}`;
+  }
+  if (toolName === 'ai_code_forge') {
+    const score = result.final_review?.score;
+    const accepted = result.accepted ?? result.success;
+    return `${accepted === false ? 'Livrable refusé' : 'Livrable produit'}${score != null ? ` · note ${score}/10` : ''}`;
+  }
+  if (toolName === 'ai_test_forge') {
+    return result.production_ready === true ? 'Validation production réussie' : 'Validation production non acquise';
+  }
+
+  const count = result.count ?? result.total ?? result.items?.length ?? result.files?.length;
+  if (Number.isFinite(count)) return `${count} élément${count > 1 ? 's' : ''}`;
+  return compactText(result.summary || result.message || result.status) || 'Résultat disponible';
 }
 
 function TurnModeBadge({ mode }) {
@@ -594,6 +694,10 @@ function renderToolResult(toolName, result) {
     );
   }
 
+  if (['code_workspace_start', 'code_workspace_status', 'code_workspace_control'].includes(toolName)) {
+    return <CodingMissionTracker result={result} />;
+  }
+
   // ── Image inline (screenshot embed, infographic) ─────
   if (result.image && result.image.startsWith('data:image/')) {
     return (
@@ -652,6 +756,78 @@ function renderToolResult(toolName, result) {
             ))}
           </CollapsibleDetail>
         )}
+      </div>
+    );
+  }
+
+  if (toolName === 'ai_adaptive_team' && result.answer) {
+    return (
+      <div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          Équipe adaptative · {(result.stages || []).filter(stage => stage.success).length}/{(result.stages || []).length} étape(s)
+          {(result.models_consulted || []).length ? ` · ${result.models_consulted.length} modèle(s)` : ''}
+          {result.evidence_quality?.epistemic_debt != null ? ` · dette de preuve ${Math.round(result.evidence_quality.epistemic_debt * 100)} %` : ''}
+        </div>
+        <MarkdownBlock text={result.answer} />
+        {(result.stages || []).length > 0 && (
+          <CollapsibleDetail label="Voir le raisonnement de l’équipe">
+            {result.stages.map((stage, index) => (
+              <div key={`${stage.name}-${index}`} style={{ padding: '8px 10px', marginBottom: 6, borderRadius: 7, background: 'var(--bg-tertiary)', borderLeft: `3px solid ${stage.success ? '#34d399' : '#f87171'}` }}>
+                <div style={{ fontWeight: 700, fontSize: 11 }}>{index + 1}. {stage.name} · {stage.success ? 'réussi' : 'échoué'}</div>
+                {stage.error && <div style={{ color: '#f87171', fontSize: 11, marginTop: 4 }}>{stage.error}</div>}
+                {stage.answer && <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginTop: 5, whiteSpace: 'pre-wrap', maxHeight: 180, overflowY: 'auto' }}>{stage.answer}</div>}
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName === 'ai_code_forge' && result.answer) {
+    const validation = result.validation || {};
+    const testReport = result.test_report || {};
+    return (
+      <div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+          Code Forge · {result.language || 'langage détecté'}
+          {validation.syntax_valid === true ? ' · syntaxe validée' : validation.syntax_valid === false ? ' · syntaxe invalide' : ' · analyseur indisponible'}
+          {` · ${result.critical_issues || 0} critique(s) restante(s)`}
+          {result.final_review?.score != null ? ` · gate final ${result.final_review.score}/10` : ''}
+          {testReport.production_ready === true ? ' · tests isolés réussis' : ' · tests isolés non validés'}
+        </div>
+        <MarkdownBlock text={result.answer} />
+        {(result.reviews || []).length > 0 && (
+          <CollapsibleDetail label="Voir les revues indépendantes">
+            {result.reviews.map((review, index) => (
+              <div key={index} style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--bg-tertiary)', borderRadius: 7 }}>
+                <div style={{ fontWeight: 700, fontSize: 11 }}>{review.model || `Reviewer ${index + 1}`} · {review.score}/10</div>
+                {(review.issues || []).map((issue, issueIndex) => (
+                  <div key={issueIndex} style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 5 }}>
+                    [{issue.severity}] {issue.problem}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+      </div>
+    );
+  }
+
+  if (toolName === 'ai_test_forge' && Array.isArray(result.steps)) {
+    return (
+      <div>
+        <div style={{ fontSize: 11, color: result.production_ready ? '#34d399' : '#f87171', marginBottom: 8, fontWeight: 700 }}>
+          Test Forge · {result.language || 'langage inconnu'} · {result.production_ready ? 'prêt production' : 'refusé'}
+        </div>
+        {(result.steps || []).map((step, index) => (
+          <div key={`${step.name}-${index}`} style={{ padding: '7px 9px', marginBottom: 6, borderRadius: 7, background: 'var(--bg-tertiary)', borderLeft: `3px solid ${step.passed ? '#34d399' : '#f87171'}` }}>
+            <div style={{ fontSize: 11, fontWeight: 700 }}>{step.name} · {step.passed ? 'réussi' : 'échoué'} · code {step.exit_code}</div>
+            {step.stderr && <div style={{ marginTop: 4, color: 'var(--text-secondary)', fontSize: 10, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{step.stderr}</div>}
+          </div>
+        ))}
+        {result.error && <div style={{ color: '#f87171', fontSize: 11 }}>{result.error}</div>}
       </div>
     );
   }
@@ -1124,11 +1300,13 @@ function renderToolResult(toolName, result) {
   return <PrettyResult result={result} />;
 }
 
-function ToolCallInline({ tool, onConfirm, onCancel }) {
+function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracker = true }) {
   // v2.148 — chrono en direct pendant l'exécution (voir ChatContext.jsx::tool_start pour
   // l'horodatage `startedAt`). Hook appelé INCONDITIONNELLEMENT avant le early-return
   // `if (!tool)` ci-dessous (règle des hooks React) — la garde se fait à l'intérieur.
   const [elapsed, setElapsed] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(viewMode !== 'reading');
+  useEffect(() => setDetailsOpen(viewMode !== 'reading'), [viewMode]);
   useEffect(() => {
     if (!tool || tool.state === 'result' || tool.state === 'error' || !tool.startedAt) return undefined;
     const update = () => setElapsed(Math.floor((Date.now() - tool.startedAt) / 1000));
@@ -1142,6 +1320,8 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
   const icon = getToolIcon(toolName);
   const isCritical = CRITICAL_TOOLS.includes(toolName);
   const state = tool.state || (tool.result !== undefined ? 'result' : 'pending');
+  const resultFailed = toolHasFailed(tool);
+  const visualState = resultFailed ? 'error' : state;
 
   const statusColors = {
     pending: 'var(--warning)',
@@ -1151,7 +1331,7 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
     'partial-call': 'var(--info)',
     call: 'var(--info)',
   };
-  const borderColor = statusColors[state] || 'var(--border)';
+  const borderColor = statusColors[visualState] || 'var(--border)';
 
   // Noms d'outils lisibles en français
   const toolLabels = {
@@ -1208,6 +1388,13 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
     web_research: 'Recherche web approfondie',
     web_deep_research: 'Recherche approfondie multi-passes',
     ai_model_council: "Consulter un panel d'experts IA",
+    ai_research_swarm: 'Lancer un essaim de recherche',
+    ai_adaptive_team: 'Mobiliser une équipe adaptative',
+    ai_code_forge: 'Produire un livrable code expert',
+    ai_test_forge: 'Tester un livrable en environnement jetable',
+    code_workspace_start: 'Démarrer une Coding Mission',
+    code_workspace_status: 'Suivre une Coding Mission',
+    code_workspace_control: 'Contrôler une Coding Mission',
     ai_subagents_run: 'Décomposer en sous-tâches',
     long_task_start: 'Démarrer une tâche longue',
     long_task_status: 'Vérifier une tâche longue',
@@ -1250,6 +1437,7 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
   // (snake_case brut) — traduit au minimum en mots séparés avec majuscule initiale
   // plutôt que d'exposer le nom technique interne.
   const prettyFallback = (n) => n.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  const isCodingMissionTool = ['code_workspace_start', 'code_workspace_status', 'code_workspace_control'].includes(toolName);
 
   // Déterminer si on doit afficher les boutons de confirmation
   let hasPendingResultConfirmation = false;
@@ -1272,6 +1460,7 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
   );
 
   const statusLabel = hasPendingResultConfirmation ? '⏳ En attente de votre confirmation'
+    : resultFailed ? '✕ Erreur'
     : state === 'result' ? '✓ Terminé'
     : state === 'error' ? '✗ Erreur'
     : state === 'call' && isCritical ? '⏳ En attente de votre confirmation'
@@ -1284,6 +1473,7 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
     : '⟳ En cours...';
 
   const statusBadgeClass = hasPendingResultConfirmation ? 'warning'
+    : resultFailed ? 'danger'
     : state === 'result' ? 'success'
     : state === 'error' ? 'danger'
     : 'info';
@@ -1311,6 +1501,18 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
         </span>
       </div>
 
+      {tool.result !== undefined && (
+        <div className={resultFailed ? styles.toolSummaryError : styles.toolSummary}>
+          {summarizeToolResult(toolName, tool.result)}
+        </div>
+      )}
+
+      {tool.result !== undefined && isCodingMissionTool && showMissionTracker && (
+        <div style={{ marginTop: '10px' }}>
+          <CodingMissionTracker result={tool.result} />
+        </div>
+      )}
+
       {/* Paramètres (si pas encore exécuté et outil critique) */}
       {needsConfirmation && tool.args && (
         <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-xs)', marginTop: '6px' }}>
@@ -1329,9 +1531,21 @@ function ToolCallInline({ tool, onConfirm, onCancel }) {
       )}
 
       {/* Résultat structuré */}
-      {tool.result !== undefined && (
+      {tool.result !== undefined && !isCodingMissionTool && (
         <div style={{ marginTop: '8px' }}>
-          {renderToolResult(toolName, tool.result)}
+          <button
+            type="button"
+            className={styles.technicalDetailsButton}
+            onClick={() => setDetailsOpen((current) => !current)}
+            aria-expanded={detailsOpen}
+          >
+            {detailsOpen ? 'Masquer les détails techniques' : 'Afficher les détails techniques'}
+          </button>
+          {detailsOpen && (
+            <div className={styles.technicalDetails}>
+              {renderToolResult(toolName, tool.result)}
+            </div>
+          )}
         </div>
       )}
 

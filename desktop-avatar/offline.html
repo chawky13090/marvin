@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Marvin</title>
+  <link rel="stylesheet" href="offline.css">
+</head>
+<body>
+  <header><strong>MARVIN</strong><button id="quit" title="Fermer">×</button></header>
+  <div class="edge edge-n" data-edge="n"></div>
+  <div class="edge edge-s" data-edge="s"></div>
+  <div class="edge edge-w" data-edge="w"></div>
+  <div class="edge edge-e" data-edge="e"></div>
+  <div class="corner corner-nw" data-edge="nw"></div>
+  <div class="corner corner-ne" data-edge="ne"></div>
+  <div class="corner corner-sw" data-edge="sw"></div>
+  <div class="corner corner-se" data-edge="se"></div>
+  <main>
+    <div class="avatar"><span></span></div>
+    <h1>Marvin est arrêté</h1>
+    <p id="status">Démarre le socle depuis cet avatar.</p>
+    <button id="start">Démarrer Marvin</button>
+  </main>
+  <script src="offline.js"></script>
+</body>
+</html>

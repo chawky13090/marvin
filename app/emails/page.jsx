@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { LoadingRow } from '@/components/ui/Spinner';
 
-const BACKEND = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatDate(raw) {
@@ -79,6 +79,16 @@ function SetupPanel({ onConfigured, onCancel, title }) {
     onConfigured(form.username);
   };
 
+  const connectGmailOAuth = async () => {
+    const r = await fetch(`${BACKEND}/api/email/oauth/google/start?account_hint=${encodeURIComponent(form.username || '')}`);
+    const data = await r.json();
+    if (!r.ok || !data.auth_url) {
+      setTestResult({ success: false, errors: [data.detail || 'Connexion OAuth impossible'] });
+      return;
+    }
+    window.location.assign(data.auth_url);
+  };
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const inp = (k, label, opts = {}) => (
     <div>
@@ -93,6 +103,18 @@ function SetupPanel({ onConfigured, onCancel, title }) {
     <div style={{ maxWidth: '560px', margin: '40px auto', padding: '28px 32px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(79, 140, 255,0.25)', borderRadius: '16px' }}>
       <h2 style={{ margin: '0 0 6px', fontSize: '1.1rem', color: '#4f8cff' }}>📧 {title || 'Configurer votre boîte mail'}</h2>
       <p style={{ margin: '0 0 20px', fontSize: '12px', color: 'var(--text-muted)' }}>Connexion IMAP/SMTP — vos identifiants sont stockés localement. Vous pouvez connecter plusieurs boîtes.</p>
+
+      {form.provider === 'gmail' && (
+        <div style={{ marginBottom: '18px', padding: '14px', borderRadius: '10px', background: 'rgba(66,133,244,0.09)', border: '1px solid rgba(66,133,244,0.35)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#8ab4ff', marginBottom: '5px' }}>Connexion Google recommandée</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>OAuth2 permet à Marvin d'utiliser Gmail sans mot de passe d'application. Chaque boîte est autorisée séparément.</div>
+          <button onClick={connectGmailOAuth} type="button"
+            style={{ padding: '9px 14px', borderRadius: '8px', border: 0, background: '#4285f4', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
+            🔐 Connecter cette boîte avec Google
+          </button>
+          <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '8px' }}>URI OAuth à autoriser dans Google Cloud : http://localhost:8005/api/oauth/google/callback/email</div>
+        </div>
+      )}
 
       {/* Fournisseur */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
@@ -276,38 +298,117 @@ function ComposeModal({ onClose, replyTo = null, account = null, prefill = null,
 // ══════════════════════════════════════════════════════════════════════════════
 // Assistant email automatique — 3 modes
 // ══════════════════════════════════════════════════════════════════════════════
+function MultiValueInput({ values = [], onChange, placeholder, style }) {
+  const [draft, setDraft] = useState('');
+
+  const addValues = (raw) => {
+    const additions = raw.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+    if (!additions.length) return;
+    const known = new Set(values.map(x => x.toLowerCase()));
+    onChange([...values, ...additions.filter(x => {
+      const key = x.toLowerCase();
+      if (known.has(key)) return false;
+      known.add(key);
+      return true;
+    })]);
+    setDraft('');
+  };
+
+  const remove = (item) => onChange(values.filter(x => x !== item));
+
+  return (
+    <div style={{ ...style, padding: '6px 8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
+      {values.map(item => (
+        <span key={item} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 7px', borderRadius: '7px', background: 'rgba(79,140,255,0.14)', border: '1px solid rgba(79,140,255,0.38)', color: '#8ab4ff', fontSize: '11px' }}>
+          {item}
+          <button type="button" onClick={() => remove(item)} aria-label={`Supprimer ${item}`}
+            style={{ padding: 0, border: 0, background: 'transparent', color: '#8ab4ff', cursor: 'pointer', fontSize: '13px', lineHeight: 1 }}>×</button>
+        </span>
+      ))}
+      <input value={draft} onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+            e.preventDefault();
+            addValues(draft);
+          } else if (e.key === 'Backspace' && !draft && values.length) {
+            remove(values[values.length - 1]);
+          }
+        }}
+        onBlur={() => addValues(draft)}
+        onPaste={e => {
+          const text = e.clipboardData.getData('text');
+          if (/[,;\n]/.test(text)) {
+            e.preventDefault();
+            addValues(text);
+          }
+        }}
+        placeholder={values.length ? 'Ajouter…' : placeholder}
+        style={{ flex: '1 1 180px', minWidth: '150px', padding: '3px 2px', background: 'transparent', border: 0, outline: 'none', color: 'var(--text-primary)', fontSize: '12.5px' }} />
+    </div>
+  );
+}
+
 function AutomationModal({ accounts, onClose, onOpenDraft }) {
-  const [cfg, setCfg] = useState({ mode: 'manuel', accounts: [], instructions: '', tone: 'professionnel, clair et courtois', signature: '', only_from: [], never_from: [], skip_keywords: [], max_per_run: 5 });
+  const [cfg, setCfg] = useState({ mode: 'manuel', accounts: [], instructions: '', tone: 'professionnel, clair et courtois', signature: '', only_from: [], never_from: [], skip_keywords: [], max_per_run: 5, send_delay_min: 5, scheduler_enabled: false, interval_min: 5, profiles: {} });
   const [loaded, setLoaded] = useState(false);
+  const [initialScheduler, setInitialScheduler] = useState(false);
+  const [profileAccount, setProfileAccount] = useState('');
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [drafts, setDrafts] = useState([]);
+  const [outbox, setOutbox] = useState([]);
 
   const reloadDrafts = () => fetch(`${BACKEND}/api/email/automation/drafts`).then(r => r.json()).then(d => setDrafts(d.drafts || [])).catch(() => {});
+  const reloadOutbox = () => fetch(`${BACKEND}/api/email/automation/outbox`).then(r => r.json()).then(d => setOutbox(d.outbox || [])).catch(() => {});
   useEffect(() => {
-    fetch(`${BACKEND}/api/email/automation`).then(r => r.json()).then(c => { setCfg(p => ({ ...p, ...c, accounts: c.accounts || [], only_from: c.only_from || [], never_from: c.never_from || [], skip_keywords: c.skip_keywords || [] })); setLoaded(true); }).catch(() => setLoaded(true));
+    fetch(`${BACKEND}/api/email/automation`).then(r => r.json()).then(c => {
+      setCfg(p => ({ ...p, ...c, accounts: c.accounts || [], profiles: c.profiles || {}, only_from: c.only_from || [], never_from: c.never_from || [], skip_keywords: c.skip_keywords || [] }));
+      setInitialScheduler(Boolean(c.scheduler_enabled));
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
     reloadDrafts();
+    reloadOutbox();
   }, []);
 
   const set = (k, v) => setCfg(c => ({ ...c, [k]: v }));
-  const csv = (arr) => (arr || []).join(', ');
-  const parseCsv = (s) => s.split(',').map(x => x.trim()).filter(Boolean);
+  const active = profileAccount ? { ...cfg, ...(cfg.profiles?.[profileAccount] || {}) } : cfg;
+  const setRule = (key, value) => {
+    if (!profileAccount) { set(key, value); return; }
+    setCfg(current => ({
+      ...current,
+      profiles: { ...(current.profiles || {}), [profileAccount]: { ...(current.profiles?.[profileAccount] || {}), [key]: value } },
+    }));
+  };
 
   const save = async () => {
+    let schedulerConfirmed = false;
+    if (cfg.scheduler_enabled && !initialScheduler) {
+      schedulerConfirmed = confirm(`Activer l'exécution automatique toutes les ${cfg.interval_min} minutes ?\n\nEn mode autonome, Marvin pourra envoyer sans nouvelle validation, uniquement selon les listes autorisées.`);
+      if (!schedulerConfirmed) return false;
+    }
     setSaving(true);
-    await fetch(`${BACKEND}/api/email/automation`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+    const response = await fetch(`${BACKEND}/api/email/automation`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cfg, scheduler_confirmed: schedulerConfirmed }) });
     setSaving(false);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setResult({ error: data.detail || 'Enregistrement impossible' });
+      return false;
+    }
+    setInitialScheduler(Boolean(cfg.scheduler_enabled));
+    return true;
   };
   const run = async (dry) => {
-    if (cfg.mode === 'autonome' && !dry && !confirm('Mode AUTONOME : Marvin va RÉPONDRE ET ENVOYER automatiquement aux emails non lus correspondant à ton cadrage. Continuer ?')) return;
-    await save();
+    const hasAutonomous = cfg.mode === 'autonome' || Object.values(cfg.profiles || {}).some(p => p.mode === 'autonome');
+    if (hasAutonomous && !dry && !confirm('Mode AUTONOME : Marvin va RÉPONDRE ET ENVOYER automatiquement aux emails non lus correspondant à ton cadrage. Continuer ?')) return;
+    if (!await save()) return;
     setRunning(true); setResult(null);
     try {
       const r = await fetch(`${BACKEND}/api/email/automation/run?dry_run=${dry ? 'true' : 'false'}`, { method: 'POST' });
       const d = await r.json();
       setResult(d.detail ? { error: d.detail } : d);
       reloadDrafts();
+      reloadOutbox();
     } catch (e) { setResult({ error: e.message }); }
     setRunning(false);
   };
@@ -315,6 +416,7 @@ function AutomationModal({ accounts, onClose, onOpenDraft }) {
   const MODES = [
     { id: 'manuel', label: '🅜 Manuel', desc: 'Rien d\'automatique. Tu rédiges via les boutons IA.' },
     { id: 'brouillon', label: '🅑 Brouillons auto', desc: 'Marvin prépare les réponses. Tu valides avant tout envoi.' },
+    { id: 'differe', label: '⏱️ Envoi différé', desc: 'Marvin prépare puis attend. Tu peux annuler avant l\'heure d\'envoi.' },
     { id: 'autonome', label: '🅐 Autonome', desc: 'Marvin répond ET ENVOIE seul, selon ton cadrage. ⚠️ Puissant.' },
   ];
   const lbl = { display: 'block', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, margin: '12px 0 4px' };
@@ -330,47 +432,58 @@ function AutomationModal({ accounts, onClose, onOpenDraft }) {
         </div>
         <p style={{ margin: '0 0 14px', fontSize: '11.5px', color: 'var(--text-muted)' }}>Choisis quand et comment Marvin répond à ta place. Les réponses sont en français, soignées et sans faute. Tu actives/désactives quand tu veux.</p>
 
+        <label style={lbl}>Profil à configurer</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+          <button onClick={() => setProfileAccount('')} style={{ padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', border: `1px solid ${!profileAccount ? '#4f8cff80' : 'var(--border)'}`, background: !profileAccount ? '#4f8cff20' : 'transparent', color: !profileAccount ? '#8ab4ff' : 'var(--text-muted)', fontSize: '11px' }}>🌐 Réglages par défaut</button>
+          {accounts.map(account => <button key={account.username} onClick={() => setProfileAccount(account.username)}
+            style={{ padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', border: `1px solid ${profileAccount === account.username ? '#4f8cff80' : 'var(--border)'}`, background: profileAccount === account.username ? '#4f8cff20' : 'transparent', color: profileAccount === account.username ? '#8ab4ff' : 'var(--text-muted)', fontSize: '11px' }}>📧 {account.username}</button>)}
+        </div>
+        {profileAccount && <div style={{ fontSize: '10px', color: '#8ab4ff', margin: '-6px 0 10px' }}>Ces valeurs remplacent les réglages par défaut uniquement pour {profileAccount}.</div>}
+
         {/* Modes */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
           {MODES.map(m => (
-            <button key={m.id} onClick={() => set('mode', m.id)}
+            <button key={m.id} onClick={() => setRule('mode', m.id)}
               style={{ textAlign: 'left', padding: '10px 12px', borderRadius: '10px', cursor: 'pointer',
-                background: cfg.mode === m.id ? 'rgba(79, 140, 255,0.14)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${cfg.mode === m.id ? 'rgba(79, 140, 255,0.5)' : 'var(--border)'}` }}>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: cfg.mode === m.id ? '#4f8cff' : 'var(--text-primary)' }}>{m.label}</div>
+                background: active.mode === m.id ? 'rgba(79, 140, 255,0.14)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${active.mode === m.id ? 'rgba(79, 140, 255,0.5)' : 'var(--border)'}` }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: active.mode === m.id ? '#4f8cff' : 'var(--text-primary)' }}>{m.label}</div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{m.desc}</div>
             </button>
           ))}
         </div>
 
-        {cfg.mode !== 'manuel' && (
+        {active.mode !== 'manuel' && (
           <>
             <label style={lbl}>Consignes générales (comment répondre)</label>
-            <textarea value={cfg.instructions} onChange={e => set('instructions', e.target.value)} rows={3}
+            <textarea value={active.instructions || ''} onChange={e => setRule('instructions', e.target.value)} rows={3}
               placeholder="Ex : Réponds poliment. Pour les demandes de devis, propose un rendez-vous. Indique que je reviens vers eux sous 24h."
               style={{ ...inp, resize: 'vertical' }} />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div><label style={lbl}>Ton</label><input value={cfg.tone} onChange={e => set('tone', e.target.value)} style={inp} /></div>
-              <div><label style={lbl}>Max réponses / passage</label><input type="number" value={cfg.max_per_run} onChange={e => set('max_per_run', Number(e.target.value))} style={inp} /></div>
+              <div><label style={lbl}>Ton</label><input value={active.tone || ''} onChange={e => setRule('tone', e.target.value)} style={inp} /></div>
+              <div><label style={lbl}>Maximum pour cette boîte / passage</label><input type="number" value={active.max_per_run || 5} onChange={e => setRule('max_per_run', Number(e.target.value))} style={inp} /></div>
             </div>
 
-            <label style={lbl}>Signature (optionnel)</label>
-            <textarea value={cfg.signature} onChange={e => set('signature', e.target.value)} rows={2} placeholder={'Cordialement,\nTon nom'} style={{ ...inp, resize: 'vertical' }} />
+            {active.mode === 'differe' && <div><label style={lbl}>Délai avant envoi (minutes)</label><input type="number" min="1" max="1440" value={active.send_delay_min || 5} onChange={e => setRule('send_delay_min', Number(e.target.value))} style={inp} /></div>}
 
-            {cfg.mode === 'autonome' && (
+            <label style={lbl}>Signature (optionnel)</label>
+            <textarea value={active.signature || ''} onChange={e => setRule('signature', e.target.value)} rows={2} placeholder={'Vide = signature enregistrée pour cette boîte'} style={{ ...inp, resize: 'vertical' }} />
+
+            {['autonome', 'differe'].includes(active.mode) && (
               <>
                 <label style={lbl}>✅ Répondre UNIQUEMENT à ces expéditeurs/domaines (fortement conseillé)</label>
-                <input value={csv(cfg.only_from)} onChange={e => set('only_from', parseCsv(e.target.value))} placeholder="client@x.com, @monentreprise.fr" style={inp} />
-                <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: 4 }}>⚠️ Si vide, Marvin pourra répondre à tout expéditeur non exclu. Renseigner cette liste = beaucoup plus sûr.</div>
+                <MultiValueInput values={active.only_from || []} onChange={v => setRule('only_from', v)} placeholder="client@x.com ou @monentreprise.fr" style={inp} />
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: 4 }}>Tape une adresse ou un domaine, puis appuie sur Entrée ou virgule. Tu peux aussi coller une liste.</div>
+                <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: 4 }}>⚠️ Une liste vide bloque volontairement tout envoi automatique.</div>
               </>
             )}
             <label style={lbl}>🚫 Ne JAMAIS répondre à (mots/expéditeurs) — en plus des exclusions auto (no-reply, banque…)</label>
-            <input value={csv(cfg.never_from)} onChange={e => set('never_from', parseCsv(e.target.value))} placeholder="spam@, promo, @pub.com" style={inp} />
+            <MultiValueInput values={active.never_from || []} onChange={v => setRule('never_from', v)} placeholder="spam@, promo ou @pub.com" style={inp} />
 
             {accounts.length > 0 && (
               <>
-                <label style={lbl}>Boîtes concernées (aucune cochée = toutes)</label>
+                <label style={lbl}>Boîtes activées — sélection explicite obligatoire</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {accounts.map(a => {
                     const on = cfg.accounts.includes(a.username);
@@ -381,11 +494,26 @@ function AutomationModal({ accounts, onClose, onOpenDraft }) {
               </>
             )}
 
+            {!profileAccount && (
+              <div style={{ marginTop: '14px', padding: '12px', borderRadius: '10px', border: `1px solid ${cfg.scheduler_enabled ? '#22c55e55' : 'var(--border)'}`, background: cfg.scheduler_enabled ? '#22c55e10' : 'rgba(255,255,255,0.025)' }}>
+                <button type="button" onClick={() => set('scheduler_enabled', !cfg.scheduler_enabled)}
+                  style={{ width: '100%', textAlign: 'left', border: 0, background: 'transparent', color: cfg.scheduler_enabled ? '#4ade80' : 'var(--text-primary)', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
+                  {cfg.scheduler_enabled ? '✅' : '⬜'} Exécuter automatiquement en arrière-plan
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Toutes les</span>
+                  <input type="number" min="2" max="1440" value={cfg.interval_min} onChange={e => set('interval_min', Number(e.target.value))} style={{ ...inp, width: '80px' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>minutes</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '7px' }}>L'activation demande une confirmation séparée. Elle reste désactivée après migration.</div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px', marginTop: '18px', flexWrap: 'wrap' }}>
               <button onClick={save} disabled={saving} style={{ padding: '9px 14px', borderRadius: '9px', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>{saving ? '⏳…' : '💾 Enregistrer'}</button>
               <button onClick={() => run(true)} disabled={running} style={{ padding: '9px 14px', borderRadius: '9px', border: '1px solid #3b82f650', background: '#3b82f620', color: '#60a5fa', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>{running ? '⏳…' : '🧪 Tester (simulation)'}</button>
-              <button onClick={() => run(false)} disabled={running} style={{ padding: '9px 14px', borderRadius: '9px', border: 'none', background: cfg.mode === 'autonome' ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'linear-gradient(135deg,#4f8cffcc,#4f8cff88)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
-                {running ? '⏳ Traitement…' : cfg.mode === 'autonome' ? '🚀 Lancer (envoi auto)' : '📝 Préparer les brouillons'}</button>
+              <button onClick={() => run(false)} disabled={running} style={{ padding: '9px 14px', borderRadius: '9px', border: 'none', background: active.mode === 'autonome' ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'linear-gradient(135deg,#4f8cffcc,#4f8cff88)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+                {running ? '⏳ Traitement…' : active.mode === 'autonome' ? '🚀 Lancer (envoi auto)' : active.mode === 'differe' ? '⏱️ Programmer les réponses' : '📝 Préparer les brouillons'}</button>
             </div>
           </>
         )}
@@ -418,6 +546,18 @@ function AutomationModal({ accounts, onClose, onOpenDraft }) {
                 style={{ padding: '8px 10px', marginBottom: '4px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>↩ {d.subject}</div>
                 <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>à {d.to} · depuis {d.account} — cliquer pour relire et envoyer</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {outbox.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>⏱️ Envois différés annulables ({outbox.length})</div>
+            {outbox.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', padding: '8px 10px', marginBottom: '4px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <div><div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{item.subject}</div><div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>à {item.to} · envoi prévu {new Date(item.send_after).toLocaleString('fr-FR')}</div></div>
+                <button onClick={() => fetch(`${BACKEND}/api/email/automation/outbox/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).then(reloadOutbox)} style={{ padding: '5px 8px', borderRadius: '7px', border: '1px solid #ef444455', background: '#ef444412', color: '#f87171', cursor: 'pointer', fontSize: '10.5px' }}>Annuler</button>
               </div>
             ))}
           </div>
@@ -915,13 +1055,13 @@ export default function EmailsPage() {
         {accounts.map(a => (
           <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
             <button onClick={() => { setActiveAccount(a.username); setSelectedId(null); setSelectedEmail(null); setSearchQ(''); }}
-              title={a.username}
+              title={`${a.username} · ${a.auth_type === 'oauth2' ? 'OAuth2 Google' : 'mot de passe d\'application'}`}
               style={{ flex: 1, minWidth: 0, padding: '7px 8px', textAlign: 'left', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '11px',
                 background: activeAccount === a.username ? 'rgba(79, 140, 255,0.14)' : 'transparent',
                 color: activeAccount === a.username ? '#4f8cff' : 'var(--text-muted)',
                 fontWeight: activeAccount === a.username ? 700 : 400,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {a.provider === 'gmail' ? '📧' : a.provider === 'outlook' ? '📨' : '✉️'} {a.username}
+              {a.provider === 'gmail' ? '📧' : a.provider === 'outlook' ? '📨' : '✉️'} {a.username} {a.auth_type === 'oauth2' ? '🔐' : ''}
             </button>
             <button onClick={() => removeAccount(a.username)} title={`Supprimer la boîte ${a.username}`}
               style={{ padding: '5px 8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.28)', borderRadius: '7px', color: '#f87171', cursor: 'pointer', fontSize: '12px', lineHeight: 1, flexShrink: 0 }}>🗑️</button>

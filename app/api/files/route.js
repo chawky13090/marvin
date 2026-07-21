@@ -1,4 +1,5 @@
 import path from 'path';
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // v2.111 — proxy vers les outils Python (file_list/file_info/file_find/file_create_folder/
 // file_rename/file_move/file_copy/file_delete) au lieu d'un accès fs Node direct. Seules les
@@ -9,10 +10,6 @@ import path from 'path';
 // (organize par catégorie, batch*, calcul de nouveau nom) restent orchestrées ici en JS
 // (pure logique de chaînes/boucles, aucun accès disque direct) mais chaque opération
 // filesystem individuelle passe par un outil Python.
-const BACKEND = (typeof window !== 'undefined' && window.location
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
-
 const FILE_CATEGORIES = {
   Documents: ['.pdf', '.doc', '.docx', '.txt', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.csv', '.rtf', '.md'],
   Images: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp', '.ico', '.tiff'],
@@ -110,7 +107,7 @@ export async function POST(req) {
     const { action, parentPath, folderName, directoryPath } = body;
 
     if (action === 'createFolder') {
-      const fullPath = path.join(parentPath || '.', folderName);
+      const fullPath = path.join(/*turbopackIgnore: true*/ parentPath || '.', folderName);
       await callTool('file_create_folder', { path: fullPath });
       return Response.json({ success: true, path: fullPath });
     }
@@ -123,13 +120,13 @@ export async function POST(req) {
         if (entry.type === 'dossier') continue;
         const category = categoryFor(entry.name);
         if (category === 'Autres') continue; // ne pas déplacer les fichiers non catégorisés
-        const destDir = path.join(listing.currentDir || dir, category);
+        const destDir = path.join(/*turbopackIgnore: true*/ listing.currentDir || dir, category);
         // Toujours passer le chemin de fichier COMPLET (dossier + nom), jamais juste le
         // dossier destination : file_move ne recrée le nom source que si la destination
         // est déjà un dossier EXISTANT — sinon il traite la destination comme un nom de
         // fichier littéral (bug réel trouvé en testant : "Images"/"Videos" créés comme
         // fichiers vides au lieu de dossiers, la 1ère fois que le dossier n'existait pas).
-        const destFile = path.join(destDir, entry.name);
+        const destFile = path.join(/*turbopackIgnore: true*/ destDir, entry.name);
         try {
           await callTool('file_move', { source: entry.path, destination: destFile });
           moved.push({ name: entry.name, category, from: entry.path, to: destFile });
@@ -157,7 +154,7 @@ export async function PATCH(req) {
     }
 
     if (action === 'move') {
-      const dest = path.join(destinationDir, path.basename(filePath));
+      const dest = path.join(/*turbopackIgnore: true*/ destinationDir, path.basename(filePath));
       const r = await callTool('file_move', { source: filePath, destination: dest });
       return Response.json({ success: true, oldPath: filePath, newPath: r.destination });
     }
@@ -204,7 +201,7 @@ export async function PUT(req) {
       for (const fp of filePaths) {
         try {
           // Chemin complet, pas juste le dossier — cf. commentaire dans l'action 'organize'.
-          const dest = path.join(destinationDir, path.basename(fp));
+          const dest = path.join(/*turbopackIgnore: true*/ destinationDir, path.basename(fp));
           const r = await callTool('file_move', { source: fp, destination: dest });
           moved.push({ from: fp, to: r.destination });
         } catch (e) {
@@ -219,7 +216,7 @@ export async function PUT(req) {
       const errors = [];
       for (const fp of filePaths) {
         try {
-          const dest = path.join(destinationDir, path.basename(fp));
+          const dest = path.join(/*turbopackIgnore: true*/ destinationDir, path.basename(fp));
           const r = await callTool('file_copy', { source: fp, destination: dest });
           copied.push({ from: fp, to: r.destination || dest });
         } catch (e) {

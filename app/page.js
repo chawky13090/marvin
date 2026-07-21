@@ -3,13 +3,28 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import ChatContainer from '@/components/chat/ChatContainer';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
+import { useToast } from '@/components/ui/Toast';
+import { BACKEND_URL } from '@/lib/backend';
+import { canSwitchConversation, initialChatSelection } from '@/lib/chatNavigation.mjs';
+
+async function fetchWithBackendFallback(path, options) {
+  try {
+    const localResponse = await fetch(path, options);
+    if (localResponse.ok || localResponse.status !== 404) return localResponse;
+  } catch {
+    // Repli direct si le proxy Next n'est momentanément pas joignable.
+  }
+  return fetch(`${BACKEND_URL}${path}`, options);
+}
 
 export default function ChatPage() {
+  const { toast } = useToast();
   const chatStatus = useChatStatus();   // { isLoading, ... } → fait battre l'avatar plus vite
+  const initialSelection = initialChatSelection(chatStatus);
   const [conversations, setConversations] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [activeConversationId, setActiveConversationId] = useState(null);
-  const [chatKey, setChatKey] = useState('new');
+  const [activeConversationId, setActiveConversationId] = useState(initialSelection.conversationId);
+  const [chatKey, setChatKey] = useState(initialSelection.chatKey);
   const [pendingActiveId, setPendingActiveId] = useState(null);
   const pendingIdRef = useRef(null);
   const [initialMessages, setInitialMessages] = useState([]);
@@ -35,6 +50,10 @@ export default function ChatPage() {
   // même si on est déjà sur "/" (un simple router.push('/') serait un no-op ici).
   useEffect(() => {
     const onNewConv = () => {
+      if (chatStatus.isLoading) {
+        toast.warning('Réponse en cours', 'Attends la fin ou arrête Marvin avant de créer une autre conversation. Le flux actuel reste conservé.');
+        return;
+      }
       setActiveConversationId(null);
       setInitialMessages([]);
       setChatKey('new_' + Date.now());
@@ -42,7 +61,7 @@ export default function ChatPage() {
     };
     window.addEventListener('marvin:new-conversation', onNewConv);
     return () => window.removeEventListener('marvin:new-conversation', onNewConv);
-  }, []);
+  }, [chatStatus.isLoading, toast]);
 
   // État du modèle actif et liste des modèles disponibles
   const [activeModel, setActiveModel] = useState('auto'); // "auto" = routing intelligent
@@ -98,6 +117,14 @@ export default function ChatPage() {
 
   const loadConversation = async (id) => {
     setShowConv(false);   // referme le tiroir (mobile)
+    if (!canSwitchConversation({
+      isLoading: chatStatus.isLoading,
+      liveConversationId: chatStatus.conversationId,
+      targetConversationId: id,
+    })) {
+      toast.warning('Réponse en cours', 'La conversation active continue en arrière-plan. Attends sa fin ou arrête-la avant d’en ouvrir une autre.');
+      return;
+    }
     if (!id) {
       setInitialMessages([]);
       setActiveConversationId(null);
@@ -106,15 +133,16 @@ export default function ChatPage() {
     }
     if (activeConversationId === id) return;
     try {
-      const res = await fetch(`/api/conversations/${id}?t=` + Date.now());
-      if (res.ok) {
-        const data = await res.json();
-        setInitialMessages(data.messages || []);
-        setActiveConversationId(id);
-        setChatKey(id);
-      }
+      const path = `/api/conversations/${id}?t=${Date.now()}`;
+      const res = await fetchWithBackendFallback(path);
+      if (!res.ok) throw new Error(`Conversation HTTP ${res.status}`);
+      const data = await res.json();
+      setInitialMessages(data.messages || []);
+      setActiveConversationId(id);
+      setChatKey(id);
     } catch (err) {
       console.error('Erreur chargement messages:', err);
+      toast.error('Conversation inaccessible', 'Les messages sont conservés. Réessayez après le diagnostic du frontend.');
     }
   };
 
@@ -193,7 +221,8 @@ export default function ChatPage() {
     e.stopPropagation();
     if (!confirm('Supprimer cette conversation définitivement ?')) return;
     try {
-      await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(`Suppression HTTP ${response.status}`);
       if (activeConversationId === id) {
         // Clear the chat view when deleting the active conversation
         setActiveConversationId(null);
@@ -210,7 +239,8 @@ export default function ChatPage() {
     e.stopPropagation();
     if (!confirm('Supprimer ce projet ?')) return;
     try {
-      await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      const response = await fetchWithBackendFallback(`/api/projects/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(`Suppression projet HTTP ${response.status}`);
       fetchData();
     } catch (err) {
       console.error(err);
@@ -227,11 +257,12 @@ export default function ChatPage() {
 
   const saveProjectInstructions = async () => {
     try {
-      await fetch(`/api/projects/${editingProjectId}`, {
+      const response = await fetchWithBackendFallback(`/api/projects/${editingProjectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instructions: projectInstructionsDraft }),
       });
+      if (!response.ok) throw new Error(`Projet HTTP ${response.status}`);
       setEditingProjectId(null);
       fetchData();
     } catch (err) {
@@ -241,11 +272,12 @@ export default function ChatPage() {
 
   const assignProject = async (convId, projectId) => {
     try {
-      await fetch(`/api/conversations/${convId}`, {
+      const response = await fetchWithBackendFallback(`/api/conversations/${convId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: projectId === 'none' ? null : projectId })
       });
+      if (!response.ok) throw new Error(`Affectation HTTP ${response.status}`);
       fetchData();
     } catch (err) {
       console.error(err);
@@ -256,7 +288,8 @@ export default function ChatPage() {
     const t = (title || '').trim();
     if (!t) return;
     try {
-      await fetch(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: t }) });
+      const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: t }) });
+      if (!response.ok) throw new Error(`Renommage HTTP ${response.status}`);
       fetchData();
     } catch (err) { console.error(err); }
   };
@@ -266,7 +299,8 @@ export default function ChatPage() {
   const togglePin = async (e, id, pinned) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinned: !pinned }) });
+      const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinned: !pinned }) });
+      if (!response.ok) throw new Error(`Épinglage HTTP ${response.status}`);
       fetchData();
     } catch (err) { console.error(err); }
   };

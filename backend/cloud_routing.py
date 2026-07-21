@@ -73,8 +73,12 @@ def is_cloud_model(name: str) -> bool:
     # reconnus comme "cloud", laissant passer une fuite potentielle. Trouvé en
     # implémentant le routage par tâche (v2.141), qui introduit justement
     # `qwen3-coder:480b-cloud` comme override réel.
-    n = name or ""
-    return n.endswith(":cloud") or n.endswith("-cloud")
+    n = (name or "").lower()
+    return (
+        n.endswith(":cloud")
+        or n.endswith("-cloud")
+        or bool(__import__("re").fullmatch(r"gemma4:e\d+b", n))
+    )
 
 
 def get_cloud_config() -> tuple[bool, dict]:
@@ -106,6 +110,26 @@ _CODE_TASK_KEYWORDS = (
     "code source", "programme informatique", "deploiement", "configuration serveur",
     "dockerfile", "docker compose", "automatiser", "automatisation",
 )
+_RESEARCH_TASK_KEYWORDS = (
+    "recherche web", "cherche sur internet", "sources officielles", "documentation actuelle",
+    "état de l'art", "etat de l'art", "veille", "compare les offres", "renseigne toi",
+)
+_PRODUCTIVITY_TASK_KEYWORDS = (
+    "document word", "docx", "excel", "xlsx", "powerpoint", "pptx", "présentation",
+    "presentation", "rapport", "compte rendu", "mise en page", "tableur",
+)
+_MULTILINGUAL_TASK_KEYWORDS = (
+    "traduis", "traduction", "translate", "multilingue", "bilingue",
+)
+_AGENTIC_TASK_KEYWORDS = (
+    "workflow", "mission longue", "plusieurs étapes", "plusieurs etapes", "orchestration",
+    "multi-agent", "utilise les outils", "automatise cette tâche", "automatise cette tache",
+)
+_REASONING_TASK_KEYWORDS = (
+    "analyse approfondie", "raisonnement complexe", "diagnostic complexe", "architecture",
+    "compare plusieurs", "évalue les compromis", "evalue les compromis", "résous ce problème",
+    "resous ce probleme",
+)
 
 
 def detect_task(text: str) -> str | None:
@@ -115,6 +139,16 @@ def detect_task(text: str) -> str | None:
     norm = strip_accents((text or "").lower())
     if any(strip_accents(k) in norm for k in _CODE_TASK_KEYWORDS):
         return "code"
+    if any(strip_accents(k) in norm for k in _RESEARCH_TASK_KEYWORDS):
+        return "research"
+    if any(strip_accents(k) in norm for k in _PRODUCTIVITY_TASK_KEYWORDS):
+        return "productivity"
+    if any(strip_accents(k) in norm for k in _MULTILINGUAL_TASK_KEYWORDS):
+        return "multilingual"
+    if any(strip_accents(k) in norm for k in _AGENTIC_TASK_KEYWORDS):
+        return "agentic"
+    if any(strip_accents(k) in norm for k in _REASONING_TASK_KEYWORDS):
+        return "reasoning"
     return None
 
 
@@ -140,7 +174,43 @@ def get_task_overrides() -> dict:
 # d'une image de test en ~6s chacun — voir mémoire screenshots-documentation-v2175).
 _GENERAL_PREFERENCE_FAMILIES = ("deepseek", "glm", "kimi", "nemotron")
 _VISION_CAPABLE_FAMILIES = ("gemini", "gemma", "qwen3.5")
-_CODE_SPECIALIST_MARKERS = ("coder",)
+_CODE_SPECIALIST_MARKERS = ("coder", "code")
+
+
+def model_family(name: str) -> str:
+    """Famille stable d'un modèle cloud, indépendante de sa taille et de son tag.
+
+    Le Council utilise cette valeur pour éviter cinq variantes d'une même famille qui
+    partageraient largement les mêmes angles morts.
+    """
+    low = (name or "").lower()
+    for family in ("deepseek", "qwen", "glm", "kimi", "nemotron", "minimax",
+                   "mistral", "gemma", "gemini", "gpt-oss", "llama"):
+        if low.startswith(family):
+            return family
+    return low.split(":", 1)[0].split("-", 1)[0]
+
+
+def list_distinct_cloud_models(need: str = "general") -> list[str]:
+    """Retourne les modèles cloud installés, ordonnés par utilité et dédupliqués par
+    famille. Aucune valeur de réglage périmée n'est inventée ni conservée."""
+    installed = list_installed_cloud_models()
+    if need == "code":
+        families = ("kimi", "glm", "deepseek", "qwen", "minimax", "mistral", "nemotron")
+    else:
+        families = ("deepseek", "qwen", "glm", "nemotron", "mistral", "minimax", "kimi")
+    ordered: list[str] = []
+    for family in families:
+        ordered.extend(m for m in installed if model_family(m) == family and m not in ordered)
+    ordered.extend(m for m in installed if m not in ordered)
+    distinct: list[str] = []
+    seen: set[str] = set()
+    for model in ordered:
+        family = model_family(model)
+        if family and family not in seen:
+            seen.add(family)
+            distinct.append(model)
+    return distinct
 
 
 def list_installed_cloud_models() -> list[str]:
@@ -208,6 +278,17 @@ def pick_best_cloud_model(need: str = "general", exclude: frozenset = frozenset(
     installed = [m for m in list_installed_cloud_models() if m not in exclude]
     if not installed:
         return None
+    try:
+        import model_market
+        recommendations = model_market.recommend(
+            need,
+            count=1,
+            exclude_models=set(exclude),
+        )
+        if recommendations:
+            return str(recommendations[0]["model"])
+    except Exception:
+        pass
     if need == "code":
         candidates = _apply_learned_capabilities(installed, "code")
         coder = next((m for m in candidates if any(k in m.lower() for k in _CODE_SPECIALIST_MARKERS)), None)
@@ -250,12 +331,47 @@ def is_local_only_lockdown() -> bool:
 
 
 def is_ultra_unrestricted() -> bool:
-    """Mode « Ultra débridé » : désactive UNIQUEMENT la détection de sensibilité,
-    jamais le garde-fou système de security.py."""
+    """Mode « Ultra débridé » : autorise les données sensibles dans le cloud.
+
+    Depuis v2.243, ce réglage porte aussi un contrat cloud-only pour les appels LLM
+    génératifs. Le garde-fou système de security.py reste indépendant et actif.
+    """
     try:
         return bool(db.get_setting("ultra_unrestricted"))
     except Exception:
         return False
+
+
+class CloudOnlyModelUnavailable(RuntimeError):
+    """Le mode Ultra exige le cloud mais aucun modèle cloud adapté n'est disponible."""
+
+
+def is_cloud_only_mode() -> bool:
+    """True uniquement quand Ultra est actif et que le coupe-circuit local ne l'est pas.
+
+    Si les deux réglages sont accidentellement vrais, Hyper local gagne. Cette priorité
+    préserve le garde-fou de défense en profondeur ajouté antérieurement.
+    """
+    return is_ultra_unrestricted() and not is_local_only_lockdown()
+
+
+def require_cloud_model(
+    need: str = "general",
+    *,
+    requested_model: str | None = None,
+    exclude: frozenset[str] = frozenset(),
+) -> str:
+    """Résout un modèle cloud installé ou échoue explicitement, sans repli local."""
+    installed = [model for model in list_installed_cloud_models() if model not in exclude]
+    if requested_model and is_cloud_model(requested_model) and requested_model in installed:
+        return requested_model
+    picked = pick_best_cloud_model(need, exclude=exclude)
+    if picked and picked in installed:
+        return picked
+    raise CloudOnlyModelUnavailable(
+        "Mode Ultra débridé actif : aucun modèle Ollama Cloud adapté n'est disponible. "
+        "Marvin refuse le repli local silencieux. Vérifiez Ollama Cloud ou changez de mode."
+    )
 
 
 def resolve_model(requested_model: str | None, profile: str = "agent",
@@ -275,12 +391,23 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
     """
     from config import MODEL_PROFILES, DEFAULT_MODEL
     fallback = local_fallback or MODEL_PROFILES.get(profile, {}).get("model") or DEFAULT_MODEL
-
-    if has_images:
-        return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback
-
     lockdown = is_local_only_lockdown()
     if lockdown:
+        return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback
+
+    # Ultra est un contrat cloud-only, pas seulement une levée du filtre de sensibilité.
+    # Un choix manuel local, une image ou un modèle cloud retiré sont reroutés vers un
+    # cloud réellement installé. À défaut, on échoue clairement au lieu de masquer un
+    # repli sur qwen/llava local.
+    if is_cloud_only_mode():
+        task = "vision" if has_images else (detect_task(text_for_sensitivity) or {
+            "analysis": "reasoning",
+            "agent": "agentic",
+            "vision": "vision",
+        }.get(profile, "general"))
+        return require_cloud_model(task, requested_model=requested_model)
+
+    if has_images:
         return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback
 
     ultra = is_ultra_unrestricted()
@@ -305,5 +432,14 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
             if picked:
                 return picked
         if profile in overrides:
-            return overrides[profile]
+            configured = overrides[profile]
+            # Un override peut rester en base après le retrait/renommage d'un modèle cloud.
+            # Ne jamais provoquer un échec puis un repli local silencieux : valider contre
+            # /api/tags et choisir un cloud réellement disponible.
+            installed = list_installed_cloud_models()
+            if configured in installed:
+                return configured
+            picked = pick_best_cloud_model("general")
+            if picked:
+                return picked
     return fallback

@@ -5,7 +5,7 @@ import { LoadingRow } from '@/components/ui/Spinner';
 import PrettyResult from '@/components/chat/PrettyResult';
 import { useToast } from '@/components/ui/Toast';
 
-const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL } from '@/lib/backend';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Catalogue des outils par catégorie
@@ -115,7 +115,7 @@ const CATEGORIES = [
         id: 'file_list', icon: '📁', name: 'Lister un dossier',
         description: 'Affiche le contenu d\'un répertoire avec taille, type et date de chaque fichier.',
         params: [
-          { name: 'path',        label: 'Chemin du dossier',        type: 'path',    required: true, placeholder: 'C:\\Users\\Chawb\\Desktop' },
+          { name: 'path',        label: 'Chemin du dossier',        type: 'path',    required: true, placeholder: 'Bureau' },
           { name: 'show_hidden', label: 'Afficher les fichiers cachés', type: 'checkbox', defaultValue: false },
         ],
       },
@@ -133,7 +133,7 @@ const CATEGORIES = [
         description: 'Lit le contenu d\'un fichier texte, PDF, Word, Excel ou CSV.',
         tips: ['Supporte .txt, .md, .pdf, .docx, .xlsx, .csv, .json, .py, .js...'],
         params: [
-          { name: 'path', label: 'Chemin du fichier', type: 'path', required: true, placeholder: 'C:\\Users\\Chawb\\Desktop\\fichier.txt' },
+          { name: 'path', label: 'Chemin du fichier', type: 'path', required: true, placeholder: 'Bureau\\fichier.txt' },
         ],
       },
       {
@@ -153,7 +153,7 @@ const CATEGORIES = [
         description: 'Cherche une chaîne de texte dans un dossier entier (récursif optionnel).',
         tips: ['Supporte les expressions régulières', 'Retourne le fichier, la ligne et le contexte'],
         params: [
-          { name: 'path',      label: 'Dossier de recherche', type: 'path', required: true, placeholder: 'C:\\Users\\Chawb\\Documents' },
+          { name: 'path',      label: 'Dossier de recherche', type: 'path', required: true, placeholder: 'Documents' },
           { name: 'query',     label: 'Texte à chercher',     type: 'text', required: true },
           { name: 'recursive', label: 'Sous-dossiers inclus', type: 'checkbox', defaultValue: true },
         ],
@@ -220,7 +220,7 @@ const CATEGORIES = [
         id: 'file_create_folder', icon: '📂', name: 'Créer un dossier',
         description: 'Crée un dossier (et tous les parents si nécessaire).',
         params: [
-          { name: 'path', label: 'Chemin du dossier', type: 'path', required: true, placeholder: 'C:\\Users\\Chawb\\Desktop\\MonDossier' },
+          { name: 'path', label: 'Chemin du dossier', type: 'path', required: true, placeholder: 'Bureau\\MonDossier' },
         ],
       },
       {
@@ -701,7 +701,7 @@ const CATEGORIES = [
         ],
         params: [
           { name: 'image_path', label: 'Chemin de l\'image', type: 'path', required: true,
-            placeholder: 'C:\\Users\\Chawb\\Desktop\\capture.png' },
+            placeholder: 'Bureau\\capture.png' },
           { name: 'prompt',     label: 'Instruction OCR (optionnel)', type: 'textarea',
             placeholder: 'Extrais tout le texte présent dans cette image.' },
           { name: 'model',      label: 'Modèle vision', type: 'select', options: [
@@ -841,7 +841,7 @@ const CATEGORIES = [
         ],
         params: [
           { name: 'sources',     label: 'Fichiers / Dossiers à compresser', type: 'tags', required: true,
-            placeholder: 'C:\\Users\\Chawb\\Desktop\\rapport, C:\\Users\\Chawb\\Desktop\\images' },
+            placeholder: 'Bureau\\rapport, Bureau\\images' },
           { name: 'output_path', label: 'Chemin de l\'archive ZIP de sortie', type: 'path',
             placeholder: 'Bureau (défaut)' },
         ],
@@ -856,7 +856,7 @@ const CATEGORIES = [
         ],
         params: [
           { name: 'archive_path', label: 'Chemin de l\'archive', type: 'path', required: true,
-            placeholder: 'C:\\Users\\Chawb\\Desktop\\fichiers.zip' },
+            placeholder: 'Bureau\\fichiers.zip' },
           { name: 'dest_path',    label: 'Dossier de destination', type: 'path',
             placeholder: 'Même dossier que l\'archive (défaut)' },
         ],
@@ -880,7 +880,7 @@ const CATEGORIES = [
         ],
         params: [
           { name: 'audio_path', label: 'Chemin du fichier audio', type: 'path', required: true,
-            placeholder: 'C:\\Users\\Chawb\\Desktop\\enregistrement.mp3' },
+            placeholder: 'Bureau\\enregistrement.mp3' },
           { name: 'model', label: 'Modèle Whisper', type: 'select', options: [
             { value: 'base',     label: '⚡ base (rapide, 74MB)' },
             { value: 'small',    label: '🔍 small (précis, 244MB)' },
@@ -1179,7 +1179,7 @@ const CATEGORIES = [
           'Action "unique" + column : liste les valeurs distinctes',
         ],
         params: [
-          { name: 'path',      label: 'Chemin du fichier CSV', type: 'path', required: true, placeholder: 'C:\\Users\\Chawb\\Desktop\\data.csv' },
+          { name: 'path',      label: 'Chemin du fichier CSV', type: 'path', required: true, placeholder: 'Bureau\\data.csv' },
           { name: 'action',    label: 'Action', type: 'select', options: [
             { value: 'summary', label: '📋 Résumé global' },
             { value: 'head',    label: '👁️ Aperçu (5 premières lignes)' },
@@ -1203,7 +1203,7 @@ const CATEGORIES = [
             { value: 'sha1',  label: '🔑 SHA-1' },
           ]},
           { name: 'text',      label: 'Texte',           type: 'textarea', placeholder: 'Texte à hacher...' },
-          { name: 'file_path', label: 'Ou chemin fichier', type: 'path',   placeholder: 'C:\\Users\\Chawb\\Desktop\\fichier.zip' },
+          { name: 'file_path', label: 'Ou chemin fichier', type: 'path',   placeholder: 'Bureau\\fichier.zip' },
         ],
       },
       {
@@ -1277,7 +1277,7 @@ const CATEGORIES = [
         description: 'Retourne les métadonnées d\'une image : dimensions, format, taille, données EXIF.',
         tips: ['Fonctionne avec JPEG, PNG, WEBP, BMP, GIF...', 'Les données EXIF incluent date de prise, appareil, GPS'],
         params: [
-          { name: 'path', label: 'Chemin de l\'image', type: 'path', required: true, placeholder: 'C:\\Users\\Chawb\\Desktop\\photo.jpg' },
+          { name: 'path', label: 'Chemin de l\'image', type: 'path', required: true, placeholder: 'Bureau\\photo.jpg' },
         ],
       },
       {
@@ -1380,7 +1380,7 @@ const CATEGORIES = [
         description: 'Extrait le texte d\'un fichier PDF page par page.',
         tips: ['Spécifiez "1-3" pour lire les pages 1 à 3', 'Laissez vide pour tout lire', 'max_chars limite la taille de la réponse'],
         params: [
-          { name: 'path',      label: 'Chemin du PDF',  type: 'path',   required: true, placeholder: 'C:\\Users\\...\\document.pdf' },
+          { name: 'path',      label: 'Chemin du PDF',  type: 'path',   required: true, placeholder: 'Documents\\document.pdf' },
           { name: 'pages',     label: 'Pages (ex: 1-3 ou 2)', type: 'text', placeholder: 'Vide = tout' },
           { name: 'max_chars', label: 'Max caractères', type: 'number', defaultValue: 4000 },
         ],
@@ -1390,7 +1390,7 @@ const CATEGORIES = [
         description: 'Retourne les métadonnées d\'un PDF : titre, auteur, pages, taille, chiffrement.',
         tips: ['Ne lit pas le contenu, juste les métadonnées', 'Rapide même pour les gros PDFs'],
         params: [
-          { name: 'path', label: 'Chemin du PDF', type: 'path', required: true, placeholder: 'C:\\Users\\...\\document.pdf' },
+          { name: 'path', label: 'Chemin du PDF', type: 'path', required: true, placeholder: 'Documents\\document.pdf' },
         ],
       },
       {
@@ -1627,7 +1627,7 @@ const CATEGORIES = [
         description: 'Lit un fichier Excel (.xlsx) et retourne les données d\'une feuille.',
         tips: ['Action "sheets" pour lister les onglets', '"summary" pour les dimensions sans charger les données', '"read" pour les lignes'],
         params: [
-          { name: 'path',     label: 'Chemin du fichier Excel', type: 'path',   required: true, placeholder: 'C:\\Users\\...\\fichier.xlsx' },
+          { name: 'path',     label: 'Chemin du fichier Excel', type: 'path',   required: true, placeholder: 'Documents\\fichier.xlsx' },
           { name: 'action',   label: 'Action', type: 'select', options: [
             { value: 'read',    label: '📊 Lire les données' },
             { value: 'sheets',  label: '📋 Lister les feuilles' },
@@ -1650,7 +1650,7 @@ const CATEGORIES = [
         description: 'Liste le contenu d\'une archive ZIP sans l\'extraire.',
         tips: ['Affiche le nom, la taille et la date de chaque fichier', 'Calcule le taux de compression'],
         params: [
-          { name: 'path', label: 'Chemin de l\'archive ZIP', type: 'path', required: true, placeholder: 'C:\\Users\\...\\archive.zip' },
+          { name: 'path', label: 'Chemin de l\'archive ZIP', type: 'path', required: true, placeholder: 'Documents\\archive.zip' },
         ],
       },
       {
@@ -1666,7 +1666,7 @@ const CATEGORIES = [
         description: 'Liste les tables et leur schéma dans une base de données SQLite.',
         tips: ['Retourne le nom, le type et les colonnes de chaque table', 'Supporte .db et .sqlite'],
         params: [
-          { name: 'db_path', label: 'Chemin de la base SQLite', type: 'path', required: true, placeholder: 'C:\\Users\\...\\base.db' },
+          { name: 'db_path', label: 'Chemin de la base SQLite', type: 'path', required: true, placeholder: 'Documents\\base.db' },
         ],
       },
       {

@@ -2,7 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL } from '@/lib/backend';
+
+const isCloudModelName = model => (
+  model.endsWith(':cloud')
+  || model.endsWith('-cloud')
+  || /^gemma4:e\d+b$/i.test(model)
+);
 
 // ── Définition des 3 niveaux de permission ────────────────────────────────────
 const PERMISSION_LEVELS = {
@@ -372,48 +378,18 @@ export default function SettingsPage() {
     }
     setPresetApplying(true);
     try {
-      let nextLockdown = false, nextEnabled = false, nextOverrides = cloudOverrides, nextUltra = false;
-      if (preset === 'normal') {
-        nextLockdown = false;
-        nextEnabled = cloudEnabled;       // ne touche pas à la config existante
-        nextOverrides = cloudOverrides;
-        nextUltra = false;
-      } else if (preset === 'hyper') {
-        nextLockdown = true;
-        nextEnabled = false;
-        nextUltra = false;
-      } else if (preset === 'cloud_max' || preset === 'ultra') {
-        // v2.179 — résolu côté backend (cloud_routing.pick_best_cloud_model), plus de liste
-        // dupliquée ici : un modèle cloud recommandé peut être retiré par le fournisseur en
-        // quelques jours (constaté en réel), la logique de choix vit maintenant à un seul
-        // endroit (partagé avec CONFIGURER-CLOUD-TOTAL.bat).
-        const bestRes = await fetch(`${BACKEND_URL}/api/cloud/best-model?need=general`);
-        const bestData = await bestRes.json();
-        const best = bestData.model;
-        if (!best) { showNotification('⚠️ Aucun modèle cloud installé — téléchargez-en un via `ollama pull`.'); setPresetApplying(false); return; }
-        nextLockdown = false;
-        nextEnabled = true;
-        nextOverrides = { agent: best, chat: best, analysis: best };
-        nextUltra = preset === 'ultra';
-      }
-      await Promise.all([
-        fetch(`${BACKEND_URL}/api/settings/local_only_lockdown`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: nextLockdown }),
-        }),
-        fetch(`${BACKEND_URL}/api/settings/cloud_enabled`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: nextEnabled }),
-        }),
-        fetch(`${BACKEND_URL}/api/settings/cloud_overrides`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: nextOverrides }),
-        }),
-        fetch(`${BACKEND_URL}/api/settings/ultra_unrestricted`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: nextUltra }),
-        }),
-      ]);
-      setLocalOnlyLockdown(nextLockdown);
-      setCloudEnabled(nextEnabled);
-      setCloudOverrides(nextOverrides);
-      setUltraUnrestricted(nextUltra);
+      // v2.243 — une route transactionnelle applique l'ensemble du contrat. L'ancienne
+      // rafale de quatre PUT pouvait laisser un état partiel après une erreur réseau.
+      const presetResponse = await fetch(`${BACKEND_URL}/api/settings/privacy-preset`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset }),
+      });
+      const presetState = await presetResponse.json();
+      if (!presetResponse.ok) throw new Error(presetState.detail || 'Application du mode impossible');
+      setLocalOnlyLockdown(Boolean(presetState.local_only_lockdown));
+      setCloudEnabled(Boolean(presetState.cloud_enabled));
+      setCloudOverrides(presetState.cloud_overrides || {});
+      setUltraUnrestricted(Boolean(presetState.ultra_unrestricted));
       showNotification(
         preset === 'normal' ? '🛡️ Mode Normal appliqué' :
         preset === 'hyper' ? '🔒 Mode Hyper sécurisé appliqué — cloud totalement verrouillé' :
@@ -874,7 +850,7 @@ export default function SettingsPage() {
                   padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)',
                   borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: 'var(--font-xs)', color: 'var(--text-secondary)', lineHeight: 1.6,
                 }}>
-                  ☠️ <strong>Mode Ultra débridé actif</strong> : emails, SSH, mots de passe et factures partent aussi au cloud — plus aucune exception de sensibilité. Le garde-fou système contre les commandes destructrices reste actif, ce mode ne concerne que le routage cloud/local. Repassez en Normal pour restaurer la protection des données sensibles.
+                  ☠️ <strong>Mode Ultra débridé actif — cloud strict</strong> : tous les appels LLM génératifs, y compris vision, compétences et replis, restent dans Ollama Cloud. Si le cloud est indisponible, Marvin échoue explicitement au lieu de basculer sur un modèle local. Emails, SSH, mots de passe et factures peuvent partir au cloud. Le garde-fou système contre les commandes destructrices reste actif.
                 </div>
               )}
 
@@ -917,7 +893,7 @@ export default function SettingsPage() {
               {cloudEnabled && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {['agent', 'chat', 'analysis'].map(profile => {
-                    const cloudModels = models.filter(m => m.endsWith(':cloud'));
+                    const cloudModels = models.filter(isCloudModelName);
                     return (
                       <div key={profile} style={{
                         display: 'flex', alignItems: 'center', gap: '12px',
@@ -939,7 +915,7 @@ export default function SettingsPage() {
                       </div>
                     );
                   })}
-                  {models.filter(m => m.endsWith(':cloud')).length === 0 && (
+                  {models.filter(isCloudModelName).length === 0 && (
                     <div style={{
                       padding: '12px 16px', background: 'var(--warning-bg)', borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--warning)', color: 'var(--warning)', fontSize: 'var(--font-xs)',

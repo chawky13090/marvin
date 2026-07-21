@@ -1,5 +1,5 @@
 r"""
-Smoke-test de balayage de pages Marvin (v2.111).
+Smoke-test de balayage de pages Marvin (v2.190).
 
 Charge chaque page de l'application et vérifie l'absence d'erreur console navigateur.
 Formalise un contrôle fait à la main plusieurs fois pendant la session v2.107-111
@@ -26,9 +26,9 @@ BASE_URL = "http://localhost:3000"
 # redirigent vers un hub (catharsis/codex/emporium/pantheon/sante/files/indexation/
 # documents/vocal) : leur redirect doit rester silencieux, zéro erreur console.
 PAGES = [
-    "/", "/agents", "/calendar", "/catharsis", "/codex", "/cron", "/devis", "/docs",
-    "/documents", "/emails", "/emporium", "/fichiers", "/files", "/indexation", "/jour",
-    "/mcp", "/memoire", "/mobile", "/monitoring", "/notes", "/outils", "/pantheon",
+    "/", "/agents", "/avatar", "/calendar", "/catharsis", "/code", "/codex", "/cron", "/devis", "/docs", "/evolution",
+    "/documents", "/emails", "/emporium", "/fichiers", "/files", "/forge", "/indexation", "/jour",
+    "/market", "/mcp", "/memoire", "/missions", "/mobile", "/monitoring", "/notes", "/outils", "/pantheon",
     "/recherche", "/redaction", "/sante", "/settings", "/skills", "/ssh", "/systeme",
     "/tasks", "/technique", "/video", "/vocal", "/workflows",
 ]
@@ -40,9 +40,11 @@ async def check(browser, path: str) -> dict:
     page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     try:
-        # 'load' plutôt que 'networkidle' : certaines pages (monitoring) font du polling
-        # live et n'atteignent jamais l'inactivité réseau — faux négatif sinon.
-        await page.goto(BASE_URL + path, wait_until="load", timeout=15000)
+        # `domcontentloaded` est le bon contrat pour une application cliente : l'accueil
+        # démarre ensuite plusieurs fetch/pollings (Ollama, conversations, statut) dont un
+        # délai réseau ne doit pas faire passer la page rendue pour une navigation cassée.
+        # `networkidle` est également impossible sur les pages de monitoring.
+        await page.goto(BASE_URL + path, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(1200)
         ok = True
     except Exception as e:

@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSetting, setSetting } from '@/lib/database/queries';
 import { getActiveModel, listOllamaModels } from '@/lib/ollama';
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // v2.107 — les actions mémoire (get/create/delete/clear) proxient désormais vers le
 // backend Python (voir app/api/conversations/route.js pour le contexte général) : elles
 // dupliquaient memory_save/memory_list/memory_delete, déjà des outils de chat Python
 // écrivant dans le même data/secretary.db. La gestion de modèles Ollama (pull/delete/
 // list/set_model) reste ici : elle n'a pas d'équivalent Python (spawn de processus local).
-const BACKEND = (typeof window !== 'undefined' && window.location
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
-
 export async function GET() {
   try {
     const activeModel = await getActiveModel();

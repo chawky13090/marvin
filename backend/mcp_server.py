@@ -28,14 +28,16 @@ Config Claude Desktop (claude_desktop_config.json) :
   {
     "mcpServers": {
       "marvin": {
-        "command": "C:\\Users\\Chawb\\secretary-ai\\backend\\.venv\\Scripts\\python.exe",
-        "args": ["C:\\Users\\Chawb\\secretary-ai\\backend\\mcp_server.py"]
+        "command": "<CHEMIN_MARVIN>\\backend\\.venv\\Scripts\\python.exe",
+        "args": ["<CHEMIN_MARVIN>\\backend\\mcp_server.py"]
       }
     }
   }
 Prérequis : le backend Marvin (uvicorn main:app, port 8005) doit déjà tourner.
 """
 import os
+import json
+import sys
 import time
 import anyio
 import httpx
@@ -123,5 +125,21 @@ async def main():
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
+def portable_client_config() -> dict:
+    backend_directory = os.path.dirname(os.path.abspath(__file__))
+    return {
+        "mcpServers": {
+            "marvin": {
+                "command": os.path.join(backend_directory, ".venv", "Scripts", "python.exe"),
+                "args": [os.path.join(backend_directory, "mcp_server.py")],
+                "env": {"MARVIN_BACKEND_URL": BACKEND_URL},
+            }
+        }
+    }
+
+
 if __name__ == "__main__":
-    anyio.run(main)
+    if "--print-config" in sys.argv[1:]:
+        print(json.dumps(portable_client_config(), ensure_ascii=False, indent=2))
+    else:
+        anyio.run(main)

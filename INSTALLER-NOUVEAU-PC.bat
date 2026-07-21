@@ -13,7 +13,7 @@ echo.
 echo  Ce script installe TOUT le necessaire :
 echo    - Python (backend) + dependances
 echo    - Node.js (frontend) + dependances
-echo    - Ollama + modeles IA (qwen2.5:7b, llava-phi3)
+echo    - Ollama + modeles IA locaux de confidentialite
 echo.
 echo  ATTENTION : il recree les environnements (.venv, .next) car
 echo  ceux copies de l'autre PC contiennent des chemins invalides.
@@ -31,8 +31,8 @@ echo.
 where winget >nul 2>&1
 if errorlevel 1 ( set "HAS_WINGET=0" ) else ( set "HAS_WINGET=1" )
 
-:: ============================================================ [1/8] Python
-echo [1/8] Verification de Python...
+:: ============================================================ [1/9] Python
+echo [1/9] Verification de Python...
 where python >nul 2>&1
 if errorlevel 1 (
     if "!HAS_WINGET!"=="1" (
@@ -74,8 +74,8 @@ if errorlevel 1 (
 )
 echo.
 
-:: ============================================================ [2/8] Node.js
-echo [2/8] Verification de Node.js...
+:: ============================================================ [2/9] Node.js
+echo [2/9] Verification de Node.js...
 where node >nul 2>&1
 if errorlevel 1 (
     if "!HAS_WINGET!"=="1" (
@@ -116,8 +116,8 @@ if errorlevel 1 (
 for /f "tokens=*" %%v in ('node --version 2^>^&1') do echo   [OK] Node %%v
 echo.
 
-:: ============================================================ [3/8] Ollama
-echo [3/8] Verification d'Ollama...
+:: ============================================================ [3/9] Ollama
+echo [3/9] Verification d'Ollama...
 set "OLLAMA=ollama"
 where ollama >nul 2>&1
 if errorlevel 1 (
@@ -146,16 +146,28 @@ if errorlevel 1 (
 )
 echo.
 
-:: ============================================================ [4/9] Docker (optionnel - recherche web SearXNG)
-echo [4/9] Verification de Docker ^(optionnel - recherche web auto-hebergee^)...
+:: ============================================================ [4/9] Docker (Test Forge + recherche web SearXNG)
+echo [4/9] Verification de Docker ^(Test Forge et recherche web^)...
 where docker >nul 2>&1
 if errorlevel 1 (
-    echo   [INFO] Docker non detecte - optionnel, uniquement pour la recherche web
-    echo   auto-hebergee ^(SearXNG, evite les blocages anti-bot DuckDuckGo^).
-    echo   Installable plus tard : winget install -e --id Docker.DockerDesktop
-    echo   Une fois installe, start.bat le configure tout seul ^(rien d'autre a faire^).
+    echo   [ATTENTION] Docker non detecte. Marvin fonctionnera, mais ne pourra pas
+    echo   certifier les scripts et programmes comme prets pour la production.
+    echo   Installation recommandee : winget install -e --id Docker.DockerDesktop
+    echo   Relancez ensuite ce script pour preparer les conteneurs jetables.
 ) else (
-    echo   [OK] Docker detecte - start.bat configurera SearXNG automatiquement.
+    docker version --format "{{.Server.Version}}" >nul 2>&1
+    if errorlevel 1 (
+        echo   [ATTENTION] Docker CLI present mais Docker Desktop ne repond pas.
+        echo   Demarrez Docker Desktop puis relancez ce script.
+    ) else (
+        echo   [OK] Docker Engine disponible.
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\prepare-test-forge.ps1"
+        if errorlevel 1 (
+            echo   [ATTENTION] Preparation Test Forge incomplete.
+        ) else (
+            echo   [OK] Images Test Forge pretes.
+        )
+    )
 )
 echo.
 
@@ -185,9 +197,13 @@ echo   [OK] Backend Python pret.
 echo.
 
 :: ============================================================ [7/9] Frontend Node
-echo [7/9] Installation des dependances du frontend ^(npm install^)...
-call npm install
-if errorlevel 1 ( echo   [ERREUR] npm install a echoue. & popd & pause & exit /b 1 )
+echo [7/9] Installation reproductible des dependances du frontend ^(npm ci^)...
+if exist "package-lock.json" (
+    call npm ci
+) else (
+    call npm install
+)
+if errorlevel 1 ( echo   [ERREUR] Installation npm echouee. & popd & pause & exit /b 1 )
 echo   [OK] Frontend pret.
 echo.
 
@@ -199,6 +215,21 @@ if errorlevel 1 (
     call npm rebuild better-sqlite3 sharp
 )
 node -e "require('better-sqlite3'); require('sharp'); console.log('   [OK] better-sqlite3 + sharp charges.');" 2>nul || echo   [ERREUR] Modules natifs toujours KO -^> supprimez node_modules puis relancez ce script.
+if not exist "node_modules\electron\dist\electron.exe" (
+    echo   [INFO] Preparation du runtime optionnel Marvin Avatar...
+    node node_modules\electron\install.js
+)
+if exist "node_modules\electron\dist\electron.exe" (
+    echo   [OK] Runtime Marvin Avatar pret.
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-desktop-avatar.ps1"
+    if errorlevel 1 (
+        echo   [ATTENTION] Raccourci Avatar non cree. Lancez scripts\install-desktop-avatar.ps1 manuellement.
+    ) else (
+        echo   [OK] Raccourci Marvin Avatar cree sur le Bureau.
+    )
+) else (
+    echo   [ATTENTION] Avatar de bureau indisponible. Le socle Marvin reste utilisable.
+)
 :: --- Verification que le backend Python importe ---
 pushd backend
 .venv\Scripts\python -c "import tools, main" >nul 2>&1 && (echo   [OK] Backend Python importe correctement.) || (echo   [ATTENTION] Le backend Python n'importe pas - verifiez requirements.txt.)
@@ -212,8 +243,13 @@ start "" /B "!OLLAMA!" serve >nul 2>&1
 timeout /t 4 /nobreak >nul
 echo   - qwen2.5:7b ^(cerveau principal, ~4.7 Go^)...
 "!OLLAMA!" pull qwen2.5:7b
+if errorlevel 1 echo   [DEGRADE] qwen2.5:7b indisponible : les profils locaux seront limites.
+echo   - nomic-embed-text ^(memoire semantique locale^)...
+"!OLLAMA!" pull nomic-embed-text
+if errorlevel 1 echo   [DEGRADE] nomic-embed-text indisponible : l'indexation semantique sera limitee.
 echo   - llava-phi3 ^(vision / OCR, ~2.9 Go^)...
 "!OLLAMA!" pull llava-phi3
+if errorlevel 1 echo   [DEGRADE] llava-phi3 indisponible : la vision locale sera limitee.
 echo   [INFO] PC peu puissant ? Modele plus leger : "!OLLAMA!" pull qwen2.5:3b
 echo.
 
@@ -222,6 +258,12 @@ echo [9/9] Configuration...
 if not exist ".env.local" if exist ".env.local.example" (
     copy ".env.local.example" ".env.local" >nul
     echo   [OK] .env.local cree ^(modifiez-le pour vos comptes Google/Outlook si besoin^).
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\write-install-report.ps1" >nul
+if errorlevel 1 (
+    echo   [ATTENTION] Rapport de capacites non genere. Le socle installe reste utilisable.
+) else (
+    echo   [OK] Rapport portable cree : data\install-capabilities.json
 )
 echo.
 
@@ -236,7 +278,7 @@ echo   Puis ouvrez votre navigateur sur :
 echo     -^> http://localhost:3000
 echo.
 echo   Verifier que tout va bien ^(apres lancement^) :
-echo     -^> http://localhost:8005/api/health   ^(doit afficher version + 231 outils^)
+echo     -^> http://localhost:8005/api/health   ^(doit afficher version + compteur d'outils^)
 echo.
 echo   [Optionnel] Generation video IA locale ^(GPU NVIDIA, ~3-5 Go^) :
 echo     voir backend\requirements-video.txt

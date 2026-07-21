@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // v2.171 — proxy pur vers le backend Python (voir app/api/conversations/route.js).
 // Recherche FULL-TEXT (titre + contenu des messages), demandée explicitement — la
 // recherche précédente ne filtrait que côté client sur le titre tronqué à 6 mots.
-const BACKEND = (typeof window !== 'undefined' && window.location
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
-
 export const dynamic = 'force-dynamic';
 
 export async function GET(req) {

@@ -1,13 +1,19 @@
 'use client';
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useChat } from '@/lib/contexts/ChatContext';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import TypingIndicator from '@/components/chat/TypingIndicator';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
-
-const BACKEND_URL = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import ConversationViewToolbar from '@/components/chat/ConversationViewToolbar';
+import { BACKEND_URL } from '@/lib/backend';
+import { isLiveConversation } from '@/lib/chatNavigation.mjs';
+import {
+  conversationAuditToMarkdown,
+  createConversationAudit,
+  groupConversationMessages,
+} from '@/lib/chatPresentation.mjs';
 
 // v2.169 — salutation dynamique (façon Claude/ChatGPT) au lieu d'un titre "MARVIN" figé +
 // tagline marketing datée ("25 ans d'expérience"). Pas de prénom en dur : Marvin est pensé
@@ -41,6 +47,7 @@ export default function ChatContainer({
   activeModel,
 }) {
   const [localInput, setLocalInput] = useState('');
+  const [viewMode, setViewMode] = useState('reading');
   const scrollRef = useRef(null);
   // v2.183 — "coller au bas" façon Claude/ChatGPT : l'ancien effet forçait scrollTop=scrollHeight
   // à CHAQUE frappe de token pendant le streaming, kidnappant le scroll dès que l'utilisateur
@@ -49,9 +56,34 @@ export default function ChatContainer({
   const stickToBottomRef = useRef(true);
   const router = useRouter();
 
+  // Le brouillon survit aux changements de page. Une demande préparée par Code Workspace
+  // reste prioritaire et remplace le brouillon courant uniquement une fois.
+  useEffect(() => {
+    const draft = window.sessionStorage.getItem('marvin:code-draft');
+    if (draft) {
+      window.sessionStorage.removeItem('marvin:code-draft');
+      setLocalInput(draft.slice(0, 20000));
+      return;
+    }
+    const key = `marvin:chat-draft:${conversationId || 'new'}`;
+    setLocalInput((window.sessionStorage.getItem(key) || '').slice(0, 20000));
+  }, [conversationId]);
+
+  useEffect(() => {
+    const key = `marvin:chat-draft:${conversationId || 'new'}`;
+    if (localInput) window.sessionStorage.setItem(key, localInput.slice(0, 20000));
+    else window.sessionStorage.removeItem(key);
+  }, [conversationId, localInput]);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('marvin:conversation-view');
+    if (['reading', 'technical', 'audit'].includes(saved)) setViewMode(saved);
+  }, []);
+
   const {
     messages, status, isLoading, error,
     sendMessage, setMessages, addToolResult, stop,
+    conversationId: liveConversationId,
     setConversationId, setActiveModel,
     subscribeConversationCreated, subscribeStreamFinish,
     voice,
@@ -65,12 +97,60 @@ export default function ChatContainer({
     return pending?.toolName || null;
   })();
 
+  // v2.244 — les appels techniques consécutifs forment une seule activité lisible.
+  const displayMessages = useMemo(
+    () => viewMode === 'audit' ? messages : groupConversationMessages(messages),
+    [messages, viewMode],
+  );
+  const lastCodingMissionMessageIndex = useMemo(() => {
+    let latest = -1;
+    displayMessages.forEach((message, index) => {
+      const fromParts = message.parts
+        ?.filter((part) => part.type === 'tool-invocation')
+        .map((part) => part.toolInvocation) || [];
+      const invocations = message.toolInvocations?.length ? message.toolInvocations : fromParts;
+      if (invocations.some((tool) => (
+        ['code_workspace_start', 'code_workspace_status', 'code_workspace_control'].includes(tool.toolName)
+        && tool.result !== undefined
+      ))) latest = index;
+    });
+    return latest;
+  }, [displayMessages]);
+
+  const changeViewMode = useCallback((mode) => {
+    if (!['reading', 'technical', 'audit'].includes(mode)) return;
+    setViewMode(mode);
+    window.localStorage.setItem('marvin:conversation-view', mode);
+  }, []);
+
+  const exportAudit = useCallback((format) => {
+    const audit = createConversationAudit(messages);
+    const isJson = format === 'json';
+    const content = isJson ? `${JSON.stringify(audit, null, 2)}\n` : conversationAuditToMarkdown(audit);
+    const blob = new Blob([content], { type: isJson ? 'application/json' : 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeId = String(conversationId || 'nouvelle').replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80);
+    link.href = url;
+    link.download = `marvin-audit-${safeId}.${isJson ? 'json' : 'md'}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, [conversationId, messages]);
+
   // ── Sync conversationId & activeModel from props to context ────────────────
   // The parent (app/page.js) owns the navigation state; we mirror it into the
   // context so the SSE stream uses the latest values.
   useEffect(() => {
+    if (isLiveConversation({
+      isLoading,
+      liveConversationId,
+      targetConversationId: conversationId,
+      liveMessageCount: messages.length,
+    })) return;
     setConversationId(conversationId);
-  }, [conversationId, setConversationId]);
+  }, [conversationId, isLoading, liveConversationId, messages.length, setConversationId]);
 
   useEffect(() => {
     if (activeModel) setActiveModel(activeModel);
@@ -94,6 +174,12 @@ export default function ChatContainer({
   useEffect(() => {
     if (initialMessages !== lastInitialMsgsRef.current) {
       lastInitialMsgsRef.current = initialMessages;
+      if (isLiveConversation({
+        isLoading,
+        liveConversationId,
+        targetConversationId: conversationId,
+        liveMessageCount: messages.length,
+      })) return;
       if (initialMessages && initialMessages.length > 0) {
         setMessages(initialMessages);
       } else if (!conversationId) {
@@ -101,7 +187,7 @@ export default function ChatContainer({
         setMessages([]);
       }
     }
-  }, [conversationId, initialMessages, setMessages]);
+  }, [conversationId, initialMessages, isLoading, liveConversationId, messages.length, setMessages]);
 
   // ── Auto-scroll vers le bas à chaque nouveau message — SEULEMENT si l'utilisateur
   // était déjà collé au bas (voir stickToBottomRef ci-dessus). ────────────────────
@@ -249,6 +335,13 @@ export default function ChatContainer({
         </div>
       )}
 
+      <ConversationViewToolbar
+        mode={viewMode}
+        onModeChange={changeViewMode}
+        onExport={exportAudit}
+        hasMessages={messages.length > 0}
+      />
+
       {/* Messages */}
       <div
         ref={scrollRef}
@@ -310,10 +403,12 @@ export default function ChatContainer({
             </div>
           </div>
         ) : (
-          messages.map((msg, index) => (
+          displayMessages.map((msg, index) => (
             <MessageBubble
               key={`${msg.id || index}-${index}`}
               message={msg}
+              viewMode={viewMode}
+              showMissionTracker={index === lastCodingMissionMessageIndex}
               onConfirmTool={handleConfirmTool}
               onCancelTool={handleCancelTool}
             />
@@ -345,7 +440,7 @@ export default function ChatContainer({
                 if (/Impossible de contacter Ollama|getaddrinfo|ECONNREFUSED|ConnectError/i.test(msg)) {
                   return (
                     <>
-                      <strong>Ollama n&apos;est pas accessible</strong> sur le port 11434.
+                      <strong>Ollama n&apos;est pas accessible</strong> sur le port {process.env.NEXT_PUBLIC_OLLAMA_PORT || '11434'}.
                       <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.85 }}>
                         Démarrez-le avec : <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>ollama serve</code>
                       </div>
@@ -381,7 +476,7 @@ export default function ChatContainer({
                 const lastUser = [...messages].reverse().find(m => m.role === 'user');
                 if (lastUser) {
                   const text = lastUser.content || lastUser.parts?.find(p => p.type === 'text')?.text || '';
-                  if (text) { stickToBottomOnSend(); sendMessage({ text }); }
+                  if (text) { stickToBottomOnSend(); sendMessage({ text, cortex: lastUser.cortexRequested }); }
                 }
               }}
               style={{

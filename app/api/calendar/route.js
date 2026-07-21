@@ -1,8 +1,7 @@
 // API REST pour le calendrier
 // Proxifie vers le backend Python (Google Calendar via OAuth) avec fallback démo.
 import * as demo from '@/lib/services/demo';
-
-const BACKEND = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 /**
  * Appelle un outil backend et retourne le result, ou null si erreur.

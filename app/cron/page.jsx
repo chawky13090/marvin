@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { LoadingRow } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 
-const BACKEND = (typeof window!=='undefined'&&window.location?window.location.protocol+'//'+window.location.hostname+':8005':(process.env.NEXT_PUBLIC_BACKEND_URL||'http://127.0.0.1:8005'));
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // Outils disponibles pour le planificateur (les plus utiles)
 const SCHEDULABLE_TOOLS = [
@@ -22,7 +22,7 @@ const SCHEDULABLE_TOOLS = [
   { id: 'web_search',        label: '🔍 Recherche web',        args: [{ name: 'query', label: 'Requête', placeholder: 'actualités tech' }] },
   { id: 'web_browse',        label: '🌐 Lire une URL',         args: [{ name: 'url', label: 'URL', placeholder: 'https://example.com' }] },
   // Fichiers & données
-  { id: 'file_list',         label: '📁 Lister un dossier',    args: [{ name: 'path', label: 'Dossier', placeholder: 'C:\\Users\\Chawb\\Desktop' }] },
+  { id: 'file_list',         label: '📁 Lister un dossier',    args: [{ name: 'path', label: 'Dossier', placeholder: 'Bureau' }] },
   { id: 'file_read',         label: '📄 Lire un fichier',      args: [{ name: 'path', label: 'Chemin', placeholder: '' }] },
   { id: 'csv_analyze',       label: '📊 Analyser un CSV',      args: [{ name: 'path', label: 'Chemin CSV', placeholder: '' }, { name: 'action', label: 'Action', placeholder: 'summary' }] },
   // Notes, tâches & mémoire

@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
+import { BACKEND_URL as BACKEND } from '@/lib/backend';
 
 // v2.107 — proxy pur vers le backend Python (voir app/api/conversations/route.js).
 // Interface externe (POST {action, ...}) conservée à l'identique pour ne pas toucher
 // app/tasks/page.jsx.
-const BACKEND = (typeof window !== 'undefined' && window.location
-  ? window.location.protocol + '//' + window.location.hostname + ':8005'
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8005'));
-
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');

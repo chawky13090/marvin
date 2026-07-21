@@ -1,4 +1,13 @@
-# Installation de Marvin sur un Windows Server (poste boutique)
+# Installation portable de Marvin sous Windows
+
+Cette procédure couvre Windows 11 et Windows Server 2019/2022/2025. Le socle Marvin
+(frontend, backend, Ollama et avatar) doit pouvoir être installé sans Docker, Hyper-V,
+Windows Sandbox ni GPU. Ces composants restent des capacités avancées optionnelles : leur
+absence dégrade Test Forge, mais ne bloque ni le chat, ni les outils ordinaires.
+
+Après installation ou vérification, l'état réel de chaque capacité est écrit dans
+`data/install-capabilities.json` avec l'un des états `available`, `degraded` ou
+`unavailable`, une explication et l'action corrective adaptée à la machine.
 
 Procédure pas à pas pour déployer Marvin sur un Windows Server dédié, avec accès
 internet et droits administrateur. Suivez les étapes dans l'ordre — chacune indique
@@ -51,7 +60,12 @@ Le script :
 1. Vérifie/installe Python, Node.js et Ollama (via `winget`, ou en repli direct si
    `winget` est absent — fréquent sur Windows Server).
 2. Recrée proprement `backend\.venv` et `node_modules` pour CETTE machine.
-3. Télécharge les modèles IA (`qwen2.5:7b`, `llava-phi3`, ~7,6 Go au total).
+3. Télécharge les modèles locaux de confidentialité : `qwen2.5:7b`,
+   `nomic-embed-text` pour la mémoire sémantique et `llava-phi3` pour la vision. Un échec
+   de téléchargement est signalé comme capacité dégradée plutôt que masqué.
+4. Installe l'avatar Electron et crée dynamiquement le raccourci `Marvin Avatar` sur le
+   Bureau, sans chemin lié au compte de développement. L'avatar est aussi accessible depuis
+   le robot en haut de la barre latérale et par `Ctrl+Maj+Espace`.
 
 **Résultat attendu** : le message `INSTALLATION TERMINEE !` à la fin, sans `[ERREUR]`
 ni `[X]` au-dessus.
@@ -71,8 +85,18 @@ ni `[X]` au-dessus.
 
 Double-cliquez sur **`VERIFIER-INSTALLATION.bat`**.
 
-**Résultat attendu** : uniquement des lignes `[OK]`. S'il y a des `[X]`, le script
-indique la commande à lancer pour corriger — exécutez-la puis relancez la vérification.
+**Résultat attendu** : les composants du socle portent `[OK]`. Docker, Hyper-V, Sandbox ou
+les VM de certification peuvent porter `[DEGRADE]` sans rendre Marvin inutilisable. Les
+erreurs `[X]` concernent le socle et doivent être corrigées avant le démarrage.
+
+## 2bis. Niveaux de capacités
+
+- Socle sans élévation : chat, outils, Code Workspace, Ollama Cloud/local et avatar.
+- Test Forge conteneurisé : Docker Desktop, facultatif, avec accès Internet uniquement lors
+  des passages d'installation explicitement prévus.
+- Certification native : Hyper-V et VM Debian/Windows préparées, facultatifs et nécessitant
+  une élévation ainsi qu'éventuellement un redémarrage. L'installateur ne modifie pas ces
+  fonctions système silencieusement.
 
 ---
 

@@ -117,6 +117,8 @@ SECURE_BLOCKED_TOOLS: set[str] = {
     # SSH (exécution distante = action externe potentiellement irréversible)
     "ssh_exec",
     "ssh_write_and_run",
+    "code_workspace_start",
+    "code_workspace_control",
 }
 
 # ── Outils nécessitant une confirmation manuelle (niveau Standard = 2) ────────
@@ -139,5 +141,8 @@ DANGEROUS_TOOLS: set[str] = {
     "itsm_ticket_create",  # crée un ticket visible dans un système externe (GLPI...)
     "pc_gui_click",      # v2.149 — clic réel dans une fenêtre (UI Automation)
     "pc_gui_type",       # v2.149 — écriture réelle dans un champ (UI Automation)
+    "vm_lab_install",    # recrée une VM Hyper-V de test et installe son OS
+    "code_workspace_start",  # crée dépôt/worktree et peut lancer un job Auto
+    "code_workspace_control",  # reprend ou annule un job Auto persistant
     "long_task_start",   # v2.151 — "Plan mode" : démarrage réel après validation du plan
 }

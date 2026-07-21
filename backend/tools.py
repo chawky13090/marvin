@@ -9,6 +9,7 @@ import os
 import sys
 import ast
 import json
+import re
 import shutil
 import asyncio
 import subprocess
@@ -19,7 +20,10 @@ from typing import Any
 
 import psutil
 import database as db
+from tool_domains import quiz as quiz_domain
+from tool_domains import it_knowledge as it_knowledge_domain
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
+from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -91,9 +95,9 @@ def _wcache_set(key, value):
 
 import re as _re
 
-_HOME = os.path.expanduser("~")
-_REAL_USER = os.path.basename(_HOME)
-_DRIVE = os.path.splitdrive(_HOME)[0] or "C:"   # ex: "C:"
+_HOME = _SYSTEM_PATHS["home"]
+_REAL_USER = _SYSTEM_PATHS["username"]
+_DRIVE = _SYSTEM_PATHS["drive"]
 
 # Tous les formats de chemins avec mauvais nom d'utilisateur que le modèle peut générer
 # Format 1: C:\Users\<wrong>\...   C:/Users/<wrong>/...
@@ -113,22 +117,22 @@ _RE_UNIX = _re.compile(
 )
 
 _KNOWN_SUBFOLDERS = {
-    "desktop":         "Desktop",
-    "bureau":          "Desktop",
-    "documents":       "Documents",
-    "mes documents":   "Documents",
-    "downloads":       "Downloads",
-    "telechargements": "Downloads",
-    "téléchargements": "Downloads",
-    "pictures":        "Pictures",
-    "images":          "Pictures",
-    "photos":          "Pictures",
-    "music":           "Music",
-    "musique":         "Music",
-    "videos":          "Videos",
-    "vidéos":          "Videos",
-    "appdata":         "AppData",
-    "temp":            "AppData\\Local\\Temp",
+    "desktop": _SYSTEM_PATHS["desktop"],
+    "bureau": _SYSTEM_PATHS["desktop"],
+    "documents": _SYSTEM_PATHS["documents"],
+    "mes documents": _SYSTEM_PATHS["documents"],
+    "downloads": _SYSTEM_PATHS["downloads"],
+    "telechargements": _SYSTEM_PATHS["downloads"],
+    "téléchargements": _SYSTEM_PATHS["downloads"],
+    "pictures": _SYSTEM_PATHS["pictures"],
+    "images": _SYSTEM_PATHS["pictures"],
+    "photos": _SYSTEM_PATHS["pictures"],
+    "music": _SYSTEM_PATHS["music"],
+    "musique": _SYSTEM_PATHS["music"],
+    "videos": _SYSTEM_PATHS["videos"],
+    "vidéos": _SYSTEM_PATHS["videos"],
+    "appdata": _SYSTEM_PATHS["appdata_local"],
+    "temp": _SYSTEM_PATHS["temp"],
 }
 
 # Noms génériques qu'un LLM invente souvent pour le nom d'utilisateur
@@ -144,16 +148,16 @@ def _resolve_path(raw: str) -> str:
     """
     Correction universelle de chemin.
     Intercepte TOUTES les variantes qu'un LLM peut générer :
-      C:/Users/YourUsername/Desktop  →  C:\\Users\\Chawb\\Desktop
-      \\Users\\username\\Desktop     →  C:\\Users\\Chawb\\Desktop
-      /Users/user/Desktop            →  C:\\Users\\Chawb\\Desktop
-      Desktop                        →  C:\\Users\\Chawb\\Desktop
-      ~\\Documents                   →  C:\\Users\\Chawb\\Documents
+      C:/Users/YourUsername/Desktop  →  dossier Bureau Windows courant
+      \\Users\\username\\Desktop     →  dossier Bureau Windows courant
+      /Users/user/Desktop            →  dossier Bureau Windows courant
+      Bureau                         →  dossier Bureau Windows courant
+      ~\\Documents                   →  dossier Documents du profil courant
     """
     if not raw:
         return _HOME
 
-    raw = raw.strip()
+    raw = expand_user_path(raw)
 
     # 1. Expansion du tilde
     if raw.startswith("~"):
@@ -175,7 +179,7 @@ def _resolve_path(raw: str) -> str:
     # 3. Raccourcis simples — nom de dossier seul (ex: "Desktop", "Bureau")
     lower = normalized.strip("\\").lower()
     if lower in _KNOWN_SUBFOLDERS:
-        return str(Path(_HOME) / _KNOWN_SUBFOLDERS[lower])
+        return _KNOWN_SUBFOLDERS[lower]
 
     def _fix_suffix(suffix: str) -> str:
         """Retourne le chemin corrigé à partir du suffixe après le nom d'utilisateur."""
@@ -189,7 +193,7 @@ def _resolve_path(raw: str) -> str:
                 len(suffix_lower) == len(key) or suffix_lower[len(key)] == "\\"
             ):
                 rest_after = suffix_norm[len(key):].lstrip("\\")
-                base = str(Path(_HOME) / folder)
+                base = folder
                 return str(Path(base) / rest_after) if rest_after else base
         return str(Path(_HOME) / suffix_norm)
 
@@ -228,7 +232,7 @@ def _resolve_path(raw: str) -> str:
 
 
 async def execute_file_list(args: dict) -> dict:
-    path = _resolve_path(args.get("path", os.path.expanduser("~")))
+    path = _resolve_path(args.get("path", _HOME))
     show_hidden = args.get("show_hidden", False)
 
     def fmt_size(n: int) -> str:
@@ -356,6 +360,43 @@ async def execute_file_read(args: dict) -> dict:
     try:
         p = Path(path)
         if not p.exists():
+            # Un livrable Code Workspace refusé n'est volontairement pas appliqué au
+            # worktree. Si le modèle tente quand même de lire ce chemin, résoudre le
+            # fichier depuis le dernier snapshot durable au lieu de renvoyer un faux
+            # "introuvable". Ce garde-fou est borné à data/coding_workspaces/<id>/repo.
+            try:
+                workspace_base = (
+                    Path(__file__).resolve().parent.parent / "data" / "coding_workspaces"
+                ).resolve()
+                relative = p.resolve(strict=False).relative_to(workspace_base)
+                parts = relative.parts
+                if (
+                    len(parts) >= 3
+                    and re.fullmatch(r"[0-9a-f]{32}", parts[0], re.IGNORECASE)
+                    and parts[1].casefold() == "repo"
+                ):
+                    import coding_mission
+
+                    mission_id = parts[0]
+                    artifact_path = Path(*parts[2:]).as_posix()
+                    snapshot_files = coding_mission.latest_files(mission_id)
+                    if artifact_path in snapshot_files:
+                        content = snapshot_files[artifact_path]
+                        return {
+                            "success": True,
+                            "path": artifact_path,
+                            "requested_path": str(p),
+                            "content": content[:50_000],
+                            "content_truncated": len(content) > 50_000,
+                            "source": "mission_snapshot",
+                            "mission_id": mission_id,
+                            "note": (
+                                "Livrable refusé lu depuis le dernier snapshot; "
+                                "il n'est pas encore appliqué au worktree."
+                            ),
+                        }
+            except (ImportError, OSError, ValueError):
+                pass
             return {"error": f"Fichier introuvable : {path}"}
         ext = p.suffix.lower()
 
@@ -1149,7 +1190,7 @@ def _file_search_text_collect_candidates(directory: str, extensions: list) -> li
 
 async def execute_file_search_text(args: dict) -> dict:
     # Accept "directory" (agent) or "path" (UI) for the search root
-    _dir_raw = args.get("directory") or args.get("path") or os.path.expanduser("~")
+    _dir_raw = args.get("directory") or args.get("path") or _HOME
     directory = _resolve_path(_dir_raw)
     query = args.get("query", "")
     extensions = args.get("extensions", [".txt", ".md", ".pdf", ".docx", ".doc", ".csv", ".xlsx", ".json", ".py", ".js", ".ts", ".html", ".xml", ".log"])
@@ -1307,9 +1348,8 @@ def _search_windows_index(pattern: str, max_results: int = 100, path_filter: str
             try:    type_val = rs.Fields("System.ItemType").Value or ""
             except: type_val = ""
 
-            # Normalize Windows path display ("C:\Utilisateurs\..." → "C:\Users\...")
             if path_val:
-                path_val = str(path_val).replace("C:\\Utilisateurs\\", "C:\\Users\\")
+                path_val = str(path_val)
 
             results.append({
                 "name":     str(name_val) if name_val else "",
@@ -1676,22 +1716,7 @@ async def execute_pc_get_real_paths(args: dict) -> dict:
     username = _REAL_USER
     drive = _DRIVE
 
-    # Chemins standards
-    paths = {
-        "username":       username,
-        "home":           home,
-        "drive":          drive,
-        "desktop":        str(Path(home) / "Desktop"),
-        "documents":      str(Path(home) / "Documents"),
-        "downloads":      str(Path(home) / "Downloads"),
-        "pictures":       str(Path(home) / "Pictures"),
-        "music":          str(Path(home) / "Music"),
-        "videos":         str(Path(home) / "Videos"),
-        "appdata_roaming":str(Path(home) / "AppData" / "Roaming"),
-        "appdata_local":  str(Path(home) / "AppData" / "Local"),
-        "temp":           str(Path(home) / "AppData" / "Local" / "Temp"),
-        "startup":        str(Path(home) / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"),
-    }
+    paths = dict(_SYSTEM_PATHS)
 
     # Essayer de lire les chemins via le registre Windows (OneDrive, etc.)
     try:
@@ -1766,12 +1791,12 @@ def _quick_access():
     """Accès rapides (dossiers utilisateur + lecteurs) pour l'explorateur."""
     home = _HOME
     qa = []
-    for label, sub, icon in [
-        ("Accueil", "", "🏠"), ("Bureau", "Desktop", "🖥️"), ("Documents", "Documents", "📄"),
-        ("Téléchargements", "Downloads", "⬇️"), ("Images", "Pictures", "🖼️"),
-        ("Musique", "Music", "🎵"), ("Vidéos", "Videos", "🎬"),
+    for label, path_key, icon in [
+        ("Accueil", "home", "🏠"), ("Bureau", "desktop", "🖥️"), ("Documents", "documents", "📄"),
+        ("Téléchargements", "downloads", "⬇️"), ("Images", "pictures", "🖼️"),
+        ("Musique", "music", "🎵"), ("Vidéos", "videos", "🎬"),
     ]:
-        p = str(Path(home) / sub) if sub else home
+        p = _SYSTEM_PATHS[path_key]
         if os.path.isdir(p):
             qa.append({"label": label, "path": p, "icon": icon, "type": "folder"})
     for d in _drive_list():
@@ -3025,7 +3050,7 @@ async def execute_win_quick_launch(args: dict) -> dict:
         return {"error": f"Raccourci inconnu : {action_id!r}. Utilise win_quick_launch_list."}
 
     if item.get("kind") == "god_mode":
-        desktop = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+        desktop = Path(_SYSTEM_PATHS["desktop"])
         god = desktop / "Marvin God Mode.{ED7BA470-8E54-465E-825C-99712043E01C}"
         god.mkdir(exist_ok=True)
         res = _win_open_target(str(god))
@@ -3136,7 +3161,7 @@ async def execute_pc_system_info(args: dict) -> dict:
             },
             "disks": disks,
             "network_interfaces": net_ifaces,
-            "home": os.path.expanduser("~"),
+            "home": _HOME,
         }
         if battery_info:
             info["battery"] = battery_info
@@ -3152,7 +3177,7 @@ async def execute_pc_screenshot(args: dict) -> dict:
     if output_path:
         output_path = _resolve_path(output_path)
     else:
-        desktop = Path(os.path.expanduser("~")) / "Desktop"
+        desktop = Path(_SYSTEM_PATHS["desktop"])
         output_path = str(desktop / f"screenshot_{int(time.time())}.png")
     try:
         from PIL import ImageGrab
@@ -3429,6 +3454,25 @@ async def execute_pc_gui_type(args: dict) -> dict:
         return {"success": True, "message": f"Texte écrit dans « {name or automation_id} » de « {title} »."}
     except Exception as e:
         return {"error": str(e)}
+
+
+async def execute_vm_lab_install(args: dict) -> dict:
+    """Inspecte ou démarre l'installateur Hyper-V persistant de Marvin."""
+    import vm_lab_jobs
+
+    action = str(args.get("action") or "status").strip().casefold()
+    try:
+        if action == "status":
+            return await asyncio.to_thread(vm_lab_jobs.status)
+        if action != "install":
+            return {"error": "Action VM Lab invalide : utilise status ou install."}
+        return await asyncio.to_thread(
+            vm_lab_jobs.start,
+            str(args.get("profile") or ""),
+            confirmed=bool(args.get("confirmed")),
+        )
+    except (OSError, ValueError, vm_lab_jobs.VMLabJobError) as exc:
+        return {"error": str(exc)}
 
 
 async def execute_pc_notify(args: dict) -> dict:
@@ -3790,6 +3834,11 @@ async def execute_memory_save(args: dict) -> dict:
                 existing_norm = (mem.get("content") or "").strip().lower()
                 # Exact match or one is a substring of the other (with >80% overlap)
                 if existing_norm == content_norm:
+                    try:
+                        import memory_mesh
+                        memory_mesh.register(mem["id"], mem.get("content") or content, category)
+                    except Exception:
+                        pass
                     return {
                         "success": True,
                         "message": "Souvenir déjà enregistré (dédoublonnage)",
@@ -3803,6 +3852,11 @@ async def execute_memory_save(args: dict) -> dict:
                         if len(content_norm) > len(existing_norm):
                             try:
                                 db.update_memory(mem["id"], content)
+                                try:
+                                    import memory_mesh
+                                    memory_mesh.register(mem["id"], content, category)
+                                except Exception:
+                                    pass
                                 return {
                                     "success": True,
                                     "message": "Souvenir existant mis à jour avec plus de détails",
@@ -3821,6 +3875,11 @@ async def execute_memory_save(args: dict) -> dict:
             pass  # Continue with normal save if dedup check fails
 
         memory = db.create_memory(content, category)
+        try:
+            import memory_mesh
+            memory_mesh.register(memory["id"], content, category)
+        except Exception:
+            pass
         try:
             from vector_store import index_memory
             await index_memory(memory["id"], content, category)
@@ -4207,7 +4266,7 @@ async def execute_infographic_create(args: dict) -> dict:
     if _op_raw:
         output_path = _resolve_path(_op_raw)
     else:
-        output_path = str(Path(os.path.expanduser("~")) / "Desktop" / f"infographie_{int(time.time())}.png")
+        output_path = str(Path(_SYSTEM_PATHS["desktop"]) / f"infographie_{int(time.time())}.png")
     colors = args.get("colors", None)
     subtitle = args.get("subtitle", "")
 
@@ -4347,7 +4406,7 @@ async def execute_infographic_create(args: dict) -> dict:
 async def execute_file_create_xlsx(args: dict) -> dict:
     """Crée un fichier Excel (.xlsx) avec des données."""
     _path_raw = args.get("path", "")
-    path = _resolve_path(_path_raw) if _path_raw else str(Path(os.path.expanduser("~")) / "Desktop" / f"tableau_{int(time.time())}.xlsx")
+    path = _resolve_path(_path_raw) if _path_raw else str(Path(_SYSTEM_PATHS["desktop"]) / f"tableau_{int(time.time())}.xlsx")
     title = args.get("title", "Données")
     headers = args.get("headers", [])
     rows = args.get("rows", [])
@@ -4413,7 +4472,7 @@ async def execute_file_create_xlsx(args: dict) -> dict:
 async def execute_file_create_pdf(args: dict) -> dict:
     """Crée un fichier PDF avec du texte formaté (sans Word requis)."""
     _path_raw = args.get("path", "")
-    path = _resolve_path(_path_raw) if _path_raw else str(Path(os.path.expanduser("~")) / "Desktop" / f"document_{int(time.time())}.pdf")
+    path = _resolve_path(_path_raw) if _path_raw else str(Path(_SYSTEM_PATHS["desktop"]) / f"document_{int(time.time())}.pdf")
     title = args.get("title", "Document")
     content = args.get("content", "")
     _identity = _document_identity()
@@ -4797,7 +4856,10 @@ def _google_calendar_ready() -> bool:
         import credentials_manager as cm
         if cm.get_credential("google_access_token") or cm.get_credential("google_refresh_token"):
             return True
-        row = db.get_conn().execute("SELECT access_token FROM oauth_tokens WHERE provider='google'").fetchone()
+        with db.db() as connection:
+            row = connection.execute(
+                "SELECT access_token FROM oauth_tokens WHERE provider='google'"
+            ).fetchone()
         return bool(row and row["access_token"])
     except Exception:
         return False
@@ -4833,9 +4895,10 @@ def _get_google_calendar_service(prefer_oauth: bool = False):
     # (table oauth_tokens, provider='google'). Le client_id/secret backend sert au refresh.
     if not access_token and not refresh_token:
         try:
-            row = db.get_conn().execute(
-                "SELECT access_token, refresh_token FROM oauth_tokens WHERE provider='google'"
-            ).fetchone()
+            with db.db() as connection:
+                row = connection.execute(
+                    "SELECT access_token, refresh_token FROM oauth_tokens WHERE provider='google'"
+                ).fetchone()
             if row:
                 access_token = row["access_token"]
                 refresh_token = row["refresh_token"]
@@ -7050,7 +7113,7 @@ async def execute_skill_learning_log(args: dict) -> dict:
 import base64 as _base64
 
 async def execute_ocr_extract(args: dict) -> dict:
-    """Extrait le texte d'une image via llava-phi3 (OCR par IA)."""
+    """Extrait le texte d'une image avec routage local/cloud conforme au mode actif."""
     image_path = args.get("image_path", "").strip()
     prompt = args.get("prompt", "Extrais tout le texte présent dans cette image. Retourne uniquement le texte brut, sans commentaire.")
     model = args.get("model", "llava-phi3")
@@ -7062,13 +7125,21 @@ async def execute_ocr_extract(args: dict) -> dict:
     # "llava:7b" — jamais installés sur cette machine) → 404 sec côté Ollama. On vérifie et
     # on retombe silencieusement sur llava-phi3 (le seul modèle vision garanti présent)
     # plutôt que d'échouer sur un nom de modèle halluciné.
-    # v2.122 — un modèle cloud n'a aucune garantie de supporter le multimodal, et l'OCR
-    # traite justement le type de contenu le plus sensible (scans de documents, captures
-    # d'écran de mots de passe) : jamais de cloud ici, quel que soit le réglage utilisateur.
+    # Hors Ultra, l'OCR reste local par défaut car les images peuvent être très sensibles.
+    # En Ultra cloud-only, resolve_model choisit au contraire un modèle vision cloud
+    # installé et interdit tout repli llava local.
     import cloud_routing as _cr
-    if _cr.is_cloud_model(model):
-        model = "llava-phi3"
-    if model != "llava-phi3":
+    try:
+        model = _cr.resolve_model(
+            model,
+            profile="vision",
+            local_fallback="llava-phi3",
+            text_for_sensitivity=prompt,
+            has_images=True,
+        )
+    except _cr.CloudOnlyModelUnavailable as exc:
+        return {"error": str(exc), "cloud_only": True}
+    if not _cr.is_cloud_model(model) and model != "llava-phi3":
         try:
             import httpx as _hx
             async with _hx.AsyncClient(timeout=5) as _c:
@@ -7183,13 +7254,13 @@ def _read_image_b64(resolved_path: str, max_dim: int = 1920) -> tuple[str, bool]
 async def _analyze_screenshot(resolved_path: str) -> dict:
     """Analyse une capture (légende + texte relevé). Retourne {caption, ocr_text, model}."""
     import httpx
+    import cloud_routing as _cr
     image_b64, _ = _read_image_b64(resolved_path)
 
     lockdown = False
     cloud_enabled = False
     candidates = []
     try:
-        import cloud_routing as _cr
         lockdown = _cr.is_local_only_lockdown()
         cloud_enabled, _overrides = _cr.get_cloud_config()
         if cloud_enabled and not lockdown:
@@ -7198,7 +7269,19 @@ async def _analyze_screenshot(resolved_path: str) -> dict:
         pass
 
     candidates = list(candidates)
-    candidates.append("llava-phi3")  # repli local final, toujours présent
+    cloud_only = False
+    try:
+        cloud_only = _cr.is_cloud_only_mode()
+    except Exception:
+        pass
+    if not cloud_only:
+        candidates.append("llava-phi3")  # repli local uniquement hors Ultra
+    elif not candidates:
+        return {
+            "caption": "", "ocr_text": "", "model": None,
+            "error": "Mode Ultra débridé actif : aucun modèle vision cloud disponible; repli local refusé.",
+            "cloud_only": True,
+        }
 
     last_err = None
     for model in candidates:
@@ -7334,7 +7417,7 @@ async def execute_doc_generate_from_screenshots(args: dict) -> dict:
     if not path:
         safe_title = _re.sub(r"[^\w\- ]", "", title).strip().replace(" ", "_")[:60] or "documentation"
         ext = "pdf" if fmt == "pdf" else "docx"
-        path = str(Path(os.path.expanduser("~")) / "Desktop" / f"{safe_title}.{ext}")
+        path = str(Path(_SYSTEM_PATHS["desktop"]) / f"{safe_title}.{ext}")
 
     call_args = {"path": path, "title": title, "content": content, "toc": True}
     if args.get("author"): call_args["author"] = args["author"]
@@ -7370,7 +7453,7 @@ async def execute_file_compress(args: dict) -> dict:
         out = Path(_resolve_path(output_path))
     else:
         first_name = Path(resolved_sources[0]).stem
-        out = Path(os.path.expanduser("~")) / "Desktop" / f"{first_name}_{int(time.time())}.zip"
+        out = Path(_SYSTEM_PATHS["desktop"]) / f"{first_name}_{int(time.time())}.zip"
     if not out.suffix:
         out = out.with_suffix(".zip")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -7445,54 +7528,21 @@ async def execute_file_extract(args: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _all_email_cfgs() -> list[dict]:
-    """Liste COMPLÈTE des configs de boîtes mail (avec mots de passe, pour les opérations).
-    Migre l'ancienne config unique 'email_config' vers la liste 'email_accounts' si besoin."""
-    import json as _json
-    def _coerce(v):
-        if isinstance(v, str):
-            try:
-                return _json.loads(v)
-            except Exception:
-                return None
-        return v
-    accts = _coerce(db.get_setting("email_accounts"))
-    if not isinstance(accts, list):
-        accts = []
-    if not accts:
-        legacy = _coerce(db.get_setting("email_config"))
-        if isinstance(legacy, dict) and legacy.get("imap_host"):
-            accts = [legacy]
-            db.set_setting("email_accounts", accts)
-    return [a for a in accts if isinstance(a, dict) and a.get("imap_host")]
+    """Configs résolues des boîtes mail (mot de passe ou jeton OAuth frais)."""
+    import email_accounts as _email_accounts
+    return _email_accounts.list_resolved()
 
 
 def _get_email_cfg(account: str | None = None) -> dict | None:
     """Config d'une boîte mail (multi-comptes). account = username ; sinon le 1er (défaut)."""
-    accts = _all_email_cfgs()
-    if not accts:
-        return None
-    if account:
-        for a in accts:
-            if a.get("username") == account:
-                return a
-        return None
-    return accts[0]
+    import email_accounts as _email_accounts
+    return _email_accounts.get(account, resolved=True)
 
 
 def _list_email_accounts() -> list[dict]:
     """Liste des comptes (username/provider) pour le chat — sans mots de passe."""
-    import json as _json
-    accts = db.get_setting("email_accounts")
-    if isinstance(accts, str):
-        try:
-            accts = _json.loads(accts)
-        except Exception:
-            accts = []
-    if not isinstance(accts, list):
-        cfg = _get_email_cfg(None)
-        accts = [cfg] if cfg else []
-    return [{"username": a.get("username"), "provider": a.get("provider", "custom")}
-            for a in accts if isinstance(a, dict) and a.get("imap_host")]
+    import email_accounts as _email_accounts
+    return [_email_accounts.public(account) for account in _email_accounts.list_raw()]
 
 
 async def execute_email_accounts(args: dict) -> dict:
@@ -7598,6 +7648,10 @@ async def execute_email_send(args: dict) -> dict:
             int(cfg.get("smtp_port", 587)),
             cfg["username"], cfg["password"],
             to=to, subject=subject, body=body, cc=cc,
+            reply_to=args.get("reply_to", ""),
+            in_reply_to=args.get("in_reply_to", ""),
+            references=args.get("references", ""),
+            auto_submitted=bool(args.get("auto_submitted", False)),
         ))
         return {"success": True, "message": f"Email envoyé à {to}", "detail": result}
     except Exception as e:
@@ -7774,17 +7828,42 @@ def _email_automation_cfg() -> dict:
             cfg = None
     if not isinstance(cfg, dict):
         cfg = {}
+    profiles = cfg.get("profiles") if isinstance(cfg.get("profiles"), dict) else {}
     return {
         "mode": cfg.get("mode", "manuel"),                    # manuel | brouillon | autonome
-        "accounts": cfg.get("accounts") or [],                # boîtes concernées (vide = toutes)
+        "accounts": cfg.get("accounts") or [],                # sélection explicite recommandée
         "instructions": cfg.get("instructions", ""),
         "tone": cfg.get("tone", "professionnel, clair et courtois"),
         "signature": cfg.get("signature", ""),
         "only_from": [s.lower().strip() for s in (cfg.get("only_from") or []) if s.strip()],
-        "never_from": [s.lower().strip() for s in (cfg.get("never_from") or [])] + _AUTO_NEVER_FROM,
-        "skip_keywords": [s.lower().strip() for s in (cfg.get("skip_keywords") or [])] + _AUTO_SKIP_KEYWORDS,
+        "never_from": [s.lower().strip() for s in (cfg.get("never_from") or []) if s.strip()],
+        "skip_keywords": [s.lower().strip() for s in (cfg.get("skip_keywords") or []) if s.strip()],
         "max_per_run": int(cfg.get("max_per_run", 5)),
+        "send_delay_min": max(1, min(int(cfg.get("send_delay_min", 5)), 1440)),
+        "scheduler_enabled": bool(cfg.get("scheduler_enabled", False)),
+        "interval_min": max(2, min(int(cfg.get("interval_min", 5)), 1440)),
+        "profiles": profiles,
     }
+
+
+def _email_effective_profile(cfg: dict, account: str) -> dict:
+    """Fusionne le profil global et les exceptions propres à une boîte."""
+    override = cfg.get("profiles", {}).get(account, {})
+    if not isinstance(override, dict):
+        override = {}
+    result = {key: cfg[key] for key in (
+        "mode", "instructions", "tone", "signature", "only_from", "never_from",
+        "skip_keywords", "max_per_run", "send_delay_min"
+    )}
+    for key, value in override.items():
+        if key in result:
+            result[key] = value
+    result["only_from"] = [str(item).lower().strip() for item in (result.get("only_from") or []) if str(item).strip()]
+    result["never_from"] = [str(item).lower().strip() for item in (result.get("never_from") or []) if str(item).strip()] + _AUTO_NEVER_FROM
+    result["skip_keywords"] = [str(item).lower().strip() for item in (result.get("skip_keywords") or []) if str(item).strip()] + _AUTO_SKIP_KEYWORDS
+    result["max_per_run"] = max(1, min(int(result.get("max_per_run", 5)), 100))
+    result["send_delay_min"] = max(1, min(int(result.get("send_delay_min", 5)), 1440))
+    return result
 
 
 async def execute_email_automation_run(args: dict) -> dict:
@@ -7893,6 +7972,282 @@ async def execute_email_automation_run(args: dict) -> dict:
     return {"success": True, "mode": mode, "dry_run": dry_run, "processed": len(results),
             "sent": sent, "drafted": len(drafted_items), "results": results[:60],
             "message": f"{n} réponse(s) {verb}" + (" (aucun envoi réel — simulation)" if dry_run else "") + "."}
+
+
+_EMAIL_AUTOMATION_LOCK = asyncio.Lock()
+
+
+async def execute_email_orchestrator_run(args: dict) -> dict:
+    """Orchestrateur multiboîte équitable, idempotent et sans effet de bord en simulation."""
+    from datetime import datetime as _dt
+    from email.utils import parseaddr
+    import email_manager as _em
+
+    if _EMAIL_AUTOMATION_LOCK.locked():
+        return {"error": "Une exécution des réponses automatiques est déjà en cours."}
+    async with _EMAIL_AUTOMATION_LOCK:
+        cfg = _email_automation_cfg()
+        dry_run = bool(args.get("dry_run", False))
+        forced_mode = (args.get("mode") or "").lower().strip()
+        selected = [str(item).lower() for item in cfg.get("accounts", [])]
+        if not selected:
+            return {"error": "Sélectionne explicitement au moins une boîte pour l'automatisation."}
+
+        accounts = [account for account in _all_email_cfgs()
+                    if (account.get("username") or "").lower() in selected]
+        if not accounts:
+            return {"error": "Aucune des boîtes sélectionnées n'est disponible."}
+
+        loop = asyncio.get_running_loop()
+
+        async def fetch_headers(account):
+            if account.get("_auth_error"):
+                return account, [], account["_auth_error"]
+            try:
+                messages = await loop.run_in_executor(None, lambda: _em.fetch_inbox(
+                    account["imap_host"], int(account.get("imap_port", 993)),
+                    account["username"], account["password"], folder="INBOX", limit=30, offset=0))
+                return account, messages, None
+            except Exception as exc:
+                return account, [], str(exc)
+
+        fetched = await asyncio.gather(*(fetch_headers(account) for account in accounts))
+        results = []
+        queues = {}
+        profiles = {}
+        for account, messages, error in fetched:
+            username = account["username"]
+            profile = _email_effective_profile(cfg, username)
+            if forced_mode:
+                profile["mode"] = forced_mode
+            profiles[username] = profile
+            if error:
+                results.append({"account": username, "action": "erreur", "reason": error})
+            queues[username] = [message for message in messages if not message.get("read")]
+
+        # Round-robin : aucune boîte ne peut monopoliser le passage.
+        candidates = []
+        per_account = {account["username"]: 0 for account in accounts}
+        while any(queues.values()):
+            progressed = False
+            for account in accounts:
+                username = account["username"]
+                profile = profiles[username]
+                if queues[username] and per_account[username] < profile["max_per_run"]:
+                    candidates.append((account, queues[username].pop(0), profile))
+                    per_account[username] += 1
+                    progressed = True
+            if not progressed:
+                break
+
+        raw_seen = db.get_setting("email_auto_seen") or []
+        if isinstance(raw_seen, str):
+            import json as _json
+            try:
+                raw_seen = _json.loads(raw_seen)
+            except Exception:
+                raw_seen = []
+        seen = set(raw_seen if isinstance(raw_seen, list) else [])
+        new_seen = set()
+        pending_drafts = []
+        pending_outbox = []
+        sent = 0
+
+        signatures = db.get_setting("email_signatures") or {}
+        if isinstance(signatures, str):
+            import json as _json
+            try:
+                signatures = _json.loads(signatures)
+            except Exception:
+                signatures = {}
+        signatures = signatures if isinstance(signatures, dict) else {}
+
+        for account, header, profile in candidates:
+            username = account["username"]
+            mode = str(profile.get("mode", "manuel")).lower()
+            if mode == "manuel":
+                continue
+            uid = str(header.get("id") or header.get("uid") or "")
+            stable_id = header.get("message_id") or uid
+            key = f"{username.lower()}:{stable_id}"
+            if not stable_id or key in seen:
+                continue
+            sender_header = header.get("from") or ""
+            sender_address = parseaddr(sender_header)[1].lower() or sender_header.lower()
+            subject = header.get("subject") or ""
+            reason = None
+            auto_submitted = (header.get("auto_submitted") or "").lower()
+            precedence = (header.get("precedence") or "").lower()
+            if auto_submitted and auto_submitted != "no":
+                reason = "message déjà automatique"
+            elif header.get("list_id") or precedence in {"bulk", "list", "junk"}:
+                reason = "liste de diffusion ou message en masse"
+            elif any(item in sender_address for item in profile["never_from"]):
+                reason = "expéditeur automatique/exclu"
+            elif any(item in (subject.lower() + " " + sender_address) for item in profile["skip_keywords"]):
+                reason = "sujet sensible"
+            elif mode in {"autonome", "differe"} and not profile["only_from"]:
+                reason = "envoi automatique bloqué : liste d'expéditeurs autorisés vide"
+            elif profile["only_from"] and not any(item in sender_address for item in profile["only_from"]):
+                reason = "hors liste d'expéditeurs autorisés"
+            if reason:
+                results.append({"account": username, "from": sender_header, "subject": subject,
+                                "action": "ignoré", "reason": reason})
+                new_seen.add(key)
+                continue
+
+            try:
+                message = await loop.run_in_executor(None, lambda: _em.fetch_email(
+                    account["imap_host"], int(account.get("imap_port", 993)),
+                    account["username"], account["password"], uid=uid, folder="INBOX",
+                    mark_seen=not dry_run))
+            except Exception as exc:
+                results.append({"account": username, "subject": subject,
+                                "action": "erreur", "reason": str(exc)})
+                continue
+            signature = profile.get("signature") or signatures.get(username, "")
+            draft_result = await execute_email_draft_reply({
+                "body": message.get("body", ""), "subject": subject,
+                "from": message.get("reply_to") or sender_header,
+                "instruction": profile.get("instructions", ""), "tone": profile.get("tone", ""),
+                "signature": signature, "account": username,
+            })
+            if draft_result.get("error"):
+                results.append({"account": username, "subject": subject,
+                                "action": "erreur", "reason": draft_result["error"]})
+                continue
+            draft = (draft_result.get("draft") or "").strip()
+            to = parseaddr(draft_result.get("to") or sender_header)[1]
+            reply_subject = draft_result.get("subject") or (f"Re: {subject}")
+            if not to or len(draft) < 15:
+                results.append({"account": username, "subject": subject,
+                                "action": "ignoré", "reason": "réponse ou destinataire invalide"})
+                new_seen.add(key)
+                continue
+
+            references = " ".join(filter(None, [message.get("references"), message.get("message_id")])).strip()
+            if dry_run:
+                action = "envoi simulé" if mode in {"autonome", "differe"} else "brouillon simulé"
+                results.append({"account": username, "to": to, "subject": reply_subject, "action": action})
+                continue
+            if mode == "autonome":
+                send_result = await execute_email_send({
+                    "to": to, "subject": reply_subject, "body": draft, "account": username,
+                    "confirmed": True, "in_reply_to": message.get("message_id", ""),
+                    "references": references, "auto_submitted": True,
+                })
+                if send_result.get("success"):
+                    sent += 1
+                    new_seen.add(key)
+                    results.append({"account": username, "to": to, "subject": reply_subject,
+                                    "action": "envoyé"})
+                else:
+                    results.append({"account": username, "to": to, "subject": reply_subject,
+                                    "action": "échec envoi", "reason": send_result.get("error")})
+            elif mode == "differe":
+                from datetime import timedelta as _timedelta
+                import uuid as _uuid
+                now = _dt.now()
+                pending_outbox.append({
+                    "id": _uuid.uuid4().hex,
+                    "account": username, "to": to, "subject": reply_subject, "body": draft,
+                    "from": sender_header, "original_subject": subject, "uid": uid,
+                    "message_id": message.get("message_id", ""), "references": references,
+                    "created_at": now.isoformat(timespec="seconds"),
+                    "send_after": (now + _timedelta(minutes=profile["send_delay_min"])).isoformat(timespec="seconds"),
+                    "status": "pending",
+                })
+                new_seen.add(key)
+                results.append({"account": username, "to": to, "subject": reply_subject,
+                                "action": "envoi différé", "delay_min": profile["send_delay_min"]})
+            else:
+                pending_drafts.append({
+                    "account": username, "to": to, "subject": reply_subject, "body": draft,
+                    "from": sender_header, "original_subject": subject, "uid": uid,
+                    "message_id": message.get("message_id", ""), "references": references,
+                    "created_at": _dt.now().isoformat(timespec="seconds"),
+                })
+                new_seen.add(key)
+                results.append({"account": username, "to": to, "subject": reply_subject,
+                                "action": "brouillon préparé"})
+
+        if not dry_run:
+            db.set_setting("email_auto_seen", list(seen | new_seen)[-2000:])
+            if pending_drafts:
+                existing = db.get_setting("email_pending_drafts") or []
+                if isinstance(existing, str):
+                    import json as _json
+                    try:
+                        existing = _json.loads(existing)
+                    except Exception:
+                        existing = []
+                db.set_setting("email_pending_drafts", ((existing if isinstance(existing, list) else []) + pending_drafts)[-200:])
+            if pending_outbox:
+                existing = db.get_setting("email_scheduled_outbox") or []
+                if not isinstance(existing, list):
+                    existing = []
+                db.set_setting("email_scheduled_outbox", (existing + pending_outbox)[-200:])
+
+        summary = {
+            "at": _dt.now().isoformat(timespec="seconds"), "source": args.get("source", "manual"),
+            "dry_run": dry_run, "processed": len(results), "sent": sent,
+            "drafted": len(pending_drafts), "queued": len(pending_outbox),
+            "errors": sum(1 for item in results if item["action"] in {"erreur", "échec envoi"}),
+        }
+        if not dry_run:
+            history = db.get_setting("email_automation_runs") or []
+            if not isinstance(history, list):
+                history = []
+            db.set_setting("email_automation_runs", (history + [summary])[-100:])
+        return {
+            "success": True, "dry_run": dry_run, "processed": len(results), "sent": sent,
+            "drafted": len(pending_drafts), "queued": len(pending_outbox), "results": results[:100],
+            "message": ("Simulation terminée sans aucune modification." if dry_run else
+                        f"{sent} réponse(s) envoyée(s), {len(pending_drafts)} brouillon(s), {len(pending_outbox)} envoi(s) différé(s)."),
+        }
+
+
+_EMAIL_OUTBOX_LOCK = asyncio.Lock()
+
+
+async def execute_email_outbox_flush() -> dict:
+    """Envoie uniquement les réponses différées arrivées à échéance."""
+    from datetime import datetime as _dt
+    if _EMAIL_OUTBOX_LOCK.locked():
+        return {"success": True, "sent": 0, "message": "File d'envoi déjà en cours."}
+    async with _EMAIL_OUTBOX_LOCK:
+        outbox = db.get_setting("email_scheduled_outbox") or []
+        if not isinstance(outbox, list):
+            outbox = []
+        now = _dt.now()
+        kept, sent, failed = [], 0, 0
+        for item in outbox:
+            if item.get("status", "pending") != "pending":
+                kept.append(item)
+                continue
+            try:
+                due = _dt.fromisoformat(item.get("send_after", "")) <= now
+            except Exception:
+                due = False
+            if not due:
+                kept.append(item)
+                continue
+            result = await execute_email_send({
+                "to": item.get("to", ""), "subject": item.get("subject", ""),
+                "body": item.get("body", ""), "account": item.get("account"),
+                "confirmed": True, "in_reply_to": item.get("message_id", ""),
+                "references": item.get("references", ""), "auto_submitted": True,
+            })
+            if result.get("success"):
+                sent += 1
+            else:
+                failed += 1
+                from datetime import timedelta as _timedelta
+                kept.append({**item, "last_error": result.get("error", "Envoi impossible"),
+                             "last_attempt_at": now.isoformat(timespec="seconds"),
+                             "send_after": (now + _timedelta(minutes=5)).isoformat(timespec="seconds")})
+        db.set_setting("email_scheduled_outbox", kept[-200:])
+        return {"success": failed == 0, "sent": sent, "failed": failed, "pending": len(kept)}
 
 
 async def execute_email_to_task(args: dict) -> dict:
@@ -9378,82 +9733,290 @@ async def execute_web_deep_research(args: dict) -> dict:
     }
 
 
-# v2.142 — « Model Council » (Perplexity, février 2026) : interroge PLUSIEURS modèles
-# cloud EN PARALLÈLE sur la même question et synthétise leurs points d'accord/désaccord,
-# au lieu d'une seule réponse d'un seul modèle. Marvin a en réalité PLUS de diversité de
-# modèles cloud installés (7) que le conseil à 3 modèles de Perplexity. Outil explicite,
-# volontairement pas utilisé par défaut (coût de plusieurs appels LLM en parallèle) —
-# réservé aux questions importantes/ambiguës où l'utilisateur veut plusieurs avis.
+# v2.211 — Council v2 : cinq familles cloud, cinq rôles indépendants, critique aveugle puis
+# arbitrage. Aucun repli local silencieux : la provenance exposée est celle de l'appel réel.
 async def execute_ai_model_council(args: dict) -> dict:
-    """Interroge plusieurs modèles IA cloud DIFFÉRENTS en parallèle sur la même question
-    et synthétise leurs réponses (accord/désaccord explicite). Réservé aux questions
-    importantes ou ambiguës — coûte plusieurs appels LLM, pas un outil pour une question
-    simple. Nécessite le mode cloud activé et au moins 2 modèles cloud configurés."""
+    """Conseil de cinq modèles Ollama Cloud appartenant à cinq familles différentes.
+
+    Le premier tour est indépendant. Un membre critique ensuite les réponses anonymisées,
+    puis un autre arbitre l'ensemble dans l'ordre inverse pour réduire le biais de position.
+    """
     question = (args.get("question") or args.get("query") or "").strip()
     if not question:
         return {"error": "Paramètre 'question' requis."}
-    try:
-        n_models = max(2, min(int(args.get("n_models", 3)), 5))
-    except Exception:
-        n_models = 3
+    evidence = (args.get("evidence") or args.get("context") or "").strip()
+    panel_size = 5
 
     import cloud_routing as _cr
-    cloud_enabled, overrides = _cr.get_cloud_config()
+    import httpx as _hx
+    cloud_enabled, _ = _cr.get_cloud_config()
     if not cloud_enabled:
-        return {"error": "Le mode cloud n'est pas activé (Réglages → Modèle IA) — le conseil de modèles nécessite plusieurs modèles cloud."}
-    if _cr.is_sensitive_text(question):
-        return {"error": "Cette question contient une donnée sensible — le conseil de modèles reste désactivé sur ce type de contenu, mêmes garanties que le reste du routage cloud."}
+        return {"error": "Le mode cloud n'est pas activé — Council v2 exige cinq modèles Ollama Cloud."}
+    if _cr.is_local_only_lockdown():
+        return {"error": "Le mode Hyper local interdit Council Cloud. Passe en mode Normal, Tout cloud ou Ultra débridé."}
+    sensitive = _cr.is_sensitive_text(question + "\n" + evidence)
+    if sensitive and not _cr.is_ultra_unrestricted():
+        return {"error": "Donnée sensible détectée : les cinq avis cloud sont bloqués hors mode Ultra débridé."}
 
-    # Modèles DÉJÀ configurés par l'utilisateur (jamais de choix arbitraire hors réglages) —
-    # dédoublonnés, en gardant l'ordre. Complété avec d'autres modèles cloud installés si
-    # les overrides ne donnent pas assez de diversité.
-    candidates = list(dict.fromkeys(overrides.values()))
-    if len(candidates) < n_models:
-        try:
-            import httpx as _hx
-            async with _hx.AsyncClient(timeout=5) as _c:
-                _r = await _c.get(f"{OLLAMA_URL}/api/tags")
-                installed = [m.get("name", "") for m in _r.json().get("models", [])]
-        except Exception:
-            installed = []
-        for m in installed:
-            if _cr.is_cloud_model(m) and m not in candidates:
-                candidates.append(m)
-            if len(candidates) >= n_models:
-                break
-    models = candidates[:n_models]
-    if len(models) < 2:
-        return {"error": "Pas assez de modèles cloud distincts configurés pour un conseil (il en faut au moins 2 — vérifie Réglages → Modèle IA)."}
+    need = _cr.detect_task(question) or "general"
+    candidates = _cr.list_distinct_cloud_models(need)
+    if len(candidates) < panel_size:
+        return {
+            "error": f"Council v2 requiert 5 familles cloud distinctes ; {len(candidates)} seulement sont disponibles.",
+            "available_models": candidates,
+        }
 
-    prompt = f"Réponds à cette question de façon claire et complète :\n\n{question}"
-
-    async def _ask(m):
-        try:
-            return await _ollama_generate(prompt, model=m, timeout=120)
-        except Exception as e:
-            return f"(échec : {str(e)[:100]})"
-
-    answers = await asyncio.gather(*[_ask(m) for m in models])
-
-    digest = "\n\n".join(
-        f"[Modèle {i+1} — {m}]\n{(a or '').strip()[:1500]}"
-        for i, (m, a) in enumerate(zip(models, answers)))
-    synth_prompt = (
-        f"Voici {len(models)} réponses de modèles IA DIFFÉRENTS à la même question. Rédige "
-        "une synthèse en français : 1) la réponse consensuelle si les modèles sont d'accord, "
-        "2) les points de DÉSACCORD explicites entre modèles s'il y en a (cite lequel dit "
-        "quoi), 3) ta meilleure recommandation. Sois direct, pas de préambule.\n\n"
-        f"QUESTION : {question}\n\nRÉPONSES :\n{digest}\n\nSYNTHÈSE :"
+    roles = (
+        ("analyste", "Construis la meilleure solution et explicite les hypothèses décisives."),
+        ("critique", "Cherche les erreurs, contre-exemples, risques et hypothèses cachées."),
+        ("vérificateur", "Contrôle la solidité factuelle, les preuves et ce qui reste incertain."),
+        ("alternatif", "Propose une approche réellement différente et compare ses compromis."),
+        ("praticien", "Transforme l'analyse en décision concrète, testable et priorisée."),
     )
-    synthesis = (await _ollama_generate(synth_prompt, model=None, timeout=120) or "").strip()
+    try:
+        concurrency = max(1, min(int(db.get_setting("council_concurrency") or 3), panel_size))
+    except Exception:
+        concurrency = 3
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def _cloud_call(client, model: str, prompt: str, phase: str) -> dict:
+        started = time.perf_counter()
+        attempts = []
+        async with semaphore:
+            for attempt in range(1, 3):
+                try:
+                    response = await client.post(
+                        f"{OLLAMA_URL}/api/generate",
+                        json={"model": model, "prompt": prompt, "stream": False},
+                    )
+                    response.raise_for_status()
+                    text = (response.json().get("response") or "").strip()
+                    if not text:
+                        raise RuntimeError("réponse vide")
+                    return {
+                        "ok": True, "model": model, "family": _cr.model_family(model),
+                        "source": "ollama_cloud", "phase": phase, "answer": text,
+                        "attempts": attempt, "duration_ms": int((time.perf_counter() - started) * 1000),
+                    }
+                except Exception as exc:
+                    attempts.append(f"{type(exc).__name__}: {str(exc)[:180]}")
+                    if isinstance(exc, _hx.TimeoutException):
+                        break
+                    if attempt == 1:
+                        await asyncio.sleep(0.5)
+        return {
+            "ok": False, "model": model, "family": _cr.model_family(model),
+            "source": "ollama_cloud", "phase": phase, "attempts": len(attempts),
+            "duration_ms": int((time.perf_counter() - started) * 1000), "errors": attempts,
+        }
+
+    context_block = f"\n\nÉLÉMENTS VÉRIFIÉS FOURNIS :\n{evidence[:12000]}" if evidence else ""
+    async with _hx.AsyncClient(timeout=_hx.Timeout(150.0, connect=10.0)) as client:
+        selected = candidates[:panel_size]
+        prompts = []
+        for index, ((role, instruction), model) in enumerate(zip(roles, selected)):
+            prompts.append((model, (
+                f"Tu es le membre {index + 1} d'un conseil, rôle : {role}. {instruction}\n"
+                "Travaille indépendamment : ne suppose pas ce que diront les autres. Réponds en français "
+                "avec les sections Recommandation, Raisons, Preuves ou vérifications nécessaires, Risques, "
+                f"Incertitudes et Confiance (0-100).\n\nQUESTION :\n{question}{context_block}"
+            )))
+        results = list(await asyncio.gather(*[
+            _cloud_call(client, model, prompt, "independent") for model, prompt in prompts
+        ]))
+        panel_attempt_log = []
+        for index, result in enumerate(results):
+            result["slot"] = index + 1
+            result["role"] = roles[index][0]
+            panel_attempt_log.append(dict(result))
+
+        # Un membre défaillant est remplacé par une AUTRE famille disponible. Aucun repli
+        # local n'est autorisé, sinon la provenance et la diversité seraient mensongères.
+        reserve = candidates[panel_size:]
+        for index, result in enumerate(list(results)):
+            if result.get("ok"):
+                continue
+            while reserve:
+                replacement = reserve.pop(0)
+                retried = await _cloud_call(client, replacement, prompts[index][1], "independent_replacement")
+                retried["slot"] = index + 1
+                retried["role"] = roles[index][0]
+                panel_attempt_log.append(dict(retried))
+                results[index] = retried
+                if retried.get("ok"):
+                    break
+
+        successful = [item for item in results if item.get("ok")]
+        if len(successful) != panel_size or len({_cr.model_family(x["model"]) for x in successful}) != panel_size:
+            return {
+                "error": "Impossible d'obtenir cinq réponses cloud issues de cinq familles distinctes.",
+                "attempted": panel_attempt_log,
+            }
+
+        anonymous = [
+            {"id": chr(65 + i), "answer": item["answer"][:4500]}
+            for i, item in enumerate(successful)
+        ]
+        forward_digest = "\n\n".join(f"[AVIS {x['id']}]\n{x['answer']}" for x in anonymous)
+        critic_prompt = (
+            "Tu es le contradicteur d'un conseil. Les avis sont anonymisés : ne devine pas les modèles. "
+            "Identifie les affirmations non étayées, contradictions, consensus trompeurs et l'avis minoritaire "
+            "qui pourrait être juste. Termine par les critères que l'arbitre doit appliquer.\n\n"
+            f"QUESTION : {question}\n\n{forward_digest}"
+        )
+        critique = await _cloud_call(client, successful[3]["model"], critic_prompt, "cross_critique")
+
+        reverse_digest = "\n\n".join(
+            f"[AVIS {x['id']}]\n{x['answer']}" for x in reversed(anonymous)
+        )
+        judge_prompt = (
+            "Tu es l'arbitre final. Les cinq avis sont anonymisés et présentés dans un ordre inversé par "
+            "rapport au contradicteur. Ne vote pas à la majorité : juge les preuves, le respect des contraintes, "
+            "les risques et l'applicabilité. Préserve explicitement un désaccord important au lieu de fabriquer "
+            "un consensus. Réponds en français avec : Réponse retenue, Pourquoi, Consensus solide, Désaccords, "
+            "Incertitudes, Plan d'action et Confiance globale (0-100).\n\n"
+            f"QUESTION : {question}\n\nAVIS :\n{reverse_digest}\n\n"
+            f"REVUE CONTRADICTOIRE :\n{critique.get('answer', 'indisponible')[:5000]}"
+        )
+        judge_order = [successful[0], successful[2], successful[1], successful[4]]
+        arbitration = None
+        for judge in judge_order:
+            attempt = await _cloud_call(client, judge["model"], judge_prompt, "arbitration")
+            if attempt.get("ok"):
+                arbitration = attempt
+                break
+        if not arbitration:
+            return {"error": "Les cinq avis ont répondu, mais l'arbitrage cloud a échoué.", "panel": successful}
 
     return {
         "success": True,
-        "answer": synthesis,
-        "models_consulted": models,
-        "individual_answers": [{"model": m, "answer": (a or "")[:1500]} for m, a in zip(models, answers)],
-        "message": f"{len(models)} modèles consultés en parallèle.",
+        "answer": arbitration["answer"],
+        "models_consulted": [item["model"] for item in successful],
+        "families": [item["family"] for item in successful],
+        "panel_size": panel_size,
+        "concurrency": concurrency,
+        "individual_answers": successful,
+        "panel_attempt_log": panel_attempt_log,
+        "critique": critique,
+        "arbitration": arbitration,
+        "privacy_mode": "ultra_unrestricted" if _cr.is_ultra_unrestricted() else "cloud_non_sensitive",
+        "message": "Council v2 terminé : 5 familles cloud, critique croisée et arbitrage traçable.",
     }
+
+
+# v2.214 — Cortex Search explore plusieurs stratégies, puis les soumet à cinq
+# vérificateurs spécialisés avant arbitrage. Déclenchement explicite uniquement.
+async def execute_ai_cortex_search(args: dict) -> dict:
+    question = (args.get("question") or args.get("query") or "").strip()
+    evidence = (args.get("evidence") or args.get("context") or "").strip()
+    try:
+        candidate_count = int(args.get("candidate_count") or 3)
+    except (TypeError, ValueError):
+        candidate_count = 3
+    import cortex_search
+    return await cortex_search.execute(question, evidence=evidence, candidate_count=candidate_count)
+
+
+async def execute_ai_research_swarm(args: dict) -> dict:
+    """Essaim de cinq chercheurs cloud spécialisés avec recherche web et vérification croisée."""
+    question = (args.get("question") or args.get("query") or "").strip()
+    try:
+        agent_count = int(args.get("agent_count") or 5)
+        sources_per_agent = int(args.get("sources_per_agent") or 3)
+    except (TypeError, ValueError):
+        agent_count, sources_per_agent = 5, 3
+    import research_swarm
+    return await research_swarm.execute(
+        question, agent_count=agent_count, sources_per_agent=sources_per_agent,
+    )
+
+
+async def execute_ai_adaptive_team(args: dict) -> dict:
+    """Compose automatiquement Research Swarm, Cortex Search ou Council selon le problème."""
+    question = (args.get("question") or args.get("query") or "").strip()
+    import adaptive_team
+    return await adaptive_team.execute(question)
+
+
+async def execute_ai_code_forge(args: dict) -> dict:
+    """Produit un livrable code revu, testé en bac à sable puis validé."""
+    request = (args.get("request") or args.get("question") or args.get("query") or "").strip()
+    evidence = (args.get("evidence") or args.get("context") or "").strip()
+    mission_id = str(args.get("mission_id") or "").strip()
+    import code_forge
+    return await code_forge.execute(request, evidence=evidence, mission_id=mission_id)
+
+
+async def execute_ai_test_forge(args: dict) -> dict:
+    """Analyse puis exécute un livrable dans Docker ou une VM native jetable."""
+    code = str(args.get("code") or "")
+    language = str(args.get("language") or "")
+    test_code = str(args.get("test_code") or args.get("tests") or "")
+    integration_test_code = str(args.get("integration_test_code") or "")
+    files = args.get("files") if isinstance(args.get("files"), dict) else None
+    require_online = bool(args.get("require_online"))
+    try:
+        timeout_seconds = int(args.get("timeout_seconds") or 90)
+    except (TypeError, ValueError):
+        timeout_seconds = 90
+    import test_forge
+    return await asyncio.to_thread(
+        test_forge.execute,
+        code,
+        language,
+        test_code=test_code,
+        integration_test_code=integration_test_code,
+        require_online=require_online,
+        timeout_seconds=timeout_seconds,
+        files=files,
+    )
+
+
+async def execute_code_workspace_start(args: dict) -> dict:
+    """Create or resume a durable Code Workspace mission from the chat."""
+    import coding_service
+    try:
+        # coding_jobs.create_job() programme le superviseur avec
+        # asyncio.create_task(). Il doit donc rester sur la boucle FastAPI
+        # courante et ne peut pas être déporté dans un thread de travail.
+        return coding_service.start(
+            str(args.get("request") or args.get("question") or ""),
+            repository_path=str(args.get("repository_path") or ""),
+            target_mode=str(args.get("target_mode") or "auto"),
+            autonomy=str(args.get("autonomy") or "autonomous"),
+            max_duration_minutes=int(args.get("max_duration_minutes") or 120),
+            max_iterations=int(args.get("max_iterations") or 12),
+            max_files_changed=int(args.get("max_files_changed") or 50),
+            create_worktree=True,
+            start_auto=str(args.get("autonomy") or "autonomous") == "autonomous",
+            confirmed=bool(args.get("confirmed")),
+            conversation_id=str(args.get("_conversation_id") or ""),
+        )
+    except (TypeError, ValueError, coding_service.CodingServiceError) as exc:
+        return {"success": False, "error": str(exc)}
+
+
+async def execute_code_workspace_status(args: dict) -> dict:
+    """Read Code Workspace missions and evidence without changing them."""
+    import coding_service
+    try:
+        return await asyncio.to_thread(coding_service.status, str(args.get("mission_id") or ""))
+    except coding_service.CodingServiceError as exc:
+        return {"success": False, "error": str(exc)}
+
+
+async def execute_code_workspace_control(args: dict) -> dict:
+    """Resume or cancel the persistent Auto job associated with a coding mission."""
+    import coding_service
+    try:
+        # resume_job() relance lui aussi une tâche asyncio persistante.
+        return coding_service.control(
+            str(args.get("mission_id") or ""),
+            str(args.get("action") or ""),
+            confirmed=bool(args.get("confirmed")),
+        )
+    except (ValueError, coding_service.CodingServiceError) as exc:
+        return {"success": False, "error": str(exc)}
 
 
 # v2.145 — « Ultra mode » (GPT-5.6 Sol, juillet 2026) : au lieu d'une seule chaîne de
@@ -9615,12 +10178,26 @@ async def execute_long_task_start(args: dict) -> dict:
         return {"error": f"Étapes créées mais échec de la programmation de reprise automatique : {str(e)[:150]}",
                 "steps": steps, "tag": tag}
 
+    mission = None
+    try:
+        import mission_os
+        mission = mission_os.create_mission(
+            goal=goal,
+            conversation_id=str(conversation_id),
+            tag=tag,
+            steps=steps,
+            task_ids=[t["id"] for t in created],
+        )
+    except Exception:
+        mission = None
+
     return {
         "success": True,
         "goal": goal,
         "steps": steps,
         "tag": tag,
         "task_ids": [t["id"] for t in created],
+        "mission_id": mission.get("id") if mission else None,
         "message": (
             f"{len(steps)} étape(s) créée(s) (visibles dans Tâches, tag « {tag} »). "
             "Continue MAINTENANT sur la première étape avec tes outils normaux — la reprise "
@@ -9650,6 +10227,17 @@ async def execute_long_task_status(args: dict) -> dict:
          "steps": [{"id": t["id"], "title": t["title"], "status": t["status"]} for t in tasks]}
         for tg, tasks in by_tag.items()
     ]
+    try:
+        import mission_os
+        for group in groups:
+            mission = mission_os.find_active(tag=group["tag"])
+            if mission:
+                mission_os.sync_steps(mission["id"], [
+                    {"id": step["id"], "status": step["status"]} for step in group["steps"]
+                ])
+                group["mission_id"] = mission["id"]
+    except Exception:
+        pass
     return {"success": True, "groups": groups, "message": f"{len(groups)} tâche(s) longue(s) trouvée(s)."}
 
 
@@ -9666,6 +10254,13 @@ async def execute_long_task_stop(args: dict) -> dict:
         if j.get("tool_name") == "_long_task_resume" and (j.get("args") or {}).get("slug") == slug:
             db.update_cron_job(j["id"], {"enabled": False})
             stopped += 1
+    try:
+        import mission_os
+        mission = mission_os.find_active(tag=f"longtask:{slug}")
+        if mission:
+            mission_os.stop_mission(mission["id"], "reprise automatique arrêtée")
+    except Exception:
+        pass
     return {"success": True, "stopped": stopped,
             "message": (f"{stopped} reprise(s) automatique(s) arrêtée(s)." if stopped
                         else "Aucune reprise automatique trouvée pour ce tag.")}
@@ -9775,6 +10370,37 @@ async def execute_ssh_list(args: dict) -> dict:
         return {"success": True, "count": len(safe), "connections": safe}
     except Exception as e:
         return {"error": str(e)}
+
+
+async def execute_ssh_connection_save(args: dict) -> dict:
+    """Enregistre uniquement les métadonnées d'une cible SSH depuis le chat.
+
+    Les secrets restent saisis par l'utilisateur dans l'écran SSH : Marvin ne reçoit ni
+    mot de passe ni clé privée dans cet outil.
+    """
+    name = (args.get("name") or args.get("host") or "").strip()
+    host = (args.get("host") or "").strip()
+    username = (args.get("username") or "").strip()
+    try:
+        port = max(1, min(int(args.get("port") or 22), 65535))
+    except Exception:
+        return {"error": "Port SSH invalide."}
+    if not name or not host or not username:
+        return {"error": "Les paramètres name, host et username sont requis."}
+    if args.get("password") or args.get("private_key") or args.get("key_passphrase"):
+        return {
+            "error": "Les secrets SSH ne sont jamais enregistrés par le chat. Ajoute le mot de passe ou la clé toi-même dans l'onglet SSH.",
+            "credentials_ui_required": True,
+        }
+    try:
+        saved = db.save_ssh_connection(name, host, port, username)
+        return {
+            "success": True,
+            "connection": saved,
+            "message": "Cible SSH enregistrée sans secret. Complète l'authentification dans l'onglet SSH si nécessaire.",
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 # v2.144 — connexion SSH AD HOC (sans passer par une connexion sauvegardée au préalable),
@@ -12100,10 +12726,17 @@ async def _ollama_generate(prompt: str, model: str = None, images: list = None, 
     import httpx, asyncio as _aio
     import cloud_routing as _cr
     primary = _cr.resolve_model(model, profile="agent", text_for_sensitivity=prompt, has_images=bool(images))
-    try:
-        light = MODEL_PROFILES.get("chat", {}).get("model") or "qwen2.5:3b"
-    except Exception:
-        light = "qwen2.5:3b"
+    if _cr.is_cloud_only_mode():
+        need = "vision" if images else (_cr.detect_task(prompt) or "general")
+        try:
+            light = _cr.require_cloud_model(need, exclude=frozenset({primary}))
+        except _cr.CloudOnlyModelUnavailable:
+            light = None
+    else:
+        try:
+            light = MODEL_PROFILES.get("chat", {}).get("model") or "qwen2.5:3b"
+        except Exception:
+            light = "qwen2.5:3b"
     # v2.137 — trouvé en corrigeant la lenteur de /api/skills/suggest (timeout 5 min dépassé,
     # backend resté sain — pas un hang, juste un budget de temps catastrophique) : l'ancien
     # schéma retentait le modèle PRIMAIRE 3× AU TIMEOUT COMPLET avant même d'essayer le repli
@@ -13276,7 +13909,7 @@ async def execute_screen_ocr(args: dict) -> dict:
         }
 
         if save:
-            saved_path = Path(os.path.expanduser("~")) / "Desktop" / f"screen_ocr_{int(time.time())}.png"
+            saved_path = Path(_SYSTEM_PATHS["desktop"]) / f"screen_ocr_{int(time.time())}.png"
             PILImg.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX").save(str(saved_path))
             result["saved_to"] = str(saved_path)
 
@@ -13823,7 +14456,7 @@ async def execute_billing_quote_pdf(args: dict) -> dict:
 """
         # Use existing file_create_pdf tool
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" / f"devis_{quote['number']}.pdf"
+            Path(_SYSTEM_PATHS["desktop"]) / f"devis_{quote['number']}.pdf"
         )
         result = await execute_file_create_pdf({
             "path": output_path,
@@ -14902,111 +15535,10 @@ async def execute_billing_seed_trade(args: dict) -> dict:
 # Utilisée par le chat, l'Agent Documentation Technique et l'assistant Devis.
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_it_kb_search(args: dict) -> dict:
-    """🧠 Recherche dans la base de connaissances IT de Marvin (outils/logiciels)."""
-    query = (args.get("query") or "").strip()
-    try:
-        results = db.it_kb_search(query, int(args.get("limit", 12))) if query else db.it_kb_list(args.get("category"))
-        return {"success": True, "query": query, "count": len(results), "tools": results,
-                "categories": db.it_kb_categories()}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_it_kb_list(args: dict) -> dict:
-    """📚 Liste / parcourt la base de connaissances IT (par catégorie optionnelle)."""
-    try:
-        tools_ = db.it_kb_list(args.get("category"))
-        by_cat = {}
-        for t in tools_:
-            by_cat.setdefault(t["category"], []).append(t["name"])
-        return {"success": True, "count": len(tools_), "categories": db.it_kb_categories(),
-                "by_category": by_cat, "tools": tools_}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_it_kb_recommend(args: dict) -> dict:
-    """
-    🎯 Recommande le(s) meilleur(s) outil(s) IT pour un besoin donné, depuis la base
-    de connaissances de Marvin (instantané). Tient compte du budget/contraintes
-    (gratuit, open source, souveraineté/RGPD…). Enrichit du web si rien en base.
-    """
-    need = (args.get("need") or args.get("query") or "").strip()
-    if not need:
-        return {"error": "Paramètre 'need' requis (ex: 'sauvegarde pour une mairie, budget limité')."}
-    text = need.lower()
-    try:
-        # Recherche en base sur les mots-clés significatifs
-        import re as _r
-        # Mots ignorés pour le MATCH (les contraintes budget/souveraineté ne servent
-        # qu'au SCORE, pas à ramener des outils hors-sujet).
-        stop = {"pour", "une", "un", "des", "de", "la", "le", "les", "du", "avec", "et",
-                "outil", "logiciel", "solution", "besoin", "client", "quel", "quelle", "meilleur",
-                "gratuit", "gratuite", "budget", "open", "source", "opensource", "souverain",
-                "souveraine", "rgpd", "anssi", "français", "française", "france", "limité", "limite",
-                "pas", "cher", "économique", "economique", "petit", "auto", "hébergé", "heberge",
-                "mairie", "collectivité", "collectivite", "pme", "tpe", "entreprise", "association"}
-        words = [w for w in _r.findall(r"[a-zàâçéèêëîïôûùüÿñ0-9]{3,}", text) if w not in stop]
-        hits, seen = [], set()
-        for w in words:
-            for t in db.it_kb_search(w, 8):
-                if t["id"] not in seen:
-                    seen.add(t["id"]); hits.append(t)
-        # Préférences budget/contraintes
-        wants_free = any(k in text for k in ("gratuit", "budget", "open source", "opensource", "sans coût", "pas cher", "économ"))
-        wants_sovereign = any(k in text for k in ("souverain", "rgpd", "français", "france", "anssi", "auto-héberg", "auto heberg"))
-
-        def score(t):
-            s = float(t.get("rating") or 0) + t.get("times_used", 0) * 0.5
-            if wants_free and t.get("pricing_model") in ("opensource", "free", "freemium"):
-                s += 3
-            if wants_sovereign and any(k in (t.get("tags", "") + t.get("best_for", "")).lower()
-                                       for k in ("souverain", "rgpd", "anssi", "français", "auto-héberg")):
-                s += 3
-            return s
-
-        hits.sort(key=score, reverse=True)
-        top = hits[:5]
-        for t in top:
-            db.it_kb_increment_usage(t["id"])
-
-        if not top:
-            return {"success": True, "need": need, "from_kb": 0,
-                    "message": "Aucun outil en base pour ce besoin. Lancez une recherche web "
-                               "(web_search) puis ajoutez le résultat avec it_kb_add.",
-                    "hint": "billing_product_reviews / billing_market_research pour évaluer une piste."}
-
-        recos = [{
-            "name": t["name"], "category": t["category"], "vendor": t.get("vendor", ""),
-            "why": t.get("best_for") or t.get("use_cases", ""),
-            "pricing": t.get("pricing_model"), "typical_price": t.get("typical_price", ""),
-            "platforms": t.get("platforms", ""), "url": t.get("official_url", ""),
-        } for t in top]
-        best = recos[0]
-        return {
-            "success": True, "need": need, "from_kb": len(top),
-            "recommendations": recos,
-            "advice": (f"Recommandé : **{best['name']}** ({best['category']}) — {best['why']}. "
-                       + ("Priorité gratuit/open source. " if wants_free else "")
-                       + ("Priorité souveraineté/RGPD. " if wants_sovereign else "")
-                       + "Comparez les avis via billing_product_reviews avant de proposer."),
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_it_kb_add(args: dict) -> dict:
-    """➕ Ajoute (ou met à jour) un outil dans la base de connaissances de Marvin.
-    Permet à Marvin d'apprendre de nouveaux outils au fil du temps."""
-    if not args.get("name"):
-        return {"error": "Paramètre 'name' requis."}
-    try:
-        entry = db.it_kb_upsert(args)
-        return {"success": True, "message": f"« {entry['name']} » enregistré dans la base IT.",
-                "tool": entry}
-    except Exception as e:
-        return {"error": str(e)}
+execute_it_kb_search = it_knowledge_domain.search
+execute_it_kb_list = it_knowledge_domain.list_entries
+execute_it_kb_recommend = it_knowledge_domain.recommend
+execute_it_kb_add = it_knowledge_domain.add
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -16145,7 +16677,7 @@ async def execute_doc_generate_report(args: dict) -> dict:
 
         # Generate the file
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"rapport_{interv['number']}.{output_format}"
         )
 
@@ -16238,7 +16770,7 @@ async def execute_doc_generate_procedure(args: dict) -> dict:
             content_md = f"# Procédure : {vars['title']}\n\n{vars['steps']}"
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"procedure_{interv['number']}.{output_format}"
         )
 
@@ -16347,7 +16879,7 @@ async def execute_doc_generate_client_sheet(args: dict) -> dict:
             content_md = f"# Fiche client : {vars['client_name']}\n\n_(template manquant)_"
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"fiche_client_{client['name'].replace(' ','_')}.{output_format}"
         )
 
@@ -16442,7 +16974,7 @@ async def execute_doc_generate_recovery_plan(args: dict) -> dict:
         if tmpl: db.doc_template_use(tmpl["id"])
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"PRA_{client['name'].replace(' ','_')}.{output_format}"
         )
 
@@ -16499,7 +17031,7 @@ async def execute_doc_generate_maintenance(args: dict) -> dict:
         if tmpl: db.doc_template_use(tmpl["id"])
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"maintenance_{client['name'].replace(' ','_')}.{output_format}"
         )
         if output_format == "docx":
@@ -16559,7 +17091,7 @@ async def execute_doc_generate_runbook(args: dict) -> dict:
         if tmpl: db.doc_template_use(tmpl["id"])
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"runbook_{interv['number']}.{output_format}"
         )
         if output_format == "docx":
@@ -16685,7 +17217,7 @@ async def execute_doc_generate_schema(args: dict) -> dict:
         if save_to_file:
             from datetime import datetime as _dt
             path = args.get("output_path") or str(
-                Path(os.path.expanduser("~")) / "Desktop" /
+                Path(_SYSTEM_PATHS["desktop"]) /
                 f"schema_{_dt.now().strftime('%Y%m%d_%H%M%S')}.md"
             )
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -17469,7 +18001,7 @@ async def execute_ops_validation_report_generate(args: dict) -> dict:
 """
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"validation_{interv['number']}.{output_format}"
         )
 
@@ -17863,7 +18395,7 @@ async def execute_client_monthly_summary_generate(args: dict) -> dict:
 """
 
         output_path = args.get("output_path") or str(
-            Path(os.path.expanduser("~")) / "Desktop" /
+            Path(_SYSTEM_PATHS["desktop"]) /
             f"CR_mensuel_{client['name'].replace(' ','_')}_{now.strftime('%Y%m')}.{output_format}"
         )
 
@@ -18011,85 +18543,12 @@ async def execute_system_self_test(args: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def execute_quiz_generate(args: dict) -> dict:
-    """Génère des fiches de révision (question/réponse) sur un sujet et les enregistre pour
-    une révision espacée (quiz_next/quiz_answer les reproposeront au bon rythme). Pour
-    préparer une certification (Network+, CCNA, Security+...) ou réviser un sujet technique
-    étudié récemment."""
-    topic = (args.get("topic") or "").strip()
-    if not topic:
-        return {"error": "Paramètre 'topic' requis (ex: 'Modèle OSI', 'Sous-réseaux IPv4')."}
-    count = max(1, min(int(args.get("count", 5)), 15))
-
-    prompt = (
-        f"Sujet : {topic}\n\n"
-        f"Génère exactement {count} questions de révision de niveau technique (type certification "
-        "informatique), avec leur réponse concise et correcte. Réponds UNIQUEMENT en JSON, une liste "
-        "d'objets {\"question\": \"...\", \"answer\": \"...\"} — rien d'autre, pas de texte autour."
-    )
-    try:
-        raw = await _ollama_generate(prompt, model=args.get("model"), timeout=90)
-    except Exception as e:
-        return {"error": f"Génération impossible : {e}"}
-
-    import re as _re
-    match = _re.search(r"\[.*\]", raw or "", _re.S)
-    if not match:
-        return {"error": "Réponse du modèle non exploitable (pas de JSON trouvé) — réessaie."}
-    try:
-        items = json.loads(match.group(0))
-    except Exception as e:
-        return {"error": f"JSON invalide généré par le modèle : {e}"}
-
-    created = []
-    for it in items[:count]:
-        q, a = (it.get("question") or "").strip(), (it.get("answer") or "").strip()
-        if q and a:
-            created.append(db.create_flashcard(topic, q, a))
-    if not created:
-        return {"error": "Aucune fiche exploitable générée — réessaie ou reformule le sujet."}
-    return {"success": True, "topic": topic, "count": len(created), "cards": created,
-            "message": f"{len(created)} fiche(s) créée(s) sur « {topic} », disponibles via quiz_next."}
+    return await quiz_domain.generate(args, _ollama_generate)
 
 
-async def execute_quiz_next(args: dict) -> dict:
-    """Renvoie la PROCHAINE fiche de révision à réviser (priorité aux fiches dues, sinon une
-    au hasard) — NE montre PAS la réponse tant que l'utilisateur n'a pas répondu, puis appelle
-    quiz_answer avec le résultat pour programmer la prochaine révision."""
-    topic = (args.get("topic") or "").strip() or None
-    card = db.get_next_flashcard(topic)
-    if not card:
-        return {"success": True, "card": None,
-                "message": ("Aucune fiche" + (f" pour « {topic} »" if topic else "") +
-                            " — crée-en avec quiz_generate.")}
-    return {"success": True, "card": {"id": card["id"], "topic": card["topic"], "question": card["question"]},
-            "message": f"Question ({card['topic']}) : {card['question']}"}
-
-
-async def execute_quiz_answer(args: dict) -> dict:
-    """Enregistre si l'utilisateur a bien répondu à une fiche (id renvoyé par quiz_next) —
-    programme la prochaine révision (bonne réponse = intervalle plus long, mauvaise = repasse
-    demain) et révèle la réponse correcte pour comparaison."""
-    fid = (args.get("id") or "").strip()
-    correct = bool(args.get("correct"))
-    if not fid:
-        return {"error": "Paramètre 'id' requis (voir quiz_next)."}
-    updated = db.answer_flashcard(fid, correct)
-    if not updated:
-        return {"error": "Fiche introuvable — vérifie l'id renvoyé par quiz_next."}
-    return {"success": True, "correct": correct, "correct_answer": updated["answer"],
-            "next_review_in_days": updated["interval_days"],
-            "message": (f"{'✅ Correct' if correct else '❌ Incorrect'} — réponse attendue : {updated['answer']}. "
-                        f"Prochaine révision dans {updated['interval_days']} jour(s).")}
-
-
-async def execute_quiz_stats(args: dict) -> dict:
-    """Statistiques de révision par sujet : nombre de fiches, fiches dues maintenant, taux de
-    réussite cumulé."""
-    stats = db.flashcard_stats()
-    if not stats:
-        return {"success": True, "topics": [], "message": "Aucune fiche de révision créée pour l'instant."}
-    return {"success": True, "topics": stats,
-            "message": f"{len(stats)} sujet(s) de révision, {sum(s.get('due_now') or 0 for s in stats)} fiche(s) due(s) maintenant."}
+execute_quiz_next = quiz_domain.next_card
+execute_quiz_answer = quiz_domain.answer
+execute_quiz_stats = quiz_domain.stats
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -18159,6 +18618,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_gui_read": execute_pc_gui_read,
     "pc_gui_click": execute_pc_gui_click,
     "pc_gui_type": execute_pc_gui_type,
+    "vm_lab_install": execute_vm_lab_install,
     "pc_notify": execute_pc_notify,
     "pc_pull_ollama_model": execute_pc_pull_ollama_model,
     "pc_clipboard_get": execute_pc_clipboard_get,
@@ -18251,7 +18711,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "email_draft_reply": execute_email_draft_reply,
     "email_summarize": execute_email_summarize,
     "email_digest": execute_email_digest,
-    "email_automation_run": execute_email_automation_run,
+    "email_automation_run": execute_email_orchestrator_run,
     "email_to_task": execute_email_to_task,
     "email_attachment_summary": execute_email_attachment_summary,
     "email_watch_check": execute_email_watch_check,
@@ -18283,12 +18743,21 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "web_research": execute_web_research,
     "web_deep_research": execute_web_deep_research,
     "ai_model_council": execute_ai_model_council,
+    "ai_cortex_search": execute_ai_cortex_search,
+    "ai_research_swarm": execute_ai_research_swarm,
+    "ai_adaptive_team": execute_ai_adaptive_team,
+    "ai_code_forge": execute_ai_code_forge,
+    "ai_test_forge": execute_ai_test_forge,
+    "code_workspace_start": execute_code_workspace_start,
+    "code_workspace_status": execute_code_workspace_status,
+    "code_workspace_control": execute_code_workspace_control,
     "ai_subagents_run": execute_ai_subagents_run,
     "long_task_start": execute_long_task_start,
     "long_task_status": execute_long_task_status,
     "long_task_stop": execute_long_task_stop,
     # SSH
     "ssh_list": execute_ssh_list,
+    "ssh_connection_save": execute_ssh_connection_save,
     "ssh_exec": execute_ssh_exec,
     "ssh_exec_multi": execute_ssh_exec_multi,
     "ssh_write_and_run": execute_ssh_write_and_run,
@@ -18816,6 +19285,16 @@ TOOLS_SPEC = [
         "text": {"type": "string", "description": "Texte à écrire dans le champ"},
         "confirmed": {"type": "boolean", "description": "Requis pour exécuter réellement l'écriture"}},
        ["text"]),
+
+    _t("vm_lab_install", "Consulte ou lance l'installation sans assistance d'une VM Test Forge Hyper-V Debian 13 "
+                          "ou Windows 11. L'installation persistante recrée uniquement la VM choisie, vérifie "
+                          "l'ISO, provisionne le compte de test au moindre privilège, crée un checkpoint propre "
+                          "et conserve les preuves. Utilise action=status pour suivre le job. action=install exige "
+                          "une demande explicite de l'utilisateur et confirmed=true.",
+       {"action": {"type": "string", "enum": ["status", "install"], "description": "Action à effectuer"},
+        "profile": {"type": "string", "enum": ["debian13", "windows11"], "description": "Profil à installer"},
+        "confirmed": {"type": "boolean", "description": "Confirmation explicite requise pour recréer la VM"}},
+       ["action"]),
 
     _t("pc_notify", "Envoie une notification Windows à l'utilisateur.",
        {"title": {"type": "string", "description": "Titre de la notification"},
@@ -19444,15 +19923,109 @@ TOOLS_SPEC = [
        {"query": {"type": "string", "description": "La question / les mots-clés à rechercher"}},
        ["query"]),
     _t("ai_model_council",
-       "Interroge PLUSIEURS modèles IA cloud DIFFÉRENTS en parallèle sur la même question et "
-       "synthétise leurs réponses en signalant les points d'accord/désaccord (équivalent Model "
-       "Council de Perplexity). Réservé aux questions IMPORTANTES ou AMBIGUËS où l'utilisateur "
-       "demande explicitement plusieurs avis (« demande à plusieurs IA », « fais un conseil de "
-       "modèles », « qu'en pensent différents modèles »). Coûte plusieurs appels — jamais pour "
-       "une question simple.",
+       "COUNCIL V2 : consulte exactement CINQ modèles Ollama Cloud de CINQ familles différentes, "
+       "avec cinq rôles indépendants, une critique aveugle et un arbitrage final traçable. À appeler "
+       "obligatoirement si l'utilisateur dit « mode Council », « Model Council » ou demande cinq "
+       "modèles. Pour une recherche web, effectue d'abord la recherche puis passe les faits vérifiés "
+       "dans evidence. Ne jamais l'utiliser spontanément pour une question simple.",
        {"question": {"type": "string", "description": "La question à poser à plusieurs modèles"},
-        "n_models": {"type": "integer", "description": "Nombre de modèles à consulter (2-5, défaut 3)"}},
+        "evidence": {"type": "string", "description": "Faits ou sources déjà vérifiés à soumettre aux cinq modèles (optionnel)"}},
        ["question"]),
+    _t("ai_cortex_search",
+       "CORTEX SEARCH : explore 2 à 3 stratégies indépendantes avec Ollama Cloud, puis les "
+       "fait contrôler par cinq vérificateurs spécialisés (exactitude, preuves, contraintes, "
+       "risques et exécution) avant arbitrage. À utiliser uniquement lorsque l'utilisateur "
+       "sélectionne explicitement Cortex Search pour un problème complexe et non sensible.",
+       {"question": {"type": "string", "description": "Le problème complexe à explorer"},
+        "evidence": {"type": "string", "description": "Faits ou sources déjà vérifiés (optionnel)"},
+        "candidate_count": {"type": "integer", "description": "Nombre de stratégies, entre 2 et 3", "minimum": 2, "maximum": 3}},
+        ["question"]),
+    _t("ai_research_swarm",
+       "RESEARCH SWARM : lance 3 à 5 cellules de recherche web spécialisées avec des familles "
+       "Ollama Cloud distinctes, puis effectue une contradiction, une vérification croisée et "
+       "une synthèse sourcée. À utiliser uniquement si l'utilisateur sélectionne explicitement "
+       "Research Swarm ou demande un essaim de recherche sur un sujet complexe et non sensible.",
+       {"question": {"type": "string", "description": "Question de recherche complexe"},
+        "agent_count": {"type": "integer", "minimum": 3, "maximum": 5,
+                        "description": "Nombre de cellules de recherche, défaut 5"},
+        "sources_per_agent": {"type": "integer", "minimum": 1, "maximum": 5,
+                              "description": "Sources maximum par cellule, défaut 3"}},
+       ["question"]),
+    _t("ai_adaptive_team",
+       "ADAPTIVE TEAM : pour une demande explicitement approfondie et complexe, compose "
+       "automatiquement le meilleur pipeline parmi Research Swarm, Cortex Search et Council. "
+       "Peut rechercher d'abord puis soumettre les preuves à plusieurs stratégies vérifiées. "
+       "Ne jamais l'utiliser pour une question simple, une rédaction directe ou sans demande "
+       "de profondeur. Bloqué pour les données sensibles hors Ultra débridé.",
+       {"question": {"type": "string", "description": "Problème complexe à confier à l'équipe adaptative"}},
+       ["question"]),
+    _t("ai_code_forge",
+       "CODE FORGE : génère ou corrige un script/code avec contrat d'architecture, implémentation "
+        "complète, deux revues indépendantes, réparation, tests générés et exécution dans un "
+        "environnement jetable. Les contrôles initiaux restent hors ligne ; les dépendances sont "
+        "ensuite installées et testées avec Internet dans Docker Linux ou Windows Sandbox. "
+        "Les projets avancés créent une mission durable avec snapshots et reprise par mission_id. "
+       "À utiliser pour toute demande de script d'installation, "
+       "déploiement, administration ou code complet nécessitant une qualité de production. "
+       "Les données sensibles restent bloquées hors Ultra débridé.",
+        {"request": {"type": "string", "description": "Exigence complète du script ou programme"},
+         "evidence": {"type": "string", "description": "Documentation et faits déjà vérifiés (optionnel)"},
+         "mission_id": {"type": "string", "description": "Mission de coding durable à reprendre (optionnel)"}},
+       ["request"]),
+    _t("ai_test_forge",
+       "TEST FORGE : analyse puis exécute un code dans un environnement jetable. Le premier passage "
+       "Docker est sans réseau, en lecture seule et à ressources bornées. Si require_online=true, "
+        "un second passage avec Internet dans la toolchain du langage installe les dépendances puis Test Forge lance lui-même "
+       "les tests. Les scripts Bash exigeant systemd ou des services sont automatiquement escaladés "
+       "vers la VM Debian Hyper-V restaurée avant et après le test. PowerShell utilise Windows Sandbox avec Internet et réseaux privés bloqués. "
+       "Bash utilise ShellCheck+Bats, Python compile+unittest et JavaScript node --check+node:test. "
+       "Sans Windows Sandbox disponible, PowerShell reste refusé pour la production. Une suite de "
+       "tests est obligatoire pour obtenir production_ready=true. Un script qui installe des "
+       "paquets ou services force automatiquement require_online=true et reste refusé sans "
+       "harness d'intégration réel.",
+       {"code": {"type": "string", "description": "Code complet à valider"},
+        "language": {"type": "string", "enum": ["bash", "python", "javascript", "json", "powershell", "go"],
+                     "description": "Langage du livrable"},
+        "test_code": {"type": "string", "description": "Suite de tests complète adaptée au langage"},
+         "integration_test_code": {"type": "string",
+                                   "description": "Harness Bash d'intégration Debian en ligne"},
+         "files": {"type": "object", "additionalProperties": {"type": "string"},
+                   "description": "Fichiers auxiliaires indexés par chemin relatif sûr"},
+        "require_online": {"type": "boolean",
+                           "description": "Exige un test Internet réel après les tests hors ligne"},
+        "timeout_seconds": {"type": "integer", "minimum": 10, "maximum": 180,
+                            "description": "Timeout par étape, défaut 90 secondes"}},
+       ["code", "language", "test_code"]),
+    _t("code_workspace_start",
+       "CODE WORKSPACE : crée une Coding Mission durable depuis le chat. Si repository_path est "
+       "vide, Marvin crée automatiquement un dépôt Git isolé dans sa bibliothèque locale. Déduit "
+       "la cible Linux ou Windows depuis la demande, lance Code Forge, Test Forge et les reprises "
+       "Auto jusqu'au succès. À utiliser quand l'utilisateur demande de travailler dans Code "
+       "Workspace, de coder un projet long ou de suivre les fichiers et preuves dans /code.",
+       {"request": {"type": "string", "description": "Demande de code complète"},
+        "repository_path": {"type": "string", "description": "Dépôt Git existant, optionnel"},
+        "target_mode": {"type": "string", "enum": ["auto", "windows", "linux", "both"],
+                        "description": "Cible, auto par défaut"},
+        "autonomy": {"type": "string", "enum": ["autonomous", "supervised"],
+                     "description": "Mode Auto ou supervisé"},
+        "max_duration_minutes": {"type": "integer", "minimum": 5, "maximum": 1440},
+        "max_iterations": {"type": "integer", "minimum": 1, "maximum": 100},
+        "max_files_changed": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "confirmed": {"type": "boolean", "description": "Confirmation de création et démarrage"}},
+       ["request"]),
+    _t("code_workspace_status",
+       "Consulte depuis le chat les Coding Missions, leur job Auto, fichiers de snapshot lisibles, "
+       "phases, preuves et capacités réelles Docker/VM. Sans mission_id, liste les missions; avec "
+       "mission_id, retourne le détail durable. Lis toujours artifacts.files au lieu de deviner un "
+       "chemin dans le worktree : un livrable refusé reste dans le snapshot sans être appliqué.",
+       {"mission_id": {"type": "string", "description": "Identifiant de mission optionnel"}}, []),
+    _t("code_workspace_control",
+       "Reprend ou annule depuis le chat le job Auto d'une Coding Mission existante. L'action est "
+       "persistante et doit être confirmée.",
+       {"mission_id": {"type": "string", "description": "Identifiant exact de Coding Mission"},
+        "action": {"type": "string", "enum": ["resume", "cancel"]},
+        "confirmed": {"type": "boolean", "description": "Confirmation explicite"}},
+       ["mission_id", "action"]),
     _t("ai_subagents_run",
        "Décompose un objectif en 2-5 sous-tâches INDÉPENDANTES traitées EN PARALLÈLE puis "
        "fusionnées en un résultat cohérent (équivalent Ultra mode de GPT-5.6 Sol, sans accès "
@@ -19502,6 +20075,16 @@ TOOLS_SPEC = [
     # ── SSH ───────────────────────────────────────────────────────────────────
     _t("ssh_list", "Liste les connexions SSH sauvegardées dans Marvin.",
        {}, []),
+
+    _t("ssh_connection_save",
+       "Enregistre une cible SSH (nom, hôte, port, utilisateur) SANS mot de passe ni clé. Pour "
+       "« ajoute/enregistre cette connexion SSH ». Les secrets doivent ensuite être saisis par "
+       "l'utilisateur lui-même dans l'onglet SSH.",
+       {"name": {"type": "string", "description": "Nom lisible de la connexion"},
+        "host": {"type": "string", "description": "Adresse IP ou nom DNS"},
+        "port": {"type": "integer", "description": "Port, défaut 22"},
+        "username": {"type": "string", "description": "Nom d'utilisateur SSH"}},
+       ["name", "host", "username"]),
 
     _t("ssh_exec",
        "Exécute une commande sur un serveur SSH — connexion SAUVEGARDÉE (connection_id, voir "

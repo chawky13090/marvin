@@ -16,15 +16,21 @@ def log_action(tool: str, args: dict = None, result=None, source: str = "chat"):
     """Enregistre une action (best-effort). source : chat | ui | proactif | cron | agent."""
     try:
         os.makedirs(os.path.dirname(_AUDIT_PATH), exist_ok=True)
+        failed = isinstance(result, dict) and (
+            bool(result.get("error")) or result.get("success") is False
+        )
         entry = {
             "ts": datetime.now().isoformat(timespec="seconds"),
             "tool": tool,
             "source": source,
-            "ok": not (isinstance(result, dict) and result.get("error")),
+            "ok": not failed,
         }
         if isinstance(result, dict):
             if result.get("error"):
                 entry["error"] = str(result["error"])[:200]
+            elif result.get("success") is False:
+                verdict = (result.get("final_review") or {}).get("verdict")
+                entry["error"] = str(verdict or "Résultat marqué en échec par le contrôle qualité.")[:200]
             elif result.get("requiresConfirmation"):
                 entry["ok"] = None  # action proposée, en attente de confirmation
                 entry["pending"] = True

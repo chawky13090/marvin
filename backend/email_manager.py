@@ -142,10 +142,21 @@ def _get_attachments(msg) -> list[dict]:
 
 # ── Connexion IMAP ───────────────────────────────────────────────────────────
 
+_OAUTH_PREFIX = "__MARVIN_OAUTH2__:"
+
+
+def _oauth_string(username: str, access_token: str) -> str:
+    return f"user={username}\x01auth=Bearer {access_token}\x01\x01"
+
+
 def _imap_connect(imap_host: str, imap_port: int, username: str, password: str):
     ctx = ssl.create_default_context()
     conn = imaplib.IMAP4_SSL(imap_host, imap_port, ssl_context=ctx)
-    conn.login(username, password)
+    if password.startswith(_OAUTH_PREFIX):
+        token = password[len(_OAUTH_PREFIX):]
+        conn.authenticate("XOAUTH2", lambda _challenge: _oauth_string(username, token).encode("utf-8"))
+    else:
+        conn.login(username, password)
     return conn
 
 
@@ -175,6 +186,11 @@ def fetch_inbox(imap_host: str, imap_port: int, username: str, password: str,
                     "date": _decode_header(msg.get("Date", "")),
                     "read": "\\Seen" in flags,
                     "preview": "",
+                    "message_id": _decode_header(msg.get("Message-ID", "")),
+                    "reply_to": _decode_header(msg.get("Reply-To", "")),
+                    "auto_submitted": (msg.get("Auto-Submitted", "") or "").strip(),
+                    "precedence": (msg.get("Precedence", "") or "").strip(),
+                    "list_id": _decode_header(msg.get("List-ID", "")),
                 })
             except Exception:
                 continue
@@ -212,13 +228,13 @@ def fetch_attachment(imap_host: str, imap_port: int, username: str, password: st
 
 
 def fetch_email(imap_host: str, imap_port: int, username: str, password: str,
-                uid: str, folder: str = "INBOX") -> dict:
+                uid: str, folder: str = "INBOX", mark_seen: bool = True) -> dict:
     """Lit le contenu complet d'un email par son UID."""
     conn = _imap_connect(imap_host, imap_port, username, password)
     try:
-        conn.select(folder, readonly=False)
-        # Marquer comme lu
-        conn.store(uid.encode(), "+FLAGS", "\\Seen")
+        conn.select(folder, readonly=not mark_seen)
+        if mark_seen:
+            conn.store(uid.encode(), "+FLAGS", "\\Seen")
         _, raw = conn.fetch(uid.encode(), "(RFC822)")
         msg = email.message_from_bytes(raw[0][1])
         plain, html_body = _get_body(msg)
@@ -232,7 +248,14 @@ def fetch_email(imap_host: str, imap_port: int, username: str, password: str,
             "body": plain,
             "html": html_body,
             "attachments": _get_attachments(msg),
-            "read": True,
+            "read": mark_seen,
+            "message_id": _decode_header(msg.get("Message-ID", "")),
+            "in_reply_to": _decode_header(msg.get("In-Reply-To", "")),
+            "references": _decode_header(msg.get("References", "")),
+            "reply_to": _decode_header(msg.get("Reply-To", "")),
+            "auto_submitted": (msg.get("Auto-Submitted", "") or "").strip(),
+            "precedence": (msg.get("Precedence", "") or "").strip(),
+            "list_id": _decode_header(msg.get("List-ID", "")),
         }
     finally:
         try:
@@ -347,7 +370,8 @@ def move_email(imap_host: str, imap_port: int, username: str, password: str,
 def send_email(smtp_host: str, smtp_port: int, username: str, password: str,
                to: str, subject: str, body: str,
                cc: str = "", reply_to: str = "",
-               html_body: str = "") -> dict:
+               html_body: str = "", in_reply_to: str = "", references: str = "",
+               auto_submitted: bool = False) -> dict:
     """Envoie un email via SMTP (STARTTLS)."""
     msg = email.mime.multipart.MIMEMultipart("alternative")
     msg["From"] = username
@@ -357,6 +381,13 @@ def send_email(smtp_host: str, smtp_port: int, username: str, password: str,
         msg["Cc"] = cc
     if reply_to:
         msg["Reply-To"] = reply_to
+    if in_reply_to:
+        msg["In-Reply-To"] = in_reply_to
+    if references:
+        msg["References"] = references
+    if auto_submitted:
+        msg["Auto-Submitted"] = "auto-replied"
+        msg["X-Auto-Response-Suppress"] = "All"
 
     msg.attach(email.mime.text.MIMEText(body, "plain", "utf-8"))
     if html_body:
@@ -368,13 +399,21 @@ def send_email(smtp_host: str, smtp_port: int, username: str, password: str,
     if smtp_port == 465:
         ctx = ssl.create_default_context()
         with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as server:
-            server.login(username, password)
+            if password.startswith(_OAUTH_PREFIX):
+                token = password[len(_OAUTH_PREFIX):]
+                server.auth("XOAUTH2", lambda _challenge=None: _oauth_string(username, token))
+            else:
+                server.login(username, password)
             server.sendmail(username, recipients, msg.as_string())
     else:
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.ehlo()
             server.starttls(context=ssl.create_default_context())
-            server.login(username, password)
+            if password.startswith(_OAUTH_PREFIX):
+                token = password[len(_OAUTH_PREFIX):]
+                server.auth("XOAUTH2", lambda _challenge=None: _oauth_string(username, token))
+            else:
+                server.login(username, password)
             server.sendmail(username, recipients, msg.as_string())
 
     return {"success": True, "to": to, "subject": subject}
@@ -399,12 +438,20 @@ def test_connection(imap_host: str, imap_port: int, smtp_host: str, smtp_port: i
         if smtp_port == 465:
             ctx = ssl.create_default_context()
             with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx, timeout=8) as s:
-                s.login(username, password)
+                if password.startswith(_OAUTH_PREFIX):
+                    token = password[len(_OAUTH_PREFIX):]
+                    s.auth("XOAUTH2", lambda _challenge=None: _oauth_string(username, token))
+                else:
+                    s.login(username, password)
         else:
             with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as s:
                 s.ehlo()
                 s.starttls(context=ssl.create_default_context())
-                s.login(username, password)
+                if password.startswith(_OAUTH_PREFIX):
+                    token = password[len(_OAUTH_PREFIX):]
+                    s.auth("XOAUTH2", lambda _challenge=None: _oauth_string(username, token))
+                else:
+                    s.login(username, password)
         smtp_ok = True
     except Exception as e:
         smtp_ok = False
