@@ -31,6 +31,7 @@ flowchart LR
 | `scheduling.py` | Parsing unique des planifications utilisé par l'API Cron et son worker |
 | `agent.py` | Composition de la boucle agentique, prompt, outils, streaming et persistance |
 | `agent_policy.py` | Politiques textuelles pures : titres et noms d'outils explicitement cités |
+| `agent_prompt.py` | Prompt système, permissions, chemins dynamiques, mémoire et date déterministe |
 | `agent_safety.py` | Validation pré-exécution des outils et analyse post-génération des scripts/documents |
 | `agent_protocol.py` | Conversion UI/base vers Ollama et encodage JSON des événements SSE |
 | `agent_routing.py` | Inventaire Ollama, sélection de profil et détection du contexte sensible |

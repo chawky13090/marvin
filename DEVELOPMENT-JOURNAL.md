@@ -2884,3 +2884,42 @@ ignorée) :
 - Restaurer les constantes et fonctions de routage dans `agent.py`, retirer
   `agent_routing.py` et son test, puis revenir à `2.269.0`. Aucun schéma ni contenu utilisateur
   n'est modifié par cette tranche.
+
+## 2026-07-22 — v2.271.0 — Prompt système extrait et rendu déterministe
+
+### Contexte et décision
+
+- Isoler la construction du prompt sans modifier la boucle LLM ni les règles existantes.
+- Éliminer l'appel `locale.setlocale`, qui modifiait un état global partagé et dépendait des
+  locales installées sur chaque machine Windows.
+
+### Implémentation
+
+- Nouveau `backend/agent_prompt.py` : chemins utilisateur dynamiques, permissions, mémoires,
+  règles de comportement et date française.
+- `agent.py` conserve `_build_system_prompt` comme alias importé; les imports `os` et `Path`
+  devenus inutiles y sont retirés.
+- La date utilise des tables françaises immuables et accepte une horloge optionnelle pour les
+  tests, sans changer la signature utilisée par Marvin.
+- Nouveau `scripts/test_agent_prompt.py`, intégré aux contrôles npm, architecture et qualité.
+
+### Validation isolée réalisée avant versionnage
+
+- Profils Sécurisé, Standard, Expert et valeur inconnue : contrats vérifiés.
+- Chemins home/Bureau injectés depuis un faux poste Windows : vérifiés.
+- Mémoire présente/absente, règles anti-erreur, Code Workspace et français : vérifiés.
+- Date injectée du 22 juillet 2026 : résultat exact `mercredi 22 juillet 2026`.
+- Façade `_build_system_prompt` importable depuis `agent.py`, compilation ciblée réussie.
+
+### Rollback
+
+- Restaurer la fonction dans `agent.py`, supprimer `agent_prompt.py` et son test, puis revenir
+  à `2.270.0`. Aucun schéma, paramètre ou contenu utilisateur n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 52/52 étapes réussies; 124 fichiers Python compilés,
+  dépendances cohérentes, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.271.0`, Ollama disponible, 344/344 outils et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
+- Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
