@@ -3342,3 +3342,43 @@ ignorée) :
 - Backend réel redémarré : version `2.280.0`, Ollama disponible; frontend Turbopack HTTP 200.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - `agent.py` passe de 1 522 à 1 456 lignes et la préparation de tour reste accessible par façade.
+
+## 2026-07-22 — v2.281.0 — Plan de tour déterministe extrait
+
+### Constat et décision
+
+- Après la préparation de session, `run_agent` mélangeait encore les décisions déterministes
+  pré-LLM avec la résolution du modèle : interdiction d'outils, Council, reprise Workspace,
+  contrat Cortex et budgets.
+- Ces contraintes doivent être figées avant de donner sa liberté au modèle. Un `TurnPlan`
+  explicite est donc créé comme entrée stable du futur Runner.
+
+### Implémentation
+
+- Nouveau `backend/agent_planning.py` avec `TurnPlan` et `compile_turn_plan`.
+- Le module compile sans réseau ni stockage : outils cités, demande de commande sans exécution,
+  suppression d'outils, Council, route/mode/mission Workspace, axes Cortex et plafonds.
+- La règle de continuité reste stricte : si `code_workspace_control` reprend une mission, les
+  outils susceptibles de créer une autre mission sont retirés du plan.
+- `agent.py` projette temporairement le plan vers ses variables historiques; cette façade sera
+  supprimée seulement lorsque le Runner recevra directement l'objet typé.
+- `scripts/test_agent_planning.py` couvre contraintes combinées, suppression prioritaire,
+  budgets, reprise Workspace, outil explicitement cité et façade.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_planning.py`, `agent.py` et du test : réussie.
+- Tests `agent_planning`, `intent_guards`, `cortex` et `agent_session` : réussis.
+
+### Rollback
+
+- Revenir au commit v2.280 et replacer la compilation des contraintes au début de `run_agent`.
+  Aucun schéma, réglage, message ni contrat HTTP n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 61/61 étapes réussies; ESLint 0 erreur et
+  37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.281.0`, Ollama disponible; frontend Turbopack HTTP 200.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+- `agent.py` passe de 1 456 à 1 424 lignes; le plan est disponible par façade typée.

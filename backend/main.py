@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.281 — compilation déterministe du plan de tour extraite d'agent.py : intentions,
+# outils imposés/interdits, reprise Workspace, contrat Cortex et budgets avant le LLM.
 # v2.280 — préparation durable d'un tour extraite d'agent.py : session, message idempotent,
 # événements initiaux, captures et titrage avant toute orchestration LLM.
 # v2.279 — contexte de session extrait d'agent.py : compaction injectable, captures

@@ -8,20 +8,14 @@ import json
 import re
 import time
 import uuid
-from functools import partial
 from typing import AsyncIterator
 
 import httpx
 
 import cloud_routing as _cr
+import cortex as _cortex
 import database as db
-from intent_guard import (
-    skill_match_text, tool_suppression_reason, wants_command_text_only as _wants_command_text_only,
-    wants_model_council, workspace_followup,
-)
-from agent_policy import (
-    exact_tool_mentions_from_text,
-)
+from intent_guard import skill_match_text
 from agent_prompt import build_system_prompt as _build_system_prompt
 from agent_protocol import encode_sse as _sse, to_ollama_messages as _to_ollama_messages
 from agent_routing import (
@@ -56,6 +50,7 @@ from agent_context import (
     summarize_overflow as _conversation_summary,
 )
 from agent_session import prepare_turn as _prepare_turn, upgrade_title as _smart_title_upgrade
+from agent_planning import compile_turn_plan as _compile_turn_plan
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, DEFAULT_MODEL, MAX_CONTEXT_MESSAGES,
@@ -65,10 +60,6 @@ from config import (
 )
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
 
-_exact_tool_mentions_from_text = partial(
-    exact_tool_mentions_from_text,
-    tool_names={spec.get("function", {}).get("name", "") for spec in TOOLS_SPEC},
-)
 _validate_tool_args = validator_for(TOOLS_SPEC)
 _strip_accents = _cr.strip_accents
 
@@ -171,41 +162,18 @@ async def run_agent(
     _user_query = _prepared_turn.user_query
     for _turn_event in _prepared_turn.events:
         yield _sse(_turn_event)
-    # Outil(s) cité(s) explicitement par leur nom exact → imposés ce tour-ci, pas de substitution.
-    _explicit_tool_names = _exact_tool_mentions_from_text(_user_query)
-    # v2.185 — « donne-moi la commande » sans verbe d'exécution → outils d'exécution bloqués ce tour.
-    _command_text_only = _wants_command_text_only(_user_query)
-    # v2.190 — décisions déterministes AVANT le LLM. Une interdiction explicite, une
-    # réponse de quiz ou une création de questionnaire attendue dans le chat ne doivent
-    # proposer aucun outil, même si des mots comme « backup » ressemblent à une action.
-    _tool_suppression = tool_suppression_reason(messages, _user_query)
-    _required_tool_names = (
-        {"ai_model_council"}
-        if not _tool_suppression and wants_model_council(_user_query)
-        else set()
-    )
-    _workspace_norm = _strip_accents((_user_query or "").casefold())
-    _workspace_route = None if _tool_suppression else workspace_followup(messages, _user_query)
-    _workspace_mission_id = str((_workspace_route or {}).get("mission_id") or "")
-    _workspace_action = str((_workspace_route or {}).get("action") or "resume")
-    if _workspace_route:
-        _required_tool_names.add(_workspace_route["tool"])
-
-    # v2.224 — Cortex compile les six axes en contrat explicable. Auto reste sans outil
-    # sauf demande explicitement approfondie et complexe, non sensible, qui peut imposer
-    # l'équipe adaptative de lecture/recherche. Les interdictions déterministes gagnent.
-    import cortex as _cortex
-    _cortex_plan = _cortex.compile_contract(_user_query, cortex_contract)
-    _execution_budget = _cortex_plan["execution_budget"]
-    _max_tool_steps = int(_execution_budget["max_tool_steps"])
-    _max_wall_seconds = int(_execution_budget["max_wall_seconds"])
-    if not _tool_suppression:
-        _required_tool_names.update(_cortex_plan.get("forced_tools") or [])
-    if "code_workspace_control" in _required_tool_names:
-        # Une réparation d'une mission existante doit reprendre son snapshot. Relancer
-        # ai_code_forge ou créer une nouvelle mission ferait perdre l'état et les preuves.
-        _required_tool_names.discard("ai_code_forge")
-        _required_tool_names.discard("code_workspace_start")
+    _turn_plan = _compile_turn_plan(messages, _user_query, cortex_contract)
+    _explicit_tool_names = _turn_plan.explicit_tool_names
+    _command_text_only = _turn_plan.command_text_only
+    _tool_suppression = _turn_plan.tool_suppression
+    _required_tool_names = _turn_plan.required_tool_names
+    _workspace_norm = _turn_plan.workspace_norm
+    _workspace_route = _turn_plan.workspace_route
+    _workspace_mission_id = _turn_plan.workspace_mission_id
+    _workspace_action = _turn_plan.workspace_action
+    _cortex_plan = _turn_plan.cortex_plan
+    _max_tool_steps = _turn_plan.max_tool_steps
+    _max_wall_seconds = _turn_plan.max_wall_seconds
     yield _sse({"type": "cortex_contract", "contract": _cortex_plan})
 
     # v2.120 — Mode « Hyper sécurisé » : coupe-circuit lu UNE fois, prioritaire sur tout
