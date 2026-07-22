@@ -3501,3 +3501,50 @@ ignorée) :
   vers CRLF propres au checkout Windows sont présents.
 - `agent.py` passe de 1 275 à 1 240 lignes; les hooks historiques restent accessibles par
   façade et couverts par un test isolé.
+
+## 2026-07-22 — v2.285.0 — Transport Ollama typé
+
+### Constat et décision
+
+- `run_agent` construisait deux payloads HTTP, gérait les timeouts, décodait directement le
+  JSONL Ollama et traduisait les exceptions réseau. La boucle métier dépendait donc de détails
+  de transport impossibles à tester sans la charger en entier.
+- La frontière retenue est un adaptateur unique Ollama. Le protocole SSE reste volontairement
+  dans le Runner : il appartient au contrat frontend, pas au transport du fournisseur LLM.
+
+### Implémentation
+
+- Nouveau `backend/agent_transport.py` : `OllamaChatRequest`, `OllamaStreamEvent`, fabrique de
+  client, décodage JSONL, appel `/api/chat`, arrêt immédiat sur `done` et erreurs publiques.
+- La redondance défensive du système est conservée : champ top-level `system` et premier
+  message `role=system`. Le `keep_alive=30m` et les timeouts 300/120 secondes sont inchangés.
+- Le client reste partagé pour toutes les étapes d'outils. La synthèse après épuisement du
+  budget ouvre un client borné séparé et omet entièrement `tools`.
+- Nouveau `scripts/test_agent_transport.py` avec transport HTTP simulé : URL, payload, ligne
+  invalide, thinking, texte, outil, arrêt sur `done`, non-200 et projection des erreurs.
+
+### Alternatives comparées
+
+- Conserver HTTP dans `run_agent` limitait le changement mais maintenait le couplage et la
+  duplication. Introduire maintenant une abstraction multi-fournisseur aurait ajouté une
+  généralisation non requise. L'adaptateur Ollama dédié est le compromis le plus réversible.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_transport.py`, `agent.py` et du test : réussie.
+- Tests `agent_transport`, `agent_protocol` et `agent_runner` : réussis.
+- `agent.py` ne contient plus d'import `httpx`, d'appel `/api/chat` ni de boucle `aiter_lines`.
+
+### Rollback
+
+- Revenir au commit v2.284 et restaurer les deux appels HTTP dans `run_agent`. Aucun schéma,
+  réglage persistant ni format SSE n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 65/65 étapes réussies; compilation de 136 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 5800, version `2.285.0`, Ollama disponible et 15 workers
+  observés (13 actifs, 2 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js Turbopack inclus.
+- `agent.py` passe de 1 240 à 1 165 lignes; aucun détail HTTP/JSONL ne reste dans le Runner.

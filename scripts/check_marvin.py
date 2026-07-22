@@ -91,6 +91,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Politiques textuelles de l'agent", (python, "scripts/test_agent_policy.py")),
         Stage("Sécurité déterministe de l'agent", (python, "scripts/test_agent_safety.py")),
         Stage("Protocole messages Ollama et SSE", (python, "scripts/test_agent_protocol.py")),
+        Stage("Transport HTTP et JSONL Ollama", (python, "scripts/test_agent_transport.py")),
         Stage("Routage des profils et modeles", (python, "scripts/test_agent_routing.py")),
         Stage("Construction du prompt systeme", (python, "scripts/test_agent_prompt.py")),
         Stage("Selection bornee des outils LLM", (python, "scripts/test_agent_tool_selection.py")),

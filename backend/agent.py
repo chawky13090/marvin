@@ -1,7 +1,7 @@
 """
-SecretaryAI Backend — Agent de streaming.
-Appelle Ollama directement (HTTP), gère la boucle d'appel d'outils,
-et produit des événements SSE pour le frontend.
+SecretaryAI Backend — Runner agentique de streaming.
+Orchestre Ollama via l'adaptateur de transport, gère la boucle d'appel d'outils
+et produit les événements SSE du frontend.
 """
 import asyncio
 import json
@@ -9,8 +9,6 @@ import re
 import time
 import uuid
 from typing import AsyncIterator
-
-import httpx
 
 import cloud_routing as _cr
 import cortex as _cortex
@@ -57,6 +55,12 @@ from agent_observability import (
     ToolObservation as _ToolObservation,
     record_long_chain as _record_long_chain,
     record_tool_observation as _record_tool_observation,
+)
+from agent_transport import (
+    OllamaChatRequest as _OllamaChatRequest,
+    create_client as _create_ollama_client,
+    error_event as _ollama_error_event,
+    stream_chat as _stream_ollama_chat,
 )
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
@@ -481,11 +485,6 @@ async def run_agent(
         block = ("\n\n---\n🏛️ **Arbitrage Council 5 déclenché par désaccord**\n" + final) if final else ""
         return call_id, args, result, block
 
-    # Create ONE shared client for all tool-loop iterations (avoids TCP reconnect per step)
-    # Timeout: 300s total (5min) to handle slow first-load on cold models
-    # Read timeout: separate so initial connection is fast but reading can be long
-    _ollama_timeout = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=10.0)
-
     # NB : on NE force PAS num_ctx ici. Tester un num_ctx réduit (16K) a provoqué un RECHARGEMENT
     # du modèle à chaque message (Ollama indexe l'instance par (modèle, num_ctx) : le prewarm et
     # le « professeur » d'arrière-plan utilisent le défaut → conflit → thrash → 40s/message).
@@ -575,7 +574,7 @@ async def run_agent(
     else:
         ollama_msgs[0]["content"] = system_prompt
 
-    async with httpx.AsyncClient(timeout=_ollama_timeout) as _ollama_client:
+    async with _create_ollama_client(read_timeout=300.0) as _ollama_client:
       for step in range(_max_tool_steps):
         if not _runner_state.begin_step(step, _max_wall_seconds):
             break
@@ -583,89 +582,29 @@ async def run_agent(
         tool_calls_found: list[dict] = []
 
         try:
-            async with _ollama_client.stream(
-                    "POST",
-                    f"{OLLAMA_URL}/api/chat",
-                    json={
-                        "model":   active_model,
-                        "system":  system_prompt,
-                        "messages": ollama_msgs,
-                        "tools":   tools_payload,
-                        "stream":  True,
-                        "options": _ollama_options,
-                        # keep_alive: keeps the model in VRAM/RAM for 30 minutes after
-                        # the request finishes → no more cold-load on subsequent messages.
-                        # This is the #1 fix for the "Ollama timeout" issue.
-                        "keep_alive": "30m",
-                    },
-                ) as resp:
-                    if resp.status_code != 200:
-                        body = await resp.aread()
-                        yield _sse({"type": "error", "message": f"Ollama HTTP {resp.status_code}: {body.decode()[:200]}"})
-                        return
-
-                    async for line in resp.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            chunk = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-
-                        msg_part = chunk.get("message", {})
-                        token = msg_part.get("content", "")
-
-                        # v2.125 — certains modèles (notamment des modèles cloud "raisonneurs")
-                        # renvoient leur raisonnement dans un champ `thinking` SÉPARÉ de
-                        # `content`, avant la réponse/l'appel d'outil réel. Ce champ était
-                        # jusqu'ici totalement ignoré : l'utilisateur ne voyait RIEN défiler
-                        # pendant potentiellement plusieurs dizaines de secondes à plusieurs
-                        # minutes (jusqu'à 3min10 mesurées sur des conversations réelles),
-                        # ce qui donnait l'impression que Marvin restait bloqué à "réfléchir"
-                        # et poussait à annuler manuellement. On le relaie maintenant au
-                        # frontend comme un événement dédié (jamais mémorisé dans
-                        # full_content — ce n'est pas la réponse finale).
-                        thinking_token = msg_part.get("thinking", "")
-                        if thinking_token:
-                            yield _sse({"type": "thinking", "text": thinking_token})
-
-                        # Stream text tokens to frontend
-                        if token:
-                            full_content += token
-                            if not _blocking_outcomes:
-                                yield _sse({"type": "text", "text": token})
-
-                        # Tool calls arrive on the final chunk
-                        if msg_part.get("tool_calls"):
-                            tool_calls_found = msg_part["tool_calls"]
-
-                        if chunk.get("done"):
-                            break
-
-        except httpx.ConnectError:
-            yield _sse({"type": "error", "message": f"ConnectError: Impossible de contacter Ollama sur {OLLAMA_URL}. Relancez Marvin avec start.bat."})
-            return
-        except httpx.ReadTimeout:
-            yield _sse({"type": "error", "message": f"Délai d'attente dépassé (300s). Le modèle '{active_model}' est peut-être en train de charger en RAM (~30-60s la 1ère fois). Réessayez dans quelques secondes."})
-            return
-        except httpx.RemoteProtocolError as e:
-            yield _sse({"type": "error", "message": f"RemoteProtocolError: La connexion au modèle '{active_model}' a été coupée. Le modèle a probablement manqué de mémoire. Essayez un modèle plus léger (qwen2.5:3b) ou augmentez le swap Windows."})
-            return
-        except Exception as e:
-            # Build a meaningful error message even if str(e) is empty
-            err_msg = str(e).strip()
-            err_type = type(e).__name__
-            if not err_msg:
-                err_msg = f"Exception {err_type} sans message (le modèle {active_model} a peut-être planté ou Ollama a coupé la connexion)"
-            else:
-                err_msg = f"{err_type}: {err_msg}"
-            import traceback as _tb
-            yield _sse({
-                "type": "error",
-                "message": err_msg,
-                "detail": _tb.format_exc()[-500:],
-                "model": active_model,
-            })
+            _request = _OllamaChatRequest(
+                model=active_model,
+                system_prompt=system_prompt,
+                messages=ollama_msgs,
+                tools=tools_payload,
+                options=_ollama_options,
+            )
+            async for event in _stream_ollama_chat(_ollama_client, OLLAMA_URL, _request):
+                if event.kind == "thinking":
+                    yield _sse({"type": "thinking", "text": event.text})
+                elif event.kind == "text":
+                    full_content += event.text
+                    if not _blocking_outcomes:
+                        yield _sse({"type": "text", "text": event.text})
+                elif event.kind == "tool_calls":
+                    tool_calls_found = list(event.tool_calls)
+        except Exception as exc:
+            yield _sse(_ollama_error_event(
+                exc,
+                model=active_model,
+                base_url=OLLAMA_URL,
+                read_timeout=300,
+            ))
             return
 
         # ── Filet de sécurité : appels d'outils écrits en TEXTE/JSON ───────────
@@ -1154,32 +1093,18 @@ async def run_agent(
     )})
     full_content = ""
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)) as _final_client:
-            async with _final_client.stream(
-                    "POST",
-                    f"{OLLAMA_URL}/api/chat",
-                    json={
-                        "model":   active_model,
-                        "system":  system_prompt,
-                        "messages": ollama_msgs,
-                        "stream":  True,
-                        "options": _ollama_options,
-                        "keep_alive": "30m",
-                    },
-            ) as resp:
-                if resp.status_code == 200:
-                    async for line in resp.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            chunk = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        msg_part = chunk.get("message", {})
-                        token = msg_part.get("content", "")
-                        if token:
-                            full_content += token
-                            yield _sse({"type": "text", "text": token})
+        async with _create_ollama_client(read_timeout=120.0) as _final_client:
+            _final_request = _OllamaChatRequest(
+                model=active_model,
+                system_prompt=system_prompt,
+                messages=ollama_msgs,
+                tools=None,
+                options=_ollama_options,
+            )
+            async for event in _stream_ollama_chat(_final_client, OLLAMA_URL, _final_request):
+                if event.kind == "text":
+                    full_content += event.text
+                    yield _sse({"type": "text", "text": event.text})
     except Exception:
         pass
 

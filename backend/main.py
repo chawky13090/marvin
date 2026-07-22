@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.285 — transport Ollama extrait d'agent.py : payload typé, client partagé,
+# décodage JSONL, flux thinking/outils et projection stable des erreurs.
 # v2.284 — observabilité du Runner extraite d'agent.py : audit, journal SQLite,
 # preuves de mission et apprentissage du routage isolés en best-effort.
 # v2.283 — état observable du Runner extrait d'agent.py : étapes, durée, arrêt, outils,
