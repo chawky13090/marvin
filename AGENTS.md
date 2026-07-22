@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.287.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.288.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.287.0)
+## 9. État actuel (v2.288.0)
+
+**v2.288 (frontière SSH unique)** : les anciennes copies sans décorateur des modèles et
+fonctions SSH ont été retirées de `main.py` après vérification repo-wide. Les 11 contrats HTTP,
+le streaming SSE, le terminal PTY WebSocket et les transferts SFTP restent tous servis par
+`api/ssh.py`; le test d'architecture vérifie le module propriétaire de chaque endpoint.
+`main.py` passe de 5 018 à 4 687 lignes sans modifier le nombre de routes FastAPI.
 
 **v2.287 (domaine Mémoire)** : les quatre outils `memory_*` sont extraits de `tools.py` vers
 `tool_domains/memory.py` avec façade directe et registre strictement inchangé. Le domaine

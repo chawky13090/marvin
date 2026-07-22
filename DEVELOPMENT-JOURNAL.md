@@ -3635,3 +3635,45 @@ ignorée) :
   observés (12 actifs, 3 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont mémoires, paramètres,
   sauvegardes et accueil Next.js Turbopack.
+
+## 2026-07-22 — v2.288.0 — Frontière SSH unique dans api/ssh.py
+
+### Constat et décision
+
+- `main.py` conservait encore les modèles et douze fonctions SSH marqués « migrés vers
+  api/ssh.py ». Ils n'avaient plus aucun décorateur FastAPI et aucune référence dans le dépôt,
+  mais dupliquaient CRUD, test, commande, SSE, PTY WebSocket et SFTP.
+- Les garder créait deux sources de vérité dont une seule était réellement exécutée. Après
+  vérification des routes actives, les copies mortes sont supprimées plutôt que maintenues.
+
+### Implémentation
+
+- Retrait de `SSHConnectionCreate`, `SSHConnectionUpdate`, `SSHCommandRequest` et des copies
+  de fonctions SSH dans `main.py`; retrait des imports `io`, `security`, `WebSocket` et
+  `WebSocketDisconnect` devenus inutilisés dans ce fichier.
+- Aucun code de `api/ssh.py` n'est modifié : garde de commande, clé multi-format, streaming,
+  PTY et transferts restent inchangés.
+- Nouveau `scripts/test_ssh_router_boundary.py` : les 11 contrats HTTP attendus et le chemin
+  WebSocket doivent exister et chaque endpoint doit appartenir au module `api.ssh`.
+
+### Validation isolée réalisée avant versionnage
+
+- Recherche repo-wide : aucune référence externe aux copies supprimées.
+- Compilation de `main.py`, `api/ssh.py` et du test : réussie.
+- Test de frontière SSH : 11 contrats HTTP, WebSocket et propriétaire de module réussis.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 5 018 à 4 687 lignes.
+
+### Rollback
+
+- Revenir au commit v2.287 réintroduit uniquement les copies mortes; le routeur actif et les
+  données ne changent pas. Aucun schéma, secret, connexion SSH ni contrat HTTP n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 68/68 étapes réussies; compilation de 138 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 34016, version `2.288.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont les connexions SSH masquées
+  et l'accueil Next.js Turbopack.

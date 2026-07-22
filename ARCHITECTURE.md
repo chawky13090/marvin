@@ -124,6 +124,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 20. l'observabilité du Runner : une panne de métrique, preuve ou apprentissage ne peut pas invalider une action exécutée.
 21. le transport Ollama : payload, timeouts, JSONL et erreurs restent indépendants du Runner et du SSE frontend.
 22. les domaines d'outils : chaque extraction préserve l'identité des fonctions du registre et l'égalité stricte des 344 implémentations/spécifications.
+23. le routeur SSH : toutes les routes HTTP, SSE, WebSocket et SFTP appartiennent exclusivement à `api/ssh.py`; aucune copie de fonction ne subsiste dans `main.py`.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
