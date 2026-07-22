@@ -3719,3 +3719,45 @@ ignorée) :
   observés (13 actifs, 2 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont connexions masquées,
   orchestrateur e-mail et accueil Next.js Turbopack.
+
+## 2026-07-22 — v2.290.0 — Frontière de la boîte e-mail
+
+### Constat et décision
+
+- Après les comptes, `main.py` portait encore neuf opérations IMAP/SMTP cohérentes et leurs
+  détails d'exécution bloquante. Elles partageaient toutes la résolution de compte désormais
+  centralisée et pouvaient être extraites sans toucher à l'automatisation IA.
+- Un routeur de boîte séparé est retenu; comptes, boîte et automatisation restent trois
+  responsabilités distinctes au lieu d'un unique module e-mail massif.
+
+### Implémentation
+
+- Nouveau `backend/api/email_mailbox.py` : boîte simple/unifiée, lecture, recherche, dossiers,
+  envoi, suppression, marquage, déplacement et pièce jointe.
+- La résolution OAuth ou mot de passe passe exclusivement par `email_account_service`; les
+  appels IMAP/SMTP bloquants restent exécutés dans l'executor asyncio.
+- La journalisation SQLite de `email_send` et le nom de compte `_account` dans les résultats
+  unifiés sont préservés.
+- Nouveau `scripts/test_email_mailbox_boundary.py` : agrégation multi-boîtes, envoi/audit,
+  pièce jointe UTF-8, refus sans compte et propriété exacte des neuf routes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du routeur, de `main.py` et du test : réussie.
+- Tests boîte, comptes et orchestrateur e-mail : réussis sans connexion externe.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 4 593 à 4 390 lignes.
+
+### Rollback
+
+- Revenir au commit v2.289 et replacer les neuf routes dans `main.py`. Aucun compte, message,
+  pièce jointe, schéma, contrat HTTP ou mode d'authentification n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 70/70 étapes réussies; compilation de 141 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 31992, version `2.290.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
+  connexions masquées et accueil Next.js Turbopack.

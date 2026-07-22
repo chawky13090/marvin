@@ -27,6 +27,7 @@ from api.conversations import router as conversations_router
 from api.content import router as content_router
 from api.connections import router as connections_router
 from api.email_accounts import router as email_accounts_router
+from api.email_mailbox import router as email_mailbox_router
 from api.cortex import router as cortex_router
 from api.cron_monitor import router as cron_monitor_router
 from api.ssh import router as ssh_router
@@ -94,9 +95,9 @@ from cron_runtime import (
     drain_run_agent as _drain_run_agent,
     long_task_resume_tick as _long_task_resume_tick,
 )
-from email_account_service import get_resolved as _get_email_config
-from email_account_service import list_resolved as _get_email_accounts
 
+# v2.290 — frontière boîte e-mail extraite : neuf routes IMAP/SMTP multi-comptes,
+# envoi audité, mutations, recherche et téléchargement de pièce jointe.
 # v2.289 — frontière comptes e-mail extraite : sept routes de configuration,
 # multi-comptes et test, avec service partagé de résolution et masquage des secrets.
 # v2.288 — copies SSH mortes retirées de main.py après migration : les 11 routes HTTP,
@@ -2979,6 +2980,7 @@ app.include_router(skills_router)
 app.include_router(content_router)
 app.include_router(connections_router)
 app.include_router(email_accounts_router)
+app.include_router(email_mailbox_router)
 app.include_router(cron_monitor_router)
 app.include_router(ssh_router)
 app.include_router(storage_router)
@@ -3333,196 +3335,6 @@ async def get_best_cloud_model(need: str = "general"):
 # Email Manager (IMAP + SMTP)
 # ══════════════════════════════════════════════════════════════════════════════
 
-import email_manager as _em
-
-
-class SendEmailRequest(BaseModel):
-    to: str
-    subject: str
-    body: str
-    cc: str = ""
-    reply_to: str = ""
-    html_body: str = ""
-
-
-@app.get("/api/email/inbox")
-async def email_inbox(folder: str = "INBOX", limit: int = 30, offset: int = 0, account: str | None = None):
-    loop = _asyncio.get_running_loop()
-    # ── Boîte UNIFIÉE : agrège toutes les boîtes (account=__all__) ──
-    if account == "__all__":
-        accts = _get_email_accounts()
-        if not accts:
-            return {"error": "Email non configuré", "emails": []}
-
-        async def _fetch_one(a):
-            try:
-                ems = await loop.run_in_executor(None, lambda: _em.fetch_inbox(
-                    a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                    folder=folder, limit=limit, offset=0))
-                for e in ems:
-                    e["_account"] = a["username"]
-                return ems
-            except Exception:
-                return []
-
-        results = await _asyncio.gather(*[_fetch_one(a) for a in accts])
-        merged = [e for sub in results for e in sub]
-        merged.sort(key=lambda e: e.get("date") or "", reverse=True)
-        return {"emails": merged[: max(limit, 30) * 2], "folder": folder, "unified": True}
-
-    # ── Boîte unique ──
-    cfg = _get_email_config(account)
-    if not cfg:
-        return {"error": "Email non configuré", "emails": []}
-    def _fetch():
-        ems = _em.fetch_inbox(
-            cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-            folder=folder, limit=limit, offset=offset,
-        )
-        for e in ems:
-            e["_account"] = cfg["username"]
-        return ems
-    try:
-        emails = await loop.run_in_executor(None, _fetch)
-        return {"emails": emails, "folder": folder}
-    except Exception as e:
-        return {"error": str(e), "emails": []}
-
-
-@app.get("/api/email/read/{uid}")
-async def email_read(uid: str, folder: str = "INBOX", account: str | None = None):
-    cfg = _get_email_config(account)
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Email non configuré")
-    def _fetch():
-        return _em.fetch_email(
-            cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-            uid=uid, folder=folder,
-        )
-    try:
-        return await _asyncio.get_running_loop().run_in_executor(None, _fetch)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/email/search")
-async def email_search(q: str, folder: str = "INBOX", limit: int = 20, account: str | None = None):
-    loop = _asyncio.get_running_loop()
-    # Recherche unifiée sur toutes les boîtes
-    if account == "__all__":
-        accts = _get_email_accounts()
-        async def _search_one(a):
-            try:
-                rs = await loop.run_in_executor(None, lambda: _em.search_emails(
-                    a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                    query=q, folder=folder, limit=limit))
-                for e in rs:
-                    e["_account"] = a["username"]
-                return rs
-            except Exception:
-                return []
-        results = await _asyncio.gather(*[_search_one(a) for a in accts])
-        merged = [e for sub in results for e in sub]
-        merged.sort(key=lambda e: e.get("date") or "", reverse=True)
-        return {"results": merged, "unified": True}
-
-    cfg = _get_email_config(account)
-    if not cfg:
-        return {"results": [], "error": "Email non configuré"}
-    def _search():
-        rs = _em.search_emails(
-            cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-            query=q, folder=folder, limit=limit,
-        )
-        for e in rs:
-            e["_account"] = cfg["username"]
-        return rs
-    try:
-        results = await loop.run_in_executor(None, _search)
-        return {"results": results}
-    except Exception as e:
-        return {"results": [], "error": str(e)}
-
-
-@app.get("/api/email/folders")
-async def email_folders(account: str | None = None):
-    cfg = _get_email_config(account)
-    if not cfg:
-        return {"folders": []}
-    def _list():
-        return _em.list_folders(
-            cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"]
-        )
-    try:
-        folders = await _asyncio.get_running_loop().run_in_executor(None, _list)
-        return {"folders": folders}
-    except Exception as e:
-        return {"folders": [], "error": str(e)}
-
-
-@app.post("/api/email/send")
-async def email_send(body: SendEmailRequest, account: str | None = None):
-    cfg = _get_email_config(account)
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Email non configuré")
-    def _send():
-        return _em.send_email(
-            cfg["smtp_host"], cfg["smtp_port"], cfg["username"], cfg["password"],
-            to=body.to, subject=body.subject, body=body.body,
-            cc=body.cc, reply_to=body.reply_to, html_body=body.html_body,
-        )
-    try:
-        result = await _asyncio.get_running_loop().run_in_executor(None, _send)
-        db.log_execution("email_send", {"to": body.to, "subject": body.subject}, result, 0)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.delete("/api/email/{uid}")
-async def email_delete(uid: str, folder: str = "INBOX", account: str | None = None):
-    cfg = _get_email_config(account)
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Email non configuré")
-    def _del():
-        _em.delete_email(
-            cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-            uid=uid, folder=folder,
-        )
-    await _asyncio.get_running_loop().run_in_executor(None, _del)
-    return {"success": True}
-
-
-@app.post("/api/email/mark")
-async def email_mark(uid: str, seen: bool = True, folder: str = "INBOX", account: str | None = None):
-    """Marque un email comme lu/non lu."""
-    cfg = _get_email_config(account)
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Email non configuré")
-    def _m():
-        _em.mark_email(cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-                       uid=uid, folder=folder, seen=seen)
-    try:
-        await _asyncio.get_running_loop().run_in_executor(None, _m)
-        return {"success": True, "seen": seen}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/email/move")
-async def email_move(uid: str, dest: str, folder: str = "INBOX", account: str | None = None):
-    """Déplace un email vers un autre dossier (archiver = déplacer vers Archive/All Mail)."""
-    cfg = _get_email_config(account)
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Email non configuré")
-    def _mv():
-        _em.move_email(cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-                       uid=uid, dest_folder=dest, folder=folder)
-    try:
-        await _asyncio.get_running_loop().run_in_executor(None, _mv)
-        return {"success": True, "dest": dest}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Signatures (par boîte) ────────────────────────────────────────────────────
@@ -3863,24 +3675,6 @@ async def email_to_task(body: SummarizeRequest):
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     return result
-
-
-@app.get("/api/email/attachment")
-async def email_attachment(uid: str, name: str = "", account: str | None = None, folder: str = "INBOX"):
-    """Télécharge une pièce jointe d'un email."""
-    cfg = _get_email_config(account)
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Email non configuré")
-    def _f():
-        return _em.fetch_attachment(cfg["imap_host"], cfg["imap_port"], cfg["username"], cfg["password"],
-                                    uid=uid, name=name, folder=folder)
-    att = await _asyncio.get_running_loop().run_in_executor(None, _f)
-    if not att or not att.get("data"):
-        raise HTTPException(status_code=404, detail="Pièce jointe introuvable")
-    import urllib.parse as _up
-    fn = _up.quote(att["name"] or "piece_jointe")
-    return Response(content=att["data"], media_type=att.get("content_type", "application/octet-stream"),
-                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn}"})
 
 
 @app.get("/api/email/attachment/summary")

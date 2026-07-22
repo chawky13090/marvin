@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.289.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.290.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.289.0)
+## 9. État actuel (v2.290.0)
+
+**v2.290 (frontière boîte e-mail)** : boîte simple/unifiée, lecture, recherche, dossiers,
+envoi, suppression, marquage, déplacement et téléchargement de pièce jointe sont extraits de
+`main.py` vers `api/email_mailbox.py`. Les neuf routes utilisent le service multi-comptes
+commun, préservent l'exécution IMAP/SMTP hors de la boucle asyncio et la journalisation de
+l'envoi. Les opérations IA/automatisation restent séparées et inchangées. `main.py` passe à
+4 390 lignes, avec 346 routes conservées.
 
 **v2.289 (frontière comptes e-mail)** : providers, lecture/écriture de configuration,
 liste/ajout/retrait multi-comptes et test de connexion sont extraits de `main.py` vers
