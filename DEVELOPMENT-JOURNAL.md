@@ -3881,6 +3881,35 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont SSH, Code Workspace et
   accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.298.0 — Domaine d'outils SSH
+
+### Constat et décision
+
+- Après extraction du transport, neuf outils SSH restaient dans `tools.py` et le routeur
+  dépendait du registre pour parcourir un dossier et obtenir le diagnostic serveur.
+- Un domaine unique est retenu afin que l'API et le registre partagent les mêmes garde-fous,
+  confirmations, résolutions de cibles et transferts, sans appel circulaire.
+
+### Implémentation et validation isolée
+
+- Nouveau `tool_domains/ssh.py`; `tools.py` injecte chemins, format de taille et dossier home,
+  puis réexporte directement les neuf fonctions.
+- `api/ssh.py` appelle le domaine pour browse/info et n'importe plus `tools.py`.
+- Nouveau test : secrets, port, confirmation, garde, exécution simulée, fermeture du client,
+  identité 344/344 et absence du cycle API. Tests transport, routeur et architecture réussis.
+- `tools.py` passe de 20 555 à 20 197 lignes; 346 routes et 344 outils sont conservés.
+
+### Rollback
+
+- Revenir au commit v2.297. Aucune connexion, clé, commande, fichier ou donnée n'est migrée.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 78/78 étapes réussies; compilation de 151 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 19244, version `2.298.0`, Ollama disponible et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-22 — v2.296.0 — Domaine d'outils Média
 
 ### Constat et décision

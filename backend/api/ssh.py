@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import database as db
 import security
 import ssh_transport
-import tools as tool_module
+from tool_domains import ssh as ssh_domain
 
 router = APIRouter()
 
@@ -235,14 +235,14 @@ async def ssh_shell_ws(websocket: WebSocket, sid: str):
 async def browse_ssh(sid: str, path: str = "."):
     if not db.get_ssh_connection(sid):
         raise HTTPException(status_code=404, detail="Connexion introuvable")
-    return await tool_module.execute_ssh_list_dir({"connection_id": sid, "remote_path": path})
+    return await ssh_domain.list_dir({"connection_id": sid, "remote_path": path})
 
 
 @router.get("/api/ssh/{sid}/info")
 async def ssh_server_info(sid: str):
     if not db.get_ssh_connection(sid):
         raise HTTPException(status_code=404, detail="Connexion introuvable")
-    return await tool_module.execute_ssh_server_info({"connection_id": sid})
+    return await ssh_domain.server_info({"connection_id": sid})
 
 
 @router.get("/api/ssh/{sid}/download")

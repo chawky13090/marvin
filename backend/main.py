@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.298 — neuf outils SSH extraits dans tool_domains/ssh.py; api/ssh.py consomme
+# directement ce domaine et ne dépend plus du registre tools.py.
 # v2.297 — transport SSH partagé extrait : API et outils utilisent ssh_transport.py pour
 # les clés privées et connexions Paramiko, sans dépendre des helpers privés de tools.py.
 # v2.296 — domaine média extrait de tools.py : 11 outils vidéo/GIF et 6 outils audio

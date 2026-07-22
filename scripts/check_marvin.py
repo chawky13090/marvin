@@ -112,6 +112,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine d'outils Mémoire", (python, "scripts/test_tool_domain_memory.py")),
         Stage("Domaine d'outils Média", (python, "scripts/test_tool_domain_media.py")),
         Stage("Transport SSH partagé", (python, "scripts/test_ssh_transport.py")),
+        Stage("Domaine d'outils SSH", (python, "scripts/test_tool_domain_ssh.py")),
         Stage("Frontière unique du routeur SSH", (python, "scripts/test_ssh_router_boundary.py")),
         Stage("Frontière des comptes e-mail", (python, "scripts/test_email_accounts_boundary.py")),
         Stage("Frontière de la boîte e-mail", (python, "scripts/test_email_mailbox_boundary.py")),

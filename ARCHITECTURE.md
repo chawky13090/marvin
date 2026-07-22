@@ -49,7 +49,7 @@ flowchart LR
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
-| `tool_domains/` | Implémentations métier extraites (Quiz, Base IT, Tâches/Notes, Mémoire, Média); `tools.py` conserve la façade et les contrats publics pendant la migration |
+| `tool_domains/` | Implémentations métier extraites (Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
@@ -139,6 +139,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 30. la génération vidéo IA locale : capacités, modèles, SSE texte/image, annulation et amélioration du prompt appartiennent à `api/video_local.py`; les fichiers uploadés sont nettoyés sur toute sortie du stream.
 31. les outils média : les 11 actions vidéo/GIF et 6 actions audio appartiennent à `tool_domains/media.py`; la façade injecte son résolveur de chemins et préserve les 17 identités du registre.
 32. le transport SSH : l'API et les outils utilisent `ssh_transport.py`; aucune route ne dépend d'un helper SSH privé de `tools.py`.
+33. le domaine SSH : cibles, commandes, scripts et transferts appartiennent à `tool_domains/ssh.py`; `api/ssh.py` ne dépend plus de `tools.py` et les neuf identités du registre sont préservées.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
