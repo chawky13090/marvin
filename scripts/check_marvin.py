@@ -114,6 +114,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Frontière des comptes e-mail", (python, "scripts/test_email_accounts_boundary.py")),
         Stage("Frontière de la boîte e-mail", (python, "scripts/test_email_mailbox_boundary.py")),
         Stage("Frontière des préférences e-mail", (python, "scripts/test_email_preferences_boundary.py")),
+        Stage("Frontière IA et automatisation e-mail", (python, "scripts/test_email_automation_boundary.py")),
         Stage("Garde-fous d'intention", (python, "scripts/test_intent_guards.py")),
         Stage("Council Cloud et provenance", (python, "scripts/test_council.py")),
         Stage("Mode Ultra strictement cloud", (python, "scripts/test_cloud_only_routing.py")),

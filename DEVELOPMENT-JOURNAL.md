@@ -3762,6 +3762,47 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
   connexions masquées et accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.292.0 — Frontière IA et automatisation e-mail
+
+### Constat et décision
+
+- Les dernières routes e-mail de `main.py` combinaient appels IA, configuration du scheduler,
+  drafts et outbox. Cette responsabilité est distincte des comptes, de la boîte et des
+  préférences déjà extraits.
+- Le routeur dédié conserve la délégation aux outils existants : aucune seconde implémentation
+  d'envoi, de résumé ou d'orchestration n'est introduite.
+
+### Implémentation
+
+- Nouveau `backend/api/email_automation.py` : 13 routes et trois modèles Pydantic.
+- Le premier passage `scheduler_enabled=false` vers `true` reste refusé en HTTP 409 sans
+  `scheduler_confirmed`; ce champ de confirmation est exclu des données persistées.
+- Les limites restent 2–1440 minutes, 1–100 réponses et 1–1440 minutes de délai. Les listes
+  anciennes sérialisées en JSON restent acceptées défensivement.
+- Nouveau `scripts/test_email_automation_boundary.py` : confirmation, bornes, profils,
+  arguments outils, dry-run, outbox et propriété exacte des 13 routes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du routeur, de `main.py` et du test : réussie.
+- Tests frontière et orchestrateur e-mail : réussis sans envoi ni accès réseau.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 4 287 à 4 108 lignes.
+
+### Rollback
+
+- Revenir au commit v2.291 et replacer les 13 routes dans `main.py`. Aucun compte, profil,
+  draft, envoi différé, schéma, contrat HTTP ou garde de confirmation n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 72/72 étapes réussies; compilation de 143 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 3372, version `2.292.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
+  planification et accueil Next.js Turbopack.
+
 ## 2026-07-22 — v2.291.0 — Frontière des préférences e-mail
 
 ### Constat et décision

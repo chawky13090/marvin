@@ -29,6 +29,7 @@ from api.connections import router as connections_router
 from api.email_accounts import router as email_accounts_router
 from api.email_mailbox import router as email_mailbox_router
 from api.email_preferences import router as email_preferences_router
+from api.email_automation import router as email_automation_router
 from api.cortex import router as cortex_router
 from api.cron_monitor import router as cron_monitor_router
 from api.ssh import router as ssh_router
@@ -97,6 +98,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.292 — IA et automatisation e-mail extraites : brouillons, résumés, digest,
+# profils, confirmation du planificateur, drafts et outbox dans 13 routes dédiées.
 # v2.291 — préférences e-mail extraites : signatures, modèles, surveillance,
 # alertes et règles dans un routeur persistant dédié de 13 contrats.
 # v2.290 — frontière boîte e-mail extraite : neuf routes IMAP/SMTP multi-comptes,
@@ -2985,6 +2988,7 @@ app.include_router(connections_router)
 app.include_router(email_accounts_router)
 app.include_router(email_mailbox_router)
 app.include_router(email_preferences_router)
+app.include_router(email_automation_router)
 app.include_router(cron_monitor_router)
 app.include_router(ssh_router)
 app.include_router(storage_router)
@@ -3404,189 +3408,6 @@ async def run_proactive_now(kind: str = "morning"):
 # ── Documents (RAG : parle à tes documents) ────────────────────────────────────
 # ── Agenda local (événements) ─────────────────────────────────────────────────
 # ── Agendas connectés (abonnements iCal) ────────────────────────────────────────
-class DraftReplyRequest(BaseModel):
-    uid: str = ""
-    body: str = ""
-    subject: str = ""
-    from_: str = Field("", alias="from")
-    instruction: str = ""
-    tone: str = ""
-    folder: str = "INBOX"
-    account: str = ""
-    model_config = {"populate_by_name": True}
-
-
-@app.post("/api/email/draft-reply")
-async def email_draft_reply(body: DraftReplyRequest):
-    """Génère par IA un brouillon de réponse (ne l'envoie pas)."""
-    args = {
-        "uid": body.uid, "body": body.body, "subject": body.subject,
-        "from": body.from_, "instruction": body.instruction, "tone": body.tone,
-        "folder": body.folder, "account": body.account or None,
-    }
-    result = await tool_module.TOOLS_REGISTRY["email_draft_reply"](args)
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
-
-
-class SummarizeRequest(BaseModel):
-    uid: str = ""
-    body: str = ""
-    subject: str = ""
-    from_: str = Field("", alias="from")
-    folder: str = "INBOX"
-    account: str = ""
-    model_config = {"populate_by_name": True}
-
-
-@app.post("/api/email/summarize")
-async def email_summarize(body: SummarizeRequest):
-    """Résume un email par IA."""
-    args = {"uid": body.uid, "body": body.body, "subject": body.subject,
-            "from": body.from_, "folder": body.folder, "account": body.account or None}
-    result = await tool_module.TOOLS_REGISTRY["email_summarize"](args)
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
-
-
-@app.get("/api/email/digest")
-async def email_digest(account: str | None = None, limit: int = 15, folder: str = "INBOX"):
-    """Briefing IA priorisé de la boîte (ou de toutes via account=__all__)."""
-    result = await tool_module.TOOLS_REGISTRY["email_digest"](
-        {"account": account, "limit": limit, "folder": folder})
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
-
-
-# ── Assistant email automatique (3 modes) ────────────────────────────────────
-class AutomationConfig(BaseModel):
-    mode: str = "manuel"                 # manuel | brouillon | differe | autonome
-    accounts: list[str] = Field(default_factory=list)
-    instructions: str = ""
-    tone: str = "professionnel, clair et courtois"
-    signature: str = ""
-    only_from: list[str] = Field(default_factory=list)
-    never_from: list[str] = Field(default_factory=list)
-    skip_keywords: list[str] = Field(default_factory=list)
-    max_per_run: int = 5
-    send_delay_min: int = 5
-    scheduler_enabled: bool = False
-    scheduler_confirmed: bool = False
-    interval_min: int = 5
-    profiles: dict[str, dict] = Field(default_factory=dict)
-
-
-@app.get("/api/email/automation")
-async def get_email_automation():
-    cfg = db.get_setting("email_automation")
-    if isinstance(cfg, str):
-        import json as _json
-        try: cfg = _json.loads(cfg)
-        except Exception: cfg = None
-    if not isinstance(cfg, dict):
-        cfg = {"mode": "manuel"}
-    return {"scheduler_enabled": False, "interval_min": 5, "profiles": {}, **cfg}
-
-
-@app.post("/api/email/automation")
-async def set_email_automation(body: AutomationConfig):
-    previous = db.get_setting("email_automation") or {}
-    if isinstance(previous, str):
-        try: previous = json.loads(previous)
-        except Exception: previous = {}
-    was_enabled = bool(previous.get("scheduler_enabled")) if isinstance(previous, dict) else False
-    if body.scheduler_enabled and not was_enabled and not body.scheduler_confirmed:
-        raise HTTPException(status_code=409, detail="Confirmation explicite requise pour activer les envois automatiques en arrière-plan.")
-    data = body.model_dump(exclude={"scheduler_confirmed"})
-    data["interval_min"] = max(2, min(int(data["interval_min"]), 1440))
-    data["max_per_run"] = max(1, min(int(data["max_per_run"]), 100))
-    data["send_delay_min"] = max(1, min(int(data["send_delay_min"]), 1440))
-    db.set_setting("email_automation", data)
-    return {"success": True, "mode": body.mode, "scheduler_enabled": body.scheduler_enabled}
-
-
-@app.post("/api/email/automation/run")
-async def run_email_automation(dry_run: bool = False, mode: str | None = None):
-    """Lance le traitement maintenant (brouillons ou envoi autonome selon le mode)."""
-    result = await tool_module.TOOLS_REGISTRY["email_automation_run"](
-        {"dry_run": dry_run, "mode": mode, "source": "manual"})
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
-
-
-@app.get("/api/email/automation/status")
-async def email_automation_status():
-    cfg = tool_module._email_automation_cfg()
-    history = db.get_setting("email_automation_runs") or []
-    if not isinstance(history, list):
-        history = []
-    return {
-        "scheduler_enabled": cfg.get("scheduler_enabled", False),
-        "interval_min": cfg.get("interval_min", 5),
-        "selected_accounts": cfg.get("accounts", []),
-        "last_run": history[-1] if history else None,
-    }
-
-
-@app.get("/api/email/automation/drafts")
-async def get_pending_drafts():
-    drafts = db.get_setting("email_pending_drafts")
-    if isinstance(drafts, str):
-        import json as _json
-        try: drafts = _json.loads(drafts)
-        except Exception: drafts = []
-    return {"drafts": drafts if isinstance(drafts, list) else []}
-
-
-@app.post("/api/email/automation/drafts/clear")
-async def clear_pending_drafts():
-    db.set_setting("email_pending_drafts", [])
-    return {"success": True}
-
-
-@app.get("/api/email/automation/outbox")
-async def get_email_automation_outbox():
-    outbox = db.get_setting("email_scheduled_outbox") or []
-    return {"outbox": outbox if isinstance(outbox, list) else []}
-
-
-@app.delete("/api/email/automation/outbox/{item_id}")
-async def cancel_email_automation_outbox(item_id: str):
-    outbox = db.get_setting("email_scheduled_outbox") or []
-    if not isinstance(outbox, list):
-        outbox = []
-    remaining = [item for item in outbox if item.get("id") != item_id]
-    if len(remaining) == len(outbox):
-        raise HTTPException(status_code=404, detail="Envoi différé introuvable")
-    db.set_setting("email_scheduled_outbox", remaining)
-    return {"success": True, "cancelled": item_id}
-
-
-@app.post("/api/email/to-task")
-async def email_to_task(body: SummarizeRequest):
-    """Transforme un email en tâche actionnable (IA)."""
-    args = {"uid": body.uid, "body": body.body, "subject": body.subject,
-            "from": body.from_, "folder": body.folder, "account": body.account or None}
-    result = await tool_module.TOOLS_REGISTRY["email_to_task"](args)
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
-
-
-@app.get("/api/email/attachment/summary")
-async def email_attachment_summary(uid: str, name: str = "", account: str | None = None, folder: str = "INBOX"):
-    """Résume par IA une pièce jointe (PDF, Word, texte)."""
-    result = await tool_module.TOOLS_REGISTRY["email_attachment_summary"](
-        {"uid": uid, "name": name, "account": account or None, "folder": folder})
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Multi-agents — exécution parallèle d'outils avec SSE
 # ══════════════════════════════════════════════════════════════════════════════
