@@ -51,9 +51,10 @@ from agent_context import (
 )
 from agent_session import prepare_turn as _prepare_turn, upgrade_title as _smart_title_upgrade
 from agent_planning import compile_turn_plan as _compile_turn_plan
+from agent_model_config import resolve_model_config as _resolve_model_config
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
-    OLLAMA_URL, DEFAULT_MODEL, MAX_CONTEXT_MESSAGES,
+    OLLAMA_URL, MAX_CONTEXT_MESSAGES,
     PERMISSION_SECURE, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
     SECURE_BLOCKED_TOOLS, DANGEROUS_TOOLS,
     MODEL_PROFILES,
@@ -61,7 +62,6 @@ from config import (
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
 
 _validate_tool_args = validator_for(TOOLS_SPEC)
-_strip_accents = _cr.strip_accents
 
 # Conserve les références des tâches d'apprentissage en arrière-plan (anti-GC).
 _BG_LEARN_TASKS: set = set()
@@ -176,135 +176,21 @@ async def run_agent(
     _max_wall_seconds = _turn_plan.max_wall_seconds
     yield _sse({"type": "cortex_contract", "contract": _cortex_plan})
 
-    # v2.120 — Mode « Hyper sécurisé » : coupe-circuit lu UNE fois, prioritaire sur tout
-    # (auto-routing cloud ci-dessous ET sélection manuelle d'un modèle cloud).
-    _lockdown = _is_local_only_lockdown()
-    # v2.121 — Mode « Ultra débridé » : désactive SEULEMENT la détection de sensibilité
-    # (choix de confidentialité assumé par l'utilisateur), jamais le garde-fou système de
-    # security.py. _lockdown reste prioritaire si jamais les deux étaient actifs ensemble
-    # (ne devrait pas arriver via l'UI, les presets sont mutuellement exclusifs, mais un
-    # verrou de sécurité doit toujours gagner par défense en profondeur).
-    _ultra = (not _lockdown) and _is_ultra_unrestricted()
-
-    # ── Sélection intelligente du modèle ─────────────────────────────────────
-    if not model or model == "auto":
-        # Mode automatique : détecter le profil optimal
-        await _refresh_model_cache()
-        profile_name, active_model, temperature = _detect_profile(messages)
-        # v2.119 — Ollama Cloud (opt-in, désactivé par défaut) : bascule vers un modèle
-        # cloud SEULEMENT si ce tour ne touche aucune donnée sensible (cf. commentaire sur
-        # _SENSITIVE_TOOL_PREFIXES plus haut) — SAUF en mode Ultra débridé (v2.121), qui
-        # ignore délibérément cette vérification. Un choix de modèle MANUEL par l'utilisateur
-        # (branche else ci-dessous) n'est jamais réécrit ici — seule la protection mid-boucle
-        # plus bas s'applique alors, en dernier recours.
-        _cloud_enabled, _cloud_overrides = _get_cloud_config()
-        if _cloud_enabled and not _lockdown and profile_name in _cloud_overrides:
-            _text_norm = _strip_accents((_user_query or "").lower())
-            if _ultra or not _is_sensitive_request(messages, _text_norm):
-                configured_cloud = _cloud_overrides[profile_name]
-                installed_cloud = _cr.list_installed_cloud_models()
-                active_model = (
-                    configured_cloud if configured_cloud in installed_cloud
-                    else (_cr.pick_best_cloud_model("general") or active_model)
-                )
-                # v2.141/v2.179 — routage par TÂCHE prioritaire sur le routage par PROFIL : un
-                # signal clair (ex. demande de script/procédure) route vers le modèle
-                # cloud le plus fort en code plutôt que le généraliste agentique du
-                # profil. Résolu EN DIRECT sur les modèles installés (pick_best_cloud_model),
-                # plus jamais via un tag figé dans un réglage — un modèle cloud peut être
-                # retiré par le fournisseur en quelques jours (constaté en réel, v2.179).
-                _task = _cr.detect_task(_user_query)
-                if _task:
-                    _picked = _cr.pick_best_cloud_model(_task)
-                    if _picked:
-                        active_model = _picked
-    else:
-        # Modèle forcé manuellement par l'utilisateur
-        active_model = model
-        profile_name = "manual"
-        # v2.120 — même un choix manuel explicite de modèle cloud est bloqué en Hyper
-        # sécurisé : ce mode est un vrai coupe-circuit, pas une simple valeur par défaut.
-        if _lockdown and _is_cloud_model(active_model):
-            active_model = (
-                MODEL_PROFILES.get("agent", {}).get("model")
-                or DEFAULT_MODEL
-            )
-            profile_name = "agent"
-        # Température basse = tool-calling déterministe, zéro hallucination (même doctrine
-        # que MODEL_PROFILES ci-dessus — v2.106 : cette branche faisait l'INVERSE, montait
-        # à 0.6 pour les PETITS modèles alors que ce sont eux les plus sujets à halluciner
-        # un nom d'outil/paramètre plausible mais faux — voir ocr_extract "llava:13b" jamais
-        # installé, trouvé lors de l'audit des échecs réels).
-        if any(x in active_model for x in (":3b", ":1b", ":2b", "3b", "1b")):
-            temperature = 0.3
-        elif any(x in active_model for x in (":7b", ":8b", "7b", "8b")):
-            temperature = 0.2
-        elif any(x in active_model for x in (":14b", ":13b", ":12b", "14b")):
-            temperature = 0.2
-        else:
-            temperature = 0.3
-
-    # Ultra débridé est désormais un contrat cloud-only pour tout LLM génératif.
-    # Il couvre aussi les profils sans override (vision), un modèle local choisi
-    # manuellement et un override cloud retiré. Aucun repli local silencieux.
-    if _ultra:
-        _cloud_need = (
-            "vision" if profile_name == "vision"
-            else (_cr.detect_task(_user_query) or {
-                "analysis": "reasoning", "agent": "agentic",
-            }.get(profile_name, "general"))
+    try:
+        _model_config = await _resolve_model_config(
+            messages, _user_query, model, _cortex_plan
         )
-        try:
-            active_model = _cr.require_cloud_model(
-                _cloud_need,
-                requested_model=active_model if _is_cloud_model(active_model) else None,
-            )
-        except _cr.CloudOnlyModelUnavailable as exc:
-            yield _sse({"type": "error", "message": str(exc), "cloud_only": True})
-            return
+    except _cr.CloudOnlyModelUnavailable as exc:
+        yield _sse({"type": "error", "message": str(exc), "cloud_only": True})
+        return
+    profile_name = _model_config.profile_name
+    active_model = _model_config.active_model
+    temperature = _model_config.temperature
+    _lockdown = _model_config.lockdown
+    _ultra = _model_config.ultra_cloud_only
 
-    # Local strict est un choix par message, prioritaire sur le routage cloud mais
-    # sans modifier le preset global de la machine. Ultra cloud-only gagne sur ce
-    # réglage conversationnel afin que son comportement ne soit jamais ambigu.
-    _cortex_privacy = _cortex_plan["resolved"]["privacy"]
-    _cortex_sensitive = _is_sensitive_request(
-        messages, _strip_accents((_user_query or "").lower())
-    )
-    if (
-        not _ultra
-        and _is_cloud_model(active_model)
-        and (_cortex_privacy == "local" or (_cortex_privacy == "hybrid_redacted" and _cortex_sensitive))
-    ):
-        active_model = (
-            MODEL_PROFILES.get(profile_name, {}).get("model")
-            or MODEL_PROFILES.get("agent", {}).get("model")
-            or DEFAULT_MODEL
-        )
-        if profile_name == "manual":
-            profile_name = "agent"
-
-    # v2.119 — modèle local de repli si le modèle courant est un modèle cloud et qu'un
-    # outil sensible est appelé EN COURS de boucle (ex. l'agent décide d'appeler email_read
-    # sans que "email" n'apparaisse dans le message initial) : bascule immédiate AVANT que
-    # le résultat (contenu d'email, sortie SSH…) ne soit envoyé au modèle cloud au tour
-    # suivant. S'applique même en sélection manuelle d'un modèle cloud (profile_name
-    # "manual") — c'est une protection de dernier recours, pas une simple commodité.
-    _local_fallback_model = (
-        MODEL_PROFILES.get(profile_name, {}).get("model")
-        or MODEL_PROFILES.get("agent", {}).get("model")
-        or DEFAULT_MODEL
-    )
-
-    # Informer le frontend du modèle sélectionné
-    profile_label = MODEL_PROFILES.get(profile_name, {}).get("label", f"🎯 {active_model}")
-    if _ultra:
-        profile_label = f"☁️ Cloud strict · {active_model}"
-    yield _sse({
-        "type":    "model_info",
-        "profile": profile_name,
-        "model":   active_model,
-        "label":   profile_label if profile_name != "manual" else f"🎯 {active_model}",
-    })
+    _local_fallback_model = _model_config.local_fallback_model
+    yield _sse(_model_config.event())
 
     # ── Préparer les messages pour Ollama ────────────────────────────────────
     # Profondeur de mémoire conversationnelle pilotée par le MODE (plus de contexte sur

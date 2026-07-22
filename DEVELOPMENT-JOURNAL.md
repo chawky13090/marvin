@@ -3382,3 +3382,41 @@ ignorée) :
 - Backend réel redémarré : version `2.281.0`, Ollama disponible; frontend Turbopack HTTP 200.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - `agent.py` passe de 1 456 à 1 424 lignes; le plan est disponible par façade typée.
+
+## 2026-07-22 — v2.282.0 — Configuration modèle et confidentialité extraite
+
+### Constat et décision
+
+- Le Runner contenait encore plus de cent lignes de résolution auto/manuelle, confidentialité
+  et repli. Ces décisions formaient un contrat unique mais implicite.
+- Un `ModelConfig` typé devient la sortie unique : profil, modèle actif, température, label,
+  modèle local de repli, verrou local, Ultra Cloud et sensibilité.
+
+### Implémentation et correction rencontrée
+
+- Nouveau `backend/agent_model_config.py`; `run_agent` appelle une seule résolution puis émet
+  `ModelConfig.event()` avant de préparer le contexte Ollama.
+- Les règles historiques sont conservées : routage Cloud par tâche, Hyper local prioritaire,
+  Ultra strictement Cloud, Cortex local/hybrid_redacted et bascule avant résultat sensible.
+- La première validation a détecté la disparition de l'alias `_detect_profile` attendu par la
+  façade `agent.py`. Tous les alias de routage historiques ont été restaurés avant versionnage.
+- Nouveau `scripts/test_agent_model_config.py` : manuel, température, Hyper local, Ultra Cloud,
+  confidentialité locale, routage Cloud automatique et façade.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, de `agent.py` et du test : réussie.
+- Tests `agent_model_config`, `agent_routing` et `cloud_only_routing` : réussis après correction.
+
+### Rollback
+
+- Revenir au commit v2.281 et replacer la résolution imbriquée dans `run_agent`. Aucun schéma,
+  réglage persistant ni contrat HTTP n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 62/62 étapes réussies; ESLint 0 erreur et
+  37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.282.0`, Ollama disponible.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js inclus.
+- `agent.py` passe de 1 424 à 1 310 lignes; la configuration reste disponible par façade.
