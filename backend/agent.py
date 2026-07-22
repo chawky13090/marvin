@@ -25,6 +25,10 @@ from agent_policy import (
     autotitle_from_text as _autotitle_from_text,
     exact_tool_mentions_from_text,
 )
+from agent_safety import (
+    scan_dangerous_script_patterns as _scan_dangerous_script_patterns,
+    validator_for,
+)
 from config import (
     OLLAMA_URL, DEFAULT_MODEL, MAX_TOOL_STEPS, MAX_CONTEXT_MESSAGES,
     PERMISSION_SECURE, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
@@ -38,6 +42,7 @@ _exact_tool_mentions_from_text = partial(
     exact_tool_mentions_from_text,
     tool_names={spec.get("function", {}).get("name", "") for spec in TOOLS_SPEC},
 )
+_validate_tool_args = validator_for(TOOLS_SPEC)
 
 # Conserve les références des tâches d'apprentissage en arrière-plan (anti-GC).
 _BG_LEARN_TASKS: set = set()
@@ -627,9 +632,6 @@ def _sse(data: dict) -> str:
 # le cas concret déjà rencontré en audit (paramètre requis totalement absent → l'outil part sur
 # une KeyError/valeur par défaut fausse) avant même l'appel, pas remplacer les validations
 # internes déjà présentes dans chaque `execute_*`.
-_TOOLS_SPEC_BY_NAME: dict = {}
-
-
 def _log_tool_exception(tool_name: str, tool_args: dict, ex: Exception, conversation_id: str | None) -> dict:
     """v2.184 — un outil qui LÈVE une exception (pas un {"error": ...} propre) est plus
     probablement un vrai bug qu'un cas géré — capture le traceback COMPLET dans bug_log.jsonl
@@ -647,36 +649,6 @@ def _log_tool_exception(tool_name: str, tool_args: dict, ex: Exception, conversa
     return {"error": str(ex)}
 
 
-def _validate_tool_args(tool_name: str, args: dict) -> str | None:
-    """Retourne un message d'erreur si un paramètre OBLIGATOIRE déclaré dans TOOLS_SPEC est
-    absent ou vide, sinon None. Best-effort : n'importe pas TOOLS_SPEC tant que non nécessaire
-    (évite tout risque de cycle), ne lève jamais d'exception."""
-    try:
-        if not _TOOLS_SPEC_BY_NAME:
-            from tools import TOOLS_SPEC as _spec
-            for s in _spec:
-                fn = s.get("function", {})
-                nm = fn.get("name")
-                if nm:
-                    _TOOLS_SPEC_BY_NAME[nm] = fn.get("parameters", {}).get("required", [])
-        required = _TOOLS_SPEC_BY_NAME.get(tool_name)
-        if not required:
-            return None
-        missing = [
-            p for p in required
-            if p not in args or (isinstance(args.get(p), str) and not args[p].strip())
-        ]
-        if missing:
-            return (
-                f"⛔ Paramètre(s) obligatoire(s) manquant(s) pour '{tool_name}' : {', '.join(missing)}. "
-                f"Vérifie la demande de l'utilisateur ou utilise l'outil de recherche/liste approprié "
-                f"pour trouver la vraie valeur — n'invente jamais un identifiant de substitution."
-            )
-        return None
-    except Exception:
-        return None
-
-
 # v2.131 — filet de sécurité DÉTERMINISTE sur les réponses techniques (scripts). La règle
 # d'or #11 (ne pas toucher à l'authentification root d'une base de données) reste violée
 # par le modèle cloud dans ~2 générations sur 3 malgré une interdiction explicite et sans
@@ -686,63 +658,6 @@ def _validate_tool_args(tool_name: str, args: dict) -> str | None:
 # SCAN a posteriori du texte final : motifs regex connus et sans ambiguïté (contrairement
 # à `security.py::screen_command`, ceci ne bloque RIEN — la réponse contient un script à
 # LIRE, pas une commande à EXÉCUTER — mais rend le risque visible et impossible à manquer).
-_DANGEROUS_SCRIPT_PATTERNS = [
-    (re.compile(r"ALTER\s+USER\s+['\"]?root['\"]?@", re.IGNORECASE),
-     "Ce script modifie le mot de passe/l'authentification du compte **root** d'une base de données (MariaDB/MySQL). "
-     "Ce n'est presque jamais nécessaire — sur Debian/Ubuntu, root utilise déjà une authentification locale sûre par défaut."),
-    (re.compile(r"SET\s+PASSWORD\s+FOR\s+['\"]?root['\"]?@", re.IGNORECASE),
-     "Ce script modifie le mot de passe du compte **root** d'une base de données — vérifie que c'est vraiment voulu."),
-    (re.compile(r"IDENTIFIED\s+BY\s+['\"]{2}", re.IGNORECASE),
-     "Un mot de passe **VIDE** apparaît dans une commande d'authentification — à corriger avant toute exécution."),
-    (re.compile(r"chmod\s+-R\s+777\b"),
-     "Permissions **777 récursives** détectées (lecture/écriture/exécution pour TOUT LE MONDE) — presque toujours trop large."),
-    # v2.133 — élargi après "continue sur cette voie" : motifs supplémentaires courants dans
-    # les scripts d'admin sys/réseau, toujours sans ambiguïté (pas de faux positif plausible
-    # sur un usage légitime volontaire — ceux-là sont rares et le bandeau reste juste un rappel,
-    # pas un blocage).
-    (re.compile(r"curl\s+[^\n]*\|\s*(sudo\s+)?(ba)?sh\b|wget\s+[^\n]*-O-?\s*[^\n]*\|\s*(sudo\s+)?(ba)?sh\b", re.IGNORECASE),
-     "Ce script télécharge un fichier distant et l'exécute directement (`curl|sh` / `wget|sh`) sans jamais l'inspecter — "
-     "n'exécute un script tiers qu'après l'avoir lu, ou vérifie au minimum son empreinte (checksum/signature)."),
-    (re.compile(r"curl\s+[^\n]*(-k\b|--insecure\b)", re.IGNORECASE),
-     "Vérification du certificat TLS **désactivée** (`curl -k`/`--insecure`) — expose à une interception (MITM), à éviter même en test."),
-    (re.compile(r"PermitRootLogin\s+yes", re.IGNORECASE),
-     "Ce script active la **connexion SSH directe en root** (`PermitRootLogin yes`) — préférer un compte nommé + `sudo`."),
-    (re.compile(r"\bufw\s+disable\b|iptables\s+-F\b(?!.*iptables-restore)", re.IGNORECASE),
-     "Ce script désactive/vide le pare-feu (`ufw disable` / `iptables -F`) sans le reconfigurer ensuite — vérifie qu'un pare-feu reste actif après."),
-    (re.compile(r"bind[- ]?address\s*[:=]\s*0\.0\.0\.0", re.IGNORECASE),
-     "Un service est configuré pour écouter sur **toutes les interfaces réseau** (`0.0.0.0`) — vérifie que c'est voulu et que l'accès est bien restreint (pare-feu/authentification) plutôt qu'exposé par défaut."),
-]
-
-# Motifs qui n'ont de sens QUE dans un document destiné à être LU (PDF/Word/rapport) — pas dans
-# un script ```bash générique, où `$(date ...)` est une substitution shell parfaitement normale
-# (ex. horodater un nom de fichier). Appliqué uniquement au scan des arguments d'outils de
-# génération de document (v2.133), jamais au scan de la réponse de chat en prose.
-_DANGEROUS_DOCUMENT_PATTERNS = [
-    (re.compile(r"\$\([^)]*\b(date|hostname|whoami)\b[^)]*\)", re.IGNORECASE),
-     "Une substitution shell non évaluée (ex. `$(date ...)`) apparaît littéralement dans le contenu — remplace-la par la vraie valeur, ce document n'est pas exécuté."),
-]
-
-
-def _scan_dangerous_script_patterns(text: str, require_code_fence: bool = True, document_mode: bool = False) -> list[str]:
-    """Retourne la liste des avertissements pour les motifs de script dangereux détectés.
-    `require_code_fence=True` (réponse de chat en prose) exige un bloc ``` pour éviter de
-    scanner du texte non technique ; `False` (arguments d'outil — contenu de document généré,
-    déjà du contenu ciblé) scanne directement. `document_mode=True` ajoute les motifs
-    spécifiques aux documents statiques (substitutions shell non évaluées). Best-effort,
-    aucune exception ne doit jamais remonter jusqu'à la boucle principale."""
-    try:
-        if require_code_fence and "```" not in text:
-            return []
-        patterns = _DANGEROUS_SCRIPT_PATTERNS + (_DANGEROUS_DOCUMENT_PATTERNS if document_mode else [])
-        warnings = []
-        for pattern, message in patterns:
-            if pattern.search(text):
-                warnings.append(message)
-        return warnings
-    except Exception:
-        return []
-
-
 # v2.141 — Passe de critique par un 2ᵉ modèle (demandé explicitement : « je pense que
 # quand une demande est faite le llm cloud répond mais doit aussi passer après réponse
 # par une revue critique d'un autre llm avant d'envoyer la réponse »). Complète le

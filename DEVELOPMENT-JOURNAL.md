@@ -2769,3 +2769,42 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, y compris connexions masquées,
   agenda et orchestrateur e-mail.
 - Frontend Next.js/Turbopack conservé actif; aucun build concurrent exécuté.
+
+## 2026-07-22 — v2.268.0 — Sécurité déterministe extraite de l'agent
+
+### Objectif et décision
+
+- Réduire `agent.py` par responsabilité sans déplacer la boucle SSE principale.
+- Isoler les contrôles qui doivent rester déterministes même lorsque le LLM change.
+
+### Implémentation
+
+- Nouveau `backend/agent_safety.py` avec index immuable des paramètres obligatoires construit
+  depuis `TOOLS_SPEC`, validateur injectable et scanner des scripts/documents.
+- `agent.py` conserve les deux alias historiques utilisés dans `run_agent`; les anciennes
+  fonctions et tables regex dupliquées sont retirées.
+- Une valeur d'arguments qui n'est pas un objet JSON est maintenant refusée explicitement.
+- Les paramètres texte obligatoires composés uniquement d'espaces restent considérés absents.
+
+### Validation isolée réalisée avant versionnage
+
+- Argument valide, absent, vide, outil inconnu et arguments non objet : succès.
+- Script sans bloc de code : pas de faux positif dans une réponse en prose.
+- Bloc Bash avec `chmod -R 777` et `ufw disable` : deux alertes détectées.
+- `$(date)` accepté dans un script, mais signalé dans un document statique.
+- Façade AST : aucune redéfinition résiduelle dans `agent.py`.
+- Code Forge, 21 garde-fous d'intention et compilation ciblée : succès.
+- Invariants : 344 outils, 346 routes et 40 pages.
+
+### Rollback
+
+- Restaurer le validateur, les motifs et le scanner dans `agent.py`, supprimer
+  `agent_safety.py` et son test, puis revenir à `2.267.0`. Aucun schéma ni donnée n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 49/49 étapes réussies; compilation, dépendances et
+  frontend validés, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.268.0`, 344/344 outils et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+- Frontend Next.js/Turbopack : HTTP 200; journal uvicorn sans exception au démarrage.

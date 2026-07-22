@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.267.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.268.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.267.0)
+## 9. État actuel (v2.268.0)
+
+**v2.268 (sécurité déterministe de l'agent)** : `backend/agent_safety.py` possède désormais
+la compilation des paramètres obligatoires depuis `TOOLS_SPEC`, la validation avant exécution
+et le scanner des scripts/documents. `agent.py` garde `_validate_tool_args` et
+`_scan_dangerous_script_patterns` comme objets injectés compatibles, sans corps dupliqué. Une
+liste ou une valeur non objet à la place des arguments JSON produit maintenant une erreur
+explicite. Les contrôles `chmod -R 777`, désactivation du pare-feu, `curl|sh`, TLS désactivé,
+connexion SSH root, écoute `0.0.0.0`, authentification SQL root et substitutions documentaires
+restent couverts par des régressions déterministes.
 
 **v2.267 (connexions SQLite bornées)** : trois lectures OAuth Google utilisaient
 `db.get_conn().execute(...)` sans fermer explicitement la connexion — deux dans `tools.py` et

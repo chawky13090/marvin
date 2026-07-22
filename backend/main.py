@@ -93,6 +93,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.268 — sécurité déterministe extraite d'agent.py : validation des arguments JSON
+# et scanner de scripts/documents dangereux, injectés derrière les alias historiques.
 # v2.267 — trois fuites de connexions SQLite OAuth/Google corrigées; invariant AST
 # interdisant désormais toute ouverture directe non bornée hors de db_connection.py.
 # v2.266 — premières politiques pures extraites d'agent.py : intention commande/texte,

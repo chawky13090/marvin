@@ -89,6 +89,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Repository conversations et messages", (python, "scripts/test_conversation_repository.py")),
         Stage("Fermeture garantie des connexions SQLite", (python, "scripts/test_db_connection_hygiene.py")),
         Stage("Politiques textuelles de l'agent", (python, "scripts/test_agent_policy.py")),
+        Stage("Sécurité déterministe de l'agent", (python, "scripts/test_agent_safety.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Garde-fous d'intention", (python, "scripts/test_intent_guards.py")),
