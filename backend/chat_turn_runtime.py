@@ -1,0 +1,249 @@
+"""Execution et journal SSE durables des tours de conversation Marvin."""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import uuid
+from collections.abc import AsyncIterator, Callable
+from typing import Any
+
+from db_connection import db
+
+
+_PROCESS_TOKEN = uuid.uuid4().hex
+_TASKS: dict[str, asyncio.Task] = {}
+_LOCK = asyncio.Lock()
+_TERMINAL = frozenset({"completed", "failed", "interrupted"})
+
+
+def payload_hash(payload: dict[str, Any]) -> str:
+    canonical = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def recover_orphaned_turns() -> int:
+    """Marque au demarrage les producteurs perdus, sans rejouer leurs actions."""
+    message = "Le backend a redemarre pendant ce tour; reprise automatique refusee sans preuve complete."
+    recovered = 0
+    with db() as connection:
+        rows = connection.execute(
+            "SELECT request_id FROM chat_turns WHERE status = 'running' AND owner_token <> ?",
+            (_PROCESS_TOKEN,),
+        ).fetchall()
+        for row in rows:
+            request_id = str(row["request_id"])
+            next_sequence = int(connection.execute(
+                "SELECT COALESCE(MAX(sequence), 0) + 1 FROM chat_turn_events WHERE request_id = ?",
+                (request_id,),
+            ).fetchone()[0])
+            connection.execute(
+                "INSERT INTO chat_turn_events (request_id, sequence, event_json) VALUES (?, ?, ?)",
+                (
+                    request_id,
+                    next_sequence,
+                    json.dumps({"type": "error", "message": message, "turnInterrupted": True}),
+                ),
+            )
+            connection.execute(
+                """UPDATE chat_turns SET status = 'interrupted', error = ?,
+                   updated_at = datetime('now'), completed_at = datetime('now')
+                   WHERE request_id = ?""",
+                (message, request_id),
+            )
+            recovered += 1
+    return recovered
+
+
+def prune(retention_days: int = 30) -> int:
+    """Supprime uniquement les journaux terminaux anciens; les messages restent intacts."""
+    days = max(1, min(int(retention_days), 365))
+    with db() as connection:
+        cursor = connection.execute(
+            """DELETE FROM chat_turns
+               WHERE status IN ('completed', 'failed', 'interrupted')
+               AND updated_at < datetime('now', ?)""",
+            (f"-{days} days",),
+        )
+        return max(0, int(cursor.rowcount))
+
+
+def _decode_agent_chunk(chunk: str) -> dict[str, Any]:
+    for line in str(chunk).splitlines():
+        if line.startswith("data: "):
+            value = json.loads(line[6:].strip())
+            if isinstance(value, dict):
+                return value
+    raise ValueError("Evenement SSE agent invalide.")
+
+
+def _encode_event(event: dict[str, Any], sequence: int) -> str:
+    enriched = dict(event)
+    enriched["turnSeq"] = sequence
+    return f"id: {sequence}\ndata: {json.dumps(enriched, ensure_ascii=False, default=str)}\n\n"
+
+
+def _append_event(request_id: str, event: dict[str, Any]) -> int:
+    with db() as connection:
+        row = connection.execute(
+            "SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence FROM chat_turn_events WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+        sequence = int(row["next_sequence"])
+        connection.execute(
+            "INSERT INTO chat_turn_events (request_id, sequence, event_json) VALUES (?, ?, ?)",
+            (request_id, sequence, json.dumps(event, ensure_ascii=False, default=str)),
+        )
+        conversation_id = event.get("conversationId") if event.get("type") == "conv_id" else None
+        if conversation_id:
+            connection.execute(
+                """UPDATE chat_turns SET conversation_id = ?, updated_at = datetime('now')
+                   WHERE request_id = ?""",
+                (str(conversation_id), request_id),
+            )
+        else:
+            connection.execute(
+                "UPDATE chat_turns SET updated_at = datetime('now') WHERE request_id = ?",
+                (request_id,),
+            )
+    return sequence
+
+
+def _finish(request_id: str, status: str, error: str | None = None) -> None:
+    with db() as connection:
+        connection.execute(
+            """UPDATE chat_turns
+               SET status = ?, error = ?, updated_at = datetime('now'), completed_at = datetime('now')
+               WHERE request_id = ? AND owner_token = ?""",
+            (status, error, request_id, _PROCESS_TOKEN),
+        )
+
+
+async def _produce(request_id: str, producer: AsyncIterator[str]) -> None:
+    saw_terminal_event = False
+    failed = False
+    try:
+        async for chunk in producer:
+            event = _decode_agent_chunk(chunk)
+            _append_event(request_id, event)
+            if event.get("type") in {"done", "error"}:
+                saw_terminal_event = True
+            if event.get("type") == "error":
+                failed = True
+        if not saw_terminal_event:
+            _append_event(request_id, {"type": "done"})
+        _finish(request_id, "failed" if failed else "completed")
+    except asyncio.CancelledError:
+        message = "Le backend s'est arrete pendant ce tour; aucune action ambiguë ne sera rejouee automatiquement."
+        _append_event(request_id, {"type": "error", "message": message, "turnInterrupted": True})
+        _finish(request_id, "interrupted", message)
+        raise
+    except Exception as exc:
+        message = f"Tour interrompu par le backend : {str(exc)[:500]}"
+        _append_event(request_id, {"type": "error", "message": message})
+        _finish(request_id, "failed", message)
+
+
+def _task_finished(request_id: str, task: asyncio.Task) -> None:
+    if _TASKS.get(request_id) is task:
+        _TASKS.pop(request_id, None)
+
+
+async def _ensure_started(
+    request_id: str,
+    fingerprint: str,
+    conversation_id: str | None,
+    producer_factory: Callable[[], AsyncIterator[str]],
+) -> str:
+    async with _LOCK:
+        with db() as connection:
+            cursor = connection.execute(
+                """INSERT OR IGNORE INTO chat_turns
+                   (request_id, payload_hash, conversation_id, status, owner_token)
+                   VALUES (?, ?, ?, 'running', ?)""",
+                (request_id, fingerprint, conversation_id, _PROCESS_TOKEN),
+            )
+            created = cursor.rowcount == 1
+            row = connection.execute(
+                "SELECT payload_hash, status, owner_token FROM chat_turns WHERE request_id = ?",
+                (request_id,),
+            ).fetchone()
+            if row is None:
+                raise RuntimeError("Le tour de chat est introuvable apres reservation.")
+            if row["payload_hash"] != fingerprint:
+                raise ValueError("Ce requestId est deja associe a une autre demande.")
+            status = str(row["status"])
+            if status == "running" and row["owner_token"] != _PROCESS_TOKEN:
+                message = "Le backend a redemarre pendant ce tour; reprise automatique refusee sans preuve complete."
+                next_sequence = int(connection.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) + 1 FROM chat_turn_events WHERE request_id = ?",
+                    (request_id,),
+                ).fetchone()[0])
+                connection.execute(
+                    "INSERT INTO chat_turn_events (request_id, sequence, event_json) VALUES (?, ?, ?)",
+                    (
+                        request_id,
+                        next_sequence,
+                        json.dumps({"type": "error", "message": message, "turnInterrupted": True}),
+                    ),
+                )
+                connection.execute(
+                    """UPDATE chat_turns SET status = 'interrupted', error = ?,
+                       updated_at = datetime('now'), completed_at = datetime('now')
+                       WHERE request_id = ?""",
+                    (message, request_id),
+                )
+                status = "interrupted"
+
+        if created:
+            task = asyncio.create_task(_produce(request_id, producer_factory()))
+            _TASKS[request_id] = task
+            task.add_done_callback(lambda done, rid=request_id: _task_finished(rid, done))
+        return status
+
+
+def _read_events(request_id: str, after_sequence: int) -> tuple[list[tuple[int, dict]], str]:
+    with db() as connection:
+        rows = connection.execute(
+            """SELECT sequence, event_json FROM chat_turn_events
+               WHERE request_id = ? AND sequence > ? ORDER BY sequence ASC LIMIT 250""",
+            (request_id, after_sequence),
+        ).fetchall()
+        turn = connection.execute(
+            "SELECT status FROM chat_turns WHERE request_id = ?", (request_id,)
+        ).fetchone()
+    events = [(int(row["sequence"]), json.loads(row["event_json"])) for row in rows]
+    return events, str(turn["status"] if turn else "failed")
+
+
+async def subscribe(
+    *,
+    request_id: str,
+    fingerprint: str,
+    conversation_id: str | None,
+    producer_factory: Callable[[], AsyncIterator[str]],
+    after_sequence: int = 0,
+) -> AsyncIterator[str]:
+    """Demarre un tour une fois et diffuse son journal, meme apres reconnexion UI."""
+    status = await _ensure_started(request_id, fingerprint, conversation_id, producer_factory)
+    cursor = max(0, int(after_sequence))
+    while True:
+        events, status = _read_events(request_id, cursor)
+        for sequence, event in events:
+            cursor = sequence
+            yield _encode_event(event, sequence)
+        if status in _TERMINAL and not events:
+            return
+        await asyncio.sleep(0.08)
+
+
+async def shutdown() -> None:
+    """Arrete proprement les producteurs; leurs tours deviennent explicitement interrompus."""
+    tasks = list(_TASKS.values())
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)

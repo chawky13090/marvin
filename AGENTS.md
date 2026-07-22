@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.273.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.274.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.273.0)
+## 9. État actuel (v2.274.0)
+
+**v2.274 (tours de chat durables et détachables)** : `/api/chat` réserve désormais un tour
+par `requestId`, lance la boucle agentique dans une tâche backend indépendante de la connexion
+du navigateur et journalise chaque événement SSE dans SQLite avec un curseur monotone. Quitter
+la page ou perdre la première connexion ne coupe plus le travail : une reconnexion au même
+identifiant relit les événements sans relancer le LLM ni les actions. Un redémarrage réel du
+backend marque le tour `interrupted` et refuse tout rejeu ambigu. Les journaux terminés sont
+conservés 30 jours; les messages de conversation ne sont jamais supprimés par cette rétention.
 
 **v2.273 (reçus idempotents des actions chat)** : chaque message utilisateur transmet son
 `requestId` au backend. La migration SQLite 3 ajoute `messages.client_request_id` et la table

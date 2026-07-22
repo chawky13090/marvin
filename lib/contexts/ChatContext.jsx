@@ -148,10 +148,7 @@ export function ChatProvider({ children }) {
     try {
       const allMessages = [...messagesRef.current, userMsg];
 
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const requestPayload = {
           messages: allMessages.map(m => {
             const msgText = extractText(m);
             let content;
@@ -178,9 +175,24 @@ export function ChatProvider({ children }) {
           requestId: userMsg.id,
           model: activeModelRef.current || null,
           cortex: missionContract,
-        }),
-        signal: controller.signal,
-      });
+        };
+      let response;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await fetch(`${BACKEND_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestPayload),
+            signal: controller.signal,
+          });
+          break;
+        } catch (fetchError) {
+          if (attempt > 0 || fetchError.name === 'AbortError') throw fetchError;
+          // Le premier POST a pu atteindre FastAPI avant la coupure. Le même requestId
+          // rattache le navigateur au producteur durable sans relancer le LLM ni ses actions.
+          await new Promise(resolve => setTimeout(resolve, 250));
+        }
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

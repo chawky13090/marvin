@@ -193,6 +193,34 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX IF NOT EXISTS idx_action_receipts_status ON action_receipts(status, started_at)",
         ),
     ),
+    Migration(
+        version=4,
+        name="durable-chat-turn-streams",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS chat_turns (
+                request_id TEXT PRIMARY KEY,
+                payload_hash TEXT NOT NULL,
+                conversation_id TEXT,
+                status TEXT NOT NULL
+                    CHECK(status IN ('running', 'completed', 'failed', 'interrupted')),
+                owner_token TEXT NOT NULL,
+                error TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at TEXT
+            )""",
+            """CREATE TABLE IF NOT EXISTS chat_turn_events (
+                request_id TEXT NOT NULL,
+                sequence INTEGER NOT NULL,
+                event_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (request_id, sequence),
+                FOREIGN KEY (request_id) REFERENCES chat_turns(request_id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_chat_turns_status ON chat_turns(status, updated_at)",
+            "CREATE INDEX IF NOT EXISTS idx_chat_turn_events_request ON chat_turn_events(request_id, sequence)",
+        ),
+    ),
 )
 
 

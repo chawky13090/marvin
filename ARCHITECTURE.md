@@ -37,6 +37,7 @@ flowchart LR
 | `agent_routing.py` | Inventaire Ollama, sélection de profil et détection du contexte sensible |
 | `agent_tool_selection.py` | Matrice d'outils, routage sémantique, repli borné et plafond déterministe |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
+| `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
 | `tool_domains/` | Implémentations métier extraites; `tools.py` conserve la façade et les contrats publics pendant la migration |
@@ -101,7 +102,8 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 8. le contrat idempotent du superviseur des workers ;
 9. l'idempotence, l'intégrité et le rollback des migrations SQLite sur une base temporaire ;
 10. le démarrage de l'initialiseur Next.js sur une base vierge ;
-11. les reçus d'action : déduplication, concurrence, interruption et masquage des secrets.
+11. les reçus d'action : déduplication, concurrence, interruption et masquage des secrets ;
+12. les tours de chat détachables : journal durable, curseur, reconnexion et arrêt sûr.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

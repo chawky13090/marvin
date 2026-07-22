@@ -2924,7 +2924,6 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
 - Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
 
-
 ## 2026-07-22 — v2.272.0 — Sélection des outils LLM extraite
 
 ### Contexte et décision
@@ -3020,3 +3019,54 @@ ignorée) :
 - OpenAPI réel : `ChatRequest` expose `requestId` avec les champs historiques inchangés.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
 - Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
+
+## 2026-07-22 — v2.274.0 — Tours de chat durables et détachables
+
+### Constat et décision
+
+- Les reçus v2.273 empêchaient un double effet de bord, mais le générateur agentique restait
+  possédé par la connexion HTTP. Une fermeture ou coupure du navigateur pouvait donc annuler
+  le travail avant que sa réponse soit persistée.
+- Deux approches ont été évaluées : conserver uniquement l'état React global, simple mais
+  incapable de survivre à une vraie coupure; ou détacher le producteur côté backend avec un
+  journal durable. La seconde est retenue car elle couvre aussi l'avatar et les reconnexions.
+
+### Implémentation
+
+- Migration SQLite 4 : `chat_turns` conserve le propriétaire et l'état du tour;
+  `chat_turn_events` conserve les événements SSE ordonnés par un curseur monotone.
+- Nouveau `backend/chat_turn_runtime.py` : réservation atomique, producteur `asyncio`
+  indépendant du client, rattachement au même `requestId`, rejeu après curseur et arrêt propre.
+- Une reconnexion au même payload ne relance pas le LLM. La réutilisation divergente d'un
+  `requestId` est refusée. Un producteur perdu après redémarrage devient `interrupted` et émet
+  une erreur explicite, sans reproduire une action dont le résultat pourrait être ambigu.
+- Le frontend retente une seule fois la connexion initiale avec le même `requestId`. Les
+  journaux terminaux sont purgés après 30 jours; les messages utilisateur restent intacts.
+- Le chemin historique sans `requestId` reste accepté pour compatibilité avec les appels
+  internes existants.
+
+### Validation isolée réalisée avant versionnage
+
+- Client détaché après le premier fragment : producteur poursuivi jusqu'à `done`.
+- Reconnexion après le curseur 1 : événements 2 et 3 relus, un seul démarrage du producteur.
+- Payload divergent avec le même identifiant : refus déterministe.
+- Ancien propriétaire simulé : tour interrompu et non relancé.
+- Migrations 1 à 4, initialiseur SQLite Next.js, compilation Python et ESLint : réussis.
+
+### Rollback
+
+- Revenir à `2.273.0`. Les deux tables additives peuvent rester inutilisées sans modifier les
+  conversations. Pour un rollback physique, arrêter Marvin puis restaurer la sauvegarde SQLite
+  cohérente précédente. Aucun message n'est supprimé par l'implémentation.
+
+### Validation complète et réelle après versionnage
+
+- Sauvegarde SQLite cohérente :
+  `data/backups/secretary_before_v2274_20260722_102352.db` (`quick_check=ok`).
+- `scripts/check_marvin.py --quick` : 55/55 étapes réussies, 127 fichiers Python compilés,
+  dépendances cohérentes, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.274.0`, Ollama disponible, 344/344 outils et 15 workers.
+- Base réelle : `user_version=4`, tables de tours présentes et `quick_check=ok`.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis; frontend Turbopack HTTP 200.
+- Tour réel sans outil : 11 événements numérotés, conversation attribuée et état final
+  `completed`; les données de test ont ensuite été supprimées.

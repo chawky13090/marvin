@@ -18,6 +18,7 @@ from typing import Any
 import database as db
 import tools as tool_module
 from agent import run_agent, _refresh_model_cache
+import chat_turn_runtime
 from api.backups import router as backups_router
 from api.billing import router as billing_router
 from api.calendar import router as calendar_router
@@ -93,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.274 — producteur de tour détaché du navigateur et journal SSE SQLite rejouable;
+# une reconnexion reprend au curseur sans relancer le LLM ni ses actions.
 # v2.273 — requestId propagé du chat et reçus SQLite transactionnels : une action
 # terminée est rejouée depuis son reçu; une interruption ambiguë n'est jamais réexécutée.
 # v2.272 — matrice et filtrage des outils extraits d'agent.py; plafond désormais
@@ -218,6 +221,8 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app_instance):
     """Initialisation au démarrage : cache des modèles + worker cron + surveillance email + pré-chargement."""
+    chat_turn_runtime.recover_orphaned_turns()
+    chat_turn_runtime.prune()
     # Auto-configuration : choisit les meilleurs modèles selon le matériel (AVANT le pré-chargement)
     try:
         import auto_config
@@ -259,6 +264,7 @@ async def lifespan(app_instance):
             pass
         yield
     finally:
+        await chat_turn_runtime.shutdown()
         try:
             import web_browser
             await web_browser.close()
@@ -2975,17 +2981,45 @@ class ChatRequest(BaseModel):
     messages: list[dict]
     conversationId: str | None = None
     requestId: str | None = Field(default=None, min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$")
+    afterEvent: int = Field(default=0, ge=0)
     model: str | None = None
     cortex: dict | None = None
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    async def event_stream():
-        async for chunk in run_agent(
-            req.messages, req.conversationId, req.model, req.cortex, request_id=req.requestId,
-        ):
-            yield chunk
+    if not req.requestId:
+        async def event_stream():
+            async for chunk in run_agent(
+                req.messages, req.conversationId, req.model, req.cortex,
+            ):
+                yield chunk
+    else:
+        fingerprint = chat_turn_runtime.payload_hash({
+            "messages": req.messages,
+            "conversationId": req.conversationId,
+            "model": req.model,
+            "cortex": req.cortex,
+        })
+
+        def producer():
+            return run_agent(
+                req.messages, req.conversationId, req.model, req.cortex,
+                request_id=req.requestId,
+            )
+
+        async def event_stream():
+            try:
+                async for chunk in chat_turn_runtime.subscribe(
+                    request_id=req.requestId,
+                    fingerprint=fingerprint,
+                    conversation_id=req.conversationId,
+                    producer_factory=producer,
+                    after_sequence=req.afterEvent,
+                ):
+                    yield chunk
+            except ValueError as exc:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_stream(),

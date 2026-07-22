@@ -103,7 +103,7 @@ def _check_catalog_order() -> None:
 
 def _check_fresh_marvin_schema() -> None:
     connection = _connection()
-    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3]
+    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4]
     tables = {
         row[0]
         for row in connection.execute(
@@ -123,6 +123,8 @@ def _check_fresh_marvin_schema() -> None:
         "email_templates",
         "automation_rules",
         "action_receipts",
+        "chat_turns",
+        "chat_turn_events",
         "schema_migrations",
     }
     assert expected <= tables, expected - tables
