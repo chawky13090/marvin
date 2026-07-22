@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.295.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.296.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.295.0)
+## 9. État actuel (v2.296.0)
+
+**v2.296 (domaine d'outils Média)** : les 11 outils vidéo/GIF et 6 outils audio sont extraits
+de `tools.py` vers `tool_domains/media.py`. Le résolveur de chemins portable historique est
+injecté par la façade; les traitements ffmpeg restent hors de la boucle asyncio et les 17
+fonctions du registre gardent leur identité exacte. `tools.py` passe de 20 801 à 20 581 lignes,
+avec 344 implémentations et 344 spécifications conservées.
 
 **v2.295 (génération vidéo IA locale)** : capacités GPU, catalogue Diffusers, génération SSE
 texte/image, annulation et amélioration de prompt Ollama sont extraits de `main.py` vers

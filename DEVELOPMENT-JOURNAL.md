@@ -3845,6 +3845,47 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
   orchestrateur e-mail et accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.296.0 — Domaine d'outils Média
+
+### Constat et décision
+
+- Les 17 outils vidéo/GIF/audio formaient un adaptateur homogène vers `video_manager.py`, mais
+  restaient noyés dans `tools.py`. Leur seule dépendance transversale significative était le
+  résolveur portable de chemins Windows.
+- Deux approches ont été comparées : déplacer aussi le résolveur global, ce qui toucherait de
+  nombreux domaines, ou l'injecter dans le module média. L'injection bornée est retenue pour
+  conserver le comportement exact sans élargir cette tranche.
+
+### Implémentation
+
+- Nouveau `backend/tool_domains/media.py` : onze actions vidéo/GIF, six actions audio, exécution
+  bloquante dans l'executor et helpers communs pour chemins et sorties.
+- `tools.py` configure le résolveur historique puis réexporte directement les 17 fonctions;
+  le registre et `TOOLS_SPEC` ne changent pas.
+- Nouveau `scripts/test_tool_domain_media.py` : chemin requis, métadonnées, trim, capture bornée,
+  fusion audio, conversions et identité stricte 344/344.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du domaine, de `tools.py` et du test : réussie.
+- Test média : vidéo, GIF, audio, chemins et 17 identités validés sans appel ffmpeg réel.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `tools.py` passe de 20 801 à 20 581 lignes.
+
+### Rollback
+
+- Revenir au commit v2.295 et replacer les 17 fonctions dans `tools.py`. Aucun fichier média,
+  schéma d'outil, chemin utilisateur ou contrat de résultat ne subit de migration.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 76/76 étapes réussies; compilation de 147 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 33264, version `2.296.0`, Ollama disponible et 15 workers
+  observés (13 actifs, 2 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
+  orchestrateur e-mail et accueil Next.js Turbopack.
+
 ## 2026-07-22 — v2.295.0 — Génération vidéo IA locale
 
 ### Constat et décision

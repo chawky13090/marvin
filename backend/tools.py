@@ -24,6 +24,7 @@ from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
 from tool_domains import memory as memory_domain
+from tool_domains import media as media_domain
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
@@ -15878,248 +15879,27 @@ async def execute_file_duplicate_finder(args: dict) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 27 — v2.32 Édition vidéo / GIF (ffmpeg local, sans GPU ni API)
+# SECTION 27 — Média local : façade vers tool_domains/media.py
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_video_info(args: dict) -> dict:
-    """Métadonnées d'un fichier vidéo/GIF : durée, résolution, fps, codec, taille."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    info = await loop.run_in_executor(None, lambda: _vm.get_media_info(resolved))
-    if info.get("error"):
-        return info
-    return {"success": True, **info}
-
-
-async def execute_video_to_gif(args: dict) -> dict:
-    """Convertit une vidéo en GIF optimisé (palette haute qualité)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_to_gif(
-        resolved, fps=int(args.get("fps", 12)), width=int(args.get("width", 480)),
-        start=args.get("start"), duration=args.get("duration"),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_gif_to_video(args: dict) -> dict:
-    """Convertit un GIF en MP4 (bien plus léger pour le partage)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.gif_to_video(
-        resolved, fps=args.get("fps"),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_video_trim(args: dict) -> dict:
-    """Découpe un segment d'une vidéo (start/end ou start/duration)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_trim(
-        resolved, start=float(args.get("start", 0)),
-        end=float(args["end"]) if args.get("end") is not None else None,
-        duration=float(args["duration"]) if args.get("duration") is not None else None,
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_video_compress(args: dict) -> dict:
-    """Compresse une vidéo (crf 18=qualité, 28=équilibré, 35=petit)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_compress(
-        resolved, crf=int(args.get("crf", 28)),
-        scale_width=int(args["scale_width"]) if args.get("scale_width") else None,
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_video_resize(args: dict) -> dict:
-    """Redimensionne une vidéo (width et/ou height, ratio préservé)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_resize(
-        resolved, width=int(args["width"]) if args.get("width") else None,
-        height=int(args["height"]) if args.get("height") else None,
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_video_extract_frames(args: dict) -> dict:
-    """Extrait des images d'une vidéo (fps=1 → 1 image/seconde)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_extract_frames(
-        resolved, fps=float(args.get("fps", 1)), max_frames=int(args.get("max_frames", 30)),
-    ))
-
-
-async def execute_video_speed(args: dict) -> dict:
-    """Change la vitesse d'une vidéo (2.0=2x rapide, 0.5=ralenti)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_speed(
-        resolved, factor=float(args.get("factor", 2.0)),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_video_watermark(args: dict) -> dict:
-    """Ajoute un texte / filigrane sur une vidéo."""
-    path = args.get("path", "").strip()
-    text = args.get("text", "").strip()
-    if not path or not text:
-        return {"error": "Paramètres 'path' et 'text' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.video_add_watermark(
-        resolved, text, position=args.get("position", "bottom-right"),
-        font_size=int(args.get("font_size", 24)),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_gif_optimize(args: dict) -> dict:
-    """Optimise un GIF (réduit fps/couleurs/taille)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    resolved = _resolve_path(path)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.gif_optimize(
-        resolved, fps=int(args.get("fps", 10)),
-        width=int(args["width"]) if args.get("width") else None,
-        colors=int(args.get("colors", 128)),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-async def execute_screen_record_gif(args: dict) -> dict:
-    """Enregistre l'écran en GIF (durée limitée). region=[x,y,w,h] ou écran entier."""
-    import video_manager as _vm
-    duration = min(float(args.get("duration", 5)), 20)  # cap 20s for safety
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.screen_record_gif(
-        duration=duration, fps=int(args.get("fps", 10)),
-        region=args.get("region"),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None,
-    ))
-
-
-# ───────────────────────── Boîte à outils AUDIO (v2.35) ─────────────────────────
-async def execute_audio_info(args: dict) -> dict:
-    """Métadonnées d'un fichier audio : durée, débit, fréquence, canaux."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.audio_info(_resolve_path(path)))
-
-
-async def execute_audio_extract(args: dict) -> dict:
-    """Extrait la piste audio d'une vidéo vers un fichier (mp3/wav/aac…)."""
-    path = args.get("path") or args.get("video_path") or ""
-    if not path.strip():
-        return {"error": "Paramètre 'path' (vidéo) requis."}
-    import video_manager as _vm
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.audio_extract(
-        _resolve_path(path), fmt=args.get("format", "mp3"), bitrate=args.get("bitrate", "192k"),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
-
-
-async def execute_audio_convert(args: dict) -> dict:
-    """Convertit un fichier audio vers un autre format."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.audio_convert(
-        _resolve_path(path), fmt=args.get("format", "mp3"), bitrate=args.get("bitrate", "192k"),
-        sample_rate=int(args["sample_rate"]) if args.get("sample_rate") else None,
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
-
-
-async def execute_audio_trim(args: dict) -> dict:
-    """Découpe un segment audio (start/end ou start+duration en secondes)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.audio_trim(
-        _resolve_path(path), start=float(args.get("start", 0)),
-        end=float(args["end"]) if args.get("end") is not None else None,
-        duration=float(args["duration"]) if args.get("duration") is not None else None,
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
-
-
-async def execute_audio_merge(args: dict) -> dict:
-    """Concatène plusieurs fichiers audio bout à bout."""
-    paths = args.get("paths") or args.get("sources") or []
-    if isinstance(paths, str):
-        paths = [s.strip() for s in paths.replace("\n", ",").split(",") if s.strip()]
-    if len(paths) < 2:
-        return {"error": "Fournir au moins 2 fichiers audio dans 'paths'."}
-    import video_manager as _vm
-    resolved = [_resolve_path(p) for p in paths]
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.audio_merge(
-        resolved, fmt=args.get("format", "mp3"),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
-
-
-async def execute_audio_volume(args: dict) -> dict:
-    """Ajuste le volume (factor ex 1.5, gain_db ex +6) ou normalise (normalize=true)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    import video_manager as _vm
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _vm.audio_volume(
-        _resolve_path(path),
-        factor=float(args["factor"]) if args.get("factor") is not None else None,
-        gain_db=float(args["gain_db"]) if args.get("gain_db") is not None else None,
-        normalize=bool(args.get("normalize", False)),
-        output_path=_resolve_path(args["output_path"]) if args.get("output_path") else None))
-
+media_domain.configure(resolve_path=_resolve_path)
+execute_video_info = media_domain.video_info
+execute_video_to_gif = media_domain.video_to_gif
+execute_gif_to_video = media_domain.gif_to_video
+execute_video_trim = media_domain.video_trim
+execute_video_compress = media_domain.video_compress
+execute_video_resize = media_domain.video_resize
+execute_video_extract_frames = media_domain.video_extract_frames
+execute_video_speed = media_domain.video_speed
+execute_video_watermark = media_domain.video_watermark
+execute_gif_optimize = media_domain.gif_optimize
+execute_screen_record_gif = media_domain.screen_record_gif
+execute_audio_info = media_domain.audio_info
+execute_audio_extract = media_domain.audio_extract
+execute_audio_convert = media_domain.audio_convert
+execute_audio_trim = media_domain.audio_trim
+execute_audio_merge = media_domain.audio_merge
+execute_audio_volume = media_domain.audio_volume
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 22 — Agent IA Documentation Technique
