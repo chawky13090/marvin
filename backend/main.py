@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.280 — préparation durable d'un tour extraite d'agent.py : session, message idempotent,
+# événements initiaux, captures et titrage avant toute orchestration LLM.
 # v2.279 — contexte de session extrait d'agent.py : compaction injectable, captures
 # multimodales bornées au dossier de conversation et nettoyage des fichiers orphelins.
 # v2.278 — revue indépendante des réponses et actions extraite d'agent.py derrière

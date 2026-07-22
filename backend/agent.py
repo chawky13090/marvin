@@ -20,7 +20,6 @@ from intent_guard import (
     wants_model_council, workspace_followup,
 )
 from agent_policy import (
-    autotitle_from_text as _autotitle_from_text,
     exact_tool_mentions_from_text,
 )
 from agent_prompt import build_system_prompt as _build_system_prompt
@@ -56,6 +55,7 @@ from agent_context import (
     persist_and_analyze_screenshots as _persist_and_analyze_screenshots,
     summarize_overflow as _conversation_summary,
 )
+from agent_session import prepare_turn as _prepare_turn, upgrade_title as _smart_title_upgrade
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, DEFAULT_MODEL, MAX_CONTEXT_MESSAGES,
@@ -111,27 +111,6 @@ _BG_LEARN_TASKS: set = set()
 # v2.126, "Marvin reste à réfléchir"). Produit un BANDEAU visible (jamais une réécriture
 # silencieuse de la réponse) : un texte auto-corrigé par un LLM sans supervision humaine
 # est invérifiable, contraire à l'exigence de fiabilité prouvée de cette session.
-async def _smart_title_upgrade(conversation_id: str, user_text: str):
-    """v2.171 — titre plus soigné qu'une simple troncature, généré en arrière-plan (ne
-    bloque jamais l'envoi). Passe par _ollama_generate (tools.py), donc bénéficie
-    automatiquement du même routage cloud/sensibilité que tout appel LLM interne (v2.122) —
-    si le message contient un mot-clé sensible, l'appel reste local comme n'importe où
-    ailleurs, sans logique dupliquée ici."""
-    try:
-        import tools as _tm
-        prompt = (
-            "Résume cette demande en un titre TRÈS court (3 à 5 mots), en français, sans "
-            "guillemets ni point final, comme un titre d'onglet de navigateur. Réponds "
-            "UNIQUEMENT le titre, rien d'autre.\n\nDemande : " + user_text[:500]
-        )
-        raw = await _tm._ollama_generate(prompt, timeout=25)
-        title = (raw or "").strip().strip('"“”«»').split("\n")[0].strip(" .")[:60]
-        if title:
-            db.upgrade_conversation_title_silent(conversation_id, title)
-    except Exception:
-        pass
-
-
 # v2.185 — signalé en audit réel : sur "donne moi la commande pour installer hyper-v..." puis
 # "la commande launtype pour que hyper v soit activé toujours", Marvin a appelé ssh_list PUIS
 # exécuté réellement la commande localement (pc_run_powershell, escaladé jusqu'à
@@ -182,61 +161,16 @@ async def run_agent(
       done       — fin de génération
       error      — erreur fatale
     """
-    # ── Créer ou récupérer la conversation ───────────────────────────────────
-    if not conversation_id:
-        conv = db.create_conversation("Nouvelle conversation")
-        conversation_id = conv["id"]
-        yield _sse({"type": "conv_id", "conversationId": conversation_id})
-
-    # ── Sauvegarder le dernier message utilisateur ────────────────────────────
-    last_msg = messages[-1] if messages else None
-    _user_query = ""   # texte de la demande utilisateur (pour l'apprentissage du routing)
-    if last_msg and last_msg.get("role") == "user":
-        content = ""
-        if isinstance(last_msg.get("content"), str):
-            content = last_msg["content"]
-        elif isinstance(last_msg.get("content"), list):
-            # Multimodal — extract text only for DB storage
-            content = " ".join(
-                p.get("text", "") for p in last_msg["content"] if p.get("type") == "text"
-            ).strip()
-        elif isinstance(last_msg.get("parts"), list):
-            content = "".join(
-                p.get("text", "") for p in last_msg["parts"] if p.get("type") == "text"
-            )
-        db.create_message(
-            conversation_id, "user", content, client_request_id=request_id,
-        )
-        _user_query = content
-
-        # v2.175 — persiste + analyse (légende + texte relevé) toute image jointe à CE message,
-        # avant qu'elle ne soit perdue (jusqu'ici jamais sauvegardée au-delà du tour courant).
-        if isinstance(last_msg.get("content"), list):
-            try:
-                _saved_shots = await _persist_and_analyze_screenshots(conversation_id, last_msg["content"])
-                if _saved_shots:
-                    yield _sse({"type": "screenshots_saved", "count": len(_saved_shots)})
-            except Exception:
-                pass
-        # v2.170 — titrer la conversation IMMÉDIATEMENT depuis le message utilisateur,
-        # avant même que l'assistant réponde. Avant ce correctif, le titre n'était posé
-        # qu'après une réponse COMPLÈTE (voir plus bas) — si le tour était interrompu en
-        # route (flux abandonné, MAX_TOOL_STEPS, crash...) la conversation restait
-        # "Nouvelle conversation" pour toujours. Signalé par l'utilisateur (capture d'écran
-        # de la barre latérale — une grande partie des entrées jamais titrées). Indépendant
-        # de la réussite du tour, comme chez Claude/ChatGPT (le titre apparaît dès l'envoi).
-        try:
-            conv = db.get_conversation(conversation_id)
-            if conv and conv.get("title") == "Nouvelle conversation" and content.strip():
-                db.update_conversation_title(conversation_id, _autotitle_from_text(content))
-                # v2.171 — titre intelligent (LLM léger) en arrière-plan, sans jamais
-                # retarder l'envoi : la troncature ci-dessus s'affiche tout de suite,
-                # remplacée par un titre plus soigné quelques secondes après.
-                _tt = asyncio.create_task(_smart_title_upgrade(conversation_id, content))
-                _BG_LEARN_TASKS.add(_tt)
-                _tt.add_done_callback(_BG_LEARN_TASKS.discard)
-        except Exception:
-            pass
+    _prepared_turn = await _prepare_turn(
+        messages,
+        conversation_id,
+        request_id,
+        background_tasks=_BG_LEARN_TASKS,
+    )
+    conversation_id = _prepared_turn.conversation_id
+    _user_query = _prepared_turn.user_query
+    for _turn_event in _prepared_turn.events:
+        yield _sse(_turn_event)
     # Outil(s) cité(s) explicitement par leur nom exact → imposés ce tour-ci, pas de substitution.
     _explicit_tool_names = _exact_tool_mentions_from_text(_user_query)
     # v2.185 — « donne-moi la commande » sans verbe d'exécution → outils d'exécution bloqués ce tour.

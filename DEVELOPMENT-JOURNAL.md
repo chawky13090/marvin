@@ -3297,3 +3297,48 @@ ignorée) :
 - Backend réel redémarré : version `2.279.0`, Ollama disponible; frontend Turbopack HTTP 200.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - `agent.py` passe de 1 612 à 1 522 lignes; les trois alias historiques sont appelables.
+
+## 2026-07-22 — v2.280.0 — Préparation durable d'un tour extraite
+
+### Constat et décision
+
+- Le début de `run_agent` créait la conversation, interprétait trois formats de message,
+  persistait l'entrée, traitait les captures, produisait deux événements SSE et lançait le
+  titrage. Cette logique de session précédait toute décision LLM mais restait imbriquée dans
+  le runner.
+- Une frontière `PreparedTurn` est retenue : elle matérialise l'état durable obtenu avant
+  orchestration, comme les objets de session/run des architectures de référence, sans imposer
+  un SDK fournisseur à Marvin.
+
+### Implémentation
+
+- Nouveau `backend/agent_session.py` avec `PreparedTurn`, `extract_user_text`,
+  `prepare_turn` et `upgrade_title`.
+- `prepare_turn` restitue l'identifiant, le texte utilisateur et les événements initiaux.
+  `run_agent` ne possède plus le détail de la création, des écritures et du titrage.
+- La persistance conserve `client_request_id`; les captures réutilisent la frontière v2.279;
+  le titre déterministe est écrit immédiatement puis amélioré dans une tâche enregistrée dans
+  `_BG_LEARN_TASKS` afin d'éviter sa collecte prématurée.
+- Correction de robustesse rencontrée : une partie multimodale non dictionnaire est ignorée
+  au lieu de lever pendant l'extraction de texte.
+- Les alias `_prepare_turn` et `_smart_title_upgrade` restent disponibles dans `agent.py`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_session.py`, `agent.py` et du test : réussie.
+- `scripts/test_agent_session.py` : nouvelle conversation, conversation existante, formats
+  multimodaux/parts, message idempotent, événements, captures, titre et tâche suivie réussis.
+- Non-régression `agent_context` et `agent_execution` : réussie.
+
+### Rollback
+
+- Revenir au commit v2.279 et replacer le bloc initial ainsi que le titrage dans `agent.py`.
+  Aucun schéma ni contrat HTTP n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 60/60 étapes réussies; ESLint 0 erreur et
+  37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.280.0`, Ollama disponible; frontend Turbopack HTTP 200.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+- `agent.py` passe de 1 522 à 1 456 lignes et la préparation de tour reste accessible par façade.

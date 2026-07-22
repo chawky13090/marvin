@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.279.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.280.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.279.0)
+## 9. État actuel (v2.280.0)
+
+**v2.280 (préparation durable d'un tour)** : création/reprise de conversation, extraction des
+formats texte/multimodaux, persistance du message avec `client_request_id`, événements
+`conv_id`/`screenshots_saved`, titre immédiat et amélioration asynchrone sont extraits de
+`agent.py` vers `agent_session.py`. `run_agent` reçoit désormais un `PreparedTurn` avant de
+compiler sa stratégie. Les tâches de titrage restent suivies par le registre anti-GC et les
+façades historiques sont conservées.
 
 **v2.279 (contexte de session et artefacts multimodaux)** : la compaction des anciens
 messages et la persistance/analyse des captures sont extraites de `agent.py` vers
