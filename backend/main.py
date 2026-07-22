@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.287 — domaine mémoire extrait de tools.py : dédoublonnage, Memory Mesh,
+# index/recherche Qdrant, repli SQLite et suppression confirmée.
 # v2.286 — domaine productivité extrait de tools.py : tâches, notes, confirmations,
 # normalisation et index vectoriel avec façade registre strictement compatible.
 # v2.285 — transport Ollama extrait d'agent.py : payload typé, client partagé,

@@ -23,6 +23,7 @@ import database as db
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
+from tool_domains import memory as memory_domain
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
@@ -3665,137 +3666,10 @@ execute_note_delete = productivity_domain.note_delete
 # SECTION 5 — Mémoire
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_memory_save(args: dict) -> dict:
-    content = args.get("content", "")
-    category = args.get("category", "fact")
-    if not content:
-        return {"error": "Contenu requis"}
-    try:
-        # Deduplication: don't save if a very similar memory already exists
-        # Check against existing memories of same category
-        try:
-            existing = db.get_memories()
-            content_norm = content.strip().lower()
-            for mem in existing:
-                if mem.get("category") != category:
-                    continue
-                existing_norm = (mem.get("content") or "").strip().lower()
-                # Exact match or one is a substring of the other (with >80% overlap)
-                if existing_norm == content_norm:
-                    try:
-                        import memory_mesh
-                        memory_mesh.register(mem["id"], mem.get("content") or content, category)
-                    except Exception:
-                        pass
-                    return {
-                        "success": True,
-                        "message": "Souvenir déjà enregistré (dédoublonnage)",
-                        "memory": mem,
-                        "duplicate": True,
-                    }
-                if len(content_norm) > 20 and len(existing_norm) > 20:
-                    # Check substring overlap
-                    if content_norm in existing_norm or existing_norm in content_norm:
-                        # Keep the longer one; update existing if new is longer
-                        if len(content_norm) > len(existing_norm):
-                            try:
-                                db.update_memory(mem["id"], content)
-                                try:
-                                    import memory_mesh
-                                    memory_mesh.register(mem["id"], content, category)
-                                except Exception:
-                                    pass
-                                return {
-                                    "success": True,
-                                    "message": "Souvenir existant mis à jour avec plus de détails",
-                                    "memory": {**mem, "content": content},
-                                    "updated": True,
-                                }
-                            except Exception:
-                                pass
-                        return {
-                            "success": True,
-                            "message": "Souvenir similaire déjà enregistré",
-                            "memory": mem,
-                            "duplicate": True,
-                        }
-        except Exception:
-            pass  # Continue with normal save if dedup check fails
-
-        memory = db.create_memory(content, category)
-        try:
-            import memory_mesh
-            memory_mesh.register(memory["id"], content, category)
-        except Exception:
-            pass
-        try:
-            from vector_store import index_memory
-            await index_memory(memory["id"], content, category)
-        except Exception:
-            pass
-        return {"success": True, "message": "Souvenir enregistré", "memory": memory}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_memory_list(args: dict) -> dict:
-    try:
-        memories = db.get_memories()
-        return {"success": True, "count": len(memories), "memories": memories}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_memory_delete(args: dict) -> dict:
-    mid = args.get("id", "")
-    if not mid:
-        return {"error": "ID de souvenir requis"}
-    if not args.get("confirmed"):
-        try:
-            all_mems = db.get_memories()
-            mem_preview = next((m for m in all_mems if m["id"] == mid), None)
-            if mem_preview:
-                preview = mem_preview["content"][:80] + ("…" if len(mem_preview["content"]) > 80 else "")
-                label = f"« {preview} »"
-            else:
-                label = f"ID {mid}"
-        except Exception:
-            label = f"ID {mid}"
-        return {"requiresConfirmation": True, "message": f"Oublier définitivement le souvenir {label} ?"}
-    try:
-        db.delete_memory(mid)
-        try:
-            from vector_store import delete_document
-            await delete_document("memories", mid)
-        except Exception:
-            pass
-        return {"success": True, "message": f"Souvenir oublié : {mid}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_memory_search(args: dict) -> dict:
-    """Recherche dans les souvenirs — sémantique via Qdrant ou filtre texte en fallback."""
-    query = args.get("query", "").strip()
-    limit = max(1, min(int(args.get("limit", 5)), 20))
-    if not query:
-        return {"error": "Requête vide"}
-    # 1) Recherche sémantique dans la collection Qdrant "memories"
-    try:
-        from vector_store import search
-        results = await search(query, collections=["memories"], limit=limit)
-        if results:
-            return {"success": True, "query": query, "count": len(results), "results": results, "mode": "semantic"}
-    except Exception:
-        pass
-    # 2) Fallback : filtre textuel simple sur les mémoires SQLite
-    try:
-        all_memories = db.get_memories()
-        q_lower = query.lower()
-        matched = [m for m in all_memories if q_lower in m.get("content", "").lower()][:limit]
-        return {"success": True, "query": query, "count": len(matched), "results": matched, "mode": "text_filter"}
-    except Exception as e:
-        return {"error": str(e)}
+execute_memory_save = memory_domain.save
+execute_memory_list = memory_domain.list_memories
+execute_memory_delete = memory_domain.delete
+execute_memory_search = memory_domain.search
 
 
 # ══════════════════════════════════════════════════════════════════════════════

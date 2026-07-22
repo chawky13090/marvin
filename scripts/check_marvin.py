@@ -109,6 +109,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),
+        Stage("Domaine d'outils Mémoire", (python, "scripts/test_tool_domain_memory.py")),
         Stage("Garde-fous d'intention", (python, "scripts/test_intent_guards.py")),
         Stage("Council Cloud et provenance", (python, "scripts/test_council.py")),
         Stage("Mode Ultra strictement cloud", (python, "scripts/test_cloud_only_routing.py")),

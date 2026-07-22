@@ -3592,3 +3592,46 @@ ignorée) :
   observés (13 actifs, 2 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont les contrats projets,
   tâches et notes ainsi que l'accueil Next.js Turbopack.
+
+## 2026-07-22 — v2.287.0 — Domaine Mémoire extrait
+
+### Constat et décision
+
+- Les outils mémoire combinaient dans `tools.py` dédoublonnage, persistance SQLite, Memory
+  Mesh et Qdrant. Leur cohérence mérite une frontière testable indépendamment du registre.
+- Le domaine est extrait sans déplacer les spécifications LLM : la façade reste stable pendant
+  la migration progressive et les consommateurs historiques ne changent pas d'import.
+
+### Implémentation
+
+- Nouveau `backend/tool_domains/memory.py` : sauvegarde dédoublonnée, liste, suppression
+  confirmée, recherche sémantique et repli textuel.
+- Les effets Memory Mesh et Qdrant sont séparés en adaptateurs best-effort; leur panne ne fait
+  pas perdre une écriture SQLite déjà réussie, conformément au comportement historique.
+- `tools.py` expose les quatre noms historiques par alias direct et conserve les quatre entrées
+  de `TOOLS_REGISTRY` et `TOOLS_SPEC`.
+- Durcissement borné : contenu/catégorie/identifiant sont normalisés et une limite de recherche
+  non numérique produit une erreur exploitable, bornée entre 1 et 20.
+- Nouveau `scripts/test_tool_domain_memory.py` : doublon, enrichissement, création, Mesh,
+  index, confirmation, suppression, recherche sémantique, panne Qdrant et repli SQLite.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du domaine, de `tools.py` et du test : réussie.
+- Tests Mémoire et Productivité : réussis.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `tools.py` passe de 20 927 à 20 801 lignes.
+
+### Rollback
+
+- Revenir au commit v2.286 et replacer les quatre fonctions dans `tools.py`. Aucun schéma,
+  contrat d'outil, nom public ni format de résultat n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 67/67 étapes réussies; compilation de 138 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 29596, version `2.287.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont mémoires, paramètres,
+  sauvegardes et accueil Next.js Turbopack.
