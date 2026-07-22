@@ -101,6 +101,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Compilation du plan de tour", (python, "scripts/test_agent_planning.py")),
         Stage("Configuration modèle et confidentialité", (python, "scripts/test_agent_model_config.py")),
         Stage("État observable du Runner", (python, "scripts/test_agent_runner.py")),
+        Stage("Observabilité du Runner", (python, "scripts/test_agent_observability.py")),
         Stage("Recus idempotents des actions chat", (python, "scripts/test_action_replay.py")),
         Stage("Tours chat durables et detachables", (python, "scripts/test_chat_turn_runtime.py")),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),

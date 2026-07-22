@@ -3458,3 +3458,46 @@ ignorée) :
 - Backend réel redémarré : version `2.283.0`, Ollama disponible.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js inclus.
 - `agent.py` passe de 1 310 à 1 275 lignes; l'état reste accessible par façade.
+
+## 2026-07-22 — v2.284.0 — Observabilité isolée du Runner
+
+### Constat et décision
+
+- Après chaque outil, `run_agent` écrivait directement vers quatre sous-systèmes distincts :
+  audit JSONL, journal SQLite, preuve Mission OS et apprentissage du routeur. Ces effets
+  best-effort encombraient la boucle et ne pouvaient pas être testés comme une frontière.
+- Une observation typée unique est diffusée dans un module dédié. Chaque destination reste
+  isolée afin qu'une panne d'observabilité ne fasse jamais échouer une action déjà exécutée.
+
+### Implémentation
+
+- Nouveau `backend/agent_observability.py` avec `ToolObservation`,
+  `record_tool_observation` et `record_long_chain`.
+- `run_agent` transmet le même résultat et la même durée aux consommateurs historiques. La
+  durée est capturée après exécution et normalisation immédiate de l'outil; elle n'inclut plus
+  la critique sensible ni les événements SSE ultérieurs.
+- L'apprentissage du routeur reste limité aux résultats dictionnaires sans champ `error`.
+- Nouveau `scripts/test_agent_observability.py` : contrats des quatre destinations, isolation
+  d'une panne d'audit, absence d'apprentissage en erreur et bornage de l'alerte longue.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_observability.py`, `agent.py` et du test : réussie.
+- Tests `agent_observability`, `agent_runner` et `agent_execution` : réussis.
+
+### Rollback
+
+- Revenir au commit v2.283 et replacer les appels best-effort dans `run_agent`. Aucun schéma,
+  réglage persistant ni contrat HTTP n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 64/64 étapes réussies; compilation de 135 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 29676, version `2.284.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js Turbopack inclus.
+- `git diff --check` : aucun défaut de contenu; seuls les avertissements de normalisation LF
+  vers CRLF propres au checkout Windows sont présents.
+- `agent.py` passe de 1 275 à 1 240 lignes; les hooks historiques restent accessibles par
+  façade et couverts par un test isolé.

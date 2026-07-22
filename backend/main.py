@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.284 — observabilité du Runner extraite d'agent.py : audit, journal SQLite,
+# preuves de mission et apprentissage du routage isolés en best-effort.
 # v2.283 — état observable du Runner extrait d'agent.py : étapes, durée, arrêt, outils,
 # succès/échecs, traces, golden path, blocages Forge et signal de chaîne longue.
 # v2.282 — résolution modèle/confidentialité extraite d'agent.py dans ModelConfig :

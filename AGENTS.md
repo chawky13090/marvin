@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.283.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.284.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.283.0)
+## 9. État actuel (v2.284.0)
+
+**v2.284 (observabilité isolée du Runner)** : les quatre effets d'observabilité exécutés après
+un outil — audit JSONL, historique SQLite, Proof-Carrying Action et apprentissage du routage —
+sont extraits de `agent.py` vers `agent_observability.py`. Chaque destination reste best-effort
+et isolée : sa panne ne transforme jamais une action déjà exécutée en échec utilisateur. La
+durée commune mesure l'exécution et sa normalisation immédiate, sans inclure la critique ou le
+rendu SSE ultérieurs. L'alerte de chaîne longue appartient aussi à cette frontière.
 
 **v2.283 (état observable du Runner)** : `RunnerState` dans `agent_runner.py` possède désormais
 le début et la consommation du budget, la cause d'arrêt, les outils exécutés, succès/échecs,

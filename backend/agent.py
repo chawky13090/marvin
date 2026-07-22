@@ -53,6 +53,11 @@ from agent_session import prepare_turn as _prepare_turn, upgrade_title as _smart
 from agent_planning import compile_turn_plan as _compile_turn_plan
 from agent_model_config import resolve_model_config as _resolve_model_config
 from agent_runner import RunnerState as _RunnerState
+from agent_observability import (
+    ToolObservation as _ToolObservation,
+    record_long_chain as _record_long_chain,
+    record_tool_observation as _record_tool_observation,
+)
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, MAX_CONTEXT_MESSAGES,
@@ -881,6 +886,7 @@ async def run_agent(
                         tool_name, tool_args, conversation_id, request_id,
                     )
 
+                _tool_duration_ms = int((time.time() - _tool_t0) * 1000)
                 # v2.248 — contrat additif commun à tous les outils. Les champs historiques
                 # restent intacts; `_contract` fournit un état, un code d'erreur et la
                 # retryabilité lisibles de façon déterministe par le Chat et les superviseurs.
@@ -888,7 +894,7 @@ async def run_agent(
                     try:
                         import engineering_runtime as _engineering_runtime
                         result = _engineering_runtime.normalize_tool_result(
-                            tool_name, result, duration_ms=int((time.time() - _tool_t0) * 1000),
+                            tool_name, result, duration_ms=_tool_duration_ms,
                         )
                     except Exception:
                         pass
@@ -941,38 +947,14 @@ async def run_agent(
                 if tool_name in {"ai_test_forge", "ai_code_forge"}:
                     _runner_state.update_blocking_outcome(tool_name, result)
 
-                # Journal d'audit : trace l'action (best-effort, n'échoue jamais)
-                try:
-                    import audit
-                    audit.log_action(tool_name, tool_args, result, source="chat")
-                except Exception:
-                    pass
-
-                # v2.139 — trouvé en implémentant la traçabilité par conversation : la boucle de
-                # chat n'écrivait JAMAIS dans `tool_executions` (seuls /api/tools, cron, ssh_exec
-                # REST et email_send le faisaient) — le tableau de bord de fiabilité v2.138 ne
-                # voyait donc qu'une fraction du vrai usage (les appels pilotés par le LLM, la
-                # majorité en pratique, étaient invisibles). Corrigé + conversation_id pour
-                # reconstituer la chronologie complète d'un tour (`pc_conversation_trace`).
-                try:
-                    db.log_execution(tool_name, tool_args, result,
-                                      int((time.time() - _tool_t0) * 1000),
-                                      conversation_id=conversation_id)
-                except Exception:
-                    pass
-                # v2.215 — Proof-Carrying Actions : chaque appel reçoit une preuve durable
-                # (arguments expurgés, résultat, durée, vérification et indication de rollback).
-                try:
-                    import mission_os as _mission_os
-                    _mission_os.record_action(
-                        conversation_id=conversation_id,
-                        tool_name=tool_name,
-                        arguments=tool_args,
-                        result=result,
-                        duration_ms=int((time.time() - _tool_t0) * 1000),
-                    )
-                except Exception:
-                    pass
+                await _record_tool_observation(_ToolObservation(
+                    conversation_id=conversation_id,
+                    user_query=_user_query,
+                    tool_name=tool_name,
+                    arguments=tool_args,
+                    result=result,
+                    duration_ms=_tool_duration_ms,
+                ))
 
                 # Suivi pour l'auto-réparation : compte OK/erreur + trace compacte.
                 _long_chain_started = _runner_state.record_tool(
@@ -982,24 +964,7 @@ async def run_agent(
                     tooling_failure=_is_tooling_failure(result),
                 )
                 if _long_chain_started:
-                    try:
-                        import audit as _audit
-                        _audit.log_action(
-                            "_long_tool_chain", {"count": _runner_state.tool_count, "query": (_user_query or "")[:200]},
-                            {"note": "Chaîne d'outils longue — la fiabilité composée se dégrade au-delà de 8 appels."},
-                            source="chat",
-                        )
-                    except Exception:
-                        pass
-
-                # Apprentissage : si l'outil a réussi, mémoriser qu'il convient à
-                # ce type de demande → routing de plus en plus juste avec l'usage.
-                if isinstance(result, dict) and not result.get("error") and _user_query:
-                    try:
-                        import tool_router
-                        await tool_router.record_success(_user_query, tool_name)
-                    except Exception:
-                        pass
+                    _record_long_chain(_user_query, _runner_state.tool_count)
 
                 tool_results_for_db_step.append({
                     "toolCallId": tool_call_id,

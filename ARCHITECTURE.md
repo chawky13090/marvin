@@ -43,6 +43,7 @@ flowchart LR
 | `agent_planning.py` | Plan déterministe pré-LLM : intentions, Workspace, contraintes Cortex et budgets |
 | `agent_model_config.py` | Configuration typée du modèle, confidentialité, température, label et repli local |
 | `agent_runner.py` | État observable du run : budget, outils, traces, blocages et résultat |
+| `agent_observability.py` | Diffusion isolée des observations d'outils vers audit, SQLite, preuves et apprentissage |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
@@ -119,6 +120,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 17. le plan de tour : suppression et obligation d'outils, reprise Workspace et budgets Cortex.
 18. la configuration modèle : routage auto/manuel, contrats local/cloud et repli sensible.
 19. l'état du Runner : progression, arrêt, preuves d'outils, blocages Forge et provenance.
+20. l'observabilité du Runner : une panne de métrique, preuve ou apprentissage ne peut pas invalider une action exécutée.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
