@@ -3420,3 +3420,41 @@ ignorée) :
 - Backend réel redémarré : version `2.282.0`, Ollama disponible.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js inclus.
 - `agent.py` passe de 1 424 à 1 310 lignes; la configuration reste disponible par façade.
+
+## 2026-07-22 — v2.283.0 — État observable du Runner
+
+### Constat et décision
+
+- La boucle conservait ses compteurs, chronomètre, cause d'arrêt, traces, blocages et outils
+  exécutés dans plus d'une dizaine de variables locales. Cela empêchait de tester l'évolution
+  d'un run sans exécuter Ollama et favorisait les divergences entre provenance et apprentissage.
+- Un `RunnerState` typé devient l'autorité unique de l'état mutable d'exécution.
+
+### Implémentation
+
+- Nouveau `backend/agent_runner.py` : `begin_step`, `record_tool`,
+  `update_blocking_outcome`, `finish_reason` et `budget_usage`.
+- `run_agent` utilise l'état pour son plafond temporel, les étapes consommées, les outils,
+  l'auto-réparation des compétences, le golden path, les reçus Forge et la provenance Cortex.
+- Le signal de chaîne longue est retourné une seule fois au neuvième appel; l'audit historique
+  reste déclenché dans `agent.py`, tandis que la décision est testable sans effet externe.
+- Nouveau `scripts/test_agent_runner.py` : temps, étapes, succès/échec, arguments expurgés de
+  `confirmed`, signal unique, blocages Code/Test Forge, arrêt et métriques.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_runner.py`, `agent.py` et du test : réussie.
+- Tests `agent_runner`, `agent_execution` et `cortex` : réussis.
+
+### Rollback
+
+- Revenir au commit v2.282 et restaurer les compteurs locaux. Aucun schéma, réglage ni contrat
+  HTTP n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 63/63 étapes réussies; ESLint 0 erreur et
+  37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.283.0`, Ollama disponible.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js inclus.
+- `agent.py` passe de 1 310 à 1 275 lignes; l'état reste accessible par façade.

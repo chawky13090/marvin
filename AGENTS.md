@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.282.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.283.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.282.0)
+## 9. État actuel (v2.283.0)
+
+**v2.283 (état observable du Runner)** : `RunnerState` dans `agent_runner.py` possède désormais
+le début et la consommation du budget, la cause d'arrêt, les outils exécutés, succès/échecs,
+traces, golden path, blocages Code/Test Forge, nudge unique et signal de chaîne supérieure à
+huit appels. La provenance Cortex et l'auto-réparation des compétences lisent ce même état au
+lieu de compteurs locaux divergents.
 
 **v2.282 (configuration modèle et confidentialité)** : la résolution automatique/manuelle,
 Hyper local, Ultra Cloud-only, confidentialité Cortex locale/hybride, température, libellé et

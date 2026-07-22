@@ -52,6 +52,7 @@ from agent_context import (
 from agent_session import prepare_turn as _prepare_turn, upgrade_title as _smart_title_upgrade
 from agent_planning import compile_turn_plan as _compile_turn_plan
 from agent_model_config import resolve_model_config as _resolve_model_config
+from agent_runner import RunnerState as _RunnerState
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, MAX_CONTEXT_MESSAGES,
@@ -449,7 +450,8 @@ async def run_agent(
     assistant_text_accum = ""       # texte de la réponse courante
     tool_calls_for_db: list = []    # tool calls de l'étape courante
     tool_results_for_db: list = []  # résultats
-    _executed_tool_names: set[str] = set()
+    _runner_state = _RunnerState()
+    _executed_tool_names = _runner_state.executed_tool_names
 
     async def _cortex_disagreement_escalation(critique_text: str | None, answer: str):
         """Déclenche le Council 5 seulement après un désaccord réel du vérificateur,
@@ -489,16 +491,11 @@ async def run_agent(
     _ollama_options = {"temperature": temperature, "top_p": 0.9}
 
     # Anti-« le modèle explique au lieu d'agir » : on ne le corrige qu'UNE fois.
-    _nudged = False
-
-    # Suivi de l'exécution (pour l'auto-réparation des compétences) :
-    # nb d'outils OK / en erreur + trace compacte, exploités à la fin si une compétence est active.
-    _run_ok = 0
-    _run_err = 0
-    _run_trace: list = []
-    _run_calls: list = []      # séquence structurée [{tool, args}] des appels RÉUSSIS (golden path)
+    # Suivi de l'exécution et preuves pour l'auto-réparation des compétences.
+    _run_trace = _runner_state.trace
+    _run_calls = _runner_state.successful_calls
     _read_call_signatures: set[str] = set()
-    _blocking_outcomes: dict[str, dict] = {}
+    _blocking_outcomes = _runner_state.blocking_outcomes
     _outcome_recorded = False
     # v2.138 — compensation de la fiabilité composée : la littérature 2026 sur les agents LLM
     # documente qu'à 95% de fiabilité PAR appel, une chaîne de 8 outils ne réussit globalement
@@ -506,7 +503,6 @@ async def run_agent(
     # trace visible (audit.jsonl) dès qu'un tour dépasse 8 appels, pour que ce signal soit
     # repérable lors d'un futur audit sans avoir à recompter manuellement les tool_start comme
     # fait à la main pour le diagnostic v2.136.
-    _long_chain_logged = False
 
     def _finalize_skill_outcome():
         """Enregistre l'issue de la compétence active et, si un OUTIL a échoué (mauvais
@@ -520,16 +516,16 @@ async def run_agent(
         _outcome_recorded = True
         try:
             import skills as _sk, tools as _tm3
-            _executed = _run_ok + _run_err
-            _ok = (_run_err == 0)
-            _detail = f"{_run_err} erreur(s) d'outil sur {_executed} appel(s)."
+            _executed = _runner_state.tool_count
+            _ok = _runner_state.succeeded
+            _detail = f"{_runner_state.failed_tools} erreur(s) d'outil sur {_executed} appel(s)."
             _trace = ("Demande: " + (_user_query or "")[:300] + "\n"
                       + "\n".join(_run_trace[-14:])
                       + "\nRéponse finale: " + (full_content or "")[:400])
             _sk.record_outcome(_skill["name"], _ok, _detail, transcript=_trace)
             # 🥇 Succès propre avec au moins un outil → mémoriser le déroulé gagnant
             # (golden path) ; skills garde le plus COURT → la compétence devient + efficace.
-            if _ok and _run_ok > 0 and _run_calls:
+            if _ok and _runner_state.successful_tools > 0 and _run_calls:
                 try:
                     _sk.record_success_trace(_skill["name"], _run_calls, _user_query)
                 except Exception:
@@ -574,15 +570,10 @@ async def run_agent(
     else:
         ollama_msgs[0]["content"] = system_prompt
 
-    _agent_loop_started = time.monotonic()
-    _steps_used = 0
-    _budget_stop_reason = None
     async with httpx.AsyncClient(timeout=_ollama_timeout) as _ollama_client:
       for step in range(_max_tool_steps):
-        if step > 0 and time.monotonic() - _agent_loop_started >= _max_wall_seconds:
-            _budget_stop_reason = "max_wall_seconds"
+        if not _runner_state.begin_step(step, _max_wall_seconds):
             break
-        _steps_used = step + 1
         full_content = ""
         tool_calls_found: list[dict] = []
 
@@ -947,16 +938,8 @@ async def run_agent(
 
                 # Un gate Forge négatif est bloquant. Le tour suivant reste tamponné : Marvin
                 # ne peut plus diffuser une affirmation de succès contredisant le reçu réel.
-                if tool_name == "ai_test_forge":
-                    if isinstance(result, dict) and result.get("success") is True and result.get("production_ready") is True:
-                        _blocking_outcomes.pop(tool_name, None)
-                    else:
-                        _blocking_outcomes[tool_name] = result if isinstance(result, dict) else {"error": str(result)}
-                elif tool_name == "ai_code_forge":
-                    if isinstance(result, dict) and result.get("success") is True:
-                        _blocking_outcomes.pop(tool_name, None)
-                    else:
-                        _blocking_outcomes[tool_name] = result if isinstance(result, dict) else {"error": str(result)}
+                if tool_name in {"ai_test_forge", "ai_code_forge"}:
+                    _runner_state.update_blocking_outcome(tool_name, result)
 
                 # Journal d'audit : trace l'action (best-effort, n'échoue jamais)
                 try:
@@ -992,27 +975,17 @@ async def run_agent(
                     pass
 
                 # Suivi pour l'auto-réparation : compte OK/erreur + trace compacte.
-                _executed_tool_names.add(tool_name)
-                if _is_tooling_failure(result):
-                    _run_err += 1
-                    _emsg = result.get("error") or result.get("stderr") or "échec"
-                    _run_trace.append(f"❌ {tool_name}({json.dumps(tool_args, ensure_ascii=False)[:140]}) → ERREUR: {str(_emsg)[:200]}")
-                else:
-                    _run_ok += 1
-                    _run_trace.append(f"✅ {tool_name} OK")
-                    # Golden path : on retient la séquence d'outils RÉUSSIS (args compacts).
-                    _aargs = {k: v for k, v in (tool_args or {}).items() if k != "confirmed"}
-                    _run_calls.append({"tool": tool_name,
-                                       "args": json.dumps(_aargs, ensure_ascii=False)[:90] if _aargs else ""})
-
-                # v2.138 — signal de fiabilité composée (voir commentaire à la déclaration de
-                # _long_chain_logged) : une seule trace par tour, pas une par outil.
-                if not _long_chain_logged and (_run_ok + _run_err) > 8:
-                    _long_chain_logged = True
+                _long_chain_started = _runner_state.record_tool(
+                    tool_name,
+                    tool_args,
+                    result,
+                    tooling_failure=_is_tooling_failure(result),
+                )
+                if _long_chain_started:
                     try:
                         import audit as _audit
                         _audit.log_action(
-                            "_long_tool_chain", {"count": _run_ok + _run_err, "query": (_user_query or "")[:200]},
+                            "_long_tool_chain", {"count": _runner_state.tool_count, "query": (_user_query or "")[:200]},
                             {"note": "Chaîne d'outils longue — la fiabilité composée se dégrade au-delà de 8 appels."},
                             source="chat",
                         )
@@ -1075,12 +1048,12 @@ async def run_agent(
                 tool_results=tool_results_for_db_step,
             )
 
-        elif (_skill and _skill.get("tools") and not _nudged and use_tools and tools_payload
+        elif (_skill and _skill.get("tools") and not _runner_state.nudged and use_tools and tools_payload
               and step < _max_tool_steps - 1):
             # ── Compétence active mais le modèle a EXPLIQUÉ au lieu d'AGIR ─────
             # (aucun appel natif, rien à récupérer dans le texte). On le corrige
             # UNE fois avec les noms d'outils EXACTS et on relance l'itération.
-            _nudged = True
+            _runner_state.nudged = True
             _avail = {s.get("function", {}).get("name") for s in tools_payload}
             _skill_tool_names = [t for t in _skill["tools"] if t in _avail]
             if full_content.strip():
@@ -1183,7 +1156,7 @@ async def run_agent(
 
             try:
                 _cortex.record_recipe_outcome(
-                    _cortex_plan["requested"].get("recipe_id"), _run_err == 0, _executed_tool_names
+                    _cortex_plan["requested"].get("recipe_id"), _runner_state.succeeded, _executed_tool_names
                 )
             except Exception:
                 pass
@@ -1193,17 +1166,13 @@ async def run_agent(
                 "provenance": _cortex.provenance(
                     _cortex_plan, active_model, _executed_tool_names,
                     critique=bool(_critique), answer=full_content, conversation_id=conversation_id,
-                    budget_usage={
-                        "tool_steps": _steps_used,
-                        "elapsed_seconds": round(time.monotonic() - _agent_loop_started, 3),
-                        "stop_reason": "criteria_satisfied",
-                    },
+                    budget_usage=_runner_state.budget_usage("criteria_satisfied"),
                 ),
             })
             yield _sse({"type": "done"})
             return
 
-    _budget_stop_reason = _budget_stop_reason or "max_tool_steps"
+    _budget_stop_reason = _runner_state.finish_reason()
     # Budget d'étapes ou de temps atteint — v2.126 : jusqu'ici on terminait la boucle
     # SANS RIEN RENVOYER, ni texte ni message sauvegardé — l'utilisateur voyait le flux
     # s'arrêter net après le dernier tool_end, sans aucune réponse. C'est exactement le
@@ -1291,7 +1260,7 @@ async def run_agent(
         yield _up_msg
     try:
         _cortex.record_recipe_outcome(
-            _cortex_plan["requested"].get("recipe_id"), _run_err == 0, _executed_tool_names
+            _cortex_plan["requested"].get("recipe_id"), _runner_state.succeeded, _executed_tool_names
         )
     except Exception:
         pass
@@ -1300,11 +1269,7 @@ async def run_agent(
         "provenance": _cortex.provenance(
             _cortex_plan, active_model, _executed_tool_names,
             critique=bool(_critique), answer=full_content, conversation_id=conversation_id,
-            budget_usage={
-                "tool_steps": _steps_used,
-                "elapsed_seconds": round(time.monotonic() - _agent_loop_started, 3),
-                "stop_reason": _budget_stop_reason,
-            },
+            budget_usage=_runner_state.budget_usage(_budget_stop_reason),
         ),
     })
     yield _sse({"type": "done"})
