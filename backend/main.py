@@ -93,6 +93,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.270 — inventaire Ollama, profils et détection sensible extraits d'agent.py;
+# cloud_routing.py reste l'autorité des modes local/cloud et des modèles Cloud.
 # v2.269 — adaptateurs UI/Ollama/SSE extraits d'agent.py et durcis contre les parties
 # multimodales ou appels d'outils mal formés, sans changer le protocole public.
 # v2.268 — sécurité déterministe extraite d'agent.py : validation des arguments JSON

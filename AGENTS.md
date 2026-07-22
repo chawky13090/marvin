@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.269.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.270.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.269.0)
+## 9. État actuel (v2.270.0)
+
+**v2.270 (routage agentique extrait)** : `backend/agent_routing.py` possède désormais
+l'inventaire des modèles Ollama, la sélection du profil chat/agent/analysis/vision et la
+détection des requêtes sensibles. `agent.py` conserve ses alias privés historiques afin de
+ne modifier ni `main.py`, ni la boucle d'outils, ni le contrat SSE. `cloud_routing.py` reste
+l'autorité unique pour les modes de confidentialité, la sélection Ollama Cloud, Ultra
+débridé cloud-only et le Council. Des régressions isolées couvrent l'inventaire exact,
+les replis, chaque profil, l'historique sensible et la façade d'import.
 
 **v2.269 (protocole agentique extrait)** : `backend/agent_protocol.py` convertit les messages
 UI et persistés vers Ollama et encode les événements SSE. `agent.py` importe les fonctions sous

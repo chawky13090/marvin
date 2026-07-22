@@ -2770,6 +2770,8 @@ ignorée) :
   agenda et orchestrateur e-mail.
 - Frontend Next.js/Turbopack conservé actif; aucun build concurrent exécuté.
 
+
+
 ## 2026-07-22 — v2.268.0 — Sécurité déterministe extraite de l'agent
 
 ### Objectif et décision
@@ -2842,3 +2844,43 @@ ignorée) :
 - Backend réel redémarré : version `2.269.0`, 344/344 outils et 15 workers.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
 - Frontend Next.js/Turbopack conservé actif; aucun build concurrent exécuté.
+
+## 2026-07-22 — v2.270.0 — Routage des profils et modèles extrait
+
+### Contexte et décision
+
+- Poursuivre la réduction progressive de `agent.py` sans réécrire la boucle agentique.
+- Isoler les décisions déterministes de profil et l'inventaire Ollama, tout en laissant
+  `cloud_routing.py` autoritaire pour la confidentialité et la sélection Cloud.
+- Conserver les alias privés utilisés par `main.py` et `run_agent` afin d'éviter une rupture
+  de compatibilité pendant la consolidation.
+
+### Implémentation
+
+- Nouveau `backend/agent_routing.py` : cache d'inventaire Ollama, disponibilité exacte des
+  modèles, replis ordonnés, profils chat/agent/analysis/vision et contexte sensible récent.
+- `agent.py` importe les décisions sous les anciens noms `_detect_profile`,
+  `_refresh_model_cache`, `_pick_available` et les façades de confidentialité historiques.
+- Les tables de mots-clés et les cinq anciennes fonctions sont retirées de `agent.py`, soit
+  plus de 300 lignes de responsabilité distincte supprimées sans suppression fonctionnelle.
+- Nouveau contrôle `scripts/test_agent_routing.py`, intégré aux commandes npm, au socle
+  d'architecture et au contrôle consolidé.
+
+### Validation réalisée
+
+- Inventaire Ollama simulé : noms complets et familles sans tag conservés.
+- Cache vide : compatibilité de démarrage préservée; repli ordonné vérifié.
+- Profils sans message, conversation courte, analyse, action et vision : vérifiés.
+- Sensibilité du message courant et d'un outil e-mail dans l'historique : vérifiée.
+- Mode Ultra strictement cloud, Council cinq modèles et 21 garde-fous d'intention : réussis.
+- `scripts/check_marvin.py --quick` : 51/51 étapes réussies; 123 fichiers Python compilés,
+  dépendances cohérentes, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.270.0`, Ollama disponible, 344/344 outils et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
+- Frontend Next.js/Turbopack conservé actif et répond en HTTP 200; aucun build concurrent.
+
+### Rollback
+
+- Restaurer les constantes et fonctions de routage dans `agent.py`, retirer
+  `agent_routing.py` et son test, puis revenir à `2.269.0`. Aucun schéma ni contenu utilisateur
+  n'est modifié par cette tranche.
