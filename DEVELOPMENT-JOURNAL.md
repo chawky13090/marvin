@@ -3148,3 +3148,62 @@ ignorée) :
 - Backend réel redémarré : version `2.276.0`, Ollama disponible, 344/344 outils et 15 workers.
 - Tour Cloud réel en effort instant : contrat 3 étapes/120 secondes, une étape consommée,
   arrêt `criteria_satisfied`; conversation et journal de test supprimés après validation.
+
+## 2026-07-22 — v2.277.0 — Frontière d'exécution du moteur agentique
+
+### Demande et remise en cohérence
+
+- L'utilisateur a rappelé que le chantier prioritaire est la consolidation globale du code
+  selon les principes d'architecture observables chez OpenAI, Anthropic et Google, et non
+  l'accumulation de fonctionnalités Cortex isolées.
+- L'option B de `CODEBASE-CONSOLIDATION-AUDIT.md` reste la décision directrice : migration
+  incrémentale par façades et contrats, avec test et rollback à chaque frontière extraite.
+
+### Références officielles et décision
+
+- OpenAI Agents SDK sépare l'agent configuré du `Runner`, du stockage de session, des
+  guardrails, des outils et du tracing par exécution.
+- Anthropic recommande une boucle simple où le LLM conserve la liberté de décider, mais avec
+  des outils composables, un état durable, des retours du monde réel et des évaluations. Son
+  architecture Managed Agents distingue explicitement session, harness et sandbox.
+- Google ADK sépare runtime/event loop, sessions, état temporaire, mémoire durable, outils,
+  callbacks et observabilité.
+- Pour Marvin, le compromis retenu n'est pas l'adoption d'un framework fournisseur : il s'agit
+  de stabiliser les mêmes frontières dans l'architecture existante, compatible Ollama Cloud,
+  Ollama local, Windows et les 344 outils actuels.
+
+### Implémentation
+
+- Nouveau `backend/agent_execution.py`, frontière unique entre décision du LLM et action :
+  résolution du registre, reçu idempotent, classification des erreurs d'outillage et
+  normalisation des appels d'outils écrits en texte par certains modèles.
+- Le registre est injectable pour isoler les tests et préparer plusieurs runtimes sans état
+  global substitué. La production conserve `TOOLS_REGISTRY` par défaut.
+- `backend/agent.py` conserve les quatre alias historiques. Aucun appel interne, outil,
+  permission, confirmation ni format SSE n'a changé.
+- Nouveau test de caractérisation `scripts/test_agent_execution.py` : succès, outil inconnu,
+  exception contrôlée, reçu, filtrage strict des outils autorisés, erreurs environnementales
+  et compatibilité de façade.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_execution.py`, `agent.py` et du test : réussie.
+- Tests `agent_execution`, `agent_policy`, `agent_safety` et `agent_tool_selection` : réussis.
+- `scripts/check_architecture.py` : Marvin 2.277.0, 344 outils, 346 routes, 40 pages et
+  63 outils encadrés.
+- `git diff --check` : aucune erreur de patch.
+
+### Rollback
+
+- Revenir au commit v2.276 et replacer les quatre fonctions derrière leurs alias dans
+  `agent.py`. Aucun schéma SQLite, contenu utilisateur ou contrat réseau n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 57/57 étapes réussies; le nouveau test d'exécution
+  agentique fait désormais partie de la porte centrale. ESLint reste à 0 erreur et conserve
+  37 avertissements historiques hors périmètre.
+- Backend réel redémarré : version `2.277.0`, Ollama disponible; frontend Turbopack HTTP 200.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+- `agent.py` passe de 1 854 à 1 694 lignes sans suppression de fonctionnalité; la logique
+  retirée est déplacée derrière des alias vers le nouveau module et couverte par test.

@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.276.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.277.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.276.0)
+## 9. État actuel (v2.277.0)
+
+**v2.277 (frontière d'exécution agentique)** : la résolution et l'exécution des outils, les
+reçus idempotents, la capture des exceptions, la classification des défauts d'outillage et la
+récupération des appels textuels sont extraits de `agent.py` vers `agent_execution.py`. Le
+registre devient injectable pour les tests et les runtimes futurs. Les alias historiques de
+`agent.py` restent disponibles : aucun outil, format SSE ni contrat public n'est supprimé.
 
 **v2.276 (budget Cortex adaptatif)** : la boucle LLM n'utilise plus un plafond uniforme de
 10 étapes. Le contrat choisit 3/10/16/24 étapes et 120/600/1800/3600 secondes pour les profils

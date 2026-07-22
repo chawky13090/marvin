@@ -36,6 +36,7 @@ flowchart LR
 | `agent_protocol.py` | Conversion UI/base vers Ollama et encodage JSON des événements SSE |
 | `agent_routing.py` | Inventaire Ollama, sélection de profil et détection du contexte sensible |
 | `agent_tool_selection.py` | Matrice d'outils, routage sémantique, repli borné et plafond déterministe |
+| `agent_execution.py` | Frontière LLM/actions : registre injectable, reçus idempotents, erreurs et normalisation des appels textuels |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
@@ -105,6 +106,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 10. le démarrage de l'initialiseur Next.js sur une base vierge ;
 11. les reçus d'action : déduplication, concurrence, interruption et masquage des secrets ;
 12. les tours de chat détachables : journal durable, curseur, reconnexion et arrêt sûr.
+13. la frontière d'exécution agentique : registre, reçus, erreurs et appels textuels bornés.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

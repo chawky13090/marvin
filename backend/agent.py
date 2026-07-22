@@ -16,7 +16,6 @@ import httpx
 
 import cloud_routing as _cr
 import database as db
-from action_replay import execute_once as _execute_action_once, should_guard as _should_guard_action
 from intent_guard import (
     skill_match_text, tool_suppression_reason, wants_command_text_only as _wants_command_text_only,
     wants_model_council, workspace_followup,
@@ -42,6 +41,12 @@ from agent_routing import (
 from agent_safety import (
     scan_dangerous_script_patterns as _scan_dangerous_script_patterns,
     validator_for,
+)
+from agent_execution import (
+    execute_registered_tool as _execute_registered_tool,
+    is_tooling_failure as _is_tooling_failure,
+    log_tool_exception as _log_tool_exception,
+    salvage_text_tool_calls as _salvage_text_tool_calls,
 )
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
@@ -78,50 +83,6 @@ _BG_LEARN_TASKS: set = set()
 # le cas concret déjà rencontré en audit (paramètre requis totalement absent → l'outil part sur
 # une KeyError/valeur par défaut fausse) avant même l'appel, pas remplacer les validations
 # internes déjà présentes dans chaque `execute_*`.
-def _log_tool_exception(tool_name: str, tool_args: dict, ex: Exception, conversation_id: str | None) -> dict:
-    """v2.184 — un outil qui LÈVE une exception (pas un {"error": ...} propre) est plus
-    probablement un vrai bug qu'un cas géré — capture le traceback COMPLET dans bug_log.jsonl
-    (tool_executions/audit.jsonl ne gardent que str(ex), jamais la stack) pour un débogage
-    effectif plus tard, sans avoir à reproduire. Best-effort, ne doit jamais lever à son tour."""
-    try:
-        import traceback as _tb
-        import bug_log as _bug_log
-        _bug_log.log_bug(
-            "tool_exception", str(ex), context={"args": tool_args},
-            traceback_str=_tb.format_exc(), conversation_id=conversation_id, tool_name=tool_name,
-        )
-    except Exception:
-        pass
-    return {"error": str(ex)}
-
-
-async def _execute_registered_tool(
-    tool_name: str,
-    tool_args: dict,
-    conversation_id: str,
-    request_id: str | None,
-):
-    """Execute un outil derriere le recu idempotent des actions a effet de bord."""
-    executor = TOOLS_REGISTRY.get(tool_name)
-    if not executor:
-        return {"error": f"Outil inconnu : {tool_name}"}
-
-    async def operation():
-        try:
-            return await executor(tool_args)
-        except Exception as ex:
-            return _log_tool_exception(tool_name, tool_args, ex, conversation_id)
-
-    return await _execute_action_once(
-        request_id=request_id,
-        conversation_id=conversation_id,
-        tool_name=tool_name,
-        arguments=tool_args,
-        operation=operation,
-        guarded=tool_name in DANGEROUS_TOOLS or _should_guard_action(tool_name),
-    )
-
-
 # v2.131 — filet de sécurité DÉTERMINISTE sur les réponses techniques (scripts). La règle
 # d'or #11 (ne pas toucher à l'authentification root d'une base de données) reste violée
 # par le modèle cloud dans ~2 générations sur 3 malgré une interdiction explicite et sans
@@ -323,127 +284,6 @@ async def _conversation_summary(conversation_id: str, overflow: list, model: str
 
 
 # ── Agent de streaming principal ──────────────────────────────────────────────
-
-def _is_tooling_failure(result) -> bool:
-    """Vrai si le résultat d'un outil traduit un PROBLÈME DE COMPÉTENCE/OUTILLAGE
-    (mauvais outil, mauvaise commande/shell, paramètre invalide, outil inconnu) — et
-    PAS un simple résultat réel négatif (ex. ping vers un hôte éteint). Sert à décider
-    s'il faut auto-réparer la compétence, sans dégrader une compétence qui marche."""
-    if not isinstance(result, dict):
-        return False
-    # Erreurs ENVIRONNEMENTALES (non corrigeables en réécrivant la compétence) → ignorées :
-    # timeout (commande lente), droits admin/permission, antivirus. Évite les faux upgrades.
-    _blob_env = (str(result.get("error", "")) + " " + str(result.get("stderr", "")) + " "
-                 + str(result.get("message", ""))).lower()
-    _env_sigs = (
-        # environnement (non corrigeable par une réécriture de compétence)
-        "délai dépassé", "delai depasse", "timed out", "timeout", "accès refusé",
-        "acces refuse", "access denied", "administrateur", "antivirus", "permission refusée",
-        # entrée utilisateur manquante (≠ défaut de compétence) → ne pas auto-upgrader
-        "requis", "required", "manquant", "missing", "fournis", "préciser", "preciser",
-        "renseigner", "obligatoire")
-    if any(s in _blob_env for s in _env_sigs):
-        return False
-    if result.get("error"):
-        return True
-    if result.get("success") is False:
-        blob = (str(result.get("stderr", "")) + " " + str(result.get("stdout", ""))).lower()
-        sigs = ("is not recognized", "n'est pas reconnu", "not recognized as",
-                "commandnotfound", "cmdletnotfound", "the term ", "parsererror",
-                "unexpected token", "paramètre", "parameterbinding", "cannot be loaded",
-                "outil inconnu", "argument", "syntax")
-        return any(s in blob for s in sigs)
-    return False
-
-
-def _salvage_text_tool_calls(content: str, allowed_names: set) -> list:
-    """
-    Filet de sécurité : certains modèles (qwen2.5 notamment, surtout quand une
-    compétence injecte une méthode pas-à-pas) DÉCRIVENT les appels d'outils en
-    TEXTE/JSON (souvent dans un bloc ```json {"name":..., "arguments":...} ```)
-    au lieu de les émettre nativement → aucun outil ne s'exécute, Marvin « parle »
-    au lieu d'« agir ». Cette fonction récupère ces appels pour les EXÉCUTER vraiment.
-
-    Sécurité : on ne récupère QUE des outils réellement proposés ce tour-ci
-    (allowed_names) ; les permissions sont vérifiées ensuite par le chemin normal.
-    Retourne une liste au format natif : [{"function": {"name", "arguments"}}].
-    """
-    if not content or not allowed_names:
-        return []
-
-    def _norm(s: str) -> str:
-        return re.sub(r"[^a-z0-9]", "", (s or "").lower())
-
-    _norm_map = {}
-    for a in allowed_names:
-        _norm_map.setdefault(_norm(a), a)
-
-    def _resolve(name: str):
-        """Résout un nom d'outil (éventuellement halluciné) vers un outil réel autorisé."""
-        if not name:
-            return None
-        if name in allowed_names:
-            return name
-        nn = _norm(name)
-        if nn in _norm_map:                      # même nom à la casse/ponctuation près
-            return _norm_map[nn]
-        # sous-chaîne UNIQUE (ex. 'ping' → 'net_ping', 'process kill' → 'pc_process_kill')
-        cands = [real for nrm, real in _norm_map.items() if nn and (nn in nrm or nrm in nn)]
-        return cands[0] if len(set(cands)) == 1 else None
-
-    dec = json.JSONDecoder()
-    calls, seen = [], set()
-    i, n = 0, len(content)
-    while i < n:
-        if content[i] != "{":
-            i += 1
-            continue
-        try:
-            obj, end = dec.raw_decode(content, i)   # gère les accolades imbriquées
-        except Exception:
-            i += 1
-            continue
-        i = end
-        if not isinstance(obj, dict):
-            continue
-        fn = obj.get("function") if isinstance(obj.get("function"), dict) else {}
-        name = _resolve(obj.get("name") or obj.get("tool") or fn.get("name"))
-        args = obj.get("arguments")
-        if args is None:
-            args = obj.get("parameters") or obj.get("args") or fn.get("arguments") or {}
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except Exception:
-                args = {}
-        if not name or name not in allowed_names or not isinstance(args, dict):
-            continue
-        key = name + json.dumps(args, sort_keys=True, ensure_ascii=False)
-        if key in seen:
-            continue
-        seen.add(key)
-        calls.append({"function": {"name": name, "arguments": args}})
-
-    # 2ᵉ passe — nom AVANT l'accolade : `net_ping {"host":...}`, `net_ping({...})`,
-    # ou bloc ```net_ping\n{...}```. Fréquent avec le petit modèle chat (3b).
-    for m in re.finditer(r"([A-Za-z_][A-Za-z0-9_]{2,40})\s*\(?\s*(\{)", content):
-        real = _resolve(m.group(1))
-        if not real or real not in allowed_names:
-            continue
-        try:
-            obj, _ = dec.raw_decode(content, m.start(2))   # l'objet APRÈS le nom = les arguments
-        except Exception:
-            continue
-        # ignorer une enveloppe d'appel déjà gérée par la passe 1 ({name/function/arguments})
-        if not isinstance(obj, dict) or any(k in obj for k in ("name", "function", "arguments")):
-            continue
-        key = real + json.dumps(obj, sort_keys=True, ensure_ascii=False)
-        if key in seen:
-            continue
-        seen.add(key)
-        calls.append({"function": {"name": real, "arguments": obj}})
-    return calls
-
 
 # v2.175 — jusqu'ici, une image attachée au chat n'était utilisée QUE pour ce tour (vision
 # ponctuelle) puis jetée : agent.py extrayait le texte du message multimodal et écrivait

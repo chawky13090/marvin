@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.277 — frontière d'exécution des outils extraite d'agent.py : registre injectable,
+# reçus idempotents, erreurs et récupération des appels textuels derrière une façade stable.
 # v2.276 — budget Cortex adaptatif : 3/10/16/24 étapes et plafond temporel selon effort,
 # arrêt dès satisfaction et consommation publiée dans la provenance de la réponse.
 # v2.275 — transport SSE frontend partagé : reconnexion après coupure en milieu de réponse
