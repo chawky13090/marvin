@@ -3207,3 +3207,47 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - `agent.py` passe de 1 854 à 1 694 lignes sans suppression de fonctionnalité; la logique
   retirée est déplacée derrière des alias vers le nouveau module et couverte par test.
+
+## 2026-07-22 — v2.278.0 — Revue indépendante extraite du runner
+
+### Constat et décision
+
+- `agent.py` contenait encore deux responsabilités distinctes de l'orchestration : construire
+  et exécuter la revue d'une réponse, puis juger la cohérence d'une action sensible.
+- OpenAI expose les output/tool guardrails comme politiques du run; Anthropic montre qu'un
+  évaluateur apporte de la valeur lorsque la tâche dépasse la fiabilité du générateur; Google
+  ADK sépare callbacks, outils, runtime et évaluations. Marvin adopte la même frontière sans
+  rendre le critique obligatoire sur les réponses simples.
+
+### Implémentation
+
+- Nouveau `backend/agent_review.py` avec `review_response`, `review_action` et la sélection
+  d'un modèle critique distinct parmi les modèles Cloud déjà configurés.
+- Le générateur est injectable : les tests ne dépendent ni d'Ollama ni du réseau.
+- Les limites existantes sont conservées : revue automatique des blocs de code, revue forcée
+  par les contrats Cortex `verify`/`council_if_disagreement`, verdict insignifiant ignoré,
+  panne du critique non bloquante et contrôle d'action limité à 200 caractères.
+- `agent.py` garde `_run_critique_pass` et `_critique_action` comme alias de compatibilité.
+- `scripts/test_agent_review.py` couvre le déclenchement, le modèle différent, OK, anomalie,
+  sortie vide, timeout, action incohérente et façade. Le test est ajouté à `check_marvin.py`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_review.py`, `agent.py` et du test : réussie.
+- Tests `agent_review`, `agent_execution` et `agent_safety` : réussis.
+- `scripts/check_architecture.py` : Marvin 2.278.0, 344 outils, 346 routes, 40 pages et
+  63 outils encadrés.
+- `git diff --check` : aucune erreur de patch.
+
+### Rollback
+
+- Revenir au commit v2.277 et replacer les deux fonctions et leur prompt dans `agent.py`.
+  Aucun schéma, message utilisateur, outil ni protocole réseau n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 58/58 étapes réussies, dont la nouvelle porte de revue;
+  ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.278.0`, Ollama disponible; frontend Turbopack HTTP 200.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+- `agent.py` passe de 1 694 à 1 612 lignes; les deux alias historiques sont toujours appelables.

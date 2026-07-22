@@ -48,6 +48,10 @@ from agent_execution import (
     log_tool_exception as _log_tool_exception,
     salvage_text_tool_calls as _salvage_text_tool_calls,
 )
+from agent_review import (
+    review_action as _critique_action,
+    review_response as _run_critique_pass,
+)
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, DEFAULT_MODEL, MAX_CONTEXT_MESSAGES,
@@ -104,66 +108,6 @@ _BG_LEARN_TASKS: set = set()
 # v2.126, "Marvin reste à réfléchir"). Produit un BANDEAU visible (jamais une réécriture
 # silencieuse de la réponse) : un texte auto-corrigé par un LLM sans supervision humaine
 # est invérifiable, contraire à l'exigence de fiabilité prouvée de cette session.
-_CRITIQUE_PROMPT_TMPL = (
-    "Tu es un RELECTEUR technique indépendant. Un AUTRE modèle vient de répondre à un "
-    "technicien informatique. Cherche UNIQUEMENT des problèmes GRAVES parmi ces 4 "
-    "catégories précises — RIEN d'autre :\n"
-    "1. Un identifiant/nom de modèle/ID technique INVENTÉ, présenté comme réel sans "
-    "avoir été vérifié.\n"
-    "2. Une information factuellement FAUSSE ou probablement périmée, présentée comme certaine.\n"
-    "3. Une dégradation de sécurité RÉELLE déguisée en amélioration (mot de passe vidé, "
-    "authentification supprimée sans remplacement, permissions 777, pare-feu désactivé).\n"
-    "4. Une syntaxe shell NON évaluée (ex. littéralement `$(date ...)`) écrite telle quelle "
-    "dans un contenu censé être lu tel quel (document/rapport), pas dans un script exécutable.\n\n"
-    "IMPORTANT — N'ES PAS un relecteur de style : IGNORE tout ce qui est préférence, "
-    "convention, formulation, usage de `sudo`, absence d'étape « vérification finale », "
-    "ou tout point que le rédacteur original a déjà lui-même signalé comme risque dans sa "
-    "réponse. En cas de doute, ne signale RIEN plutôt que de trouver un problème mineur "
-    "pour justifier ta relecture — la plupart des réponses sont correctes et méritent « OK ».\n\n"
-    "DEMANDE ORIGINALE :\n{query}\n\n"
-    "RÉPONSE À VÉRIFIER :\n{response}\n\n"
-    "Réponds UNIQUEMENT par « OK » si aucun problème GRAVE des 4 catégories ci-dessus n'est "
-    "trouvé, sinon par une liste à puces courte (3 points maximum) — rien d'autre."
-)
-
-
-async def _run_critique_pass(
-    user_query: str, full_content: str, active_model: str, *, force: bool = False
-) -> str | None:
-    """Retourne le verdict du critique (texte des problèmes trouvés) ou None si le
-    critique n'a rien trouvé / a échoué / ne s'applique pas à ce tour. Best-effort
-    strict : aucune exception ne doit jamais empêcher l'envoi de la réponse principale."""
-    if not force and "```" not in full_content:
-        return None
-    try:
-        import cloud_routing as _cr2
-        import tools as _tm2
-        # Choisir un modèle DIFFÉRENT de celui qui a répondu (diversité de jugement,
-        # cf. Mixture-of-Agents) — reste dans les modèles cloud déjà configurés par
-        # l'utilisateur, jamais un choix arbitraire hors de ses réglages.
-        critic_model = None
-        if _cr2.is_cloud_model(active_model):
-            _, _overrides = _cr2.get_cloud_config()
-            for _m in _overrides.values():
-                if _m and _m != active_model:
-                    critic_model = _m
-                    break
-        prompt = _CRITIQUE_PROMPT_TMPL.format(
-            query=(user_query or "")[:2000], response=full_content[:6000])
-        verdict = await _tm2._ollama_generate(prompt, model=critic_model, timeout=90)
-        verdict = (verdict or "").strip()
-        if not verdict or verdict.upper().startswith("OK"):
-            return None
-        # Filet : un critique qui dégénère en sortie quasi vide (ex. juste "-", observé
-        # en test réel sur un appel) ne doit jamais produire un bandeau vide/inutile —
-        # mieux vaut ne rien afficher qu'un "problème" sans contenu substantiel.
-        if len(re.sub(r"[\s\-•*]", "", verdict)) < 15:
-            return None
-        return verdict
-    except Exception:
-        return None
-
-
 async def _smart_title_upgrade(conversation_id: str, user_text: str):
     """v2.171 — titre plus soigné qu'une simple troncature, généré en arrière-plan (ne
     bloque jamais l'envoi). Passe par _ollama_generate (tools.py), donc bénéficie
@@ -215,32 +159,6 @@ _ALWAYS_CONFIRM_TOOLS = {
     "system_cleanup", "long_task_start", "pc_gui_click", "pc_gui_type",
     "code_workspace_start", "code_workspace_control",
 }
-
-
-async def _critique_action(user_query: str, tool_name: str, args: dict, model: str = None):
-    """Auto-critique : vérifie qu'une action sensible correspond bien à la demande.
-    Renvoie None si OK, sinon une courte phrase décrivant le souci. Best-effort.
-    Réutilise le modèle déjà chargé (model) pour éviter de charger un 2ᵉ modèle."""
-    try:
-        import tools as _tm
-        prompt = (
-            "Tu es un contrôleur de sécurité. Tu dois détecter si une action ne correspond PAS à la demande.\n\n"
-            f"DEMANDE : « {user_query} »\n"
-            f"ACTION PRÉVUE : {tool_name} avec {json.dumps(args, ensure_ascii=False)[:400]}\n\n"
-            "Le TYPE d'action et ses cibles correspondent-ils à la demande ?\n"
-            "- Si l'action fait clairement autre chose que demandé (ex: la demande parle de supprimer une tâche "
-            "mais l'action envoie un email), réponds : PROBLEME: <quoi> en UNE phrase.\n"
-            "- Si l'action correspond bien à la demande, réponds uniquement : OK\n"
-            "Réponse :"
-        )
-        r = (await _tm._ollama_generate(prompt, model=model, timeout=60) or "").strip()
-        if not r or r.upper().startswith("OK") or len(r) < 5:
-            return None
-        r = r.split("\n")[0]
-        r = re.sub(r"^\s*PROBL[EÈ]?ME\s*:\s*", "", r, flags=re.IGNORECASE)
-        return r[:200] if len(r) >= 5 else None
-    except Exception:
-        return None
 
 
 async def _conversation_summary(conversation_id: str, overflow: list, model: str = None) -> str | None:

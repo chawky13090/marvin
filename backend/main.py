@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.278 — revue indépendante des réponses et actions extraite d'agent.py derrière
+# une interface injectable, sans modifier les déclencheurs Cortex ni le comportement SSE.
 # v2.277 — frontière d'exécution des outils extraite d'agent.py : registre injectable,
 # reçus idempotents, erreurs et récupération des appels textuels derrière une façade stable.
 # v2.276 — budget Cortex adaptatif : 3/10/16/24 étapes et plafond temporel selon effort,

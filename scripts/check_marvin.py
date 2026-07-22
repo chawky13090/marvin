@@ -95,6 +95,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Construction du prompt systeme", (python, "scripts/test_agent_prompt.py")),
         Stage("Selection bornee des outils LLM", (python, "scripts/test_agent_tool_selection.py")),
         Stage("Execution deterministe des outils LLM", (python, "scripts/test_agent_execution.py")),
+        Stage("Revue indépendante des réponses et actions", (python, "scripts/test_agent_review.py")),
         Stage("Recus idempotents des actions chat", (python, "scripts/test_action_replay.py")),
         Stage("Tours chat durables et detachables", (python, "scripts/test_chat_turn_runtime.py")),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
