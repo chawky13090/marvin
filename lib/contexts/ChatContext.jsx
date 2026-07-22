@@ -26,6 +26,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import { useVoice } from '@/lib/hooks/useVoice';
 import { BACKEND_URL } from '@/lib/backend';
 import { DEFAULT_CORTEX_CONTRACT, resetOneShot } from '@/lib/cortex';
+import { durableChatEvents } from '@/lib/chatStream';
 
 const ChatContext = createContext(null);
 
@@ -176,50 +177,10 @@ export function ChatProvider({ children }) {
           model: activeModelRef.current || null,
           cortex: missionContract,
         };
-      let response;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          response = await fetch(`${BACKEND_URL}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestPayload),
-            signal: controller.signal,
-          });
-          break;
-        } catch (fetchError) {
-          if (attempt > 0 || fetchError.name === 'AbortError') throw fetchError;
-          // Le premier POST a pu atteindre FastAPI avant la coupure. Le même requestId
-          // rattache le navigateur au producteur durable sans relancer le LLM ni ses actions.
-          await new Promise(resolve => setTimeout(resolve, 250));
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
       setStatus('streaming');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
-
-          let event;
-          try { event = JSON.parse(raw); } catch { continue; }
-
+      for await (const event of durableChatEvents({
+        url: `${BACKEND_URL}/api/chat`, payload: requestPayload, signal: controller.signal,
+      })) {
           switch (event.type) {
             case 'conv_id':
               if (event.conversationId) {
@@ -396,7 +357,6 @@ export function ChatProvider({ children }) {
               }
               break;
           }
-        }
       }
     } catch (err) {
       if (err.name !== 'AbortError') {

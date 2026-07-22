@@ -70,6 +70,7 @@ flowchart LR
 |---|---|
 | `app/` | Pages App Router et proxys Next.js compatibles avec l’UI historique |
 | `lib/backend.js` | Résolution unique de l’URL FastAPI en local, LAN et SSR |
+| `lib/chatStream.js` | Transport SSE reprenable, curseur `turnSeq` et reconnexion bornée sans doublon |
 | `lib/contexts/ChatContext.jsx` | État global du chat et lecture du flux SSE |
 | `components/chat/` | Saisie, rendu des messages, outils et fichiers |
 | `components/sidebar/` | Navigation et état global visible |

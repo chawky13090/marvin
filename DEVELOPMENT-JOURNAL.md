@@ -3070,3 +3070,41 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis; frontend Turbopack HTTP 200.
 - Tour réel sans outil : 11 événements numérotés, conversation attribuée et état final
   `completed`; les données de test ont ensuite été supprimées.
+
+## 2026-07-22 — v2.275.0 — Reconnexion SSE frontend au curseur
+
+### Constat et décision
+
+- La v2.274 conservait le producteur et ses événements, mais l'UI ne retentait automatiquement
+  que l'établissement initial du POST. Une rupture de transport après plusieurs fragments
+  laissait le backend terminer sans rattacher l'affichage courant.
+- Centraliser le transport dans un générateur JavaScript partagé évite deux implémentations
+  divergentes entre `ChatContext` et `useSecretary`.
+
+### Implémentation
+
+- Nouveau `lib/chatStream.js` : parsing SSE, curseur du dernier événement effectivement livré,
+  deux reconnexions bornées et propagation immédiate d'une annulation utilisateur.
+- Chaque reconnexion renvoie `afterEvent`; le backend ne restitue que les séquences suivantes.
+  Le texte, les outils, le raisonnement et la synthèse vocale ne reçoivent donc aucun doublon.
+- `ChatContext` et `useSecretary` conservent leurs projections UI historiques mais délèguent
+  désormais le transport au même générateur.
+
+### Validation isolée réalisée avant versionnage
+
+- Flux simulé coupé après `turnSeq=1`, puis repris : deux connexions, second POST avec
+  `afterEvent=1`, événements visibles `text`, `text`, `done`, contenu final `AB` sans doublon.
+- ESLint : 0 erreur.
+
+### Rollback
+
+- Revenir à `2.274.0` et restaurer les lecteurs SSE locaux dans les deux hooks. Aucun schéma
+  SQLite supplémentaire n'est introduit par cette version.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 56/56 étapes réussies, 127 fichiers Python compilés,
+  dépendances cohérentes, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.275.0`, Ollama disponible, 344/344 outils et 15 workers.
+- Frontend Next.js/Turbopack : `/market` répond HTTP 200. Le navigateur intégré refuse le
+  rechargement de `localhost` par politique d'URL; aucune tentative de contournement effectuée.

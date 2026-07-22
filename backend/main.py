@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.275 — transport SSE frontend partagé : reconnexion après coupure en milieu de réponse
+# avec afterEvent, sans dupliquer texte, outils, raisonnement ou lecture vocale.
 # v2.274 — producteur de tour détaché du navigateur et journal SSE SQLite rejouable;
 # une reconnexion reprend au curseur sans relancer le LLM ni ses actions.
 # v2.273 — requestId propagé du chat et reçus SQLite transactionnels : une action
