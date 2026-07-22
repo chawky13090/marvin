@@ -6,12 +6,11 @@ Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 import json
 import base64
 import re as _re
-import asyncio as _asyncio
 import sys
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, FileResponse, Response
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from typing import Any
 
@@ -60,6 +59,7 @@ from api.voice import prewarm_whisper
 from api.voice import router as voice_router
 from api.avatar import router as avatar_router
 from api.vm_lab import router as vm_lab_router
+from api.video_editing import router as video_editing_router
 from api.video_remote import router as video_remote_router
 from api.workflows import router as workflows_router
 from app_version import APP_VERSION
@@ -99,6 +99,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.294 — création et montage vidéo locaux extraits : diaporama, texte animé, fichiers
+# bornés au stockage vidéo et opérations ffmpeg vivent dans api/video_editing.py.
 # v2.293 — frontière vidéo distante extraite : catalogue Replicate, générations texte/image,
 # suivi SSE, annulation et import d'une URL vivent dans api/video_remote.py.
 # v2.292 — IA et automatisation e-mail extraites : brouillons, résumés, digest,
@@ -2984,6 +2986,7 @@ app.include_router(workflows_router)
 app.include_router(voice_router)
 app.include_router(avatar_router)
 app.include_router(vm_lab_router)
+app.include_router(video_editing_router)
 app.include_router(video_remote_router)
 app.include_router(runtime_config_router)
 app.include_router(skills_router)
@@ -3428,300 +3431,7 @@ async def run_proactive_now(kind: str = "morning"):
 # Génération vidéo — Text-to-Video / Image-to-Video / Slideshow local
 # ══════════════════════════════════════════════════════════════════════════════
 
-import video_manager as _vm
 import os as _os
-
-
-@app.post("/api/video/slideshow")
-async def video_slideshow(
-    images: list[UploadFile] = File(...),
-    format: str = Form("gif"),
-    duration: float = Form(2.0),
-    transition_frames: int = Form(8),
-    fps: int = Form(24),
-    fade_duration: float = Form(0.5),
-    width: int = Form(640),
-    height: int = Form(480),
-):
-    """Crée un diaporama GIF ou MP4 depuis des images uploadées (100% local, sans API)."""
-    import tempfile
-
-    if not images:
-        raise HTTPException(status_code=400, detail="Au moins une image requise")
-
-    tmp_paths = []
-    try:
-        for img in images:
-            img_bytes = await img.read()
-            ext = ".jpg"
-            if img.content_type:
-                if "png"  in img.content_type: ext = ".png"
-                elif "webp" in img.content_type: ext = ".webp"
-                elif "gif"  in img.content_type: ext = ".gif"
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-                tmp.write(img_bytes)
-                tmp_paths.append(tmp.name)
-
-        resize_to = (width, height)
-
-        if format.lower() == "mp4":
-            out_path = await _asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: _vm.create_slideshow_mp4(
-                    tmp_paths,
-                    duration_per_image=duration,
-                    fps=fps,
-                    resize_to=resize_to,
-                    fade_duration=fade_duration,
-                ),
-            )
-        else:
-            out_path = await _asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: _vm.create_slideshow_gif(
-                    tmp_paths,
-                    duration_per_frame=duration,
-                    resize_to=resize_to,
-                    transition_frames=transition_frames,
-                ),
-            )
-
-        filename = _os.path.basename(out_path)
-        size = _os.path.getsize(out_path)
-        return {
-            "success": True,
-            "filename": filename,
-            "size": size,
-            "size_human": _vm._fmt_size(size),
-            "format": format.upper(),
-            "url": f"/api/video/files/{filename}",
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        for p in tmp_paths:
-            try:
-                _os.unlink(p)
-            except Exception:
-                pass
-
-
-class VideoTextAnimRequest(BaseModel):
-    text: str
-    style: str = "typewriter"     # typewriter | fade | scroll | title
-    duration: float = 5.0
-    fps: int = 24
-    width: int = 854
-    height: int = 480
-    output_format: str = "mp4"    # mp4 | gif
-    font_size: int = 40
-
-
-@app.post("/api/video/text-animation")
-async def video_text_animation(body: VideoTextAnimRequest):
-    """Génère une vidéo animée depuis un texte (100% local, sans GPU ni API)."""
-    if not body.text.strip():
-        raise HTTPException(status_code=400, detail="Texte requis")
-    try:
-        out_path = await _asyncio.get_running_loop().run_in_executor(
-            None,
-            lambda: _vm.create_text_animation_video(
-                text=body.text,
-                style=body.style,
-                fps=body.fps,
-                duration=body.duration,
-                width=body.width,
-                height=body.height,
-                font_size=body.font_size,
-                output_format=body.output_format,
-            ),
-        )
-        filename = _os.path.basename(out_path)
-        size = _os.path.getsize(out_path)
-        return {
-            "success": True,
-            "filename": filename,
-            "size": size,
-            "size_human": _vm._fmt_size(size),
-            "format": _os.path.splitext(filename)[1].lstrip(".").upper(),
-            "url": f"/api/video/files/{filename}",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/video/files")
-async def list_video_files():
-    """Liste toutes les vidéos générées (MP4, GIF, WebM)."""
-    files = _vm.list_generated_videos()
-    return {"files": files, "count": len(files)}
-
-
-@app.get("/api/video/files/{filename}")
-async def serve_video_file(filename: str):
-    """Sert un fichier vidéo généré (streaming HTTP)."""
-    path = _vm.get_video_dir() / filename
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Fichier introuvable")
-    ext = path.suffix.lower()
-    media_types = {
-        ".mp4": "video/mp4",
-        ".gif": "image/gif",
-        ".webm": "video/webm",
-        ".mov": "video/quicktime",
-    }
-    return FileResponse(
-        str(path),
-        media_type=media_types.get(ext, "application/octet-stream"),
-        filename=filename,
-    )
-
-
-@app.delete("/api/video/files/{filename}")
-async def delete_video_file(filename: str):
-    """Supprime un fichier vidéo généré."""
-    path = _vm.get_video_dir() / filename
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Fichier introuvable")
-    path.unlink()
-    return {"success": True}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# v2.32 — Édition / Conversion vidéo & GIF (ffmpeg local, sans GPU ni API)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _video_edit_result(res: dict) -> dict:
-    """Normalise un retour de video_manager → ajoute filename + url servable."""
-    if not res or res.get("error"):
-        raise HTTPException(status_code=500, detail=(res or {}).get("error", "Échec du traitement"))
-    out = dict(res)
-    path = res.get("path")
-    if path:
-        fn = _os.path.basename(path)
-        out["filename"] = fn
-        out["url"] = f"/api/video/files/{fn}"
-    return out
-
-
-@app.post("/api/video/edit")
-async def video_edit(
-    operation: str = Form(...),
-    file: UploadFile = File(None),
-    fps: float = Form(None),
-    width: int = Form(None),
-    height: int = Form(None),
-    start: float = Form(None),
-    end: float = Form(None),
-    duration: float = Form(None),
-    crf: int = Form(None),
-    scale_width: int = Form(None),
-    factor: float = Form(None),
-    colors: int = Form(None),
-    text: str = Form(None),
-    position: str = Form("bottom-right"),
-    font_size: int = Form(24),
-    region: str = Form(None),       # "x,y,w,h"
-    max_frames: int = Form(30),
-):
-    """
-    Édition vidéo/GIF locale via ffmpeg (sans GPU ni API).
-    operation ∈ {info, to_gif, gif_to_video, trim, compress, resize,
-                 extract_frames, speed, watermark, optimize_gif, screen_record}
-    Pour screen_record aucun fichier n'est requis.
-    """
-    import tempfile
-
-    op = (operation or "").strip().lower()
-    needs_file = op != "screen_record"
-    tmp_path = None
-    loop = _asyncio.get_running_loop()
-
-    try:
-        if needs_file:
-            if file is None:
-                raise HTTPException(status_code=400, detail="Fichier requis pour cette opération")
-            data = await file.read()
-            suffix = _os.path.splitext(file.filename or "")[1] or ".mp4"
-            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-                tmp.write(data)
-                tmp_path = tmp.name
-
-        if op == "info":
-            res = await loop.run_in_executor(None, lambda: _vm.get_media_info(tmp_path))
-            if res.get("error"):
-                raise HTTPException(status_code=500, detail=res["error"])
-            return {"success": True, **res}
-
-        elif op == "to_gif":
-            res = await loop.run_in_executor(None, lambda: _vm.video_to_gif(
-                tmp_path, fps=int(fps) if fps else 12, width=width or 480,
-                start=start, duration=duration))
-
-        elif op == "gif_to_video":
-            res = await loop.run_in_executor(None, lambda: _vm.gif_to_video(
-                tmp_path, fps=int(fps) if fps else None))
-
-        elif op == "trim":
-            res = await loop.run_in_executor(None, lambda: _vm.video_trim(
-                tmp_path, start=start or 0, end=end, duration=duration))
-
-        elif op == "compress":
-            res = await loop.run_in_executor(None, lambda: _vm.video_compress(
-                tmp_path, crf=crf or 28, scale_width=scale_width))
-
-        elif op == "resize":
-            res = await loop.run_in_executor(None, lambda: _vm.video_resize(
-                tmp_path, width=width, height=height))
-
-        elif op == "extract_frames":
-            res = await loop.run_in_executor(None, lambda: _vm.video_extract_frames(
-                tmp_path, fps=fps or 1, max_frames=max_frames or 30))
-            if res.get("error"):
-                raise HTTPException(status_code=500, detail=res["error"])
-            return {"success": True, **res}
-
-        elif op == "speed":
-            res = await loop.run_in_executor(None, lambda: _vm.video_speed(
-                tmp_path, factor=factor or 2.0))
-
-        elif op == "watermark":
-            if not text:
-                raise HTTPException(status_code=400, detail="Paramètre 'text' requis pour le filigrane")
-            res = await loop.run_in_executor(None, lambda: _vm.video_add_watermark(
-                tmp_path, text, position=position or "bottom-right", font_size=font_size or 24))
-
-        elif op == "optimize_gif":
-            res = await loop.run_in_executor(None, lambda: _vm.gif_optimize(
-                tmp_path, fps=int(fps) if fps else 10, width=width, colors=colors or 128))
-
-        elif op == "screen_record":
-            reg = None
-            if region:
-                try:
-                    reg = [int(x) for x in region.split(",")]
-                except Exception:
-                    reg = None
-            res = await loop.run_in_executor(None, lambda: _vm.screen_record_gif(
-                duration=min(duration or 5, 20), fps=int(fps) if fps else 10, region=reg))
-
-        else:
-            raise HTTPException(status_code=400, detail=f"Opération inconnue : {operation}")
-
-        return _video_edit_result(res)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if tmp_path:
-            try:
-                _os.unlink(tmp_path)
-            except Exception:
-                pass
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Génération vidéo LOCALE — CogVideoX / Wan 2.1 (HuggingFace Diffusers)

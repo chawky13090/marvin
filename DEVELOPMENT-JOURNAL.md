@@ -3845,6 +3845,45 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
   orchestrateur e-mail et accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.294.0 — Création et montage vidéo locaux
+
+### Constat et décision
+
+- Les routes de diaporama, texte animé, fichiers et édition ffmpeg formaient une frontière
+  locale déterministe distincte de Replicate et des modèles Diffusers.
+- Extraire ce bloc avant la génération IA locale réduit le risque : les contrats de fichiers
+  et ffmpeg peuvent être testés sans charger de modèle ni utiliser le réseau.
+
+### Implémentation
+
+- Nouveau `backend/api/video_editing.py` avec les six routes historiques et l'exécution des
+  traitements bloquants dans l'executor asyncio.
+- La résolution des fichiers accepte les noms simples existants mais refuse désormais toute
+  traversée ou sortie du répertoire retourné par `video_manager.get_video_dir()`.
+- Nouveau `scripts/test_video_editing_boundary.py` : animation de texte, résultat de capture,
+  plafond de durée, parsing de région, confinement de chemin et propriété exacte des routes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du routeur, de `main.py` et du test : réussie.
+- Test de frontière : création, stockage sûr, capture ffmpeg et six routes validés.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 3 794 à 3 544 lignes.
+
+### Rollback
+
+- Revenir au commit v2.293 et replacer les six routes dans `main.py`. Les fichiers générés,
+  leurs formats, ffmpeg et les signatures HTTP ne subissent aucune migration.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 74/74 étapes réussies; compilation de 145 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 17776, version `2.294.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
+  orchestrateur e-mail et accueil Next.js Turbopack.
+
 ## 2026-07-22 — v2.291.0 — Frontière des préférences e-mail
 
 ### Constat et décision
