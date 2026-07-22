@@ -52,6 +52,7 @@ flowchart LR
 | `tool_domains/` | Implémentations métier extraites (Quiz, Base IT, Tâches/Notes, Mémoire); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
+| `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
 | `db_connection.py` | Fabrique de connexions WAL, clés étrangères et frontière commit/rollback |
 | `db_migrations.py` | Catalogue de schéma versionné, checksums, compatibilité et rollback transactionnel |
 | `repositories/` | Persistance métier injectable; conversations/messages extraits en premier |
@@ -125,6 +126,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 21. le transport Ollama : payload, timeouts, JSONL et erreurs restent indépendants du Runner et du SSE frontend.
 22. les domaines d'outils : chaque extraction préserve l'identité des fonctions du registre et l'égalité stricte des 344 implémentations/spécifications.
 23. le routeur SSH : toutes les routes HTTP, SSE, WebSocket et SFTP appartiennent exclusivement à `api/ssh.py`; aucune copie de fonction ne subsiste dans `main.py`.
+24. les comptes e-mail : configuration, liste, ajout, retrait et test appartiennent à `api/email_accounts.py`; la résolution OAuth/mot de passe passe par un service partagé.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

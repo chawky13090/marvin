@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.288.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.289.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.288.0)
+## 9. État actuel (v2.289.0)
+
+**v2.289 (frontière comptes e-mail)** : providers, lecture/écriture de configuration,
+liste/ajout/retrait multi-comptes et test de connexion sont extraits de `main.py` vers
+`api/email_accounts.py`. `email_account_service.py` devient la façade commune des routes et
+des opérations IMAP restantes pour résoudre compte OAuth ou mot de passe. La projection
+publique masque mot de passe, jetons d'accès/rafraîchissement, secret OAuth et champs internes.
+Les sept contrats gardent leurs chemins et méthodes; `main.py` passe à 4 593 lignes.
 
 **v2.288 (frontière SSH unique)** : les anciennes copies sans décorateur des modèles et
 fonctions SSH ont été retirées de `main.py` après vérification repo-wide. Les 11 contrats HTTP,

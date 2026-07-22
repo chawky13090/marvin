@@ -26,6 +26,7 @@ from api.coding import router as coding_router
 from api.conversations import router as conversations_router
 from api.content import router as content_router
 from api.connections import router as connections_router
+from api.email_accounts import router as email_accounts_router
 from api.cortex import router as cortex_router
 from api.cron_monitor import router as cron_monitor_router
 from api.ssh import router as ssh_router
@@ -93,7 +94,11 @@ from cron_runtime import (
     drain_run_agent as _drain_run_agent,
     long_task_resume_tick as _long_task_resume_tick,
 )
+from email_account_service import get_resolved as _get_email_config
+from email_account_service import list_resolved as _get_email_accounts
 
+# v2.289 — frontière comptes e-mail extraite : sept routes de configuration,
+# multi-comptes et test, avec service partagé de résolution et masquage des secrets.
 # v2.288 — copies SSH mortes retirées de main.py après migration : les 11 routes HTTP,
 # le WebSocket PTY, le SSE et SFTP restent exclusivement servis par api/ssh.py.
 # v2.287 — domaine mémoire extrait de tools.py : dédoublonnage, Memory Mesh,
@@ -2973,6 +2978,7 @@ app.include_router(runtime_config_router)
 app.include_router(skills_router)
 app.include_router(content_router)
 app.include_router(connections_router)
+app.include_router(email_accounts_router)
 app.include_router(cron_monitor_router)
 app.include_router(ssh_router)
 app.include_router(storage_router)
@@ -3328,43 +3334,6 @@ async def get_best_cloud_model(need: str = "general"):
 # ══════════════════════════════════════════════════════════════════════════════
 
 import email_manager as _em
-import email_accounts as _email_accounts
-
-def _coerce_json(v):
-    if isinstance(v, str):
-        try:
-            import json as _json
-            return _json.loads(v)
-        except Exception:
-            return None
-    return v
-
-
-def _get_email_accounts() -> list[dict]:
-    """Liste résolue des comptes email (mot de passe ou jeton OAuth frais)."""
-    return _email_accounts.list_resolved()
-
-
-def _save_email_accounts(accts: list[dict]) -> None:
-    _email_accounts.save(accts)
-
-
-def _upsert_email_account(cfg: dict) -> list[dict]:
-    return _email_accounts.upsert(cfg)
-
-
-def _get_email_config(account: str | None = None) -> dict | None:
-    return _email_accounts.get(account, resolved=True)
-
-
-class EmailConfig(BaseModel):
-    provider: str = "custom"
-    imap_host: str
-    imap_port: int = 993
-    smtp_host: str
-    smtp_port: int = 587
-    username: str
-    password: str
 
 
 class SendEmailRequest(BaseModel):
@@ -3374,69 +3343,6 @@ class SendEmailRequest(BaseModel):
     cc: str = ""
     reply_to: str = ""
     html_body: str = ""
-
-
-@app.get("/api/email/providers")
-async def email_providers():
-    return _em.PROVIDERS
-
-
-@app.get("/api/email/config")
-async def get_email_config(account: str | None = None):
-    cfg = _get_email_config(account)
-    if not cfg:
-        return {"configured": False}
-    # Ne pas retourner le mot de passe en clair
-    secret_fields = {"password", "access_token", "refresh_token", "oauth_client_secret"}
-    safe = {k: v for k, v in cfg.items() if k not in secret_fields and not k.startswith("_")}
-    safe["configured"] = True
-    safe["password_set"] = bool(cfg.get("password"))
-    return safe
-
-
-@app.post("/api/email/config")
-async def set_email_config(body: EmailConfig):
-    # Ajoute ou met à jour le compte (multi-comptes) au lieu d'écraser.
-    _upsert_email_account({**body.model_dump(), "auth_type": "app_password"})
-    return {"success": True}
-
-
-# ── Multi-comptes email ───────────────────────────────────────────────────────
-@app.get("/api/email/accounts")
-async def email_accounts_list():
-    """Liste des boîtes mail connectées (sans les mots de passe)."""
-    accts = _email_accounts.list_raw()
-    return {
-        "accounts": [_email_accounts.public(a) for a in accts],
-        "default": accts[0].get("username") if accts else None,
-        "count": len(accts),
-    }
-
-
-@app.post("/api/email/accounts")
-async def email_accounts_add(body: EmailConfig):
-    """Ajoute (ou met à jour) une boîte mail sans toucher aux autres."""
-    accts = _upsert_email_account({**body.model_dump(), "auth_type": "app_password"})
-    return {"success": True, "id": body.username, "count": len(accts)}
-
-
-@app.delete("/api/email/accounts/{account_id}")
-async def email_accounts_remove(account_id: str):
-    """Déconnecte une boîte mail précise."""
-    removed = _email_accounts.remove(account_id)
-    return {"success": True, "removed": removed, "count": len(_email_accounts.list_raw())}
-
-
-@app.post("/api/email/test")
-async def test_email_config(body: EmailConfig):
-    def _test():
-        return _em.test_connection(
-            body.imap_host, body.imap_port,
-            body.smtp_host, body.smtp_port,
-            body.username, body.password,
-        )
-    result = await _asyncio.get_running_loop().run_in_executor(None, _test)
-    return result
 
 
 @app.get("/api/email/inbox")

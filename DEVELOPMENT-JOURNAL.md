@@ -3677,3 +3677,45 @@ ignorée) :
   observés (12 actifs, 3 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont les connexions SSH masquées
   et l'accueil Next.js Turbopack.
+
+## 2026-07-22 — v2.289.0 — Frontière des comptes e-mail
+
+### Constat et décision
+
+- `main.py` mélangeait la configuration multi-comptes avec les opérations de boîte IMAP/SMTP.
+  Les sept routes de compte forment une frontière cohérente et peuvent être extraites sans
+  toucher au comportement de lecture, envoi, automatisation ou pièces jointes.
+- Un service partagé est retenu afin que les routes extraites et les opérations restantes
+  utilisent la même résolution OAuth/mot de passe, sans dépendance circulaire avec `main.py`.
+
+### Implémentation
+
+- Nouveau `backend/email_account_service.py` : résolution, liste publique, upsert mot de passe
+  applicatif, retrait et projection de configuration expurgée.
+- Nouveau `backend/api/email_accounts.py` : providers, GET/POST config, GET/POST/DELETE comptes
+  et test de connexion exécuté hors de la boucle asyncio.
+- `main.py` monte le routeur et importe seulement `get_resolved`/`list_resolved` pour les
+  opérations IMAP encore présentes.
+- Nouveau `scripts/test_email_accounts_boundary.py` : masquage des secrets, défaut
+  multi-comptes, auth_type et propriété exacte des sept routes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du service, du routeur, de `main.py` et du test : réussie.
+- Tests frontière comptes et orchestrateur e-mail : réussis.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 4 687 à 4 593 lignes.
+
+### Rollback
+
+- Revenir au commit v2.288 et replacer les sept routes dans `main.py`. Aucun compte, jeton,
+  schéma, fournisseur, contrat HTTP ni mode d'authentification n'est supprimé.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 69/69 étapes réussies; compilation de 140 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 31724, version `2.289.0`, Ollama disponible et 15 workers
+  observés (13 actifs, 2 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont connexions masquées,
+  orchestrateur e-mail et accueil Next.js Turbopack.
