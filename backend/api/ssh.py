@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 import database as db
 import security
+import ssh_transport
 import tools as tool_module
 
 router = APIRouter()
@@ -77,7 +78,7 @@ async def test_ssh(body: SSHConnectionCreate):
             key_passphrase = saved.get("key_passphrase") or ""
 
     def run():
-        client = tool_module._ssh_connect({
+        client = ssh_transport.connect({
             "host": body.host, "port": body.port, "username": body.username,
             "password": password, "private_key": private_key,
             "key_passphrase": key_passphrase,
@@ -109,7 +110,7 @@ async def exec_ssh(body: SSHCommandRequest):
                 "exit_code": -1, "command": body.command}
 
     def run():
-        client = tool_module._ssh_connect(conn, timeout=body.timeout)
+        client = ssh_transport.connect(conn, timeout=body.timeout)
         _, stdout, stderr = client.exec_command(body.command, timeout=body.timeout)
         result = {"stdout": stdout.read().decode(errors="replace"),
                   "stderr": stderr.read().decode(errors="replace"),
@@ -142,7 +143,7 @@ async def exec_ssh_stream(connection_id: str, command: str):
             yield f"data: {json.dumps({'type': 'error', 'message': blocked.get('error', 'Commande bloquée.')})}\n\n"
             return
         try:
-            client = await asyncio.get_running_loop().run_in_executor(None, tool_module._ssh_connect, conn, 30)
+            client = await asyncio.get_running_loop().run_in_executor(None, ssh_transport.connect, conn, 30)
             _, stdout, stderr = client.exec_command(command, timeout=60)
             while True:
                 line = await asyncio.get_running_loop().run_in_executor(None, stdout.readline)
@@ -173,7 +174,7 @@ async def ssh_shell_ws(websocket: WebSocket, sid: str):
     loop = asyncio.get_running_loop()
     client = channel = None
     try:
-        client = await loop.run_in_executor(None, tool_module._ssh_connect, conn, 15)
+        client = await loop.run_in_executor(None, ssh_transport.connect, conn, 15)
         channel = await loop.run_in_executor(
             None, lambda: client.invoke_shell(term="xterm-256color", width=80, height=24))
     except Exception as exc:
@@ -251,7 +252,7 @@ async def download_ssh_file(sid: str, path: str):
         raise HTTPException(status_code=404, detail="Connexion introuvable")
 
     def run():
-        client = tool_module._ssh_connect(conn, timeout=30)
+        client = ssh_transport.connect(conn, timeout=30)
         sftp = client.open_sftp()
         buf = io.BytesIO()
         sftp.getfo(path, buf)
@@ -276,7 +277,7 @@ async def upload_ssh_file(sid: str, remote_path: str = Form(...), file: UploadFi
     content = await file.read()
 
     def run():
-        client = tool_module._ssh_connect(conn, timeout=60)
+        client = ssh_transport.connect(conn, timeout=60)
         sftp = client.open_sftp()
         sftp.putfo(io.BytesIO(content), remote_path)
         size = sftp.stat(remote_path).st_size

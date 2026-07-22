@@ -53,6 +53,7 @@ flowchart LR
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
+| `ssh_transport.py` | Chargement des clés privées et connexions Paramiko partagés entre API et outils |
 | `api/video_remote.py` | Catalogue Replicate, génération texte/image, suivi SSE, annulation et import des vidéos distantes |
 | `api/video_editing.py` | Diaporamas, animations texte, stockage borné et montage ffmpeg local hors de la boucle asyncio |
 | `api/video_local.py` | Capacités GPU, génération Diffusers texte/image, annulation et amélioration de prompt Ollama |
@@ -137,6 +138,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 29. le montage vidéo local : diaporamas, texte animé, fichiers et opérations ffmpeg appartiennent à `api/video_editing.py`; tout nom de fichier reste confiné au stockage vidéo.
 30. la génération vidéo IA locale : capacités, modèles, SSE texte/image, annulation et amélioration du prompt appartiennent à `api/video_local.py`; les fichiers uploadés sont nettoyés sur toute sortie du stream.
 31. les outils média : les 11 actions vidéo/GIF et 6 actions audio appartiennent à `tool_domains/media.py`; la façade injecte son résolveur de chemins et préserve les 17 identités du registre.
+32. le transport SSH : l'API et les outils utilisent `ssh_transport.py`; aucune route ne dépend d'un helper SSH privé de `tools.py`.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

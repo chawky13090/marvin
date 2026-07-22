@@ -3845,6 +3845,42 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
   orchestrateur e-mail et accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.297.0 — Transport SSH partagé
+
+### Constat et décision
+
+- Le routeur SSH appelait `_ssh_connect`, helper privé de `tools.py`. Cette dépendance inversée
+  empêchait d'extraire proprement le domaine SSH et liait l'API au registre complet des outils.
+- Un transport partagé est retenu plutôt qu'une nouvelle copie : une seule implémentation reste
+  responsable des formats de clés, des paramètres Paramiko et des timeouts.
+
+### Implémentation
+
+- Nouveau `backend/ssh_transport.py` avec `load_private_key` et `connect`.
+- Les sept appels de connexion du routeur utilisent directement ce transport. `tools.py`
+  conserve ses deux noms privés comme alias de compatibilité, sans duplication.
+- Nouveau `scripts/test_ssh_transport.py` : ordre des formats de clé, mot de passe, paramètres,
+  identité des alias et absence de dépendance privée dans le routeur.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du transport, du routeur, de `tools.py` et du test : réussie.
+- Tests transport et frontière SSH : réussis; 11 contrats HTTP/WebSocket conservés.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+
+### Rollback
+
+- Revenir au commit v2.296 et replacer les deux helpers dans `tools.py`. Aucune connexion,
+  clé, empreinte, donnée utilisateur ou route n'est migrée.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 77/77 étapes réussies; compilation de 149 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 6824, version `2.297.0`, Ollama disponible et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont SSH, Code Workspace et
+  accueil Next.js Turbopack.
+
 ## 2026-07-22 — v2.296.0 — Domaine d'outils Média
 
 ### Constat et décision

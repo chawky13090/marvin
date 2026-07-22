@@ -25,6 +25,7 @@ from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
 from tool_domains import memory as memory_domain
 from tool_domains import media as media_domain
+import ssh_transport
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
@@ -10042,35 +10043,8 @@ async def execute_voice_transcribe(args: dict) -> dict:
 # SECTION SSH — Exécution de commandes à distance
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _ssh_load_key(key_str: str, passphrase: str | None = None):
-    """Charge une clé privée quel que soit son type (Ed25519, ECDSA, RSA, DSS)."""
-    import paramiko, io as _io
-    last = None
-    for KeyClass in (getattr(paramiko, "Ed25519Key", None), getattr(paramiko, "ECDSAKey", None),
-                     paramiko.RSAKey, getattr(paramiko, "DSSKey", None)):
-        if KeyClass is None:
-            continue
-        try:
-            return KeyClass.from_private_key(_io.StringIO(key_str), password=passphrase or None)
-        except Exception as e:
-            last = e
-    raise ValueError(f"Format de clé privée non reconnu (RSA/Ed25519/ECDSA/DSS). {last}")
-
-
-def _ssh_connect(conn: dict, timeout: int = 30):
-    """Ouvre une connexion paramiko (clé tous formats ou mot de passe)."""
-    import paramiko
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    kwargs = dict(hostname=conn["host"], port=int(conn.get("port", 22) or 22),
-                  username=conn["username"], timeout=timeout,
-                  banner_timeout=timeout, auth_timeout=timeout)
-    if (conn.get("private_key") or "").strip():
-        kwargs["pkey"] = _ssh_load_key(conn["private_key"], conn.get("key_passphrase"))
-    elif conn.get("password"):
-        kwargs["password"] = conn["password"]
-    client.connect(**kwargs)
-    return client
+_ssh_load_key = ssh_transport.load_private_key
+_ssh_connect = ssh_transport.connect
 
 
 async def execute_ssh_list(args: dict) -> dict:

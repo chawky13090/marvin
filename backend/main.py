@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.297 — transport SSH partagé extrait : API et outils utilisent ssh_transport.py pour
+# les clés privées et connexions Paramiko, sans dépendre des helpers privés de tools.py.
 # v2.296 — domaine média extrait de tools.py : 11 outils vidéo/GIF et 6 outils audio
 # délégués à tool_domains/media.py avec le résolveur de chemins Windows injecté.
 # v2.295 — génération vidéo IA locale extraite : capacités GPU, Diffusers texte/image,
