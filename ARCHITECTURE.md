@@ -49,7 +49,7 @@ flowchart LR
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
-| `tool_domains/` | Implémentations métier extraites; `tools.py` conserve la façade et les contrats publics pendant la migration |
+| `tool_domains/` | Implémentations métier extraites (Quiz, Base IT, Tâches/Notes); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `db_connection.py` | Fabrique de connexions WAL, clés étrangères et frontière commit/rollback |
@@ -123,6 +123,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 19. l'état du Runner : progression, arrêt, preuves d'outils, blocages Forge et provenance.
 20. l'observabilité du Runner : une panne de métrique, preuve ou apprentissage ne peut pas invalider une action exécutée.
 21. le transport Ollama : payload, timeouts, JSONL et erreurs restent indépendants du Runner et du SSE frontend.
+22. les domaines d'outils : chaque extraction préserve l'identité des fonctions du registre et l'égalité stricte des 344 implémentations/spécifications.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

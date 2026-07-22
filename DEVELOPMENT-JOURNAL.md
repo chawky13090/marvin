@@ -3548,3 +3548,47 @@ ignorée) :
   observés (13 actifs, 2 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, accueil Next.js Turbopack inclus.
 - `agent.py` passe de 1 240 à 1 165 lignes; aucun détail HTTP/JSONL ne reste dans le Runner.
+
+## 2026-07-22 — v2.286.0 — Domaine Tâches et Notes extrait
+
+### Constat et décision
+
+- `tools.py` dépassait 21 000 lignes et mélangeait implémentations métier, registre et contrats
+  LLM. Les huit outils Tâches/Notes forment un domaine cohérent, à faible couplage et déjà
+  couvert par les repositories de `database.py`.
+- L'extraction progressive avec alias de façade est retenue. Une réécriture simultanée du
+  registre ou des 344 schémas aurait augmenté inutilement le risque de perte fonctionnelle.
+
+### Implémentation
+
+- Nouveau `backend/tool_domains/productivity.py` : création, liste, mise à jour et suppression
+  des tâches et notes, normalisation partagée des tags et cycle d'index Qdrant best-effort.
+- `tools.py` importe le domaine et expose les huit noms historiques comme alias directs. Les
+  entrées de `TOOLS_REGISTRY` référencent donc exactement les fonctions du domaine.
+- La suppression reste soumise à `confirmed`; aucune mutation n'a lieu lors de la première
+  réponse `requiresConfirmation`.
+- Durcissement borné : un statut de tâche non textuel renvoie une erreur structurée au lieu
+  de lever sur `.lower()` avant le bloc historique de gestion d'erreur.
+- Nouveau `scripts/test_tool_domain_productivity.py` : tags, filtres, alias, confirmations,
+  mutations, indexation et identité des huit entrées, avec contrôle strict 344/344.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du domaine, de `tools.py` et du test : réussie.
+- Tests Productivité, Quiz et Base IT : réussis.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `tools.py` passe de 21 079 à 20 927 lignes.
+
+### Rollback
+
+- Revenir au commit v2.285 et replacer les huit fonctions dans `tools.py`. Aucun schéma SQLite,
+  contrat d'outil, nom public ni format de résultat n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 66/66 étapes réussies; compilation de 137 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 30384, version `2.286.0`, Ollama disponible et 15 workers
+  observés (13 actifs, 2 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont les contrats projets,
+  tâches et notes ainsi que l'accueil Next.js Turbopack.

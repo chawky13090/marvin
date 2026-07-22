@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.285.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.286.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.285.0)
+## 9. État actuel (v2.286.0)
+
+**v2.286 (domaine Tâches et Notes)** : les huit implémentations `task_*` et `note_*` sont
+extraites de `tools.py` vers `tool_domains/productivity.py`. La façade conserve les mêmes
+objets fonctions dans `TOOLS_REGISTRY`, les huit spécifications publiques et le total strict
+344/344. Les confirmations avant suppression, alias de statut, normalisation des tags et
+indexation Qdrant best-effort sont conservés; un statut non textuel produit désormais une
+erreur exploitable au lieu d'une exception hors du garde d'erreur.
 
 **v2.285 (transport Ollama typé)** : le client HTTP, les timeouts, la construction du payload
 `/api/chat`, le décodage JSONL et la projection des erreurs sont extraits de `agent.py` vers

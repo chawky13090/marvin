@@ -22,6 +22,7 @@ import psutil
 import database as db
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
+from tool_domains import productivity as productivity_domain
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
@@ -3644,173 +3645,20 @@ async def execute_pc_process_kill(args: dict) -> dict:
 # SECTION 3 — Tâches
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _parse_tags(raw) -> list[str]:
-    """Normalise les tags : str 'a, b, c' → ['a','b','c'] ou list → list."""
-    if isinstance(raw, list):
-        return [str(t).strip() for t in raw if str(t).strip()]
-    if isinstance(raw, str) and raw.strip():
-        return [t.strip() for t in raw.split(",") if t.strip()]
-    return []
-
-
-async def execute_task_create(args: dict) -> dict:
-    try:
-        task = db.create_task(
-            title=args["title"],
-            description=args.get("description", ""),
-            priority=args.get("priority", "medium"),
-            due_date=args.get("due_date", None),
-            tags=_parse_tags(args.get("tags", [])),
-        )
-        return {"success": True, "message": f"Tâche créée : « {task['title']} »", "task": task}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_task_list(args: dict) -> dict:
-    try:
-        status = args.get("status") or None
-        # L'UI envoie "all" pour "toutes les tâches" → pas de filtre
-        if status == "all":
-            status = None
-        tasks = db.list_tasks(
-            status=status,
-            priority=args.get("priority"),
-        )
-        return {"success": True, "count": len(tasks), "tasks": tasks}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_task_update(args: dict) -> dict:
-    tid = args.get("id", "")
-    if not tid:
-        return {"error": "ID de tâche requis"}
-    # Normalize status: the LLM sometimes says 'completed' — map to 'done'
-    _STATUS_ALIASES = {
-        "completed": "done", "terminé": "done", "termine": "done", "fini": "done",
-        "wip": "in_progress", "en cours": "in_progress", "started": "in_progress",
-        "todo": "pending", "à faire": "pending", "a faire": "pending",
-        "annulé": "cancelled", "annule": "cancelled", "canceled": "cancelled",
-    }
-    if "status" in args:
-        args = dict(args)
-        args["status"] = _STATUS_ALIASES.get(args["status"].lower().strip(), args["status"])
-    try:
-        task = db.update_task(tid, args)
-        if not task:
-            return {"error": f"Tâche introuvable : {tid}"}
-        return {"success": True, "message": "Tâche mise à jour", "task": task}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_task_delete(args: dict) -> dict:
-    tid = args.get("id", "")
-    if not tid:
-        return {"error": "ID de tâche requis"}
-    # Charger le titre pour un message de confirmation lisible
-    if not args.get("confirmed"):
-        try:
-            task_preview = db.get_task(tid)
-            label = f"« {task_preview['title']} »" if task_preview else f"ID {tid}"
-        except Exception:
-            label = f"ID {tid}"
-        return {"requiresConfirmation": True, "message": f"Supprimer définitivement la tâche {label} ?"}
-    try:
-        task = db.get_task(tid)
-        if not task:
-            return {"error": f"Tâche introuvable : {tid}"}
-        db.delete_task(tid)
-        return {"success": True, "message": f"Tâche « {task['title']} » supprimée"}
-    except Exception as e:
-        return {"error": str(e)}
+execute_task_create = productivity_domain.task_create
+execute_task_list = productivity_domain.task_list
+execute_task_update = productivity_domain.task_update
+execute_task_delete = productivity_domain.task_delete
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 4 — Notes
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_note_create(args: dict) -> dict:
-    try:
-        note = db.create_note(
-            title=args["title"],
-            content=args.get("content", ""),
-            tags=_parse_tags(args.get("tags", [])),
-            pinned=args.get("pinned", False),
-        )
-        # Indexer dans Qdrant
-        try:
-            from vector_store import index_note
-            await index_note(note["id"], note["title"], note["content"], note.get("tags", []))
-        except Exception:
-            pass
-        return {"success": True, "message": f"Note créée : « {note['title']} »", "note": note}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_note_list(args: dict) -> dict:
-    try:
-        # "tag" vient de l'interface outils, "search" vient de l'agent
-        search = args.get("search") or args.get("tag") or None
-        notes = db.list_notes(
-            search=search,
-            pinned=args.get("pinned"),
-        )
-        return {"success": True, "count": len(notes), "notes": notes}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_note_update(args: dict) -> dict:
-    nid = args.get("id", "")
-    if not nid:
-        return {"error": "ID de note requis"}
-    try:
-        # Normaliser les tags si fournis comme string
-        update_args = dict(args)
-        if "tags" in update_args:
-            update_args["tags"] = _parse_tags(update_args["tags"])
-        note = db.update_note(nid, update_args)
-        if not note:
-            return {"error": f"Note introuvable : {nid}"}
-        # Ré-indexer
-        try:
-            from vector_store import index_note
-            await index_note(note["id"], note["title"], note["content"], note.get("tags", []))
-        except Exception:
-            pass
-        return {"success": True, "message": "Note mise à jour", "note": note}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_note_delete(args: dict) -> dict:
-    nid = args.get("id", "")
-    if not nid:
-        return {"error": "ID de note requis"}
-    if not args.get("confirmed"):
-        try:
-            note_preview = db.get_note(nid)
-            label = f"« {note_preview['title']} »" if note_preview else f"ID {nid}"
-        except Exception:
-            label = f"ID {nid}"
-        return {"requiresConfirmation": True, "message": f"Supprimer définitivement la note {label} ?"}
-    nid = args.get("id", "")
-    try:
-        note = db.get_note(nid)
-        if not note:
-            return {"error": f"Note introuvable : {nid}"}
-        db.delete_note(nid)
-        try:
-            from vector_store import delete_document
-            await delete_document("notes", nid)
-        except Exception:
-            pass
-        return {"success": True, "message": f"Note « {note['title']} » supprimée"}
-    except Exception as e:
-        return {"error": str(e)}
+execute_note_create = productivity_domain.note_create
+execute_note_list = productivity_domain.note_list
+execute_note_update = productivity_domain.note_update
+execute_note_delete = productivity_domain.note_delete
 
 
 # ══════════════════════════════════════════════════════════════════════════════
