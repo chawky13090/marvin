@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.278.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.279.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.278.0)
+## 9. État actuel (v2.279.0)
+
+**v2.279 (contexte de session et artefacts multimodaux)** : la compaction des anciens
+messages et la persistance/analyse des captures sont extraites de `agent.py` vers
+`agent_context.py`. Le générateur de résumé et l'analyseur d'image sont injectables. Le cache
+historique `convsum_*`, les limites 40 messages/1 500 caractères et les alias publics restent
+compatibles. Les dossiers de capture refusent désormais un identifiant susceptible de sortir
+de `data/screenshots`, et un échec d'analyse supprime le fichier orphelin.
 
 **v2.278 (revue indépendante du runner)** : le contrôle critique des réponses techniques et
 la vérification sémantique des actions sensibles sont extraits de `agent.py` vers

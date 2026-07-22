@@ -3251,3 +3251,49 @@ ignorée) :
 - Backend réel redémarré : version `2.278.0`, Ollama disponible; frontend Turbopack HTTP 200.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - `agent.py` passe de 1 694 à 1 612 lignes; les deux alias historiques sont toujours appelables.
+
+## 2026-07-22 — v2.279.0 — Contexte de session et captures extraits
+
+### Constat et décision
+
+- La boucle `run_agent` gérait encore directement deux responsabilités d'état : résumer les
+  messages sortis de la fenêtre de contexte et maintenir le cycle de vie des captures jointes.
+- La séparation `Session`/`State`/`Memory` de Google ADK, les sessions du Runner OpenAI et la
+  session append-only d'Anthropic convergent sur une frontière d'état indépendante du modèle.
+  Marvin conserve sa base actuelle mais rend cette frontière explicite et injectable.
+
+### Implémentation et corrections
+
+- Nouveau `backend/agent_context.py` : compaction bornée, cache `convsum_*`, extraction des
+  data URL, persistance, analyse parallèle et enregistrement des captures.
+- Le générateur de résumé et l'analyseur sont injectables; aucun appel Cloud, Ollama, OCR ou
+  SQLite réel n'est nécessaire aux tests unitaires.
+- Conservation du comportement : minimum quatre messages, 40 anciens messages au maximum,
+  500 caractères par message, cache réutilisé à moins de six messages d'écart et résumé borné
+  à 1 500 caractères.
+- Correction rencontrée pendant l'extraction : `conversation_id` était concaténé directement
+  au chemin disque. Il est désormais limité à 128 caractères alphanumériques, tiret ou
+  underscore; une valeur comme `../../outside` est refusée.
+- Correction de résilience : si le décodage, l'analyse ou l'écriture SQLite échoue après la
+  création du fichier, celui-ci est supprimé au lieu de rester orphelin.
+- `agent.py` conserve les trois alias historiques et le même appel depuis `run_agent`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent_context.py`, `agent.py` et du test : réussie.
+- `scripts/test_agent_context.py` : compaction, cache, exclusion des messages outil, image,
+  confinement du chemin, nettoyage après panne et façade réussis.
+- Non-régression `agent_execution` et `agent_review` : réussie.
+
+### Rollback
+
+- Revenir au commit v2.278 et replacer les trois fonctions dans `agent.py`. Aucun schéma,
+  message, capture existante ni contrat HTTP n'est migré par cette version.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 59/59 étapes réussies; ESLint 0 erreur et les
+  37 avertissements historiques restent inchangés.
+- Backend réel redémarré : version `2.279.0`, Ollama disponible; frontend Turbopack HTTP 200.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+- `agent.py` passe de 1 612 à 1 522 lignes; les trois alias historiques sont appelables.

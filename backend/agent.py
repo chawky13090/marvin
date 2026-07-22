@@ -4,7 +4,6 @@ Appelle Ollama directement (HTTP), gère la boucle d'appel d'outils,
 et produit des événements SSE pour le frontend.
 """
 import asyncio
-import base64
 import json
 import re
 import time
@@ -52,15 +51,19 @@ from agent_review import (
     review_action as _critique_action,
     review_response as _run_critique_pass,
 )
+from agent_context import (
+    persist_and_analyze_screenshot as _persist_and_analyze_one_screenshot,
+    persist_and_analyze_screenshots as _persist_and_analyze_screenshots,
+    summarize_overflow as _conversation_summary,
+)
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, DEFAULT_MODEL, MAX_CONTEXT_MESSAGES,
     PERMISSION_SECURE, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
     SECURE_BLOCKED_TOOLS, DANGEROUS_TOOLS,
-    MODEL_PROFILES, DATA_DIR,
+    MODEL_PROFILES,
 )
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
-import tools as _tools_mod
 
 _exact_tool_mentions_from_text = partial(
     exact_tool_mentions_from_text,
@@ -161,100 +164,7 @@ _ALWAYS_CONFIRM_TOOLS = {
 }
 
 
-async def _conversation_summary(conversation_id: str, overflow: list, model: str = None) -> str | None:
-    """Compaction (anti « context rot ») : résume les messages ANCIENS sortis de la fenêtre
-    de contexte, au lieu de les perdre. Mis en cache par conversation et régénéré seulement
-    tous les ~6 messages (sinon on réutilise le résumé). Utilise le modèle déjà chargé."""
-    if not overflow or len(overflow) < 4:
-        return None
-    cached = None
-    if conversation_id:
-        try:
-            cached = db.get_setting(f"convsum_{conversation_id}")
-        except Exception:
-            cached = None
-    if isinstance(cached, dict) and cached.get("summary") and abs(cached.get("covered", 0) - len(overflow)) < 6:
-        return cached["summary"]
-    parts = []
-    for m in overflow[-40:]:
-        c = m.get("content")
-        if isinstance(c, list):
-            c = " ".join(p.get("text", "") for p in c if isinstance(p, dict) and p.get("type") == "text")
-        if c and m.get("role") in ("user", "assistant"):
-            who = "Utilisateur" if m.get("role") == "user" else "Marvin"
-            parts.append(f"{who}: {str(c)[:500]}")
-    if not parts:
-        return None
-    prompt = ("Résume cette conversation en quelques puces FACTUELLES et utiles (décisions prises, "
-              "informations importantes, préférences exprimées, tâches/sujets en cours) afin de garder "
-              "le contexte. Sois bref et concret.\n\n" + "\n".join(parts) + "\n\nRÉSUMÉ :")
-    try:
-        import tools as _tm
-        s = (await _tm._ollama_generate(prompt, model=model, timeout=120) or "").strip()
-    except Exception:
-        return cached.get("summary") if isinstance(cached, dict) else None
-    if s and conversation_id:
-        try:
-            db.set_setting(f"convsum_{conversation_id}", {"covered": len(overflow), "summary": s[:1500]})
-        except Exception:
-            pass
-    return s[:1500] if s else None
-
-
 # ── Agent de streaming principal ──────────────────────────────────────────────
-
-# v2.175 — jusqu'ici, une image attachée au chat n'était utilisée QUE pour ce tour (vision
-# ponctuelle) puis jetée : agent.py extrayait le texte du message multimodal et écrivait
-# `content` seul en base, sans jamais toucher les images (cf. mémoire document-identity-toc-v2174
-# et le pipeline documenté à l'époque de l'ajout du multi-attach v2.140). Pour « ingurgiter
-# beaucoup de captures et en faire de la documentation », il faut d'abord qu'elles SURVIVENT
-# au tour — persistées sur disque + analysées une fois (légende + texte relevé) + indexées
-# dans la table `screenshots`, pour qu'un outil ultérieur (doc_generate_from_screenshots)
-# puisse les récupérer sans jamais renvoyer les octets bruts au modèle à chaque nouveau tour.
-_MIME_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg",
-             "image/gif": ".gif", "image/webp": ".webp"}
-
-
-async def _persist_and_analyze_one_screenshot(conversation_id: str, data_url: str) -> dict | None:
-    try:
-        header, b64data = data_url.split(",", 1)
-        mime = header.split(";")[0].replace("data:", "") if ":" in header else "image/png"
-        ext = _MIME_EXT.get(mime, ".png")
-        raw = base64.b64decode(b64data)
-
-        conv_dir = DATA_DIR / "screenshots" / conversation_id
-        conv_dir.mkdir(parents=True, exist_ok=True)
-        fname = f"{uuid.uuid4().hex}{ext}"
-        fpath = conv_dir / fname
-        fpath.write_bytes(raw)
-
-        analysis = await _tools_mod._analyze_screenshot(str(fpath))
-        row = db.create_screenshot(conversation_id, str(fpath),
-                                    analysis.get("caption", ""), analysis.get("ocr_text", ""))
-        return row
-    except Exception:
-        return None
-
-
-async def _persist_and_analyze_screenshots(conversation_id: str, content_parts: list) -> list[dict]:
-    """Best-effort, jamais bloquant pour le tour : une erreur d'analyse d'UNE capture ne doit
-    pas empêcher le reste de la conversation. Traitées en parallèle (asyncio.gather) — avec
-    plusieurs captures, les analyser en série aurait ajouté plusieurs x le temps d'un appel
-    vision (~6s en cloud, jusqu'à 90s en repli local) au tour en cours."""
-    urls = []
-    for part in content_parts or []:
-        if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
-            url = part.get("image_url", {}).get("url", "") or part.get("url", "")
-            if url.startswith("data:"):
-                urls.append(url)
-    if not urls:
-        return []
-    results = await asyncio.gather(
-        *[_persist_and_analyze_one_screenshot(conversation_id, u) for u in urls],
-        return_exceptions=False,
-    )
-    return [r for r in results if r]
-
 
 async def run_agent(
     messages: list[dict],
