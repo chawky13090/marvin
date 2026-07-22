@@ -35,6 +35,7 @@ flowchart LR
 | `agent_safety.py` | Validation pré-exécution des outils et analyse post-génération des scripts/documents |
 | `agent_protocol.py` | Conversion UI/base vers Ollama et encodage JSON des événements SSE |
 | `agent_routing.py` | Inventaire Ollama, sélection de profil et détection du contexte sensible |
+| `agent_tool_selection.py` | Matrice d'outils, routage sémantique, repli borné et plafond déterministe |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
 | `tool_domains/` | Implémentations métier extraites; `tools.py` conserve la façade et les contrats publics pendant la migration |

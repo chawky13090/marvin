@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.271.0",
+  "version": "2.272.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -27,6 +27,7 @@
     "check:agent-protocol": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_protocol.py",
     "check:agent-routing": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_routing.py",
     "check:agent-prompt": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_prompt.py",
+    "check:agent-tool-selection": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_tool_selection.py",
     "check:tool-domain-quiz": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_domain_quiz.py",
     "check:tool-domain-it-knowledge": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_domain_it_knowledge.py",
     "check:intents": "backend\\.venv\\Scripts\\python.exe scripts\\test_intent_guards.py",

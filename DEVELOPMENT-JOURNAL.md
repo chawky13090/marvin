@@ -2923,3 +2923,43 @@ ignorée) :
 - Backend réel redémarré : version `2.271.0`, Ollama disponible, 344/344 outils et 15 workers.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
 - Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
+
+## 2026-07-22 — v2.272.0 — Sélection des outils LLM extraite
+
+### Contexte et décision
+
+- Sortir de `agent.py` la matrice de routage qui relie les formulations utilisateur aux
+  outils exposés au modèle, sans changer les 344 contrats d'outils.
+- Corriger l'ordre non déterministe des ensembles quand `max_tools` tronque la sélection.
+
+### Implémentation
+
+- Nouveau `backend/agent_tool_selection.py` : outils universels, repli courant, matrice de
+  domaines, normalisation, routage sémantique/appris et plafond par profil.
+- `agent.py` conserve `_filter_relevant_tools` comme alias importé et `_strip_accents` pour
+  ses autres décisions; environ 670 lignes de responsabilité dédiée en sont retirées.
+- Les groupes prioritaires sont triés avant troncature. À demande, configuration et catalogue
+  identiques, la liste retenue ne dépend plus du hash seed du processus Python.
+- Nouveau `scripts/test_agent_tool_selection.py`, intégré au contrôle consolidé.
+
+### Validation isolée réalisée avant versionnage
+
+- Aucun message : catalogue complet historique conservé.
+- Recherche web récente : `web_search`, `web_browse` et `web_research` présents.
+- Code Workspace : démarrage, statut et contrôle présents.
+- E-mail : comptes, liste et lecture présents.
+- Plafond à trois outils sur catalogue simulé : résultat stable `[a, b, z]` sur deux passages.
+- Façade importable, compilation ciblée, prompt, routage modèle et 21 intentions : réussis.
+
+### Rollback
+
+- Restaurer la matrice et le filtre dans `agent.py`, supprimer le module et son test, puis
+  revenir à `2.271.0`. Aucun schéma ni contenu utilisateur n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 53/53 étapes réussies; compilation, dépendances et
+  frontend validés, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.272.0`, Ollama disponible, 344/344 outils et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
+- Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.

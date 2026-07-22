@@ -93,6 +93,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.272 — matrice et filtrage des outils extraits d'agent.py; plafond désormais
+# déterministe entre deux processus Python malgré le hash seed des ensembles.
 # v2.271 — constructeur du prompt système extrait d'agent.py; date française sans
 # locale globale afin de conserver un comportement déterministe entre workers.
 # v2.270 — inventaire Ollama, profils et détection sensible extraits d'agent.py;
