@@ -25,6 +25,7 @@ from agent_policy import (
     autotitle_from_text as _autotitle_from_text,
     exact_tool_mentions_from_text,
 )
+from agent_protocol import encode_sse as _sse, to_ollama_messages as _to_ollama_messages
 from agent_safety import (
     scan_dangerous_script_patterns as _scan_dangerous_script_patterns,
     validator_for,
@@ -521,107 +522,6 @@ Règles de comportement :
 
 
 # ── Conversion messages frontend → Ollama ─────────────────────────────────────
-
-def _to_ollama_messages(messages: list[dict]) -> list[dict]:
-    """
-    Convertit les messages UI (format parts / toolInvocations) en messages Ollama.
-    Gère 3 formats :
-      1. Frontend toolInvocations : [{toolCallId, toolName, args, state, result}]
-      2. BD tool_calls : [{toolCallId, toolName, args}]  +  messages role='tool' séparés
-      3. Messages texte simples
-    """
-    result = []
-    for m in messages:
-        role = m.get("role", "user")
-        if role not in ("user", "assistant", "tool"):
-            continue
-
-        # Extraire le contenu texte (et éventuellement les images)
-        content = ""
-        images_b64 = []  # Pour Ollama multimodal
-        if isinstance(m.get("content"), str):
-            content = m["content"]
-        elif isinstance(m.get("content"), list):
-            # Contenu multimodal (texte + images)
-            for part in m["content"]:
-                if part.get("type") == "text":
-                    content += part.get("text", "")
-                elif part.get("type") in ("image_url", "image"):
-                    url = part.get("image_url", {}).get("url", "") or part.get("url", "")
-                    if url.startswith("data:"):
-                        # Extraire le base64 pur
-                        try:
-                            b64 = url.split(",", 1)[1]
-                            images_b64.append(b64)
-                        except IndexError:
-                            pass
-        elif isinstance(m.get("parts"), list):
-            content = "".join(
-                p.get("text", "") for p in m["parts"] if p.get("type") == "text"
-            )
-
-        if role == "tool":
-            result.append({"role": "tool", "content": content})
-            continue
-
-        if role == "assistant":
-            # ── Format 1 : toolInvocations (vient du frontend useSecretary) ──
-            invocations = m.get("toolInvocations") or []
-            if invocations:
-                tool_calls_ollama = [
-                    {
-                        "function": {
-                            "name": inv.get("toolName", ""),
-                            "arguments": inv.get("args", {}),
-                        }
-                    }
-                    for inv in invocations
-                ]
-                result.append({
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": tool_calls_ollama,
-                })
-                # Injecter les résultats comme messages tool
-                for inv in invocations:
-                    if inv.get("state") == "result":
-                        result.append({
-                            "role": "tool",
-                            "content": json.dumps(inv.get("result", {}), ensure_ascii=False),
-                        })
-                continue
-
-            # ── Format 2 : tool_calls depuis la BD ───────────────────────────
-            if m.get("tool_calls"):
-                result.append({
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": [
-                        {
-                            "function": {
-                                "name": tc.get("toolName", ""),
-                                "arguments": tc.get("args", {}),
-                            }
-                        }
-                        for tc in m["tool_calls"]
-                    ],
-                })
-                continue
-
-        # ── Message texte simple (avec images éventuelles pour Ollama vision) ──
-        if role == "user" and images_b64:
-            result.append({"role": role, "content": content, "images": images_b64})
-        else:
-            result.append({"role": role, "content": content})
-
-    return result
-
-
-# ── SSE helpers ───────────────────────────────────────────────────────────────
-
-def _sse(data: dict) -> str:
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-
 
 # v2.138 — validation légère des arguments AVANT exécution (1ʳᵉ des 3 couches recommandées pour
 # le tool-calling agentique : validation → retry ciblé → decoding contraint — la 2ᵉ existe déjà

@@ -93,6 +93,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.269 — adaptateurs UI/Ollama/SSE extraits d'agent.py et durcis contre les parties
+# multimodales ou appels d'outils mal formés, sans changer le protocole public.
 # v2.268 — sécurité déterministe extraite d'agent.py : validation des arguments JSON
 # et scanner de scripts/documents dangereux, injectés derrière les alias historiques.
 # v2.267 — trois fuites de connexions SQLite OAuth/Google corrigées; invariant AST

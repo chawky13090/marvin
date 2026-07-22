@@ -2808,3 +2808,37 @@ ignorée) :
 - Backend réel redémarré : version `2.268.0`, 344/344 outils et 15 workers.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - Frontend Next.js/Turbopack : HTTP 200; journal uvicorn sans exception au démarrage.
+
+## 2026-07-22 — v2.269.0 — Protocole UI, Ollama et SSE extrait
+
+### Implémentation
+
+- Nouveau `backend/agent_protocol.py` pour la conversion des messages et l'encodage SSE.
+- Conservation des formats `toolInvocations` frontend, `tool_calls` persistés, messages outil,
+  texte simple, `parts` et images data URL.
+- Les fragments multimodaux et appels d'outils qui ne sont pas des objets sont ignorés sans
+  interrompre la réponse complète.
+- `agent.py` conserve `_to_ollama_messages` et `_sse` comme alias importés; les anciens corps
+  sont retirés.
+
+### Validation isolée réalisée avant versionnage
+
+- Texte, image base64, outil frontend et résultat Unicode : succès.
+- Appel d'outil rechargé depuis SQLite : nom et arguments conservés.
+- SSE : préfixe `data:`, Unicode conservé, saut de ligne du contenu échappé et terminaison vide.
+- Façade AST : aucune redéfinition dans `agent.py`.
+- Navigation Chat : 8 assertions; Mission Tracker : 4; présentation Chat : 14.
+- Compilation ciblée et invariants : 344 outils, 346 routes et 40 pages.
+
+### Rollback
+
+- Restaurer les deux fonctions dans `agent.py`, supprimer `agent_protocol.py` et son test,
+  puis revenir à `2.268.0`. Aucun schéma ni contenu utilisateur n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 50/50 étapes réussies; 0 erreur ESLint et 37
+  avertissements historiques inchangés.
+- Backend réel redémarré : version `2.269.0`, 344/344 outils et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
+- Frontend Next.js/Turbopack conservé actif; aucun build concurrent exécuté.

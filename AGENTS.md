@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.268.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.269.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.268.0)
+## 9. État actuel (v2.269.0)
+
+**v2.269 (protocole agentique extrait)** : `backend/agent_protocol.py` convertit les messages
+UI et persistés vers Ollama et encode les événements SSE. `agent.py` importe les fonctions sous
+les alias historiques `_to_ollama_messages` et `_sse`. Les parties multimodales non objet et
+les appels d'outils mal formés sont ignorés proprement au lieu de lever une exception. Le
+contrat conserve texte, images base64, `toolInvocations`, résultats d'outils, `tool_calls` de la
+base et Unicode SSE sur une seule ligne `data:`. Les tests existants de navigation, suivi de
+mission et présentation du chat restent réussis.
 
 **v2.268 (sécurité déterministe de l'agent)** : `backend/agent_safety.py` possède désormais
 la compilation des paramètres obligatoires depuis `TOOLS_SPEC`, la validation avant exécution
