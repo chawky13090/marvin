@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.294.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.295.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.294.0)
+## 9. État actuel (v2.295.0)
+
+**v2.295 (génération vidéo IA locale)** : capacités GPU, catalogue Diffusers, génération SSE
+texte/image, annulation et amélioration de prompt Ollama sont extraits de `main.py` vers
+`api/video_local.py`. Le routage par mode de performance et les formats SSE restent identiques.
+Le fichier image temporaire est désormais supprimé même lorsque la capacité est désactivée,
+au lieu de rester sur disque. `main.py` passe à 3 375 lignes, avec cinq routes conservées.
 
 **v2.294 (création et montage vidéo locaux)** : diaporama, animation de texte, liste/service/
 suppression des fichiers et montage ffmpeg sont extraits de `main.py` vers

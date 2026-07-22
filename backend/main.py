@@ -8,7 +8,7 @@ import base64
 import re as _re
 import sys
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Body
+from fastapi import FastAPI, HTTPException, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
@@ -60,6 +60,7 @@ from api.voice import router as voice_router
 from api.avatar import router as avatar_router
 from api.vm_lab import router as vm_lab_router
 from api.video_editing import router as video_editing_router
+from api.video_local import router as video_local_router
 from api.video_remote import router as video_remote_router
 from api.workflows import router as workflows_router
 from app_version import APP_VERSION
@@ -99,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.295 — génération vidéo IA locale extraite : capacités GPU, Diffusers texte/image,
+# annulation et amélioration de prompt Ollama vivent dans api/video_local.py.
 # v2.294 — création et montage vidéo locaux extraits : diaporama, texte animé, fichiers
 # bornés au stockage vidéo et opérations ffmpeg vivent dans api/video_editing.py.
 # v2.293 — frontière vidéo distante extraite : catalogue Replicate, générations texte/image,
@@ -2987,6 +2990,7 @@ app.include_router(voice_router)
 app.include_router(avatar_router)
 app.include_router(vm_lab_router)
 app.include_router(video_editing_router)
+app.include_router(video_local_router)
 app.include_router(video_remote_router)
 app.include_router(runtime_config_router)
 app.include_router(skills_router)
@@ -3430,207 +3434,6 @@ async def run_proactive_now(kind: str = "morning"):
 # ══════════════════════════════════════════════════════════════════════════════
 # Génération vidéo — Text-to-Video / Image-to-Video / Slideshow local
 # ══════════════════════════════════════════════════════════════════════════════
-
-import os as _os
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Génération vidéo LOCALE — CogVideoX / Wan 2.1 (HuggingFace Diffusers)
-# ══════════════════════════════════════════════════════════════════════════════
-
-import local_video as _lv
-
-
-def _video_gen_allowed() -> bool:
-    """La génération vidéo locale est-elle autorisée ? Pilotée par le MODE de performance
-    (setting video_gen_enabled, calculé selon GPU). Par défaut : suit le support matériel."""
-    v = db.get_setting("video_gen_enabled")
-    if v is None:
-        try:
-            return bool(_lv.get_device_info().get("video_gen_supported"))
-        except Exception:
-            return False
-    return bool(v)
-
-
-def _video_gen_reason() -> str:
-    try:
-        info = _lv.get_device_info()
-    except Exception:
-        info = {}
-    if not info.get("video_gen_supported"):
-        return ("Génération vidéo locale indisponible sur ce matériel "
-                f"({info.get('gpu') or info.get('vendor') or 'pas de GPU CUDA'}). "
-                "Elle nécessite une carte NVIDIA/CUDA.")
-    return ("Génération vidéo locale désactivée dans le mode de performance actuel. "
-            "Passe en mode « Performance » ou « Maximum » (Mon jour → Auto-config) pour l'activer.")
-
-
-@app.get("/api/video/local/models")
-async def local_video_models():
-    """Retourne les modèles locaux disponibles + infos device (CUDA/CPU/VRAM)."""
-    status = _lv.get_models_status()
-    if isinstance(status, dict):
-        status["video_gen_enabled"] = _video_gen_allowed()
-    return status
-
-
-class LocalVideoTextRequest(BaseModel):
-    model_key: str
-    prompt: str
-    num_steps: int | None = None   # None → défaut du modèle
-    num_frames: int | None = None
-    fps: int | None = None
-    guidance: float | None = None
-    duration: float | None = None   # durée cible en secondes (retime + interpolation)
-    resolution: int | None = None   # 256 / 384 / 512 (qualité ↔ vitesse)
-    seed: int | None = None         # graine (reproductibilité) ; None/-1 = aléatoire
-    negative_prompt: str | None = None  # éléments à éviter
-
-
-@app.post("/api/video/local/generate")
-async def local_video_generate_text(body: LocalVideoTextRequest):
-    """
-    SSE : télécharge le modèle si absent, le charge en mémoire, génère et exporte en MP4.
-    Progression : downloading → loading → processing (step N/N) → succeeded/error.
-    """
-    async def generate():
-        import json as _j
-        if not _video_gen_allowed():
-            yield f"data: {_j.dumps({'status': 'error', 'error': _video_gen_reason()})}\n\n"
-            return
-        async for event in _lv.generate_video_local_sse(
-            model_key=body.model_key,
-            prompt=body.prompt,
-            num_steps=body.num_steps,
-            num_frames=body.num_frames,
-            fps=body.fps,
-            guidance=body.guidance,
-            duration=body.duration,
-            resolution=body.resolution,
-            seed=body.seed,
-            negative_prompt=body.negative_prompt,
-        ):
-            yield event
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
-    )
-
-
-@app.post("/api/video/local/cancel")
-async def local_video_cancel():
-    """Demande l'annulation de la génération locale en cours (entre deux étapes)."""
-    _lv.request_cancel()
-    return {"success": True, "message": "Annulation demandée — arrêt à la prochaine étape."}
-
-
-class PromptEnhanceRequest(BaseModel):
-    prompt: str
-
-
-@app.post("/api/video/enhance-prompt")
-async def enhance_video_prompt(body: PromptEnhanceRequest):
-    """
-    ✨ Améliore un prompt vidéo via le LLM local (Ollama) :
-    traduit en anglais (SD1.5 comprend mieux l'anglais) et l'enrichit en
-    description cinématographique détaillée → bien meilleure adhérence au texte.
-    """
-    import httpx as _httpx
-    from config import OLLAMA_URL
-    raw = (body.prompt or "").strip()
-    if not raw:
-        raise HTTPException(status_code=400, detail="Prompt vide")
-
-    sys_prompt = (
-        "You are a prompt engineer for an AI text-to-video model (Stable Diffusion 1.5 based). "
-        "Rewrite the user's idea into ONE single rich English prompt, optimized for video generation. "
-        "Rules: translate to English; keep the user's subject and intent EXACTLY; add concrete visual "
-        "details (lighting, camera angle, environment, mood, colors, style like 'cinematic, 4k, detailed'); "
-        "describe motion suitable for a short clip; NO preamble, NO quotes, NO explanations, NO line breaks. "
-        "Output ONLY the final prompt, under 60 words."
-    )
-    # Modèle rapide pour cette tâche courte
-    candidates = ["qwen2.5:3b", "llama3.2:3b", "qwen2.5:7b", "hermes3:8b"]
-    model = None
-    try:
-        async with _httpx.AsyncClient(timeout=3.0) as c:
-            r = await c.get(f"{OLLAMA_URL}/api/tags")
-            avail = [m["name"] for m in r.json().get("models", [])] if r.status_code == 200 else []
-        model = next((m for m in candidates if m in avail), (avail[0] if avail else None))
-    except Exception:
-        pass
-    if not model:
-        raise HTTPException(status_code=503, detail="Ollama indisponible pour l'amélioration du prompt")
-
-    try:
-        async with _httpx.AsyncClient(timeout=40.0) as c:
-            resp = await c.post(f"{OLLAMA_URL}/api/chat", json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": raw},
-                ],
-                "stream": False,
-                "keep_alive": "30m",
-                "options": {"temperature": 0.7, "num_predict": 160},
-            })
-        data = resp.json()
-        enhanced = (data.get("message", {}) or {}).get("content", "").strip()
-        # Nettoyage : retire guillemets/sauts de ligne éventuels
-        enhanced = enhanced.strip().strip('"').strip("'").replace("\n", " ").strip()
-        if not enhanced:
-            raise ValueError("réponse vide")
-        return {"success": True, "original": raw, "enhanced": enhanced, "model": model}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Échec de l'amélioration : {e}")
-
-
-@app.post("/api/video/local/generate/image")
-async def local_video_generate_image(
-    model_key: str = Form(...),
-    prompt: str = Form(""),
-    num_steps: int | None = Form(None),   # None → défaut du modèle
-    image: UploadFile = File(...),
-):
-    """SSE : génération image-to-video locale (CogVideoX-5B-I2V)."""
-    import tempfile
-
-    img_bytes = await image.read()
-    ext = ".jpg"
-    if image.content_type:
-        if "png"  in image.content_type: ext = ".png"
-        elif "webp" in image.content_type: ext = ".webp"
-    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-        tmp.write(img_bytes)
-        tmp_path = tmp.name
-
-    async def generate():
-        import json as _j
-        if not _video_gen_allowed():
-            yield f"data: {_j.dumps({'status': 'error', 'error': _video_gen_reason()})}\n\n"
-            return
-        try:
-            async for event in _lv.generate_video_local_sse(
-                model_key=model_key,
-                prompt=prompt,
-                num_steps=num_steps,
-                image_path=tmp_path,
-            ):
-                yield event
-        finally:
-            try:
-                _os.unlink(tmp_path)
-            except Exception:
-                pass
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
-    )
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Voix — Text-to-Speech (Edge-TTS neural voices, gratuit, sans clé API)

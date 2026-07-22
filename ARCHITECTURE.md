@@ -55,6 +55,7 @@ flowchart LR
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
 | `api/video_remote.py` | Catalogue Replicate, génération texte/image, suivi SSE, annulation et import des vidéos distantes |
 | `api/video_editing.py` | Diaporamas, animations texte, stockage borné et montage ffmpeg local hors de la boucle asyncio |
+| `api/video_local.py` | Capacités GPU, génération Diffusers texte/image, annulation et amélioration de prompt Ollama |
 | `db_connection.py` | Fabrique de connexions WAL, clés étrangères et frontière commit/rollback |
 | `db_migrations.py` | Catalogue de schéma versionné, checksums, compatibilité et rollback transactionnel |
 | `repositories/` | Persistance métier injectable; conversations/messages extraits en premier |
@@ -134,6 +135,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 27. l'IA e-mail : brouillons, résumés, digest, profils, scheduler, drafts et outbox appartiennent à `api/email_automation.py`; l'activation initiale exige une confirmation explicite.
 28. la vidéo distante : modèles, générations texte/image, suivi SSE, annulation et import Replicate appartiennent à `api/video_remote.py`; le jeton reste lu par le gestionnaire de secrets.
 29. le montage vidéo local : diaporamas, texte animé, fichiers et opérations ffmpeg appartiennent à `api/video_editing.py`; tout nom de fichier reste confiné au stockage vidéo.
+30. la génération vidéo IA locale : capacités, modèles, SSE texte/image, annulation et amélioration du prompt appartiennent à `api/video_local.py`; les fichiers uploadés sont nettoyés sur toute sortie du stream.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

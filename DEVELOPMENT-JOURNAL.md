@@ -3845,6 +3845,48 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
   orchestrateur e-mail et accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.295.0 — Génération vidéo IA locale
+
+### Constat et décision
+
+- La capacité GPU, les modèles Diffusers, les deux générations SSE et leur annulation étaient
+  encore couplés au composition root. L'amélioration de prompt utilise la même UX vidéo et
+  reste dans cette frontière, tout en déléguant l'inférence à Ollama.
+- Cette extraction achève le découpage du domaine vidéo en trois responsabilités indépendantes :
+  fournisseur distant, montage/fichiers locaux et génération IA locale.
+
+### Implémentation
+
+- Nouveau `backend/api/video_local.py` avec les cinq routes historiques, les modèles Pydantic,
+  le contrôle de capacité et les raisons de mode dégradé.
+- Le SSE, les paramètres Diffusers, l'annulation coopérative et le choix Ollama existants sont
+  conservés. Aucun modèle n'est téléchargé ou chargé par les tests.
+- Correction connexe : le fichier temporaire de l'image est maintenant nettoyé par un `finally`
+  englobant aussi le refus pour capacité désactivée.
+- Nouveau `scripts/test_video_local_boundary.py` : matériel/réglage, erreur SSE, nettoyage,
+  annulation, prompt vide et propriété exacte des cinq routes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du routeur, de `main.py` et du test : réussie.
+- Test de frontière : capacité, SSE, nettoyage, annulation et cinq routes validés.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 3 544 à 3 375 lignes.
+
+### Rollback
+
+- Revenir au commit v2.294 et replacer les cinq routes dans `main.py`. Les modèles locaux,
+  réglages de performance, artefacts vidéo et formats SSE ne subissent aucune migration.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 75/75 étapes réussies; compilation de 146 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 28048, version `2.295.0`, Ollama disponible et 15 workers
+  observés (13 actifs, 2 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
+  orchestrateur e-mail et accueil Next.js Turbopack.
+
 ## 2026-07-22 — v2.294.0 — Création et montage vidéo locaux
 
 ### Constat et décision
