@@ -17,10 +17,26 @@ def main() -> None:
     clean = cortex.compile_contract("Bonjour, explique-moi simplement ce concept")
     check(clean["forced_tools"] == [], "Auto ne doit forcer aucun outil")
     check(clean["resolved"]["autonomy"] == "advise", "Une explication reste en conseil")
+    check(clean["execution_budget"]["max_tool_steps"] == 10, "Budget standard")
+
+    instant = cortex.compile_contract("Réponds vite", {"effort": "instant"})
+    deep = cortex.compile_contract("Analyse complète", {"effort": "deep"})
+    mission = cortex.compile_contract("Poursuis cette mission", {"autonomy": "mission"})
+    check(instant["execution_budget"]["max_tool_steps"] == 3, "Budget instant")
+    check(deep["execution_budget"]["max_tool_steps"] == 16, "Budget approfondi")
+    check(mission["execution_budget"]["max_tool_steps"] == 24, "Budget mission")
+    check(
+        instant["execution_budget"]["max_wall_seconds"]
+        < deep["execution_budget"]["max_wall_seconds"]
+        < mission["execution_budget"]["max_wall_seconds"],
+        "Budgets temporels croissants",
+    )
+    check("plafond n'est jamais un objectif" in cortex.prompt_block(deep), "Arrêt anticipé explicite")
 
     web = cortex.compile_contract("Compare ces solutions", {"evidence": "primary", "output": "report"})
     check(web["forced_tools"] == ["web_deep_research"], "Sources primaires explicites")
     check(web["resolved"]["output"] == "report", "Livrable rapport")
+    check(web["execution_budget"]["evidence_required"] is True, "Preuves requises exposées")
 
     council = cortex.compile_contract("Décide entre A et B", {"review": "council5"})
     check(council["forced_tools"] == ["ai_model_council"], "Council explicite obligatoire")

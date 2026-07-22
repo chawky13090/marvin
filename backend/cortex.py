@@ -26,6 +26,12 @@ AXES = {
 }
 
 DEFAULT_CONTRACT = {axis: "auto" for axis in AXES}
+_EFFORT_BUDGETS = {
+    "instant": (3, 120),
+    "standard": (10, 600),
+    "deep": (16, 1800),
+    "mission": (24, 3600),
+}
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _RECIPES_PATH = _DATA_DIR / "cortex_recipes.json"
 _LOCK = threading.RLock()
@@ -147,7 +153,7 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
     if "output" in explicit and resolved["output"] == "document":
         forced_tools.append("document_generate")
 
-    return {
+    compiled = {
         "version": 1,
         "requested": requested,
         "resolved": resolved,
@@ -156,6 +162,28 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
         "risk_score": risk_score(text),
         "reasons": reasons,
         "summary": summary(resolved),
+    }
+    compiled["execution_budget"] = execution_budget(compiled)
+    return compiled
+
+
+def execution_budget(compiled: dict) -> dict:
+    """Traduit le contrat en limites explicites; un budget est un plafond, jamais une cible."""
+    resolved = compiled.get("resolved") if isinstance(compiled, dict) else {}
+    resolved = resolved if isinstance(resolved, dict) else {}
+    effort = str(resolved.get("effort") or "standard")
+    if resolved.get("autonomy") == "mission":
+        effort = "mission"
+    max_steps, max_seconds = _EFFORT_BUDGETS.get(effort, _EFFORT_BUDGETS["standard"])
+    evidence = str(resolved.get("evidence") or "memory")
+    review = str(resolved.get("review") or "none")
+    return {
+        "profile": effort,
+        "max_tool_steps": max_steps,
+        "max_wall_seconds": max_seconds,
+        "evidence_required": evidence in {"web", "primary", "connected"},
+        "review_required": review not in {"none", "auto"},
+        "stop_when_satisfied": True,
     }
 
 
@@ -189,11 +217,17 @@ def summary(resolved: dict) -> str:
 
 def prompt_block(compiled: dict) -> str:
     r = compiled["resolved"]
+    budget = compiled.get("execution_budget") or execution_budget(compiled)
     lines = [
         "\n\n=== CONTRAT DE MISSION CORTEX ===",
         f"Effort={r['effort']}; preuves={r['evidence']}; révision={r['review']}; ",
         f"autonomie={r['autonomy']}; confidentialité={r['privacy']}; livrable={r['output']}.",
         "Ce contrat n'annule jamais les confirmations, permissions ou garde-fous existants.",
+        (
+            f"Budget maximal : {budget['max_tool_steps']} étapes d'outils et "
+            f"{budget['max_wall_seconds']} secondes. Arrête dès que les critères sont satisfaits; "
+            "ce plafond n'est jamais un objectif à consommer."
+        ),
     ]
     if r["autonomy"] == "advise":
         lines.append("Reste en conseil : n'exécute aucune action sortante ou modificatrice.")
@@ -215,7 +249,7 @@ def prompt_block(compiled: dict) -> str:
 
 def provenance(
     compiled: dict, model: str, tools: set[str] | list[str], *, critique: bool = False,
-    answer: str = "", conversation_id: str | None = None,
+    answer: str = "", conversation_id: str | None = None, budget_usage: dict | None = None,
 ) -> dict:
     names = sorted(set(tools or []))
     evidence_tools = [n for n in names if n.startswith(("web_", "file_", "email_", "calendar_", "memory_"))]
@@ -245,6 +279,8 @@ def provenance(
             "cited" if urls else "tool_evidence" if evidence_tools else "missing" if requested_evidence else "not_requested"
         ),
         "privacy_route": compiled["resolved"]["privacy"],
+        "execution_budget": compiled.get("execution_budget") or execution_budget(compiled),
+        "budget_usage": budget_usage or {},
         "unresolved": [],
         "truth_ledger": ({
             "record_id": ledger["id"],

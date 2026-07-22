@@ -3108,3 +3108,43 @@ ignorée) :
 - Backend réel redémarré : version `2.275.0`, Ollama disponible, 344/344 outils et 15 workers.
 - Frontend Next.js/Turbopack : `/market` répond HTTP 200. Le navigateur intégré refuse le
   rechargement de `localhost` par politique d'URL; aucune tentative de contournement effectuée.
+
+## 2026-07-22 — v2.276.0 — Budget d'autonomie Cortex adaptatif
+
+### Constat et décision
+
+- `agent.py` utilisait le même plafond de 10 itérations pour une explication instantanée et
+  une mission complexe. Le modèle pouvait donc surconsommer sur une tâche simple ou manquer
+  d'espace pour vérifier une mission profonde.
+- Un travail sans limite a été écarté : il augmente les coûts Cloud, les boucles d'outils et
+  le risque d'effets répétés. Le compromis retenu est un budget croissant, observable et borné.
+
+### Implémentation
+
+- `cortex.execution_budget` compile les profils instant/standard/deep/mission en plafonds de
+  3/10/16/24 étapes et 120/600/1800/3600 secondes.
+- Une autonomie explicitement `mission` reçoit le budget mission même si l'effort n'était pas
+  épinglé. Les exigences de preuves et de revue sont également exposées dans le contrat.
+- La boucle agentique utilise le budget compilé, arrête avant une nouvelle étape si le temps
+  est épuisé et conserve la synthèse finale historique sans outils.
+- La provenance indique étapes consommées, durée et cause d'arrêt
+  (`criteria_satisfied`, `max_tool_steps` ou `max_wall_seconds`).
+
+### Validation isolée réalisée avant versionnage
+
+- Budgets des quatre profils et croissance temporelle vérifiés sans appel LLM.
+- Sources primaires marquées comme preuve requise; instruction d'arrêt anticipé injectée.
+- Garde-fous d'intention, prompt agent et compilation Python : réussis.
+
+### Rollback
+
+- Revenir à `2.275.0` et réutiliser `config.MAX_TOOL_STEPS=10`. Aucun schéma ni contenu
+  utilisateur n'est modifié par cette version.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 56/56 étapes réussies, 127 fichiers Python compilés,
+  dépendances cohérentes, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.276.0`, Ollama disponible, 344/344 outils et 15 workers.
+- Tour Cloud réel en effort instant : contrat 3 étapes/120 secondes, une étape consommée,
+  arrêt `criteria_satisfied`; conversation et journal de test supprimés après validation.

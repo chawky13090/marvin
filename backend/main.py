@@ -94,6 +94,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.276 — budget Cortex adaptatif : 3/10/16/24 étapes et plafond temporel selon effort,
+# arrêt dès satisfaction et consommation publiée dans la provenance de la réponse.
 # v2.275 — transport SSE frontend partagé : reconnexion après coupure en milieu de réponse
 # avec afterEvent, sans dupliquer texte, outils, raisonnement ou lecture vocale.
 # v2.274 — producteur de tour détaché du navigateur et journal SSE SQLite rejouable;

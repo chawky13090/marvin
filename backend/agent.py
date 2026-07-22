@@ -45,7 +45,7 @@ from agent_safety import (
 )
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
-    OLLAMA_URL, DEFAULT_MODEL, MAX_TOOL_STEPS, MAX_CONTEXT_MESSAGES,
+    OLLAMA_URL, DEFAULT_MODEL, MAX_CONTEXT_MESSAGES,
     PERMISSION_SECURE, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
     SECURE_BLOCKED_TOOLS, DANGEROUS_TOOLS,
     MODEL_PROFILES, DATA_DIR,
@@ -594,6 +594,9 @@ async def run_agent(
     # l'équipe adaptative de lecture/recherche. Les interdictions déterministes gagnent.
     import cortex as _cortex
     _cortex_plan = _cortex.compile_contract(_user_query, cortex_contract)
+    _execution_budget = _cortex_plan["execution_budget"]
+    _max_tool_steps = int(_execution_budget["max_tool_steps"])
+    _max_wall_seconds = int(_execution_budget["max_wall_seconds"])
     if not _tool_suppression:
         _required_tool_names.update(_cortex_plan.get("forced_tools") or [])
     if "code_workspace_control" in _required_tool_names:
@@ -1115,8 +1118,15 @@ async def run_agent(
     else:
         ollama_msgs[0]["content"] = system_prompt
 
+    _agent_loop_started = time.monotonic()
+    _steps_used = 0
+    _budget_stop_reason = None
     async with httpx.AsyncClient(timeout=_ollama_timeout) as _ollama_client:
-      for step in range(MAX_TOOL_STEPS):
+      for step in range(_max_tool_steps):
+        if step > 0 and time.monotonic() - _agent_loop_started >= _max_wall_seconds:
+            _budget_stop_reason = "max_wall_seconds"
+            break
+        _steps_used = step + 1
         full_content = ""
         tool_calls_found: list[dict] = []
 
@@ -1222,7 +1232,7 @@ async def run_agent(
         _missing_required = _required_tool_names - _executed_tool_names - {
             tc.get("function", {}).get("name", "") for tc in tool_calls_found
         }
-        if _missing_required and (not tool_calls_found or step >= MAX_TOOL_STEPS - 2):
+        if _missing_required and (not tool_calls_found or step >= _max_tool_steps - 2):
             for required_name in sorted(_missing_required):
                 if required_name == "ai_model_council":
                     arguments = {"question": _user_query}
@@ -1610,7 +1620,7 @@ async def run_agent(
             )
 
         elif (_skill and _skill.get("tools") and not _nudged and use_tools and tools_payload
-              and step < MAX_TOOL_STEPS - 1):
+              and step < _max_tool_steps - 1):
             # ── Compétence active mais le modèle a EXPLIQUÉ au lieu d'AGIR ─────
             # (aucun appel natif, rien à récupérer dans le texte). On le corrige
             # UNE fois avec les noms d'outils EXACTS et on relance l'itération.
@@ -1726,13 +1736,19 @@ async def run_agent(
                 "type": "cortex_provenance",
                 "provenance": _cortex.provenance(
                     _cortex_plan, active_model, _executed_tool_names,
-                    critique=bool(_critique), answer=full_content, conversation_id=conversation_id
+                    critique=bool(_critique), answer=full_content, conversation_id=conversation_id,
+                    budget_usage={
+                        "tool_steps": _steps_used,
+                        "elapsed_seconds": round(time.monotonic() - _agent_loop_started, 3),
+                        "stop_reason": "criteria_satisfied",
+                    },
                 ),
             })
             yield _sse({"type": "done"})
             return
 
-    # Trop d'étapes (MAX_TOOL_STEPS atteint) — v2.126 : jusqu'ici on terminait la boucle
+    _budget_stop_reason = _budget_stop_reason or "max_tool_steps"
+    # Budget d'étapes ou de temps atteint — v2.126 : jusqu'ici on terminait la boucle
     # SANS RIEN RENVOYER, ni texte ni message sauvegardé — l'utilisateur voyait le flux
     # s'arrêter net après le dernier tool_end, sans aucune réponse. C'est exactement le
     # symptôme rapporté (« Marvin continue de réfléchir sans rien faire ») : reproduit en
@@ -1740,7 +1756,7 @@ async def run_agent(
     # produire de texte. On force maintenant UN dernier appel, SANS outils, pour obtenir
     # une synthèse de ce qui a déjà été trouvé plutôt qu'un silence total.
     ollama_msgs.append({"role": "user", "content": (
-        "⛔ Tu as atteint la limite d'appels d'outils pour ce tour. Tu ne peux PLUS utiliser "
+        f"⛔ Tu as atteint le budget ({_budget_stop_reason}) pour ce tour. Tu ne peux PLUS utiliser "
         "aucun outil. Réponds MAINTENANT, en français, avec une synthèse aussi complète que "
         "possible de ce que tu as déjà trouvé pour répondre à la demande initiale de "
         "l'utilisateur. Si des informations manquent encore, dis-le clairement plutôt que de "
@@ -1827,7 +1843,12 @@ async def run_agent(
         "type": "cortex_provenance",
         "provenance": _cortex.provenance(
             _cortex_plan, active_model, _executed_tool_names,
-            critique=bool(_critique), answer=full_content, conversation_id=conversation_id
+            critique=bool(_critique), answer=full_content, conversation_id=conversation_id,
+            budget_usage={
+                "tool_steps": _steps_used,
+                "elapsed_seconds": round(time.monotonic() - _agent_loop_started, 3),
+                "stop_reason": _budget_stop_reason,
+            },
         ),
     })
     yield _sse({"type": "done"})

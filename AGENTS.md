@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.275.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.276.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.275.0)
+## 9. État actuel (v2.276.0)
+
+**v2.276 (budget Cortex adaptatif)** : la boucle LLM n'utilise plus un plafond uniforme de
+10 étapes. Le contrat choisit 3/10/16/24 étapes et 120/600/1800/3600 secondes pour les profils
+instant/standard/deep/mission. Ce sont des plafonds, jamais des objectifs : le modèle conclut
+dès que les critères sont satisfaits. La provenance expose budget, consommation et cause
+d'arrêt. Une mission reçoit ainsi plus de liberté qu'une question simple sans boucle infinie.
 
 **v2.275 (reconnexion SSE au milieu d'une réponse)** : le transport partagé
 `lib/chatStream.js` lit les événements du chat, mémorise le dernier `turnSeq` reçu et se

@@ -48,7 +48,7 @@ flowchart LR
 | `repositories/` | Persistance métier injectable; conversations/messages extraits en premier |
 | `skills.py` | Compétences Markdown, matching, apprentissage et versioning |
 | `tool_router.py` | Index sémantique et sélection dynamique des outils |
-| `cortex.py` | Contrats de mission, routage explicable, provenance et recettes Cortex |
+| `cortex.py` | Contrats de mission, budgets adaptatifs, routage explicable, provenance et recettes Cortex |
 | `cortex_search.py` | Exploration multi-stratégies, vérificateurs spécialisés et arbitrage Cloud |
 | `forge.py` | Corpus de scénarios, notation déterministe, historique et métriques pass^k |
 | `mission_os.py` | Missions durables, checkpoints, journal d'événements et preuves d'actions |
