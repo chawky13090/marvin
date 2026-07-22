@@ -93,6 +93,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.273 — requestId propagé du chat et reçus SQLite transactionnels : une action
+# terminée est rejouée depuis son reçu; une interruption ambiguë n'est jamais réexécutée.
 # v2.272 — matrice et filtrage des outils extraits d'agent.py; plafond désormais
 # déterministe entre deux processus Python malgré le hash seed des ensembles.
 # v2.271 — constructeur du prompt système extrait d'agent.py; date française sans
@@ -2972,6 +2974,7 @@ async def _global_exception_handler(request: Request, exc: Exception):
 class ChatRequest(BaseModel):
     messages: list[dict]
     conversationId: str | None = None
+    requestId: str | None = Field(default=None, min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$")
     model: str | None = None
     cortex: dict | None = None
 
@@ -2979,7 +2982,9 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
     async def event_stream():
-        async for chunk in run_agent(req.messages, req.conversationId, req.model, req.cortex):
+        async for chunk in run_agent(
+            req.messages, req.conversationId, req.model, req.cortex, request_id=req.requestId,
+        ):
             yield chunk
 
     return StreamingResponse(

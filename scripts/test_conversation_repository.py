@@ -66,6 +66,21 @@ def _check_repository(path: Path) -> None:
     )
     assert message["tool_calls"] == [{"name": "demo"}]
     assert message["tool_results"] == [{"success": True}]
+    first_request = repository.create_message(
+        first["id"], "user", "Message idempotent", client_request_id="request-unique-1",
+    )
+    repeated_request = repository.create_message(
+        first["id"], "user", "Message idempotent", client_request_id="request-unique-1",
+    )
+    assert repeated_request["id"] == first_request["id"]
+    try:
+        repository.create_message(
+            first["id"], "user", "Contenu divergent", client_request_id="request-unique-1",
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Un request id reutilise avec un autre contenu devait etre refuse.")
     repository.create_message(
         second["id"], "user", "Contenu unique pour recherche et repetition"
     )
@@ -74,7 +89,8 @@ def _check_repository(path: Path) -> None:
         second["id"],
     }
     assert repository.get_recent_user_messages() == [
-        "Contenu unique pour recherche et repetition"
+        "Contenu unique pour recherche et repetition",
+        "Message idempotent",
     ]
 
     with db(path) as connection:
@@ -93,7 +109,7 @@ def _check_repository(path: Path) -> None:
         pass
     else:
         raise AssertionError("Le CHECK SQL des roles devait refuser la valeur.")
-    assert len(repository.get_messages_by_conversation(first["id"])) == 1
+    assert len(repository.get_messages_by_conversation(first["id"])) == 2
 
     repository.delete_conversation(first["id"])
     assert repository.get_conversation(first["id"]) is None

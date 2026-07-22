@@ -175,6 +175,7 @@ export function ChatProvider({ children }) {
             };
           }),
           conversationId: conversationIdRef.current || null,
+          requestId: userMsg.id,
           model: activeModelRef.current || null,
           cortex: missionContract,
         }),

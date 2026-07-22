@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.272.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.273.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.272.0)
+## 9. État actuel (v2.273.0)
+
+**v2.273 (reçus idempotents des actions chat)** : chaque message utilisateur transmet son
+`requestId` au backend. La migration SQLite 3 ajoute `messages.client_request_id` et la table
+`action_receipts`. Un message rejoué n'est plus persisté deux fois. Une action à effet de bord
+terminée réutilise son résultat sans reproduire l'effet; une copie concurrente est refusée;
+après interruption d'un ancien processus, le résultat est déclaré inconnu et Marvin refuse
+le rejeu automatique. Les arguments ne sont conservés que sous forme de hash et les secrets
+éventuels du résultat sont masqués dans le reçu. Les lectures restent librement rejouables.
 
 **v2.272 (sélection des outils extraite)** : `backend/agent_tool_selection.py` possède la
 matrice mots-clés vers outils, le routage sémantique/appris, le repli borné et le plafond

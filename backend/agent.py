@@ -16,6 +16,7 @@ import httpx
 
 import cloud_routing as _cr
 import database as db
+from action_replay import execute_once as _execute_action_once, should_guard as _should_guard_action
 from intent_guard import (
     skill_match_text, tool_suppression_reason, wants_command_text_only as _wants_command_text_only,
     wants_model_council, workspace_followup,
@@ -92,6 +93,33 @@ def _log_tool_exception(tool_name: str, tool_args: dict, ex: Exception, conversa
     except Exception:
         pass
     return {"error": str(ex)}
+
+
+async def _execute_registered_tool(
+    tool_name: str,
+    tool_args: dict,
+    conversation_id: str,
+    request_id: str | None,
+):
+    """Execute un outil derriere le recu idempotent des actions a effet de bord."""
+    executor = TOOLS_REGISTRY.get(tool_name)
+    if not executor:
+        return {"error": f"Outil inconnu : {tool_name}"}
+
+    async def operation():
+        try:
+            return await executor(tool_args)
+        except Exception as ex:
+            return _log_tool_exception(tool_name, tool_args, ex, conversation_id)
+
+    return await _execute_action_once(
+        request_id=request_id,
+        conversation_id=conversation_id,
+        tool_name=tool_name,
+        arguments=tool_args,
+        operation=operation,
+        guarded=tool_name in DANGEROUS_TOOLS or _should_guard_action(tool_name),
+    )
 
 
 # v2.131 — filet de sécurité DÉTERMINISTE sur les réponses techniques (scripts). La règle
@@ -475,6 +503,7 @@ async def run_agent(
     conversation_id: str | None,
     model: str | None,
     cortex_contract: dict | None = None,
+    request_id: str | None = None,
 ) -> AsyncIterator[str]:
     """
     Générateur SSE. Yielde des événements de type :
@@ -507,7 +536,9 @@ async def run_agent(
             content = "".join(
                 p.get("text", "") for p in last_msg["parts"] if p.get("type") == "text"
             )
-        db.create_message(conversation_id, "user", content)
+        db.create_message(
+            conversation_id, "user", content, client_request_id=request_id,
+        )
         _user_query = content
 
         # v2.175 — persiste + analyse (légende + texte relevé) toute image jointe à CE message,
@@ -1383,25 +1414,15 @@ async def run_agent(
                     # renvoie requiresConfirmation et demande un accord humain explicite.
                     if tool_name not in _ALWAYS_CONFIRM_TOOLS:
                         tool_args["confirmed"] = True
-                    executor = TOOLS_REGISTRY.get(tool_name)
-                    if executor:
-                        try:
-                            result = await executor(tool_args)
-                        except Exception as ex:
-                            result = _log_tool_exception(tool_name, tool_args, ex, conversation_id)
-                    else:
-                        result = {"error": f"Outil inconnu : {tool_name}"}
+                    result = await _execute_registered_tool(
+                        tool_name, tool_args, conversation_id, request_id,
+                    )
 
                 else:
                     # Niveau Standard (ou non défini) : comportement normal
-                    executor = TOOLS_REGISTRY.get(tool_name)
-                    if executor:
-                        try:
-                            result = await executor(tool_args)
-                        except Exception as ex:
-                            result = _log_tool_exception(tool_name, tool_args, ex, conversation_id)
-                    else:
-                        result = {"error": f"Outil inconnu : {tool_name}"}
+                    result = await _execute_registered_tool(
+                        tool_name, tool_args, conversation_id, request_id,
+                    )
 
                 # v2.248 — contrat additif commun à tous les outils. Les champs historiques
                 # restent intacts; `_contract` fournit un état, un code d'erreur et la

@@ -103,7 +103,7 @@ def _check_catalog_order() -> None:
 
 def _check_fresh_marvin_schema() -> None:
     connection = _connection()
-    assert apply_migrations(connection, MIGRATIONS) == [1, 2]
+    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3]
     tables = {
         row[0]
         for row in connection.execute(
@@ -122,6 +122,7 @@ def _check_fresh_marvin_schema() -> None:
         "notes",
         "email_templates",
         "automation_rules",
+        "action_receipts",
         "schema_migrations",
     }
     assert expected <= tables, expected - tables
@@ -129,6 +130,10 @@ def _check_fresh_marvin_schema() -> None:
         row[1] for row in connection.execute("PRAGMA table_info(conversations)")
     }
     assert {"project_id", "pinned"} <= conversation_columns
+    message_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(messages)")
+    }
+    assert "client_request_id" in message_columns
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
     connection.close()

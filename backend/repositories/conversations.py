@@ -113,22 +113,57 @@ class ConversationRepository:
         content: str,
         tool_calls: list | None = None,
         tool_results: list | None = None,
+        client_request_id: str | None = None,
     ) -> dict:
         message_id = str(uuid.uuid4())
         with self._connection_scope() as connection:
-            connection.execute(
-                """INSERT INTO messages
-                   (id, conversation_id, role, content, tool_calls, tool_results)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (
-                    message_id,
-                    conversation_id,
-                    role,
-                    content,
-                    json.dumps(tool_calls) if tool_calls else None,
-                    json.dumps(tool_results) if tool_results else None,
-                ),
-            )
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(messages)")
+            }
+            supports_request_id = "client_request_id" in columns
+            if client_request_id and supports_request_id:
+                existing = connection.execute(
+                    """SELECT * FROM messages
+                       WHERE conversation_id = ? AND client_request_id = ?""",
+                    (conversation_id, client_request_id),
+                ).fetchone()
+                if existing is not None:
+                    parsed = self._parse_message(row_to_dict(existing))
+                    if parsed and parsed.get("role") == role and parsed.get("content") == content:
+                        return parsed
+                    raise ValueError(
+                        "Le client_request_id existe deja avec un contenu different."
+                    )
+
+            if supports_request_id:
+                connection.execute(
+                    """INSERT INTO messages
+                       (id, conversation_id, role, content, tool_calls, tool_results, client_request_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        message_id,
+                        conversation_id,
+                        role,
+                        content,
+                        json.dumps(tool_calls) if tool_calls else None,
+                        json.dumps(tool_results) if tool_results else None,
+                        client_request_id,
+                    ),
+                )
+            else:
+                connection.execute(
+                    """INSERT INTO messages
+                       (id, conversation_id, role, content, tool_calls, tool_results)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        message_id,
+                        conversation_id,
+                        role,
+                        content,
+                        json.dumps(tool_calls) if tool_calls else None,
+                        json.dumps(tool_results) if tool_results else None,
+                    ),
+                )
             connection.execute(
                 "UPDATE conversations SET updated_at = datetime('now') WHERE id = ?",
                 (conversation_id,),
@@ -147,7 +182,7 @@ class ConversationRepository:
         with self._connection_scope() as connection:
             rows = connection.execute(
                 """SELECT * FROM messages WHERE conversation_id = ?
-                   ORDER BY created_at ASC LIMIT ?""",
+                   ORDER BY created_at ASC, rowid ASC LIMIT ?""",
                 (conversation_id, limit),
             ).fetchall()
         return [self._parse_message(row_to_dict(row)) for row in rows]
@@ -157,7 +192,7 @@ class ConversationRepository:
             rows = connection.execute(
                 """SELECT content FROM messages WHERE role = 'user'
                    AND content IS NOT NULL AND length(content) > 6
-                   ORDER BY created_at DESC LIMIT ?""",
+                   ORDER BY created_at DESC, rowid DESC LIMIT ?""",
                 (limit,),
             ).fetchall()
         output: list[str] = []

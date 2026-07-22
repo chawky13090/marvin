@@ -168,6 +168,31 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC)",
         ),
     ),
+    Migration(
+        version=3,
+        name="chat-turn-and-action-receipts",
+        statements=(
+            "ALTER TABLE messages ADD COLUMN client_request_id TEXT",
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_request
+               ON messages(conversation_id, client_request_id)
+               WHERE client_request_id IS NOT NULL""",
+            """CREATE TABLE IF NOT EXISTS action_receipts (
+                idempotency_key TEXT PRIMARY KEY,
+                request_id TEXT NOT NULL,
+                conversation_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                args_hash TEXT NOT NULL,
+                status TEXT NOT NULL
+                    CHECK(status IN ('started', 'completed', 'unknown')),
+                owner_token TEXT NOT NULL,
+                result_json TEXT,
+                started_at TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at TEXT
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_action_receipts_request ON action_receipts(request_id, started_at)",
+            "CREATE INDEX IF NOT EXISTS idx_action_receipts_status ON action_receipts(status, started_at)",
+        ),
+    ),
 )
 
 

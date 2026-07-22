@@ -2924,6 +2924,7 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
 - Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
 
+
 ## 2026-07-22 — v2.272.0 — Sélection des outils LLM extraite
 
 ### Contexte et décision
@@ -2961,5 +2962,61 @@ ignorée) :
 - `scripts/check_marvin.py --quick` : 53/53 étapes réussies; compilation, dépendances et
   frontend validés, 0 erreur ESLint et 37 avertissements historiques inchangés.
 - Backend réel redémarré : version `2.272.0`, Ollama disponible, 344/344 outils et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
+- Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
+
+## 2026-07-22 — v2.273.0 — Reçus idempotents des actions du chat
+
+### Constat et décision
+
+- Le frontend créait déjà un identifiant unique par message utilisateur, mais ne le
+  transmettait pas à `/api/chat`.
+- Le backend recréait donc le message et des identifiants d'appels aléatoires à chaque
+  requête. Après interruption ou rejeu réseau, aucune preuve ne permettait d'empêcher une
+  seconde création, un second envoi ou une seconde commande.
+- Retenir un reçu durable par `requestId + conversation + outil + hash des arguments`.
+
+### Implémentation
+
+- Migration SQLite 3 : colonne `messages.client_request_id`, index unique partiel et table
+  `action_receipts` avec états `started`, `completed` et `unknown`.
+- `ChatContext` et `useSecretary` transmettent l'identifiant du message courant; FastAPI le
+  valide puis le transmet à `run_agent`.
+- Le repository de conversations retourne le message existant pour le même identifiant et
+  refuse un même identifiant associé à un contenu divergent.
+- `backend/action_replay.py` réserve atomiquement les actions à effet de bord. Un reçu terminé
+  est réutilisé, un doublon concurrent est refusé et un reçu appartenant à un ancien processus
+  devient `unknown` sans nouvelle exécution.
+- Seul le hash canonique des arguments est stocké. Les clés de secrets sont masquées dans les
+  résultats persistés. Une panne d'écriture du reçu après l'action ne masque pas le résultat
+  déjà obtenu et n'entraîne pas un rejeu implicite.
+- Le tri des messages utilise aussi `rowid` pour départager deux écritures dans la même seconde.
+
+### Validation isolée réalisée avant versionnage
+
+- Même action appelée deux fois : exécuteur appelé une seule fois, second résultat réutilisé.
+- Deux appels concurrents : le second reçoit `action_in_progress` sans exécution.
+- Reçu `started` d'un ancien processus : `action_outcome_unknown`, aucun nouvel effet.
+- Lecture non gardée : deux exécutions autorisées.
+- Secret du résultat : valeur masquée dans le reçu rejoué.
+- Échec de persistance après action : succès utilisateur conservé avec avertissement de reçu.
+- Message avec même requestId : une seule ligne; contenu divergent refusé.
+- Migrations, repository, intentions, cloud-only, compilation et lint sans erreur : réussis.
+
+### Rollback
+
+- Le code peut revenir à `2.272.0`; les colonnes et la table additives peuvent rester sans
+  être utilisées. Pour un rollback physique hors ligne, restaurer la sauvegarde SQLite créée
+  avant migration. Aucune donnée existante n'est transformée ou supprimée.
+
+### Validation complète et réelle après versionnage
+
+- Sauvegarde SQLite cohérente vérifiée par `quick_check` dans
+  `data/backups/secretary_before_v2273_consistent_20260722_100452.db`.
+- `scripts/check_marvin.py --quick` : 54/54 étapes réussies; compilation, dépendances et
+  frontend validés, 0 erreur ESLint et 37 avertissements historiques inchangés.
+- Backend réel redémarré : version `2.273.0`, Ollama disponible, 344/344 outils et 15 workers.
+- Base réelle : `user_version=3`, table `action_receipts` présente et `quick_check=ok`.
+- OpenAPI réel : `ChatRequest` expose `requestId` avec les champs historiques inchangés.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis après redémarrage.
 - Frontend Next.js/Turbopack : HTTP 200; aucun build concurrent exécuté.
