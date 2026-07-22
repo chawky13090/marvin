@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.290.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.291.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.290.0)
+## 9. État actuel (v2.291.0)
+
+**v2.291 (préférences e-mail)** : les 13 routes de signatures, modèles, surveillance,
+alertes et règles sont extraites de `main.py` vers `api/email_preferences.py`. Les réglages
+restent persistés via la façade SQLite, les modèles restent limités aux 50 derniers, et les
+exécutions manuelles surveillance/règles passent toujours par les outils historiques. Aucun
+envoi ni accès boîte n'est introduit dans cette frontière. `main.py` passe à 4 287 lignes.
 
 **v2.290 (frontière boîte e-mail)** : boîte simple/unifiée, lecture, recherche, dossiers,
 envoi, suppression, marquage, déplacement et téléchargement de pièce jointe sont extraits de

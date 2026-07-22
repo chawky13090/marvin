@@ -28,6 +28,7 @@ from api.content import router as content_router
 from api.connections import router as connections_router
 from api.email_accounts import router as email_accounts_router
 from api.email_mailbox import router as email_mailbox_router
+from api.email_preferences import router as email_preferences_router
 from api.cortex import router as cortex_router
 from api.cron_monitor import router as cron_monitor_router
 from api.ssh import router as ssh_router
@@ -96,6 +97,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.291 — préférences e-mail extraites : signatures, modèles, surveillance,
+# alertes et règles dans un routeur persistant dédié de 13 contrats.
 # v2.290 — frontière boîte e-mail extraite : neuf routes IMAP/SMTP multi-comptes,
 # envoi audité, mutations, recherche et téléchargement de pièce jointe.
 # v2.289 — frontière comptes e-mail extraite : sept routes de configuration,
@@ -2981,6 +2984,7 @@ app.include_router(content_router)
 app.include_router(connections_router)
 app.include_router(email_accounts_router)
 app.include_router(email_mailbox_router)
+app.include_router(email_preferences_router)
 app.include_router(cron_monitor_router)
 app.include_router(ssh_router)
 app.include_router(storage_router)
@@ -3335,110 +3339,6 @@ async def get_best_cloud_model(need: str = "general"):
 # Email Manager (IMAP + SMTP)
 # ══════════════════════════════════════════════════════════════════════════════
 
-
-
-# ── Signatures (par boîte) ────────────────────────────────────────────────────
-def _coerce_obj(v, default):
-    if isinstance(v, str):
-        import json as _json
-        try: return _json.loads(v)
-        except Exception: return default
-    return v if v is not None else default
-
-
-@app.get("/api/email/signatures")
-async def get_signatures():
-    return {"signatures": _coerce_obj(db.get_setting("email_signatures"), {})}
-
-
-@app.post("/api/email/signatures")
-async def set_signatures(body: dict = Body(...)):
-    sigs = _coerce_obj(db.get_setting("email_signatures"), {})
-    acc = (body.get("account") or "").strip()
-    if not acc:
-        raise HTTPException(status_code=400, detail="account requis")
-    sigs[acc] = body.get("signature", "")
-    db.set_setting("email_signatures", sigs)
-    return {"success": True}
-
-
-# ── Modèles de réponse réutilisables ──────────────────────────────────────────
-@app.get("/api/email/templates")
-async def get_templates():
-    t = _coerce_obj(db.get_setting("email_templates"), [])
-    return {"templates": t if isinstance(t, list) else []}
-
-
-@app.post("/api/email/templates")
-async def add_template(body: dict = Body(...)):
-    name = (body.get("name") or "").strip()
-    content = body.get("body", "")
-    if not name:
-        raise HTTPException(status_code=400, detail="nom requis")
-    t = _coerce_obj(db.get_setting("email_templates"), [])
-    if not isinstance(t, list):
-        t = []
-    t = [x for x in t if x.get("name") != name]  # remplace si même nom
-    t.append({"name": name, "body": content})
-    db.set_setting("email_templates", t[-50:])
-    return {"success": True, "count": len(t)}
-
-
-@app.delete("/api/email/templates/{name}")
-async def delete_template(name: str):
-    t = _coerce_obj(db.get_setting("email_templates"), [])
-    if not isinstance(t, list):
-        t = []
-    new = [x for x in t if x.get("name") != name]
-    db.set_setting("email_templates", new)
-    return {"success": True, "count": len(new)}
-
-
-# ── Surveillance intelligente des mails importants (notifications) ────────────
-@app.get("/api/email/watch")
-async def get_email_watch():
-    return _coerce_obj(db.get_setting("email_watch"), {"enabled": False, "interval_min": 5, "accounts": [], "max_notify": 5})
-
-
-@app.post("/api/email/watch")
-async def set_email_watch(body: dict = Body(...)):
-    db.set_setting("email_watch", body)
-    return {"success": True, "enabled": bool(body.get("enabled"))}
-
-
-@app.post("/api/email/watch/run")
-async def run_email_watch():
-    """Vérifie maintenant (force) les mails importants et notifie."""
-    return await tool_module.TOOLS_REGISTRY["email_watch_check"]({"force": True})
-
-
-@app.get("/api/email/watch/alerts")
-async def get_email_alerts():
-    return {"alerts": _coerce_obj(db.get_setting("email_watch_alerts"), [])}
-
-
-@app.post("/api/email/watch/alerts/clear")
-async def clear_email_alerts():
-    db.set_setting("email_watch_alerts", [])
-    return {"success": True}
-
-
-# ── Règles de classement automatique ─────────────────────────────────────────
-@app.get("/api/email/rules")
-async def get_email_rules():
-    return {"rules": _coerce_obj(db.get_setting("email_rules"), [])}
-
-
-@app.post("/api/email/rules")
-async def set_email_rules(body: dict = Body(...)):
-    rules = body.get("rules", [])
-    db.set_setting("email_rules", rules if isinstance(rules, list) else [])
-    return {"success": True, "count": len(rules) if isinstance(rules, list) else 0}
-
-
-@app.post("/api/email/rules/run")
-async def run_email_rules(dry_run: bool = False, account: str | None = None):
-    return await tool_module.TOOLS_REGISTRY["email_apply_rules"]({"dry_run": dry_run, "account": account})
 
 
 # ── Briefing du jour ──────────────────────────────────────────────────────────

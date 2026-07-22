@@ -3761,3 +3761,42 @@ ignorée) :
   observés (12 actifs, 3 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
   connexions masquées et accueil Next.js Turbopack.
+
+## 2026-07-22 — v2.291.0 — Frontière des préférences e-mail
+
+### Constat et décision
+
+- Signatures, modèles, surveillance, alertes et règles formaient un bloc persistant cohérent
+  encore mélangé au composition root. Ces routes ne réalisent directement aucun accès IMAP ou
+  SMTP et peuvent évoluer indépendamment de la boîte et de l'automatisation.
+- Elles sont regroupées dans un routeur dédié; les actions « exécuter maintenant » continuent
+  d'appeler le registre d'outils, afin de ne pas dupliquer leurs garde-fous métier.
+
+### Implémentation
+
+- Nouveau `backend/api/email_preferences.py` avec décodage défensif des anciens réglages JSON,
+  signatures par compte, remplacement de modèle homonyme et plafond historique de 50.
+- Surveillance, alertes et règles conservent les mêmes clés SQLite et formats de réponse.
+- Nouveau `scripts/test_email_preferences_boundary.py` : compatibilité JSON, signature,
+  remplacement de modèle, délégation aux outils et propriété exacte des 13 routes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du routeur, de `main.py` et du test : réussie.
+- Tests préférences et boîte e-mail : réussis sans action externe.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 4 390 à 4 287 lignes.
+
+### Rollback
+
+- Revenir au commit v2.290 et replacer les 13 routes dans `main.py`. Aucun réglage, message,
+  compte, règle, contrat HTTP ou outil n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 71/71 étapes réussies; compilation de 142 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 20824, version `2.291.0`, Ollama disponible et 15 workers
+  observés (12 actifs, 3 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
+  connexions masquées et accueil Next.js Turbopack.
