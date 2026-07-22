@@ -60,6 +60,7 @@ from api.voice import prewarm_whisper
 from api.voice import router as voice_router
 from api.avatar import router as avatar_router
 from api.vm_lab import router as vm_lab_router
+from api.video_remote import router as video_remote_router
 from api.workflows import router as workflows_router
 from app_version import APP_VERSION
 from config import (
@@ -98,6 +99,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.293 — frontière vidéo distante extraite : catalogue Replicate, générations texte/image,
+# suivi SSE, annulation et import d'une URL vivent dans api/video_remote.py.
 # v2.292 — IA et automatisation e-mail extraites : brouillons, résumés, digest,
 # profils, confirmation du planificateur, drafts et outbox dans 13 routes dédiées.
 # v2.291 — préférences e-mail extraites : signatures, modèles, surveillance,
@@ -2981,6 +2984,7 @@ app.include_router(workflows_router)
 app.include_router(voice_router)
 app.include_router(avatar_router)
 app.include_router(vm_lab_router)
+app.include_router(video_remote_router)
 app.include_router(runtime_config_router)
 app.include_router(skills_router)
 app.include_router(content_router)
@@ -3426,173 +3430,6 @@ async def run_proactive_now(kind: str = "morning"):
 
 import video_manager as _vm
 import os as _os
-
-
-@app.get("/api/video/models")
-async def video_models():
-    """Retourne les modèles disponibles pour text-to-video et image-to-video."""
-    return {
-        "text_to_video": _vm.TEXT_TO_VIDEO_MODELS,
-        "image_to_video": _vm.IMAGE_TO_VIDEO_MODELS,
-    }
-
-
-class VideoGenerateTextRequest(BaseModel):
-    model_key: str
-    prompt: str
-    extra_params: dict = Field(default_factory=dict)
-
-
-@app.post("/api/video/generate/text")
-async def video_generate_text(body: VideoGenerateTextRequest):
-    """Lance une génération text-to-video sur Replicate et retourne le prediction_id."""
-    import credentials_manager as cm
-
-    model = _vm.TEXT_TO_VIDEO_MODELS.get(body.model_key)
-    if not model:
-        raise HTTPException(status_code=404, detail=f"Modèle inconnu : {body.model_key}")
-
-    if model["provider"] == "replicate":
-        api_token = cm.get_credential("replicate_api_token")
-        if not api_token:
-            raise HTTPException(
-                status_code=400,
-                detail="Token Replicate non configuré (Paramètres > Connexions)",
-            )
-        params = {**model["params"], "prompt": body.prompt, **body.extra_params}
-        try:
-            data = await _vm._replicate_start(model["model_id"], params, api_token)
-            return {
-                "success": True,
-                "prediction_id": data["id"],
-                "status": data.get("status", "starting"),
-                "provider": "replicate",
-                "model_name": model["name"],
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    else:
-        raise HTTPException(status_code=400, detail=f"Provider non supporté : {model['provider']}")
-
-
-@app.post("/api/video/generate/image")
-async def video_generate_image(
-    model_key: str = Form(...),
-    prompt: str = Form(""),
-    image: UploadFile = File(...),
-):
-    """Lance une génération image-to-video depuis un fichier image uploadé."""
-    import credentials_manager as cm
-    import tempfile
-
-    model = _vm.IMAGE_TO_VIDEO_MODELS.get(model_key)
-    if not model:
-        raise HTTPException(status_code=404, detail=f"Modèle inconnu : {model_key}")
-
-    # Déduire l'extension
-    ext = ".jpg"
-    if image.content_type:
-        if "png"  in image.content_type: ext = ".png"
-        elif "webp" in image.content_type: ext = ".webp"
-        elif "gif"  in image.content_type: ext = ".gif"
-
-    img_bytes = await image.read()
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-            tmp.write(img_bytes)
-            tmp_path = tmp.name
-
-        img_uri = _vm.image_to_data_uri(tmp_path)
-
-        if model["provider"] == "replicate":
-            api_token = cm.get_credential("replicate_api_token")
-            if not api_token:
-                raise HTTPException(status_code=400, detail="Token Replicate non configuré")
-
-            params = dict(model["params"])
-            # Injecter l'image dans le champ attendu par le modèle
-            for field in ("input_image", "image", "first_frame_image"):
-                if field in params:
-                    params[field] = img_uri
-                    break
-            if "prompt" in params:
-                params["prompt"] = prompt
-
-            data = await _vm._replicate_start(model["model_id"], params, api_token)
-            return {
-                "success": True,
-                "prediction_id": data["id"],
-                "status": data.get("status", "starting"),
-                "provider": "replicate",
-                "model_name": model["name"],
-            }
-        else:
-            raise HTTPException(status_code=400, detail=f"Provider non supporté : {model['provider']}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if tmp_path:
-            try:
-                _os.unlink(tmp_path)
-            except Exception:
-                pass
-
-
-@app.get("/api/video/status/{prediction_id}")
-async def video_status_stream(prediction_id: str):
-    """SSE : stream l'état d'une prédiction Replicate jusqu'à la fin."""
-    import credentials_manager as cm
-
-    api_token = cm.get_credential("replicate_api_token")
-    if not api_token:
-        raise HTTPException(status_code=400, detail="Token Replicate non configuré")
-
-    async def generate():
-        async for event in _vm.poll_replicate_sse(prediction_id, api_token):
-            yield event
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
-    )
-
-
-@app.post("/api/video/cancel/{prediction_id}")
-async def video_cancel(prediction_id: str):
-    """Annule une prédiction Replicate en cours."""
-    import credentials_manager as cm
-    api_token = cm.get_credential("replicate_api_token")
-    if not api_token:
-        raise HTTPException(status_code=400, detail="Token Replicate non configuré")
-    await _vm._replicate_cancel(prediction_id, api_token)
-    return {"success": True}
-
-
-@app.post("/api/video/download")
-async def video_download_url(request: Request):
-    """Télécharge et sauvegarde une vidéo générée depuis une URL externe."""
-    body = await request.json()
-    url = body.get("url")
-    if not url:
-        raise HTTPException(status_code=400, detail="URL requise")
-    try:
-        path = await _vm.download_video(url)
-        filename = _os.path.basename(path)
-        size = _os.path.getsize(path)
-        return {
-            "success": True,
-            "filename": filename,
-            "size": size,
-            "size_human": _vm._fmt_size(size),
-            "url": f"/api/video/files/{filename}",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/video/slideshow")

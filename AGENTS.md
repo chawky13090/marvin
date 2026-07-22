@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.292.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.293.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.292.0)
+## 9. État actuel (v2.293.0)
+
+**v2.293 (frontière vidéo distante Replicate)** : les six routes de catalogue, génération
+texte/image, suivi SSE, annulation et import d'URL sont extraites de `main.py` vers
+`api/video_remote.py`. La résolution du jeton demeure dans le gestionnaire de secrets, les
+modèles et appels réseau historiques de `video_manager.py` sont conservés, et les routes
+locales de montage/génération restent inchangées. `main.py` passe à 3 794 lignes.
 
 **v2.292 (IA et automatisation e-mail)** : brouillon, résumé, digest, conversion en tâche,
 résumé de pièce jointe, configuration/profils, exécution, statut, drafts et outbox sont extraits

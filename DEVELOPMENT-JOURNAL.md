@@ -3803,6 +3803,48 @@ ignorée) :
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
   planification et accueil Next.js Turbopack.
 
+## 2026-07-22 — v2.293.0 — Frontière vidéo distante Replicate
+
+### Constat et décision
+
+- `main.py` contenait encore le catalogue Replicate et les six routes distantes au milieu des
+  traitements vidéo locaux. Ce bloc possède une dépendance et un cycle de vie distincts :
+  jeton Replicate, appel HTTP distant, suivi SSE et import du résultat.
+- Deux choix ont été comparés : déplacer tout le domaine vidéo en une fois, ou extraire d'abord
+  la frontière distante. L'extraction progressive est retenue : elle limite le changement à
+  six contrats HTTP et laisse intacts ffmpeg, les fichiers locaux et la génération IA locale.
+
+### Implémentation
+
+- Nouveau `backend/api/video_remote.py` : catalogue texte/image, génération Replicate,
+  suivi SSE, annulation et téléchargement d'une URL générée.
+- Le jeton est toujours obtenu par `credentials_manager`; aucun secret ni nouvelle méthode de
+  connexion n'est introduit. Les appels restent délégués à `video_manager.py`.
+- Nouveau `scripts/test_video_remote_boundary.py` : fusion des paramètres, upload image,
+  refus sans jeton et propriété exacte des six routes.
+- La nouvelle frontière est ajoutée aux invariants d'architecture et à `check_marvin --quick`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `api/video_remote.py`, `main.py` et du test : réussie.
+- Test de frontière : six routes, paramètres texte/image et absence de jeton validés.
+- `scripts/check_architecture.py` : 344 outils, 346 routes, 40 pages.
+- `main.py` passe de 4 108 à 3 794 lignes sans suppression de route.
+
+### Rollback
+
+- Revenir au commit v2.292 et replacer les six routes dans `main.py`. Aucun modèle vidéo,
+  fichier local, secret, contrat HTTP ou format de réponse n'est migré.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 73/73 étapes réussies; compilation de 144 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 28380, version `2.293.0`, Ollama disponible et 15 workers
+  observés (13 actifs, 2 terminés au moment du health check).
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont Code Workspace,
+  orchestrateur e-mail et accueil Next.js Turbopack.
+
 ## 2026-07-22 — v2.291.0 — Frontière des préférences e-mail
 
 ### Constat et décision

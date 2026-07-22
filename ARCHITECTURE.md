@@ -53,6 +53,7 @@ flowchart LR
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
+| `api/video_remote.py` | Catalogue Replicate, génération texte/image, suivi SSE, annulation et import des vidéos distantes |
 | `db_connection.py` | Fabrique de connexions WAL, clés étrangères et frontière commit/rollback |
 | `db_migrations.py` | Catalogue de schéma versionné, checksums, compatibilité et rollback transactionnel |
 | `repositories/` | Persistance métier injectable; conversations/messages extraits en premier |
@@ -130,6 +131,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 25. la boîte e-mail : lecture/recherche/dossiers, envoi audité, mutations et pièces jointes appartiennent à `api/email_mailbox.py` et utilisent la même résolution multi-comptes.
 26. les préférences e-mail : signatures, modèles, surveillance, alertes et règles appartiennent à `api/email_preferences.py`; leurs exécutions restent déléguées au registre d'outils.
 27. l'IA e-mail : brouillons, résumés, digest, profils, scheduler, drafts et outbox appartiennent à `api/email_automation.py`; l'activation initiale exige une confirmation explicite.
+28. la vidéo distante : modèles, générations texte/image, suivi SSE, annulation et import Replicate appartiennent à `api/video_remote.py`; le jeton reste lu par le gestionnaire de secrets.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
