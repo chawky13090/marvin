@@ -24,6 +24,15 @@ from repositories.conversations import (
     update_conversation_title,
     upgrade_conversation_title_silent,
 )
+from repositories.ssh_connections import (
+    delete_ssh_connection,
+    get_ssh_connection,
+    list_ssh_connections,
+    save_ssh_connection,
+    set_ssh_test_result,
+    touch_ssh_connection,
+    update_ssh_connection,
+)
 
 
 # ── Mémoires ──────────────────────────────────────────────────────────────────
@@ -3006,113 +3015,6 @@ def _parse_cron(row: dict | None) -> dict | None:
             row["args"] = {}
     row["enabled"] = bool(row.get("enabled", 1))
     return row
-
-
-# ── Connexions SSH ─────────────────────────────────────────────────────────────
-
-def _ensure_ssh_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ssh_connections (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            host TEXT NOT NULL,
-            port INTEGER NOT NULL DEFAULT 22,
-            username TEXT NOT NULL,
-            password TEXT DEFAULT '',
-            private_key TEXT DEFAULT '',
-            last_used TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    # v2.117 — passphrase de clé privée (souvent utilisée en pratique, la colonne
-    # manquait alors que tools.py::_ssh_connect la lisait déjà : fonctionnalité fantôme)
-    # + statut du dernier test (badge visuel dans la sidebar SSH).
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(ssh_connections)").fetchall()}
-    if "key_passphrase" not in cols:
-        conn.execute("ALTER TABLE ssh_connections ADD COLUMN key_passphrase TEXT DEFAULT ''")
-    if "last_test_ok" not in cols:
-        conn.execute("ALTER TABLE ssh_connections ADD COLUMN last_test_ok INTEGER")
-    if "last_test_at" not in cols:
-        conn.execute("ALTER TABLE ssh_connections ADD COLUMN last_test_at TEXT")
-
-
-def list_ssh_connections() -> list[dict]:
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        rows = conn.execute(
-            "SELECT id,name,host,port,username,last_used,created_at,"
-            "last_test_ok,last_test_at FROM ssh_connections ORDER BY name"
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def get_ssh_connection(sid: str) -> dict | None:
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        row = conn.execute("SELECT * FROM ssh_connections WHERE id = ?", (sid,)).fetchone()
-    return row_to_dict(row)
-
-
-def save_ssh_connection(name: str, host: str, port: int, username: str, password: str = "",
-                         private_key: str = "", key_passphrase: str = "") -> dict:
-    sid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        conn.execute(
-            "INSERT INTO ssh_connections (id,name,host,port,username,password,private_key,key_passphrase) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (sid, name, host, port, username, password, private_key, key_passphrase)
-        )
-        row = conn.execute("SELECT id,name,host,port,username,last_used,created_at FROM ssh_connections WHERE id=?", (sid,)).fetchone()
-    return row_to_dict(row)
-
-
-def update_ssh_connection(sid: str, **fields) -> dict | None:
-    """Met à jour une connexion SSH existante. Les champs vides (password/private_key/
-    key_passphrase) NE remplacent PAS la valeur existante — permet de modifier le nom/hôte
-    sans ressaisir le secret à chaque fois (pattern standard des gestionnaires de connexion)."""
-    allowed = {"name", "host", "port", "username", "password", "private_key", "key_passphrase"}
-    keep_if_empty = {"password", "private_key", "key_passphrase"}
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        sets, values = [], []
-        for k, v in fields.items():
-            if k not in allowed:
-                continue
-            if k in keep_if_empty and (v is None or v == ""):
-                continue
-            sets.append(f"{k}=?")
-            values.append(v)
-        if not sets:
-            row = conn.execute("SELECT id,name,host,port,username,last_used,created_at FROM ssh_connections WHERE id=?", (sid,)).fetchone()
-            return row_to_dict(row)
-        sets.append("updated_at=datetime('now')")
-        values.append(sid)
-        conn.execute(f"UPDATE ssh_connections SET {', '.join(sets)} WHERE id=?", values)
-        row = conn.execute("SELECT id,name,host,port,username,last_used,created_at FROM ssh_connections WHERE id=?", (sid,)).fetchone()
-    return row_to_dict(row)
-
-
-def set_ssh_test_result(sid: str, ok: bool):
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        conn.execute(
-            "UPDATE ssh_connections SET last_test_ok=?, last_test_at=datetime('now') WHERE id=?",
-            (1 if ok else 0, sid)
-        )
-
-
-def touch_ssh_connection(sid: str):
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        conn.execute("UPDATE ssh_connections SET last_used=datetime('now') WHERE id=?", (sid,))
-
-
-def delete_ssh_connection(sid: str):
-    with db() as conn:
-        _ensure_ssh_table(conn)
-        conn.execute("DELETE FROM ssh_connections WHERE id=?", (sid,))
 
 
 # ── Workflows ─────────────────────────────────────────────────────────────────

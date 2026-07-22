@@ -2393,6 +2393,35 @@ ignorée) :
 - Le même health check observe réellement 15 workers : 12 boucles actives et 3 tâches
   ponctuelles terminées normalement.
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
+## 2026-07-22 — v2.299.0 — Repository des connexions SSH
+
+### Constat et décision
+
+- Les accès SQLite SSH étaient encore inclus dans la façade monolithique `database.py`, alors
+  que l'API, le domaine d'outils et le transport sont désormais séparés.
+- Un repository injectable est retenu pour centraliser schéma compatible, transactions et
+  distinction entre projections publiques et lecture interne avec secrets.
+
+### Implémentation et validation isolée
+
+- Nouveau `repositories/ssh_connections.py`; `database.py` réexporte les sept fonctions sans
+  changement d'appelant. Les champs modifiables sont en liste blanche et les secrets vides ne
+  remplacent jamais une valeur existante.
+- Nouveau test sur SQLite temporaire : ancienne table, ajout de colonnes, CRUD, secrets,
+  test/touch, champ interdit, rollback sur contrainte et identité de façade.
+- Hygiène SQLite, domaine SSH, 11 routes et architecture : tous les contrôles réussissent.
+
+### Rollback
+
+- Revenir au commit v2.298. Aucun schéma destructif ni déplacement de données n'est réalisé.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 79/79 étapes réussies; compilation de 153 fichiers
+  Python, ESLint 0 erreur et 37 avertissements historiques inchangés.
+- Backend réel redémarré : PID 33380, version `2.299.0`, Ollama disponible et 15 workers.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
 - Frontend Next.js/Turbopack conservé en fonctionnement : page `/` HTTP 200.
 - Journaux Uvicorn : démarrage complet, index des outils prêt et sauvegarde SQLite créée;
   aucune exception de worker observée.

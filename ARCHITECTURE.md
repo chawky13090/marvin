@@ -59,7 +59,7 @@ flowchart LR
 | `api/video_local.py` | Capacités GPU, génération Diffusers texte/image, annulation et amélioration de prompt Ollama |
 | `db_connection.py` | Fabrique de connexions WAL, clés étrangères et frontière commit/rollback |
 | `db_migrations.py` | Catalogue de schéma versionné, checksums, compatibilité et rollback transactionnel |
-| `repositories/` | Persistance métier injectable; conversations/messages extraits en premier |
+| `repositories/` | Persistance métier injectable; conversations/messages et connexions SSH extraits |
 | `skills.py` | Compétences Markdown, matching, apprentissage et versioning |
 | `tool_router.py` | Index sémantique et sélection dynamique des outils |
 | `cortex.py` | Contrats de mission, budgets adaptatifs, routage explicable, provenance et recettes Cortex |
@@ -140,6 +140,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 31. les outils média : les 11 actions vidéo/GIF et 6 actions audio appartiennent à `tool_domains/media.py`; la façade injecte son résolveur de chemins et préserve les 17 identités du registre.
 32. le transport SSH : l'API et les outils utilisent `ssh_transport.py`; aucune route ne dépend d'un helper SSH privé de `tools.py`.
 33. le domaine SSH : cibles, commandes, scripts et transferts appartiennent à `tool_domains/ssh.py`; `api/ssh.py` ne dépend plus de `tools.py` et les neuf identités du registre sont préservées.
+34. la persistance SSH : CRUD, statut de test et dernier usage appartiennent à `repositories/ssh_connections.py`; les listes publiques excluent les secrets et toute opération passe par la transaction `db()`.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
