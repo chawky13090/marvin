@@ -44,6 +44,7 @@ flowchart LR
 | `agent_model_config.py` | Configuration typée du modèle, confidentialité, température, label et repli local |
 | `agent_runner.py` | État observable du run : budget, outils, traces, blocages et résultat |
 | `agent_observability.py` | Diffusion isolée des observations d'outils vers audit, SQLite, preuves et apprentissage |
+| `agent_skill_outcome.py` | Issue idempotente des compétences, golden path et auto-amélioration suivie |
 | `agent_transport.py` | Client HTTP Ollama, payload `/api/chat`, décodage JSONL et erreurs de transport typées |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
@@ -147,6 +148,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 38. l'étape d'outil : `agent_tool_step.py` normalise les variantes d'arguments des modèles, injecte les identifiants internes hors du LLM et borne uniquement la projection de résultat renvoyée au contexte modèle.
 39. le dispatch d'outil : `agent_tool_dispatch.py` applique anti-polling, outil explicite, texte sans exécution, validation des arguments, niveau Sécurisé et confirmation Expert avant l'exécuteur idempotent.
 40. la post-validation d'outil : `agent_tool_postprocess.py` normalise le contrat de résultat, critique les confirmations dangereuses et inspecte le contenu documentaire sans invalider une action déjà exécutée si un observateur tombe en panne.
+41. l'issue d'une compétence : `agent_skill_outcome.py` enregistre une seule issue par tour, conserve le golden path des succès et suit l'auto-amélioration asynchrone d'un véritable échec d'outil.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

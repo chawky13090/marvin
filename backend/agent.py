@@ -75,6 +75,7 @@ from agent_tool_dispatch import (
 from agent_tool_postprocess import (
     postprocess_tool_result as _postprocess_tool_result,
 )
+from agent_skill_outcome import SkillOutcomeRecorder as _SkillOutcomeRecorder
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -450,62 +451,13 @@ async def run_agent(
     _run_calls = _runner_state.successful_calls
     _read_call_signatures: set[str] = set()
     _blocking_outcomes = _runner_state.blocking_outcomes
-    _outcome_recorded = False
+    _skill_outcomes = _SkillOutcomeRecorder()
     # v2.138 — compensation de la fiabilité composée : la littérature 2026 sur les agents LLM
     # documente qu'à 95% de fiabilité PAR appel, une chaîne de 8 outils ne réussit globalement
     # qu'à ~66% (les erreurs se composent). Pas de changement de comportement ici — juste une
     # trace visible (audit.jsonl) dès qu'un tour dépasse 8 appels, pour que ce signal soit
     # repérable lors d'un futur audit sans avoir à recompter manuellement les tool_start comme
     # fait à la main pour le diagnostic v2.136.
-
-    def _finalize_skill_outcome():
-        """Enregistre l'issue de la compétence active et, si un OUTIL a échoué (mauvais
-        outil/commande/paramètre — pas un simple résultat négatif), programme un
-        AUTO-UPGRADE en arrière-plan (Marvin ré-écrit la compétence ; ancienne version
-        archivée). Appelé aux 2 sorties (réponse finale ET MAX_TOOL_STEPS). Retourne un
-        message SSE à yield, ou None."""
-        nonlocal _outcome_recorded
-        if _outcome_recorded or not (_skill and _skill.get("tools")):
-            return None
-        _outcome_recorded = True
-        try:
-            import skills as _sk, tools as _tm3
-            _executed = _runner_state.tool_count
-            _ok = _runner_state.succeeded
-            _detail = f"{_runner_state.failed_tools} erreur(s) d'outil sur {_executed} appel(s)."
-            _trace = ("Demande: " + (_user_query or "")[:300] + "\n"
-                      + "\n".join(_run_trace[-14:])
-                      + "\nRéponse finale: " + (full_content or "")[:400])
-            _sk.record_outcome(_skill["name"], _ok, _detail, transcript=_trace)
-            # 🥇 Succès propre avec au moins un outil → mémoriser le déroulé gagnant
-            # (golden path) ; skills garde le plus COURT → la compétence devient + efficace.
-            if _ok and _runner_state.successful_tools > 0 and _run_calls:
-                try:
-                    _sk.record_success_trace(_skill["name"], _run_calls, _user_query)
-                except Exception:
-                    pass
-            if not _ok:
-                _all_names = [t.get("function", {}).get("name") for t in TOOLS_SPEC]
-                _sk_name = _skill["name"]
-
-                async def _auto_upgrade():
-                    async def _g(p):
-                        # v2.122 — model=None laisse _ollama_generate consulter le routage
-                        # cloud/sensibilité (cloud_routing.resolve_model) sur le PROMPT réel
-                        # (transcript de l'échec inclus) plutôt que de pré-résoudre en local
-                        # à l'aveugle — reste local automatiquement si le transcript contient
-                        # une donnée sensible, sinon peut bénéficier du cloud si configuré.
-                        return await _tm3._ollama_generate(p, model=None, timeout=240)
-                    await _sk.upgrade_skill(_sk_name, _g, reason=_detail, transcript=_trace, tool_names=_all_names)
-
-                _ut = asyncio.create_task(_auto_upgrade())
-                _BG_LEARN_TASKS.add(_ut)
-                _ut.add_done_callback(_BG_LEARN_TASKS.discard)
-                return _sse({"type": "skill_upgrade", "skill": _sk_name,
-                             "message": f"🔧 Compétence « {_sk_name} » : un outil a échoué — auto-amélioration en arrière-plan."})
-        except Exception:
-            pass
-        return None
 
     # v2.142 — BUG RACINE trouvé en diagnostiquant pourquoi les instructions de projet
     # (ci-dessus) n'avaient AUCUN effet malgré une injection confirmée correcte dans
@@ -833,7 +785,15 @@ async def run_agent(
                 pass
 
             # Auto-réparation des compétences (enregistre l'issue + auto-upgrade si échec).
-            _up_msg = _finalize_skill_outcome()
+            _up_msg = _skill_outcomes.finalize(
+                skill=_skill,
+                runner_state=_runner_state,
+                user_query=_user_query,
+                final_content=full_content,
+                tools_spec=TOOLS_SPEC,
+                background_tasks=_BG_LEARN_TASKS,
+                encode_sse=_sse,
+            )
             if _up_msg:
                 yield _up_msg
 
@@ -913,7 +873,15 @@ async def run_agent(
     db.create_message(conversation_id, "assistant", full_content)
 
     # Enregistre tout de même l'issue de la compétence (souvent un signe de faiblesse).
-    _up_msg = _finalize_skill_outcome()
+    _up_msg = _skill_outcomes.finalize(
+        skill=_skill,
+        runner_state=_runner_state,
+        user_query=_user_query,
+        final_content=full_content,
+        tools_spec=TOOLS_SPEC,
+        background_tasks=_BG_LEARN_TASKS,
+        encode_sse=_sse,
+    )
     if _up_msg:
         yield _up_msg
     try:

@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.305.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.306.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -138,7 +138,7 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 - Au match, si la compétence requiert des outils et qu'on est en profil `chat` (3b) → **escalade** automatique vers le profil `agent` (re-yield du `model_info`).
 - Création depuis le chat : bouton 🧩 → ✨ (depuis un prompt) ou 🧠 (depuis la conversation). Endpoints `/api/skills/*`.
 - Génération de compétences : forcer **« RÉDIGE EN FRANÇAIS »** + modèle agent + parser tolérant `skills.parse_skill_json` (le LLM produit du JSON imparfait : quotes/sauts de ligne non échappés dans `body`, ou recopie le placeholder `triggers` → filtré).
-- **Auto-réparation (v2.80)** : `agent.py::_finalize_skill_outcome` enregistre l'issue (`skills.record_outcome` → `data/skills_stats.json`) après chaque échange piloté par une compétence ; si un OUTIL a vraiment échoué (`_is_tooling_failure`, ≠ résultat réel négatif), il déclenche en arrière-plan `skills.upgrade_skill` (le LLM ré-écrit la compétence ; ancienne version archivée dans `data/skills/_versions/` → rollback). Piloté aussi à la main depuis l'onglet **Skills** (badge perf, 🔧 Renforcer, 🕘 Versions). Penser à **enregistrer l'issue aux DEUX sorties** de la boucle (réponse finale ET MAX_TOOL_STEPS).
+- **Auto-réparation (v2.306)** : `agent_skill_outcome.py` enregistre idempotemment l'issue (`skills.record_outcome` → `data/skills_stats.json`) après chaque échange piloté par une compétence ; si un OUTIL a vraiment échoué (`_is_tooling_failure`, ≠ résultat réel négatif), il déclenche en arrière-plan `skills.upgrade_skill` (le LLM ré-écrit la compétence ; ancienne version archivée dans `data/skills/_versions/` → rollback). Piloté aussi à la main depuis l'onglet **Skills** (badge perf, 🔧 Renforcer, 🕘 Versions). Les DEUX sorties du Runner appellent le même enregistreur, qui refuse un second enregistrement.
 
 ---
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.305.0)
+## 9. État actuel (v2.306.0)
+
+**v2.306 (issue idempotente des compétences)** : l'enregistrement de l'issue, la conservation
+du golden path et la programmation d'une auto-amélioration après échec réel sont extraits dans
+`agent_skill_outcome.py`. Un même tour ne peut être enregistré qu'une fois, même si plusieurs
+chemins de sortie convergent; la tâche asynchrone reste suivie par le registre anti-GC.
 
 **v2.305 (post-validation des résultats d'outils)** : contrat commun, critique d'une action
 en attente de confirmation et scan des documents générés sont extraits dans

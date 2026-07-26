@@ -4182,6 +4182,45 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.306.0 — Issue idempotente des compétences
+
+### Constat et décision
+
+- `agent.py` contenait encore une closure mutable pour enregistrer l'issue d'une compétence,
+  mémoriser un parcours gagnant et programmer une auto-amélioration après échec d'outil.
+- Cette responsabilité est appelée depuis les deux sorties du Runner et doit rester
+  strictement idempotente afin de ne pas doubler les statistiques ni les tâches LLM.
+
+### Implémentation
+
+- Nouveau `backend/agent_skill_outcome.py` avec `SkillOutcomeRecorder`.
+- Le succès conserve le golden path historique.
+- L'échec programme une seule amélioration via le registre de tâches anti-GC.
+- Les imports `skills` et `tools` restent tardifs pour éviter d'alourdir le chargement du Runner.
+- Nouveau `scripts/test_agent_skill_outcome.py`, intégré à `check_marvin --quick`.
+- `agent.py` passe de 933 à 901 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du nouveau module, du Runner et du test : réussie.
+- Succès, échec, idempotence et auto-amélioration : réussis.
+- Régressions finalisation générale et état du Runner : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.305 et replacer la finalisation de compétence dans `agent.py`.
+  Aucun contrat SSE, format de statistique, compétence ou outil n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 86/86 étapes réussies en 116,5 secondes.
+- Backend compilé : 157 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.306.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.305.0 — Post-validation des résultats d'outils
 
 ### Constat et décision
