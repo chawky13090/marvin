@@ -237,128 +237,9 @@ def _resolve_path(raw: str) -> str:
     return normalized
 
 
-async def execute_file_list(args: dict) -> dict:
-    path = _resolve_path(args.get("path", _HOME))
-    show_hidden = args.get("show_hidden", False)
-
-    def fmt_size(n: int) -> str:
-        for unit in ("o", "Ko", "Mo", "Go"):
-            if n < 1024:
-                return f"{n:.0f} {unit}"
-            n /= 1024
-        return f"{n:.1f} To"
-
-    def ext_category(name: str) -> str:
-        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-        cats = {
-            "pdf": "PDF", "doc": "Word", "docx": "Word",
-            "xls": "Excel", "xlsx": "Excel", "ppt": "PPT", "pptx": "PPT",
-            "txt": "Texte", "md": "Markdown", "csv": "CSV",
-            "jpg": "Image", "jpeg": "Image", "png": "Image", "gif": "Image",
-            "webp": "Image", "bmp": "Image", "svg": "Image",
-            "mp3": "Audio", "wav": "Audio", "flac": "Audio",
-            "mp4": "Vidéo", "mkv": "Vidéo", "avi": "Vidéo",
-            "zip": "Archive", "rar": "Archive", "7z": "Archive",
-            "py": "Python", "js": "JavaScript", "ts": "TypeScript",
-            "html": "HTML", "css": "CSS", "json": "JSON", "xml": "XML",
-            "exe": "Exécutable", "bat": "Script", "ps1": "PowerShell",
-        }
-        return cats.get(ext, ext.upper() if ext else "—")
-
-    try:
-        p = Path(path)
-        if not p.exists():
-            return {"error": f"Chemin introuvable : {path}"}
-        if not p.is_dir():
-            return {"error": f"Ce n'est pas un répertoire : {path}"}
-
-        entries = []
-        try:
-            items = sorted(p.iterdir(), key=lambda x: (x.is_file(), x.name.lower()))
-        except PermissionError:
-            return {"error": f"Accès refusé par Windows : {path}. Ce dossier est protégé par le système."}
-
-        for item in items:
-            if not show_hidden and item.name.startswith("."):
-                continue
-            try:
-                stat = item.stat()
-                size = stat.st_size if item.is_file() else 0
-                entries.append({
-                    "name": item.name,
-                    "type": "fichier" if item.is_file() else "dossier",
-                    "category": ext_category(item.name) if item.is_file() else "Dossier",
-                    "size": fmt_size(size) if item.is_file() else "—",
-                    "size_bytes": size,
-                    "path": str(item),
-                    "modified": time.strftime("%d/%m/%Y %H:%M", time.localtime(stat.st_mtime)),
-                })
-            except (PermissionError, OSError):
-                entries.append({
-                    "name": item.name,
-                    "type": "fichier" if item.is_file() else "dossier",
-                    "category": "🔒 Accès refusé",
-                    "size": "—",
-                    "size_bytes": 0,
-                    "path": str(item),
-                    "modified": "",
-                })
-
-        return {"success": True, "currentDir": str(p), "count": len(entries), "files": entries}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_file_info(args: dict) -> dict:
-    """Retourne les métadonnées détaillées d'un fichier ou dossier."""
-    path = _resolve_path(args.get("path", ""))
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    include_hash = args.get("hash", False)
-    try:
-        p = Path(path)
-        if not p.exists():
-            return {"error": f"Introuvable : {path}"}
-        stat = p.stat()
-        info: dict = {
-            "success": True,
-            "path": str(p),
-            "name": p.name,
-            "type": "dossier" if p.is_dir() else "fichier",
-            "extension": p.suffix.lower() if p.is_file() else "",
-            "created": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_ctime)),
-            "modified": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_mtime)),
-            "accessed": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_atime)),
-        }
-        if p.is_file():
-            size = stat.st_size
-            for unit in ("o", "Ko", "Mo", "Go"):
-                if size < 1024:
-                    info["size"] = f"{size:.0f} {unit}"
-                    break
-                size /= 1024
-            else:
-                info["size"] = f"{size:.1f} To"
-            info["size_bytes"] = stat.st_size
-            if include_hash:
-                import hashlib
-                h = hashlib.md5()
-                with open(str(p), "rb") as f:
-                    for chunk in iter(lambda: f.read(65536), b""):
-                        h.update(chunk)
-                info["md5"] = h.hexdigest()
-        else:
-            # Dossier : compte les entrées
-            try:
-                items = list(p.iterdir())
-                info["children_count"] = len(items)
-                info["files_count"] = sum(1 for i in items if i.is_file())
-                info["folders_count"] = sum(1 for i in items if i.is_dir())
-            except PermissionError:
-                info["children_count"] = "accès refusé"
-        return info
-    except Exception as e:
-        return {"error": str(e)}
+filesystem_domain.configure(resolve_path=_resolve_path)
+execute_file_list = filesystem_domain.list_entries
+execute_file_info = filesystem_domain.info
 
 
 async def execute_file_read(args: dict) -> dict:
@@ -474,7 +355,6 @@ async def execute_file_read(args: dict) -> dict:
         return {"error": str(e)}
 
 
-filesystem_domain.configure(resolve_path=_resolve_path)
 execute_file_write = filesystem_domain.write
 execute_file_delete = filesystem_domain.delete
 execute_file_rename = filesystem_domain.rename

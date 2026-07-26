@@ -23,6 +23,11 @@ async def main() -> int:
         assert created["success"] and (base / "docs").is_dir()
         written = await filesystem.write({"path": "docs/a.txt", "content": "a"})
         assert written["success"]
+        listing = await filesystem.list_entries({"path": "docs"})
+        assert listing["count"] == 1 and listing["files"][0]["category"] == "Texte"
+        metadata = await filesystem.info({"path": "docs/a.txt", "hash": True})
+        assert metadata["size_bytes"] == 1
+        assert len(metadata["md5"]) == 32 and len(metadata["sha256"]) == 64
         await filesystem.write({"path": "docs/a.txt", "content": "b", "mode": "append"})
         assert (base / "docs/a.txt").read_text(encoding="utf-8") == "ab"
         copied = await filesystem.copy({"source": "docs/a.txt", "destination": "docs"})
@@ -38,6 +43,8 @@ async def main() -> int:
 
     filesystem.configure(resolve_path=tools._resolve_path)
     assert tools.execute_file_write is filesystem.write
+    assert tools.execute_file_list is filesystem.list_entries
+    assert tools.execute_file_info is filesystem.info
     assert tools.execute_file_delete is filesystem.delete
     assert tools.execute_file_rename is filesystem.rename
     assert tools.execute_file_move is filesystem.move

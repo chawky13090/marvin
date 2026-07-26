@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.314.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.315.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.314.0)
+## 9. État actuel (v2.315.0)
+
+**v2.315 (inventaire et intégrité des fichiers)** : `file_list` et `file_info` rejoignent
+`tool_domains/filesystem.py`. Catégories, tailles, dates, filtrage des fichiers cachés et
+comptages restent compatibles. `hash=true` conserve le champ MD5 historique et ajoute
+SHA-256, utilisable comme preuve d'intégrité sans casser les consommateurs existants.
 
 **v2.314 (domaine de mutation des fichiers)** : écriture/ajout UTF-8, suppression confirmée,
 renommage, déplacement, copie avec déduplication et création de dossier sont extraits vers

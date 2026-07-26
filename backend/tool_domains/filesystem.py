@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import shutil
+import hashlib
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -40,6 +42,127 @@ def normalize_destination(source: str, destination: str) -> str:
         destination_path /= source_path.name
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     return str(destination_path)
+
+
+def format_size(size: int) -> str:
+    value = float(size)
+    for unit in ("o", "Ko", "Mo", "Go"):
+        if value < 1024:
+            return f"{value:.0f} {unit}"
+        value /= 1024
+    return f"{value:.1f} To"
+
+
+def extension_category(name: str) -> str:
+    extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    categories = {
+        "pdf": "PDF", "doc": "Word", "docx": "Word",
+        "xls": "Excel", "xlsx": "Excel", "ppt": "PPT", "pptx": "PPT",
+        "txt": "Texte", "md": "Markdown", "csv": "CSV",
+        "jpg": "Image", "jpeg": "Image", "png": "Image", "gif": "Image",
+        "webp": "Image", "bmp": "Image", "svg": "Image",
+        "mp3": "Audio", "wav": "Audio", "flac": "Audio",
+        "mp4": "Vidéo", "mkv": "Vidéo", "avi": "Vidéo",
+        "zip": "Archive", "rar": "Archive", "7z": "Archive",
+        "py": "Python", "js": "JavaScript", "ts": "TypeScript",
+        "html": "HTML", "css": "CSS", "json": "JSON", "xml": "XML",
+        "exe": "Exécutable", "bat": "Script", "ps1": "PowerShell",
+    }
+    return categories.get(extension, extension.upper() if extension else "—")
+
+
+async def list_entries(args: dict[str, Any]) -> dict[str, Any]:
+    path = _resolve(str(args.get("path", "")))
+    show_hidden = bool(args.get("show_hidden", False))
+    try:
+        directory = Path(path)
+        if not directory.exists():
+            return {"error": f"Chemin introuvable : {path}"}
+        if not directory.is_dir():
+            return {"error": f"Ce n'est pas un répertoire : {path}"}
+        try:
+            items = sorted(directory.iterdir(), key=lambda item: (item.is_file(), item.name.lower()))
+        except PermissionError:
+            return {"error": f"Accès refusé par Windows : {path}. Ce dossier est protégé par le système."}
+        entries: list[dict[str, Any]] = []
+        for item in items:
+            if not show_hidden and item.name.startswith("."):
+                continue
+            try:
+                stat = item.stat()
+                is_file = item.is_file()
+                size = stat.st_size if is_file else 0
+                entries.append({
+                    "name": item.name,
+                    "type": "fichier" if is_file else "dossier",
+                    "category": extension_category(item.name) if is_file else "Dossier",
+                    "size": format_size(size) if is_file else "—",
+                    "size_bytes": size,
+                    "path": str(item),
+                    "modified": time.strftime("%d/%m/%Y %H:%M", time.localtime(stat.st_mtime)),
+                })
+            except (PermissionError, OSError):
+                entries.append({
+                    "name": item.name,
+                    "type": "fichier" if item.is_file() else "dossier",
+                    "category": "🔒 Accès refusé",
+                    "size": "—",
+                    "size_bytes": 0,
+                    "path": str(item),
+                    "modified": "",
+                })
+        return {
+            "success": True,
+            "currentDir": str(directory),
+            "count": len(entries),
+            "files": entries,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+async def info(args: dict[str, Any]) -> dict[str, Any]:
+    path = _resolve(str(args.get("path", "")))
+    if not path:
+        return {"error": "Paramètre 'path' requis."}
+    try:
+        target = Path(path)
+        if not target.exists():
+            return {"error": f"Introuvable : {path}"}
+        stat = target.stat()
+        result: dict[str, Any] = {
+            "success": True,
+            "path": str(target),
+            "name": target.name,
+            "type": "dossier" if target.is_dir() else "fichier",
+            "extension": target.suffix.lower() if target.is_file() else "",
+            "created": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_ctime)),
+            "modified": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_mtime)),
+            "accessed": time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(stat.st_atime)),
+        }
+        if target.is_file():
+            result["size"] = format_size(stat.st_size)
+            result["size_bytes"] = stat.st_size
+            if args.get("hash", False):
+                md5 = hashlib.md5(usedforsecurity=False)
+                sha256 = hashlib.sha256()
+                with target.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(65_536), b""):
+                        md5.update(chunk)
+                        sha256.update(chunk)
+                result["md5"] = md5.hexdigest()
+                result["sha256"] = sha256.hexdigest()
+        else:
+            try:
+                children = list(target.iterdir())
+                result["children_count"] = len(children)
+                result["files_count"] = sum(1 for child in children if child.is_file())
+                result["folders_count"] = sum(1 for child in children if child.is_dir())
+            except PermissionError:
+                result["children_count"] = "accès refusé"
+        return result
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 async def write(args: dict[str, Any]) -> dict[str, Any]:

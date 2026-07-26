@@ -92,9 +92,9 @@ Extraire par cohésion et risque :
 Chaque domaine conserve les mêmes objets fonctions dans `TOOLS_REGISTRY`. À la fin, séparer
 les spécifications déclaratives du registre d'exécution.
 
-État : première tranche livrée en v2.314.0. Les six mutations fondamentales de fichiers
-appartiennent désormais à `tool_domains/filesystem.py`; lecture, inventaire, recherche et
-génération documentaire restent à extraire dans les tranches suivantes.
+État : mutations livrées en v2.314.0, inventaire et métadonnées en v2.315.0.
+`tool_domains/filesystem.py` possède désormais huit outils; lecture, recherche et génération
+documentaire restent à extraire dans les tranches suivantes.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

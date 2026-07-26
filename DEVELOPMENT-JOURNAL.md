@@ -4728,3 +4728,41 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.315.0 — Inventaire et intégrité des fichiers
+
+### Demande
+
+- Continuer la phase B par responsabilités cohésives et améliorer les défauts établis.
+
+### Constats et décisions
+
+- `file_list` et `file_info` partageaient résolution de chemin, formatage des tailles et
+  métadonnées avec le nouveau domaine filesystem.
+- L'option `hash=true` ne fournissait que MD5. Le champ reste présent pour compatibilité,
+  mais SHA-256 est calculé dans la même lecture par blocs et ajouté au contrat de résultat.
+- Les erreurs de chemin, permissions, fichiers cachés et comptages de dossiers conservent
+  leur comportement public.
+
+### Fichiers
+
+- `backend/tool_domains/filesystem.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_filesystem.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test filesystem ciblé : inventaire, catégorie Texte, taille exacte, MD5, SHA-256 et
+  identités de façade réussis, en plus des mutations déjà couvertes.
+- `scripts/check_marvin.py --quick` : **96/96 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.315.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 20 070 à **19 950 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
