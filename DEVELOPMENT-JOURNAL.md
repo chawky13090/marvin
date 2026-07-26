@@ -4888,3 +4888,43 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 654 à **19 592 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.319.0 — Formatage documentaire partagé
+
+### Demande
+
+- Préparer l'extraction DOCX/PDF sans dupliquer leur logique de rendu.
+
+### Constats et décisions
+
+- Les générateurs DOCX et PDF dépendent de la même grammaire Markdown, mais celle-ci vivait
+  comme helpers privés au milieu de `tools.py`.
+- Les helpers sont extraits vers `document_formatting.py` et réexposés sous leurs alias
+  historiques pour les consommateurs internes et l'API existante.
+- Titres, paragraphes, listes, citations, séparateurs, code, tableaux et images sont couverts.
+- Une URL Markdown contenant un guillemet pouvait produire un attribut XML ReportLab invalide;
+  les guillemets sont maintenant encodés en `&quot;`.
+
+### Fichiers
+
+- `backend/document_formatting.py`
+- `backend/tools.py`
+- `scripts/test_document_formatting.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`
+- `BACKEND-CONSOLIDATION-PLAN.md`, `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test `test_document_formatting.py` : blocs, tableau, code, image, gras, italique,
+  code inline, lien, échappement HTML, URL avec guillemets et alias réussis.
+- `scripts/check_marvin.py --quick` : **97/97 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.319.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 592 à **19 511 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

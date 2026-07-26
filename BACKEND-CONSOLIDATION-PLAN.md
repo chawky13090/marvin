@@ -97,6 +97,9 @@ multi-format en v2.316.0, recherche par nom en v2.317.0 et recherche de contenu 
 `tool_domains/filesystem.py` possède désormais onze outils; la génération documentaire reste
 à extraire dans les tranches suivantes.
 
+Le formatage Markdown partagé des documents est extrait en v2.319.0; les générateurs DOCX/PDF
+gardent ainsi une seule grammaire avant leur déplacement vers le domaine documentaire.
+
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.
 

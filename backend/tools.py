@@ -28,6 +28,10 @@ from tool_domains import media as media_domain
 from tool_domains import ssh as ssh_domain
 from tool_domains import filesystem as filesystem_domain
 import ssh_transport
+from document_formatting import (
+    markdown_inline_to_reportlab as _md_inline_to_rl,
+    parse_markdown_blocks as _parse_md_blocks,
+)
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
@@ -251,91 +255,6 @@ execute_file_copy = filesystem_domain.copy
 execute_file_create_folder = filesystem_domain.create_folder
 
 
-def _parse_md_blocks(content: str):
-    """Découpe un Markdown en blocs structurés pour le rendu (docx/pdf).
-    Yields (kind, payload) : h1/h2/h3, p, bullet, num, quote, hr, code, table, space."""
-    lines = (content or "").split("\n")
-    i = 0
-    while i < len(lines):
-        raw = lines[i]
-        s = raw.strip()
-        # Tableau Markdown : ligne | ... | suivie d'une ligne de séparation |---|
-        if s.startswith("|") and i + 1 < len(lines) and _re.match(r"^\s*\|?[\s:|-]+\|?\s*$", lines[i + 1]):
-            rows = []
-            header = [c.strip() for c in s.strip("|").split("|")]
-            rows.append(header)
-            i += 2
-            while i < len(lines) and lines[i].strip().startswith("|"):
-                rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
-                i += 1
-            yield ("table", rows)
-            continue
-        # Bloc de code ``` ... ```
-        if s.startswith("```"):
-            code = []
-            i += 1
-            while i < len(lines) and not lines[i].strip().startswith("```"):
-                code.append(lines[i]); i += 1
-            i += 1
-            yield ("code", "\n".join(code))
-            continue
-        # v2.175 — image ![légende](chemin), pour embarquer une VRAIE image dans le
-        # document (ex. captures d'écran de doc_generate_from_screenshots) plutôt qu'un
-        # simple lien texte.
-        _img_m = _re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", s)
-        if _img_m:
-            yield ("image", (_img_m.group(1).strip(), _img_m.group(2).strip()))
-            i += 1
-            continue
-        if s.startswith("### "):   yield ("h3", s[4:])
-        elif s.startswith("## "):  yield ("h2", s[3:])
-        elif s.startswith("# "):   yield ("h1", s[2:])
-        elif s.startswith(("> ",)): yield ("quote", s[2:])
-        elif s.startswith(("- ", "* ", "• ")): yield ("bullet", s[2:])
-        elif _re.match(r"^\d+\.\s", s): yield ("num", _re.sub(r"^\d+\.\s", "", s))
-        elif s in ("---", "***", "___", "==="): yield ("hr", None)
-        elif s == "": yield ("space", None)
-        else: yield ("p", s)
-        i += 1
-
-
-# v2.183 -- les polices PDF standard de reportlab (Helvetica/Times, encodage WinAnsi) n'ont
-# AUCUN glyphe emoji -- chaque emoji laissé dans un titre/paragraphe se rend en carré noir
-# ("tofu"), et un emoji multi-codepoint (ex. 🖥️ = DESKTOP COMPUTER + VARIATION SELECTOR-16)
-# produit DEUX carrés collés (constaté en reel : "🖥️ Inventaire des Serveurs" -> "■■ Inventaire
-# des Serveurs" dans le sommaire, qui reprend le meme texte que le titre). Contrairement aux
-# tableaux ASCII (v2.172/173, rendus en image Consolas car l'alignement compte), les emoji de
-# titre sont de la pure decoration sans substitut 1-pour-1 satisfaisant -- on les retire plutot
-# que de les remplacer.
-_EMOJI_STRIP_RE = _re.compile(
-    "["
-    "\U0001F1E6-\U0001F1FF"  # drapeaux (indicateurs régionaux)
-    "\U0001F300-\U0001FAFF"  # émoji/pictogrammes (blocs principaux)
-    "\U00002600-\U000027BF"  # symboles divers & dingbats
-    "\U00002B00-\U00002BFF"  # symboles/flèches divers
-    "\U0000FE0F"             # variation selector-16 (force le rendu emoji)
-    "\U0000200D"             # zero-width joiner
-    "]+"
-)
-
-
-def _md_inline_to_rl(text: str) -> str:
-    """Markdown inline → balises reportlab (<b> <i> <font> <a>). Échappe le HTML."""
-    t = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    t = _EMOJI_STRIP_RE.sub("", t)
-    t = _re.sub(r"[ \t]{2,}", " ", t).strip()
-    t = _re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r'<a href="\2" color="#2563eb"><u>\1</u></a>', t)
-    t = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
-    t = _re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<i>\1</i>", t)
-    t = _re.sub(r"`([^`]+)`", r'<font face="Courier" backColor="#f0f0f0">\1</font>', t)
-    return t
-
-
-# v2.174 — Identité document persistante (auteur/organisation/en-tête/pied de page par
-# défaut) : demandé explicitement par l'utilisateur pour que Marvin n'ait plus à redemander
-# ces infos à chaque génération. Réglée une fois via document_identity_set, réutilisée
-# automatiquement par file_create_docx ET file_create_pdf comme repli si l'appelant (le LLM)
-# ne précise pas explicitement author/header/footer_text pour CE document.
 def _document_identity() -> dict:
     try:
         val = db.get_setting("document_identity")
