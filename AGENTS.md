@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.315.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.316.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.315.0)
+## 9. État actuel (v2.316.0)
+
+**v2.316 (lecture multi-format des fichiers)** : `file_read` rejoint le domaine filesystem
+avec le repli durable Coding Mission et les lecteurs PDF, DOCX, XLSX, CSV et texte. Chaque
+résultat expose maintenant explicitement sa troncature. Le classeur XLSX est fermé dans un
+`finally`; les formats binaires `.doc` et `.xls`, réellement incompatibles avec les
+bibliothèques installées, renvoient une erreur de conversion précise au lieu d'un échec
+trompeur de `python-docx` ou `openpyxl`.
 
 **v2.315 (inventaire et intégrité des fichiers)** : `file_list` et `file_info` rejoignent
 `tool_domains/filesystem.py`. Catégories, tailles, dates, filtrage des fichiers cachés et

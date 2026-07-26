@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.316 — lecture multi-format extraite dans filesystem :
+# snapshots Coding Mission, PDF/DOCX/XLSX/CSV/texte et fermeture garantie.
 # v2.315 — inventaire et métadonnées de fichiers extraits dans filesystem :
 # catégories, tailles, dates, comptages et empreintes MD5/SHA-256 compatibles.
 # v2.314 — mutations de fichiers extraites vers tool_domains/filesystem.py :

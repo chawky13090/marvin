@@ -6,11 +6,15 @@ import os
 import shutil
 import hashlib
 import time
+import csv
+import io
+import re
 from pathlib import Path
 from typing import Any, Callable
 
 
 _resolve_path: Callable[[str], str] | None = None
+_MAX_CONTENT = 50_000
 
 
 def configure(*, resolve_path: Callable[[str], str]) -> None:
@@ -161,6 +165,149 @@ async def info(args: dict[str, Any]) -> dict[str, Any]:
             except PermissionError:
                 result["children_count"] = "accès refusé"
         return result
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+def _content_result(path: Path, content: str, **extra: Any) -> dict[str, Any]:
+    return {
+        "success": True,
+        "path": str(path),
+        "content": content[:_MAX_CONTENT],
+        "content_truncated": len(content) > _MAX_CONTENT,
+        **extra,
+    }
+
+
+def _read_mission_snapshot(path: Path) -> dict[str, Any] | None:
+    try:
+        workspace_base = (
+            Path(__file__).resolve().parents[2] / "data" / "coding_workspaces"
+        ).resolve()
+        relative = path.resolve(strict=False).relative_to(workspace_base)
+        parts = relative.parts
+        if (
+            len(parts) < 3
+            or not re.fullmatch(r"[0-9a-f]{32}", parts[0], re.IGNORECASE)
+            or parts[1].casefold() != "repo"
+        ):
+            return None
+        import coding_mission
+
+        mission_id = parts[0]
+        artifact_path = Path(*parts[2:]).as_posix()
+        files = coding_mission.latest_files(mission_id)
+        if artifact_path not in files:
+            return None
+        content = files[artifact_path]
+        return {
+            **_content_result(Path(artifact_path), content),
+            "requested_path": str(path),
+            "source": "mission_snapshot",
+            "mission_id": mission_id,
+            "note": (
+                "Livrable refusé lu depuis le dernier snapshot; "
+                "il n'est pas encore appliqué au worktree."
+            ),
+        }
+    except (ImportError, OSError, ValueError):
+        return None
+
+
+async def read(args: dict[str, Any]) -> dict[str, Any]:
+    path = _resolve(str(args.get("path", "")))
+    try:
+        target = Path(path)
+        if not target.exists():
+            snapshot = _read_mission_snapshot(target)
+            return snapshot or {"error": f"Fichier introuvable : {path}"}
+        if not target.is_file():
+            return {"error": f"Ce n'est pas un fichier : {path}"}
+        extension = target.suffix.lower()
+
+        if extension == ".pdf":
+            try:
+                from pypdf import PdfReader
+
+                reader = PdfReader(str(target))
+                content = "\n".join(page.extract_text() or "" for page in reader.pages)
+                return _content_result(target, content, pages=len(reader.pages))
+            except Exception as exc:
+                return {"error": f"Erreur lecture PDF : {exc}"}
+
+        if extension == ".doc":
+            return {
+                "error": (
+                    "Le format Word binaire .doc n'est pas pris en charge par python-docx. "
+                    "Convertissez le fichier en .docx avant lecture."
+                ),
+                "unsupported_format": True,
+            }
+        if extension == ".docx":
+            try:
+                from docx import Document
+
+                document = Document(str(target))
+                content = "\n".join(paragraph.text for paragraph in document.paragraphs)
+                return _content_result(target, content)
+            except Exception as exc:
+                return {"error": f"Erreur lecture Word : {exc}"}
+
+        if extension == ".xls":
+            return {
+                "error": (
+                    "Le format Excel binaire .xls n'est pas pris en charge par openpyxl. "
+                    "Convertissez le classeur en .xlsx avant lecture."
+                ),
+                "unsupported_format": True,
+            }
+        if extension == ".xlsx":
+            workbook = None
+            try:
+                import openpyxl
+
+                workbook = openpyxl.load_workbook(
+                    str(target), read_only=True, data_only=True
+                )
+                sheet_names = list(workbook.sheetnames)
+                lines: list[str] = []
+                for sheet_name in sheet_names:
+                    worksheet = workbook[sheet_name]
+                    lines.append(f"=== Feuille : {sheet_name} ===")
+                    for row in worksheet.iter_rows(values_only=True):
+                        if any(cell is not None for cell in row):
+                            lines.append("\t".join(
+                                str(cell) if cell is not None else "" for cell in row
+                            ))
+                return _content_result(target, "\n".join(lines), sheets=sheet_names)
+            except Exception as exc:
+                return {"error": f"Erreur lecture Excel : {exc}"}
+            finally:
+                if workbook is not None:
+                    workbook.close()
+
+        if extension == ".csv":
+            try:
+                raw = None
+                for encoding in ("utf-8", "latin-1", "cp1252"):
+                    try:
+                        raw = target.read_text(encoding=encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if raw is None:
+                    raw = target.read_bytes().decode(errors="replace")
+                lines = ["\t".join(row) for row in csv.reader(io.StringIO(raw))]
+                return _content_result(target, "\n".join(lines), rows=len(lines))
+            except Exception as exc:
+                return {"error": f"Erreur lecture CSV : {exc}"}
+
+        for encoding in ("utf-8", "latin-1", "cp1252"):
+            try:
+                return _content_result(target, target.read_text(encoding=encoding))
+            except UnicodeDecodeError:
+                continue
+        return {"error": "Encodage non supporté"}
     except Exception as exc:
         return {"error": str(exc)}
 

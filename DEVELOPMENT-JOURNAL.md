@@ -4766,3 +4766,44 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 20 070 à **19 950 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.316.0 — Lecture multi-format des fichiers
+
+### Demande
+
+- Continuer l'extraction des outils fichiers en corrigeant les défauts établis.
+
+### Constats et décisions
+
+- Le lecteur historique annonçait `.doc` et `.xls`, alors que `python-docx` et `openpyxl`
+  ne prennent pas en charge ces formats binaires.
+- Le classeur XLSX n'était pas fermé si une exception survenait pendant l'itération et ses
+  noms de feuilles étaient consultés après `close()`.
+- La lecture de snapshot Code Workspace refusé reste strictement bornée au chemin
+  `data/coding_workspaces/<mission>/repo`.
+- Les formats réellement supportés restent PDF, DOCX, XLSX, CSV et texte multi-encodage.
+  Les formats anciens produisent désormais une erreur explicite avec instruction de conversion.
+- Tous les lecteurs exposent `content_truncated` sans retirer les anciens champs.
+
+### Fichiers
+
+- `backend/tool_domains/filesystem.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_filesystem.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test filesystem ciblé : texte, CSV, troncature et erreur `.xls` explicite réussis;
+  l'identité `tools.execute_file_read is filesystem.read` est vérifiée.
+- `scripts/check_marvin.py --quick` : **96/96 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.316.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 950 à **19 838 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

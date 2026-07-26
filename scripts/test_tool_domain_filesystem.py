@@ -28,6 +28,14 @@ async def main() -> int:
         metadata = await filesystem.info({"path": "docs/a.txt", "hash": True})
         assert metadata["size_bytes"] == 1
         assert len(metadata["md5"]) == 32 and len(metadata["sha256"]) == 64
+        read = await filesystem.read({"path": "docs/a.txt"})
+        assert read["content"] == "a" and read["content_truncated"] is False
+        (base / "docs/data.csv").write_text("name,value\nmarvin,1\n", encoding="utf-8")
+        csv_read = await filesystem.read({"path": "docs/data.csv"})
+        assert csv_read["rows"] == 2 and "marvin\t1" in csv_read["content"]
+        (base / "docs/legacy.xls").write_bytes(b"legacy")
+        legacy = await filesystem.read({"path": "docs/legacy.xls"})
+        assert legacy["unsupported_format"] is True
         await filesystem.write({"path": "docs/a.txt", "content": "b", "mode": "append"})
         assert (base / "docs/a.txt").read_text(encoding="utf-8") == "ab"
         copied = await filesystem.copy({"source": "docs/a.txt", "destination": "docs"})
@@ -45,6 +53,7 @@ async def main() -> int:
     assert tools.execute_file_write is filesystem.write
     assert tools.execute_file_list is filesystem.list_entries
     assert tools.execute_file_info is filesystem.info
+    assert tools.execute_file_read is filesystem.read
     assert tools.execute_file_delete is filesystem.delete
     assert tools.execute_file_rename is filesystem.rename
     assert tools.execute_file_move is filesystem.move
