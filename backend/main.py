@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.304 — politique de dispatch extraite dans agent_tool_dispatch.py :
+# blocages déterministes, permissions et confirmation Expert testables.
 # v2.303 — préparation d'une étape d'outil extraite dans agent_tool_step.py :
 # alias modèles, contexte interne et projection LLM bornée sont testables.
 # v2.302 — matérialisation des outils obligatoires extraite dans

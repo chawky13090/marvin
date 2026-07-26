@@ -4182,6 +4182,50 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.304.0 — Politique de dispatch des outils
+
+### Constat et décision
+
+- La boucle du Runner décidait encore elle-même si un outil devait être exécuté ou bloqué :
+  polling répété, substitution d'un outil explicitement demandé, commande demandée en texte,
+  arguments invalides, permission Sécurisée et confirmation Expert.
+- Cette décision précède l'exécuteur idempotent et constitue une politique déterministe
+  indépendante du transport Ollama et du SSE.
+- Les tests ont révélé une incohérence existante : le niveau Sécurisé, défini comme lecture
+  seule, bloquait `pc_run_command` et `pc_run_elevated` mais pas `pc_run_powershell`.
+
+### Implémentation
+
+- Nouveau `backend/agent_tool_dispatch.py` avec requête et résultat typés.
+- Les six branches de blocage/autorisation sont centralisées et injectent le validateur ainsi
+  que l'exécuteur existants.
+- Les opérations irréversibles ou sortantes restent non confirmées même en Expert afin que
+  leur outil exige toujours l'accord humain.
+- `pc_run_powershell` rejoint `SECURE_BLOCKED_TOOLS`; Standard et Expert sont inchangés.
+- Nouveau `scripts/test_agent_tool_dispatch.py`, intégré à `check_marvin --quick`.
+- `agent.py` passe de 1 069 à 960 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Polling, outil explicite, texte, validation, Sécurisé et Expert : réussis.
+- Régressions politiques, sécurité et garde-fous d'intention : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.303, replacer la politique dans `agent.py` et retirer
+  `pc_run_powershell` de `SECURE_BLOCKED_TOOLS`. Aucun outil ni route n'est supprimé.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 84/84 étapes réussies après correction des deux
+  régressions de frontière détectées; compilation de 155 fichiers Python, cohérence 344/344
+  outils et ESLint sans erreur.
+- Backend réel redémarré : processus lancé PID 32392, version `2.304.0`, Ollama disponible,
+  344 outils et 15 workers observés.
+- `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
+
 ## 2026-07-26 — v2.303.0 — Préparation déterministe d'une étape d'outil
 
 ### Constat et décision

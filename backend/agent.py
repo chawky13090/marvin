@@ -66,6 +66,12 @@ from agent_tool_step import (
     inject_internal_context as _inject_internal_tool_context,
     prepare_tool_call as _prepare_tool_call,
 )
+from agent_tool_dispatch import (
+    ALWAYS_CONFIRM_TOOLS as _ALWAYS_CONFIRM_TOOLS,
+    EXECUTION_TOOLS as _EXECUTION_TOOLS,
+    ToolDispatchRequest as _ToolDispatchRequest,
+    dispatch_tool as _dispatch_tool,
+)
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -75,8 +81,7 @@ from agent_transport import (
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, MAX_CONTEXT_MESSAGES,
-    PERMISSION_SECURE, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
-    SECURE_BLOCKED_TOOLS, DANGEROUS_TOOLS,
+    DEFAULT_PERMISSION_LEVEL, DANGEROUS_TOOLS,
     MODEL_PROFILES,
 )
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
@@ -85,74 +90,6 @@ _validate_tool_args = validator_for(TOOLS_SPEC)
 
 # Conserve les références des tâches d'apprentissage en arrière-plan (anti-GC).
 _BG_LEARN_TASKS: set = set()
-
-# ── Prompt système ────────────────────────────────────────────────────────────
-
-
-
-# ── Conversion messages frontend → Ollama ─────────────────────────────────────
-
-# v2.138 — validation légère des arguments AVANT exécution (1ʳᵉ des 3 couches recommandées pour
-# le tool-calling agentique : validation → retry ciblé → decoding contraint — la 2ᵉ existe déjà
-# via le garde de sécurité + le repli de modèle, celle-ci comblait le seul vrai trou). Volontai-
-# rement CONSERVATRICE : ne vérifie que la PRÉSENCE des paramètres obligatoires (déclarés dans
-# TOOLS_SPEC) — pas de coercition de type stricte, qui casserait des appels qui fonctionnent
-# déjà (beaucoup d'outils acceptent un nombre envoyé en chaîne, etc.). Objectif : intercepter
-# le cas concret déjà rencontré en audit (paramètre requis totalement absent → l'outil part sur
-# une KeyError/valeur par défaut fausse) avant même l'appel, pas remplacer les validations
-# internes déjà présentes dans chaque `execute_*`.
-# v2.131 — filet de sécurité DÉTERMINISTE sur les réponses techniques (scripts). La règle
-# d'or #11 (ne pas toucher à l'authentification root d'une base de données) reste violée
-# par le modèle cloud dans ~2 générations sur 3 malgré une interdiction explicite et sans
-# exception dans le prompt système, testé en réel — un rappel textuel, même explicite, ne
-# garantit JAMAIS un comportement 100% fiable sur un LLM probabiliste. Plutôt que de
-# continuer à durcir un texte qui a déjà atteint son plafond d'efficacité, on ajoute un
-# SCAN a posteriori du texte final : motifs regex connus et sans ambiguïté (contrairement
-# à `security.py::screen_command`, ceci ne bloque RIEN — la réponse contient un script à
-# LIRE, pas une commande à EXÉCUTER — mais rend le risque visible et impossible à manquer).
-# v2.141 — Passe de critique par un 2ᵉ modèle (demandé explicitement : « je pense que
-# quand une demande est faite le llm cloud répond mais doit aussi passer après réponse
-# par une revue critique d'un autre llm avant d'envoyer la réponse »). Complète le
-# scanner déterministe ci-dessus (regex, ne peut voir que des motifs connus à l'avance)
-# avec un vrai jugement de modèle — principe Mixture-of-Agents (un 2ᵉ regard indépendant
-# détecte des erreurs qu'un modèle ne voit pas dans sa propre sortie).
-# Scope VOLONTAIREMENT restreint aux réponses contenant un bloc de code (même critère
-# que le scanner déterministe) : appliquer ça à CHAQUE message ("quelle heure est-il ?")
-# doublerait la latence pour zéro bénéfice — régression déjà vécue et corrigée (v2.125/
-# v2.126, "Marvin reste à réfléchir"). Produit un BANDEAU visible (jamais une réécriture
-# silencieuse de la réponse) : un texte auto-corrigé par un LLM sans supervision humaine
-# est invérifiable, contraire à l'exigence de fiabilité prouvée de cette session.
-# v2.185 — signalé en audit réel : sur "donne moi la commande pour installer hyper-v..." puis
-# "la commande launtype pour que hyper v soit activé toujours", Marvin a appelé ssh_list PUIS
-# exécuté réellement la commande localement (pc_run_powershell, escaladé jusqu'à
-# pc_run_elevated) — alors que l'utilisateur demandait juste LE TEXTE de la commande, jamais son
-# exécution. La règle d'or #14 existante couvrait déjà "écrire ≠ exécuter" pour un OS différent/
-# une machine distante, mais pas ce cas précis (même OS, machine locale, mais aucun verbe
-# d'exécution dans le message) — le prompt seul n'a pas suffi (plafond déjà documenté ailleurs,
-# cf. deterministic-script-scanner-v2131). Filet déterministe : si le dernier message demande
-# explicitement LA COMMANDE (texte) sans aucun verbe d'exécution, les outils qui exécutent
-# réellement quelque chose sont bloqués pour ce tour — l'exception explicite ("lance-la",
-# "exécute-la", "fais-le") réactive immédiatement l'exécution normale.
-_EXECUTION_TOOLS = {"pc_run_command", "pc_run_powershell", "pc_run_elevated",
-                     "ssh_exec", "ssh_exec_multi", "ssh_write_and_run",
-                     # v2.185 — observé dans la même conversation réelle : ssh_list/ssh_server_info
-                     # appelés sur des questions purement locales Windows, sans rapport avec la
-                     # demande (déjà interdit par la règle d'or #10, mais pas respecté de façon
-                     # fiable) — un utilisateur qui demande juste le TEXTE d'une commande n'a besoin
-                     # d'aucune de ces deux investigations.
-                     "ssh_list", "ssh_server_info"}
-
-# Même au niveau Expert, une action sortante ou irréversible reste soumise à la validation
-# humaine explicite. Expert accélère les opérations locales réversibles ; il ne transforme
-# jamais « prépare/envisage » en envoi, suppression ou modification distante autorisée.
-_ALWAYS_CONFIRM_TOOLS = {
-    "email_send", "email_automation_run", "telegram_send", "itsm_ticket_create",
-    "file_delete", "task_delete", "note_delete", "event_delete", "memory_delete",
-    "ssh_exec", "ssh_exec_multi", "ssh_upload", "ssh_write_and_run",
-    "system_cleanup", "long_task_start", "pc_gui_click", "pc_gui_type",
-    "code_workspace_start", "code_workspace_control",
-}
-
 
 # ── Agent de streaming principal ──────────────────────────────────────────────
 
@@ -717,68 +654,24 @@ async def run_agent(
                 # son nom exact (ex: net_ping au lieu de file_find). tools_payload a déjà été
                 # restreint à _explicit_tool_names ; ce garde-fou couvre le cas résiduel où le
                 # modèle appelle quand même un autre nom (halluciné ou substitué).
-                if _read_signature and _read_signature in _read_call_signatures:
-                    result = {
-                        "success": False,
-                        "duplicate_poll_blocked": True,
-                        "message": (
-                            "Statut Code Workspace déjà lu pendant ce tour. N'interroge pas "
-                            "la mission en boucle : réponds avec le dernier état observé. "
-                            "Le superviseur Auto continue en arrière-plan."
-                        ),
-                    }
-                elif _explicit_tool_names and tool_name not in (_explicit_tool_names | _required_tool_names):
-                    requested = ", ".join(sorted(_explicit_tool_names))
-                    result = {
-                        "error": (
-                            f"⛔ Outil bloqué : tu as explicitement demandé {requested}. "
-                            f"Marvin ne peut pas appeler '{tool_name}' à la place ce tour-ci."
-                        ),
-                        "blocked_by_explicit_tool": True,
-                        "requested_tools": sorted(_explicit_tool_names),
-                    }
-                # ── v2.185 : « donne-moi la commande » ≠ « exécute-la » ─────────
-                # Filet déterministe (le prompt seul ne suffisait pas, cf. note plus haut) :
-                # aucun verbe d'exécution dans le message → les outils qui exécutent réellement
-                # quelque chose sont bloqués, Marvin doit répondre en texte à la place.
-                elif _command_text_only and tool_name in _EXECUTION_TOOLS:
-                    result = {
-                        "error": (
-                            "⛔ L'utilisateur a demandé LE TEXTE de la commande, pas son exécution "
-                            f"— '{tool_name}' est bloqué ce tour-ci. Réponds directement avec la "
-                            "commande en texte (bloc de code), sans l'exécuter. Si l'utilisateur "
-                            "veut vraiment l'exécuter, il te le dira explicitement (« lance-la », "
-                            "« exécute »)."
-                        ),
-                        "blocked_command_text_only": True,
-                    }
-                # ── Validation des arguments (v2.138) ──────────────────────────
-                elif (_missing_msg := _validate_tool_args(tool_name, tool_args)):
-                    result = {"error": _missing_msg, "validation_failed": True}
-                # ── Vérification des permissions ──────────────────────────────
-                elif permission_level == PERMISSION_SECURE and tool_name in SECURE_BLOCKED_TOOLS:
-                    result = {
-                        "error": (
-                            f"🛡️ Permission refusée (niveau Sécurisé) : "
-                            f"l'outil '{tool_name}' n'est pas autorisé. "
-                            f"Passez en mode Standard ou Expert dans les Paramètres pour débloquer cette action."
-                        )
-                    }
-                elif permission_level == PERMISSION_EXPERT:
-                    # Expert accélère les actions locales réversibles. Les sorties et les
-                    # suppressions restent volontairement non confirmées afin que l'exécuteur
-                    # renvoie requiresConfirmation et demande un accord humain explicite.
-                    if tool_name not in _ALWAYS_CONFIRM_TOOLS:
-                        tool_args["confirmed"] = True
-                    result = await _execute_registered_tool(
-                        tool_name, tool_args, conversation_id, request_id,
-                    )
-
-                else:
-                    # Niveau Standard (ou non défini) : comportement normal
-                    result = await _execute_registered_tool(
-                        tool_name, tool_args, conversation_id, request_id,
-                    )
+                _dispatch = await _dispatch_tool(
+                    _ToolDispatchRequest(
+                        name=tool_name,
+                        arguments=tool_args,
+                        conversation_id=conversation_id,
+                        request_id=request_id,
+                        permission_level=permission_level,
+                        read_signature=_read_signature,
+                        seen_read_signatures=_read_call_signatures,
+                        explicit_names=_explicit_tool_names,
+                        required_names=_required_tool_names,
+                        command_text_only=_command_text_only,
+                    ),
+                    validate=_validate_tool_args,
+                    execute=_execute_registered_tool,
+                )
+                result = _dispatch.result
+                tool_args = _dispatch.arguments
 
                 _tool_duration_ms = int((time.time() - _tool_t0) * 1000)
                 # v2.248 — contrat additif commun à tous les outils. Les champs historiques

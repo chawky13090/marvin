@@ -126,7 +126,11 @@ def main() -> int:
     test_internal_cloud_fallback()
     test_atomic_presets()
     source = (ROOT / "backend" / "agent.py").read_text(encoding="utf-8")
-    assert "duplicate_poll_blocked" in source
+    dispatch_source = (
+        ROOT / "backend" / "agent_tool_dispatch.py"
+    ).read_text(encoding="utf-8")
+    assert "duplicate_poll_blocked" in dispatch_source
+    assert "_dispatch_tool" in source
     assert "Cloud strict · compétence" in source
     print("Cloud-only OK - chat, vision, outils internes, presets et absence de repli local.")
     return 0

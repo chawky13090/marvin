@@ -93,6 +93,7 @@ SECURE_BLOCKED_TOOLS: set[str] = {
     "file_create_xlsx",
     "file_create_pdf",
     "pc_run_command",
+    "pc_run_powershell",
     "pc_run_elevated",  # exécution EN ADMINISTRATEUR — jamais en niveau Sécurisé
     "pc_process_kill",
     "pc_clipboard_set",
