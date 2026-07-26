@@ -72,6 +72,9 @@ from agent_tool_dispatch import (
     ToolDispatchRequest as _ToolDispatchRequest,
     dispatch_tool as _dispatch_tool,
 )
+from agent_tool_postprocess import (
+    postprocess_tool_result as _postprocess_tool_result,
+)
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -674,52 +677,20 @@ async def run_agent(
                 tool_args = _dispatch.arguments
 
                 _tool_duration_ms = int((time.time() - _tool_t0) * 1000)
-                # v2.248 — contrat additif commun à tous les outils. Les champs historiques
-                # restent intacts; `_contract` fournit un état, un code d'erreur et la
-                # retryabilité lisibles de façon déterministe par le Chat et les superviseurs.
-                if isinstance(result, dict):
-                    try:
-                        import engineering_runtime as _engineering_runtime
-                        result = _engineering_runtime.normalize_tool_result(
-                            tool_name, result, duration_ms=_tool_duration_ms,
-                        )
-                    except Exception:
-                        pass
-
                 if _read_signature:
                     _read_call_signatures.add(_read_signature)
 
-                # 🛡️ AUTO-CRITIQUE : avant une action irréversible (qui attend confirmation),
-                # une IA vérifie que l'action correspond bien à la demande. Si doute → averti.
-                if (isinstance(result, dict) and result.get("requiresConfirmation")
-                        and tool_name in DANGEROUS_TOOLS and _user_query):
-                    try:
-                        concern = await _critique_action(_user_query, tool_name, tool_args, model=active_model)
-                        if concern:
-                            result["message"] = (result.get("message", "") +
-                                                  f"\n\n⚠️ Vérification de Marvin : {concern}")
-                    except Exception:
-                        pass
-
-                # v2.133 — le filet v2.131/132 ne scannait que la réponse de chat visible, pas
-                # le CONTENU des documents générés (file_create_pdf, document_generate...) — un
-                # angle mort concret : le PDF GLPI qui a motivé tout ce chantier (v2.127) avait
-                # son mot de passe root vidé et son `$(date...)` littéral dans l'argument
-                # `content` d'un appel d'outil, jamais dans le texte de chat lui-même, donc le
-                # scanner de la réponse finale ne l'aurait PAS attrapé. Scan des arguments texte
-                # des outils de génération de document, AVANT que l'utilisateur ne parte
-                # chercher le fichier généré.
-                if tool_name in ("file_create_pdf", "document_generate", "billing_quote_pdf",
-                                  "file_convert_docx_to_pdf") and isinstance(result, dict) and result.get("success"):
-                    _doc_text = tool_args.get("content") or tool_args.get("body") or ""
-                    if isinstance(_doc_text, str) and _doc_text:
-                        _doc_warnings = _scan_dangerous_script_patterns(
-                            _doc_text, require_code_fence=False, document_mode=True)
-                        if _doc_warnings:
-                            result["security_warning"] = (
-                                "⚠️ Vérification automatique de sécurité — points à relire dans ce document avant de l'utiliser :\n"
-                                + "\n".join(f"- {w}" for w in _doc_warnings)
-                            )
+                result = await _postprocess_tool_result(
+                    tool_name=tool_name,
+                    arguments=tool_args,
+                    result=result,
+                    duration_ms=_tool_duration_ms,
+                    user_query=_user_query,
+                    active_model=active_model,
+                    dangerous_tools=DANGEROUS_TOOLS,
+                    critique_action=_critique_action,
+                    scan_document=_scan_dangerous_script_patterns,
+                )
 
                 # Notifier le frontend — fin d'outil
                 yield _sse({

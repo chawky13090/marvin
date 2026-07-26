@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.304.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.305.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.304.0)
+## 9. État actuel (v2.305.0)
+
+**v2.305 (post-validation des résultats d'outils)** : contrat commun, critique d'une action
+en attente de confirmation et scan des documents générés sont extraits dans
+`agent_tool_postprocess.py`. Chaque contrôle est best-effort et isolé : sa panne ne transforme
+jamais en échec une action déjà exécutée.
 
 **v2.304 (politique de dispatch des outils)** : anti-polling, respect d'un outil explicitement
 demandé, distinction « donner la commande »/« exécuter », validation des arguments, niveau

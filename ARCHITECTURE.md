@@ -146,6 +146,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 37. les outils obligatoires : `agent_required_tools.py` matérialise les contrats explicites sans doublon, préserve l'autonomie tant que le modèle agit et injecte le contexte du livrable précédent uniquement pour une reprise Code Workspace.
 38. l'étape d'outil : `agent_tool_step.py` normalise les variantes d'arguments des modèles, injecte les identifiants internes hors du LLM et borne uniquement la projection de résultat renvoyée au contexte modèle.
 39. le dispatch d'outil : `agent_tool_dispatch.py` applique anti-polling, outil explicite, texte sans exécution, validation des arguments, niveau Sécurisé et confirmation Expert avant l'exécuteur idempotent.
+40. la post-validation d'outil : `agent_tool_postprocess.py` normalise le contrat de résultat, critique les confirmations dangereuses et inspecte le contenu documentaire sans invalider une action déjà exécutée si un observateur tombe en panne.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

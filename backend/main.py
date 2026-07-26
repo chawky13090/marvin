@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.305 — post-validation des résultats extraite dans agent_tool_postprocess.py :
+# contrat commun, critique d'action et scan documentaire isolés.
 # v2.304 — politique de dispatch extraite dans agent_tool_dispatch.py :
 # blocages déterministes, permissions et confirmation Expert testables.
 # v2.303 — préparation d'une étape d'outil extraite dans agent_tool_step.py :

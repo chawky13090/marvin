@@ -4182,6 +4182,47 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.305.0 — Post-validation des résultats d'outils
+
+### Constat et décision
+
+- Après le dispatch et l'exécution, la boucle du Runner normalisait encore le contrat commun,
+  lançait une critique des actions dangereuses en attente de confirmation et inspectait le
+  texte des documents générés.
+- Ces contrôles portent sur un résultat déjà obtenu. Ils doivent rester isolés : leur propre
+  panne ne doit jamais annoncer à tort que l'action métier a échoué.
+
+### Implémentation
+
+- Nouveau `backend/agent_tool_postprocess.py`.
+- La normalisation `_contract` conserve les champs historiques du résultat.
+- La critique est limitée aux outils dangereux retournant `requiresConfirmation`.
+- Les quatre outils documentaires historiques restent inspectés avec le scanner déterministe.
+- Les trois observateurs sont best-effort et testables par injection.
+- Nouveau `scripts/test_agent_tool_postprocess.py`, intégré à `check_marvin --quick`.
+- `agent.py` passe de 962 à 933 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Contrat, critique, scan documentaire et isolation d'exception : réussis.
+- Régressions observabilité, revue et sécurité : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.304 et replacer ces trois contrôles dans `agent.py`.
+  Aucun résultat complet, reçu, événement SSE, outil ou route n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 85/85 étapes réussies en 108,5 secondes.
+- Backend compilé : 156 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.305.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.304.0 — Politique de dispatch des outils
 
 ### Constat et décision
