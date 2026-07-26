@@ -57,6 +57,7 @@ flowchart LR
 | `agent_budget_completion.py` | Synthèse terminale sans outil et repli utilisateur lors d'un budget épuisé |
 | `agent_transport.py` | Client HTTP Ollama, payload `/api/chat`, décodage JSONL et erreurs de transport typées |
 | `document_formatting.py` | Projection Markdown commune aux générateurs DOCX/PDF et échappement ReportLab |
+| `document_profile.py` | Identité persistante, champs autorisés et catalogue de modèles documentaires |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |

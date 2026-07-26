@@ -4928,3 +4928,45 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 592 à **19 511 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.320.0 — Profil documentaire
+
+### Demande
+
+- Découpler préférences et modèles avant l'extraction des générateurs DOCX/PDF.
+
+### Constats et décisions
+
+- L'identité persistante et le catalogue de dix modèles étaient mélangés aux traitements de
+  génération dans `tools.py`.
+- `get_identity` retourne désormais une copie de la valeur SQLite pour éviter une mutation
+  indirecte de l'objet fourni par la persistance.
+- La mise à jour n'accepte que neuf champs documentaires connus, normalise les chaînes et
+  préserve les valeurs existantes ainsi que la possibilité de vider explicitement un champ.
+- La liste publique retourne une copie des sections; un consommateur ne peut plus modifier
+  accidentellement le catalogue global.
+- Les quatre alias historiques restent identiques pour `api/documents.py` et `tools.py`.
+
+### Fichiers
+
+- `backend/document_profile.py`
+- `backend/tools.py`
+- `scripts/test_document_profile.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`
+- `BACKEND-CONSOLIDATION-PLAN.md`, `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test `test_document_profile.py` : liste blanche, normalisation, conservation, vidage,
+  absence de mutation source, dix modèles, copies défensives et quatre alias réussis.
+- `scripts/check_marvin.py --quick` : **98/98 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.320.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 511 à **19 468 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

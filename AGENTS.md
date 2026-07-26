@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.319.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.320.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.319.0)
+## 9. État actuel (v2.320.0)
+
+**v2.320 (profil documentaire)** : identité persistante, champs autorisés et dix modèles
+documentaires sont extraits vers `document_profile.py`. La mise à jour copie la valeur SQLite,
+préserve les champs existants, ignore les clés inconnues et normalise les chaînes. La liste
+publique retourne des copies défensives; l'API et les générateurs gardent leurs alias.
 
 **v2.319 (formatage documentaire partagé)** : le découpage Markdown en titres, listes,
 tableaux, code et images ainsi que la conversion inline ReportLab sont extraits vers

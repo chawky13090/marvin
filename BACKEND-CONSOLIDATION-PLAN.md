@@ -99,6 +99,8 @@ multi-format en v2.316.0, recherche par nom en v2.317.0 et recherche de contenu 
 
 Le formatage Markdown partagé des documents est extrait en v2.319.0; les générateurs DOCX/PDF
 gardent ainsi une seule grammaire avant leur déplacement vers le domaine documentaire.
+L'identité persistante et le catalogue de modèles rejoignent `document_profile.py` en
+v2.320.0, sans changer les façades consommées par l'API et les générateurs.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

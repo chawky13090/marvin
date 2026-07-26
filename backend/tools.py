@@ -32,6 +32,12 @@ from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
     parse_markdown_blocks as _parse_md_blocks,
 )
+from document_profile import (
+    TEMPLATES as _DOC_TEMPLATES,
+    get_identity as _document_identity,
+    list_templates as _doc_templates_list,
+    set_identity as execute_document_identity_set,
+)
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
@@ -253,27 +259,6 @@ execute_file_rename = filesystem_domain.rename
 execute_file_move = filesystem_domain.move
 execute_file_copy = filesystem_domain.copy
 execute_file_create_folder = filesystem_domain.create_folder
-
-
-def _document_identity() -> dict:
-    try:
-        val = db.get_setting("document_identity")
-        return val if isinstance(val, dict) else {}
-    except Exception:
-        return {}
-
-
-async def execute_document_identity_set(args: dict) -> dict:
-    """Enregistre/à jour l'identité document par défaut (auteur, organisation, en-tête,
-    pied de page) — réutilisée automatiquement par file_create_docx/file_create_pdf."""
-    current = _document_identity()
-    fields = ("author", "org", "address", "phone", "email", "website", "logo",
-              "footer_text", "confidentiality")
-    for f in fields:
-        if args.get(f) is not None:
-            current[f] = args[f]
-    db.set_setting("document_identity", current)
-    return {"success": True, "message": "Identité document enregistrée.", "identity": current}
 
 
 async def execute_file_create_docx(args: dict) -> dict:
@@ -586,34 +571,6 @@ async def execute_document_convert_format(args: dict) -> dict:
 
 
 # ── Générateur de documentation IA (notes brutes → document Word complet) ───────
-_DOC_TEMPLATES = {
-    "rapport_intervention": {"name": "Rapport d'intervention IT", "icon": "🛠️",
-        "sections": ["Contexte et demande", "Diagnostic", "Actions réalisées", "Résultat et tests", "Recommandations"]},
-    "dossier_pro": {"name": "Dossier professionnel", "icon": "🎓",
-        "sections": ["Présentation et contexte", "Description de l'activité réalisée", "Compétences mises en œuvre", "Difficultés rencontrées et solutions", "Bilan et perspectives"]},
-    "procedure": {"name": "Procédure technique", "icon": "📋",
-        "sections": ["Objectif", "Prérequis", "Étapes détaillées", "Vérification", "Dépannage (FAQ)"]},
-    "cahier_charges": {"name": "Cahier des charges", "icon": "📐",
-        "sections": ["Contexte et objectifs", "Périmètre du projet", "Besoins fonctionnels", "Contraintes techniques", "Livrables et planning"]},
-    "compte_rendu": {"name": "Compte-rendu de réunion", "icon": "📝",
-        "sections": ["Informations (date, participants)", "Points abordés", "Décisions prises", "Actions à suivre"]},
-    "doc_technique": {"name": "Documentation technique", "icon": "🗂️",
-        "sections": ["Vue d'ensemble", "Architecture et fonctionnement", "Installation et configuration", "Utilisation", "Maintenance et annexes"]},
-    "devis_technique": {"name": "Devis technique", "icon": "💶",
-        "sections": ["Contexte du besoin", "Solution proposée", "Détail des prestations", "Matériel et licences", "Conditions et délais"]},
-    "pv_recette": {"name": "PV de recette", "icon": "✅",
-        "sections": ["Objet et périmètre", "Tests réalisés et résultats", "Réserves et anomalies", "Conclusion et validation"]},
-    "fiche_poste": {"name": "Fiche de poste", "icon": "👤",
-        "sections": ["Intitulé et rattachement", "Missions principales", "Activités et tâches", "Compétences requises", "Conditions d'exercice"]},
-    "libre": {"name": "Document professionnel", "icon": "📄",
-        "sections": ["Introduction", "Développement", "Conclusion"]},
-}
-
-
-def _doc_templates_list():
-    return [{"key": k, "name": v["name"], "icon": v["icon"], "sections": v["sections"]} for k, v in _DOC_TEMPLATES.items()]
-
-
 async def execute_document_generate(args: dict) -> dict:
     """Génère un document professionnel COMPLET au format Word (.docx) à partir de notes
     brutes, selon un modèle (rapport d'intervention, dossier pro, procédure...). Rédige
