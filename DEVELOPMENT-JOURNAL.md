@@ -4182,6 +4182,49 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.309.0 — Enrichissements concurrents et contexte Skill
+
+### Constat et décision
+
+- Le rappel sémantique, le matching de compétence et le filtrage d'outils étaient lancés dans
+  `run_agent`, puis attendus à des endroits différents sans contrat d'annulation commun.
+- Une sortie anticipée pendant l'escalade Cloud d'une skill pouvait laisser des tâches
+  préparatoires actives; une compétence Markdown incomplète pouvait lever une exception.
+
+### Implémentation et améliorations
+
+- Nouveau `backend/agent_enrichment.py` avec `EnrichmentTasks`.
+- Les trois tâches restent concurrentes; chaque panne indépendante se replie sur vide.
+- `cancel_pending()` annule et attend toutes les tâches encore actives avant une sortie Cloud.
+- L'injection du rappel sémantique et l'assemblage sans doublon du catalogue sont testables.
+- Nouveau `backend/agent_skill_context.py` : validation des champs, méthode agentique, golden
+  path borné à huit étapes et ressources best-effort.
+- Une compétence invalide est ignorée proprement au lieu de casser le tour.
+- Deux tests déterministes sont intégrés à `check_marvin --quick`.
+- `agent.py` passe de 788 à 726 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation des deux modules, du Runner et des tests : réussie.
+- Concurrence, replis, annulation, mémoire et catalogue : réussis.
+- Méthode Skill, golden path, ressources et Markdown invalide : réussis.
+- Régressions sélection d'outils et Ultra cloud-only : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.308 et replacer les enrichissements et le prompt Skill dans `agent.py`.
+  Aucun format de compétence, outil, événement SSE ou politique Cloud n'est supprimé.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 91/91 étapes réussies en 109,7 secondes.
+- Backend compilé : 162 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.309.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.308.0 — Contexte déterministe du tour
 
 ### Constat et décision

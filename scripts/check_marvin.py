@@ -105,6 +105,8 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Escalade Council après désaccord", (python, "scripts/test_agent_council_escalation.py")),
         Stage("Apprentissage post-réponse suivi", (python, "scripts/test_agent_learning.py")),
         Stage("Préparation déterministe du contexte de tour", (python, "scripts/test_agent_turn_context.py")),
+        Stage("Enrichissements concurrents du tour", (python, "scripts/test_agent_enrichment.py")),
+        Stage("Contexte prompt des compétences", (python, "scripts/test_agent_skill_context.py")),
         Stage("Revue indépendante des réponses et actions", (python, "scripts/test_agent_review.py")),
         Stage("Contexte de session et captures", (python, "scripts/test_agent_context.py")),
         Stage("Préparation durable d'un tour", (python, "scripts/test_agent_session.py")),

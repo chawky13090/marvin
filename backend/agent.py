@@ -80,6 +80,12 @@ from agent_council_escalation import (
 )
 from agent_learning import schedule_exchange_learning as _schedule_exchange_learning
 from agent_turn_context import prepare_agent_context as _prepare_agent_context
+from agent_enrichment import (
+    assemble_tool_payload as _assemble_tool_payload,
+    inject_learned_block as _inject_learned_block,
+    start_enrichments as _start_enrichments,
+)
+from agent_skill_context import build_skill_prompt_context as _build_skill_prompt_context
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -192,82 +198,36 @@ async def run_agent(
     # Rappel mémoire (embed) + filtrage des outils (embed) = 2 opérations INDÉPENDANTES.
     # On les lance EN PARALLÈLE (gain de latence, résultat identique) et on construit le
     # prompt système pendant ce temps.
-    async def _recall_learned():
-        try:
-            import learning
-            return learning.recall_block(await learning.recall(_user_query))
-        except Exception:
-            return ""
-
-    async def _match_skill():
-        try:
-            import skills
-            # v2.190 — le contexte précédent n'est repris que pour un vrai follow-up
-            # anaphorique (« vas-y », « fais-le »), plus pour toute phrase de 4 mots.
-            match_text = skill_match_text(messages, _user_query)
-            return await skills.match(match_text)
-        except Exception:
-            return None
-
-    _recall_task = (
-        asyncio.create_task(_recall_learned())
-        if _tool_suppression != "quiz_answer"
-        else None
+    _enrichments = _start_enrichments(
+        messages=messages,
+        user_query=_user_query,
+        profile_name=profile_name,
+        use_tools=use_tools,
+        tool_suppression=_tool_suppression,
+        skill_matcher_text=skill_match_text,
+        filter_tools=_filter_relevant_tools,
     )
-    _tools_task = asyncio.create_task(_filter_relevant_tools(messages, profile_name)) if use_tools else None
-    _skill_task = asyncio.create_task(_match_skill()) if not _tool_suppression else None
 
     # SKILL : si une compétence (fichier Markdown) correspond à la demande, on injecte sa
     # MÉTHODE dans le prompt (Marvin l'applique avec ses outils déjà vérifiés). Couche-prompt
     # uniquement → aucune exécution de code, donc aucune faille « à la OpenClaw ».
-    _skill = None
-    try:
-        _skill = await _skill_task if _skill_task else None
-    except Exception:
-        _skill = None
+    _skill = await _enrichments.skill()
     if _skill:
-        rel = _skill.get("related") or []
-        rel_line = (f"\nCompétences liées que tu peux enchaîner si besoin : {', '.join(rel)}." if rel else "")
-        system_prompt += (
-            f"\n\n## 📋 Compétence activée : {_skill['name']}\n"
-            f"Quand : {_skill['description']}\n\n{_skill['body']}{rel_line}\n\n"
-            "### Mode opératoire agentique (IMPÉRATIF)\n"
-            "1. AGIS MAINTENANT : exécute le PREMIER outil pertinent via un VRAI appel d'outil. "
-            "⛔ N'écris JAMAIS un appel d'outil sous forme de texte, de JSON ou de bloc ```...``` — "
-            "fais l'appel réel ; le système exécutera l'outil et te renverra le résultat.\n"
-            "2. NE déroule PAS tout le plan à l'avance en texte : un seul outil à la fois, puis observe.\n"
-            "3. Après CHAQUE outil, LIS le résultat réel et dis ce qu'il signifie — ne suppose JAMAIS le résultat.\n"
-            "4. Si une étape échoue ou surprend, AUTO-CORRIGE (essaie une alternative) au lieu d'abandonner ou d'inventer.\n"
-            "5. VÉRIFIE que le problème est réellement résolu AVANT de conclure (refais un test quand c'est possible).\n"
-            "6. CONCLUS : diagnostic clair + preuve (résultats obtenus) + action recommandée. Si non résolu, dis-le honnêtement et propose l'étape suivante.")
-        # 🥇 GOLDEN PATH : si cette compétence a DÉJÀ réussi, on injecte la séquence d'outils
-        # gagnante comme EXEMPLE few-shot. Pour un petit modèle local, imiter un déroulé réel
-        # est bien plus fiable que suivre des consignes → exécution plus rapide et plus juste.
-        try:
-            import skills as _skg
-            _golden = _skg.get_golden_trace(_skill["name"])
-        except Exception:
-            _golden = None
-        if _golden and _golden.get("calls"):
-            _steps = "\n".join(
-                f"{i+1}. `{c.get('tool')}`" + (f" — {c.get('args')}" if c.get("args") else "")
-                for i, c in enumerate(_golden["calls"][:8]))
-            system_prompt += (
-                f"\n\n### ✅ Déroulé DÉJÀ RÉUSSI (exemple à imiter)\n"
-                f"Pour une demande similaire, cette SÉQUENCE d'outils a fonctionné. Réutilise-la en "
-                f"adaptant les paramètres au cas présent — c'est la voie la plus efficace :\n{_steps}")
-        # 📦 RESSOURCES : injecte le contenu de référence embarqué (petites ressources inline ;
-        # gros fichiers / binaires → chemins à lire à la demande via file_read).
-        try:
-            import skills as _skr
-            _resblock = _skr.resources_prompt_block(_skill["name"])
-            if _resblock:
-                system_prompt += _resblock
-        except Exception:
-            pass
+        import skills as _skills_context
+
+        _skill_context = _build_skill_prompt_context(
+            system_prompt,
+            _skill,
+            get_golden_trace=_skills_context.get_golden_trace,
+            resources_prompt_block=_skills_context.resources_prompt_block,
+        )
+        if not _skill_context.valid:
+            _skill = None
+        else:
+            system_prompt = _skill_context.prompt
         # Une compétence pilote des OUTILS → un petit modèle (chat 3b) suit mal la méthode et
         # choisit le mauvais outil. On bascule sur le modèle AGENT (plus fiable) pour l'exécuter.
-        if profile_name == "chat" and _skill.get("tools"):
+        if _skill and profile_name == "chat" and _skill_context.requires_agent_profile:
             profile_name = "agent"
             _agent_local = _pick_available(
                 MODEL_PROFILES.get("agent", {}).get("model", active_model),
@@ -281,6 +241,7 @@ async def run_agent(
                     text_for_sensitivity=_user_query,
                 )
             except _cr.CloudOnlyModelUnavailable as exc:
+                await _enrichments.cancel_pending()
                 yield _sse({"type": "error", "message": str(exc), "cloud_only": True})
                 return
             yield _sse({"type": "model_info", "profile": "agent", "model": active_model,
@@ -297,38 +258,15 @@ async def run_agent(
         except Exception:
             pass
 
-    learned_block = await _recall_task if _recall_task else ""
-    # Position la PLUS saillante : on injecte la mémoire dans le dernier message
-    # utilisateur (sinon noyée dans le long prompt système et ignorée par le modèle).
-    if learned_block and ollama_msgs and ollama_msgs[-1].get("role") == "user":
-        u = ollama_msgs[-1].get("content", "")
-        if isinstance(u, str) and u.strip():
-            ollama_msgs[-1]["content"] = (
-                learned_block.strip()
-                + "\n\n(Utilise ces informations mémorisées si elles sont pertinentes pour répondre, "
-                "sans les répéter mot pour mot.)\n\n— Demande : " + u
-            )
-
-    # ── Filtrage intelligent des outils (déjà lancé en parallèle ci-dessus) ──
-    tools_payload = (await _tools_task) if _tools_task else []
-    # Outil explicite : n'offrir QUE celui-là au modèle (pas de distraction possible).
-    if _explicit_tool_names and use_tools:
-        tools_payload = [
-            s for s in TOOLS_SPEC if s.get("function", {}).get("name") in _explicit_tool_names
-        ] or tools_payload
-    if _required_tool_names and use_tools:
-        have = {t.get("function", {}).get("name") for t in tools_payload}
-        for spec in TOOLS_SPEC:
-            if spec.get("function", {}).get("name") in _required_tool_names - have:
-                tools_payload.append(spec)
-    # Une skill peut suggérer des outils précis → on s'assure qu'ils sont bien proposés au modèle.
-    if _skill and _skill.get("tools") and use_tools:
-        have = {t.get("function", {}).get("name") for t in tools_payload}
-        for spec in TOOLS_SPEC:
-            nm = spec.get("function", {}).get("name")
-            if nm in _skill["tools"] and nm not in have:
-                tools_payload.append(spec)
-                have.add(nm)
+    _inject_learned_block(ollama_msgs, await _enrichments.learned_block())
+    tools_payload = _assemble_tool_payload(
+        await _enrichments.tools(),
+        tools_spec=TOOLS_SPEC,
+        explicit_tool_names=_explicit_tool_names,
+        required_tool_names=_required_tool_names,
+        skill=_skill,
+        use_tools=use_tools,
+    )
 
     # ── Boucle d'appel d'outils ───────────────────────────────────────────────
     assistant_text_accum = ""       # texte de la réponse courante

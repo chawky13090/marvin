@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.308.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.309.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.308.0)
+## 9. État actuel (v2.309.0)
+
+**v2.309 (enrichissements concurrents du tour)** : `agent_enrichment.py` pilote en parallèle
+le rappel sémantique, le matching de compétence et la sélection d'outils, avec replis isolés
+et annulation structurée sur sortie Cloud anticipée. `agent_skill_context.py` valide la
+compétence avant d'injecter méthode, golden path et ressources. Un Markdown incomplet ne peut
+plus interrompre le chat; le catalogue final évite les doublons requis/skills.
 
 **v2.308 (contexte déterministe du tour)** : `agent_turn_context.py` prépare la fenêtre
 d'historique, l'injection des chemins réels au premier tour, les mémoires, permissions,
