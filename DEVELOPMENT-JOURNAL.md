@@ -4182,6 +4182,47 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.307.0 — Effets post-réponse du Runner
+
+### Constat et décision
+
+- L'escalade Council et l'apprentissage durable restaient définis comme closures dans
+  `run_agent`, alors qu'ils sont des effets post-réponse aux politiques indépendantes.
+- Leur extraction précède la future extraction de la préparation du tour et évite de déplacer
+  simultanément mémoire, skills, routage Cloud et boucle d'outils.
+
+### Implémentation
+
+- Nouveau `backend/agent_council_escalation.py` : Council exige un désaccord réel, un axe
+  `review` explicitement demandé et la politique `council_if_disagreement`.
+- Les preuves transmises restent bornées à 5 000 caractères de réponse et 1 800 de critique.
+- Nouveau `backend/agent_learning.py` : choix `resident`/`dedicated`, professeur injectable,
+  tâche conservée dans le registre anti-GC et repli résident si le réglage est indisponible.
+- Deux tests déterministes sont intégrés à `check_marvin --quick`.
+- `agent.py` passe de 901 à 867 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation des nouveaux modules, du Runner et des tests : réussie.
+- Escalade : politique, bornes, succès et erreur Council : réussis.
+- Apprentissage : résident, dédié, repli de configuration et suivi anti-GC : réussis.
+- Régressions finalisation, Council, Cortex et Ultra cloud-only : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.306 et replacer les deux effets dans `agent.py`.
+  Aucun contrat SSE, modèle Council, réglage d'apprentissage ou outil n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 88/88 étapes réussies en 124,1 secondes.
+- Backend compilé : 159 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.307.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.306.0 — Issue idempotente des compétences
 
 ### Constat et décision

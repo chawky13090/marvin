@@ -7,7 +7,6 @@ import asyncio
 import json
 import re
 import time
-import uuid
 from typing import AsyncIterator
 
 import cloud_routing as _cr
@@ -76,6 +75,10 @@ from agent_tool_postprocess import (
     postprocess_tool_result as _postprocess_tool_result,
 )
 from agent_skill_outcome import SkillOutcomeRecorder as _SkillOutcomeRecorder
+from agent_council_escalation import (
+    escalate_council_on_disagreement as _escalate_council_on_disagreement,
+)
+from agent_learning import schedule_exchange_learning as _schedule_exchange_learning
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -414,27 +417,13 @@ async def run_agent(
     _executed_tool_names = _runner_state.executed_tool_names
 
     async def _cortex_disagreement_escalation(critique_text: str | None, answer: str):
-        """Déclenche le Council 5 seulement après un désaccord réel du vérificateur,
-        et uniquement si l'utilisateur a explicitement choisi cette politique."""
-        if not critique_text:
-            return None
-        if "review" not in _cortex_plan.get("explicit_axes", []):
-            return None
-        if _cortex_plan["resolved"]["review"] != "council_if_disagreement":
-            return None
-        call_id = f"cortex-council-{uuid.uuid4().hex[:10]}"
-        args = {
-            "question": _user_query,
-            "evidence": ("Réponse initiale :\n" + answer[:5000] +
-                         "\n\nDésaccord du vérificateur :\n" + critique_text[:1800]),
-        }
-        try:
-            result = await TOOLS_REGISTRY["ai_model_council"](args)
-        except Exception as exc:
-            result = {"error": f"Escalade Council impossible : {exc}"}
-        final = result.get("answer") if isinstance(result, dict) else None
-        block = ("\n\n---\n🏛️ **Arbitrage Council 5 déclenché par désaccord**\n" + final) if final else ""
-        return call_id, args, result, block
+        return await _escalate_council_on_disagreement(
+            critique_text,
+            answer,
+            cortex_plan=_cortex_plan,
+            user_query=_user_query,
+            council_tool=TOOLS_REGISTRY["ai_model_council"],
+        )
 
     # NB : on NE force PAS num_ctx ici. Tester un num_ctx réduit (16K) a provoqué un RECHARGEMENT
     # du modèle à chaque message (Ollama indexe l'instance par (modèle, num_ctx) : le prewarm et
@@ -753,36 +742,13 @@ async def run_agent(
             # utilisateur (voir plus haut, _autotitle_from_text) — bloc post-hoc retiré,
             # devenu redondant et surtout jamais atteint si le tour est interrompu avant.
 
-            # Apprentissage en arrière-plan (sans bloquer) : le LLM « professeur »
-            # extrait les faits durables + une Q/R réutilisable de cet échange.
-            # ⚠️ Garder une référence à la tâche (sinon le GC peut la détruire avant exécution).
-            try:
-                import learning, tools as _tm
-                # Stratégie d'apprentissage selon le MODE de performance :
-                # - "resident" (petites machines) : réutilise le modèle DÉJÀ chargé (active_model)
-                #   → aucun 2ᵉ modèle à charger (sinon, sur 4 Go, ça évince le 3b et fait ramer).
-                # - "dedicated" (machines puissantes) : utilise un gros modèle (analysis/agent)
-                #   pour une extraction de faits de meilleure qualité (la VRAM le permet).
-                try:
-                    _strategy = db.get_setting("learn_strategy") or "resident"
-                except Exception:
-                    _strategy = "resident"
-                if _strategy == "dedicated":
-                    # v2.122 — model=None laisse _ollama_generate consulter le routage
-                    # cloud/sensibilité sur le PROMPT réel (contenu de l'échange) plutôt que
-                    # de pré-résoudre en local à l'aveugle.
-                    _learn_model = None
-                else:
-                    # "resident" : réutilise active_model déjà correctement routé pour ce
-                    # tour (cloud si approprié, local si sensible) — pas de nouveau choix.
-                    _learn_model = active_model
-                async def _teacher(p):
-                    return await _tm._ollama_generate(p, model=_learn_model, timeout=180)
-                _t = asyncio.create_task(learning.learn_from_exchange(_user_query, full_content, _teacher))
-                _BG_LEARN_TASKS.add(_t)
-                _t.add_done_callback(_BG_LEARN_TASKS.discard)
-            except Exception:
-                pass
+            _schedule_exchange_learning(
+                user_query=_user_query,
+                final_content=full_content,
+                active_model=active_model,
+                background_tasks=_BG_LEARN_TASKS,
+                get_setting=db.get_setting,
+            )
 
             # Auto-réparation des compétences (enregistre l'issue + auto-upgrade si échec).
             _up_msg = _skill_outcomes.finalize(

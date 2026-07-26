@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.307 — effets post-réponse extraits : escalade Council conditionnelle et
+# apprentissage durable asynchrone suivi par le registre anti-GC.
 # v2.306 — issue des compétences extraite dans agent_skill_outcome.py :
 # enregistrement, golden path et auto-amélioration idempotents aux deux sorties du Runner.
 # v2.305 — post-validation des résultats extraite dans agent_tool_postprocess.py :
