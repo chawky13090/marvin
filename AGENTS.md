@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.313.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.314.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.313.0)
+## 9. État actuel (v2.314.0)
+
+**v2.314 (domaine de mutation des fichiers)** : écriture/ajout UTF-8, suppression confirmée,
+renommage, déplacement, copie avec déduplication et création de dossier sont extraits vers
+`tool_domains/filesystem.py`. La résolution portable des chemins reste injectée depuis la
+façade, les six identités du registre sont conservées et la recherche globale confirme
+l'absence de consommateur des anciens helpers privés. La recherche d'un nom libre est
+désormais bornée au lieu de pouvoir boucler indéfiniment.
 
 **v2.313 (clôture de la phase Runner)** : `agent_loop_policy.py` isole le repli local
 mid-loop, la relance unique d'une compétence et le refus déterministe d'un reçu Forge négatif.

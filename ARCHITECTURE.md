@@ -60,7 +60,7 @@ flowchart LR
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
-| `tool_domains/` | Implémentations métier extraites (Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
+| `tool_domains/` | Implémentations métier extraites (Fichiers, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |

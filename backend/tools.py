@@ -26,6 +26,7 @@ from tool_domains import productivity as productivity_domain
 from tool_domains import memory as memory_domain
 from tool_domains import media as media_domain
 from tool_domains import ssh as ssh_domain
+from tool_domains import filesystem as filesystem_domain
 import ssh_transport
 from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
@@ -473,141 +474,13 @@ async def execute_file_read(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_file_write(args: dict) -> dict:
-    path = _resolve_path(args.get("path", ""))
-    content = args.get("content", "")
-    # UI envoie mode='append'|'overwrite'; l'agent envoie append=True|False
-    _mode = args.get("mode", "")
-    append = args.get("append", False) or (_mode == "append")
-    try:
-        p = Path(path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        mode = "a" if append else "w"
-        with p.open(mode, encoding="utf-8") as fh:
-            fh.write(content)
-        return {"success": True, "message": f"Fichier {'complété' if append else 'écrit'} : {path}", "path": str(p)}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_file_delete(args: dict) -> dict:
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True, "message": f"Supprimer définitivement : {args.get('path', '')} ?"}
-    path = _resolve_path(args.get("path", ""))
-    try:
-        p = Path(path)
-        if not p.exists():
-            return {"error": f"Introuvable : {path}"}
-        if p.is_dir():
-            shutil.rmtree(str(p))
-        else:
-            p.unlink()
-        return {"success": True, "message": f"Supprimé : {path}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_file_rename(args: dict) -> dict:
-    source = _resolve_path(args.get("source", ""))
-    # UI envoie 'new_name' (juste un nom), l'agent envoie 'destination' (chemin complet)
-    raw_dest = args.get("destination") or args.get("new_name") or ""
-    if not raw_dest:
-        return {"error": "Paramètre 'destination' ou 'new_name' requis."}
-    # Si c'est juste un nom de fichier (sans séparateur), on construit le chemin complet
-    if not any(c in raw_dest for c in ("/", "\\")):
-        destination = str(Path(source).parent / raw_dest)
-    else:
-        destination = _resolve_path(raw_dest)
-    try:
-        s = Path(source)
-        if not s.exists():
-            return {"error": f"Source introuvable : {source}"}
-        d = Path(destination)
-        if d.exists():
-            return {"error": f"Destination déjà existante : {destination}"}
-        s.rename(destination)
-        return {"success": True, "message": f"Renommé : {Path(source).name} → {Path(destination).name}",
-                "old_path": source, "new_path": destination}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def _dedupe_path(dest: str) -> str:
-    """Si dest existe déjà, renvoie un chemin libre en ajoutant ' (2)', ' (3)'…
-    Préserve l'extension : 'a.txt' -> 'a (2).txt'."""
-    p = Path(dest)
-    if not p.exists():
-        return dest
-    parent, stem, suffix = p.parent, p.stem, p.suffix
-    n = 2
-    while True:
-        cand = parent / f"{stem} ({n}){suffix}"
-        if not cand.exists():
-            return str(cand)
-        n += 1
-
-
-def _normalize_dest(source: str, destination: str) -> str:
-    """Résout une destination conviviale :
-    - si destination est un dossier existant -> on y place source (même nom de fichier)
-    - crée les dossiers parents manquants (mkdir -p)."""
-    src = Path(source)
-    dst = Path(destination)
-    # Destination = dossier existant -> garder le nom de la source
-    if dst.is_dir():
-        dst = dst / src.name
-    # Heuristique : destination sans extension qui n'existe pas et source est un fichier
-    # -> on suppose un fichier de destination (pas un dossier) sauf si finit par séparateur
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    return str(dst)
-
-
-async def execute_file_move(args: dict) -> dict:
-    source = _resolve_path(args.get("source", ""))
-    destination = _resolve_path(args.get("destination", ""))
-    if not Path(source).exists():
-        return {"error": f"Source introuvable : {source}"}
-    try:
-        destination = _normalize_dest(source, destination)
-        if os.path.normcase(os.path.abspath(source)) == os.path.normcase(os.path.abspath(destination)):
-            return {"error": "La source et la destination sont identiques."}
-        if Path(destination).exists():
-            destination = _dedupe_path(destination)
-        shutil.move(source, destination)
-        return {"success": True, "message": f"Déplacé : {source} → {destination}", "destination": destination}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_file_copy(args: dict) -> dict:
-    source = _resolve_path(args.get("source", ""))
-    destination = _resolve_path(args.get("destination", ""))
-    if not Path(source).exists():
-        return {"error": f"Source introuvable : {source}"}
-    try:
-        s = Path(source)
-        destination = _normalize_dest(source, destination)
-        # Copier sur soi-même ou collision -> dédupliquer (' (2)') au lieu d'échouer
-        if Path(destination).exists() or (
-            os.path.normcase(os.path.abspath(source)) == os.path.normcase(os.path.abspath(destination))
-        ):
-            destination = _dedupe_path(destination)
-        if s.is_dir():
-            shutil.copytree(source, destination)
-        else:
-            shutil.copy2(source, destination)
-        return {"success": True, "message": f"Copié : {source} → {destination}", "destination": destination}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_file_create_folder(args: dict) -> dict:
-    path = _resolve_path(args.get("path", ""))
-    try:
-        Path(path).mkdir(parents=True, exist_ok=True)
-        return {"success": True, "message": f"Dossier créé : {path}"}
-    except Exception as e:
-        return {"error": str(e)}
+filesystem_domain.configure(resolve_path=_resolve_path)
+execute_file_write = filesystem_domain.write
+execute_file_delete = filesystem_domain.delete
+execute_file_rename = filesystem_domain.rename
+execute_file_move = filesystem_domain.move
+execute_file_copy = filesystem_domain.copy
+execute_file_create_folder = filesystem_domain.create_folder
 
 
 def _parse_md_blocks(content: str):

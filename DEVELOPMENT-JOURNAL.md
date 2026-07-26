@@ -4683,3 +4683,48 @@ ignorée) :
 - `agent.py` passe de 560 à **533 lignes**.
 - `git diff --check` : réussi; seuls les avertissements de conversion LF/CRLF Windows
   attendus sont présents.
+## 2026-07-27 — v2.314.0 — Domaine de mutation des fichiers
+
+### Demande
+
+- Poursuivre la phase B après clôture du Runner.
+- Améliorer le code pendant l'extraction sans retirer de fonctionnalité.
+
+### Constats et décisions
+
+- Six opérations cohésives de mutation étaient encore implémentées directement dans
+  `tools.py`.
+- La résolution des chemins Windows reste la responsabilité portable de la façade et est
+  injectée explicitement dans le domaine.
+- Les fonctions du registre restent les mêmes objets que les fonctions du domaine; aucun
+  wrapper divergent n'est ajouté.
+- La déduplication d'une destination était une boucle sans borne. Elle est maintenant bornée
+  à 10 000 collisions et produit une erreur explicite dans ce cas extrême.
+- Une recherche globale confirme que `_dedupe_path` et `_normalize_dest` n'avaient aucun
+  consommateur externe.
+
+### Fichiers
+
+- `backend/tool_domains/filesystem.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_filesystem.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`
+- `BACKEND-CONSOLIDATION-PLAN.md`, `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test ciblé `test_tool_domain_filesystem.py` : réussi pour création, écriture,
+  ajout, collision de copie, renommage, déplacement identique, confirmation et suppression.
+- Compatibilité de façade : les six objets fonctions du registre sont ceux du domaine.
+- `scripts/check_marvin.py --quick` : **96/96 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète du backend et cohérence des dépendances : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.314.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 20 197 à **20 070 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

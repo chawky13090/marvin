@@ -123,6 +123,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Recus idempotents des actions chat", (python, "scripts/test_action_replay.py")),
         Stage("Tours chat durables et detachables", (python, "scripts/test_chat_turn_runtime.py")),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
+        Stage("Domaine d'outils Fichiers", (python, "scripts/test_tool_domain_filesystem.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),
