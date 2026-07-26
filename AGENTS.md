@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.302.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.303.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.302.0)
+## 9. État actuel (v2.303.0)
+
+**v2.303 (préparation d'une étape d'outil)** : `agent_tool_step.py` normalise les variantes
+réelles émises par les modèles, calcule la signature anti-polling Code Workspace, injecte les
+identifiants internes de conversation et compacte la seule projection renvoyée au LLM. Le
+résultat complet reste inchangé dans le SSE, la base, l'audit et les preuves.
 
 **v2.302 (outils obligatoires du Runner)** : `agent_required_tools.py` matérialise Council,
 Cortex, Research Swarm, Code Forge, Code Workspace, recherche, mission longue et document

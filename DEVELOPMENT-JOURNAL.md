@@ -4182,6 +4182,47 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-26 — v2.303.0 — Préparation déterministe d'une étape d'outil
+
+### Constat et décision
+
+- La boucle du Runner normalisait directement deux variantes réellement émises par les LLM,
+  injectait les identifiants de conversation et compactait les résultats volumineux.
+- Ces transformations sont déterministes et doivent être testables sans lancer un modèle.
+  L'exécution, les permissions, les reçus, la critique et l'observabilité restent dans leurs
+  frontières existantes.
+
+### Implémentation
+
+- Nouveau `backend/agent_tool_step.py` avec `PreparedToolCall`.
+- `command` est normalisé vers `script` pour PowerShell et l'ancien `ssh_connect(save=true)`
+  vers `ssh_connection_save`, comme avant.
+- Les identifiants `_conversation_id` sont injectés dans une copie des arguments après
+  l'événement public `tool_start`; le LLM n'a pas à les connaître ni à les inventer.
+- La projection Ollama conserve les champs critiques, borne textes et listes volumineux,
+  tandis que le résultat intégral reste envoyé au frontend et persisté.
+- Nouveau `scripts/test_agent_tool_step.py`, intégré à `check_marvin --quick`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Alias, JSON invalide, signature, contexte interne et projection bornée : réussis.
+- Régressions exécution, observabilité et Code Workspace : réussies.
+- Architecture : 344 outils, 346 routes et 40 pages.
+
+### Rollback
+
+- Revenir au commit v2.302 et replacer ces transformations dans `agent.py`.
+  Aucun reçu, événement SSE, outil, route, schéma ou résultat complet n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 83/83 étapes réussies; compilation de 154 fichiers
+  Python, cohérence 344/344 outils et ESLint sans erreur.
+- Backend réel redémarré : processus lancé PID 33600, version `2.303.0`, Ollama disponible,
+  344 outils et 15 workers observés.
+- `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
+
 ## 2026-07-26 — v2.302.0 — Matérialisation déterministe des outils obligatoires
 
 ### Constat et décision

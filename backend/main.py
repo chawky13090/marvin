@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.303 — préparation d'une étape d'outil extraite dans agent_tool_step.py :
+# alias modèles, contexte interne et projection LLM bornée sont testables.
 # v2.302 — matérialisation des outils obligatoires extraite dans
 # agent_required_tools.py : contrats explicites, budget et contexte Workspace testables.
 # v2.301 — finalisation commune du Runner extraite dans agent_finalization.py :

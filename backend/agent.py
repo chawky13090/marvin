@@ -61,6 +61,11 @@ from agent_required_tools import (
     RequiredToolContext as _RequiredToolContext,
     inject_required_tool_calls as _inject_required_tool_calls,
 )
+from agent_tool_step import (
+    compact_tool_result as _compact_tool_result,
+    inject_internal_context as _inject_internal_tool_context,
+    prepare_tool_call as _prepare_tool_call,
+)
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -683,30 +688,15 @@ async def run_agent(
             tool_results_for_db_step = []
 
             for tc, tc_db in zip(tool_calls_found, tc_for_db):
-                tool_name = tc["function"]["name"]
-                tool_args = tc["function"].get("arguments", {})
-                if isinstance(tool_args, str):
-                    try:
-                        tool_args = json.loads(tool_args)
-                    except Exception:
-                        tool_args = {}
-                # Compatibilité avec les erreurs réellement observées dans les conversations :
-                # certains modèles utilisent `command` pour pc_run_powershell et l'ancien nom
-                # plausible `ssh_connect`. Normaliser avant validation évite un échec inutile.
-                if tool_name == "pc_run_powershell" and not tool_args.get("script") and tool_args.get("command"):
-                    tool_args["script"] = tool_args.pop("command")
-                if tool_name == "ssh_connect" and tool_args.get("save"):
-                    tool_name = "ssh_connection_save"
-                    tc["function"]["name"] = tool_name
-                    tc_db["toolName"] = tool_name
-                    tool_args.pop("save", None)
-
-                _read_signature = ""
-                if tool_name == "code_workspace_status":
-                    _read_signature = json.dumps(
-                        {"tool": tool_name, "mission_id": str(tool_args.get("mission_id") or "")},
-                        sort_keys=True,
-                    )
+                _prepared_call = _prepare_tool_call(
+                    tc["function"]["name"],
+                    tc["function"].get("arguments", {}),
+                )
+                tool_name = _prepared_call.name
+                tool_args = _prepared_call.arguments
+                _read_signature = _prepared_call.read_signature
+                tc["function"]["name"] = tool_name
+                tc_db["toolName"] = tool_name
 
                 tool_call_id = tc_db["toolCallId"]
 
@@ -719,19 +709,9 @@ async def run_agent(
                 })
 
                 _tool_t0 = time.time()
-                # v2.145 — `long_task_start` a besoin du `conversation_id` COURANT pour
-                # programmer sa reprise en arrière-plan (cron → nouveau tour sur CETTE
-                # conversation) — injecté ici plutôt que demandé au LLM (qui n'a de toute
-                # façon pas une vision fiable de son propre conversation_id).
-                if tool_name == "long_task_start":
-                    tool_args["_conversation_id"] = conversation_id
-                if tool_name == "code_workspace_start":
-                    tool_args["_conversation_id"] = conversation_id
-                # v2.175 — même principe : le modèle n'a pas de vision fiable de son propre
-                # conversation_id (règle d'or #7, jamais d'ID inventé) — injecté ici pour les
-                # outils qui portent sur "cette conversation" par défaut.
-                if tool_name in ("screenshot_list", "doc_generate_from_screenshots") and "conversation_id" not in tool_args:
-                    tool_args["_conversation_id"] = conversation_id
+                tool_args = _inject_internal_tool_context(
+                    tool_name, tool_args, conversation_id
+                )
                 # ── Outil explicite : bloque toute substitution ────────────────
                 # Le modèle propose parfois un outil "proche" au lieu de celui demandé par
                 # son nom exact (ex: net_ping au lieu de file_find). tools_payload a déjà été
@@ -886,38 +866,9 @@ async def run_agent(
                     "result": result,
                 })
 
-                # Ajouter le résultat dans la boucle Ollama
-                # Truncate very large results to protect context window:
-                # Full result is sent to frontend/DB; Ollama only gets a summary.
-                result_str = json.dumps(result, ensure_ascii=False)
-                MAX_TOOL_RESULT_CHARS = 4000
-                if len(result_str) > MAX_TOOL_RESULT_CHARS:
-                    # Keep critical fields, truncate large text blobs
-                    try:
-                        compact = {}
-                        if isinstance(result, dict):
-                            for k, v in result.items():
-                                if k in ("error", "success", "message", "path", "url", "title",
-                                         "status", "count", "hash", "result", "translated",
-                                         "rows_count", "entries_count", "pages", "total_pages"):
-                                    compact[k] = v
-                                elif isinstance(v, str) and len(v) > 500:
-                                    compact[k] = v[:500] + f"…[{len(v)-500} chars tronqués]"
-                                elif isinstance(v, list) and len(v) > 20:
-                                    compact[k] = v[:20] + [f"…+{len(v)-20} éléments"]
-                                else:
-                                    compact[k] = v
-                            result_for_ollama = json.dumps(compact, ensure_ascii=False)
-                        else:
-                            result_for_ollama = result_str[:MAX_TOOL_RESULT_CHARS] + "…[tronqué]"
-                    except Exception:
-                        result_for_ollama = result_str[:MAX_TOOL_RESULT_CHARS] + "…[tronqué]"
-                else:
-                    result_for_ollama = result_str
-
                 ollama_msgs.append({
                     "role": "tool",
-                    "content": result_for_ollama,
+                    "content": _compact_tool_result(result),
                 })
 
             # Sauvegarder les résultats d'outils
