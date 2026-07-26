@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.310 — lecture d'une itération modèle extraite dans agent_model_step.py :
+# projection thinking/texte, collecte native, récupération textuelle et outils requis.
 # v2.309 — enrichissements concurrents et contexte Skill extraits :
 # mémoire sémantique, catalogue, matching, golden path, ressources et annulation sûre.
 # v2.308 — préparation déterministe du contexte extraite dans agent_turn_context.py :

@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.309.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.310.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.309.0)
+## 9. État actuel (v2.310.0)
+
+**v2.310 (itération modèle typée)** : `agent_model_step.py` lit un stream Ollama, projette
+`thinking`/`text`, collecte les appels natifs, récupère les appels écrits en texte et injecte
+les outils contractuels. Une régression runtime a révélé et corrigé l'import `uuid` manquant,
+qui aurait provoqué un `NameError` lors du premier véritable appel d'outil.
 
 **v2.309 (enrichissements concurrents du tour)** : `agent_enrichment.py` pilote en parallèle
 le rappel sémantique, le matching de compétence et la sélection d'outils, avec replis isolés

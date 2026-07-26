@@ -7,6 +7,7 @@ import asyncio
 import json
 import re
 import time
+import uuid
 from typing import AsyncIterator
 
 import cloud_routing as _cr
@@ -86,6 +87,11 @@ from agent_enrichment import (
     start_enrichments as _start_enrichments,
 )
 from agent_skill_context import build_skill_prompt_context as _build_skill_prompt_context
+from agent_model_step import (
+    ModelStepResult as _ModelStepResult,
+    prepare_model_step as _prepare_model_step,
+    stream_model_step as _stream_model_step,
+)
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -328,8 +334,7 @@ async def run_agent(
       for step in range(_max_tool_steps):
         if not _runner_state.begin_step(step, _max_wall_seconds):
             break
-        full_content = ""
-        tool_calls_found: list[dict] = []
+        _model_step = _ModelStepResult()
 
         try:
             _request = _OllamaChatRequest(
@@ -339,15 +344,15 @@ async def run_agent(
                 tools=tools_payload,
                 options=_ollama_options,
             )
-            async for event in _stream_ollama_chat(_ollama_client, OLLAMA_URL, _request):
-                if event.kind == "thinking":
-                    yield _sse({"type": "thinking", "text": event.text})
-                elif event.kind == "text":
-                    full_content += event.text
-                    if not _blocking_outcomes:
-                        yield _sse({"type": "text", "text": event.text})
-                elif event.kind == "tool_calls":
-                    tool_calls_found = list(event.tool_calls)
+            async for _event in _stream_model_step(
+                client=_ollama_client,
+                base_url=OLLAMA_URL,
+                request=_request,
+                stream_chat=_stream_ollama_chat,
+                result=_model_step,
+                suppress_text=bool(_blocking_outcomes),
+            ):
+                yield _sse(_event)
         except Exception as exc:
             yield _sse(_ollama_error_event(
                 exc,
@@ -356,36 +361,32 @@ async def run_agent(
                 read_timeout=300,
             ))
             return
+        full_content = _model_step.content
 
         # ── Filet de sécurité : appels d'outils écrits en TEXTE/JSON ───────────
         # Si le modèle n'a pas émis d'appel natif mais a décrit des appels en JSON
         # dans le texte (fréquent avec les compétences pas-à-pas), on les récupère
         # pour AGIR réellement au lieu de seulement « parler ».
-        if not tool_calls_found and full_content:
-            _allowed = {t.get("function", {}).get("name") for t in tools_payload}
-            _salvaged = _salvage_text_tool_calls(full_content, _allowed)
-            if _salvaged:
-                tool_calls_found = _salvaged
-
-        # Une demande explicite de Council est un contrat, pas une simple suggestion au LLM.
-        # S'il tente de conclure sans l'appeler, ou s'il remplit presque tout le budget avec
-        # des recherches web, on injecte l'appel réel en conservant les autres outils du tour.
-        _required_injection = _inject_required_tool_calls(
-            required_names=_required_tool_names,
-            executed_names=_executed_tool_names,
-            tool_calls=tool_calls_found,
+        _prepared_model_step = _prepare_model_step(
+            content=full_content,
+            native_tool_calls=_model_step.tool_calls,
+            tools_payload=tools_payload,
+            required_tool_names=_required_tool_names,
+            executed_tool_names=_executed_tool_names,
             step=step,
             max_steps=_max_tool_steps,
-            context=_RequiredToolContext(
+            required_context=_RequiredToolContext(
                 user_query=_user_query,
                 workspace_normalized_query=_workspace_norm,
                 workspace_mission_id=_workspace_mission_id,
                 workspace_action=_workspace_action,
                 messages=messages,
             ),
+            salvage_text_tool_calls=_salvage_text_tool_calls,
+            inject_required_tool_calls=_inject_required_tool_calls,
         )
-        tool_calls_found = _required_injection.tool_calls
-        if _required_injection.injected and full_content.strip():
+        tool_calls_found = _prepared_model_step.tool_calls
+        if _prepared_model_step.required_injected and full_content.strip():
             yield _sse({"type": "text", "text": "\n\n"})
 
         # v2.119 — protection mid-boucle : un outil sensible vient d'être demandé alors

@@ -4182,6 +4182,46 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.310.0 — Itération modèle typée
+
+### Constat et décision
+
+- La boucle lisait directement le stream Ollama, concaténait le texte, projetait les événements,
+  récupérait les appels textuels et injectait les outils contractuels.
+- L'audit a aussi détecté un défaut runtime : `uuid` avait été retiré alors que la création
+  des identifiants `toolCallId` l'utilisait encore. La compilation seule ne détectait pas ce nom.
+
+### Implémentation et amélioration
+
+- Nouveau `backend/agent_model_step.py` avec `ModelStepResult` et `PreparedModelStep`.
+- `stream_model_step` projette `thinking`/`text`, respecte le masquage Forge et collecte les
+  appels natifs sans dépendre du SSE.
+- `prepare_model_step` récupère les appels textuels puis matérialise les outils requis.
+- L'import `uuid` est restauré et exercé par le test runtime.
+- Nouveau test déterministe intégré à `check_marvin --quick`.
+- La façade `run_agent` conserve l'erreur transport historique et l'ordre exact des événements.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Streaming, masquage, récupération, outils requis et génération UUID : réussis.
+- Régressions Transport et Required Tools : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.309 et replacer la lecture du stream dans `agent.py`, en conservant
+  impérativement l'import `uuid`. Aucun contrat Ollama, SSE ou outil n'est modifié.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 92/92 étapes réussies en 113,3 secondes.
+- Backend compilé : 163 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.310.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.309.0 — Enrichissements concurrents et contexte Skill
 
 ### Constat et décision
