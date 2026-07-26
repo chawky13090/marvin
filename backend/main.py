@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.312 — finalisation commune extraite dans agent_turn_completion.py :
+# revue, persistance, apprentissage, skill, recette Cortex, provenance et done.
 # v2.311 — lot d'appels d'outils extrait dans agent_tool_batch.py :
 # dispatch, SSE, post-validation, preuves, état, contexte Ollama et persistance.
 # v2.310 — lecture d'une itération modèle extraite dans agent_model_step.py :

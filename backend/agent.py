@@ -88,6 +88,7 @@ from agent_model_step import (
     stream_model_step as _stream_model_step,
 )
 from agent_tool_batch import execute_tool_batch as _execute_tool_batch
+from agent_turn_completion import complete_turn as _complete_turn
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -286,6 +287,40 @@ async def run_agent(
             council_tool=TOOLS_REGISTRY["ai_model_council"],
         )
 
+    async def _finish_turn(
+        content: str,
+        stop_reason: str,
+        *,
+        learn: bool,
+    ):
+        review_mode = _cortex_plan["resolved"]["review"]
+        return await _complete_turn(
+            user_query=_user_query,
+            content=content,
+            active_model=active_model,
+            conversation_id=conversation_id,
+            cortex_plan=_cortex_plan,
+            runner_state=_runner_state,
+            executed_tool_names=_executed_tool_names,
+            stop_reason=stop_reason,
+            force_review=review_mode in {"verify", "council_if_disagreement"},
+            skill=_skill,
+            skill_outcomes=_skill_outcomes,
+            tools_spec=TOOLS_SPEC,
+            background_tasks=_BG_LEARN_TASKS,
+            schedule_learning=learn,
+            finalize_answer=_finalize_answer,
+            script_scanner=_scan_dangerous_script_patterns,
+            critique_pass=_run_critique_pass,
+            council_escalation=_cortex_disagreement_escalation,
+            create_message=db.create_message,
+            schedule_exchange_learning=_schedule_exchange_learning,
+            get_setting=db.get_setting,
+            record_recipe_outcome=_cortex.record_recipe_outcome,
+            build_provenance=_cortex.provenance,
+            encode_sse=_sse,
+        )
+
     # NB : on NE force PAS num_ctx ici. Tester un num_ctx réduit (16K) a provoqué un RECHARGEMENT
     # du modèle à chaque message (Ollama indexe l'instance par (modèle, num_ctx) : le prewarm et
     # le « professeur » d'arrière-plan utilisent le défaut → conflit → thrash → 40s/message).
@@ -470,67 +505,13 @@ async def run_agent(
                     + "\n\nLe livrable reste refusé tant qu'une correction suivie d'un nouveau reçu `production_ready=true` n'a pas été observée."
                 )
                 yield _sse({"type": "text", "text": full_content})
-            _review_mode = _cortex_plan["resolved"]["review"]
-            _force_review = _review_mode in {"verify", "council_if_disagreement"}
-            _finalized = await _finalize_answer(
-                user_query=_user_query,
-                content=full_content,
-                active_model=active_model,
-                force_review=_force_review,
-                script_scanner=_scan_dangerous_script_patterns,
-                critique_pass=_run_critique_pass,
-                council_escalation=_cortex_disagreement_escalation,
+            _completion = await _finish_turn(
+                full_content,
+                "criteria_satisfied",
+                learn=True,
             )
-            full_content = _finalized.content
-            for _event in _finalized.events:
-                yield _sse(_event)
-            _critique = _finalized.critique
-            if _finalized.council_executed:
-                _executed_tool_names.add("ai_model_council")
-
-            db.create_message(conversation_id, "assistant", full_content)
-
-            # v2.170 — le titrage se fait désormais immédiatement à l'envoi du message
-            # utilisateur (voir plus haut, _autotitle_from_text) — bloc post-hoc retiré,
-            # devenu redondant et surtout jamais atteint si le tour est interrompu avant.
-
-            _schedule_exchange_learning(
-                user_query=_user_query,
-                final_content=full_content,
-                active_model=active_model,
-                background_tasks=_BG_LEARN_TASKS,
-                get_setting=db.get_setting,
-            )
-
-            # Auto-réparation des compétences (enregistre l'issue + auto-upgrade si échec).
-            _up_msg = _skill_outcomes.finalize(
-                skill=_skill,
-                runner_state=_runner_state,
-                user_query=_user_query,
-                final_content=full_content,
-                tools_spec=TOOLS_SPEC,
-                background_tasks=_BG_LEARN_TASKS,
-                encode_sse=_sse,
-            )
-            if _up_msg:
-                yield _up_msg
-
-            try:
-                _cortex.record_recipe_outcome(
-                    _cortex_plan["requested"].get("recipe_id"), _runner_state.succeeded, _executed_tool_names
-                )
-            except Exception:
-                pass
-
-            yield _sse({
-                "type": "cortex_provenance",
-                "provenance": _cortex.provenance(
-                    _cortex_plan, active_model, _executed_tool_names,
-                    critique=bool(_critique), answer=full_content, conversation_id=conversation_id,
-                    budget_usage=_runner_state.budget_usage("criteria_satisfied"),
-                ),
-            })
-            yield _sse({"type": "done"})
+            for _event in _completion.events:
+                yield _event
             return
 
     _budget_stop_reason = _runner_state.finish_reason()
@@ -570,50 +551,10 @@ async def run_agent(
                          "autorisées. Peux-tu préciser ta demande ou me demander de continuer ?")
         yield _sse({"type": "text", "text": full_content})
 
-    _review_mode = _cortex_plan["resolved"]["review"]
-    _force_review = _review_mode in {"verify", "council_if_disagreement"}
-    _finalized = await _finalize_answer(
-        user_query=_user_query,
-        content=full_content,
-        active_model=active_model,
-        force_review=_force_review,
-        script_scanner=_scan_dangerous_script_patterns,
-        critique_pass=_run_critique_pass,
-        council_escalation=_cortex_disagreement_escalation,
+    _completion = await _finish_turn(
+        full_content,
+        _budget_stop_reason,
+        learn=False,
     )
-    full_content = _finalized.content
-    for _event in _finalized.events:
-        yield _sse(_event)
-    _critique = _finalized.critique
-    if _finalized.council_executed:
-        _executed_tool_names.add("ai_model_council")
-
-    db.create_message(conversation_id, "assistant", full_content)
-
-    # Enregistre tout de même l'issue de la compétence (souvent un signe de faiblesse).
-    _up_msg = _skill_outcomes.finalize(
-        skill=_skill,
-        runner_state=_runner_state,
-        user_query=_user_query,
-        final_content=full_content,
-        tools_spec=TOOLS_SPEC,
-        background_tasks=_BG_LEARN_TASKS,
-        encode_sse=_sse,
-    )
-    if _up_msg:
-        yield _up_msg
-    try:
-        _cortex.record_recipe_outcome(
-            _cortex_plan["requested"].get("recipe_id"), _runner_state.succeeded, _executed_tool_names
-        )
-    except Exception:
-        pass
-    yield _sse({
-        "type": "cortex_provenance",
-        "provenance": _cortex.provenance(
-            _cortex_plan, active_model, _executed_tool_names,
-            critique=bool(_critique), answer=full_content, conversation_id=conversation_id,
-            budget_usage=_runner_state.budget_usage(_budget_stop_reason),
-        ),
-    })
-    yield _sse({"type": "done"})
+    for _event in _completion.events:
+        yield _event

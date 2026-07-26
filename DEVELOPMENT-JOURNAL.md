@@ -4182,6 +4182,46 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.312.0 — Finalisation commune du tour
+
+### Constat et décision
+
+- Les sorties normale et par épuisement de budget dupliquaient revue, persistance, issue de
+  compétence, recette Cortex, provenance et événement `done`.
+- Cette duplication pouvait faire diverger l'ordre des événements ou oublier un effet terminal.
+
+### Implémentation
+
+- Nouveau `backend/agent_turn_completion.py` avec `TurnCompletion`.
+- Revue et éventuel Council précèdent toujours la persistance finale.
+- L'issue de compétence précède la provenance, puis `done` termine le flux.
+- La recette Cortex reste best-effort et la provenance utilise la cause d'arrêt exacte.
+- L'apprentissage durable reste activé sur une réponse normale et désactivé sur la synthèse
+  par budget, afin de ne pas mémoriser une réponse déclarée incomplète.
+- Nouveau test déterministe intégré à `check_marvin --quick`.
+- `agent.py` passe de 619 à 560 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Ordre, Council, apprentissage, skill, recette et provenance : réussis.
+- Régressions Finalization, Skill Outcome et Learning : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.311 et restaurer les deux séquences terminales dans `agent.py`.
+  Aucun événement SSE, message persistant, critique ou provenance ne change.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 94/94 étapes réussies en 114,6 secondes.
+- Backend compilé : 165 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.312.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.311.0 — Lot d'outils observé et persistant
 
 ### Constat et décision
