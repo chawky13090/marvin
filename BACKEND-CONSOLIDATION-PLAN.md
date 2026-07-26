@@ -1,0 +1,152 @@
+# Plan de consolidation complète du backend Marvin
+
+Date de référence : 2026-07-26  
+Version auditée : 2.300.0  
+Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
+workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
+les critères de clôture ci-dessous ne sont pas satisfaits.
+
+## 1. Décision d'architecture
+
+Marvin reste un monolithe modulaire. Il n'est pas transformé en microservices : le besoin réel
+est un assistant Windows installable, local-first et exploitable sur une seule machine. La
+séparation recherchée concerne les responsabilités du code, pas les processus de déploiement.
+
+Deux approches ont été comparées :
+
+1. réécriture globale de `agent.py`, `tools.py` et `database.py` ;
+2. extraction progressive derrière les façades existantes, avec identité des fonctions,
+   contrats HTTP, schéma SQLite et formats SSE conservés.
+
+L'approche 2 est retenue. Elle minimise le risque de régression, permet un rollback par commit
+et maintient Marvin utilisable entre chaque tranche.
+
+Les références officielles convergent sur les mêmes primitives : Runner explicite, outils
+documentés et spécialisés, état durable, guardrails déterministes, traces, évaluations et
+choix du workflow le plus simple adapté au besoin. Marvin possède déjà ces primitives ; le
+travail restant consiste à rendre leurs frontières de code aussi nettes que leurs contrats.
+
+## 2. État établi
+
+### Terminé et couvert par des tests
+
+- protocole messages/Ollama/SSE ;
+- routage des modèles et confidentialité cloud/local ;
+- prompt système ;
+- sélection déterministe et bornée des outils ;
+- exécution des outils, reçus idempotents et reprise sûre ;
+- revue indépendante ;
+- contexte, préparation de session et plan de tour ;
+- configuration modèle ;
+- état observable du Runner et effets d'observabilité ;
+- transport Ollama ;
+- tours de chat détachables et reconnexion SSE ;
+- workers idempotents, cron et reprises longues ;
+- migrations SQLite transactionnelles ;
+- repositories conversations, connexions SSH et workflows ;
+- frontières API e-mail, vidéo et SSH ;
+- domaines d'outils Productivité, Mémoire, Média, SSH, Quiz et Base IT ;
+- 344 implémentations pour 344 spécifications et 346 routes sans doublon.
+
+### Partiel
+
+| Frontière | État mesuré | Reste |
+|---|---:|---|
+| Runner | `agent.py` : 1 fonction `run_agent`, lignes 149–1165 | rendre l'orchestrateur court en extrayant les phases de boucle et de finalisation |
+| Outils | `tools.py` : 20 197 lignes, 398 objets AST | extraire les domaines restants puis séparer catalogue et assemblage du registre |
+| Persistance | `database.py` : 3 138 lignes, 143 objets AST | déplacer les domaines restants vers des repositories injectables |
+| Composition FastAPI | `main.py` : 3 470 lignes, 44 routeurs, 12 fonctions/classes actives | extraire les derniers endpoints chat/MCP/proactif ; conserver seulement lifespan, assemblage et handlers globaux |
+| Dépendances | nombreux imports directs de `tools` et `database` | remplacer progressivement par services/domaines, sans rupture de façade |
+
+## 3. Ordre d'exécution
+
+### Phase A — Runner
+
+1. extraire la préparation de boucle et la projection des événements ;
+2. extraire la gestion d'un appel modèle et d'une étape d'outil ;
+3. extraire la finalisation normale, budget épuisé et erreur ;
+4. conserver `run_agent` comme orchestrateur lisible ;
+5. tester chaque sortie SSE, reprise, budget, revue, compétence et observabilité.
+
+Critère : `run_agent` orchestre des composants nommés et ne contient plus une boucle métier
+monolithique. Aucun événement SSE ni comportement de modèle ne change.
+
+### Phase B — Outils
+
+Extraire par cohésion et risque :
+
+1. fichiers et documents ;
+2. PC et Windows ;
+3. web, recherche et navigateurs ;
+4. réseau et diagnostics ;
+5. calendrier, cloud et connecteurs ;
+6. données, PDF, tableurs et archives ;
+7. facturation, documentation technique et opérations ;
+8. utilitaires restants.
+
+Chaque domaine conserve les mêmes objets fonctions dans `TOOLS_REGISTRY`. À la fin, séparer
+les spécifications déclaratives du registre d'exécution.
+
+Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
+volumineux n'y est implémenté. Le contrôle 344/344 reste exact.
+
+### Phase C — Persistance
+
+Extraire par agrégat transactionnel :
+
+1. paramètres et configuration ;
+2. tâches, notes et mémoires ;
+3. événements et calendriers locaux ;
+4. projets et artefacts ;
+5. traces d'exécution et fiabilité ;
+6. inventaire, snapshots, modèles et cron ;
+7. facturation ;
+8. documentation et opérations ;
+9. règles de commande, approbations et santé ;
+10. base IT et fiches de révision.
+
+Critère : `database.py` devient une façade d'import compatible. Toute opération passe par
+`db()` ou un repository injectable, avec fermeture, commit et rollback garantis.
+
+### Phase D — Composition et dépendances
+
+1. extraire les derniers endpoints chat, outils/MCP et proactif ;
+2. conserver `main.py` pour la création de l'application, le lifespan, le montage des routeurs
+   et le handler global ;
+3. supprimer les imports inversés entre API, outils et persistance ;
+4. contrôler les cycles d'import et le temps d'import du backend.
+
+## 4. Validation obligatoire par tranche
+
+- compilation Python ciblée ;
+- test unitaire de la nouvelle frontière ;
+- test de compatibilité de la façade historique ;
+- test d'erreur, rollback ou indisponibilité pertinent ;
+- `scripts/check_architecture.py` ;
+- `scripts/check_marvin.py --quick` ;
+- redémarrage réel du backend ;
+- `/api/health` avec version attendue, Ollama et workers ;
+- `scripts/smoke_test_api.py` avec frontend Turbopack actif ;
+- `git diff --check`, journal, version et commit atomique.
+
+## 5. Critères de clôture backend
+
+Le backend n'est déclaré consolidé que si :
+
+- le Runner central est lisible et testé par phases ;
+- `tools.py` et `database.py` sont des façades/assembleurs, pas des domaines monolithiques ;
+- `main.py` est un composition root ;
+- les contrats publics restent à 344 outils et 346 routes, sauf évolution fonctionnelle
+  explicitement décidée ;
+- aucune connexion SQLite directe ne contourne la fabrique ;
+- les modes de confidentialité, Ultra cloud-only et Council cinq modèles restent couverts ;
+- les reprises SSE, reçus idempotents et missions longues passent ;
+- tous les tests rapides, le runtime réel et les smoke tests sont verts ;
+- `AGENTS.md`, `ARCHITECTURE.md` et `DEVELOPMENT-JOURNAL.md` reflètent l'état réel ;
+- l'arbre Git est propre et chaque tranche dispose d'un rollback par commit.
+
+## 6. Hors périmètre jusqu'à clôture
+
+Les améliorations frontend, avatar et UX restent planifiées, mais ne commencent pas avant la
+clôture factuelle des phases A à D. Une correction frontend bloquante peut être faite plus tôt
+uniquement si elle empêche de valider le backend par le smoke test.
