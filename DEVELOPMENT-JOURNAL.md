@@ -4848,3 +4848,43 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 838 à **19 654 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.318.0 — Recherche de contenu observable
+
+### Demande
+
+- Continuer l'extraction des outils fichiers et améliorer les défauts rencontrés.
+
+### Constats et décisions
+
+- Une extension fournie sous forme de chaîne était traitée comme une collection de caractères.
+- `max_results` n'était ni converti ni borné; une valeur textuelle interrompait l'outil.
+- Un dossier inexistant retournait un faux succès sans résultat.
+- L'énumération chargeait tous les candidats en mémoire sans limite.
+- La nouvelle frontière normalise les extensions, borne les résultats à 1000 et les candidats
+  à 50 000, ignore les répertoires de dépendances usuels et expose les compteurs utiles.
+- La valeur par défaut de `max_files` est 5000; `candidate_limit_reached` signale explicitement
+  qu'une recherche plus ciblée est nécessaire.
+
+### Fichiers
+
+- `backend/tool_domains/filesystem.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_filesystem.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test filesystem ciblé : extension chaîne CSV, résultat trouvé, borne non atteinte,
+  dossier absent et identité de façade réussis.
+- `scripts/check_marvin.py --quick` : **96/96 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.318.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 654 à **19 592 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

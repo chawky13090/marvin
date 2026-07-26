@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.317.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.318.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.317.0)
+## 9. État actuel (v2.318.0)
+
+**v2.318 (recherche dans le contenu)** : `file_search_text` rejoint le domaine filesystem.
+Les extensions chaîne/liste sont normalisées, les répertoires absents ne produisent plus un
+faux succès vide, et `max_results`/`max_files` sont validés et bornés. Le résultat expose
+fichiers visités, candidats lus, erreurs de lecture et atteinte éventuelle de la borne.
+L'énumération récursive reste hors de la boucle asyncio.
 
 **v2.317 (recherche de fichiers)** : `file_find`, son accès Windows Search et son fallback
 `os.walk` rejoignent le domaine filesystem. `max_results` est validé et borné de 1 à 1000,

@@ -93,9 +93,9 @@ Chaque domaine conserve les mêmes objets fonctions dans `TOOLS_REGISTRY`. À la
 les spécifications déclaratives du registre d'exécution.
 
 État : mutations livrées en v2.314.0, inventaire et métadonnées en v2.315.0, lecture
-multi-format en v2.316.0 et recherche par nom en v2.317.0.
-`tool_domains/filesystem.py` possède désormais dix outils; recherche de contenu et génération
-documentaire restent à extraire dans les tranches suivantes.
+multi-format en v2.316.0, recherche par nom en v2.317.0 et recherche de contenu en v2.318.0.
+`tool_domains/filesystem.py` possède désormais onze outils; la génération documentaire reste
+à extraire dans les tranches suivantes.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

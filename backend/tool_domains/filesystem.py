@@ -17,6 +17,10 @@ from typing import Any, Callable
 
 _resolve_path: Callable[[str], str] | None = None
 _MAX_CONTENT = 50_000
+_SEARCH_TEXT_EXTENSIONS = (
+    ".txt", ".md", ".pdf", ".docx", ".csv", ".xlsx", ".json",
+    ".py", ".js", ".ts", ".html", ".xml", ".log",
+)
 
 
 def configure(*, resolve_path: Callable[[str], str]) -> None:
@@ -488,6 +492,107 @@ async def find(args: dict[str, Any]) -> dict[str, Any]:
         "scanned": scanned,
         "results": results,
     }
+
+
+def _normalize_extensions(raw: Any) -> set[str]:
+    values = [raw] if isinstance(raw, str) else raw
+    if not isinstance(values, (list, tuple, set)):
+        values = _SEARCH_TEXT_EXTENSIONS
+    normalized = set()
+    for value in values:
+        extension = str(value).strip().casefold()
+        if not extension:
+            continue
+        normalized.add(extension if extension.startswith(".") else f".{extension}")
+    return normalized or set(_SEARCH_TEXT_EXTENSIONS)
+
+
+def _collect_candidates(
+    directory: str,
+    extensions: set[str],
+    max_files: int,
+) -> tuple[list[Path], int, bool]:
+    candidates: list[Path] = []
+    visited = 0
+    for root, dirs, files in os.walk(directory):
+        dirs[:] = [
+            name for name in dirs
+            if not name.startswith(".")
+            and name not in {".git", ".venv", "node_modules", "__pycache__"}
+        ]
+        for filename in files:
+            visited += 1
+            path = Path(root) / filename
+            if path.suffix.casefold() in extensions:
+                candidates.append(path)
+                if len(candidates) >= max_files:
+                    return candidates, visited, True
+    return candidates, visited, False
+
+
+async def search_text(args: dict[str, Any]) -> dict[str, Any]:
+    directory = Path(_resolve(str(
+        args.get("directory") or args.get("path") or ""
+    )))
+    query = str(args.get("query", ""))
+    if not query:
+        return {"error": "Requête de recherche vide"}
+    if not directory.exists() or not directory.is_dir():
+        return {"error": f"Dossier introuvable : {directory}"}
+    try:
+        max_results = max(1, min(1000, int(args.get("max_results", 20))))
+        max_files = max(1, min(50_000, int(args.get("max_files", 5000))))
+    except (TypeError, ValueError):
+        return {
+            "error": (
+                "Paramètres 'max_results' ou 'max_files' invalides : "
+                "entiers attendus."
+            )
+        }
+    extensions = _normalize_extensions(
+        args.get("extensions", _SEARCH_TEXT_EXTENSIONS)
+    )
+    case_sensitive = bool(args.get("case_sensitive", False))
+    needle = query if case_sensitive else query.casefold()
+    try:
+        candidates, visited, limited = await asyncio.to_thread(
+            _collect_candidates, str(directory), extensions, max_files
+        )
+        results: list[dict[str, str]] = []
+        read_errors = 0
+        for path in candidates:
+            if len(results) >= max_results:
+                break
+            content_result = await read({"path": str(path)})
+            text = content_result.get("content", "")
+            if not text:
+                if content_result.get("error"):
+                    read_errors += 1
+                continue
+            haystack = text if case_sensitive else text.casefold()
+            index = haystack.find(needle)
+            if index < 0:
+                continue
+            start = max(0, index - 80)
+            end = min(len(text), index + len(query) + 80)
+            results.append({
+                "name": path.name,
+                "path": str(path),
+                "snippet": f"...{text[start:end].strip()}...",
+            })
+        return {
+            "success": True,
+            "query": query,
+            "directory": str(directory),
+            "count": len(results),
+            "results": results,
+            "files_visited": visited,
+            "candidates_read": min(len(candidates), max_files),
+            "read_errors": read_errors,
+            "candidate_limit_reached": limited,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 async def write(args: dict[str, Any]) -> dict[str, Any]:

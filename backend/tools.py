@@ -823,69 +823,7 @@ async def execute_document_generate(args: dict) -> dict:
     return result
 
 
-def _file_search_text_collect_candidates(directory: str, extensions: list) -> list:
-    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, ne bloque jamais l'event loop."""
-    candidates = []
-    for root, _, files in os.walk(directory):
-        for fname in files:
-            fpath = Path(root) / fname
-            if fpath.suffix.lower() in extensions:
-                candidates.append(fpath)
-    return candidates
-
-
-async def execute_file_search_text(args: dict) -> dict:
-    # Accept "directory" (agent) or "path" (UI) for the search root
-    _dir_raw = args.get("directory") or args.get("path") or _HOME
-    directory = _resolve_path(_dir_raw)
-    query = args.get("query", "")
-    extensions = args.get("extensions", [".txt", ".md", ".pdf", ".docx", ".doc", ".csv", ".xlsx", ".json", ".py", ".js", ".ts", ".html", ".xml", ".log"])
-    case_sensitive = args.get("case_sensitive", False)
-    max_results = args.get("max_results", 20)
-
-    if not query:
-        return {"error": "Requête de recherche vide"}
-
-    results = []
-    search_term = query if case_sensitive else query.lower()
-
-    try:
-        # v2.163 : l'énumération récursive du dossier (os.walk, peut prendre plusieurs
-        # dizaines de secondes sans dossier précisé — même classe de bug que
-        # file_large_finder v2.160) est déportée sur un thread ; seule la lecture de
-        # chaque fichier candidat (déjà async) reste dans la boucle principale.
-        candidates = await asyncio.to_thread(_file_search_text_collect_candidates, directory, extensions)
-        for fpath in candidates:
-            if len(results) >= max_results:
-                break
-            try:
-                content_result = await execute_file_read({"path": str(fpath)})
-                text = content_result.get("content", "")
-                if not text:
-                    continue
-                haystack = text if case_sensitive else text.lower()
-                if search_term in haystack:
-                    idx = haystack.find(search_term)
-                    start = max(0, idx - 80)
-                    end = min(len(text), idx + len(query) + 80)
-                    snippet = "..." + text[start:end].strip() + "..."
-                    results.append({
-                        "name": fpath.name,
-                        "path": str(fpath),
-                        "snippet": snippet,
-                    })
-            except Exception:
-                pass
-
-        return {
-            "success": True,
-            "query": query,
-            "directory": directory,
-            "count": len(results),
-            "results": results,
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_file_search_text = filesystem_domain.search_text
 
 
 def _normalize_windows_path(path: str) -> str:

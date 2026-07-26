@@ -44,6 +44,15 @@ async def main() -> int:
             "path": "docs", "pattern": "*", "max_results": "many"
         })
         assert "entier attendu" in invalid_limit["error"]
+        text_search = await filesystem.search_text({
+            "path": "docs", "query": "marvin", "extensions": "csv"
+        })
+        assert text_search["count"] == 1
+        assert text_search["candidate_limit_reached"] is False
+        missing_search = await filesystem.search_text({
+            "path": "absent", "query": "marvin"
+        })
+        assert "introuvable" in missing_search["error"]
         await filesystem.write({"path": "docs/a.txt", "content": "b", "mode": "append"})
         assert (base / "docs/a.txt").read_text(encoding="utf-8") == "ab"
         copied = await filesystem.copy({"source": "docs/a.txt", "destination": "docs"})
@@ -63,6 +72,7 @@ async def main() -> int:
     assert tools.execute_file_info is filesystem.info
     assert tools.execute_file_read is filesystem.read
     assert tools.execute_file_find is filesystem.find
+    assert tools.execute_file_search_text is filesystem.search_text
     assert tools.execute_file_delete is filesystem.delete
     assert tools.execute_file_rename is filesystem.rename
     assert tools.execute_file_move is filesystem.move
