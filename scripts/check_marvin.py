@@ -102,6 +102,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Contexte de session et captures", (python, "scripts/test_agent_context.py")),
         Stage("Préparation durable d'un tour", (python, "scripts/test_agent_session.py")),
         Stage("Compilation du plan de tour", (python, "scripts/test_agent_planning.py")),
+        Stage("Matérialisation des outils obligatoires", (python, "scripts/test_agent_required_tools.py")),
         Stage("Configuration modèle et confidentialité", (python, "scripts/test_agent_model_config.py")),
         Stage("État observable du Runner", (python, "scripts/test_agent_runner.py")),
         Stage("Observabilité du Runner", (python, "scripts/test_agent_observability.py")),

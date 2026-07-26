@@ -143,6 +143,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 34. la persistance SSH : CRUD, statut de test et dernier usage appartiennent à `repositories/ssh_connections.py`; les listes publiques excluent les secrets et toute opération passe par la transaction `db()`.
 35. la persistance des workflows : définitions et exécutions appartiennent à `repositories/workflows.py`; les anciens JSON invalides se replient sur une liste vide, l'historique est borné et la suppression d'un workflow avec ses exécutions est atomique.
 36. la finalisation agentique : scan déterministe, critique indépendante et escalade Council appartiennent à `agent_finalization.py`; les sorties normales et par budget partagent le même ordre d'événements SSE.
+37. les outils obligatoires : `agent_required_tools.py` matérialise les contrats explicites sans doublon, préserve l'autonomie tant que le modèle agit et injecte le contexte du livrable précédent uniquement pour une reprise Code Workspace.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

@@ -57,6 +57,10 @@ from agent_observability import (
     record_tool_observation as _record_tool_observation,
 )
 from agent_finalization import finalize_answer as _finalize_answer
+from agent_required_tools import (
+    RequiredToolContext as _RequiredToolContext,
+    inject_required_tool_calls as _inject_required_tool_calls,
+)
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -621,53 +625,23 @@ async def run_agent(
         # Une demande explicite de Council est un contrat, pas une simple suggestion au LLM.
         # S'il tente de conclure sans l'appeler, ou s'il remplit presque tout le budget avec
         # des recherches web, on injecte l'appel réel en conservant les autres outils du tour.
-        _missing_required = _required_tool_names - _executed_tool_names - {
-            tc.get("function", {}).get("name", "") for tc in tool_calls_found
-        }
-        if _missing_required and (not tool_calls_found or step >= _max_tool_steps - 2):
-            for required_name in sorted(_missing_required):
-                if required_name == "ai_model_council":
-                    arguments = {"question": _user_query}
-                elif required_name == "ai_cortex_search":
-                    arguments = {"question": _user_query}
-                elif required_name == "ai_research_swarm":
-                    arguments = {"question": _user_query}
-                elif required_name == "ai_adaptive_team":
-                    arguments = {"question": _user_query}
-                elif required_name == "ai_code_forge":
-                    arguments = {"request": _user_query}
-                elif required_name == "code_workspace_start":
-                    contextual_request = _user_query
-                    if re.search(r"\b(?:ce|le|la)\s+(?:script|code|programme|projet)\b", _workspace_norm):
-                        previous_assistant = next(
-                            (str(item.get("content") or "") for item in reversed(messages[:-1])
-                             if item.get("role") == "assistant" and str(item.get("content") or "").strip()),
-                            "",
-                        )
-                        if previous_assistant:
-                            contextual_request += "\n\nContexte du livrable précédent à reprendre :\n" + previous_assistant[-16_000:]
-                    arguments = {"request": contextual_request}
-                elif required_name == "code_workspace_status":
-                    arguments = {"mission_id": _workspace_mission_id}
-                elif required_name == "code_workspace_control":
-                    arguments = {
-                        "mission_id": _workspace_mission_id,
-                        "action": _workspace_action,
-                    }
-                elif required_name in {"web_research", "web_deep_research"}:
-                    arguments = {"query": _user_query}
-                elif required_name == "long_task_start":
-                    arguments = {"goal": _user_query}
-                elif required_name == "document_generate":
-                    arguments = {"text": _user_query, "template": "libre"}
-                else:
-                    arguments = {}
-                tool_calls_found.append({
-                    "id": f"required-{uuid.uuid4().hex[:12]}",
-                    "function": {"name": required_name, "arguments": arguments},
-                })
-            if full_content.strip():
-                yield _sse({"type": "text", "text": "\n\n"})
+        _required_injection = _inject_required_tool_calls(
+            required_names=_required_tool_names,
+            executed_names=_executed_tool_names,
+            tool_calls=tool_calls_found,
+            step=step,
+            max_steps=_max_tool_steps,
+            context=_RequiredToolContext(
+                user_query=_user_query,
+                workspace_normalized_query=_workspace_norm,
+                workspace_mission_id=_workspace_mission_id,
+                workspace_action=_workspace_action,
+                messages=messages,
+            ),
+        )
+        tool_calls_found = _required_injection.tool_calls
+        if _required_injection.injected and full_content.strip():
+            yield _sse({"type": "text", "text": "\n\n"})
 
         # v2.119 — protection mid-boucle : un outil sensible vient d'être demandé alors
         # qu'on est sur un modèle CLOUD → bascule en local AVANT que son résultat (contenu

@@ -4181,3 +4181,43 @@ ignorée) :
 - Backend réel redémarré : processus lancé PID 13432, version `2.301.0`, Ollama disponible,
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
+
+## 2026-07-26 — v2.302.0 — Matérialisation déterministe des outils obligatoires
+
+### Constat et décision
+
+- La boucle du Runner construisait directement les arguments de Council, Cortex, Research
+  Swarm, Code Forge, Code Workspace, recherche, mission longue et génération documentaire.
+- Cette logique est un contrat déterministe entre le plan de tour et l'exécution, pas une
+  responsabilité du transport Ollama. Elle est extraite sans forcer prématurément le modèle :
+  tant qu'il agit et que le budget reste suffisant, Marvin conserve son autonomie.
+
+### Implémentation
+
+- Nouveau `backend/agent_required_tools.py` avec contextes et résultat typés.
+- Un outil déjà exécuté ou déjà émis dans l'étape n'est jamais dupliqué.
+- L'injection intervient si le modèle tente de conclure sans satisfaire le contrat, ou dans
+  les deux dernières étapes du budget.
+- La reprise d'un script/code/projet dans Code Workspace reçoit au maximum les 16 000 derniers
+  caractères du livrable assistant précédent, comme auparavant.
+- Nouveau `scripts/test_agent_required_tools.py`, intégré à `check_marvin --quick`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Contrats, ordre, dédoublonnage, autonomie avant fin de budget et contexte Workspace : réussis.
+- Régressions planification, Council et service Code Workspace : réussies.
+- Architecture : 344 outils, 346 routes et 40 pages.
+
+### Rollback
+
+- Revenir au commit v2.301 et replacer la construction des arguments dans `agent.py`.
+  Aucun format d'appel, identifiant, outil, route, modèle ou donnée persistée n'est migré.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 82/82 étapes réussies; compilation de 153 fichiers
+  Python, cohérence 344/344 outils et ESLint sans erreur.
+- Backend réel redémarré : processus lancé PID 29172, version `2.302.0`, Ollama disponible,
+  344 outils et 15 workers observés.
+- `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
