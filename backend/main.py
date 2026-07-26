@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.313 — politiques résiduelles de boucle et synthèse de budget extraites :
+# repli sensible, relance Skill, refus Forge et sortie garantie sont testables.
 # v2.312 — finalisation commune extraite dans agent_turn_completion.py :
 # revue, persistance, apprentissage, skill, recette Cortex, provenance et done.
 # v2.311 — lot d'appels d'outils extrait dans agent_tool_batch.py :

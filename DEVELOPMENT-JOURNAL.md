@@ -4635,3 +4635,51 @@ ignorée) :
 - Backend réel redémarré : processus lancé PID 29172, version `2.302.0`, Ollama disponible,
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
+## 2026-07-27 — v2.313.0 — Clôture de la phase Runner
+
+### Demande
+
+- Poursuivre la consolidation sans perte de fonctionnalité.
+- Profiter de chaque tranche pour corriger et retravailler les défauts établis.
+- Tester chaque modification avant de passer à la suite.
+
+### Constats et décisions
+
+- L'escalade d'une compétence du profil chat vers agent utilisait
+  `AUTO_MODE_FALLBACKS` sans l'importer : ce chemin rare pouvait lever `NameError`.
+- Sept variables/imports résiduels n'avaient plus aucun lecteur après les extractions
+  précédentes; ils ont été retirés après recherche globale.
+- Les dernières politiques métier encore mêlées à la boucle étaient le repli local sensible,
+  la relance unique d'une compétence, le refus Forge et la synthèse après épuisement du budget.
+- Ces politiques sont maintenant injectables et testables dans `agent_loop_policy.py` et
+  `agent_budget_completion.py`; `run_agent` reste le composition root du Runner.
+- La synthèse de repli ne demande plus de reformuler la requête après un long travail : elle
+  expose l'incomplétude et propose de continuer, sans annoncer de succès non vérifié.
+
+### Fichiers
+
+- `backend/agent.py`
+- `backend/agent_loop_policy.py`
+- `backend/agent_budget_completion.py`
+- `scripts/test_agent_loop_policy.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`
+- `BACKEND-CONSOLIDATION-PLAN.md`, `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test ciblé `test_agent_loop_policy.py` : réussi, y compris import runtime de
+  `AUTO_MODE_FALLBACKS`, repli sensible, exception Ultra, relance Skill, refus Forge,
+  synthèse nominale et repli sur panne de transport.
+- `scripts/check_marvin.py --quick` : **95/95 étapes réussies**.
+- Compilation de l'ensemble du backend : réussie.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.313.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test réel avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `agent.py` passe de 560 à **533 lignes**.
+- `git diff --check` : réussi; seuls les avertissements de conversion LF/CRLF Windows
+  attendus sont présents.

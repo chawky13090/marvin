@@ -1,0 +1,106 @@
+"""Régressions des politiques terminales et inter-itérations du Runner."""
+
+from __future__ import annotations
+
+import asyncio
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
+
+from agent_budget_completion import synthesize_budget_answer
+import agent
+from agent_loop_policy import (
+    build_skill_nudge,
+    render_blocking_outcomes,
+    sensitive_tool_model_switch,
+)
+
+
+async def main() -> int:
+    # Régression du chemin Skill chat -> agent : la liste doit exister au runtime.
+    assert agent.AUTO_MODE_FALLBACKS
+
+    switch = sensitive_tool_model_switch(
+        tool_calls=[{"function": {"name": "email_read"}}],
+        active_model="cloud/model",
+        profile_name="agent",
+        local_fallback_model="local/model",
+        ultra_cloud_only=False,
+        is_cloud_model=lambda model: model.startswith("cloud/"),
+        is_sensitive_tool=lambda name: name.startswith("email_"),
+    )
+    assert switch and switch.model == "local/model"
+    assert sensitive_tool_model_switch(
+        tool_calls=[{"function": {"name": "email_read"}}],
+        active_model="cloud/model",
+        profile_name="agent",
+        local_fallback_model="local/model",
+        ultra_cloud_only=True,
+        is_cloud_model=lambda _model: True,
+        is_sensitive_tool=lambda _name: True,
+    ) is None
+
+    nudge = build_skill_nudge(
+        skill={"tools": ["email_read", "unknown"]},
+        tools_payload=[{"function": {"name": "email_read"}}],
+        full_content="Je vais lire.",
+    )
+    assert nudge[0]["role"] == "assistant"
+    assert "email_read" in nudge[-1]["content"]
+    refusal = render_blocking_outcomes({
+        "code_forge": {"message": "tests échoués", "failed_steps": ["pytest"]}
+    })
+    assert refusal and "tests échoués" in refusal and "pytest" in refusal
+    assert render_blocking_outcomes({}) is None
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+    async def stream(_client, _url, request):
+        assert request["tools"] is None
+        yield SimpleNamespace(kind="text", text="Synthèse vérifiée.")
+
+    events = [
+        event async for event in synthesize_budget_answer(
+            stop_reason="step_budget",
+            active_model="model",
+            system_prompt="system",
+            ollama_messages=[],
+            options={},
+            base_url="http://ollama",
+            request_factory=lambda **kwargs: kwargs,
+            client_factory=lambda **_kwargs: Client(),
+            stream_chat=stream,
+        )
+    ]
+    assert events[-1] == {"type": "_budget_answer", "content": "Synthèse vérifiée."}
+
+    fallback = [
+        event async for event in synthesize_budget_answer(
+            stop_reason="wall_clock_budget",
+            active_model="model",
+            system_prompt="system",
+            ollama_messages=[],
+            options={},
+            base_url="http://ollama",
+            request_factory=lambda **kwargs: kwargs,
+            client_factory=lambda **_kwargs: Client(),
+            stream_chat=lambda *_args: (_ for _ in ()).throw(RuntimeError()),
+        )
+    ]
+    assert fallback[-1]["type"] == "_budget_answer"
+    assert "continuer" in fallback[-1]["content"]
+    print("Agent Loop Policy OK - repli, nudge, refus Forge et budget.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(asyncio.run(main()))

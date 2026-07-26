@@ -29,7 +29,7 @@ flowchart LR
 | `cron_runtime.py` | Jobs planifiés, journal d'exécution et reprise bornée des tâches longues |
 | `api/` | Routeurs par domaine : données, métiers, voix, agenda, IA, connexions, SSH, planification, monitoring et santé |
 | `scheduling.py` | Parsing unique des planifications utilisé par l'API Cron et son worker |
-| `agent.py` | Composition de la boucle agentique, prompt, outils, streaming et persistance |
+| `agent.py` | Composition du Runner : session, contexte, itérations et délégation aux frontières spécialisées |
 | `agent_policy.py` | Politiques textuelles pures : titres et noms d'outils explicitement cités |
 | `agent_prompt.py` | Prompt système, permissions, chemins dynamiques, mémoire et date déterministe |
 | `agent_safety.py` | Validation pré-exécution des outils et analyse post-génération des scripts/documents |
@@ -53,6 +53,8 @@ flowchart LR
 | `agent_model_step.py` | Lecture typée d'une itération Ollama et matérialisation des appels contractuels |
 | `agent_tool_batch.py` | Exécution séquentielle, événements, preuves et persistance d'un lot d'outils |
 | `agent_turn_completion.py` | Sortie commune : revue, persistance, apprentissage, skill et provenance |
+| `agent_loop_policy.py` | Politiques inter-itérations : repli sensible, relance Skill et refus Forge |
+| `agent_budget_completion.py` | Synthèse terminale sans outil et repli utilisateur lors d'un budget épuisé |
 | `agent_transport.py` | Client HTTP Ollama, payload `/api/chat`, décodage JSONL et erreurs de transport typées |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |

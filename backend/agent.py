@@ -4,7 +4,6 @@ Orchestre Ollama via l'adaptateur de transport, gère la boucle d'appel d'outils
 et produit les événements SSE du frontend.
 """
 import asyncio
-import re
 from typing import AsyncIterator
 
 import cloud_routing as _cr
@@ -18,7 +17,6 @@ from agent_routing import (
     detect_profile as _detect_profile,
     get_cloud_config as _get_cloud_config,
     is_cloud_model as _is_cloud_model,
-    is_local_only_lockdown as _is_local_only_lockdown,
     is_sensitive_request as _is_sensitive_request,
     is_sensitive_tool as _is_sensitive_tool,
     is_ultra_unrestricted as _is_ultra_unrestricted,
@@ -89,6 +87,12 @@ from agent_model_step import (
 )
 from agent_tool_batch import execute_tool_batch as _execute_tool_batch
 from agent_turn_completion import complete_turn as _complete_turn
+from agent_loop_policy import (
+    build_skill_nudge as _build_skill_nudge,
+    render_blocking_outcomes as _render_blocking_outcomes,
+    sensitive_tool_model_switch as _sensitive_tool_model_switch,
+)
+from agent_budget_completion import synthesize_budget_answer as _synthesize_budget_answer
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -99,7 +103,7 @@ from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
 from config import (
     OLLAMA_URL, MAX_CONTEXT_MESSAGES,
     DEFAULT_PERMISSION_LEVEL, DANGEROUS_TOOLS,
-    MODEL_PROFILES,
+    MODEL_PROFILES, AUTO_MODE_FALLBACKS,
 )
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
 
@@ -142,7 +146,6 @@ async def run_agent(
     _tool_suppression = _turn_plan.tool_suppression
     _required_tool_names = _turn_plan.required_tool_names
     _workspace_norm = _turn_plan.workspace_norm
-    _workspace_route = _turn_plan.workspace_route
     _workspace_mission_id = _turn_plan.workspace_mission_id
     _workspace_action = _turn_plan.workspace_action
     _cortex_plan = _turn_plan.cortex_plan
@@ -160,7 +163,6 @@ async def run_agent(
     profile_name = _model_config.profile_name
     active_model = _model_config.active_model
     temperature = _model_config.temperature
-    _lockdown = _model_config.lockdown
     _ultra = _model_config.ultra_cloud_only
 
     _local_fallback_model = _model_config.local_fallback_model
@@ -272,9 +274,6 @@ async def run_agent(
     )
 
     # ── Boucle d'appel d'outils ───────────────────────────────────────────────
-    assistant_text_accum = ""       # texte de la réponse courante
-    tool_calls_for_db: list = []    # tool calls de l'étape courante
-    tool_results_for_db: list = []  # résultats
     _runner_state = _RunnerState()
     _executed_tool_names = _runner_state.executed_tool_names
 
@@ -332,8 +331,6 @@ async def run_agent(
 
     # Anti-« le modèle explique au lieu d'agir » : on ne le corrige qu'UNE fois.
     # Suivi de l'exécution et preuves pour l'auto-réparation des compétences.
-    _run_trace = _runner_state.trace
-    _run_calls = _runner_state.successful_calls
     _read_call_signatures: set[str] = set()
     _blocking_outcomes = _runner_state.blocking_outcomes
     _skill_outcomes = _SkillOutcomeRecorder()
@@ -427,15 +424,18 @@ async def run_agent(
         # ne l'ait anticipé — dernier filet, pas le mécanisme principal.
         # v2.121 — désactivé en mode Ultra débridé (l'utilisateur a explicitement accepté
         # que ces données partent au cloud, y compris celles découvertes en cours de tour).
-        if tool_calls_found and not _ultra and _is_cloud_model(active_model):
-            if any(_is_sensitive_tool(tc.get("function", {}).get("name", "")) for tc in tool_calls_found):
-                active_model = _local_fallback_model
-                yield _sse({
-                    "type":    "model_info",
-                    "profile": profile_name,
-                    "model":   active_model,
-                    "label":   "🔒 Repli local (donnée sensible détectée)",
-                })
+        _model_switch = _sensitive_tool_model_switch(
+            tool_calls=tool_calls_found,
+            active_model=active_model,
+            profile_name=profile_name,
+            local_fallback_model=_local_fallback_model,
+            ultra_cloud_only=_ultra,
+            is_cloud_model=_is_cloud_model,
+            is_sensitive_tool=_is_sensitive_tool,
+        )
+        if _model_switch:
+            active_model = _model_switch.model
+            yield _sse(_model_switch.event)
 
         # ── Traiter les tool calls ─────────────────────────────────────────────
         if tool_calls_found:
@@ -476,34 +476,19 @@ async def run_agent(
             # (aucun appel natif, rien à récupérer dans le texte). On le corrige
             # UNE fois avec les noms d'outils EXACTS et on relance l'itération.
             _runner_state.nudged = True
-            _avail = {s.get("function", {}).get("name") for s in tools_payload}
-            _skill_tool_names = [t for t in _skill["tools"] if t in _avail]
-            if full_content.strip():
-                ollama_msgs.append({"role": "assistant", "content": full_content})
-            ollama_msgs.append({"role": "user", "content": (
-                "⛔ STOP. Tu as DÉCRIT les étapes au lieu d'AGIR. N'explique plus, ne réécris pas le plan. "
-                "Exécute MAINTENANT, via un VRAI appel d'outil (pas de texte, pas de bloc JSON), "
-                "l'outil le plus pertinent pour la 1ʳᵉ étape — un seul. "
-                + (f"Utilise EXACTEMENT l'un de ces noms d'outils : {', '.join(_skill_tool_names)}."
-                   if _skill_tool_names else "Utilise l'un des outils fournis."))})
+            ollama_msgs.extend(_build_skill_nudge(
+                skill=_skill,
+                tools_payload=tools_payload,
+                full_content=full_content,
+            ))
             yield _sse({"type": "text", "text": "\n\n"})
             continue
 
         else:
             # ── Réponse finale — pas de tool calls ────────────────────────────
-            if _blocking_outcomes:
-                details = []
-                for failed_tool, receipt in _blocking_outcomes.items():
-                    failed_steps = receipt.get("failed_steps") or receipt.get("test_report", {}).get("failed_steps") or []
-                    reason = receipt.get("error") or receipt.get("message") or "gate de qualité non validé"
-                    suffix = f" Étapes en échec : {', '.join(map(str, failed_steps))}." if failed_steps else ""
-                    details.append(f"- `{failed_tool}` : {reason}.{suffix}")
-                full_content = (
-                    "## Validation non obtenue\n\n"
-                    "Je ne peux pas annoncer que le code ou les tests ont réussi : le dernier reçu Forge est négatif.\n\n"
-                    + "\n".join(details)
-                    + "\n\nLe livrable reste refusé tant qu'une correction suivie d'un nouveau reçu `production_ready=true` n'a pas été observée."
-                )
+            _blocking_answer = _render_blocking_outcomes(_blocking_outcomes)
+            if _blocking_answer:
+                full_content = _blocking_answer
                 yield _sse({"type": "text", "text": full_content})
             _completion = await _finish_turn(
                 full_content,
@@ -522,34 +507,22 @@ async def run_agent(
     # réel avec une requête de recherche web qui a enchaîné 11 tool_start sans jamais
     # produire de texte. On force maintenant UN dernier appel, SANS outils, pour obtenir
     # une synthèse de ce qui a déjà été trouvé plutôt qu'un silence total.
-    ollama_msgs.append({"role": "user", "content": (
-        f"⛔ Tu as atteint le budget ({_budget_stop_reason}) pour ce tour. Tu ne peux PLUS utiliser "
-        "aucun outil. Réponds MAINTENANT, en français, avec une synthèse aussi complète que "
-        "possible de ce que tu as déjà trouvé pour répondre à la demande initiale de "
-        "l'utilisateur. Si des informations manquent encore, dis-le clairement plutôt que de "
-        "rester silencieux."
-    )})
     full_content = ""
-    try:
-        async with _create_ollama_client(read_timeout=120.0) as _final_client:
-            _final_request = _OllamaChatRequest(
-                model=active_model,
-                system_prompt=system_prompt,
-                messages=ollama_msgs,
-                tools=None,
-                options=_ollama_options,
-            )
-            async for event in _stream_ollama_chat(_final_client, OLLAMA_URL, _final_request):
-                if event.kind == "text":
-                    full_content += event.text
-                    yield _sse({"type": "text", "text": event.text})
-    except Exception:
-        pass
-
-    if not full_content.strip():
-        full_content = ("Je n'ai pas réussi à conclure cette recherche dans le nombre d'étapes "
-                         "autorisées. Peux-tu préciser ta demande ou me demander de continuer ?")
-        yield _sse({"type": "text", "text": full_content})
+    async for _event in _synthesize_budget_answer(
+        stop_reason=_budget_stop_reason,
+        active_model=active_model,
+        system_prompt=system_prompt,
+        ollama_messages=ollama_msgs,
+        options=_ollama_options,
+        base_url=OLLAMA_URL,
+        request_factory=_OllamaChatRequest,
+        client_factory=_create_ollama_client,
+        stream_chat=_stream_ollama_chat,
+    ):
+        if _event["type"] == "_budget_answer":
+            full_content = _event["content"]
+        else:
+            yield _sse(_event)
 
     _completion = await _finish_turn(
         full_content,

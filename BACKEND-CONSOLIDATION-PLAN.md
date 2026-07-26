@@ -52,7 +52,7 @@ travail restant consiste à rendre leurs frontières de code aussi nettes que le
 
 | Frontière | État mesuré | Reste |
 |---|---:|---|
-| Runner | `agent.py` : 1 fonction `run_agent`, lignes 149–1165 | rendre l'orchestrateur court en extrayant les phases de boucle et de finalisation |
+| Runner | Terminé en v2.313 : `agent.py` orchestre des frontières nommées | surveiller les régressions via les tests de contrat |
 | Outils | `tools.py` : 20 197 lignes, 398 objets AST | extraire les domaines restants puis séparer catalogue et assemblage du registre |
 | Persistance | `database.py` : 3 138 lignes, 143 objets AST | déplacer les domaines restants vers des repositories injectables |
 | Composition FastAPI | `main.py` : 3 470 lignes, 44 routeurs, 12 fonctions/classes actives | extraire les derniers endpoints chat/MCP/proactif ; conserver seulement lifespan, assemblage et handlers globaux |
@@ -70,6 +70,11 @@ travail restant consiste à rendre leurs frontières de code aussi nettes que le
 
 Critère : `run_agent` orchestre des composants nommés et ne contient plus une boucle métier
 monolithique. Aucun événement SSE ni comportement de modèle ne change.
+
+État : **terminé en v2.313.0**. La session, le plan, le contexte, les enrichissements, la
+configuration modèle, le transport, une itération modèle, un lot d'outils, les politiques
+inter-itérations et les deux sorties terminales ont chacun une frontière testable. Le Runner
+central ne contient plus d'implémentation métier d'outil, de persistance ou de revue.
 
 ### Phase B — Outils
 
