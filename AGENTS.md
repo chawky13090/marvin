@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.300.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.301.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.300.0)
+## 9. État actuel (v2.301.0)
+
+**v2.301 (finalisation commune du Runner)** : `agent_finalization.py` applique désormais le
+scan déterministe des scripts, la critique indépendante et l'escalade Council aux sorties
+normales comme aux sorties par budget. Il retourne des événements typés que `agent.py`
+projette sur le SSE historique, sans modifier l'ordre visible ni le choix des modèles.
 
 **v2.300 (repository des workflows)** : définitions, exécutions et compteurs sont extraits de
 `database.py` vers `repositories/workflows.py`. La façade historique conserve ses fonctions,

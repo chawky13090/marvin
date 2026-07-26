@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.301 — finalisation commune du Runner extraite dans agent_finalization.py :
+# scan de sortie, critique et escalade Council gardent le même ordre SSE.
 # v2.300 — persistance des workflows extraite dans repositories/workflows.py :
 # définitions, exécutions et suppression atomique derrière la façade database.py.
 # v2.299 — persistance SSH extraite dans repositories/ssh_connections.py : schéma

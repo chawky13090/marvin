@@ -56,6 +56,7 @@ from agent_observability import (
     record_long_chain as _record_long_chain,
     record_tool_observation as _record_tool_observation,
 )
+from agent_finalization import finalize_answer as _finalize_answer
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -987,34 +988,23 @@ async def run_agent(
                     + "\n\nLe livrable reste refusé tant qu'une correction suivie d'un nouveau reçu `production_ready=true` n'a pas été observée."
                 )
                 yield _sse({"type": "text", "text": full_content})
-            _script_warnings = _scan_dangerous_script_patterns(full_content)
-            if _script_warnings:
-                _warning_block = (
-                    "\n\n---\n⚠️ **Vérification automatique de sécurité** — points à relire avant d'exécuter ce script :\n"
-                    + "\n".join(f"- {w}" for w in _script_warnings)
-                )
-                yield _sse({"type": "text", "text": _warning_block})
-                full_content += _warning_block
-
             _review_mode = _cortex_plan["resolved"]["review"]
             _force_review = _review_mode in {"verify", "council_if_disagreement"}
-            _critique = await _run_critique_pass(
-                _user_query, full_content, active_model, force=_force_review
+            _finalized = await _finalize_answer(
+                user_query=_user_query,
+                content=full_content,
+                active_model=active_model,
+                force_review=_force_review,
+                script_scanner=_scan_dangerous_script_patterns,
+                critique_pass=_run_critique_pass,
+                council_escalation=_cortex_disagreement_escalation,
             )
-            if _critique:
-                _critique_block = "\n\n---\n🧠 **Revue critique (2ᵉ modèle)** :\n" + _critique
-                yield _sse({"type": "text", "text": _critique_block})
-                full_content += _critique_block
-
-            _escalation = await _cortex_disagreement_escalation(_critique, full_content)
-            if _escalation:
-                _cid, _cargs, _cresult, _cblock = _escalation
-                yield _sse({"type": "tool_start", "toolCallId": _cid, "toolName": "ai_model_council", "args": _cargs})
-                yield _sse({"type": "tool_end", "toolCallId": _cid, "result": _cresult})
+            full_content = _finalized.content
+            for _event in _finalized.events:
+                yield _sse(_event)
+            _critique = _finalized.critique
+            if _finalized.council_executed:
                 _executed_tool_names.add("ai_model_council")
-                if _cblock:
-                    yield _sse({"type": "text", "text": _cblock})
-                    full_content += _cblock
 
             db.create_message(conversation_id, "assistant", full_content)
 
@@ -1113,34 +1103,23 @@ async def run_agent(
                          "autorisées. Peux-tu préciser ta demande ou me demander de continuer ?")
         yield _sse({"type": "text", "text": full_content})
 
-    _script_warnings = _scan_dangerous_script_patterns(full_content)
-    if _script_warnings:
-        _warning_block = (
-            "\n\n---\n⚠️ **Vérification automatique de sécurité** — points à relire avant d'exécuter ce script :\n"
-            + "\n".join(f"- {w}" for w in _script_warnings)
-        )
-        yield _sse({"type": "text", "text": _warning_block})
-        full_content += _warning_block
-
     _review_mode = _cortex_plan["resolved"]["review"]
     _force_review = _review_mode in {"verify", "council_if_disagreement"}
-    _critique = await _run_critique_pass(
-        _user_query, full_content, active_model, force=_force_review
+    _finalized = await _finalize_answer(
+        user_query=_user_query,
+        content=full_content,
+        active_model=active_model,
+        force_review=_force_review,
+        script_scanner=_scan_dangerous_script_patterns,
+        critique_pass=_run_critique_pass,
+        council_escalation=_cortex_disagreement_escalation,
     )
-    if _critique:
-        _critique_block = "\n\n---\n🧠 **Revue critique (2ᵉ modèle)** :\n" + _critique
-        yield _sse({"type": "text", "text": _critique_block})
-        full_content += _critique_block
-
-    _escalation = await _cortex_disagreement_escalation(_critique, full_content)
-    if _escalation:
-        _cid, _cargs, _cresult, _cblock = _escalation
-        yield _sse({"type": "tool_start", "toolCallId": _cid, "toolName": "ai_model_council", "args": _cargs})
-        yield _sse({"type": "tool_end", "toolCallId": _cid, "result": _cresult})
+    full_content = _finalized.content
+    for _event in _finalized.events:
+        yield _sse(_event)
+    _critique = _finalized.critique
+    if _finalized.council_executed:
         _executed_tool_names.add("ai_model_council")
-        if _cblock:
-            yield _sse({"type": "text", "text": _cblock})
-            full_content += _cblock
 
     db.create_message(conversation_id, "assistant", full_content)
 

@@ -4142,3 +4142,42 @@ ignorée) :
 - Le premier smoke test a correctement identifié que Next.js n'était pas démarré : 22/28.
   Le frontend normal a été lancé avec `npm run dev` sous Turbopack, HTTP 200 confirmé, puis
   `scripts/smoke_test_api.py` a validé 28/28 contrats, dont workflows et Code Workspace.
+
+## 2026-07-26 — v2.301.0 — Finalisation commune du Runner
+
+### Constat et décision
+
+- `run_agent` appliquait deux fois la même séquence : scanner la réponse, déclencher la revue
+  indépendante, arbitrer un désaccord avec le Council puis émettre les événements SSE.
+- Conserver deux copies exposait les sorties normales et par budget à une divergence future.
+  Une fonction pure sur les effets externes, avec callbacks injectés, est retenue plutôt
+  qu'une réécriture globale de la boucle agentique.
+
+### Implémentation
+
+- Nouveau `backend/agent_finalization.py` avec résultat typé `FinalizedAnswer`.
+- La séquence sécurité, critique, Council et ajout de contenu est centralisée; la persistance,
+  la provenance et le streaming restent sous le contrôle explicite du Runner.
+- Les deux sorties de `agent.py` consomment le même composant sans modifier le choix du modèle,
+  le mode de confidentialité, les critères Cortex ou l'ordre des événements.
+- Nouveau `scripts/test_agent_finalization.py`, intégré à `check_marvin --quick`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation de `agent.py`, du nouveau module et du test : réussie.
+- Sécurité, critique forcée, Council, ordre des cinq événements et chemin sans revue : réussis.
+- Régressions `agent_review` et `agent_runner` : réussies.
+- Architecture : 344 outils, 346 routes et 40 pages.
+
+### Rollback
+
+- Revenir au commit v2.300 et replacer les deux séquences de finalisation dans `agent.py`.
+  Aucun contrat SSE, schéma, outil, route, modèle ou donnée persistée n'est migré.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 81/81 étapes réussies; compilation de 152 fichiers
+  Python, cohérence 344/344 outils et ESLint sans erreur.
+- Backend réel redémarré : processus lancé PID 13432, version `2.301.0`, Ollama disponible,
+  344 outils et 15 workers observés.
+- `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
