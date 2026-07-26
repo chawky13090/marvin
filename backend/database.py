@@ -33,6 +33,16 @@ from repositories.ssh_connections import (
     touch_ssh_connection,
     update_ssh_connection,
 )
+from repositories.workflows import (
+    create_workflow,
+    create_workflow_run,
+    delete_workflow,
+    finish_workflow_run,
+    get_workflow,
+    list_workflow_runs,
+    list_workflows,
+    update_workflow,
+)
 
 
 # ── Mémoires ──────────────────────────────────────────────────────────────────
@@ -3015,145 +3025,6 @@ def _parse_cron(row: dict | None) -> dict | None:
             row["args"] = {}
     row["enabled"] = bool(row.get("enabled", 1))
     return row
-
-
-# ── Workflows ─────────────────────────────────────────────────────────────────
-
-def _ensure_workflow_tables(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS workflows (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            steps TEXT DEFAULT '[]',
-            last_run TEXT,
-            run_count INTEGER NOT NULL DEFAULT 0,
-            last_status TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS workflow_runs (
-            id TEXT PRIMARY KEY,
-            workflow_id TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending',
-            steps_results TEXT DEFAULT '[]',
-            started_at TEXT NOT NULL DEFAULT (datetime('now')),
-            finished_at TEXT,
-            duration_ms INTEGER
-        )
-    """)
-
-
-def _parse_workflow(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    for f in ("steps",):
-        if row.get(f) and isinstance(row[f], str):
-            try:
-                row[f] = json.loads(row[f])
-            except Exception:
-                row[f] = []
-    return row
-
-
-def _parse_run(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("steps_results") and isinstance(row["steps_results"], str):
-        try:
-            row["steps_results"] = json.loads(row["steps_results"])
-        except Exception:
-            row["steps_results"] = []
-    return row
-
-
-def create_workflow(name: str, description: str, steps: list) -> dict:
-    wid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        conn.execute(
-            "INSERT INTO workflows (id, name, description, steps) VALUES (?,?,?,?)",
-            (wid, name, description, json.dumps(steps))
-        )
-        row = conn.execute("SELECT * FROM workflows WHERE id=?", (wid,)).fetchone()
-    return _parse_workflow(row_to_dict(row))
-
-
-def list_workflows() -> list[dict]:
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        rows = conn.execute("SELECT * FROM workflows ORDER BY updated_at DESC").fetchall()
-    return [_parse_workflow(row_to_dict(r)) for r in rows]
-
-
-def get_workflow(wid: str) -> dict | None:
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        row = conn.execute("SELECT * FROM workflows WHERE id=?", (wid,)).fetchone()
-    return _parse_workflow(row_to_dict(row))
-
-
-def update_workflow(wid: str, updates: dict) -> dict | None:
-    fields, values = [], []
-    for k in ("name", "description", "last_run", "last_status"):
-        if k in updates:
-            fields.append(f"{k} = ?")
-            values.append(updates[k])
-    if "steps" in updates:
-        fields.append("steps = ?")
-        values.append(json.dumps(updates["steps"]))
-    if "run_count" in updates:
-        fields.append("run_count = run_count + 1")
-    if not fields:
-        return get_workflow(wid)
-    fields.append("updated_at = datetime('now')")
-    values.append(wid)
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        conn.execute(f"UPDATE workflows SET {', '.join(fields)} WHERE id=?", values)
-    return get_workflow(wid)
-
-
-def delete_workflow(wid: str):
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        conn.execute("DELETE FROM workflow_runs WHERE workflow_id=?", (wid,))
-        conn.execute("DELETE FROM workflows WHERE id=?", (wid,))
-
-
-def create_workflow_run(workflow_id: str) -> dict:
-    rid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        conn.execute(
-            "INSERT INTO workflow_runs (id, workflow_id, status) VALUES (?,?,?)",
-            (rid, workflow_id, "running")
-        )
-        row = conn.execute("SELECT * FROM workflow_runs WHERE id=?", (rid,)).fetchone()
-    return _parse_run(row_to_dict(row))
-
-
-def finish_workflow_run(rid: str, status: str, steps_results: list, duration_ms: int) -> dict:
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        conn.execute(
-            "UPDATE workflow_runs SET status=?,steps_results=?,finished_at=datetime('now'),duration_ms=? WHERE id=?",
-            (status, json.dumps(steps_results), duration_ms, rid)
-        )
-        row = conn.execute("SELECT * FROM workflow_runs WHERE id=?", (rid,)).fetchone()
-    return _parse_run(row_to_dict(row))
-
-
-def list_workflow_runs(workflow_id: str, limit: int = 20) -> list[dict]:
-    with db() as conn:
-        _ensure_workflow_tables(conn)
-        rows = conn.execute(
-            "SELECT * FROM workflow_runs WHERE workflow_id=? ORDER BY started_at DESC LIMIT ?",
-            (workflow_id, limit)
-        ).fetchall()
-    return [_parse_run(row_to_dict(r)) for r in rows]
 
 
 # ── Fiches de révision / quiz (v2.155) ──────────────────────────────────────────

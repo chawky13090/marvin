@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.300 — persistance des workflows extraite dans repositories/workflows.py :
+# définitions, exécutions et suppression atomique derrière la façade database.py.
 # v2.299 — persistance SSH extraite dans repositories/ssh_connections.py : schéma
 # compatible, projections sans secrets, transactions et rollback derrière database.py.
 # v2.298 — neuf outils SSH extraits dans tool_domains/ssh.py; api/ssh.py consomme

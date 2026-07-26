@@ -4099,3 +4099,46 @@ ignorée) :
   observés (12 actifs, 3 terminés au moment du health check).
 - `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis, dont orchestrateur e-mail,
   connexions masquées et accueil Next.js Turbopack.
+## 2026-07-26 — v2.300.0 — Repository transactionnel des workflows
+
+### Constat et décision
+
+- Les définitions de workflows et leurs exécutions restaient dans `database.py`, alors que
+  l'API et le moteur cron forment un domaine métier cohérent et testable séparément.
+- Deux options ont été comparées : extraire uniquement le CRUD des définitions, ou déplacer
+  ensemble définitions et exécutions. La seconde est retenue pour préserver dans une même
+  frontière la mise à jour du compteur, l'historique et la suppression atomique.
+- Le schéma SQLite, les noms de fonctions de la façade `database.py` et les formats retournés
+  restent compatibles. Aucune route, aucun outil et aucune donnée existante n'est supprimé.
+
+### Implémentation
+
+- Nouveau `backend/repositories/workflows.py` avec `WorkflowRepository` injectable et aliases
+  historiques pour `database.py`.
+- Création, liste, lecture, mise à jour, suppression, création et terminaison d'exécution
+  utilisent toutes la fabrique transactionnelle `db()`.
+- Les anciens champs JSON illisibles se replient sur `[]`; la limite d'historique est bornée
+  entre 1 et 200; la suppression des exécutions et du workflow est atomique.
+- Nouveau `scripts/test_workflow_repository.py`, intégré à `check_marvin --quick`.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation Python ciblée : réussie.
+- CRUD, JSON, exécutions, bornes, suppression et rollback : réussis sur SQLite temporaire.
+- Hygiène SQLite : aucune connexion directe hors de la fabrique.
+- Architecture : 344 outils, 346 routes et 40 pages.
+
+### Rollback
+
+- Revenir au commit v2.299 et replacer les fonctions de workflows dans `database.py`.
+  Le schéma SQLite n'a subi aucune migration et les données restent directement compatibles.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 80/80 étapes réussies; compilation de 151 fichiers
+  Python, cohérence 344/344 outils et ESLint sans erreur (37 avertissements historiques).
+- Backend réel redémarré : processus lancé PID 28944, version `2.300.0`, Ollama disponible
+  et 15 workers observés.
+- Le premier smoke test a correctement identifié que Next.js n'était pas démarré : 22/28.
+  Le frontend normal a été lancé avec `npm run dev` sous Turbopack, HTTP 200 confirmé, puis
+  `scripts/smoke_test_api.py` a validé 28/28 contrats, dont workflows et Code Workspace.
