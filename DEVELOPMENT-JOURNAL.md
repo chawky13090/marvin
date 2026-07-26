@@ -4182,6 +4182,48 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.311.0 — Lot d'outils observé et persistant
+
+### Constat et décision
+
+- `run_agent` exécutait encore chaque appel, diffusait les événements, mettait à jour les
+  preuves et persistait manuellement l'étape dans un bloc d'environ 160 lignes.
+- Cette séquence doit rester strictement ordonnée et testable sans modèle ni véritable outil.
+
+### Implémentation et améliorations
+
+- Nouveau `backend/agent_tool_batch.py`.
+- Identifiant, préparation, contexte interne, dispatch, durée et post-validation sont isolés.
+- `tool_start` reste émis avant exécution et `tool_end` après post-validation.
+- Les gates Forge mettent toujours à jour le tampon bloquant avant le tour suivant.
+- Observation, état du Runner, chaîne longue, contexte Ollama et persistance sont conservés.
+- Une exception de l'observateur ou de l'alerte de chaîne longue est maintenant absorbée à
+  cette frontière, même avec une implémentation injectée non conforme.
+- Nouveau test de lot intégré à `check_marvin --quick`.
+- `agent.py` passe de 727 à 619 lignes.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et des tests : réussie.
+- Dispatch, événements, durée, Forge, preuve, état, contexte et persistance : réussis.
+- Exception réelle de l'observateur après exécution : absorbée, résultat conservé.
+- Régressions Model Step, Dispatch et Observability : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.310 et replacer la séquence dans `agent.py`.
+  Aucun événement SSE, reçu, argument interne, résultat complet ou message persistant ne change.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 93/93 étapes réussies en 113,7 secondes.
+- Backend compilé : 164 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel : `/api/health` expose `2.311.0`, Ollama disponible, 344/344 outils et
+  15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.310.0 — Itération modèle typée
 
 ### Constat et décision

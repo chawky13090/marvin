@@ -4,10 +4,7 @@ Orchestre Ollama via l'adaptateur de transport, gère la boucle d'appel d'outils
 et produit les événements SSE du frontend.
 """
 import asyncio
-import json
 import re
-import time
-import uuid
 from typing import AsyncIterator
 
 import cloud_routing as _cr
@@ -52,7 +49,6 @@ from agent_planning import compile_turn_plan as _compile_turn_plan
 from agent_model_config import resolve_model_config as _resolve_model_config
 from agent_runner import RunnerState as _RunnerState
 from agent_observability import (
-    ToolObservation as _ToolObservation,
     record_long_chain as _record_long_chain,
     record_tool_observation as _record_tool_observation,
 )
@@ -69,7 +65,6 @@ from agent_tool_step import (
 from agent_tool_dispatch import (
     ALWAYS_CONFIRM_TOOLS as _ALWAYS_CONFIRM_TOOLS,
     EXECUTION_TOOLS as _EXECUTION_TOOLS,
-    ToolDispatchRequest as _ToolDispatchRequest,
     dispatch_tool as _dispatch_tool,
 )
 from agent_tool_postprocess import (
@@ -92,6 +87,7 @@ from agent_model_step import (
     prepare_model_step as _prepare_model_step,
     stream_model_step as _stream_model_step,
 )
+from agent_tool_batch import execute_tool_batch as _execute_tool_batch
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -408,140 +404,36 @@ async def run_agent(
 
         # ── Traiter les tool calls ─────────────────────────────────────────────
         if tool_calls_found:
-            # Sauvegarder le message assistant de cette étape en BD
-            tc_for_db = [
-                {
-                    "toolCallId": str(uuid.uuid4()),
-                    "toolName": tc["function"]["name"],
-                    "args": tc["function"].get("arguments", {}),
-                }
-                for tc in tool_calls_found
-            ]
-            db.create_message(conversation_id, "assistant", full_content, tool_calls=tc_for_db)
-
-            # Ajouter le message assistant à la boucle Ollama
-            ollama_msgs.append({
-                "role": "assistant",
-                "content": full_content,
-                "tool_calls": tool_calls_found,
-            })
-
-            tool_results_for_db_step = []
-
-            for tc, tc_db in zip(tool_calls_found, tc_for_db):
-                _prepared_call = _prepare_tool_call(
-                    tc["function"]["name"],
-                    tc["function"].get("arguments", {}),
-                )
-                tool_name = _prepared_call.name
-                tool_args = _prepared_call.arguments
-                _read_signature = _prepared_call.read_signature
-                tc["function"]["name"] = tool_name
-                tc_db["toolName"] = tool_name
-
-                tool_call_id = tc_db["toolCallId"]
-
-                # Notifier le frontend — début d'outil
-                yield _sse({
-                    "type": "tool_start",
-                    "toolCallId": tool_call_id,
-                    "toolName": tool_name,
-                    "args": tool_args,
-                })
-
-                _tool_t0 = time.time()
-                tool_args = _inject_internal_tool_context(
-                    tool_name, tool_args, conversation_id
-                )
-                # ── Outil explicite : bloque toute substitution ────────────────
-                # Le modèle propose parfois un outil "proche" au lieu de celui demandé par
-                # son nom exact (ex: net_ping au lieu de file_find). tools_payload a déjà été
-                # restreint à _explicit_tool_names ; ce garde-fou couvre le cas résiduel où le
-                # modèle appelle quand même un autre nom (halluciné ou substitué).
-                _dispatch = await _dispatch_tool(
-                    _ToolDispatchRequest(
-                        name=tool_name,
-                        arguments=tool_args,
-                        conversation_id=conversation_id,
-                        request_id=request_id,
-                        permission_level=permission_level,
-                        read_signature=_read_signature,
-                        seen_read_signatures=_read_call_signatures,
-                        explicit_names=_explicit_tool_names,
-                        required_names=_required_tool_names,
-                        command_text_only=_command_text_only,
-                    ),
-                    validate=_validate_tool_args,
-                    execute=_execute_registered_tool,
-                )
-                result = _dispatch.result
-                tool_args = _dispatch.arguments
-
-                _tool_duration_ms = int((time.time() - _tool_t0) * 1000)
-                if _read_signature:
-                    _read_call_signatures.add(_read_signature)
-
-                result = await _postprocess_tool_result(
-                    tool_name=tool_name,
-                    arguments=tool_args,
-                    result=result,
-                    duration_ms=_tool_duration_ms,
-                    user_query=_user_query,
-                    active_model=active_model,
-                    dangerous_tools=DANGEROUS_TOOLS,
-                    critique_action=_critique_action,
-                    scan_document=_scan_dangerous_script_patterns,
-                )
-
-                # Notifier le frontend — fin d'outil
-                yield _sse({
-                    "type": "tool_end",
-                    "toolCallId": tool_call_id,
-                    "toolName": tool_name,
-                    "result": result,
-                })
-
-                # Un gate Forge négatif est bloquant. Le tour suivant reste tamponné : Marvin
-                # ne peut plus diffuser une affirmation de succès contredisant le reçu réel.
-                if tool_name in {"ai_test_forge", "ai_code_forge"}:
-                    _runner_state.update_blocking_outcome(tool_name, result)
-
-                await _record_tool_observation(_ToolObservation(
-                    conversation_id=conversation_id,
-                    user_query=_user_query,
-                    tool_name=tool_name,
-                    arguments=tool_args,
-                    result=result,
-                    duration_ms=_tool_duration_ms,
-                ))
-
-                # Suivi pour l'auto-réparation : compte OK/erreur + trace compacte.
-                _long_chain_started = _runner_state.record_tool(
-                    tool_name,
-                    tool_args,
-                    result,
-                    tooling_failure=_is_tooling_failure(result),
-                )
-                if _long_chain_started:
-                    _record_long_chain(_user_query, _runner_state.tool_count)
-
-                tool_results_for_db_step.append({
-                    "toolCallId": tool_call_id,
-                    "toolName": tool_name,
-                    "result": result,
-                })
-
-                ollama_msgs.append({
-                    "role": "tool",
-                    "content": _compact_tool_result(result),
-                })
-
-            # Sauvegarder les résultats d'outils
-            db.create_message(
-                conversation_id, "tool",
-                json.dumps(tool_results_for_db_step),
-                tool_results=tool_results_for_db_step,
-            )
+            async for _event in _execute_tool_batch(
+                tool_calls=tool_calls_found,
+                assistant_content=full_content,
+                ollama_messages=ollama_msgs,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                user_query=_user_query,
+                active_model=active_model,
+                permission_level=permission_level,
+                explicit_tool_names=_explicit_tool_names,
+                required_tool_names=_required_tool_names,
+                command_text_only=_command_text_only,
+                read_signatures=_read_call_signatures,
+                runner_state=_runner_state,
+                dangerous_tools=DANGEROUS_TOOLS,
+                prepare_tool_call=_prepare_tool_call,
+                inject_internal_context=_inject_internal_tool_context,
+                dispatch_tool=_dispatch_tool,
+                validate_tool_args=_validate_tool_args,
+                execute_registered_tool=_execute_registered_tool,
+                postprocess_tool_result=_postprocess_tool_result,
+                critique_action=_critique_action,
+                scan_document=_scan_dangerous_script_patterns,
+                record_tool_observation=_record_tool_observation,
+                record_long_chain=_record_long_chain,
+                is_tooling_failure=_is_tooling_failure,
+                compact_tool_result=_compact_tool_result,
+                create_message=db.create_message,
+            ):
+                yield _sse(_event)
 
         elif (_skill and _skill.get("tools") and not _runner_state.nudged and use_tools and tools_payload
               and step < _max_tool_steps - 1):

@@ -51,6 +51,7 @@ flowchart LR
 | `agent_enrichment.py` | Tâches concurrentes de rappel, matching et sélection d'outils avec annulation structurée |
 | `agent_skill_context.py` | Méthode Markdown, golden path et ressources d'une compétence validée |
 | `agent_model_step.py` | Lecture typée d'une itération Ollama et matérialisation des appels contractuels |
+| `agent_tool_batch.py` | Exécution séquentielle, événements, preuves et persistance d'un lot d'outils |
 | `agent_transport.py` | Client HTTP Ollama, payload `/api/chat`, décodage JSONL et erreurs de transport typées |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
@@ -159,6 +160,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 43. le contexte de tour : `agent_turn_context.py` prépare l'historique, les chemins réels, les permissions, les mémoires, les contraintes Cortex, le projet et l'identité documentaire avec des replis déterministes.
 44. les enrichissements du tour : `agent_enrichment.py` isole rappel, matching et catalogue, absorbe leurs pannes indépendantes et annule toute tâche restante lors d'une sortie anticipée; `agent_skill_context.py` refuse une compétence incomplète sans casser le chat.
 45. l'itération modèle : `agent_model_step.py` projette thinking et texte, collecte les appels natifs, récupère les appels textuels et matérialise les outils requis avant toute exécution.
+46. le lot d'outils : `agent_tool_batch.py` conserve l'ordre dispatch, post-validation, `tool_end`, état Runner, observabilité, contexte Ollama et persistance; une panne d'observation ne transforme jamais l'action exécutée en échec.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

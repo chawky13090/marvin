@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from agent_model_step import ModelStepResult, prepare_model_step, stream_model_step
-import agent
+import agent_tool_batch
 
 
 async def main() -> int:
@@ -88,7 +88,7 @@ async def main() -> int:
     assert prepared.required_injected is True
 
     # Régression du chemin runtime : les identifiants d'appels doivent être générables.
-    assert str(agent.uuid.uuid4())
+    assert str(agent_tool_batch.uuid.uuid4())
     print("Agent Model Step OK - streaming, blocage, récupération et outils requis.")
     return 0
 
