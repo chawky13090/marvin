@@ -4807,3 +4807,44 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 950 à **19 838 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.317.0 — Recherche de fichiers bornée
+
+### Demande
+
+- Continuer la consolidation des outils et corriger les fragilités rencontrées.
+
+### Constats et décisions
+
+- `file_find` et ses deux moteurs partageaient une responsabilité unique mais vivaient au
+  milieu de `tools.py`.
+- `max_results` acceptait une conversion directe et aucune borne avant son interpolation
+  dans `SELECT TOP`.
+- Les objets ADO pouvaient ne pas être fermés lorsque la lecture d'un champ ou le parcours
+  du recordset échouait.
+- Le domaine valide désormais l'entier entre 1 et 1000, ferme recordset, connexion et COM
+  en `finally`, et maintient Windows Search comme chemin rapide avec `os.walk` en repli.
+- Les deux moteurs bloquants sont exécutés avec `asyncio.to_thread`.
+
+### Fichiers
+
+- `backend/tool_domains/filesystem.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_filesystem.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test filesystem ciblé : fallback `os.walk`, glob, limite invalide et identité de façade
+  réussis, en complément de toute la couverture fichiers précédente.
+- `scripts/check_marvin.py --quick` : **96/96 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.317.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 838 à **19 654 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

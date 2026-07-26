@@ -36,6 +36,14 @@ async def main() -> int:
         (base / "docs/legacy.xls").write_bytes(b"legacy")
         legacy = await filesystem.read({"path": "docs/legacy.xls"})
         assert legacy["unsupported_format"] is True
+        found = await filesystem.find({
+            "path": "docs", "pattern": "*.txt", "use_index": False
+        })
+        assert found["method"] == "os.walk" and found["count"] == 1
+        invalid_limit = await filesystem.find({
+            "path": "docs", "pattern": "*", "max_results": "many"
+        })
+        assert "entier attendu" in invalid_limit["error"]
         await filesystem.write({"path": "docs/a.txt", "content": "b", "mode": "append"})
         assert (base / "docs/a.txt").read_text(encoding="utf-8") == "ab"
         copied = await filesystem.copy({"source": "docs/a.txt", "destination": "docs"})
@@ -54,6 +62,7 @@ async def main() -> int:
     assert tools.execute_file_list is filesystem.list_entries
     assert tools.execute_file_info is filesystem.info
     assert tools.execute_file_read is filesystem.read
+    assert tools.execute_file_find is filesystem.find
     assert tools.execute_file_delete is filesystem.delete
     assert tools.execute_file_rename is filesystem.rename
     assert tools.execute_file_move is filesystem.move

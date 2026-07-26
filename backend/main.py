@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.317 — recherche de fichiers extraite dans filesystem :
+# index Windows borné, ressources COM garanties et fallback os.walk hors event loop.
 # v2.316 — lecture multi-format extraite dans filesystem :
 # snapshots Coding Mission, PDF/DOCX/XLSX/CSV/texte et fermeture garantie.
 # v2.315 — inventaire et métadonnées de fichiers extraits dans filesystem :

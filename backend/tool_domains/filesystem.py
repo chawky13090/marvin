@@ -9,6 +9,8 @@ import time
 import csv
 import io
 import re
+import asyncio
+import fnmatch
 from pathlib import Path
 from typing import Any, Callable
 
@@ -310,6 +312,182 @@ async def read(args: dict[str, Any]) -> dict[str, Any]:
         return {"error": "Encodage non supporté"}
     except Exception as exc:
         return {"error": str(exc)}
+
+
+def _windows_index_search(
+    pattern: str,
+    max_results: int,
+    path_filter: str | None,
+) -> list[dict[str, Any]] | None:
+    try:
+        import pythoncom
+        import win32com.client as win32com
+    except ImportError:
+        return None
+    initialized = False
+    connection = None
+    recordset = None
+    try:
+        pythoncom.CoInitialize()
+        initialized = True
+        sql_pattern = pattern.replace("*", "%").replace("?", "_")
+        if not sql_pattern.startswith("%") and not any(
+            character in sql_pattern for character in "%_"
+        ):
+            sql_pattern = f"%{sql_pattern}%"
+        sql_pattern = sql_pattern.replace("'", "''")
+        where = [f"System.FileName LIKE '{sql_pattern}'"]
+        if path_filter:
+            scope = path_filter.replace("'", "''").replace("\\", "/")
+            where.append(f"SCOPE='file:{scope}'")
+        query = (
+            f"SELECT TOP {max_results} System.ItemPathDisplay, System.ItemName, "
+            "System.Size, System.DateModified, System.ItemType "
+            f"FROM SystemIndex WHERE {' AND '.join(where)}"
+        )
+        connection = win32com.Dispatch("ADODB.Connection")
+        connection.Open(
+            "Provider=Search.CollatorDSO;"
+            "Extended Properties='Application=Windows';"
+        )
+        recordset = win32com.Dispatch("ADODB.Recordset")
+        recordset.Open(query, connection)
+        results: list[dict[str, Any]] = []
+        while not recordset.EOF:
+            def field(name: str, default: Any = None) -> Any:
+                try:
+                    return recordset.Fields(name).Value
+                except Exception:
+                    return default
+
+            path_value = field("System.ItemPathDisplay", "")
+            size_value = field("System.Size", 0)
+            try:
+                size_value = int(size_value or 0)
+            except (TypeError, ValueError):
+                size_value = 0
+            results.append({
+                "name": str(field("System.ItemName", "") or ""),
+                "path": str(path_value or ""),
+                "size": size_value,
+                "modified": str(field("System.DateModified", "") or ""),
+                "type": str(field("System.ItemType", "") or ""),
+            })
+            recordset.MoveNext()
+        return results
+    except Exception:
+        return None
+    finally:
+        if recordset is not None:
+            try:
+                recordset.Close()
+            except Exception:
+                pass
+        if connection is not None:
+            try:
+                connection.Close()
+            except Exception:
+                pass
+        if initialized:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+
+def _walk_search(
+    root: str,
+    pattern: str,
+    include_dirs: bool,
+    max_results: int,
+) -> tuple[list[dict[str, Any]], int]:
+    results: list[dict[str, Any]] = []
+    scanned = 0
+    excluded = {
+        "$RECYCLE.BIN", "System Volume Information", "AppData", "node_modules",
+        "__pycache__", ".git", ".venv", "Windows.old", "Windows",
+        "Program Files", "Program Files (x86)",
+    }
+    for directory, dirs, files in os.walk(root):
+        dirs[:] = [
+            name for name in dirs
+            if not name.startswith(".") and name not in excluded
+        ]
+        for name in files + (dirs if include_dirs else []):
+            scanned += 1
+            if not fnmatch.fnmatch(name.casefold(), pattern.casefold()):
+                continue
+            full_path = os.path.join(directory, name)
+            try:
+                stat = os.stat(full_path)
+                results.append({
+                    "name": name,
+                    "path": full_path,
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                })
+            except OSError:
+                results.append({"name": name, "path": full_path})
+            if len(results) >= max_results:
+                return results, scanned
+    return results, scanned
+
+
+async def find(args: dict[str, Any]) -> dict[str, Any]:
+    pattern = str(args.get("pattern", "*")).strip()
+    path = str(args.get("path", "")).strip()
+    if not pattern:
+        return {"error": "Paramètre 'pattern' requis. Ex: *.pdf, rapport*, *abdou*"}
+    try:
+        max_results = max(1, min(1000, int(args.get("max_results", 100))))
+    except (TypeError, ValueError):
+        return {"error": "Paramètre 'max_results' invalide : entier attendu."}
+    include_dirs = bool(args.get("include_dirs", False))
+    use_index = bool(args.get("use_index", True))
+    global_scope = not path or path.casefold() in {"all", "tout", "everywhere", "*"}
+
+    if use_index and global_scope:
+        results = await asyncio.to_thread(
+            _windows_index_search, pattern, max_results, None
+        )
+        if results is not None:
+            return {
+                "success": True,
+                "pattern": pattern,
+                "method": "windows_search_index",
+                "scope": "all indexed locations",
+                "count": len(results),
+                "results": results,
+            }
+        path = "~"
+    resolved = Path(_resolve(path or "~"))
+    if not resolved.exists() or not resolved.is_dir():
+        return {"error": f"Dossier introuvable : {resolved}"}
+    if use_index:
+        results = await asyncio.to_thread(
+            _windows_index_search, pattern, max_results, str(resolved)
+        )
+        if results:
+            return {
+                "success": True,
+                "pattern": pattern,
+                "root": str(resolved),
+                "method": "windows_search_index",
+                "count": len(results),
+                "results": results,
+            }
+    results, scanned = await asyncio.to_thread(
+        _walk_search, str(resolved), pattern, include_dirs, max_results
+    )
+    return {
+        "success": True,
+        "pattern": pattern,
+        "root": str(resolved),
+        "method": "os.walk",
+        "count": len(results),
+        "scanned": scanned,
+        "results": results,
+    }
 
 
 async def write(args: dict[str, Any]) -> dict[str, Any]:
