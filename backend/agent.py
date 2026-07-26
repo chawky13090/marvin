@@ -79,6 +79,7 @@ from agent_council_escalation import (
     escalate_council_on_disagreement as _escalate_council_on_disagreement,
 )
 from agent_learning import schedule_exchange_learning as _schedule_exchange_learning
+from agent_turn_context import prepare_agent_context as _prepare_agent_context
 from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
@@ -159,67 +160,38 @@ async def run_agent(
     # ── Préparer les messages pour Ollama ────────────────────────────────────
     # Profondeur de mémoire conversationnelle pilotée par le MODE (plus de contexte sur
     # une machine puissante, moins sur une petite pour rester rapide).
-    try:
-        _hist = int(db.get_setting("history_depth") or MAX_CONTEXT_MESSAGES)
-    except Exception:
-        _hist = MAX_CONTEXT_MESSAGES
-    _overflow = messages[:max(0, len(messages) - _hist)]   # messages anciens → compactés en résumé
-    recent = messages[max(0, len(messages) - _hist):]
-    ollama_msgs = _to_ollama_messages(recent)
+    from tools import execute_pc_get_real_paths
 
-    # ── Injecter les vrais chemins dans le premier tour de chaque conversation ─
-    # Si c'est le 1er message (nouveau conv), on injecte les paths comme 1er tool result
-    # pour que le modèle "voie" les vrais chemins avant de répondre.
-    if len(messages) <= 1 and not _tool_suppression:
-        from tools import execute_pc_get_real_paths
-        try:
-            real_paths = await execute_pc_get_real_paths({})
-            paths_injection = {
-                "role": "tool",
-                "content": json.dumps({
-                    "type": "system_paths_discovery",
-                    **real_paths,
-                }, ensure_ascii=False),
-            }
-            # Insérer juste avant le dernier message utilisateur
-            if ollama_msgs and ollama_msgs[-1]["role"] == "user":
-                ollama_msgs.insert(-1, {
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": [{"function": {"name": "pc_get_real_paths", "arguments": {}}}],
-                })
-                ollama_msgs.insert(-1, paths_injection)
-        except Exception:
-            pass
-
-    # ── Charger les mémoires ──────────────────────────────────────────────────
-    try:
-        memories = db.get_memories()
-    except Exception:
-        memories = []
-
-    # ── Lire le niveau de permission ─────────────────────────────────────────
-    try:
-        perm_raw = db.get_setting("permission_level")
-        permission_level = int(perm_raw) if perm_raw is not None else DEFAULT_PERMISSION_LEVEL
-    except Exception:
-        permission_level = DEFAULT_PERMISSION_LEVEL
+    _base_context = await _prepare_agent_context(
+        messages=messages,
+        conversation_id=conversation_id,
+        profile_name=profile_name,
+        cortex_plan=_cortex_plan,
+        tool_suppression=_tool_suppression,
+        required_tool_names=_required_tool_names,
+        max_context_messages=MAX_CONTEXT_MESSAGES,
+        default_permission_level=DEFAULT_PERMISSION_LEVEL,
+        model_profiles=MODEL_PROFILES,
+        get_setting=db.get_setting,
+        get_memories=db.get_memories,
+        get_conversation=db.get_conversation,
+        get_project=db.get_project,
+        to_ollama_messages=_to_ollama_messages,
+        build_system_prompt=_build_system_prompt,
+        cortex_prompt_block=_cortex.prompt_block,
+        get_real_paths=execute_pc_get_real_paths,
+    )
+    _overflow = _base_context.overflow
+    ollama_msgs = _base_context.ollama_messages
+    system_prompt = _base_context.system_prompt
+    permission_level = _base_context.permission_level
+    use_tools = _base_context.use_tools
 
     # Connaissances apprises : rappel SÉMANTIQUE → injecté EN TÊTE (priorité absolue,
     # sinon noyé dans le long prompt de capacités et ignoré par le modèle).
     # Rappel mémoire (embed) + filtrage des outils (embed) = 2 opérations INDÉPENDANTES.
     # On les lance EN PARALLÈLE (gain de latence, résultat identique) et on construit le
     # prompt système pendant ce temps.
-    _cortex_advise_only = (
-        "autonomy" in _cortex_plan.get("explicit_axes", [])
-        and _cortex_plan["resolved"]["autonomy"] == "advise"
-    )
-    use_tools = (
-        MODEL_PROFILES.get(profile_name, {}).get("tools", True)
-        and not _tool_suppression
-        and (not _cortex_advise_only or bool(_required_tool_names))
-    )
-
     async def _recall_learned():
         try:
             import learning
@@ -244,57 +216,6 @@ async def run_agent(
     )
     _tools_task = asyncio.create_task(_filter_relevant_tools(messages, profile_name)) if use_tools else None
     _skill_task = asyncio.create_task(_match_skill()) if not _tool_suppression else None
-
-    system_prompt = _build_system_prompt(memories, permission_level)
-    system_prompt += _cortex.prompt_block(_cortex_plan)
-    if _tool_suppression:
-        system_prompt += (
-            "\n\n=== MODE RÉPONSE DIRECTE ===\n"
-            "Aucun outil ne doit être appelé pour ce tour. Réponds uniquement au message "
-            "de l'utilisateur dans le chat, sans chercher, diagnostiquer, mémoriser ni créer de fichier."
-        )
-    if _required_tool_names:
-        system_prompt += (
-            "\n\n=== OUTIL(S) IMPOSÉ(S) PAR LE CONTRAT ===\n"
-            f"Tu dois obligatoirement exécuter : {', '.join(sorted(_required_tool_names))}. "
-            "Tu ne peux pas conclure avant leur exécution réelle."
-        )
-
-    # v2.142 — « Projects » avec instructions persistantes (équivalent Claude/ChatGPT
-    # Projects) : si cette conversation est rattachée à un projet ayant des instructions,
-    # elles sont injectées ici — s'appliquent à TOUTE conversation du projet, sans avoir
-    # à les répéter à chaque fois. Best-effort (jamais bloquant).
-    try:
-        _conv = db.get_conversation(conversation_id)
-        _pid = (_conv or {}).get("project_id")
-        if _pid:
-            _project = db.get_project(_pid)
-            _pinstr = (_project or {}).get("instructions") or ""
-            if _pinstr.strip():
-                system_prompt += (
-                    f"\n\n=== INSTRUCTIONS DU PROJET « {_project.get('name', '')} » ===\n"
-                    f"{_pinstr.strip()}\n"
-                    "(Ces instructions s'appliquent à toute cette conversation, en plus des règles ci-dessus.)"
-                )
-    except Exception:
-        pass
-
-    # v2.174 — identité document persistante (auteur/organisation/en-tête/pied de page par
-    # défaut, réglée via document_identity_set) injectée ici pour que le modèle SACHE déjà
-    # si elle est connue avant de décider s'il doit la demander (règle d'or #16) — évite de
-    # redemander à chaque document une fois réglée une première fois.
-    try:
-        _doc_identity = db.get_setting("document_identity")
-        if isinstance(_doc_identity, dict) and any(_doc_identity.values()):
-            _di_lines = "\n".join(f"- {k} : {v}" for k, v in _doc_identity.items() if v)
-            system_prompt += (
-                "\n\n=== IDENTITÉ DOCUMENT DÉJÀ CONNUE (ne redemande PAS ces infos) ===\n"
-                f"{_di_lines}\n"
-                "(file_create_pdf/file_create_docx l'appliquent déjà automatiquement en repli — "
-                "inutile de la repasser en argument sauf pour LA remplacer pour ce document précis.)"
-            )
-    except Exception:
-        pass
 
     # SKILL : si une compétence (fichier Markdown) correspond à la demande, on injecte sa
     # MÉTHODE dans le prompt (Marvin l'applique avec ses outils déjà vérifiés). Couche-prompt

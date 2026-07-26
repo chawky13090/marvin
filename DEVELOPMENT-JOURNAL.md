@@ -4182,6 +4182,49 @@ ignorée) :
   344 outils et 15 workers observés.
 - `scripts/smoke_test_api.py` : 28/28 contrats réussis avec le frontend Turbopack actif.
 
+## 2026-07-27 — v2.308.0 — Contexte déterministe du tour
+
+### Constat et décision
+
+- `run_agent` préparait directement la fenêtre d'historique, les chemins réels, les mémoires,
+  permissions, instructions de projet, identité documentaire et politique d'outils.
+- Ces données sont un contexte d'entrée cohésif, antérieur aux skills et à la boucle LLM.
+
+### Implémentation
+
+- Nouveau `backend/agent_turn_context.py` avec `PreparedAgentContext`.
+- La profondeur d'historique conserve le réglage runtime et son repli.
+- Une profondeur nulle/négative est ramenée à un message afin de ne jamais retirer la demande
+  utilisateur courante; un retour de mémoire non conforme se replie sur une liste vide.
+- Le premier tour injecte toujours `pc_get_real_paths` juste avant la demande utilisateur.
+- Le mode réponse directe, les outils imposés et le mode Cortex conseil seulement conservent
+  leurs politiques exactes.
+- Projet et identité documentaire restent best-effort, sans rendre le tour indisponible.
+- Nouveau test déterministe intégré à `check_marvin --quick`.
+- `agent.py` passe de 867 à 788 lignes après retrait des commentaires devenus orphelins.
+
+### Validation isolée réalisée avant versionnage
+
+- Compilation du module, du Runner et du test : réussie.
+- Historique, chemins, permissions, projet, identité et politique d'outils : réussis.
+- Régressions Prompt, Session et Planning : réussies.
+- Architecture : 344 outils, 346 routes, 40 pages et 64 outils encadrés.
+
+### Rollback
+
+- Revenir au commit v2.307 et replacer la préparation du contexte dans `agent.py`.
+  Aucun message Ollama, prompt, route, outil ou réglage persistant n'est supprimé.
+
+### Validation complète et réelle après versionnage
+
+- `scripts/check_marvin.py --quick` : 89/89 étapes réussies en 116,8 secondes après
+  l'amélioration du cas limite d'historique.
+- Backend compilé : 160 fichiers Python.
+- Frontend : 0 erreur ESLint ; 37 avertissements historiques, hors périmètre de cette tranche.
+- Redémarrage réel du code final : `/api/health` expose `2.308.0`, Ollama disponible,
+  344/344 outils et 15 workers supervisés.
+- `scripts/smoke_test_api.py` : 28/28 contrats HTTP réussis.
+
 ## 2026-07-27 — v2.307.0 — Effets post-réponse du Runner
 
 ### Constat et décision

@@ -47,6 +47,7 @@ flowchart LR
 | `agent_skill_outcome.py` | Issue idempotente des compétences, golden path et auto-amélioration suivie |
 | `agent_council_escalation.py` | Arbitrage Council borné après désaccord explicite du vérificateur |
 | `agent_learning.py` | Apprentissage post-réponse résident ou dédié et suivi anti-GC |
+| `agent_turn_context.py` | Fenêtre d'historique, chemins, permissions et enrichissements persistants du prompt |
 | `agent_transport.py` | Client HTTP Ollama, payload `/api/chat`, décodage JSONL et erreurs de transport typées |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
@@ -152,6 +153,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 40. la post-validation d'outil : `agent_tool_postprocess.py` normalise le contrat de résultat, critique les confirmations dangereuses et inspecte le contenu documentaire sans invalider une action déjà exécutée si un observateur tombe en panne.
 41. l'issue d'une compétence : `agent_skill_outcome.py` enregistre une seule issue par tour, conserve le golden path des succès et suit l'auto-amélioration asynchrone d'un véritable échec d'outil.
 42. les effets post-réponse : `agent_council_escalation.py` n'autorise Council qu'après un désaccord et une politique explicite; `agent_learning.py` choisit la stratégie résidente ou dédiée et conserve toute tâche jusqu'à sa fin.
+43. le contexte de tour : `agent_turn_context.py` prépare l'historique, les chemins réels, les permissions, les mémoires, les contraintes Cortex, le projet et l'identité documentaire avec des replis déterministes.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

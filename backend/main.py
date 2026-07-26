@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.308 — préparation déterministe du contexte extraite dans agent_turn_context.py :
+# historique, chemins, permissions, mémoires, projet, identité documentaire et outils.
 # v2.307 — effets post-réponse extraits : escalade Council conditionnelle et
 # apprentissage durable asynchrone suivi par le registre anti-GC.
 # v2.306 — issue des compétences extraite dans agent_skill_outcome.py :
