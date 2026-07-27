@@ -61,6 +61,7 @@ from tool_domains import google_calendar as google_calendar_domain
 from tool_domains import calendar_subscriptions as calendar_subscriptions_domain
 from tool_domains import calendar_events as calendar_events_domain
 from tool_domains import deterministic_utilities as deterministic_utilities_domain
+from tool_domains import datetime_tools as datetime_tools_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3205,101 +3206,7 @@ execute_ssh_server_info = ssh_domain.server_info
 execute_calculator = deterministic_utilities_domain.calculator
 
 
-async def execute_datetime_info(args: dict) -> dict:
-    """Retourne l'heure actuelle, effectue des conversions et calculs de dates."""
-    from datetime import datetime, timezone, timedelta
-    import zoneinfo
-
-    action   = args.get("action", "now")   # now | convert | diff | add
-    tz_name  = args.get("timezone", "Europe/Paris")
-    dt_input = args.get("datetime", "")    # ISO 8601 pour convert/diff/add
-    dt2      = args.get("datetime2", "")   # pour diff
-    delta    = args.get("delta", {})       # pour add : {"days": 5, "hours": 2}
-
-    try:
-        tz = zoneinfo.ZoneInfo(tz_name)
-    except Exception:
-        tz = timezone.utc
-        tz_name = "UTC"
-
-    now_utc = datetime.now(timezone.utc)
-    now_tz  = now_utc.astimezone(tz)
-
-    if action == "now":
-        return {
-            "success":   True,
-            "utc":       now_utc.isoformat(),
-            "local":     now_tz.isoformat(),
-            "timezone":  tz_name,
-            "weekday":   now_tz.strftime("%A"),
-            "formatted": now_tz.strftime("%d/%m/%Y %H:%M:%S %Z"),
-            "unix":      int(now_utc.timestamp()),
-        }
-
-    if action == "convert":
-        if not dt_input:
-            return {"error": "Paramètre 'datetime' requis pour action=convert"}
-        try:
-            dt = datetime.fromisoformat(dt_input)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            converted = dt.astimezone(tz)
-            return {
-                "success":   True,
-                "original":  dt.isoformat(),
-                "converted": converted.isoformat(),
-                "timezone":  tz_name,
-                "formatted": converted.strftime("%d/%m/%Y %H:%M:%S %Z"),
-            }
-        except ValueError as e:
-            return {"error": f"Format datetime invalide : {e}"}
-
-    if action == "diff":
-        if not dt_input or not dt2:
-            return {"error": "Paramètres 'datetime' et 'datetime2' requis pour action=diff"}
-        try:
-            d1 = datetime.fromisoformat(dt_input)
-            d2 = datetime.fromisoformat(dt2)
-            if d1.tzinfo is None: d1 = d1.replace(tzinfo=timezone.utc)
-            if d2.tzinfo is None: d2 = d2.replace(tzinfo=timezone.utc)
-            diff = abs(d2 - d1)
-            total_s = int(diff.total_seconds())
-            return {
-                "success":   True,
-                "diff_seconds":     total_s,
-                "diff_minutes":     round(total_s / 60, 2),
-                "diff_hours":       round(total_s / 3600, 2),
-                "diff_days":        diff.days,
-                "human":            f"{diff.days}j {diff.seconds // 3600}h {(diff.seconds % 3600) // 60}min",
-            }
-        except ValueError as e:
-            return {"error": f"Format datetime invalide : {e}"}
-
-    if action == "add":
-        if not dt_input:
-            return {"error": "Paramètre 'datetime' requis pour action=add"}
-        try:
-            dt = datetime.fromisoformat(dt_input)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            td = timedelta(
-                days=int(delta.get("days", 0)),
-                hours=int(delta.get("hours", 0)),
-                minutes=int(delta.get("minutes", 0)),
-                seconds=int(delta.get("seconds", 0)),
-                weeks=int(delta.get("weeks", 0)),
-            )
-            result = (dt + td).astimezone(tz)
-            return {
-                "success":   True,
-                "original":  dt.isoformat(),
-                "result":    result.isoformat(),
-                "formatted": result.strftime("%d/%m/%Y %H:%M:%S %Z"),
-            }
-        except ValueError as e:
-            return {"error": f"Format datetime invalide : {e}"}
-
-    return {"error": f"Action inconnue : {action!r}. Utilisez : now, convert, diff, add"}
+execute_datetime_info = datetime_tools_domain.datetime_info
 
 
 async def execute_unit_convert(args: dict) -> dict:
@@ -7648,7 +7555,15 @@ TOOLS_SPEC = [
         "timezone":  {"type": "string", "description": "Nom du fuseau horaire IANA (ex: Europe/Paris, America/New_York). Défaut : Europe/Paris"},
         "datetime":  {"type": "string", "description": "Date/heure ISO 8601 (requis pour convert, diff, add). Ex: '2025-06-01T14:30:00'"},
         "datetime2": {"type": "string", "description": "Deuxième date/heure ISO 8601 (requis pour action=diff)"},
-        "delta":     {"type": "object", "description": "Durée à ajouter (action=add). Ex: {\"days\": 5, \"hours\": 2, \"minutes\": 30}"}},
+        "delta":     {"type": "object",
+                      "properties": {
+                          "weeks": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+                          "days": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+                          "hours": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+                          "minutes": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+                          "seconds": {"type": "integer", "minimum": -1000000, "maximum": 1000000}},
+                      "additionalProperties": False,
+                      "description": "Durée à ajouter (action=add). Ex: {\"days\": 5, \"hours\": 2, \"minutes\": 30}"}},
        []),
 
     _t("weather", "Récupère la météo actuelle et les prévisions (jusqu'à 7 jours) via Open-Meteo (gratuit, sans clé API).",

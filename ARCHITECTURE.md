@@ -212,6 +212,9 @@ couches et restrictions; `check_architecture.py` interdit une couverture inféri
 75. les contrats d'outils fermés : les 344 schémas racine déclarent
 `additionalProperties=false`. Un champ halluciné ou mal orthographié est refusé avant
 permission, confirmation et effet de bord.
+76. la date et l'heure : `tool_domains/datetime_tools.py` possède horloge, parsing ISO,
+fuseaux IANA, différences et deltas. Les dates naïves conservent la convention UTC historique;
+les fuseaux inconnus et les deltas non bornés sont refusés explicitement.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

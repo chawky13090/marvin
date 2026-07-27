@@ -159,6 +159,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Abonnements calendrier", (python, "scripts/test_tool_domain_calendar_subscriptions.py")),
         Stage("Événements agenda", (python, "scripts/test_tool_domain_calendar_events.py")),
         Stage("Utilitaires déterministes", (python, "scripts/test_tool_domain_deterministic_utilities.py")),
+        Stage("Date et heure déterministes", (python, "scripts/test_tool_domain_datetime.py")),
         Stage("Gateway commun des 344 outils", (python, "scripts/test_tool_gateway.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),

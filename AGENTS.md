@@ -176,7 +176,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.357.0)
+## 9. État actuel (v2.358.0)
+
+**v2.358 (date et heure déterministes)** : `datetime_info` rejoint
+`tool_domains/datetime_tools.py`. Les fuseaux IANA invalides ne deviennent plus silencieusement
+UTC, toutes les dates internes sont conscientes de leur fuseau, les deltas sont fermés et
+bornés, et `tzdata` reste la source portable Windows déclarée.
 
 **v2.357 (contrats d'outils fermés)** : les 344 schémas refusent désormais toute propriété
 racine non déclarée avant exécution. Les confirmations explicites manquantes de quatre outils

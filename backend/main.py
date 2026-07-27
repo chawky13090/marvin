@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.358 — date/heure extraite dans tool_domains/datetime_tools.py; fuseaux IANA,
+# dates conscientes, deltas bornés et schéma imbriqué strict.
 # v2.357 — schémas fermés pour les 344 outils; tout argument inconnu est refusé
 # avant exécution et les confirmations manquantes sont désormais déclarées.
 # v2.356 — gateway déterministe commun au chat, à l'UI et à MCP; couverture du harness

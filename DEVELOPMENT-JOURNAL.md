@@ -6497,3 +6497,52 @@ non prévu à un outil, sans casser les confirmations ni les appels valides hist
 Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomique du commit
 restaure les schémas ouverts et la version 2.356.0. Le patch inverse est contrôlé avant
 commit; après réversion, redémarrer le backend puis exécuter `/api/health` et le smoke test.
+
+## 2026-07-28 — v2.358.0 — Date et heure déterministes
+
+### Contexte
+
+Extraire `datetime_info` de `tools.py`, préserver ses quatre actions et supprimer les résultats
+temporels trompeurs avant de poursuivre les autres utilitaires.
+
+### Veille et décisions
+
+- Python recommande des `datetime` conscientes pour représenter UTC et `ZoneInfo` pour les
+  fuseaux IANA. Sur Windows, la documentation recommande la dépendance `tzdata`, déjà épinglée
+  par Marvin en version 2026.2.
+  Sources : https://docs.python.org/3/library/zoneinfo.html ;
+  https://docs.python.org/3/library/datetime.html
+- Un fuseau inconnu ne doit pas être remplacé silencieusement par UTC : Python expose
+  `ZoneInfoNotFoundError`, désormais projetée comme erreur métier explicite.
+
+### Analyse et solution
+
+- `tool_domains/datetime_tools.py` possède `now`, `convert`, `diff` et `add`.
+- Les dates ISO sans fuseau conservent la convention historique UTC; toutes les opérations
+  internes utilisent ensuite des dates conscientes.
+- Fuseau, dates et composantes du delta sont bornés. Seuls `weeks`, `days`, `hours`,
+  `minutes` et `seconds` sont acceptés, chacun entre -1 000 000 et 1 000 000.
+- Le schéma imbriqué de `delta` est typé et fermé; le gateway refuse donc une fraction ou
+  une propriété comme `months` avant l'exécution.
+- `tools.py` conserve l'identité publique par alias direct et passe de 8 560 à
+  **8 480 lignes**.
+
+### Validation observée
+
+- Tests ciblés : horloge injectée, heure d'été/hiver, conversion IANA, fuseau inconnu,
+  différence entre offsets, addition, delta inconnu/hors limite, schéma, façade et registre.
+- Suite complète : **133/133 étapes** en **266,8 secondes**; compilation de 205 fichiers,
+  ESLint **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.358.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Test HTTP réel : `2026-01-15T12:00:00Z` devient
+  `2026-01-15T13:00:00+01:00` pour `Europe/Paris`.
+- Test négatif réel : `Europe/Does-Not-Exist` produit une erreur explicite et aucun résultat.
+- Smoke API avec frontend Turbopack actif : **28/28 contrats réussis**.
+
+### Rollback vérifié
+
+Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomique du commit
+restaure l'implémentation dans `tools.py`, supprime le domaine et son test, puis remet la
+version 2.357.0. Le patch inverse est contrôlé avant commit; le backend doit ensuite être
+redémarré et validé par `/api/health` et le smoke test.

@@ -226,6 +226,8 @@ Le gateway commun relie chat, UI et MCP au cœur déterministe. La couverture es
 restrictions renforcées et non comme totalité du harness.
 Les 344 schémas racine sont fermés (`additionalProperties=false`) : les arguments inconnus
 sont refusés avant exécution, sans retirer les paramètres valides existants.
+La date et l'heure sont isolées dans un domaine déterministe avec dépendance `tzdata`
+portable, fuseaux IANA explicites et deltas imbriqués strictement validés.
 
 ## 4. Validation obligatoire par tranche
 
