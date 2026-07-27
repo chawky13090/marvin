@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.327.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.328.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.327.0)
+## 9. État actuel (v2.328.0)
+
+**v2.328 (domaine Images)** : inspection, redimensionnement, assemblage PDF, rognage,
+rotation, compression et traitement en lot rejoignent `tool_domains/images.py`. Les sept
+identités du registre sont conservées. Orientation EXIF, formats, dimensions, qualité,
+boîtes, aspects, nombre de fichiers et DPI sont validés; toutes les sorties utilisent un
+remplacement atomique. Le lot récursif détecte désormais correctement un dossier ne contenant
+que des images imbriquées. Le test crée, transforme et rouvre PNG/JPEG/WEBP et un PDF réel.
 
 **v2.327 (captures documentaires)** : analyse multimodale, liste persistée et génération
 DOCX/PDF depuis les captures rejoignent `tool_domains/screenshots.py`. Accès SQLite,

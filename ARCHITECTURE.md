@@ -171,6 +171,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 49. les tableurs : `tool_domains/spreadsheets.py` possède création et lecture XLSX ainsi que les conversions CSV; les sorties sont atomiques, les CSV traités en flux borné et les classeurs fermés sur toute sortie.
 50. l'OCR vision : `tool_domains/ocr.py` conserve le routage Cloud/local de confidentialité, borne et valide l'image avant encodage et isole le transport Ollama derrière une interface injectable.
 51. les captures documentaires : `tool_domains/screenshots.py` analyse les images selon le profil de confidentialité, projette l'index SQLite et compose DOCX/PDF; `agent_context.py` dépend directement de ce domaine et non de la façade globale `tools.py`.
+52. les images locales : `tool_domains/images.py` possède inspection, resize, crop, rotation, compression, PDF et lots; orientation EXIF, limites de pixels/fichiers, paramètres et sorties atomiques sont uniformes.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

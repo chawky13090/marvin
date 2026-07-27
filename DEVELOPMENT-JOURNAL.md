@@ -5287,3 +5287,51 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 18 367 à **18 204 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.328.0 — Domaine Images locales
+
+### Demande
+
+- Continuer l'extraction des domaines métier de `tools.py`, améliorer les défauts constatés
+  et prouver la compatibilité sur de vrais artefacts.
+
+### Constats et décisions
+
+- Sept opérations d'images étaient réparties dans trois zones de `tools.py`.
+- Le lot récursif cherchait d'abord uniquement à la racine et retournait une erreur avant
+  d'appliquer `recursive=True` lorsqu'un dossier ne contenait que des images imbriquées.
+- Plusieurs images restaient ouvertes, les orientations EXIF n'étaient pas normalisées,
+  certaines dimensions/boîtes/qualités n'étaient pas validées et les sorties étaient écrites
+  directement sur leur destination.
+- Inspection, resize, images→PDF, crop, rotation, compression et batch rejoignent
+  `tool_domains/images.py`; les sept identités publiques restent inchangées.
+- Les entrées sont limitées à 100 MP et 5 000 fichiers, les paramètres sont bornés, les
+  images sont détachées de leur fichier, l'orientation EXIF est appliquée et toutes les
+  sorties passent par un fichier temporaire puis `os.replace`.
+- Les opérations de lot convert/resize/compress/rotate/watermark, la cible de poids et les
+  formats JPEG/PNG/WEBP/BMP/TIFF restent disponibles.
+
+### Fichiers
+
+- `backend/tool_domains/images.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_images.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test Images : PNG inspecté, JPEG redimensionné, crop, rotation, WEBP compressé, PDF de
+  deux pages relu avec pypdf et batch récursif imbriqué exécutés avec succès.
+- `scripts/check_marvin.py --quick` : **104/104 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.328.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 18 204 à **17 881 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

@@ -114,6 +114,9 @@ images et transport testable; les captures documentaires terminent cette sous-ph
 Analyse, consultation et génération DOCX/PDF depuis les captures rejoignent
 `tool_domains/screenshots.py` en v2.327.0. `agent_context.py` ne dépend plus de `tools.py`;
 la sous-phase Fichiers/Documents est close et la suite porte sur les autres domaines d'outils.
+Les sept opérations d'images locales rejoignent `tool_domains/images.py` en v2.328.0 avec
+sorties atomiques, orientation EXIF et bornes uniformes. Les autres familles métier sont
+extraites par cohésion avant la séparation finale registre/catalogue.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

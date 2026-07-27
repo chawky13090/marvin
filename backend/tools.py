@@ -32,6 +32,7 @@ from tool_domains import archives as archives_domain
 from tool_domains import spreadsheets as spreadsheets_domain
 from tool_domains import ocr as ocr_domain
 from tool_domains import screenshots as screenshots_domain
+from tool_domains import images as images_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -287,6 +288,14 @@ screenshots_domain.configure(
 _analyze_screenshot = screenshots_domain.analyze
 execute_screenshot_list = screenshots_domain.list_for_conversation
 execute_doc_generate_from_screenshots = screenshots_domain.generate_document
+images_domain.configure(resolve_path=_resolve_path)
+execute_image_info = images_domain.info
+execute_image_resize = images_domain.resize
+execute_images_to_pdf = images_domain.images_to_pdf
+execute_image_crop = images_domain.crop
+execute_image_rotate = images_domain.rotate
+execute_image_compress = images_domain.compress
+execute_image_batch = images_domain.batch
 
 
 execute_file_search_text = filesystem_domain.search_text
@@ -8971,122 +8980,6 @@ async def execute_diff_text(args: dict) -> dict:
     }
 
 
-async def execute_image_info(args: dict) -> dict:
-    """Retourne les métadonnées d'une image (dimensions, format, mode couleur, taille)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-
-    try:
-        from PIL import Image as _Image
-        resolved = _resolve_path(path)
-        with _Image.open(resolved) as img:
-            exif_data = {}
-            try:
-                exif_raw = img._getexif()
-                if exif_raw:
-                    from PIL.ExifTags import TAGS
-                    for tag_id, value in exif_raw.items():
-                        tag = TAGS.get(tag_id, tag_id)
-                        if isinstance(value, (str, int, float)):
-                            exif_data[str(tag)] = str(value)
-            except Exception:
-                pass
-
-            return {
-                "success":    True,
-                "path":       str(resolved),
-                "format":     img.format or "inconnu",
-                "mode":       img.mode,
-                "width":      img.width,
-                "height":     img.height,
-                "megapixels": round(img.width * img.height / 1_000_000, 2),
-                "size_bytes": Path(resolved).stat().st_size,
-                "size_kb":    round(Path(resolved).stat().st_size / 1024, 1),
-                "exif":       exif_data,
-            }
-    except ImportError:
-        return {"error": "Pillow non installé. Installez avec : pip install Pillow"}
-    except FileNotFoundError:
-        return {"error": f"Fichier introuvable : {path}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_image_resize(args: dict) -> dict:
-    """Redimensionne ou convertit une image (JPEG, PNG, WEBP, BMP)."""
-    path        = args.get("path", "").strip()
-    output_path = args.get("output_path", "").strip()
-    width       = args.get("width")
-    height      = args.get("height")
-    quality     = int(args.get("quality", 85))
-    keep_ratio  = args.get("keep_ratio", True)
-    output_format = args.get("format", "").upper()  # JPEG | PNG | WEBP
-
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    if not width and not height:
-        return {"error": "Spécifiez au moins 'width' ou 'height'."}
-
-    try:
-        from PIL import Image as _Image
-        resolved_in = Path(_resolve_path(path))
-
-        with _Image.open(resolved_in) as img:
-            orig_w, orig_h = img.width, img.height
-
-            if keep_ratio:
-                if width and height:
-                    ratio = min(width / orig_w, height / orig_h)
-                    new_w, new_h = round(orig_w * ratio), round(orig_h * ratio)
-                elif width:
-                    new_w = width
-                    new_h = round(orig_h * width / orig_w)
-                else:
-                    new_h = height
-                    new_w = round(orig_w * height / orig_h)
-            else:
-                new_w = width or orig_w
-                new_h = height or orig_h
-
-            resized = img.resize((new_w, new_h), _Image.LANCZOS)
-
-            # Chemin de sortie
-            if not output_path:
-                stem = resolved_in.stem
-                fmt_ext = (output_format or resolved_in.suffix[1:]).lower()
-                if fmt_ext == "jpeg": fmt_ext = "jpg"
-                out = resolved_in.parent / f"{stem}_resized.{fmt_ext}"
-            else:
-                out = Path(_resolve_path(output_path))
-
-            save_fmt = output_format or img.format or "PNG"
-            if save_fmt == "JPG": save_fmt = "JPEG"
-
-            save_kwargs = {}
-            if save_fmt in ("JPEG", "WEBP"):
-                save_kwargs["quality"] = quality
-
-            # Convertir en RGB si nécessaire pour JPEG
-            if save_fmt == "JPEG" and resized.mode in ("RGBA", "P"):
-                resized = resized.convert("RGB")
-
-            resized.save(str(out), format=save_fmt, **save_kwargs)
-
-        return {
-            "success":    True,
-            "output":     str(out),
-            "original":   {"width": orig_w, "height": orig_h},
-            "resized":    {"width": new_w,  "height": new_h},
-            "format":     save_fmt,
-            "size_kb":    round(out.stat().st_size / 1024, 1),
-        }
-    except ImportError:
-        return {"error": "Pillow non installé. Installez avec : pip install Pillow"}
-    except FileNotFoundError:
-        return {"error": f"Fichier introuvable : {path}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 async def execute_qr_generate(args: dict) -> dict:
@@ -9720,131 +9613,8 @@ async def execute_pdf_rotate(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_images_to_pdf(args: dict) -> dict:
-    """Assemble plusieurs images (JPG/PNG…) en un seul PDF, une image par page."""
-    sources = args.get("sources") or args.get("images") or []
-    if isinstance(sources, str):
-        sources = [s.strip() for s in sources.replace("\n", ",").split(",") if s.strip()]
-    if not sources:
-        return {"error": "Fournir des images dans 'sources'."}
-    try:
-        from PIL import Image as _Image
-        imgs = []
-        for s in sources:
-            rp = Path(_resolve_path(s))
-            if not rp.exists():
-                return {"error": f"Image introuvable : {rp}"}
-            im = _Image.open(str(rp))
-            if im.mode in ("RGBA", "P", "LA"):
-                im = im.convert("RGB")
-            imgs.append(im)
-        out = _resolve_path(args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "images.pdf"))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        imgs[0].save(out, "PDF", save_all=True, append_images=imgs[1:], resolution=float(args.get("dpi", 150)))
-        return {"success": True, "path": out, "destination": out, "pages": len(imgs),
-                "message": f"{len(imgs)} image(s) → PDF : {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
-async def execute_image_crop(args: dict) -> dict:
-    """Rogne une image. Boîte (left, top, right, bottom) en pixels OU aspect='1:1','16:9' (centré)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from PIL import Image as _Image
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Image introuvable : {rp}"}
-        im = _Image.open(str(rp))
-        W, H = im.size
-        if args.get("aspect"):
-            try:
-                aw, ah = (float(x) for x in str(args["aspect"]).replace("/", ":").split(":"))
-            except Exception:
-                return {"error": "aspect invalide (ex: '1:1', '16:9')."}
-            target = aw / ah
-            cur = W / H
-            if cur > target:  # trop large -> rogner les côtés
-                nw = int(H * target); x0 = (W - nw) // 2; box = (x0, 0, x0 + nw, H)
-            else:             # trop haut -> rogner haut/bas
-                nh = int(W / target); y0 = (H - nh) // 2; box = (0, y0, W, y0 + nh)
-        else:
-            box = (int(args.get("left", 0)), int(args.get("top", 0)),
-                   int(args.get("right", W)), int(args.get("bottom", H)))
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_crop" + rp.suffix)))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        im.crop(box).save(out)
-        return {"success": True, "path": out, "destination": out, "box": list(box),
-                "size": [box[2]-box[0], box[3]-box[1]], "message": f"Image rognée → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_image_rotate(args: dict) -> dict:
-    """Pivote/retourne une image. angle (sens horaire) ; flip='horizontal'|'vertical'."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from PIL import Image as _Image
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Image introuvable : {rp}"}
-        im = _Image.open(str(rp))
-        flip = (args.get("flip") or "").lower()
-        if flip in ("horizontal", "h"):
-            im = im.transpose(_Image.FLIP_LEFT_RIGHT)
-        elif flip in ("vertical", "v"):
-            im = im.transpose(_Image.FLIP_TOP_BOTTOM)
-        angle = float(args.get("angle", 0))
-        if angle:
-            im = im.rotate(-angle, expand=True)  # négatif = sens horaire
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_rot" + rp.suffix)))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        im.save(out)
-        return {"success": True, "path": out, "destination": out, "message": f"Image transformée → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_image_compress(args: dict) -> dict:
-    """Compresse une image (JPEG/WEBP) en visant un poids cible (target_kb) ou une qualité fixe."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from PIL import Image as _Image
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Image introuvable : {rp}"}
-        im = _Image.open(str(rp))
-        if im.mode in ("RGBA", "P", "LA"):
-            im = im.convert("RGB")
-        fmt = (args.get("format") or "JPEG").upper()
-        ext = ".webp" if fmt == "WEBP" else ".jpg"
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_compresse" + ext)))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        orig = rp.stat().st_size
-        target_kb = args.get("target_kb")
-        if target_kb:
-            target = int(target_kb) * 1024
-            q = 90
-            while q >= 20:
-                im.save(out, fmt, quality=q, optimize=True)
-                if Path(out).stat().st_size <= target:
-                    break
-                q -= 10
-        else:
-            im.save(out, fmt, quality=int(args.get("quality", 80)), optimize=True)
-        new = Path(out).stat().st_size
-        return {"success": True, "path": out, "destination": out,
-                "original_kb": round(orig/1024, 1), "compressed_kb": round(new/1024, 1),
-                "saved_pct": round((1 - new/orig) * 100, 1) if orig else 0,
-                "message": f"{round(orig/1024,1)} Ko → {round(new/1024,1)} Ko ({round((1-new/orig)*100)}% gagné)"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 def _file_large_finder_scan(root: Path, top: int, threshold: float) -> tuple[list, int]:
@@ -10066,99 +9836,6 @@ async def execute_pdf_extract_images(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_image_batch(args: dict) -> dict:
-    """Traite en LOT toutes les images d'un dossier : convert/resize/compress/rotate/watermark.
-    operation ∈ convert|resize|compress|rotate|watermark. Sortie dans output_dir (ou <dossier>_traite)."""
-    directory = (args.get("directory") or args.get("path") or "").strip()
-    if not directory:
-        return {"error": "Paramètre 'directory' requis."}
-    op = (args.get("operation") or "convert").lower()
-    try:
-        from PIL import Image as _Image
-        src_dir = Path(_resolve_path(directory))
-        if not src_dir.is_dir():
-            return {"error": f"Dossier introuvable : {src_dir}"}
-        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(src_dir.parent / f"{src_dir.name}_traite")))
-        out_dir.mkdir(parents=True, exist_ok=True)
-        exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff"}
-        files = [p for p in sorted(src_dir.iterdir()) if p.suffix.lower() in exts and p.is_file()]
-        if not files:
-            return {"error": f"Aucune image dans {src_dir}"}
-        recurse = bool(args.get("recursive", False))
-        if recurse:
-            files = [p for p in src_dir.rglob("*") if p.suffix.lower() in exts and p.is_file()]
-        fmt = (args.get("format") or "").upper()
-        width = args.get("width"); height = args.get("height")
-        target_kb = args.get("target_kb"); quality = int(args.get("quality", 85))
-        angle = float(args.get("angle", 0)); flip = (args.get("flip") or "").lower()
-        wm_text = args.get("text", "")
-        done, errors = [], 0
-        for fp in files:
-            try:
-                im = _Image.open(str(fp))
-                ext = fp.suffix
-                if op == "convert" and fmt:
-                    ext = "." + ("jpg" if fmt == "JPEG" else fmt.lower())
-                    if im.mode in ("RGBA", "P", "LA") and fmt in ("JPEG",):
-                        im = im.convert("RGB")
-                elif op == "resize":
-                    w = int(width) if width else None; h = int(height) if height else None
-                    if w and h:
-                        im = im.resize((w, h))
-                    elif w:
-                        im = im.resize((w, int(im.height * w / im.width)))
-                    elif h:
-                        im = im.resize((int(im.width * h / im.height), h))
-                elif op == "compress":
-                    ext = ".jpg"
-                    if im.mode in ("RGBA", "P", "LA"):
-                        im = im.convert("RGB")
-                elif op == "rotate":
-                    if flip in ("horizontal", "h"):
-                        im = im.transpose(_Image.FLIP_LEFT_RIGHT)
-                    elif flip in ("vertical", "v"):
-                        im = im.transpose(_Image.FLIP_TOP_BOTTOM)
-                    if angle:
-                        im = im.rotate(-angle, expand=True)
-                elif op == "watermark" and wm_text:
-                    from PIL import ImageDraw, ImageFont
-                    if im.mode != "RGBA":
-                        im = im.convert("RGBA")
-                    overlay = _Image.new("RGBA", im.size, (0, 0, 0, 0))
-                    d = ImageDraw.Draw(overlay)
-                    fs = max(16, im.width // 18)
-                    try:
-                        font = ImageFont.truetype("arial.ttf", fs)
-                    except Exception:
-                        font = ImageFont.load_default()
-                    tb = d.textbbox((0, 0), wm_text, font=font)
-                    tw, th = tb[2] - tb[0], tb[3] - tb[1]
-                    d.text((im.width - tw - 12, im.height - th - 12), wm_text,
-                           fill=(255, 255, 255, 160), font=font)
-                    im = _Image.alpha_composite(im, overlay).convert("RGB")
-                    ext = ".png" if fp.suffix.lower() == ".png" else ".jpg"
-                outp = out_dir / (fp.stem + ext)
-                if op == "compress" and target_kb:
-                    target = int(target_kb) * 1024; q = 90
-                    while q >= 20:
-                        im.save(str(outp), "JPEG", quality=q, optimize=True)
-                        if outp.stat().st_size <= target:
-                            break
-                        q -= 10
-                elif ext.lower() in (".jpg", ".jpeg"):
-                    if im.mode in ("RGBA", "P", "LA"):
-                        im = im.convert("RGB")
-                    im.save(str(outp), "JPEG", quality=quality, optimize=True)
-                else:
-                    im.save(str(outp))
-                done.append(str(outp))
-            except Exception:
-                errors += 1
-        return {"success": True, "operation": op, "processed": len(done), "errors": errors,
-                "output_dir": str(out_dir), "files": done[:30],
-                "message": f"{len(done)} image(s) traitée(s) ({op}) → {out_dir}" + (f" | {errors} échec(s)" if errors else "")}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 # ════════════════ PDF render/OCR/forms, PPTX, conversions, IA (v2.36) ════════════
