@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.363.0)
+## 9. État actuel (v2.364.0)
+
+**v2.364 (documents Office Open XML)** : création/lecture PowerPoint rejoignent
+`tool_domains/presentations.py`; l'extraction Word rejoint `tool_domains/documents.py`.
+`office_packages.py` contrôle extension, structure, nombre de composants, taille décompressée,
+intégrité CRC et taux de compression avant parsing. Les sorties PPTX et texte sont atomiques,
+les volumes sont bornés et DOCX conserve désormais l'ordre réel paragraphes/tableaux avec
+échappement Markdown des cellules. Les trois identités historiques restent inchangées.
 
 **v2.363 (données structurées)** : analyse CSV, graphiques PNG, requêtes et inspection
 SQLite rejoignent `tool_domains/structured_data.py`. CSV est traité en flux avec volumes,

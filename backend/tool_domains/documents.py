@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import os
 import re as _re
+import tempfile
 from pathlib import Path
 from typing import Awaitable, Callable
 
+from office_packages import validate_office_package
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
     parse_markdown_blocks as _parse_md_blocks,
@@ -55,6 +57,119 @@ def _resolve_path(raw: str) -> str:
     if _resolver is None:
         raise RuntimeError("Le domaine documents n'est pas configuré")
     return _resolver(raw)
+
+
+def _markdown_cell(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("|", "\\|").replace("\r", "").replace("\n", "<br>")
+
+
+def _paragraph_markdown(paragraph) -> str:
+    text = paragraph.text.strip()
+    if not text:
+        return ""
+    style_name = (paragraph.style.name or "") if paragraph.style else ""
+    style_id = (paragraph.style.style_id or "") if paragraph.style else ""
+    style = f"{style_name} {style_id}".casefold()
+    heading = _re.search(r"(?:heading|titre)\s*([1-9])", style)
+    if heading:
+        return f"{'#' * min(int(heading.group(1)), 6)} {text}"
+    if "list" in style or "bullet" in style or "puce" in style:
+        return f"- {text}"
+    return text
+
+
+def _table_markdown(table) -> list[str]:
+    if not table.rows:
+        return []
+    header = [_markdown_cell(cell.text.strip()) for cell in table.rows[0].cells]
+    lines = ["| " + " | ".join(header) + " |"]
+    lines.append("| " + " | ".join("---" for _ in header) + " |")
+    for row in table.rows[1:]:
+        values = [_markdown_cell(cell.text.strip()) for cell in row.cells]
+        lines.append("| " + " | ".join(values) + " |")
+    return lines
+
+
+def _extract_docx(path: Path, *, markdown: bool) -> tuple[str, int, int]:
+    from docx import Document
+    from docx.table import Table
+
+    validate_office_package(path, suffix=".docx", marker="word/document.xml")
+    document = Document(path)
+    lines: list[str] = []
+    total = 0
+    maximum = 2_000_000
+    for block in document.iter_inner_content():
+        if isinstance(block, Table):
+            block_lines = (
+                _table_markdown(block)
+                if markdown
+                else [
+                    " | ".join(cell.text.strip() for cell in row.cells)
+                    for row in block.rows
+                ]
+            )
+        else:
+            block_lines = [
+                _paragraph_markdown(block) if markdown else block.text.strip()
+            ]
+        for line in block_lines:
+            total += len(line) + 1
+            if total > maximum:
+                raise ValueError("Texte DOCX extrait limité à 2 000 000 caractères.")
+            lines.append(line)
+    return "\n".join(lines).strip(), len(document.paragraphs), len(document.tables)
+
+
+async def extract_docx_text(args: dict) -> dict:
+    raw_path = args.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return {"error": "Paramètre 'path' requis."}
+    output_value = args.get("output_path")
+    if output_value is not None and not isinstance(output_value, str):
+        return {"error": "Paramètre 'output_path' invalide."}
+    output_value = str(output_value or "").strip()
+    target_format = str(args.get("format") or "markdown").strip().lower()
+    if target_format not in {"markdown", "text"}:
+        return {"error": "Format attendu : markdown | text."}
+    try:
+        path = Path(_resolve_path(raw_path.strip()))
+        text, paragraphs, tables = await asyncio.to_thread(
+            _extract_docx,
+            path,
+            markdown=target_format == "markdown",
+        )
+        saved: Path | None = None
+        if output_value:
+            saved = Path(_resolve_path(output_value))
+            if saved.suffix.casefold() not in {".txt", ".md", ".markdown"}:
+                return {"error": "La sortie texte doit utiliser .txt, .md ou .markdown."}
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{saved.stem}.",
+                suffix=saved.suffix,
+                dir=str(saved.parent),
+            )
+            os.close(descriptor)
+            temporary = Path(temporary_name)
+            try:
+                temporary.write_text(text, encoding="utf-8")
+                os.replace(temporary, saved)
+            finally:
+                temporary.unlink(missing_ok=True)
+    except FileNotFoundError as exc:
+        return {"error": str(exc)}
+    except (OSError, ValueError) as exc:
+        return {"error": f"Extraction Word échouée : {exc}"}
+    return {
+        "success": True,
+        "text": text[:8_000],
+        "truncated": len(text) > 8_000,
+        "paragraphs": paragraphs,
+        "tables": tables,
+        "path": str(saved) if saved else None,
+        "message": f"Word extrait ({paragraphs} paragraphes, {tables} tableau(x))",
+    }
 
 
 async def create_docx(args: dict) -> dict:

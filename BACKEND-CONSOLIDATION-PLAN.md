@@ -242,6 +242,9 @@ Analyse CSV, graphiques et accès SQLite sont isolés dans un domaine de donnée
 Les fichiers sont bornés, les graphiques sont atomiques et les requêtes SQLite ne reposent
 plus sur un test lexical contournable : l'authorizer natif classe les effets réels. Toute
 écriture confirmée crée une sauvegarde cohérente avant commit.
+Création/lecture PowerPoint et extraction Word ont rejoint leurs domaines Office. Une
+validation Open XML commune borne les archives avant parsing; les sorties sont atomiques et
+l'extraction Word conserve l'ordre réel du document.
 
 ## 4. Validation obligatoire par tranche
 

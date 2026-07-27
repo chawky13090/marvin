@@ -6838,3 +6838,57 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Les sauvegardes `.marvin-backups` sont des données utilisateur produites uniquement après
   une écriture explicitement confirmée; la réversion du code ne doit pas les supprimer.
 - Le patch inverse indexé doit être vérifié avant commit, puis le backend redémarré et validé.
+
+## 2026-07-28 — v2.364.0 — Frontière Office Open XML
+
+### Demande et constats
+
+- Continuer l'extraction des outils restants avec contrats, tests et rollback.
+- Création/lecture PPTX et extraction DOCX vivaient encore dans `tools.py`.
+- Les conteneurs Open XML étaient ouverts sans contrôle de taille décompressée, nombre de
+  composants, intégrité ou taux de compression.
+- Les sorties étaient écrites directement : une interruption pouvait laisser un fichier
+  partiel.
+- L'extraction Word plaçait tous les paragraphes avant tous les tableaux, perdant l'ordre
+  documentaire réel, et n'échappait pas les séparateurs Markdown dans les cellules.
+
+### Décisions et modifications
+
+- `tool_domains/presentations.py` possède `pptx_create` et `pptx_read`.
+- `tool_domains/documents.py` possède désormais aussi `docx_to_text`.
+- `office_packages.py` valide extension, marqueur Open XML, fichier <= 100 Mio, au plus
+  10 000 composants, taille décompressée <= 500 Mio, ratio <= 1 000 et CRC.
+- Titres, diapositives, puces, texte lu et chemins sont validés et bornés; les opérations
+  bloquantes quittent la boucle asyncio.
+- PPTX et sortie DOCX texte utilisent un fichier temporaire dans le dossier cible puis
+  `os.replace`.
+- `Document.iter_inner_content()` conserve l'ordre paragraphes/tableaux. Les cellules
+  Markdown échappent barre verticale, antislash et sauts de ligne.
+- Les schémas imbriqués des diapositives sont fermés et typés.
+- Références : documentation officielle `python-pptx` pour les layouts, text frames et
+  extraction; `python-docx 1.2` pour `iter_inner_content`; documentation Python `zipfile`
+  pour l'intégrité et les tailles des composants.
+
+### Validation
+
+- Test PPTX réel : couverture, deux diapositives de contenu, puces, relecture et structure.
+- Test DOCX réel : titre, paragraphes autour d'un tableau, ordre conservé, cellule contenant
+  `|`, sorties Markdown/texte et écriture atomique.
+- Tests négatifs : extension, nombre de diapositives, schéma imbriqué, faux PPTX et archive
+  DOCX à taux de compression anormal.
+- `scripts/check_marvin.py --quick` : **139/139 étapes réussies**, y compris le domaine
+  documentaire existant, compilation backend et lint frontend sans erreur.
+- Redémarrage réel : `/api/health` expose **2.364.0**, Ollama disponible, 344 outils et
+  15 workers.
+- Gateway HTTP réel : création d'un PPTX de 29 117 octets, relecture de deux diapositives et
+  présence vérifiée de la puce `Rollback`; laboratoire supprimé après contrôle.
+- `scripts/smoke_test_api.py` avec le frontend Turbopack : **28/28 contrats réussis**.
+
+### Rollback
+
+- Aucun schéma ni donnée applicative Marvin n'est modifié.
+- Réversion atomique du commit : remet les trois corps historiques dans `tools.py`, retire
+  `presentations.py`, `office_packages.py` et leur test, puis restaure documents, schémas,
+  gate et métadonnées 2.363.0.
+- Aucun document produit pendant les tests n'est conservé. Le patch inverse indexé doit être
+  vérifié avant commit.

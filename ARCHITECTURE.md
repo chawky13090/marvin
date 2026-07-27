@@ -234,6 +234,10 @@ graphiques PNG et inspection/requête SQLite. Le CSV est lu en flux borné; Matp
 une `Figure` isolée et une sortie atomique. L'authorizer SQLite détecte les mutations réelles,
 y compris derrière une CTE, refuse les capacités hors périmètre et exige confirmation.
 Une écriture confirmée dispose d'une sauvegarde cohérente avant commit.
+82. les documents Office : `tool_domains/presentations.py` possède création et lecture PPTX;
+`tool_domains/documents.py` possède aussi l'extraction DOCX. `office_packages.py` valide les
+conteneurs Open XML avant parsing. Les sorties sont atomiques, les volumes bornés et
+`Document.iter_inner_content()` préserve l'ordre réel entre paragraphes et tableaux.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

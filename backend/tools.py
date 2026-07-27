@@ -68,6 +68,7 @@ from tool_domains import weather as weather_domain
 from tool_domains import translation as translation_domain
 from tool_domains import text_processing as text_processing_domain
 from tool_domains import structured_data as structured_data_domain
+from tool_domains import presentations as presentations_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -304,6 +305,7 @@ execute_file_create_folder = filesystem_domain.create_folder
 
 
 documents_domain.configure(resolve_path=_resolve_path)
+presentations_domain.configure(resolve_path=_resolve_path)
 execute_file_create_docx = documents_domain.create_docx
 execute_file_convert_docx_to_pdf = documents_domain.convert_docx_to_pdf
 execute_document_convert_format = documents_domain.convert_format
@@ -3601,129 +3603,11 @@ execute_document_refine_section = document_knowledge_domain.refine_section
 
 
 
-async def execute_pptx_create(args: dict) -> dict:
-    """Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces."""
-    slides = args.get("slides") or []
-    if isinstance(slides, str):
-        try:
-            slides = json.loads(slides)
-        except Exception:
-            return {"error": "'slides' doit être une liste d'objets {title, bullets}."}
-    if not slides and not args.get("title"):
-        return {"error": "Fournir 'title' et/ou 'slides' (liste de {title, bullets})."}
-    try:
-        from pptx import Presentation
-        from pptx.util import Pt
-        prs = Presentation()
-        # Diapo de titre
-        if args.get("title"):
-            s = prs.slides.add_slide(prs.slide_layouts[0])
-            s.shapes.title.text = args["title"]
-            if args.get("subtitle") and len(s.placeholders) > 1:
-                s.placeholders[1].text = args["subtitle"]
-        # Diapos de contenu
-        for sl in slides:
-            if isinstance(sl, str):
-                sl = {"title": sl, "bullets": []}
-            s = prs.slides.add_slide(prs.slide_layouts[1])
-            s.shapes.title.text = sl.get("title", "")
-            bullets = sl.get("bullets") or sl.get("points") or []
-            if isinstance(bullets, str):
-                bullets = [b.strip() for b in bullets.split("\n") if b.strip()]
-            if bullets and len(s.placeholders) > 1:
-                tf = s.placeholders[1].text_frame
-                tf.text = str(bullets[0])
-                for b in bullets[1:]:
-                    p = tf.add_paragraph(); p.text = str(b)
-        out = _resolve_path(args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "presentation.pptx"))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        prs.save(out)
-        n_slides = len(slides) + (1 if args.get("title") else 0)
-        return {"success": True, "path": out, "destination": out, "slides": n_slides,
-                "message": f"Présentation créée ({n_slides} diapos) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
+execute_pptx_create = presentations_domain.create
+execute_pptx_read = presentations_domain.read
 
 
-async def execute_pptx_read(args: dict) -> dict:
-    """Extrait le texte de toutes les diapos d'un fichier PowerPoint (.pptx)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pptx import Presentation
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Fichier introuvable : {rp}"}
-        prs = Presentation(str(rp))
-        out = []
-        for i, slide in enumerate(prs.slides):
-            parts = []
-            for shape in slide.shapes:
-                if shape.has_text_frame and shape.text_frame.text.strip():
-                    parts.append(shape.text_frame.text.strip())
-            out.append({"slide": i + 1, "text": "\n".join(parts)})
-        full = "\n\n".join(f"--- Diapo {s['slide']} ---\n{s['text']}" for s in out)
-        return {"success": True, "slides": len(out), "content": out, "text": full[:6000],
-                "message": f"{len(out)} diapo(s) lue(s)"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-
-
-async def execute_docx_to_text(args: dict) -> dict:
-    """Extrait le texte d'un document Word (.docx), en texte brut ou Markdown (titres, listes, tableaux)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    as_md = (args.get("format", "markdown").lower() == "markdown")
-    try:
-        from docx import Document
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Fichier introuvable : {rp}"}
-        doc = Document(str(rp))
-        lines = []
-        for para in doc.paragraphs:
-            t = para.text.strip()
-            if not t:
-                lines.append("")
-                continue
-            style = (para.style.name or "").lower() if para.style else ""
-            if as_md and style.startswith("heading"):
-                try:
-                    lvl = int(style.replace("heading", "").strip() or 1)
-                except Exception:
-                    lvl = 1
-                lines.append("#" * min(lvl, 6) + " " + t)
-            elif as_md and ("list" in style or "bullet" in style):
-                lines.append("- " + t)
-            else:
-                lines.append(t)
-        # Tableaux
-        for tbl in doc.tables:
-            if as_md and tbl.rows:
-                hdr = [c.text.strip() for c in tbl.rows[0].cells]
-                lines.append("\n| " + " | ".join(hdr) + " |")
-                lines.append("| " + " | ".join("---" for _ in hdr) + " |")
-                for row in tbl.rows[1:]:
-                    lines.append("| " + " | ".join(c.text.strip() for c in row.cells) + " |")
-            else:
-                for row in tbl.rows:
-                    lines.append(" | ".join(c.text.strip() for c in row.cells))
-        text = "\n".join(lines).strip()
-        saved = None
-        if args.get("output_path"):
-            saved = _resolve_path(args["output_path"])
-            Path(saved).parent.mkdir(parents=True, exist_ok=True)
-            Path(saved).write_text(text, encoding="utf-8")
-        return {"success": True, "text": text[:8000], "truncated": len(text) > 8000,
-                "paragraphs": len(doc.paragraphs), "tables": len(doc.tables), "path": saved,
-                "message": f"Word extrait ({len(doc.paragraphs)} paragraphes, {len(doc.tables)} tableau(x))"}
-    except Exception as e:
-        return {"error": str(e)}
-
+execute_docx_to_text = documents_domain.extract_docx_text
 
 async def execute_text_summarize(args: dict) -> dict:
     """Résume un texte ou un document (txt/pdf/docx) via l'IA locale. style: bref|détaillé|puces|action."""
@@ -6953,14 +6837,22 @@ TOOLS_SPEC = [
         "confirmed": {"type": "boolean", "description": "Confirmation explicite de suppression"}},
        []),
     _t("pptx_create", "Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces.",
-       {"title": {"type": "string", "description": "Titre de la présentation (diapo de couverture)"},
-        "subtitle": {"type": "string", "description": "Sous-titre de couverture"},
-        "slides": {"type": "array", "items": {"type": "object"},
+       {"title": {"type": "string", "maxLength": 10000, "description": "Titre de la présentation (diapo de couverture)"},
+        "subtitle": {"type": "string", "maxLength": 10000, "description": "Sous-titre de couverture"},
+        "slides": {"type": "array", "maxItems": 100,
+                   "items": {"type": "object", "additionalProperties": False,
+                             "properties": {
+                                 "title": {"type": "string", "maxLength": 10000},
+                                 "bullets": {"type": "array", "maxItems": 100,
+                                             "items": {"type": "string", "maxLength": 10000}},
+                                 "points": {"type": "array", "maxItems": 100,
+                                            "items": {"type": "string", "maxLength": 10000}}
+                             }},
                    "description": "Diapos : [{title, bullets:[...]}, …]"},
-        "output_path": {"type": "string", "description": "Fichier .pptx de sortie (défaut : Bureau)"}},
+        "output_path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx de sortie (défaut : Bureau)"}},
        []),
     _t("pptx_read", "Extrait le texte de toutes les diapos d'un PowerPoint (.pptx).",
-       {"path": {"type": "string", "description": "Fichier .pptx"}},
+       {"path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx"}},
        ["path"]),
     _t("csv_to_xlsx", "Convertit un fichier CSV en classeur Excel (.xlsx) avec en-têtes en gras.",
        {"path": {"type": "string", "description": "Fichier CSV source"},
@@ -6974,9 +6866,9 @@ TOOLS_SPEC = [
         "output_path": {"type": "string", "description": "Fichier .csv de sortie"}},
        ["path"]),
     _t("docx_to_text", "Extrait le texte d'un document Word (.docx) en texte brut ou Markdown (titres, listes, tableaux).",
-       {"path": {"type": "string", "description": "Fichier .docx"},
+       {"path": {"type": "string", "maxLength": 32767, "description": "Fichier .docx"},
         "format": {"type": "string", "enum": ["markdown", "text"], "description": "Format de sortie (défaut markdown)"},
-        "output_path": {"type": "string", "description": "Fichier texte de sortie (optionnel)"}},
+        "output_path": {"type": "string", "maxLength": 32767, "description": "Fichier texte de sortie (optionnel)"}},
        ["path"]),
     _t("text_summarize", "Résume un texte OU un document (txt/pdf/docx) via l'IA locale. Styles : bref, détaillé, puces, action.",
        {"text": {"type": "string", "description": "Texte à résumer (ou utiliser 'path')"},
