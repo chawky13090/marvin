@@ -111,6 +111,9 @@ conversions CSV rejoignent `tool_domains/spreadsheets.py` en v2.325.0; OCR et ca
 désormais les prochaines frontières Fichiers/Documents. L'OCR vision rejoint
 `tool_domains/ocr.py` en v2.326.0 avec routage de confidentialité inchangé, validation des
 images et transport testable; les captures documentaires terminent cette sous-phase.
+Analyse, consultation et génération DOCX/PDF depuis les captures rejoignent
+`tool_domains/screenshots.py` en v2.327.0. `agent_context.py` ne dépend plus de `tools.py`;
+la sous-phase Fichiers/Documents est close et la suite porte sur les autres domaines d'outils.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

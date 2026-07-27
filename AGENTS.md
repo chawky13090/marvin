@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.326.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.327.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.326.0)
+## 9. État actuel (v2.327.0)
+
+**v2.327 (captures documentaires)** : analyse multimodale, liste persistée et génération
+DOCX/PDF depuis les captures rejoignent `tool_domains/screenshots.py`. Accès SQLite,
+transport Ollama et moteurs documentaires sont injectés. Les trois façades historiques sont
+conservées, les limites et formats sont validés et le profil Ultra interdit toujours le repli
+local. `agent_context.py` appelle directement le domaine au lieu d'importer `tools.py`. Le test
+vérifie analyse structurée, provenance du modèle, liste projetée, composition PDF et Cloud-only.
 
 **v2.326 (domaine OCR vision)** : `ocr_extract` rejoint `tool_domains/ocr.py`. Le routage
 de confidentialité reste autoritaire : Ultra Cloud-only ne reçoit aucun repli local et les

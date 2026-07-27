@@ -5236,3 +5236,54 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 18 459 à **18 367 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.327.0 — Captures documentaires
+
+### Demande
+
+- Terminer la sous-phase Fichiers/Documents, améliorer les défauts découverts et réduire les
+  dépendances de la session agentique envers la façade globale d'outils.
+
+### Constats et décisions
+
+- Analyse vision, liste SQLite et génération DOCX/PDF des captures étaient dispersées dans
+  `tools.py`; `agent_context.py` importait toute cette façade uniquement pour obtenir
+  `_analyze_screenshot`.
+- `tool_domains/screenshots.py` devient propriétaire des trois flux. Accès aux captures,
+  transport Ollama et moteurs documentaires sont injectés.
+- `agent_context.py` dépend maintenant directement de ce domaine. La façade conserve
+  `_analyze_screenshot`, `execute_screenshot_list` et
+  `execute_doc_generate_from_screenshots` comme alias compatibles.
+- L'encodage borné de l'image est partagé avec le domaine OCR. Les limites de consultation,
+  formats DOCX/PDF, identifiants et chemins de capture sont validés avant rendu.
+- Le routage historique est préservé : candidats Cloud si autorisés, repli `llava-phi3`
+  uniquement hors Ultra, apprentissage de capacité après résultat réel et refus explicite
+  du repli local en Cloud-only.
+
+### Fichiers
+
+- `backend/tool_domains/screenshots.py`
+- `backend/tool_domains/ocr.py`
+- `backend/agent_context.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_screenshots.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test Captures : projection de liste, limites, contenu documentaire, sélection PDF,
+  format invalide, analyse vision structurée, modèle/provenance et Cloud-only vérifiés.
+- Régression `agent_context` : compaction, cache, captures, nettoyage et façade réussis.
+- `scripts/check_marvin.py --quick` : **103/103 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.327.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 18 367 à **18 204 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

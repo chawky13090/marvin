@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Any
 
 import database as db
-import tools
 from config import DATA_DIR
+from tool_domains import screenshots
 
 
 Generate = Callable[..., Awaitable[str | None]]
@@ -130,7 +130,7 @@ async def persist_and_analyze_screenshot(
         file_path = conversation_dir / f"{uuid.uuid4().hex}{extension}"
         file_path.write_bytes(raw)
 
-        analyzer = tools._analyze_screenshot if analyze is None else analyze
+        analyzer = screenshots.analyze if analyze is None else analyze
         analysis = await analyzer(str(file_path))
         return db.create_screenshot(
             conversation_id,

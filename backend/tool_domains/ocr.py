@@ -58,7 +58,7 @@ async def _request_json(
         return data
 
 
-def _encode_image(path: Path) -> tuple[str, bool]:
+def encode_image(path: Path) -> tuple[str, bool]:
     size = path.stat().st_size
     if size > _MAX_INPUT_BYTES:
         raise ValueError("Image refusée : taille supérieure à 25 Mio")
@@ -138,7 +138,7 @@ async def extract(args: dict) -> dict:
     if not resolved.is_file():
         return {"error": f"Fichier introuvable : {resolved}"}
     try:
-        image_b64, resized = _encode_image(resolved)
+        image_b64, resized = encode_image(resolved)
     except (OSError, ValueError) as exc:
         return {"error": f"Erreur lecture image : {exc}"}
 

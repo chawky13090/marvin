@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.327 — captures documentaires extraites de la façade d'outils :
+# analyse vision, index SQLite et rendu DOCX/PDF injectables et testés.
 # v2.326 — OCR vision extrait avec confidentialité inchangée :
 # image bornée/validée, transport injectable et repli local contrôlé.
 # v2.325 — création, lecture et conversions XLSX/CSV extraites :

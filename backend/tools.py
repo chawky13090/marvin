@@ -31,6 +31,7 @@ from tool_domains import documents as documents_domain
 from tool_domains import archives as archives_domain
 from tool_domains import spreadsheets as spreadsheets_domain
 from tool_domains import ocr as ocr_domain
+from tool_domains import screenshots as screenshots_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -279,6 +280,13 @@ execute_xlsx_to_csv = spreadsheets_domain.xlsx_to_csv
 execute_xlsx_read = spreadsheets_domain.read_xlsx
 ocr_domain.configure(resolve_path=_resolve_path, ollama_url=OLLAMA_URL)
 execute_ocr_extract = ocr_domain.extract
+screenshots_domain.configure(
+    list_screenshots=db.list_screenshots,
+    ollama_url=OLLAMA_URL,
+)
+_analyze_screenshot = screenshots_domain.analyze
+execute_screenshot_list = screenshots_domain.list_for_conversation
+execute_doc_generate_from_screenshots = screenshots_domain.generate_document
 
 
 execute_file_search_text = filesystem_domain.search_text
@@ -2989,6 +2997,10 @@ async def execute_infographic_create(args: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 execute_file_create_pdf = documents_domain.create_pdf
+screenshots_domain.configure_renderers(
+    create_docx=execute_file_create_docx,
+    create_pdf=execute_file_create_pdf,
+)
 
 
 _GOOGLE_SA_PATH = os.path.join(os.path.dirname(__file__), "data", "google_service_account.json")
@@ -5295,139 +5307,6 @@ async def execute_skill_learning_log(args: dict) -> dict:
 # SECTION OCR — Extraction de texte par vision (llava-phi3)
 # ══════════════════════════════════════════════════════════════════════════════
 
-import base64 as _base64
-
-
-
-# v2.175 — Analyse de capture d'écran pour la documentation (screenshot_list /
-# doc_generate_from_screenshots). DÉLIBÉRÉMENT SÉPARÉ de ocr_extract ci-dessus : ocr_extract
-# reste 100% local par doctrine (v2.122, contenu potentiellement le plus sensible). Ici,
-# l'utilisateur a explicitement autorisé le cloud pour CE pipeine précis après un benchmark
-# réel (llava-phi3 local a HALLUCINÉ des données DNS fictives sur une image de test — preuve
-# concrète, pas une supposition — alors que gemini/gemma/qwen3.5 ont extrait les 4 détails
-# exacts en ~6s). `local_only_lockdown` (Hyper sécurisé) reste un plafond dur JAMAIS
-# contourné ; le cloud n'est utilisé que si `cloud_enabled` (opt-in existant) est actif,
-# sinon repli local silencieux sur llava-phi3.
-# v2.179 — la liste de candidats N'EST PLUS figée par tag exact (gemini-3-flash-preview:cloud
-# et qwen3-coder:480b-cloud, tous deux recommandés dans CETTE session, ont été retirés par
-# Ollama Cloud ~2 jours plus tard — constaté en réel) : résolue en DIRECT sur les modèles
-# réellement installés via cloud_routing.list_vision_candidates() (familles par préfixe).
-
-_SCREENSHOT_ANALYZE_PROMPT = (
-    "Tu analyses une capture d'écran technique (contexte informatique/administration système). "
-    "Réponds en français, en respectant EXACTEMENT ce format à 2 sections :\n"
-    "LÉGENDE: <une phrase décrivant ce que montre la capture>\n"
-    "TEXTE RELEVÉ: <tout le texte visible dans l'image, transcrit fidèlement : messages, "
-    "codes d'erreur, adresses IP, chemins, valeurs de configuration — verbatim, pas de résumé>\n"
-    "N'invente rien : si un détail n'est pas lisible, ne le mentionne pas."
-)
-
-
-def _read_image_b64(resolved_path: str, max_dim: int = 1920) -> tuple[str, bool]:
-    """Lit une image et la renvoie en base64, redimensionnée si besoin. Réutilisé par
-    ocr_extract et _analyze_screenshot pour un comportement cohérent."""
-    from PIL import Image as _PILImage
-    import io as _io
-    with _PILImage.open(resolved_path) as _raw_img:
-        img = _raw_img.copy()
-        orig_fmt = _raw_img.format
-    orig_size = img.size
-    if max(img.size) > max_dim:
-        ratio = max_dim / max(img.size)
-        img = img.resize((int(img.width * ratio), int(img.height * ratio)), _PILImage.LANCZOS)
-    buf = _io.BytesIO()
-    fmt = orig_fmt if orig_fmt in ("PNG", "JPEG", "WEBP") else "PNG"
-    img.save(buf, format=fmt)
-    return _base64.b64encode(buf.getvalue()).decode(), img.size != orig_size
-
-
-async def _analyze_screenshot(resolved_path: str) -> dict:
-    """Analyse une capture (légende + texte relevé). Retourne {caption, ocr_text, model}."""
-    import httpx
-    import cloud_routing as _cr
-    image_b64, _ = _read_image_b64(resolved_path)
-
-    lockdown = False
-    cloud_enabled = False
-    candidates = []
-    try:
-        lockdown = _cr.is_local_only_lockdown()
-        cloud_enabled, _overrides = _cr.get_cloud_config()
-        if cloud_enabled and not lockdown:
-            candidates = _cr.list_vision_candidates()
-    except Exception:
-        pass
-
-    candidates = list(candidates)
-    cloud_only = False
-    try:
-        cloud_only = _cr.is_cloud_only_mode()
-    except Exception:
-        pass
-    if not cloud_only:
-        candidates.append("llava-phi3")  # repli local uniquement hors Ultra
-    elif not candidates:
-        return {
-            "caption": "", "ocr_text": "", "model": None,
-            "error": "Mode Ultra débridé actif : aucun modèle vision cloud disponible; repli local refusé.",
-            "cloud_only": True,
-        }
-
-    last_err = None
-    for model in candidates:
-        try:
-            payload = {"model": model, "prompt": _SCREENSHOT_ANALYZE_PROMPT,
-                       "images": [image_b64], "stream": False, "options": {"temperature": 0.1}}
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
-                resp.raise_for_status()
-                text = resp.json().get("response", "").strip()
-            caption, ocr_text = text, ""
-            m = _re.search(r"L[ÉE]GENDE\s*:\s*(.+?)\n\s*TEXTE RELEV[ÉE]\s*:\s*(.+)", text, _re.S | _re.I)
-            if m:
-                caption, ocr_text = m.group(1).strip(), m.group(2).strip()
-            # v2.180 — apprentissage passif : ce modèle vient de PROUVER qu'il gère la vision,
-            # mémorisé pour que les prochains appels le préfèrent (expérience réelle > famille).
-            if model != "llava-phi3":
-                try:
-                    _cr.record_model_capability(model, "vision", True)
-                except Exception:
-                    pass
-            return {"caption": caption, "ocr_text": ocr_text, "model": model}
-        except Exception as e:
-            # Erreur de CAPACITÉ constatée (4xx = le modèle refuse ce contenu, ex. pas de
-            # support multimodal) -> mémorisé pour ne plus jamais le retenter en vision.
-            # Un incident transitoire (timeout, 5xx, réseau) n'est PAS mémorisé comme un
-            # échec de capacité — ce serait exclure à tort un modèle valide.
-            if model != "llava-phi3":
-                status = getattr(getattr(e, "response", None), "status_code", None)
-                if status is not None and 400 <= status < 500:
-                    try:
-                        _cr.record_model_capability(model, "vision", False)
-                    except Exception:
-                        pass
-            last_err = e
-            continue
-    return {"caption": "", "ocr_text": "", "model": None, "error": str(last_err) if last_err else "aucun modèle vision disponible"}
-
-
-async def execute_screenshot_list(args: dict) -> dict:
-    """Liste les captures d'écran déjà analysées pour une conversation (ou toutes, si aucune
-    précisée) — utile pour savoir ce qui est disponible avant de générer une documentation."""
-    conv_id = args.get("conversation_id") or args.get("_conversation_id")
-    limit = int(args.get("limit") or 100)
-    shots = db.list_screenshots(conv_id, limit=limit)
-    return {
-        "success": True,
-        "count": len(shots),
-        "screenshots": [
-            {"id": s["id"], "path": s["path"], "caption": s.get("caption", ""),
-             "ocr_text": s.get("ocr_text", ""), "created_at": s.get("created_at")}
-            for s in shots
-        ],
-    }
-
-
 async def execute_logo_generate(args: dict) -> dict:
     """Génère un logo localement (GPU, sd-turbo) à partir d'une description, l'enregistre
     dans data/logos/ et le référence en base pour réutilisation future (logo_list). Né d'un
@@ -5475,48 +5354,6 @@ async def execute_logo_list(args: dict) -> dict:
     }
 
 
-async def execute_doc_generate_from_screenshots(args: dict) -> dict:
-    """Génère un document Word/PDF structuré à partir des captures d'écran enregistrées
-    (une section par capture : image intégrée + légende + texte relevé)."""
-    conv_id = args.get("conversation_id") or args.get("_conversation_id")
-    if not conv_id:
-        return {"error": "Aucune conversation_id disponible — cet outil doit être appelé depuis une conversation."}
-    shots = db.list_screenshots(conv_id, limit=int(args.get("limit") or 200))
-    if not shots:
-        return {"error": "Aucune capture d'écran enregistrée pour cette conversation. "
-                          "Demande à l'utilisateur d'attacher ses captures au chat d'abord."}
-
-    title = args.get("title") or "Documentation technique"
-    fmt = (args.get("format") or "docx").lower()
-
-    parts = []
-    intro = args.get("intro") or ""
-    if intro:
-        parts.append(intro); parts.append("")
-    for idx, s in enumerate(shots, 1):
-        cap = (s.get("caption") or f"Capture {idx}").strip()
-        parts.append(f"## {idx}. {cap}")
-        parts.append(f"![{cap}]({s['path']})")
-        if s.get("ocr_text"):
-            parts.append("**Texte relevé :**")
-            parts.append(f"```\n{s['ocr_text']}\n```")
-        parts.append("")
-    content = "\n".join(parts)
-
-    path = args.get("path")
-    if not path:
-        safe_title = _re.sub(r"[^\w\- ]", "", title).strip().replace(" ", "_")[:60] or "documentation"
-        ext = "pdf" if fmt == "pdf" else "docx"
-        path = str(Path(_SYSTEM_PATHS["desktop"]) / f"{safe_title}.{ext}")
-
-    call_args = {"path": path, "title": title, "content": content, "toc": True}
-    if args.get("author"): call_args["author"] = args["author"]
-    if args.get("subtitle"): call_args["subtitle"] = args["subtitle"]
-
-    result = await (execute_file_create_pdf(call_args) if fmt == "pdf" else execute_file_create_docx(call_args))
-    if result.get("success"):
-        result["screenshots_used"] = len(shots)
-    return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
