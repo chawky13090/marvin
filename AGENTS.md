@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.324.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.325.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.324.0)
+## 9. État actuel (v2.325.0)
+
+**v2.325 (domaine Tableurs)** : création/lecture XLSX et conversions CSV sont extraites vers
+`tool_domains/spreadsheets.py`. Les quatre identités du registre sont conservées. Les sorties
+XLSX/CSV sont atomiques, les CSV sont traités en flux borné, les classeurs sont toujours
+refermés et les paramètres de feuille/délimiteur/volume sont validés. La fusion du titre
+utilise désormais les coordonnées openpyxl et fonctionne au-delà de 26 colonnes. Le test
+crée puis relit un XLSX de 28 colonnes et valide un cycle CSV→XLSX→CSV.
 
 **v2.324 (domaine Archives)** : `file_compress` et `file_extract` sont extraits vers
 `tool_domains/archives.py`. La création ZIP utilise un fichier temporaire puis un remplacement

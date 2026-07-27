@@ -168,6 +168,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 46. le lot d'outils : `agent_tool_batch.py` conserve l'ordre dispatch, post-validation, `tool_end`, état Runner, observabilité, contexte Ollama et persistance; une panne d'observation ne transforme jamais l'action exécutée en échec.
 47. la sortie du tour : `agent_turn_completion.py` impose le même ordre de revue, persistance, issue de compétence, recette Cortex, provenance et `done` aux terminaisons normales et par budget; l'apprentissage reste désactivé pour une synthèse incomplète par budget.
 48. les archives : `tool_domains/archives.py` crée les ZIP de façon atomique et extrait ZIP/TAR membre par membre; chemins absolus ou traversants, liens, fichiers spéciaux et décompressions hors limites sont refusés avant écriture.
+49. les tableurs : `tool_domains/spreadsheets.py` possède création et lecture XLSX ainsi que les conversions CSV; les sorties sont atomiques, les CSV traités en flux borné et les classeurs fermés sur toute sortie.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

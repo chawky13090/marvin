@@ -5144,3 +5144,50 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 18 716 à **18 632 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.325.0 — Domaine Tableurs
+
+### Demande
+
+- Continuer la consolidation backend, améliorer les défauts rencontrés et vérifier chaque
+  évolution sur des artefacts réellement exploitables.
+
+### Constats et décisions
+
+- Les quatre outils de création/lecture XLSX et de conversion CSV étaient dispersés dans
+  `tools.py`.
+- La fusion du titre utilisait `chr(64 + nombre_colonnes)` et devenait invalide dès la
+  colonne 27. Les noms de feuille et délimiteurs n'étaient pas validés, le CSV était chargé
+  intégralement en mémoire et certains classeurs pouvaient rester ouverts après exception.
+- Les quatre outils rejoignent `tool_domains/spreadsheets.py` avec le résolveur portable
+  injecté et les mêmes identités publiques.
+- Les coordonnées de fusion utilisent désormais openpyxl, les écritures XLSX/CSV sont
+  atomiques, le CSV est traité en flux avec un plafond explicite, les lectures sont bornées
+  et chaque classeur est fermé dans un `finally`.
+- Les formats XLSX et CSV, les styles, formules, modes `read/sheets/summary`, choix de feuille
+  et détection de délimiteur restent disponibles.
+
+### Fichiers
+
+- `backend/tool_domains/spreadsheets.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_spreadsheets.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test Tableurs : XLSX réel de 28 colonnes créé et rouvert, fusion `A1:AB1`, formule,
+  dimensions, résumé, liste des feuilles, lecture bornée et cycle CSV→XLSX→CSV vérifiés.
+- `scripts/check_marvin.py --quick` : **101/101 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.325.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 18 632 à **18 459 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

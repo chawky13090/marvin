@@ -29,6 +29,7 @@ from tool_domains import ssh as ssh_domain
 from tool_domains import filesystem as filesystem_domain
 from tool_domains import documents as documents_domain
 from tool_domains import archives as archives_domain
+from tool_domains import spreadsheets as spreadsheets_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -270,6 +271,11 @@ execute_document_convert_format = documents_domain.convert_format
 archives_domain.configure(resolve_path=_resolve_path)
 execute_file_compress = archives_domain.compress
 execute_file_extract = archives_domain.extract
+spreadsheets_domain.configure(resolve_path=_resolve_path)
+execute_file_create_xlsx = spreadsheets_domain.create_xlsx
+execute_csv_to_xlsx = spreadsheets_domain.csv_to_xlsx
+execute_xlsx_to_csv = spreadsheets_domain.xlsx_to_csv
+execute_xlsx_read = spreadsheets_domain.read_xlsx
 
 
 execute_file_search_text = filesystem_domain.search_text
@@ -2971,71 +2977,6 @@ async def execute_infographic_create(args: dict) -> dict:
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _render_chart)
 
-
-async def execute_file_create_xlsx(args: dict) -> dict:
-    """Crée un fichier Excel (.xlsx) avec des données."""
-    _path_raw = args.get("path", "")
-    path = _resolve_path(_path_raw) if _path_raw else str(Path(_SYSTEM_PATHS["desktop"]) / f"tableau_{int(time.time())}.xlsx")
-    title = args.get("title", "Données")
-    headers = args.get("headers", [])
-    rows = args.get("rows", [])
-    sheet_name = args.get("sheet_name", "Feuille1")
-
-    try:
-        import openpyxl
-        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = sheet_name
-
-        GOLD = "C9A84C"
-        DARK = "111111"
-        LIGHT_GRAY = "1E1E1E"
-
-        # En-tête
-        if title:
-            ws.merge_cells(f"A1:{chr(64 + max(len(headers), 1))}1")
-            cell = ws.cell(row=1, column=1, value=title)
-            cell.font = Font(bold=True, color="FFFFFF", size=13)
-            cell.fill = PatternFill("solid", fgColor=GOLD)
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            ws.row_dimensions[1].height = 26
-            start_row = 2
-        else:
-            start_row = 1
-
-        # Headers
-        if headers:
-            for col_idx, h in enumerate(headers, 1):
-                cell = ws.cell(row=start_row, column=col_idx, value=h)
-                cell.font = Font(bold=True, color="FFFFFF", size=10)
-                cell.fill = PatternFill("solid", fgColor="2A2A2A")
-                cell.alignment = Alignment(horizontal="center")
-            start_row += 1
-
-        # Données
-        for row_idx, row in enumerate(rows):
-            fill_color = "181818" if row_idx % 2 == 0 else DARK
-            for col_idx, val in enumerate(row, 1):
-                cell = ws.cell(row=start_row + row_idx, column=col_idx, value=val)
-                cell.fill = PatternFill("solid", fgColor=fill_color)
-                cell.font = Font(color="C3C3C3", size=10)
-                cell.alignment = Alignment(horizontal="left")
-
-        # Auto-width
-        for col in ws.columns:
-            max_len = max((len(str(c.value or "")) for c in col), default=8)
-            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
-
-        out = Path(path)
-        if not out.suffix:
-            out = out.with_suffix(".xlsx")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        wb.save(str(out))
-        return {"success": True, "message": f"Fichier Excel créé : {out}", "path": str(out)}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 
@@ -10794,67 +10735,6 @@ async def execute_pptx_read(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_csv_to_xlsx(args: dict) -> dict:
-    """Convertit un fichier CSV en classeur Excel (.xlsx) avec en-têtes en gras."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import csv as _csv
-        from openpyxl import Workbook
-        from openpyxl.styles import Font
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Fichier introuvable : {rp}"}
-        delim = args.get("delimiter") or ""
-        with open(rp, "r", encoding="utf-8-sig", newline="") as f:
-            sample = f.read(2048); f.seek(0)
-            if not delim:
-                try:
-                    delim = _csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
-                except Exception:
-                    delim = ","
-            rows = list(_csv.reader(f, delimiter=delim))
-        wb = Workbook(); ws = wb.active; ws.title = rp.stem[:31]
-        for r, row in enumerate(rows, 1):
-            for c, val in enumerate(row, 1):
-                cell = ws.cell(row=r, column=c, value=val)
-                if r == 1:
-                    cell.font = Font(bold=True)
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_suffix(".xlsx")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        wb.save(out)
-        return {"success": True, "path": out, "destination": out, "rows": len(rows),
-                "message": f"CSV converti en Excel ({len(rows)} lignes) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_xlsx_to_csv(args: dict) -> dict:
-    """Convertit une feuille d'un classeur Excel (.xlsx) en CSV."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import csv as _csv
-        from openpyxl import load_workbook
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Fichier introuvable : {rp}"}
-        wb = load_workbook(str(rp), read_only=True, data_only=True)
-        ws = wb[args["sheet"]] if args.get("sheet") and args["sheet"] in wb.sheetnames else wb.active
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_suffix(".csv")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        n = 0
-        with open(out, "w", encoding="utf-8-sig", newline="") as f:
-            w = _csv.writer(f, delimiter=args.get("delimiter", ","))
-            for row in ws.iter_rows(values_only=True):
-                w.writerow(["" if v is None else v for v in row]); n += 1
-        wb.close()
-        return {"success": True, "path": out, "destination": out, "rows": n, "sheet": ws.title,
-                "message": f"Excel converti en CSV ({n} lignes, feuille « {ws.title} ») → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 async def execute_docx_to_text(args: dict) -> dict:
@@ -11172,59 +11052,6 @@ async def execute_csv_to_chart(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_xlsx_read(args: dict) -> dict:
-    """Lit un fichier Excel (.xlsx) et retourne le contenu d'une feuille."""
-    path     = args.get("path", "").strip()
-    sheet    = args.get("sheet", None)
-    max_rows = int(args.get("max_rows", 50))
-    action   = args.get("action", "read")   # read | sheets | summary
-
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import openpyxl as _xl
-        resolved = Path(_resolve_path(path))
-        if not resolved.exists():
-            return {"error": f"Fichier introuvable : {resolved}"}
-        wb = _xl.load_workbook(str(resolved), read_only=True, data_only=True)
-        sheet_names = wb.sheetnames
-
-        if action == "sheets":
-            wb.close()
-            return {"success": True, "file": str(resolved), "sheets": sheet_names, "count": len(sheet_names)}
-
-        ws = wb[sheet] if sheet and sheet in sheet_names else wb.active
-
-        if action == "summary":
-            result = {
-                "success": True, "file": str(resolved),
-                "active_sheet": ws.title, "sheets": sheet_names,
-                "rows": ws.max_row, "columns": ws.max_column,
-            }
-            wb.close()
-            return result
-
-        # action == "read"
-        rows = []; headers = None
-        for i, row in enumerate(ws.iter_rows(values_only=True)):
-            if i == 0:
-                headers = [str(c) if c is not None else f"Col{j+1}" for j, c in enumerate(row)]
-            elif i <= max_rows:
-                rows.append({
-                    headers[j]: (str(v) if v is not None else "")
-                    for j, v in enumerate(row) if j < len(headers)
-                })
-        wb.close()
-        return {
-            "success":     True,
-            "file":        str(resolved),
-            "sheet":       ws.title,
-            "headers":     headers,
-            "rows_loaded": len(rows),
-            "data":        rows,
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 async def execute_url_analyze(args: dict) -> dict:
