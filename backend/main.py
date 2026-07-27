@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.337 — diagnostic PC extrait :
+# matériel, santé, pilotes, tendances et fiabilité isolés avec composition ordonnée.
 # v2.336 — contrôle PC extrait :
 # commandes, bureau, GUI, presse-papiers et processus isolés avec entrées bornées.
 # v2.335 — domaine Web extrait :

@@ -4729,6 +4729,36 @@ ignorée) :
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
 
+## 2026-07-27 — v2.337.0 — Domaine diagnostic PC
+
+### Demande et périmètre
+
+- Achever la séparation PC avec une frontière de diagnostic distincte des effets de bord.
+
+### Constats et décisions
+
+- Dix outils de matériel, santé, pilotes, tendances et observabilité restaient dans `tools.py`.
+- Ils rejoignent `tool_domains/pc_diagnostics.py`; PowerShell et Web sont injectés.
+- Le premier import a révélé que le diagnostic était configuré avant la création de l'alias
+  Web. La composition a été réordonnée : façades PC et Web, puis injection diagnostic.
+- Jours, volumes, appels minimum, composants et identifiants sont normalisés avant lecture.
+- Les 10 identités publiques et les données historiques SQLite restent inchangées.
+
+### Validation réelle
+
+- Compilation ciblée, tests diagnostic PC, contrôle PC et Web, architecture 344/344 : réussis.
+- Le test utilise des transports simulés et n'exécute aucun diagnostic système réel.
+- `scripts/check_marvin.py --quick` : **113/113 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.337.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 12 913 à **12 455 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.336.0 — Domaine de contrôle PC
 
 ### Demande et périmètre

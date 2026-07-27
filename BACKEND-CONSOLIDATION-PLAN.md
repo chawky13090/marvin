@@ -140,6 +140,9 @@ leurs contrats tandis que providers et volumes sont bornés.
 Les 21 outils de contrôle PC rejoignent `tool_domains/pc_control.py` en v2.336.0. Les actions
 restent protégées par confirmation et `security`; chemins/formatage sont injectés et les
 contrats d'entrée sont validés avant toute commande, interaction GUI ou terminaison.
+Les 10 outils de diagnostic PC rejoignent `tool_domains/pc_diagnostics.py` en v2.337.0.
+PowerShell et Web sont injectés dans un ordre explicite; métriques, tendances et observabilité
+restent en lecture/persistance historique avec paramètres bornés.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

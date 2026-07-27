@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.336.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.337.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.336.0)
+## 9. État actuel (v2.337.0)
+
+**v2.337 (diagnostic PC)** : les 10 outils de spécifications matérielles, GPU/températures,
+SMART, erreurs Windows, pilotes, tendance de santé, fiabilité des outils, trace de conversation
+et logiciels installés rejoignent `tool_domains/pc_diagnostics.py`. PowerShell et Web sont
+injectés après matérialisation de leurs façades; un défaut d'ordre de composition a été détecté
+par import ciblé et corrigé avant validation. Les paramètres temporels/volumétriques et
+identifiants sont normalisés; les lectures et persistances historiques restent inchangées.
 
 **v2.336 (contrôle PC)** : 21 outils de chemins, navigation, applications, commandes,
 PowerShell/élévation, métriques, captures, fenêtres, GUI, notifications, Ollama,
