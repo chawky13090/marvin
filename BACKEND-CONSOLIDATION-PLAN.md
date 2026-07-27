@@ -154,6 +154,9 @@ approbation et historique sont isolés, avec listes et volumes bornés.
 Les six outils de contrôles opérationnels rejoignent `tool_domains/operations_safety.py` en
 v2.340.0. Les pré/post-checks sont typés avant écriture, preuves et formats sont validés, et
 les générateurs documentaires sont injectés sans introduire d'exécution automatique.
+Les cinq outils de santé client rejoignent `tool_domains/client_health.py` en v2.341.0.
+Calcul multi-axes, recommandations, historique et synthèse mensuelle partagent une frontière
+testable; formats, statuts et volumes sont bornés et les erreurs internes ne sont plus exposées.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

@@ -5807,3 +5807,39 @@ Poursuivre la consolidation des outils et garde-fous backend avec validation ré
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **9 513 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.341.0 — Domaine santé client
+
+### Demande
+
+Continuer la consolidation backend avec amélioration des contrats et tests réels.
+
+### Constats et décisions
+
+- Les cinq outils de score client agrégeaient plusieurs domaines mais restaient dans la façade
+  globale, ce qui rendait le calcul difficile à tester sans charger tous les outils.
+- Le domaine rejoint `tool_domains/client_health.py`; ses générateurs DOCX/PDF sont injectés.
+- Les historiques sont bornés à 1–120, les statuts de recommandation utilisent une liste
+  blanche et les exports refusent tout format autre que PDF, DOCX ou Markdown.
+- Le calcul renvoyait les 400 derniers caractères d'un traceback dans la réponse publique.
+  Cette fuite de détail interne est supprimée; l'erreur exploitable reste disponible.
+- Un test avec données déterministes vérifie que les cinq scores restent dans 0–100 et que le
+  niveau de risque appartient au contrat public.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/client_health.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_client_health.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Tests ciblés santé client, contrôles opérationnels et architecture **344/344** réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **117/117 étapes** en
+  190,0 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.341.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **9 187 lignes** mesurées par PowerShell.

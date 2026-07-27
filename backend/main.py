@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.341 — santé client extraite :
+# score multi-axes, recommandations, historique et synthèse mensuelle isolés.
 # v2.340 — contrôles opérationnels extraits :
 # pré/post-checks, preuves et rapport de validation isolés avec contrats stricts.
 # v2.339 — sécurité des commandes extraite :
