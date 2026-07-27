@@ -6064,3 +6064,33 @@ rencontrées lorsque cela renforce leur déterminisme et leur testabilité.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 498 lignes** non vides mesurées par
   PowerShell.
+
+## 2026-07-27 — v2.348.0 — Domaine ITSM/GLPI
+
+### Demande
+
+Poursuivre la consolidation en améliorant les responsabilités rencontrées, sans modifier les
+contrats publics ni diminuer les capacités de Marvin.
+
+### Constats et décisions
+
+- Le transport GLPI et les trois outils ITSM vivaient dans `tools.py`; la fermeture de session
+  n'était pas garantie lorsqu'une requête ou le décodage de sa réponse échouait.
+- `tool_domains/itsm.py` possède désormais le transport, la projection des tickets/actifs et
+  la création confirmée. La façade historique conserve les trois noms du registre.
+- La session GLPI est terminée dans un `finally`; URL, limites, tailles de texte et urgence
+  sont validées. Une réponse non JSON produit une erreur exploitable.
+- La confirmation demeure obligatoire avant toute création de ticket, donc aucun effet
+  sortant n'a été rendu plus permissif.
+
+### Validation
+
+- Tests ciblés : liste, bornes, confirmation sans appel, urgence, création, actifs, backend
+  non pris en charge et compatibilité du registre réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **124/124 étapes** en
+  201,0 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.348.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 411 lignes** non vides mesurées par
+  PowerShell.

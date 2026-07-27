@@ -204,6 +204,8 @@ Critère : `database.py` devient une façade d'import compatible. Toute opérati
 
 La recherche Windows est isolée derrière une frontière injectable, sans modifier les
 identités `system_search` et `system_search_content` du registre public.
+Le connecteur ITSM est isolé avec transport injectable et fermeture garantie des sessions
+GLPI; l'ajout d'un autre backend ne doit pas étendre la façade `tools.py`.
 
 ## 4. Validation obligatoire par tranche
 

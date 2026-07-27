@@ -53,6 +53,7 @@ from tool_domains import windows_registry as windows_registry_domain
 from tool_domains import windows_tweaks as windows_tweaks_domain
 from tool_domains import catharsis as catharsis_domain
 from tool_domains import system_search as system_search_domain
+from tool_domains import itsm as itsm_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -1672,108 +1673,16 @@ async def execute_bug_log_list(args: dict) -> dict:
 # d'échouer silencieusement ou d'halluciner un résultat.
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def _glpi_request(method: str, endpoint: str, json_body: dict = None, params: dict = None) -> dict:
-    """Appel GLPI REST API — ouvre/ferme une session à chaque appel (simple et robuste plutôt
-    que de gérer un cache de session_token entre requêtes, le volume d'appels reste faible).
-    Credentials lues via credentials_manager (jamais tapées en dur) : glpi_url, glpi_app_token,
-    glpi_user_token — configurables dans Réglages > Connexions, comme les autres clés API."""
-    import credentials_manager as cm
-    base_url = (cm.get_credential("glpi_url") or "").rstrip("/")
-    app_token = cm.get_credential("glpi_app_token") or ""
-    user_token = cm.get_credential("glpi_user_token") or ""
-    if not base_url or not app_token or not user_token:
-        return {"error": (
-            "GLPI non configuré. Il faut renseigner glpi_url, glpi_app_token et glpi_user_token "
-            "dans Réglages > Connexions (générés depuis GLPI : Configuration > Générale > API, "
-            "puis Préférences utilisateur > Clé d'accès à distance)."
-        )}
-    import httpx
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            init = await client.get(
-                f"{base_url}/apirest.php/initSession",
-                headers={"Authorization": f"user_token {user_token}", "App-Token": app_token},
-            )
-            if init.status_code != 200:
-                return {"error": f"Connexion GLPI échouée (HTTP {init.status_code}) : {init.text[:200]}"}
-            session_token = init.json().get("session_token")
-            headers = {"Session-Token": session_token, "App-Token": app_token}
-            resp = await client.request(method, f"{base_url}/apirest.php/{endpoint}",
-                                         headers=headers, json=json_body, params=params)
-            data = resp.json() if resp.content else {}
-            await client.get(f"{base_url}/apirest.php/killSession", headers=headers)
-            if resp.status_code >= 400:
-                return {"error": f"GLPI a refusé la requête (HTTP {resp.status_code}) : {str(data)[:300]}"}
-            return {"success": True, "data": data}
-    except Exception as e:
-        return {"error": f"Erreur de connexion à GLPI : {e}"}
-
-
-_ITSM_BACKENDS = {"glpi"}  # systèmes réellement implémentés — étendre ici + ajouter le backend
-
-
 async def execute_itsm_ticket_list(args: dict) -> dict:
-    """Liste les tickets d'un système ITSM/ticketing connecté (GLPI pour l'instant — architecture
-    prête pour d'autres produits). Utilise ceci pour voir les tickets ouverts/en cours."""
-    system = (args.get("system") or "glpi").lower()
-    if system not in _ITSM_BACKENDS:
-        return {"error": f"Système '{system}' pas encore implémenté (disponibles : {', '.join(sorted(_ITSM_BACKENDS))})."}
-    limit = max(1, min(int(args.get("limit", 20)), 100))
-    r = await _glpi_request("GET", "Ticket", params={"range": f"0-{limit - 1}"})
-    if r.get("error"):
-        return r
-    tickets = r["data"] if isinstance(r["data"], list) else []
-    return {
-        "success": True, "system": system, "count": len(tickets),
-        "tickets": [
-            {"id": t.get("id"), "title": t.get("name"), "status": t.get("status"),
-             "urgency": t.get("urgency"), "date": t.get("date")}
-            for t in tickets
-        ],
-    }
+    return await itsm_domain.ticket_list(args)
 
 
 async def execute_itsm_ticket_create(args: dict) -> dict:
-    """Crée un ticket dans un système ITSM/ticketing connecté (GLPI pour l'instant). Confirme
-    toujours le contenu avec l'utilisateur avant d'appeler — action visible pour d'autres
-    personnes (technicien assigné, demandeur)."""
-    system = (args.get("system") or "glpi").lower()
-    if system not in _ITSM_BACKENDS:
-        return {"error": f"Système '{system}' pas encore implémenté (disponibles : {', '.join(sorted(_ITSM_BACKENDS))})."}
-    title = args.get("title", "").strip()
-    description = args.get("description", "").strip()
-    if not title:
-        return {"error": "Paramètre 'title' requis."}
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True,
-                "message": f"Créer un ticket {system.upper()} — « {title} » ?\n\n{description[:300]}"}
-    urgency = args.get("urgency")  # 1 (très basse) à 5 (très haute), GLPI
-    payload = {"input": {"name": title, "content": description}}
-    if urgency:
-        payload["input"]["urgency"] = int(urgency)
-    r = await _glpi_request("POST", "Ticket", json_body=payload)
-    if r.get("error"):
-        return r
-    ticket_id = r["data"].get("id") if isinstance(r["data"], dict) else None
-    return {"success": True, "system": system, "ticket_id": ticket_id, "message": f"Ticket créé (#{ticket_id})."}
+    return await itsm_domain.ticket_create(args)
 
 
 async def execute_itsm_asset_list(args: dict) -> dict:
-    """Liste les postes/matériel enregistrés dans l'inventaire d'un système ITSM (GLPI pour
-    l'instant) — complète `pc_hardware_specs`/`net_inventory_list` (données Marvin locales) avec
-    la vue « déjà déclarée dans l'outil de gestion de parc »."""
-    system = (args.get("system") or "glpi").lower()
-    if system not in _ITSM_BACKENDS:
-        return {"error": f"Système '{system}' pas encore implémenté (disponibles : {', '.join(sorted(_ITSM_BACKENDS))})."}
-    limit = max(1, min(int(args.get("limit", 50)), 200))
-    r = await _glpi_request("GET", "Computer", params={"range": f"0-{limit - 1}"})
-    if r.get("error"):
-        return r
-    computers = r["data"] if isinstance(r["data"], list) else []
-    return {
-        "success": True, "system": system, "count": len(computers),
-        "assets": [{"id": c.get("id"), "name": c.get("name"), "serial": c.get("serial")} for c in computers],
-    }
+    return await itsm_domain.asset_list(args)
 
 
 async def execute_skill_learning_log(args: dict) -> dict:

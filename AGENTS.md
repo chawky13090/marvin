@@ -172,7 +172,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.347.0)
+## 9. État actuel (v2.348.0)
+
+**v2.348 (ITSM/GLPI)** : transport GLPI, liste/création de tickets et inventaire des actifs
+sont extraits vers `tool_domains/itsm.py`. Les sessions sont fermées en `finally`, limites,
+URL, tailles et urgence sont validées, et la création conserve sa confirmation obligatoire.
 
 **v2.347 (recherche Windows)** : les recherches par nom et par contenu dans l'index
 Windows Search sont extraites vers `tool_domains/system_search.py`. Les limites sont bornées,

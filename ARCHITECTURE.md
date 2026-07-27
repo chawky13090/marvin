@@ -187,6 +187,8 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 65. la recherche Windows : `tool_domains/system_search.py` possède les requêtes par nom et
 contenu sur l'index Windows Search; limites et types sont bornés, les littéraux sont échappés
 et la durée COM est exécutée hors de la boucle asyncio.
+66. l'ITSM : `tool_domains/itsm.py` possède le transport GLPI, les tickets et les actifs;
+sessions distantes, entrées, limites et confirmation des créations sont gérées par le domaine.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
