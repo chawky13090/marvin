@@ -4728,6 +4728,7 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.315.0 — Inventaire et intégrité des fichiers
 
 ### Demande
@@ -5094,4 +5095,52 @@ ignorée) :
   **344/344 outils** et **15 workers**.
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 044 à **18 716 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.324.0 — Domaine Archives borné
+
+### Demande
+
+- Poursuivre la consolidation backend et améliorer les implémentations fragiles rencontrées,
+  sans retirer de fonctionnalité.
+
+### Constats et décisions
+
+- `file_compress` et `file_extract` restaient implémentés dans `tools.py`.
+- L'extraction utilisait directement `ZipFile.extractall()` et `TarFile.extractall()` :
+  aucun confinement des chemins internes n'empêchait une archive hostile d'écrire hors de la
+  destination, et liens ou fichiers spéciaux TAR n'étaient pas filtrés.
+- Les deux outils rejoignent `tool_domains/archives.py` avec le résolveur portable injecté.
+- La création ZIP passe par un fichier temporaire puis `os.replace`; le fichier de sortie est
+  exclu si la destination se trouve dans un dossier source.
+- L'extraction traite chaque membre après validation du chemin, du type, du nombre d'entrées,
+  de la taille décompressée et du taux de compression. Les liens ZIP/TAR et fichiers spéciaux
+  TAR sont refusés. ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ et TGZ restent pris en charge.
+- Les objets historiques `execute_file_compress` et `execute_file_extract` restent les
+  identités enregistrées par la façade; aucune spécification ni fonctionnalité publique
+  n'est supprimée.
+
+### Fichiers
+
+- `backend/tool_domains/archives.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_archives.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test Archives : ZIP réel créé puis relu, TAR.GZ réel extrait, traversée ZIP et lien TAR
+  hostiles refusés, format inconnu refusé et identités de façade contrôlées.
+- `scripts/check_marvin.py --quick` : **100/100 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.324.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 18 716 à **18 632 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

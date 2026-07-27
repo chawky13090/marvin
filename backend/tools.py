@@ -28,6 +28,7 @@ from tool_domains import media as media_domain
 from tool_domains import ssh as ssh_domain
 from tool_domains import filesystem as filesystem_domain
 from tool_domains import documents as documents_domain
+from tool_domains import archives as archives_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -266,6 +267,9 @@ documents_domain.configure(resolve_path=_resolve_path)
 execute_file_create_docx = documents_domain.create_docx
 execute_file_convert_docx_to_pdf = documents_domain.convert_docx_to_pdf
 execute_document_convert_format = documents_domain.convert_format
+archives_domain.configure(resolve_path=_resolve_path)
+execute_file_compress = archives_domain.compress
+execute_file_extract = archives_domain.extract
 
 
 execute_file_search_text = filesystem_domain.search_text
@@ -5670,94 +5674,6 @@ async def execute_doc_generate_from_screenshots(args: dict) -> dict:
 # SECTION ARCHIVES — Compression et extraction (ZIP/TAR)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_file_compress(args: dict) -> dict:
-    """Compresse des fichiers ou dossiers en ZIP."""
-    sources = args.get("sources", [])
-    if isinstance(sources, str):
-        sources = [sources]
-    output_path = args.get("output_path", "").strip()
-    if not sources:
-        return {"error": "Paramètre 'sources' requis (liste de fichiers/dossiers à compresser)."}
-
-    # Résoudre chemins
-    resolved_sources = [_resolve_path(s) for s in sources]
-    for s in resolved_sources:
-        if not os.path.exists(s):
-            return {"error": f"Fichier/dossier introuvable : {s}"}
-
-    # Chemin de sortie
-    if output_path:
-        out = Path(_resolve_path(output_path))
-    else:
-        first_name = Path(resolved_sources[0]).stem
-        out = Path(_SYSTEM_PATHS["desktop"]) / f"{first_name}_{int(time.time())}.zip"
-    if not out.suffix:
-        out = out.with_suffix(".zip")
-    out.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        import zipfile
-        with zipfile.ZipFile(str(out), "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for src in resolved_sources:
-                src_path = Path(src)
-                if src_path.is_dir():
-                    for file in src_path.rglob("*"):
-                        if file.is_file():
-                            zf.write(str(file), arcname=str(file.relative_to(src_path.parent)))
-                else:
-                    zf.write(str(src_path), arcname=src_path.name)
-        size = out.stat().st_size
-        return {
-            "success": True,
-            "message": f"Archive créée : {out}",
-            "path": str(out),
-            "size": f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / 1024 / 1024:.1f} MB",
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_file_extract(args: dict) -> dict:
-    """Extrait une archive ZIP vers un dossier de destination."""
-    archive_path = _resolve_path(args.get("archive_path", "").strip())
-    dest_path = args.get("dest_path", "").strip()
-
-    if not archive_path:
-        return {"error": "Paramètre 'archive_path' requis."}
-    if not os.path.exists(archive_path):
-        return {"error": f"Archive introuvable : {archive_path}"}
-
-    # Destination par défaut = même dossier que l'archive
-    if dest_path:
-        dest = Path(_resolve_path(dest_path))
-    else:
-        dest = Path(archive_path).parent / Path(archive_path).stem
-
-    dest.mkdir(parents=True, exist_ok=True)
-
-    try:
-        ext = Path(archive_path).suffix.lower()
-        if ext == ".zip":
-            import zipfile
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                zf.extractall(str(dest))
-                names = zf.namelist()
-        elif ext in (".tar", ".gz", ".bz2", ".xz", ".tgz"):
-            import tarfile
-            with tarfile.open(archive_path, "r:*") as tf:
-                tf.extractall(str(dest))
-                names = tf.getnames()
-        else:
-            return {"error": f"Format d'archive non supporté : {ext}. Utilisez .zip ou .tar.gz"}
-
-        return {
-            "success": True,
-            "message": f"Archive extraite dans : {dest}",
-            "dest_path": str(dest),
-            "files_extracted": len(names),
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

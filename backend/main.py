@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.324 — archives ZIP/TAR extraites dans un domaine borné :
+# écritures atomiques, chemins confinés et liens/fichiers spéciaux refusés.
 # v2.323 — générateur PDF natif extrait dans le domaine Documents :
 # TOC, pagination, tableaux/images et rendu PDF réel relu en test.
 # v2.322 — génération IA documentaire extraite dans le domaine Documents :

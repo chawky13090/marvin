@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.323.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.324.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.323.0)
+## 9. État actuel (v2.324.0)
+
+**v2.324 (domaine Archives)** : `file_compress` et `file_extract` sont extraits vers
+`tool_domains/archives.py`. La création ZIP utilise un fichier temporaire puis un remplacement
+atomique. ZIP et TAR sont extraits membre par membre après contrôle du nombre d'entrées, de la
+taille décompressée et du taux de compression; chemins traversants, liens et fichiers spéciaux
+sont refusés. Les deux identités du registre sont conservées et les tests manipulent de vrais
+ZIP/TAR, dont deux archives hostiles.
 
 **v2.323 (générateur PDF natif)** : `file_create_pdf` rejoint
 `tool_domains/documents.py`. Identité, en-tête, styles, sommaire, pagination, tableaux,
