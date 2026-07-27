@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.326 — OCR vision extrait avec confidentialité inchangée :
+# image bornée/validée, transport injectable et repli local contrôlé.
 # v2.325 — création, lecture et conversions XLSX/CSV extraites :
 # fichiers atomiques, flux CSV borné et classeurs toujours refermés.
 # v2.324 — archives ZIP/TAR extraites dans un domaine borné :

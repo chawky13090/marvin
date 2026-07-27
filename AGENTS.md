@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.325.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.326.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.325.0)
+## 9. État actuel (v2.326.0)
+
+**v2.326 (domaine OCR vision)** : `ocr_extract` rejoint `tool_domains/ocr.py`. Le routage
+de confidentialité reste autoritaire : Ultra Cloud-only ne reçoit aucun repli local et les
+autres profils conservent `llava-phi3` comme repli vision installé. Les fichiers sont bornés à
+25 Mio, les images validées jusqu'à 100 MP puis ramenées à 1 920 pixels, et le transport
+Ollama est injectable. Le test simule tags et génération, vérifie repli, redimensionnement,
+fichier invalide et absence de modèle Cloud sans appel réseau réel.
 
 **v2.325 (domaine Tableurs)** : création/lecture XLSX et conversions CSV sont extraites vers
 `tool_domains/spreadsheets.py`. Les quatre identités du registre sont conservées. Les sorties

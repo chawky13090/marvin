@@ -5191,3 +5191,48 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 18 632 à **18 459 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.326.0 — Domaine OCR vision
+
+### Demande
+
+- Continuer la consolidation backend sans casser les garde-fous Cloud/local et améliorer les
+  implémentations fragiles découvertes.
+
+### Constats et décisions
+
+- `ocr_extract` mélangeait routage de confidentialité, inventaire Ollama, lecture/redimensionnement
+  de l'image, encodage et transport HTTP dans `tools.py`.
+- Le fichier n'avait aucune limite de taille ou de pixels; le transport direct rendait les
+  cas Cloud-only et les replis difficiles à tester sans modèle réel.
+- L'outil rejoint `tool_domains/ocr.py`. Le résolveur de chemin, l'URL Ollama et un transport
+  optionnel sont injectés; l'identité historique du registre reste inchangée.
+- La politique reste identique : Ultra Cloud-only échoue explicitement sans modèle vision
+  Cloud; hors Ultra, un modèle local absent retombe sur `llava-phi3`.
+- Une image est limitée à 25 Mio et 100 MP, décodée avant envoi puis réduite à 1 920 pixels.
+  Les faux fichiers image et réponses Ollama non objet produisent une erreur exploitable.
+
+### Fichiers
+
+- `backend/tool_domains/ocr.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_ocr.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test OCR : transport simulé, modèle local inconnu, repli `llava-phi3`, image réellement
+  redimensionnée, texte projeté, faux fichier image refusé et Cloud-only sans modèle vérifiés.
+- `scripts/check_marvin.py --quick` : **102/102 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.326.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 18 459 à **18 367 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

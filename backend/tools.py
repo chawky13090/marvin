@@ -30,6 +30,7 @@ from tool_domains import filesystem as filesystem_domain
 from tool_domains import documents as documents_domain
 from tool_domains import archives as archives_domain
 from tool_domains import spreadsheets as spreadsheets_domain
+from tool_domains import ocr as ocr_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -276,6 +277,8 @@ execute_file_create_xlsx = spreadsheets_domain.create_xlsx
 execute_csv_to_xlsx = spreadsheets_domain.csv_to_xlsx
 execute_xlsx_to_csv = spreadsheets_domain.xlsx_to_csv
 execute_xlsx_read = spreadsheets_domain.read_xlsx
+ocr_domain.configure(resolve_path=_resolve_path, ollama_url=OLLAMA_URL)
+execute_ocr_extract = ocr_domain.extract
 
 
 execute_file_search_text = filesystem_domain.search_text
@@ -5294,101 +5297,6 @@ async def execute_skill_learning_log(args: dict) -> dict:
 
 import base64 as _base64
 
-async def execute_ocr_extract(args: dict) -> dict:
-    """Extrait le texte d'une image avec routage local/cloud conforme au mode actif."""
-    image_path = args.get("image_path", "").strip()
-    prompt = args.get("prompt", "Extrais tout le texte présent dans cette image. Retourne uniquement le texte brut, sans commentaire.")
-    model = args.get("model", "llava-phi3")
-
-    if not image_path:
-        return {"error": "Paramètre 'image_path' requis."}
-
-    # Le modèle peut avoir halluciné un nom plausible mais non installé (ex. "llava:13b",
-    # "llava:7b" — jamais installés sur cette machine) → 404 sec côté Ollama. On vérifie et
-    # on retombe silencieusement sur llava-phi3 (le seul modèle vision garanti présent)
-    # plutôt que d'échouer sur un nom de modèle halluciné.
-    # Hors Ultra, l'OCR reste local par défaut car les images peuvent être très sensibles.
-    # En Ultra cloud-only, resolve_model choisit au contraire un modèle vision cloud
-    # installé et interdit tout repli llava local.
-    import cloud_routing as _cr
-    try:
-        model = _cr.resolve_model(
-            model,
-            profile="vision",
-            local_fallback="llava-phi3",
-            text_for_sensitivity=prompt,
-            has_images=True,
-        )
-    except _cr.CloudOnlyModelUnavailable as exc:
-        return {"error": str(exc), "cloud_only": True}
-    if not _cr.is_cloud_model(model) and model != "llava-phi3":
-        try:
-            import httpx as _hx
-            async with _hx.AsyncClient(timeout=5) as _c:
-                _r = await _c.get(f"{OLLAMA_URL}/api/tags")
-                _installed = {m.get("name", "") for m in _r.json().get("models", [])}
-                _installed |= {n[:-len(":latest")] for n in _installed if n.endswith(":latest")}
-            if model not in _installed:
-                model = "llava-phi3"
-        except Exception:
-            pass  # Ollama injoignable — laisse l'appel suivant échouer avec une erreur claire
-
-    resolved = _resolve_path(image_path)
-    if not os.path.exists(resolved):
-        return {"error": f"Fichier introuvable : {resolved}"}
-
-    # Lire et encoder l'image en base64 (redimensionner si > 1920px pour accélérer)
-    try:
-        from PIL import Image as _PILImage
-        import io as _io
-        with _PILImage.open(resolved) as _raw_img:
-            img = _raw_img.copy()   # detach from file so handle is released
-            orig_fmt = _raw_img.format
-        orig_size = img.size
-        max_dim = 1920
-        if max(img.size) > max_dim:
-            ratio = max_dim / max(img.size)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, _PILImage.LANCZOS)
-        buf = _io.BytesIO()
-        fmt = orig_fmt or "PNG"
-        if fmt not in ("PNG", "JPEG", "WEBP"):
-            fmt = "PNG"
-        img.save(buf, format=fmt)
-        image_b64 = _base64.b64encode(buf.getvalue()).decode()
-        resized = img.size != orig_size
-    except ImportError:
-        # Pillow non dispo → lire tel quel
-        with open(resolved, "rb") as f:
-            image_b64 = _base64.b64encode(f.read()).decode()
-        resized = False
-    except Exception as e:
-        return {"error": f"Erreur lecture image : {e}"}
-
-    # Appel Ollama vision
-    try:
-        import httpx
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "images": [image_b64],
-            "stream": False,
-        }
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            extracted = data.get("response", "").strip()
-            return {
-                "success": True,
-                "image": resolved,
-                "model": model,
-                "text": extracted,
-                "char_count": len(extracted),
-                "resized_for_speed": resized,
-            }
-    except Exception as e:
-        return {"error": f"Erreur OCR : {e}. Vérifiez que le modèle {model} est installé dans Ollama."}
 
 
 # v2.175 — Analyse de capture d'écran pour la documentation (screenshot_list /

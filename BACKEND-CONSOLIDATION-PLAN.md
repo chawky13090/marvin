@@ -108,7 +108,9 @@ principale Fichiers/Documents est désormais extraite. Les archives ZIP/TAR rejo
 `tool_domains/archives.py` en v2.324.0 avec extraction confinée et bornée; tableurs, OCR et
 captures restent les prochains outils spécialisés à isoler. Création/lecture XLSX et
 conversions CSV rejoignent `tool_domains/spreadsheets.py` en v2.325.0; OCR et captures sont
-désormais les prochaines frontières Fichiers/Documents.
+désormais les prochaines frontières Fichiers/Documents. L'OCR vision rejoint
+`tool_domains/ocr.py` en v2.326.0 avec routage de confidentialité inchangé, validation des
+images et transport testable; les captures documentaires terminent cette sous-phase.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.
