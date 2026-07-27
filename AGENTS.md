@@ -172,7 +172,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.352.0)
+## 9. État actuel (v2.353.0)
+
+**v2.353 (abonnements calendrier)** : lecture, parsing récurrent, synchronisation iCalendar et
+import Google sont extraits vers `tool_domains/calendar_subscriptions.py`. URLs secrètes
+masquées, SSRF local bloqué, flux/occurrences bornés et suppression confirmée sont couverts.
 
 **v2.352 (Google Calendar)** : compte de service, OAuth, normalisation RFC3339 et quatre
 opérations sont extraits vers `tool_domains/google_calendar.py`. Les appels SDK passent hors

@@ -197,6 +197,8 @@ appels SDK sont hors boucle asyncio, les entrées sont bornées et les flux fich
 chemins, tailles et upload simple en flux sont bornés selon les contrats du fournisseur.
 70. Google Calendar : `tool_domains/google_calendar.py` possède authentification, résolution
 d'agenda, dates et CRUD distant; appels SDK, repli OAuth et durée des événements sont isolés.
+71. les abonnements calendrier : `tool_domains/calendar_subscriptions.py` possède stockage,
+iCalendar récurrent, import Google et synchronisation; secrets, SSRF et volumes sont encadrés.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

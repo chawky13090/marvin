@@ -214,6 +214,8 @@ OneDrive est désormais isolé avec transport injectable et upload asynchrone en
 fichiers au-delà du contrat simple de 250 Mo exigent explicitement une upload session future.
 Google Calendar est isolé tout en gardant ses alias privés provisoires pour les routes de
 connexion, Doctor et les outils d'agenda encore en cours d'extraction.
+Les abonnements iCalendar sont isolés avec URLs publiques masquées, récupération HTTP bornée
+et protection SSRF; les suppressions via LLM exigent une confirmation explicite.
 
 ## 4. Validation obligatoire par tranche
 

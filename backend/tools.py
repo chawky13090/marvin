@@ -58,6 +58,7 @@ from tool_domains import runtime_observability as runtime_observability_domain
 from tool_domains import google_drive as google_drive_domain
 from tool_domains import onedrive as onedrive_domain
 from tool_domains import google_calendar as google_calendar_domain
+from tool_domains import calendar_subscriptions as calendar_subscriptions_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -2526,214 +2527,53 @@ async def execute_event_delete(args: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _calendar_subs() -> list:
-    subs = db.get_setting("calendar_subscriptions")
-    if isinstance(subs, str):
-        try:
-            import json as _json
-            subs = _json.loads(subs)
-        except Exception:
-            subs = []
-    return subs if isinstance(subs, list) else []
+    return calendar_subscriptions_domain.load_subscriptions(storage=db)
 
 
 def _save_calendar_subs(subs: list):
-    db.set_setting("calendar_subscriptions", subs)
+    calendar_subscriptions_domain.save_subscriptions(subs, storage=db)
 
 
-def _parse_ics(data: bytes) -> list:
-    """Parse un flux iCal et développe les récurrences (RRULE) sur une fenêtre
-    [−30 j, +180 j]. Convertit les heures en fuseau local."""
-    import icalendar, recurring_ical_events
-    from datetime import datetime as _dt, date as _date, timedelta as _td
-    cal = icalendar.Calendar.from_ical(data)
-    start = _dt.now() - _td(days=30)
-    end = _dt.now() + _td(days=180)
-    try:
-        occurrences = recurring_ical_events.of(cal).between(start, end)
-    except Exception:
-        # repli : pas d'expansion de récurrence
-        occurrences = [c for c in cal.walk("VEVENT")]
-
-    def _fmt(v):
-        if v is None:
-            return None, False
-        d = v.dt if hasattr(v, "dt") else v
-        if isinstance(d, _dt):
-            if d.tzinfo is not None:
-                try: d = d.astimezone()   # → heure locale
-                except Exception: pass
-            return d.strftime("%Y-%m-%d %H:%M"), False
-        if isinstance(d, _date):
-            return d.strftime("%Y-%m-%d 00:00"), True   # date pure = journée entière
-        return None, False
-
-    out = []
-    for ev in occurrences:
-        try:
-            start_at, all_day = _fmt(ev.get("DTSTART"))
-            if not start_at:
-                continue
-            end_at, _ = _fmt(ev.get("DTEND"))
-            out.append({
-                "title": str(ev.get("SUMMARY", "(sans titre)")),
-                "location": str(ev.get("LOCATION", "") or ""),
-                "description": str(ev.get("DESCRIPTION", "") or "")[:500],
-                "start_at": start_at, "end_at": end_at, "all_day": all_day,
-                "external_id": str(ev.get("UID", "") or ""),
-            })
-        except Exception:
-            continue
-    return out
+_parse_ics = calendar_subscriptions_domain.parse_ics
 
 
-async def _fetch_ics(url: str, timeout: int = 25) -> bytes:
-    import httpx
-    u = url.strip()
-    if u.lower().startswith("webcal://"):
-        u = "https://" + u[len("webcal://"):]
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        r = await client.get(u, headers={"User-Agent": "Marvin/1.0 (+calendar-sync)"})
-        r.raise_for_status()
-        return r.content
+_fetch_ics = calendar_subscriptions_domain.fetch_ics
 
 
 async def _sync_subscription(sub: dict) -> dict:
-    """Récupère + parse + remplace les événements d'un abonnement. Met à jour sub en place."""
-    from datetime import datetime as _dt
-    src = f"ics:{sub.get('id')}"
-    try:
-        data = await _fetch_ics(sub["url"])
-        loop = asyncio.get_running_loop()
-        events = await loop.run_in_executor(None, _parse_ics, data)
-        for e in events:
-            e["color"] = sub.get("color") or "#10b981"
-        n = db.replace_external_events(src, events)
-        sub["last_sync"] = _dt.now().strftime("%Y-%m-%d %H:%M")
-        sub["last_error"] = ""
-        sub["count"] = n
-        return {"success": True, "count": n}
-    except Exception as e:
-        sub["last_error"] = str(e)[:200]
-        return {"error": str(e)[:200]}
+    return await calendar_subscriptions_domain.sync_subscription(sub, storage=db)
 
 
 async def execute_calendar_subscribe(args: dict) -> dict:
-    """Abonne Marvin à un agenda via son lien iCal (.ics / webcal). Le synchronise aussitôt."""
-    url = (args.get("url") or "").strip()
-    name = (args.get("name") or "").strip() or "Agenda"
-    color = (args.get("color") or "#10b981").strip()
-    if not url or (".ics" not in url.lower() and "ical" not in url.lower()
-                   and not url.lower().startswith(("webcal://", "http"))):
-        return {"error": "Lien iCal invalide. Fournissez l'URL .ics (Google : « Adresse secrète au format iCal »)."}
-    import uuid as _uuid
-    subs = _calendar_subs()
-    sub = {"id": _uuid.uuid4().hex[:8], "name": name, "url": url, "color": color,
-           "enabled": True, "last_sync": "", "last_error": "", "count": 0}
-    r = await _sync_subscription(sub)
-    subs.append(sub)
-    _save_calendar_subs(subs)
-    if r.get("error"):
-        return {"error": f"Abonnement ajouté mais synchro échouée : {r['error']}", "subscription": sub}
-    return {"success": True, "subscription": sub,
-            "message": f"📅 Agenda « {name} » connecté : {r.get('count', 0)} événement(s) importé(s)."}
+    return await calendar_subscriptions_domain.subscribe(args, storage=db)
 
 
 async def execute_calendar_subscriptions(args: dict) -> dict:
-    """Liste les agendas connectés (abonnements iCal) et leur état."""
-    subs = _calendar_subs()
-    return {"success": True, "subscriptions": subs, "count": len(subs)}
+    return await calendar_subscriptions_domain.list_subscriptions(args, storage=db)
 
 
 async def execute_calendar_unsubscribe(args: dict) -> dict:
-    """Déconnecte un agenda (par id ou nom) et retire ses événements."""
-    key = (args.get("id") or args.get("name") or "").strip().lower()
-    if not key:
-        return {"error": "Fournissez l'id ou le nom de l'agenda à déconnecter."}
-    subs = _calendar_subs()
-    keep, removed = [], None
-    for s in subs:
-        if s.get("id", "").lower() == key or (s.get("name", "").lower() == key):
-            removed = s
-        else:
-            keep.append(s)
-    if not removed:
-        return {"error": "Agenda introuvable."}
-    db.delete_events_by_source(f"ics:{removed['id']}")
-    _save_calendar_subs(keep)
-    return {"success": True, "message": f"🗑️ Agenda « {removed.get('name')} » déconnecté."}
+    return await calendar_subscriptions_domain.unsubscribe(args, storage=db)
 
 
 async def _sync_google_into_events() -> dict:
-    """Si un compte Google est connecté, importe ses événements dans l'agenda local
-    (source='google'), comme un abonnement iCal. Best-effort (ignore si non connecté)."""
-    try:
-        service = _get_google_calendar_service()
-    except Exception:
-        return {"connected": False, "count": 0}
-    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-    loop = asyncio.get_running_loop()
-
-    def _list():
-        now = _dt.now(_tz.utc)
-        res = service.events().list(
-            calendarId=_resolve_calendar_id("primary"),
-            timeMin=(now - _td(days=30)).isoformat(),
-            timeMax=(now + _td(days=180)).isoformat(),
-            singleEvents=True, orderBy="startTime", maxResults=500,
-        ).execute()
-        return res.get("items", [])
-
-    try:
-        items = await loop.run_in_executor(None, _list)
-    except Exception as e:
-        return {"connected": True, "count": 0, "error": str(e)[:150]}
-
-    def _fmt(x):
-        if not x:
-            return None
-        return x.replace("T", " ")[:16]   # garde l'heure murale fournie par Google
-
-    evts = []
-    for it in items:
-        st, en = it.get("start", {}), it.get("end", {})
-        all_day = "date" in st
-        evts.append({
-            "title": it.get("summary", "(sans titre)"),
-            "location": it.get("location", ""),
-            "start_at": _fmt(st.get("dateTime") or st.get("date")),
-            "end_at": _fmt(en.get("dateTime") or en.get("date")),
-            "all_day": all_day, "external_id": it.get("id"), "color": "#4285f4",
-        })
-    n = db.replace_external_events("google", evts)
-    return {"connected": True, "count": n}
+    return await calendar_subscriptions_domain.sync_google(
+        storage=db,
+        service_factory=_get_google_calendar_service,
+        calendar_id_resolver=_resolve_calendar_id,
+    )
 
 
 async def execute_calendar_sync(args: dict) -> dict:
-    """Resynchronise tous les agendas connectés (iCal + Google si connecté)."""
-    subs = _calendar_subs()
-    only = (args.get("id") or "").strip()
-    results, total, ok = [], 0, 0
-    for sub in subs:
-        if only and sub.get("id") != only:
-            continue
-        if not sub.get("enabled", True):
-            continue
-        r = await _sync_subscription(sub)
-        if r.get("success"):
-            total += r.get("count", 0); ok += 1
-        results.append({"name": sub.get("name"), "id": sub.get("id"), **r})
-    _save_calendar_subs(subs)
-    # Google (si connecté)
-    g = await _sync_google_into_events()
-    if g.get("connected"):
-        total += g.get("count", 0)
-        results.append({"name": "Google Agenda", "id": "google", "success": True, "count": g.get("count", 0)})
-        if g.get("count"):
-            ok += 1
-    if not subs and not g.get("connected"):
-        return {"success": True, "total_events": 0, "results": [], "message": "Aucun agenda connecté."}
-    return {"success": True, "synced": ok, "total_events": total, "results": results,
-            "message": f"🔄 {total} événement(s) synchronisé(s) depuis {ok} agenda(s)."}
+    return await calendar_subscriptions_domain.sync_all(
+        args,
+        storage=db,
+        google_synchronizer=lambda **kwargs: calendar_subscriptions_domain.sync_google(
+            service_factory=_get_google_calendar_service,
+            calendar_id_resolver=_resolve_calendar_id,
+            **kwargs,
+        ),
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

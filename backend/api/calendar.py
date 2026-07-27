@@ -75,7 +75,11 @@ async def add_calendar_subscription(body: CalendarSubscriptionBody):
 
 @router.delete("/api/calendar/subscriptions/{subscription_id}")
 async def remove_calendar_subscription(subscription_id: str):
-    return await tool_module.TOOLS_REGISTRY["calendar_unsubscribe"]({"id": subscription_id})
+    # Le clic explicite sur la route DELETE constitue la confirmation UI. Les appels LLM
+    # restent soumis à la demande de confirmation du domaine.
+    return await tool_module.TOOLS_REGISTRY["calendar_unsubscribe"](
+        {"id": subscription_id, "confirmed": True}
+    )
 
 
 @router.post("/api/calendar/subscriptions/sync")

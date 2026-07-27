@@ -6229,3 +6229,51 @@ trois méthodes de connexion conservées pour les installations futures.
 
 Réversion atomique du commit de tranche; aucun schéma, secret ni événement réel n'a été
 modifié par les tests, qui utilisent des services injectés.
+
+## 2026-07-27 — v2.353.0 — Abonnements calendrier
+
+### Contexte
+
+Extraire les abonnements iCalendar et l'import Google de la façade `tools.py`, sans exposer
+les URL privées des agendas ni modifier les contrats de l'API Agenda.
+
+### Veille et décisions
+
+- La fiche OWASP SSRF Prevention impose une validation stricte des protocoles et destinations
+  et recommande de ne pas suivre automatiquement les redirections. Marvin revalide donc
+  chaque destination et limite la chaîne à trois sauts.
+  Source : https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+- La documentation Google Calendar recommande les jetons de synchronisation incrémentale et
+  une reprise complète sur HTTP 410. Cette optimisation est inscrite pour la prochaine tranche
+  agenda, car elle nécessite une migration de l'état de synchronisation et des tests dédiés.
+  Source : https://developers.google.com/workspace/calendar/api/guides/sync
+
+### Analyse et solution
+
+- `tool_domains/calendar_subscriptions.py` possède stockage, projection publique, parsing,
+  téléchargement, synchronisation, abonnement et désabonnement.
+- Les URL complètes restent persistées pour permettre la synchronisation, mais leur chemin
+  secret est masqué dans toutes les réponses publiques.
+- Protocoles, identifiants intégrés, ports, DNS, adresses locales, taille du flux, nombre
+  d'événements, couleurs et longueurs sont contrôlés.
+- Le client HTTP n'effectue aucune redirection automatique : chaque saut est résolu, validé
+  et borné avant le nouvel appel.
+- Une suppression issue du LLM exige toujours `confirmed`; la route DELETE de l'interface
+  constitue sa confirmation utilisateur explicite.
+- Les erreurs Google sont conservées et ne peuvent plus être transformées en faux succès.
+
+### Validation observée
+
+- Test ciblé et compilation : réussis, y compris URL masquée, doublon, confirmation,
+  suppression, SSRF locale, politique de redirection, import Google, alias et registre.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **129/129 étapes** en
+  219 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.353.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel avec Turbopack : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **7 754 lignes** mesurées par PowerShell.
+
+### Rollback
+
+Réversion atomique du commit de tranche; les tests utilisent uniquement un stockage et des
+services injectés, sans modifier un agenda, un secret ou un événement réel.
