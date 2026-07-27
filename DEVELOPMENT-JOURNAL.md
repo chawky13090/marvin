@@ -4729,6 +4729,40 @@ ignorée) :
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
 
+## 2026-07-27 — v2.334.0 — Domaine d'outils Windows
+
+### Demande et périmètre
+
+- Continuer backend-first en séparant lecture système et actions Windows sans affaiblir les
+  confirmations.
+
+### Constats et décisions
+
+- Quatorze outils et leurs helpers mélangeaient raccourcis, services et diagnostics dans
+  `tools.py`; le domaine rejoint `tool_domains/windows.py` avec runner PowerShell injecté.
+- `win_network_config` reste transmis au domaine Réseau par composition explicite.
+- Le nom du journal d'événements était interpolé directement dans PowerShell. Il est désormais
+  choisi dans `System`, `Application`, `Security` ou `Setup`; niveau et volume sont validés.
+- Les noms de service sont normalisés sans retour à une commande shell libre. Les actions
+  start/stop/restart/pause/resume exigent toujours `confirmed=true`.
+- Les 14 identités de registre sont conservées.
+
+### Validation réelle
+
+- Compilation ciblée, tests Windows et Réseau, architecture 344/344 : réussis.
+- Le test couvre rejet d'une entrée hostile, borne de 200 événements, cache uptime, résolution
+  de service, confirmation d'action, façades et registre.
+- `scripts/check_marvin.py --quick` : **110/110 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.334.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 14 909 à **14 325 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.333.0 — Domaine d'outils Facturation
 
 ### Demande et périmètre

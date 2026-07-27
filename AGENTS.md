@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.333.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.334.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.333.0)
+## 9. État actuel (v2.334.0)
+
+**v2.334 (domaine Windows)** : les 14 outils de raccourcis Windows, services, événements,
+utilisateurs, disques, mises à jour, uptime, démarrage, tâches planifiées, réseau et rapport
+système rejoignent `tool_domains/windows.py`. Le runner PowerShell est injecté et le domaine
+Réseau reçoit toujours la même configuration. Les journaux sont limités à une liste blanche,
+les volumes/niveaux sont bornés et les noms de service sont normalisés. Les actions de service
+conservent leur confirmation; tests Windows, Réseau, façades, cache et registre passent.
 
 **v2.333 (domaine Facturation)** : les 22 outils clients, catalogue, devis, recherche marché,
 propositions, TCO, factures et pilotage rejoignent `tool_domains/billing.py`. Recherche web

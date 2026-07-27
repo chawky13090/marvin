@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.334 — domaine Windows extrait :
+# raccourcis, services et diagnostics natifs isolés avec entrées PowerShell bornées.
 # v2.333 — domaine facturation extrait :
 # clients, devis, marché, factures et pilotage isolés avec montants validés.
 # v2.332 — domaine réseau extrait :
