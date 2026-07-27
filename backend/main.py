@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.363 — CSV, graphiques et SQLite extraits dans structured_data.py;
+# lecture bornée, rendu PNG atomique, autorisation SQL et sauvegarde avant écriture.
 # v2.362 — traitement textuel extrait dans tool_domains/text_processing.py;
 # HTML sûr, regex avec timeout et bornes de chaînes/listes appliquées par le guardrail.
 # v2.361 — traduction extraite dans tool_domains/translation.py; routage

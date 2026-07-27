@@ -67,6 +67,7 @@ from tool_domains import unit_conversion as unit_conversion_domain
 from tool_domains import weather as weather_domain
 from tool_domains import translation as translation_domain
 from tool_domains import text_processing as text_processing_domain
+from tool_domains import structured_data as structured_data_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -288,6 +289,7 @@ def _resolve_path(raw: str) -> str:
 
 
 filesystem_domain.configure(resolve_path=_resolve_path)
+structured_data_domain.configure(resolve_path=_resolve_path)
 execute_file_list = filesystem_domain.list_entries
 execute_file_info = filesystem_domain.info
 
@@ -3290,102 +3292,7 @@ execute_json_tool = deterministic_utilities_domain.json_tool
 
 execute_markdown_convert = text_processing_domain.markdown_convert
 execute_regex_tool = text_processing_domain.regex_tool
-async def execute_csv_analyze(args: dict) -> dict:
-    """Analyse un fichier CSV : aperçu, statistiques et valeurs uniques."""
-    import csv as _csv, io as _io, statistics as _stats
-
-    path       = args.get("path", "").strip()
-    max_rows   = int(args.get("max_rows", 100))    # lignes à charger pour stats
-    action     = args.get("action", "summary")     # summary | head | stats | unique
-    column     = args.get("column", "")            # pour stats/unique sur une colonne
-    delimiter  = args.get("delimiter", ",")
-
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-
-    try:
-        resolved = _resolve_path(path)
-        with open(resolved, encoding="utf-8-sig", errors="replace") as f:
-            raw = f.read(2 * 1024 * 1024)  # 2 MB max
-
-        reader = _csv.DictReader(_io.StringIO(raw), delimiter=delimiter)
-        headers = reader.fieldnames or []
-
-        rows = []
-        for i, row in enumerate(reader):
-            if i >= max_rows: break
-            rows.append(dict(row))
-
-        total_rows_approx = raw.count("\n")
-        base = {
-            "success":      True,
-            "file":         str(resolved),
-            "columns":      list(headers),
-            "column_count": len(headers),
-            "rows_loaded":  len(rows),
-            "total_rows_approx": total_rows_approx - 1,  # -1 pour l'en-tête
-        }
-
-        if action == "head":
-            base["preview"] = rows[:10]
-            return base
-
-        if action == "unique":
-            if not column or column not in headers:
-                return {**base, "error": f"Colonne '{column}' introuvable. Colonnes disponibles : {headers}"}
-            vals = sorted({r[column] for r in rows if r.get(column) not in ("", None)})
-            return {**base, "column": column, "unique_values": vals[:200], "unique_count": len(vals)}
-
-        if action == "stats":
-            if not column or column not in headers:
-                return {**base, "error": f"Colonne '{column}' introuvable. Colonnes disponibles : {headers}"}
-            nums = []
-            for r in rows:
-                v = r.get(column, "")
-                try: nums.append(float(v.replace(",", ".").strip()))
-                except: pass
-            if not nums:
-                return {**base, "column": column, "error": "Aucune valeur numérique dans cette colonne."}
-            return {
-                **base, "column": column,
-                "count":   len(nums),
-                "sum":     round(sum(nums), 6),
-                "mean":    round(_stats.mean(nums), 6),
-                "median":  round(_stats.median(nums), 6),
-                "min":     min(nums),
-                "max":     max(nums),
-                "stdev":   round(_stats.stdev(nums), 6) if len(nums) > 1 else 0,
-            }
-
-        # default: summary
-        col_stats = {}
-        for col in headers:
-            vals = [r.get(col, "") for r in rows]
-            non_empty = [v for v in vals if v not in ("", None)]
-            nums = []
-            for v in non_empty:
-                try: nums.append(float(str(v).replace(",", ".").strip()))
-                except: pass
-            col_stats[col] = {
-                "non_empty": len(non_empty),
-                "empty":     len(vals) - len(non_empty),
-                "unique":    len(set(non_empty)),
-                "numeric":   len(nums) == len(non_empty) and len(nums) > 0,
-            }
-            if nums:
-                col_stats[col]["min"]  = min(nums)
-                col_stats[col]["max"]  = max(nums)
-                col_stats[col]["mean"] = round(_stats.mean(nums), 4)
-
-        base["column_analysis"] = col_stats
-        base["preview"] = rows[:5]
-        return base
-
-    except FileNotFoundError:
-        return {"error": f"Fichier introuvable : {path}"}
-    except Exception as e:
-        return {"error": str(e)}
-
+execute_csv_analyze = structured_data_domain.csv_analyze
 
 execute_text_stats = deterministic_utilities_domain.text_stats
 
@@ -3908,95 +3815,7 @@ async def execute_text_to_speech(args: dict) -> dict:
 
 
 
-async def execute_csv_to_chart(args: dict) -> dict:
-    """📊 Génère un graphique (PNG) directement à partir d'un fichier CSV.
-    chart_type: bar|line|pie. label_column = colonne des étiquettes ; value_columns auto-détectées si absentes."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import csv as _csv
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"Fichier introuvable : {rp}"}
-        with open(rp, "r", encoding="utf-8-sig", newline="") as f:
-            sample = f.read(2048); f.seek(0)
-            try:
-                delim = _csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
-            except Exception:
-                delim = ","
-            rows = [r for r in _csv.reader(f, delimiter=delim) if any(c.strip() for c in r)]
-        if len(rows) < 2:
-            return {"error": "CSV insuffisant (il faut un en-tête + des données)."}
-        header = rows[0]
-        data = rows[1:200]  # borné
-        label_col = int(args.get("label_column", 0))
-
-        def _num(v):
-            try:
-                return float(str(v).replace(" ", "").replace(" ", "").replace(",", "."))
-            except Exception:
-                return None
-
-        # colonnes de valeurs : spécifiées, sinon auto-détection des colonnes numériques
-        if args.get("value_columns"):
-            vc = args["value_columns"]
-            value_cols = [int(x) for x in (vc if isinstance(vc, list) else str(vc).split(","))]
-        else:
-            value_cols = []
-            for ci in range(len(header)):
-                if ci == label_col:
-                    continue
-                col_vals = [_num(r[ci]) for r in data if len(r) > ci]
-                if col_vals and sum(1 for v in col_vals if v is not None) >= max(1, len(col_vals) // 2):
-                    value_cols.append(ci)
-        if not value_cols:
-            return {"error": "Aucune colonne numérique détectée à tracer."}
-
-        labels = [r[label_col] if len(r) > label_col else "" for r in data]
-        chart_type = (args.get("chart_type") or "bar").lower()
-        title = args.get("title") or rp.stem
-        plt.figure(figsize=(11, 6))
-        plt.rcParams.update({"font.size": 10})
-
-        if chart_type == "pie":
-            ci = value_cols[0]
-            vals = [(_num(r[ci]) or 0) for r in data if len(r) > ci]
-            plt.pie(vals, labels=labels[:len(vals)], autopct="%1.1f%%", startangle=90)
-            plt.axis("equal")
-        else:
-            import numpy as _np
-            x = _np.arange(len(labels))
-            nseries = len(value_cols)
-            width = 0.8 / max(1, nseries) if chart_type == "bar" else None
-            for si, ci in enumerate(value_cols):
-                vals = [(_num(r[ci]) if len(r) > ci else None) for r in data]
-                vals = [v if v is not None else 0 for v in vals]
-                name = header[ci] if ci < len(header) else f"Col {ci}"
-                if chart_type == "line":
-                    plt.plot(x, vals, marker="o", label=name)
-                else:  # bar
-                    plt.bar(x + si * width - 0.4 + width / 2, vals, width=width, label=name)
-            plt.xticks(x, labels, rotation=45, ha="right")
-            if nseries > 1:
-                plt.legend()
-            plt.grid(axis="y", alpha=0.3)
-        plt.title(title)
-        plt.tight_layout()
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_suffix(".png")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(out, dpi=120, bbox_inches="tight")
-        plt.close()
-        return {"success": True, "path": out, "destination": out, "chart_type": chart_type,
-                "series": len(value_cols), "points": len(labels),
-                "message": f"Graphique {chart_type} généré ({len(value_cols)} série(s), {len(labels)} points) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
+execute_csv_to_chart = structured_data_domain.csv_to_chart
 
 
 async def execute_url_analyze(args: dict) -> dict:
@@ -4144,111 +3963,8 @@ async def execute_color_tool(args: dict) -> dict:
 # SECTION 17 — SQLite, Git & Fichiers avancés
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_sqlite_query(args: dict) -> dict:
-    """Exécute une requête SQL sur une base SQLite locale."""
-    db_path  = args.get("db_path", "").strip()
-    query    = args.get("query", "").strip()
-    max_rows = int(args.get("max_rows", 100))
-    confirmed = args.get("confirmed", False)
-
-    if not db_path:
-        return {"error": "Paramètre 'db_path' requis."}
-    if not query:
-        return {"error": "Paramètre 'query' requis."}
-
-    resolved = _resolve_path(db_path)
-    if not os.path.exists(resolved):
-        return {"error": f"Base de données introuvable : {resolved}"}
-
-    # Les requêtes d'écriture (INSERT/UPDATE/DELETE/DROP/CREATE) nécessitent confirmation
-    is_write = any(
-        query.strip().upper().startswith(kw)
-        for kw in ("INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "REPLACE", "TRUNCATE")
-    )
-    if is_write and not confirmed:
-        preview = query[:200]
-        return {
-            "requiresConfirmation": True,
-            "message": f"Exécuter cette requête d'écriture sur {os.path.basename(resolved)} ?\n{preview}",
-        }
-
-    import sqlite3 as _sq
-    try:
-        def _run():
-            conn = _sq.connect(resolved)
-            conn.row_factory = _sq.Row
-            cur = conn.cursor()
-            cur.execute(query)
-            if is_write:
-                conn.commit()
-                rows_affected = cur.rowcount
-                conn.close()
-                return {"write": True, "rows_affected": rows_affected}
-            cols = [d[0] for d in (cur.description or [])]
-            rows = [dict(zip(cols, r)) for r in cur.fetchmany(max_rows)]
-            # Convert non-serializable types
-            for row in rows:
-                for k, v in row.items():
-                    if isinstance(v, bytes):
-                        row[k] = f"<bytes:{len(v)}>"
-            total = cur.fetchall()  # consume remainder for count
-            conn.close()
-            return {"cols": cols, "rows": rows, "rows_count": len(rows), "has_more": len(total) > 0}
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, _run)
-        if result.get("write"):
-            return {"success": True, "write": True, "rows_affected": result["rows_affected"]}
-        return {
-            "success":    True,
-            "db":         os.path.basename(resolved),
-            "query":      query[:200],
-            "columns":    result["cols"],
-            "rows":       result["rows"],
-            "rows_count": result["rows_count"],
-            "truncated":  result["has_more"],
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_sqlite_tables(args: dict) -> dict:
-    """Liste les tables et leur schéma dans une base SQLite."""
-    db_path = args.get("db_path", "").strip()
-    if not db_path:
-        return {"error": "Paramètre 'db_path' requis."}
-    resolved = _resolve_path(db_path)
-    if not os.path.exists(resolved):
-        return {"error": f"Base de données introuvable : {resolved}"}
-    import sqlite3 as _sq
-    try:
-        def _run():
-            conn = _sq.connect(resolved)
-            cur = conn.cursor()
-            cur.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') ORDER BY name;")
-            tables = [{"name": r[0], "type": r[1]} for r in cur.fetchall()]
-            schema = {}
-            for t in tables:
-                cur.execute(f"PRAGMA table_info('{t['name']}');")
-                schema[t["name"]] = [
-                    {"col": r[1], "type": r[2], "notnull": bool(r[3]), "pk": bool(r[5])}
-                    for r in cur.fetchall()
-                ]
-            conn.close()
-            return tables, schema
-        loop = asyncio.get_running_loop()
-        tables, schema = await loop.run_in_executor(None, _run)
-        stat = Path(resolved).stat()
-        return {
-            "success":    True,
-            "db":         os.path.basename(resolved),
-            "size_kb":    round(stat.st_size / 1024, 1),
-            "table_count": len(tables),
-            "tables":     tables,
-            "schema":     schema,
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
+execute_sqlite_query = structured_data_domain.sqlite_query
+execute_sqlite_tables = structured_data_domain.sqlite_tables
 
 async def execute_git_info(args: dict) -> dict:
     """Retourne les informations Git d'un dépôt : branche, statut, derniers commits."""
@@ -6065,12 +5781,12 @@ TOOLS_SPEC = [
         "confirmed": {"type": "boolean", "description": "Requis pour on/off"}}, ["action"]),
 
     _t("csv_analyze", "Analyse un fichier CSV : aperçu, statistiques par colonne, valeurs uniques.",
-       {"path":      {"type": "string",  "description": "Chemin du fichier CSV"},
+       {"path":      {"type": "string", "maxLength": 32767, "description": "Chemin du fichier CSV"},
         "action":    {"type": "string",  "enum": ["summary", "head", "stats", "unique"],
                       "description": "Action : summary (défaut), head (5 premières lignes), stats (stats numériques colonne), unique (valeurs uniques colonne)"},
-        "column":    {"type": "string",  "description": "Colonne cible pour stats ou unique"},
-        "max_rows":  {"type": "integer", "description": "Nombre max de lignes à charger (défaut 100)"},
-        "delimiter": {"type": "string",  "description": "Séparateur (défaut ',')"}},
+        "column":    {"type": "string", "maxLength": 1000, "description": "Colonne cible pour stats ou unique"},
+        "max_rows":  {"type": "integer", "minimum": 1, "maximum": 10000, "description": "Nombre max de lignes à charger (défaut 100)"},
+        "delimiter": {"type": "string", "minLength": 1, "maxLength": 2, "description": "Séparateur unique (défaut ',', utiliser \\\\t pour une tabulation)"}},
        ["path"]),
 
     _t("pc_system_info", "Retourne les informations techniques du PC : CPU, RAM, disques, uptime.",
@@ -7288,12 +7004,12 @@ TOOLS_SPEC = [
         "output_path": {"type": "string", "description": "PDF de sortie (défaut : _numerote)"}},
        ["path"]),
     _t("csv_to_chart", "Génère un graphique PNG directement depuis un fichier CSV (bar/line/pie, colonnes numériques auto-détectées).",
-       {"path": {"type": "string", "description": "Fichier CSV source"},
+       {"path": {"type": "string", "maxLength": 32767, "description": "Fichier CSV source"},
         "chart_type": {"type": "string", "enum": ["bar","line","pie"], "description": "Type de graphique"},
-        "label_column": {"type": "integer", "description": "Index de la colonne des étiquettes (défaut 0)"},
-        "value_columns": {"type": "string", "description": "Indices des colonnes de valeurs, ex '1,2' (auto si absent)"},
-        "title": {"type": "string", "description": "Titre du graphique"},
-        "output_path": {"type": "string", "description": "Image PNG de sortie"}},
+        "label_column": {"type": "integer", "minimum": 0, "maximum": 499, "description": "Index de la colonne des étiquettes (défaut 0)"},
+        "value_columns": {"type": "string", "maxLength": 200, "pattern": "^\\s*\\d+(?:\\s*,\\s*\\d+)*\\s*$", "description": "Indices des colonnes de valeurs, ex '1,2' (auto si absent)"},
+        "title": {"type": "string", "maxLength": 300, "description": "Titre du graphique"},
+        "output_path": {"type": "string", "maxLength": 32767, "description": "Image PNG de sortie"}},
        ["path"]),
     _t("xlsx_read", "Lit un fichier Excel (.xlsx) et retourne le contenu d'une feuille.",
        {"path":     {"type": "string", "description": "Chemin du fichier Excel (.xlsx)"},
@@ -7314,13 +7030,13 @@ TOOLS_SPEC = [
        ["color"]),
     # ── Section 17 ──────────────────────────────────────────────────────────
     _t("sqlite_query", "Exécute une requête SQL (SELECT ou écriture avec confirmation) sur une base SQLite locale.",
-       {"db_path":   {"type": "string",  "description": "Chemin du fichier .db ou .sqlite"},
-        "query":     {"type": "string",  "description": "Requête SQL à exécuter"},
-        "max_rows":  {"type": "integer", "description": "Nombre max de lignes retournées (défaut 100)"},
+       {"db_path":   {"type": "string", "maxLength": 32767, "description": "Chemin du fichier .db ou .sqlite"},
+        "query":     {"type": "string", "maxLength": 100000, "description": "Requête SQL unique à exécuter"},
+        "max_rows":  {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Nombre max de lignes retournées (défaut 100)"},
         "confirmed": {"type": "boolean", "description": "Requis pour les requêtes d'écriture (INSERT/UPDATE/DELETE…)"}},
        ["db_path", "query"]),
     _t("sqlite_tables", "Liste les tables et leur schéma dans une base SQLite.",
-       {"db_path": {"type": "string", "description": "Chemin du fichier SQLite (.db, .sqlite)"}},
+       {"db_path": {"type": "string", "maxLength": 32767, "description": "Chemin du fichier SQLite (.db, .sqlite)"}},
        ["db_path"]),
     _t("git_info", "Retourne des informations sur un dépôt Git : branche, statut, commits, branches.",
        {"path":   {"type": "string", "description": "Chemin du dépôt (défaut : dossier courant)"},

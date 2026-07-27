@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.362.0)
+## 9. État actuel (v2.363.0)
+
+**v2.363 (données structurées)** : analyse CSV, graphiques PNG, requêtes et inspection
+SQLite rejoignent `tool_domains/structured_data.py`. CSV est traité en flux avec volumes,
+colonnes et lignes bornés; les graphiques utilisent des objets `Figure` indépendants et un
+remplacement atomique. SQLite s'ouvre sans création implicite, détecte les mutations avec
+l'authorizer natif, refuse ATTACH/extensions/PRAGMA dangereux, impose confirmation, timeout
+et résultats bornés. Toute écriture confirmée crée d'abord une sauvegarde cohérente utilisable
+pour rollback; une transaction échouée est annulée et sa sauvegarde provisoire supprimée.
 
 **v2.362 (traitement textuel déterministe)** : extraction structurée, comparaison,
 conversion Markdown, expressions régulières et jointure rejoignent

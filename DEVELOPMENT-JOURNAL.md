@@ -6779,3 +6779,62 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   `backend\.venv\Scripts\python.exe -m pip uninstall -y regex`; réinstaller ensuite les
   dépendances depuis `backend\requirements.txt`. Le patch inverse indexé doit être vérifié
   avant commit.
+
+## 2026-07-28 — v2.363.0 — CSV et SQLite transactionnels
+
+### Demande et constats
+
+- Continuer l'extraction cohérente des outils restants sans perte fonctionnelle.
+- `csv_analyze`, `csv_to_chart`, `sqlite_query` et `sqlite_tables` vivaient dans `tools.py`.
+- La détection d'écriture SQLite reposait sur le premier mot de la requête. Une CTE, un
+  commentaire ou certains PRAGMA pouvaient donc contourner la confirmation.
+- Les lectures consommaient tout le reste du résultat pour savoir s'il était tronqué.
+- Les connexions n'étaient pas toutes protégées par `finally`; le schéma composait un PRAGMA
+  avec le nom de table et une écriture réussie ne fournissait aucun rollback.
+- Matplotlib utilisait l'état global `pyplot`, fragile sous concurrence.
+
+### Décisions et modifications
+
+- `backend/tool_domains/structured_data.py` possède les quatre outils; les façades et le
+  registre conservent leurs identités.
+- Les CSV sont lus avec `newline=""`, en flux, avec taille, lignes, colonnes, séparateur,
+  en-têtes et champs contrôlés. Les nombres non finis sont rejetés.
+- Les graphiques utilisent `Figure`/`FigureCanvasAgg`, sans état `pyplot`, et remplacent le
+  PNG atomiquement.
+- SQLite ouvre les fichiers existants via URI `mode=ro` ou `mode=rw`, limite attente,
+  durée et résultats, puis ferme toujours la connexion.
+- `Connection.set_authorizer` classe les vraies opérations SQLite : CTE mutante comprise.
+  ATTACH, DETACH, `load_extension` et les PRAGMA dangereux sont refusés.
+- Avant chaque écriture confirmée, l'API SQLite `backup()` produit une copie cohérente dans
+  `.marvin-backups`; le chemin est retourné comme preuve de rollback. Toute erreur provoque
+  un rollback transactionnel et supprime la sauvegarde provisoire.
+- L'inspection de schéma utilise `pragma_table_info(?)` paramétré, y compris pour un nom de
+  table contenant une apostrophe.
+- Références : documentation officielle Python `csv` (ouverture avec `newline=""`),
+  `sqlite3` (URI, transactions, authorizer, fermeture) et Matplotlib (objets `Figure`
+  indépendants pour une application serveur).
+
+### Validation
+
+- Test dédié sur CSV réel, statistiques, valeurs uniques, CSV malformé et PNG réel.
+- Test SQLite réel : schéma hostile, SELECT tronqué, CTE d'écriture sans effet avant
+  confirmation, sauvegarde, écriture, restauration effective, rollback sur contrainte et
+  refus d'ATTACH.
+- `scripts/check_marvin.py --quick` : **138/138 étapes réussies**, dont le domaine dédié,
+  la cohérence des dépendances, la compilation backend et le lint frontend sans erreur.
+- Redémarrage réel : `/api/health` expose **2.363.0**, Ollama disponible, 344 outils et
+  15 workers.
+- Validation HTTP sur une base temporaire : l'installation est actuellement en permission
+  Expert, donc le gateway préconfirme comme prévu; l'écriture a produit une sauvegarde,
+  `runtime-ok` a été relu, puis la restauration a ramené le compteur de lignes de 1 à 0.
+  Le laboratoire temporaire a ensuite été supprimé.
+- `scripts/smoke_test_api.py` avec le frontend Turbopack : **28/28 contrats réussis**.
+
+### Rollback
+
+- Aucun schéma applicatif Marvin n'est migré.
+- Réversion atomique du commit : remet les quatre corps dans `tools.py`, retire le domaine et
+  son test, restaure les schémas, les métadonnées 2.362.0 et le gate précédent.
+- Les sauvegardes `.marvin-backups` sont des données utilisateur produites uniquement après
+  une écriture explicitement confirmée; la réversion du code ne doit pas les supprimer.
+- Le patch inverse indexé doit être vérifié avant commit, puis le backend redémarré et validé.

@@ -229,6 +229,11 @@ Markdown, regex et jointure. Les opérations coûteuses quittent la boucle async
 sont bornées, le rendu HTML échappe les données non fiables et le moteur `regex` interrompt
 les motifs pathologiques. Le validateur central applique les bornes de chaînes et de listes
 déclarées dans les schémas avant l'exécution.
+81. les données structurées : `tool_domains/structured_data.py` possède analyse CSV,
+graphiques PNG et inspection/requête SQLite. Le CSV est lu en flux borné; Matplotlib utilise
+une `Figure` isolée et une sortie atomique. L'authorizer SQLite détecte les mutations réelles,
+y compris derrière une CTE, refuse les capacités hors périmètre et exige confirmation.
+Une écriture confirmée dispose d'une sauvegarde cohérente avant commit.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

@@ -238,6 +238,10 @@ Extraction, diff, Markdown, regex et jointure sont isolés dans un domaine textu
 Les entrées/sorties sont bornées, le HTML est sûr par construction et les regex disposent
 d'un timeout natif. Le guardrail partagé fait respecter les bornes textuelles et de listes
 des schémas, au lieu de les laisser purement déclaratives.
+Analyse CSV, graphiques et accès SQLite sont isolés dans un domaine de données structurées.
+Les fichiers sont bornés, les graphiques sont atomiques et les requêtes SQLite ne reposent
+plus sur un test lexical contournable : l'authorizer natif classe les effets réels. Toute
+écriture confirmée crée une sauvegarde cohérente avant commit.
 
 ## 4. Validation obligatoire par tranche
 
