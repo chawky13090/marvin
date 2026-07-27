@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.365 — QR, inventaire ZIP et couleurs rattachés aux domaines Images,
+# Archives et Utilitaires; sorties atomiques, formats stricts et ressources bornées.
 # v2.364 — PowerPoint extrait dans presentations.py et DOCX texte rattaché
 # au domaine documents; Open XML borné, ordre documentaire et sorties atomiques.
 # v2.363 — CSV, graphiques et SQLite extraits dans structured_data.py;

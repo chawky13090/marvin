@@ -245,6 +245,9 @@ plus sur un test lexical contournable : l'authorizer natif classe les effets ré
 Création/lecture PowerPoint et extraction Word ont rejoint leurs domaines Office. Une
 validation Open XML commune borne les archives avant parsing; les sorties sont atomiques et
 l'extraction Word conserve l'ordre réel du document.
+Génération QR, inventaire ZIP et conversion de couleurs ont rejoint les domaines Images,
+Archives et Utilitaires déterministes. Les écritures sont atomiques, les archives sont
+bornées et vérifiées, et les syntaxes de couleurs sont analysées par grammaires fermées.
 
 ## 4. Validation obligatoire par tranche
 

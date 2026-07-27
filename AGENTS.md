@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.364.0)
+## 9. État actuel (v2.365.0)
+
+**v2.365 (formats locaux déterministes)** : génération QR rejoint
+`tool_domains/images.py`, l'inventaire ZIP `tool_domains/archives.py` et la conversion
+HEX/RGB/HSL `tool_domains/deterministic_utilities.py`. Les PNG sont remplacés atomiquement,
+tailles et couleurs sont validées, les ZIP sont contrôlés avant lecture complète et les
+grammaires de couleurs refusent les valeurs hors plage. Les identités publiques restent
+inchangées et chaque modification doit désormais franchir le gate de rollback documenté.
 
 **v2.364 (documents Office Open XML)** : création/lecture PowerPoint rejoignent
 `tool_domains/presentations.py`; l'extraction Word rejoint `tool_domains/documents.py`.

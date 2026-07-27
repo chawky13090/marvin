@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import base64
+import colorsys
 import hashlib
 import json
 import math
@@ -392,3 +393,107 @@ async def text_stats(args: dict[str, Any]) -> dict[str, Any]:
             for word, count in frequency.most_common(top_n)
         ],
     }
+
+
+_HEX_COLOR = re.compile(r"^#(?P<value>[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+_RGB_COLOR = re.compile(
+    r"^rgb\(\s*(?P<r>\d{1,3})\s*,\s*(?P<g>\d{1,3})\s*,\s*(?P<b>\d{1,3})\s*\)$",
+    re.IGNORECASE,
+)
+_HSL_COLOR = re.compile(
+    r"^hsl\(\s*(?P<h>\d+(?:\.\d+)?)\s*,\s*"
+    r"(?P<s>\d+(?:\.\d+)?)%\s*,\s*(?P<l>\d+(?:\.\d+)?)%\s*\)$",
+    re.IGNORECASE,
+)
+
+
+async def color_tool(args: dict[str, Any]) -> dict[str, Any]:
+    """Convertit strictement HEX/RGB/HSL et calcule le complément HSL."""
+    color = str(args.get("color") or "").strip()
+    if not color:
+        return {
+            "error": (
+                "Paramètre 'color' requis. Exemple : #FF5733, "
+                "rgb(255,87,51) ou hsl(11,100%,60%)"
+            )
+        }
+    if len(color) > 64:
+        return {"error": "La représentation de couleur est limitée à 64 caractères."}
+    try:
+        hex_match = _HEX_COLOR.fullmatch(color)
+        rgb_match = _RGB_COLOR.fullmatch(color)
+        hsl_match = _HSL_COLOR.fullmatch(color)
+        if hex_match:
+            value = hex_match.group("value")
+            if len(value) == 3:
+                value = "".join(component * 2 for component in value)
+            red, green, blue = (
+                int(value[0:2], 16),
+                int(value[2:4], 16),
+                int(value[4:6], 16),
+            )
+        elif rgb_match:
+            red, green, blue = (
+                int(rgb_match.group("r")),
+                int(rgb_match.group("g")),
+                int(rgb_match.group("b")),
+            )
+            if any(component > 255 for component in (red, green, blue)):
+                raise ValueError("Les composantes RGB doivent être comprises entre 0 et 255.")
+        elif hsl_match:
+            hue = float(hsl_match.group("h"))
+            saturation = float(hsl_match.group("s"))
+            lightness = float(hsl_match.group("l"))
+            if not 0 <= hue <= 360:
+                raise ValueError("La teinte HSL doit être comprise entre 0 et 360.")
+            if not 0 <= saturation <= 100 or not 0 <= lightness <= 100:
+                raise ValueError(
+                    "La saturation et la luminosité HSL doivent être comprises entre 0 et 100."
+                )
+            converted = colorsys.hls_to_rgb(
+                (hue % 360) / 360,
+                lightness / 100,
+                saturation / 100,
+            )
+            red, green, blue = (round(component * 255) for component in converted)
+        else:
+            return {
+                "error": (
+                    f"Format non reconnu : {color}. Utilisez #RRGGBB, "
+                    "rgb(r,g,b) ou hsl(h,s%,l%)."
+                )
+            }
+
+        hue, lightness, saturation = colorsys.rgb_to_hls(
+            red / 255, green / 255, blue / 255
+        )
+        hue_degrees = round(hue * 360, 1)
+        saturation_percent = round(saturation * 100, 1)
+        lightness_percent = round(lightness * 100, 1)
+        complement_rgb = colorsys.hls_to_rgb(
+            (hue + 0.5) % 1.0, lightness, saturation
+        )
+        complementary = "#" + "".join(
+            f"{round(component * 255):02X}" for component in complement_rgb
+        )
+        luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
+        return {
+            "success": True,
+            "input": color,
+            "hex": f"#{red:02X}{green:02X}{blue:02X}",
+            "rgb": {"r": red, "g": green, "b": blue},
+            "rgb_str": f"rgb({red},{green},{blue})",
+            "hsl": {
+                "h": hue_degrees,
+                "s": saturation_percent,
+                "l": lightness_percent,
+            },
+            "hsl_str": (
+                f"hsl({hue_degrees},{saturation_percent}%,{lightness_percent}%)"
+            ),
+            "complementary": complementary,
+            "luminance": round(luminance, 3),
+            "brightness": "clair" if luminance > 0.5 else "sombre",
+        }
+    except (TypeError, ValueError) as exc:
+        return {"error": str(exc)}

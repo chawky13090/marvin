@@ -47,6 +47,12 @@ async def _run() -> None:
         assert "source/nested/data.json" in names
         assert output.name not in names
 
+        listed = await archives.list_contents({"path": str(output)})
+        assert listed.get("success") is True, listed
+        assert listed["entries_count"] == 2
+        assert listed["entries_truncated"] is False
+        assert {item["name"] for item in listed["entries"]} == names
+
         destination = root / "zip-output"
         extracted = await archives.extract(
             {"archive_path": str(output), "dest_path": str(destination)}
@@ -101,9 +107,14 @@ async def _run() -> None:
         unsupported_result = await archives.extract({"archive_path": str(unsupported)})
         assert "non supporté" in unsupported_result.get("error", "")
 
+        invalid_zip = root / "invalid.zip"
+        invalid_zip.write_bytes(b"not a zip")
+        assert "error" in await archives.list_contents({"path": str(invalid_zip)})
+
     archives.configure(resolve_path=tools._resolve_path)
     assert tools.execute_file_compress is archives.compress
     assert tools.execute_file_extract is archives.extract
+    assert tools.execute_zip_list is archives.list_contents
 
 
 if __name__ == "__main__":

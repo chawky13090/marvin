@@ -6892,3 +6892,46 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   gate et métadonnées 2.363.0.
 - Aucun document produit pendant les tests n'est conservé. Le patch inverse indexé doit être
   vérifié avant commit.
+## 2026-07-28 — v2.365.0 — Formats locaux déterministes
+
+### Demande et décision
+
+- poursuivre l'extraction de `tools.py` sans perte de fonctionnalité ;
+- rendre obligatoire une possibilité de rollback pour chaque changement ;
+- rattacher les fonctions orphelines à leurs domaines déjà constitués plutôt que créer une
+  nouvelle couche artificielle.
+
+### Changements
+
+- `qr_generate` rejoint `tool_domains/images.py` avec sortie PNG atomique, travail bloquant
+  hors boucle asyncio, données limitées à 4 000 octets, modules/bordures bornés et couleurs
+  validées par Pillow ;
+- `zip_list` rejoint `tool_domains/archives.py` et réutilise les limites communes sur le
+  nombre de membres, la taille décompressée et le taux de compression; `testzip()` contrôle
+  en plus l'intégrité CRC et le résultat indique explicitement une troncature après 200 entrées ;
+- `color_tool` rejoint `tool_domains/deterministic_utilities.py` avec grammaires fermées
+  HEX/RGB/HSL, contrôles des plages et conversions normalisées via `colorsys` ;
+- les schémas publics déclarent les nouvelles bornes; les 344 identités publiques sont
+  conservées.
+
+### Références vérifiées
+
+- documentation officielle `qrcode` 8.2 : `QRCode`, `fit`, `box_size`, `border` et couleurs ;
+- documentation Python `zipfile` : `ZipInfo.file_size`, `compress_size` et `testzip()` ;
+- documentation Python `colorsys` : coordonnées normalisées et conversions RGB/HLS ;
+- documentation Pillow `ImageColor.getrgb()` : parsing standard et erreur sur couleur invalide.
+
+### Validation et rollback
+
+- tests Images, Archives et Utilitaires déterministes exécutés sur de vrais PNG et ZIP :
+  succès ;
+- architecture : 344 outils, 346 routes, harness 344/344, 64 restrictions renforcées ;
+- gate rapide complet : **139/139** étapes ;
+- redémarrage réel : `/api/health` expose **2.365.0**, Ollama disponible, 344 outils et
+  15 workers ;
+- API réelle `/api/tools` : QR PNG 165×165 créé, ZIP d'une entrée vérifié et HSL rouge
+  converti en `#FF0000` ;
+- frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
+- cette tranche ne modifie ni schéma ni donnée persistante. Rollback : réversion atomique du
+  commit v2.365; avant commit, le patch inverse indexé doit réussir avec
+  `git diff --cached --binary | git apply --cached --check --reverse`.

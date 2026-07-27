@@ -126,6 +126,30 @@ async def _run() -> None:
         )
         assert "Opération invalide" in invalid_operation.get("error", "")
 
+        qr_path = root / "marvin-qr.png"
+        qr = await images.qr_generate(
+            {
+                "data": "https://localhost/marvin?rollback=ready",
+                "output_path": str(qr_path),
+                "size": 6,
+                "border": 4,
+                "fg_color": "#123456",
+                "bg_color": "white",
+            }
+        )
+        assert qr.get("success") is True, qr
+        with Image.open(qr_path) as result:
+            assert result.format == "PNG"
+            assert result.width == result.height
+            assert result.width > 100
+        assert "error" in await images.qr_generate(
+            {"data": "x", "output_path": str(root / "bad.jpg")}
+        )
+        assert "error" in await images.qr_generate(
+            {"data": "x", "output_path": str(root / "bad.png"), "fg_color": "invalid!"}
+        )
+        assert "error" in await images.qr_generate({"data": "x" * 4_001})
+
     images.configure(resolve_path=tools._resolve_path)
     assert tools.execute_image_info is images.info
     assert tools.execute_image_resize is images.resize
@@ -134,6 +158,7 @@ async def _run() -> None:
     assert tools.execute_image_rotate is images.rotate
     assert tools.execute_image_compress is images.compress
     assert tools.execute_image_batch is images.batch
+    assert tools.execute_qr_generate is images.qr_generate
 
 
 if __name__ == "__main__":

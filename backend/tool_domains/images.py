@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import re
 import time
 from pathlib import Path
 from typing import Callable
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
 from platform_paths import PATHS as _SYSTEM_PATHS
 
@@ -91,6 +93,85 @@ def _rgb_for(image: Image.Image, image_format: str) -> Image.Image:
     if image_format == "JPEG" and image.mode in {"RGBA", "P", "LA"}:
         return image.convert("RGB")
     return image
+
+
+def _generate_qr_sync(
+    data: str,
+    destination: Path,
+    *,
+    box_size: int,
+    border: int,
+    foreground: tuple[int, int, int],
+    background: tuple[int, int, int],
+) -> tuple[int, int]:
+    try:
+        import qrcode
+    except ImportError as exc:
+        raise RuntimeError(
+            "qrcode non installé. Réinstallez les dépendances Marvin."
+        ) from exc
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=box_size,
+        border=border,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    image = qr.make_image(
+        fill_color=foreground,
+        back_color=background,
+    ).get_image()
+    _save_atomic(image, destination, image_format="PNG")
+    return image.size
+
+
+async def qr_generate(args: dict) -> dict:
+    """Génère atomiquement un QR code PNG borné."""
+    data = str(args.get("data") or "").strip()
+    if not data:
+        return {"error": "Paramètre 'data' requis."}
+    if len(data.encode("utf-8")) > 4_000:
+        return {"error": "Les données du QR code sont limitées à 4 000 octets."}
+    try:
+        box_size = int(args.get("size", 10))
+        border = int(args.get("border", 4))
+        if not 1 <= box_size <= 50:
+            raise ValueError("'size' doit être compris entre 1 et 50.")
+        if not 0 <= border <= 20:
+            raise ValueError("'border' doit être compris entre 0 et 20.")
+        foreground = ImageColor.getrgb(str(args.get("fg_color") or "black"))
+        background = ImageColor.getrgb(str(args.get("bg_color") or "white"))
+        if len(foreground) != 3 or len(background) != 3:
+            raise ValueError("Les couleurs avec canal alpha ne sont pas acceptées.")
+
+        output_path = str(args.get("output_path") or "").strip()
+        if output_path:
+            destination = _resolve_path(output_path)
+        else:
+            safe_name = re.sub(r"[^\w-]", "_", data[:30]).strip("_") or "qrcode"
+            destination = Path(_SYSTEM_PATHS["desktop"]) / f"qr_{safe_name}.png"
+        if destination.suffix.lower() != ".png":
+            raise ValueError("Le chemin de sortie du QR code doit se terminer par .png.")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        width, height = await asyncio.to_thread(
+            _generate_qr_sync,
+            data,
+            destination,
+            box_size=box_size,
+            border=border,
+            foreground=foreground,
+            background=background,
+        )
+        return {
+            "success": True,
+            "output": str(destination),
+            "data": data,
+            "size_px": [width, height],
+            "size_kb": round(destination.stat().st_size / 1024, 1),
+        }
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        return {"error": str(exc)}
 
 
 async def info(args: dict) -> dict:

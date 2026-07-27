@@ -238,6 +238,10 @@ Une écriture confirmée dispose d'une sauvegarde cohérente avant commit.
 `tool_domains/documents.py` possède aussi l'extraction DOCX. `office_packages.py` valide les
 conteneurs Open XML avant parsing. Les sorties sont atomiques, les volumes bornés et
 `Document.iter_inner_content()` préserve l'ordre réel entre paragraphes et tableaux.
+83. les formats locaux déterministes : `tool_domains/images.py` possède aussi la génération
+QR PNG atomique; `tool_domains/archives.py` possède l'inventaire ZIP borné avec contrôle CRC;
+`tool_domains/deterministic_utilities.py` possède la conversion stricte HEX/RGB/HSL. Les
+façades historiques et les entrées du registre restent identiques.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

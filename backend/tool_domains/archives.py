@@ -204,6 +204,55 @@ async def compress(args: dict) -> dict:
         return {"error": str(exc)}
 
 
+async def list_contents(args: dict) -> dict:
+    """Liste une archive ZIP après contrôle de structure et d'intégrité."""
+    raw_path = str(args.get("path") or "").strip()
+    if not raw_path:
+        return {"error": "Paramètre 'path' requis."}
+    archive = Path(_resolve_path(raw_path))
+    if not archive.is_file():
+        return {"error": f"Archive introuvable : {archive}"}
+    try:
+        with zipfile.ZipFile(archive, "r") as handle:
+            members = handle.infolist()
+            expanded = sum(item.file_size for item in members)
+            compressed = sum(item.compress_size for item in members)
+            _check_limits(len(members), expanded, compressed)
+            corrupt = handle.testzip()
+            if corrupt is not None:
+                raise ValueError(f"Archive ZIP corrompue au membre : {corrupt}")
+            entries = [
+                {
+                    "name": item.filename,
+                    "size": item.file_size,
+                    "compressed": item.compress_size,
+                    "is_dir": item.is_dir(),
+                    "date": (
+                        f"{item.date_time[0]}-{item.date_time[1]:02d}-"
+                        f"{item.date_time[2]:02d}"
+                    ),
+                }
+                for item in members[:200]
+            ]
+        ratio = (
+            f"{round((1 - compressed / expanded) * 100, 1)}%"
+            if expanded > 0
+            else "0%"
+        )
+        return {
+            "success": True,
+            "archive": str(archive),
+            "entries_count": len(members),
+            "total_size_kb": round(expanded / 1024, 1),
+            "compressed_size_kb": round(compressed / 1024, 1),
+            "compression_ratio": ratio,
+            "entries": entries,
+            "entries_truncated": len(members) > len(entries),
+        }
+    except (OSError, ValueError, zipfile.BadZipFile, RuntimeError) as exc:
+        return {"error": str(exc)}
+
+
 async def extract(args: dict) -> dict:
     """Extrait une archive ZIP ou TAR sans autoriser de sortie du dossier cible."""
     raw_archive = str(args.get("archive_path") or "").strip()

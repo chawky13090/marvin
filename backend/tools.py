@@ -3239,54 +3239,7 @@ execute_text_extract = text_processing_domain.text_extract
 execute_diff_text = text_processing_domain.diff_text
 
 
-async def execute_qr_generate(args: dict) -> dict:
-    """Génère un QR code en PNG depuis un texte ou URL."""
-    data        = args.get("data", "").strip()
-    output_path = args.get("output_path", "").strip()
-    size        = int(args.get("size", 10))          # box_size
-    border      = int(args.get("border", 4))
-    fg_color    = args.get("fg_color", "black")
-    bg_color    = args.get("bg_color", "white")
-
-    if not data:
-        return {"error": "Paramètre 'data' requis."}
-
-    try:
-        import qrcode as _qr
-    except ImportError:
-        return {"error": "qrcode non installé. Installez avec : pip install qrcode[pil]"}
-
-    try:
-        qr = _qr.QRCode(
-            version=1,
-            error_correction=_qr.constants.ERROR_CORRECT_L,
-            box_size=size,
-            border=border,
-        )
-        qr.add_data(data)
-        qr.make(fit=True)
-
-        img = qr.make_image(fill_color=fg_color, back_color=bg_color)
-
-        if not output_path:
-            import re as _re2
-            desktop = Path(_resolve_path("~/Desktop"))
-            safe_name = _re2.sub(r"[^\w\-]", "_", data[:30]).strip("_") or "qrcode"
-            out = desktop / f"qr_{safe_name}.png"
-        else:
-            out = Path(_resolve_path(output_path))
-
-        img.save(str(out))
-
-        return {
-            "success":     True,
-            "output":      str(out),
-            "data":        data,
-            "size_px":     list(img.size),
-            "size_kb":     round(out.stat().st_size / 1024, 1),
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_qr_generate = images_domain.qr_generate
 
 
 execute_json_tool = deterministic_utilities_domain.json_tool
@@ -3755,92 +3708,10 @@ async def execute_url_analyze(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_zip_list(args: dict) -> dict:
-    """Liste le contenu d'une archive ZIP sans l'extraire."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import zipfile as _zf
-        resolved = _resolve_path(path)
-        if not os.path.exists(resolved):
-            return {"error": f"Archive introuvable : {resolved}"}
-        entries = []; total_size = 0; comp_size = 0
-        with _zf.ZipFile(resolved, "r") as zf:
-            for info in zf.infolist():
-                entries.append({
-                    "name":       info.filename,
-                    "size":       info.file_size,
-                    "compressed": info.compress_size,
-                    "is_dir":     info.filename.endswith("/"),
-                    "date":       f"{info.date_time[0]}-{info.date_time[1]:02d}-{info.date_time[2]:02d}",
-                })
-                total_size += info.file_size
-                comp_size  += info.compress_size
-        ratio = f"{round((1 - comp_size / total_size) * 100, 1)}%" if total_size > 0 else "0%"
-        return {
-            "success":            True,
-            "archive":            str(resolved),
-            "entries_count":      len(entries),
-            "total_size_kb":      round(total_size / 1024, 1),
-            "compressed_size_kb": round(comp_size  / 1024, 1),
-            "compression_ratio":  ratio,
-            "entries":            entries[:200],
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_zip_list = archives_domain.list_contents
 
 
-async def execute_color_tool(args: dict) -> dict:
-    """Convertit des couleurs entre HEX, RGB et HSL, et calcule la couleur complémentaire."""
-    color = args.get("color", "").strip()
-    if not color:
-        return {"error": "Paramètre 'color' requis. Exemple : #FF5733 ou rgb(255,87,51) ou hsl(11,100%,60%)"}
-    import colorsys as _cs, re as _re
-    try:
-        def _hex_to_rgb(h):
-            h = h.lstrip("#")
-            if len(h) == 3:
-                h = "".join(c * 2 for c in h)
-            return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-
-        if color.startswith("#"):
-            r, g, b = _hex_to_rgb(color)
-        elif color.lower().startswith("rgb"):
-            nums = _re.findall(r"\d+", color)
-            r, g, b = int(nums[0]), int(nums[1]), int(nums[2])
-        elif color.lower().startswith("hsl"):
-            nums = _re.findall(r"[\d.]+", color)
-            h_deg, s_pct, l_pct = float(nums[0]), float(nums[1]), float(nums[2])
-            r_, g_, b_ = _cs.hls_to_rgb(h_deg / 360, l_pct / 100, s_pct / 100)
-            r, g, b = round(r_ * 255), round(g_ * 255), round(b_ * 255)
-        else:
-            return {"error": f"Format non reconnu : {color}. Utilisez #RRGGBB, rgb(r,g,b) ou hsl(h,s%,l%)"}
-
-        h, lum, s = _cs.rgb_to_hls(r / 255, g / 255, b / 255)
-        h_deg2 = round(h * 360, 1); s_pct2 = round(s * 100, 1); l_pct2 = round(lum * 100, 1)
-        hex_out = f"#{r:02X}{g:02X}{b:02X}"
-
-        # Complementary colour
-        h_comp = (h + 0.5) % 1.0
-        rc, gc, bc = _cs.hls_to_rgb(h_comp, lum, s)
-        complementary = f"#{round(rc*255):02X}{round(gc*255):02X}{round(bc*255):02X}"
-
-        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-        return {
-            "success":       True,
-            "input":         color,
-            "hex":           hex_out,
-            "rgb":           {"r": r, "g": g, "b": b},
-            "rgb_str":       f"rgb({r},{g},{b})",
-            "hsl":           {"h": h_deg2, "s": s_pct2, "l": l_pct2},
-            "hsl_str":       f"hsl({h_deg2},{s_pct2}%,{l_pct2}%)",
-            "complementary": complementary,
-            "luminance":     round(luminance, 3),
-            "brightness":    "clair" if luminance > 0.5 else "sombre",
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_color_tool = deterministic_utilities_domain.color_tool
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -6686,10 +6557,10 @@ TOOLS_SPEC = [
        ["path"]),
 
     _t("qr_generate", "Génère un QR code PNG depuis un texte ou une URL.",
-       {"data":        {"type": "string",  "description": "Texte ou URL à encoder dans le QR code"},
+       {"data":        {"type": "string",  "maxLength": 4000, "description": "Texte ou URL à encoder dans le QR code"},
         "output_path": {"type": "string",  "description": "Chemin du fichier PNG de sortie (défaut : Bureau)"},
-        "size":        {"type": "integer", "description": "Taille des modules en pixels (défaut 10)"},
-        "border":      {"type": "integer", "description": "Bordure blanche autour (défaut 4 modules)"},
+        "size":        {"type": "integer", "minimum": 1, "maximum": 50, "description": "Taille des modules en pixels (défaut 10)"},
+        "border":      {"type": "integer", "minimum": 0, "maximum": 20, "description": "Bordure autour (défaut 4 modules)"},
         "fg_color":    {"type": "string",  "description": "Couleur des modules (défaut black)"},
         "bg_color":    {"type": "string",  "description": "Couleur de fond (défaut white)"}},
        ["data"]),
@@ -6917,7 +6788,7 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin de l'archive ZIP"}},
        ["path"]),
     _t("color_tool", "Convertit une couleur entre HEX, RGB et HSL, et calcule la couleur complémentaire.",
-       {"color": {"type": "string",
+       {"color": {"type": "string", "maxLength": 64,
                   "description": "Couleur à convertir. Formats acceptés : #RRGGBB (#FF5733), rgb(r,g,b) (rgb(255,87,51)) ou hsl(h,s%,l%)"}},
        ["color"]),
     # ── Section 17 ──────────────────────────────────────────────────────────

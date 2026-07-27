@@ -81,11 +81,22 @@ async def main() -> None:
     assert stats["top_words"][0] == {"word": "marvin", "count": 2}
     assert "error" in await domain.text_stats({"text": "x", "top_words": 101})
 
+    color = await domain.color_tool({"color": "#FF5733"})
+    assert color["hex"] == "#FF5733"
+    assert color["rgb"] == {"r": 255, "g": 87, "b": 51}
+    assert color["complementary"] == "#33DBFF"
+    assert (await domain.color_tool({"color": "rgb(255, 87, 51)"}))["hex"] == "#FF5733"
+    assert (await domain.color_tool({"color": "hsl(0,100%,50%)"}))["hex"] == "#FF0000"
+    assert "error" in await domain.color_tool({"color": "rgb(256,0,0)"})
+    assert "error" in await domain.color_tool({"color": "hsl(0,101%,50%)"})
+    assert "error" in await domain.color_tool({"color": "#12345"})
+
     assert tools.execute_calculator is domain.calculator
     assert tools.execute_password_generate is domain.password_generate
     assert tools.execute_base64_tool is domain.base64_tool
     assert tools.execute_json_tool is domain.json_tool
     assert tools.execute_text_stats is domain.text_stats
+    assert tools.execute_color_tool is domain.color_tool
     assert tools.TOOLS_REGISTRY["hash_compute"] is tools.execute_hash_compute
 
 
