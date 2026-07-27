@@ -18,12 +18,31 @@ def main() -> int:
     validator = validator_for(({
         "function": {
             "name": "file_read",
-            "parameters": {"required": ["path"]},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+                    "mode": {"type": "string", "enum": ["text", "binary"]},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["path"],
+            },
         }
     },))
     assert validator("file_read", {"path": "C:/test.txt"}) is None
     assert "path" in (validator("file_read", {"path": "  "}) or "")
     assert "objet JSON" in (validator("file_read", []) or "")
+    assert "integer" in (validator("file_read", {"path": "x", "limit": "2"}) or "")
+    assert "inférieur ou égal" in (
+        validator("file_read", {"path": "x", "limit": 501}) or ""
+    )
+    assert "valeurs" in (
+        validator("file_read", {"path": "x", "mode": "other"}) or ""
+    )
+    assert "tags[0]" in (
+        validator("file_read", {"path": "x", "tags": [42]}) or ""
+    )
     assert validator("unknown", {}) is None
 
     assert scan_dangerous_script_patterns("chmod -R 777 /srv") == []

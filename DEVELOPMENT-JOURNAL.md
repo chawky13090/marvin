@@ -6277,3 +6277,59 @@ les URL privées des agendas ni modifier les contrats de l'API Agenda.
 
 Réversion atomique du commit de tranche; les tests utilisent uniquement un stockage et des
 services injectés, sans modifier un agenda, un secret ou un événement réel.
+
+## 2026-07-27 — v2.354.0 — Événements agenda et validation des outils
+
+### Contexte
+
+Extraire le CRUD de l'agenda local, supprimer les incohérences silencieuses entre Google et
+la copie locale, et améliorer le harness de tous les outils pendant l'extraction.
+
+### Veille et décisions
+
+- Google exige un début et une fin pour créer un événement; les événements horaires utilisent
+  RFC3339 et les journées entières des dates. Marvin contrôle donc l'intervalle avant routage.
+  Source : https://developers.google.com/workspace/calendar/api/guides/create-events
+- RFC 5545 définit `DTSTART` comme inclusif et `DTEND` comme exclusif. Une fin doit rester
+  postérieure au début et une durée existante est conservée lors d'un déplacement.
+  Source : https://datatracker.ietf.org/doc/html/rfc5545
+- OpenAI, Anthropic et Google décrivent l'outil comme un contrat typé dont l'application,
+  et non le modèle, reste responsable. `agent_safety.py` valide désormais les valeurs du
+  schéma avant dispatch : types, enums, bornes, tableaux et objets imbriqués.
+  Sources : https://openai.github.io/openai-agents-python/guardrails/ ;
+  https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works ;
+  https://ai.google.dev/gemini-api/docs/function-calling
+
+### Analyse et solution
+
+- `tool_domains/calendar_events.py` possède périodes, interprétation naturelle, validation,
+  création, liste, mise à jour, suppression et routage Google/local.
+- Titres, descriptions, lieux, rappels, dates et volumes sont bornés et contrôlés.
+- Si Google est connecté et échoue, aucune mutation locale cachée n'est effectuée; Marvin
+  expose l'erreur et le repli `local_only` reste un choix explicite.
+- Une mise à jour Google échouée conserve la copie locale. Une suppression Google échouée
+  conserve également cette copie afin que l'état ne mente pas.
+- Une recherche par titre produisant plusieurs événements renvoie des candidats et ne
+  supprime plus arbitrairement le premier résultat.
+- La route DELETE de l'interface constitue une confirmation explicite; les appels du LLM
+  restent soumis au dialogue de confirmation.
+- Les schémas `event_list`, `event_create` et `event_update` exposent leurs enums et bornes,
+  utilisées automatiquement par le validateur commun du Runner.
+
+### Validation observée
+
+- Tests ciblés : langage naturel, local explicite, intervalle invalide, échec Google sans
+  repli, limites, conservation de durée, mise à jour transactionnelle, ambiguïté et
+  confirmation de suppression, types/enums/bornes/tableaux du harness, alias et registre.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **130/130 étapes** en
+  213,2 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.354.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Lecture réelle `/api/events?period=upcoming&limit=1` : succès, sans mutation.
+- Smoke API réel avec Turbopack : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **7 588 lignes** mesurées par PowerShell.
+
+### Rollback
+
+Réversion atomique du commit de tranche. Les tests utilisent un stockage et des transports
+Google injectés; aucune donnée d'agenda réelle n'est créée, modifiée ou supprimée.

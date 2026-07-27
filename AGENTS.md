@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.353.0)
+## 9. État actuel (v2.354.0)
+
+**v2.354 (événements agenda et schémas d'outils)** : création, liste, mise à jour et
+suppression des événements rejoignent `tool_domains/calendar_events.py`. Dates, durées,
+rappels, textes et volumes sont bornés. Un échec Google ne crée ou ne modifie plus une copie
+locale silencieusement, les recherches ambiguës par titre ne suppriment rien et les quatre
+identités publiques sont conservées. Le harness du chat valide désormais types, enums, bornes,
+tableaux et objets imbriqués pour les 344 schémas, en plus des champs obligatoires.
 
 **v2.353 (abonnements calendrier)** : lecture, parsing récurrent, synchronisation iCalendar et
 import Google sont extraits vers `tool_domains/calendar_subscriptions.py`. URLs secrètes

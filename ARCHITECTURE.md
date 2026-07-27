@@ -199,6 +199,10 @@ chemins, tailles et upload simple en flux sont bornés selon les contrats du fou
 d'agenda, dates et CRUD distant; appels SDK, repli OAuth et durée des événements sont isolés.
 71. les abonnements calendrier : `tool_domains/calendar_subscriptions.py` possède stockage,
 iCalendar récurrent, import Google et synchronisation; secrets, SSRF et volumes sont encadrés.
+72. les événements agenda : `tool_domains/calendar_events.py` possède parsing temporel,
+CRUD local et routage Google. Il refuse les intervalles invalides, les replis silencieux et
+les suppressions ambiguës. `agent_safety.py` valide les valeurs déclarées par les schémas de
+tous les outils avant le dispatch du Runner.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

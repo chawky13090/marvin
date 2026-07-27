@@ -10,7 +10,9 @@ router = APIRouter(tags=["calendar"])
 
 
 @router.get("/api/events")
-async def list_events(period: str = "", start: str = "", end: str = ""):
+async def list_events(
+    period: str = "", start: str = "", end: str = "", limit: int = 200
+):
     args = {}
     if period:
         args["period"] = period
@@ -18,6 +20,7 @@ async def list_events(period: str = "", start: str = "", end: str = ""):
         args["start"] = start
     if end:
         args["end"] = end
+    args["limit"] = limit
     return await tool_module.TOOLS_REGISTRY["event_list"](args)
 
 
@@ -30,6 +33,7 @@ class EventBody(BaseModel):
     description: str = ""
     all_day: bool = False
     reminder_minutes: int | None = None
+    local_only: bool = False
 
 
 @router.post("/api/events")
@@ -51,7 +55,11 @@ async def update_event(event_id: str, body: dict = Body(...)):
 
 @router.delete("/api/events/{event_id}")
 async def delete_event(event_id: str):
-    return await tool_module.TOOLS_REGISTRY["event_delete"]({"id": event_id})
+    # La requête DELETE provient du geste explicite de l'interface. Les appels du LLM
+    # continuent à recevoir une demande de confirmation avant toute suppression.
+    return await tool_module.TOOLS_REGISTRY["event_delete"](
+        {"id": event_id, "confirmed": True}
+    )
 
 
 @router.get("/api/calendar/subscriptions")

@@ -7,47 +7,111 @@ from collections.abc import Iterable, Mapping
 from functools import partial
 
 
-def build_required_tool_args(specifications: Iterable[dict]) -> dict[str, tuple[str, ...]]:
-    required: dict[str, tuple[str, ...]] = {}
+def build_tool_schemas(specifications: Iterable[dict]) -> dict[str, dict]:
+    schemas: dict[str, dict] = {}
     for specification in specifications:
         function = specification.get("function", {})
         name = function.get("name")
         if name:
-            required[str(name)] = tuple(
-                function.get("parameters", {}).get("required", ())
-            )
-    return required
+            schemas[str(name)] = dict(function.get("parameters", {}))
+    return schemas
+
+
+def build_required_tool_args(specifications: Iterable[dict]) -> dict[str, tuple[str, ...]]:
+    """Compatibilité publique pour les tests et consommateurs historiques."""
+    return {
+        name: tuple(schema.get("required", ()))
+        for name, schema in build_tool_schemas(specifications).items()
+    }
+
+
+def _type_matches(value: object, expected: str) -> bool:
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "object":
+        return isinstance(value, dict)
+    return True
+
+
+def _validate_schema_value(path: str, value: object, schema: Mapping) -> str | None:
+    expected = schema.get("type")
+    if isinstance(expected, str) and not _type_matches(value, expected):
+        return f"le paramètre '{path}' doit être de type {expected}"
+    allowed = schema.get("enum")
+    if isinstance(allowed, list) and value not in allowed:
+        return f"le paramètre '{path}' doit valoir l'une des valeurs {allowed}"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum, maximum = schema.get("minimum"), schema.get("maximum")
+        if minimum is not None and value < minimum:
+            return f"le paramètre '{path}' doit être supérieur ou égal à {minimum}"
+        if maximum is not None and value > maximum:
+            return f"le paramètre '{path}' doit être inférieur ou égal à {maximum}"
+    if isinstance(value, list) and isinstance(schema.get("items"), Mapping):
+        for index, item in enumerate(value):
+            error = _validate_schema_value(f"{path}[{index}]", item, schema["items"])
+            if error:
+                return error
+    if isinstance(value, dict) and isinstance(schema.get("properties"), Mapping):
+        properties = schema["properties"]
+        required = schema.get("required", ())
+        for name in required:
+            if name not in value:
+                return f"le paramètre '{path}.{name}' est obligatoire"
+        for name, item in value.items():
+            child_schema = properties.get(name)
+            if isinstance(child_schema, Mapping):
+                error = _validate_schema_value(f"{path}.{name}", item, child_schema)
+                if error:
+                    return error
+    return None
 
 
 def validate_tool_args(
     tool_name: str,
     args: object,
     *,
-    required_by_name: Mapping[str, tuple[str, ...]],
+    required_by_name: Mapping[str, tuple[str, ...]] | None = None,
+    schemas_by_name: Mapping[str, Mapping] | None = None,
 ) -> str | None:
-    """Refuse les arguments obligatoires absents sans coercition destructive."""
+    """Valide les champs obligatoires, types, enums et bornes avant exécution."""
     if not isinstance(args, dict):
         return f"⛔ Les arguments de '{tool_name}' doivent former un objet JSON."
-    required = required_by_name.get(tool_name, ())
+    schemas = schemas_by_name or {}
+    schema = schemas.get(tool_name, {})
+    required = (
+        tuple(schema.get("required", ()))
+        if schema
+        else (required_by_name or {}).get(tool_name, ())
+    )
     missing = [
         name
         for name in required
         if name not in args
         or (isinstance(args.get(name), str) and not args[name].strip())
     ]
-    if not missing:
-        return None
-    return (
-        f"⛔ Paramètre(s) obligatoire(s) manquant(s) pour '{tool_name}' : {', '.join(missing)}. "
-        "Vérifie la demande de l'utilisateur ou utilise l'outil de recherche/liste approprié "
-        "pour trouver la vraie valeur — n'invente jamais un identifiant de substitution."
-    )
+    if missing:
+        return (
+            f"⛔ Paramètre(s) obligatoire(s) manquant(s) pour '{tool_name}' : {', '.join(missing)}. "
+            "Vérifie la demande de l'utilisateur ou utilise l'outil de recherche/liste approprié "
+            "pour trouver la vraie valeur — n'invente jamais un identifiant de substitution."
+        )
+    error = _validate_schema_value(tool_name, args, schema)
+    return f"⛔ Arguments invalides pour '{tool_name}' : {error}." if error else None
 
 
 def validator_for(specifications: Iterable[dict]):
+    schemas = build_tool_schemas(specifications)
     return partial(
         validate_tool_args,
-        required_by_name=build_required_tool_args(specifications),
+        schemas_by_name=schemas,
     )
 
 

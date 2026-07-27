@@ -59,6 +59,7 @@ from tool_domains import google_drive as google_drive_domain
 from tool_domains import onedrive as onedrive_domain
 from tool_domains import google_calendar as google_calendar_domain
 from tool_domains import calendar_subscriptions as calendar_subscriptions_domain
+from tool_domains import calendar_events as calendar_events_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -2296,228 +2297,51 @@ async def execute_daily_briefing(args: dict) -> dict:
 # SECTION AGENDA — Événements locaux (indépendant de Google Calendar)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _now_iso() -> str:
-    from datetime import datetime as _dt
-    return _dt.now().strftime("%Y-%m-%d %H:%M")
-
-
-def _period_range(period: str):
-    """Retourne (start_iso, end_iso, label_fr) pour un mot-clé de période."""
-    from datetime import datetime as _dt, timedelta as _td
-    now = _dt.now()
-    today0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    period = (period or "upcoming").lower().strip()
-    if period in ("today", "jour", "aujourd'hui", "aujourdhui"):
-        return today0.strftime("%Y-%m-%d 00:00"), today0.strftime("%Y-%m-%d 23:59"), "aujourd'hui"
-    if period in ("tomorrow", "demain"):
-        t = today0 + _td(days=1)
-        return t.strftime("%Y-%m-%d 00:00"), t.strftime("%Y-%m-%d 23:59"), "demain"
-    if period in ("week", "semaine", "7days"):
-        return today0.strftime("%Y-%m-%d 00:00"), (today0 + _td(days=7)).strftime("%Y-%m-%d 23:59"), "cette semaine"
-    if period in ("month", "mois", "30days"):
-        return today0.strftime("%Y-%m-%d 00:00"), (today0 + _td(days=31)).strftime("%Y-%m-%d 23:59"), "ce mois-ci"
-    if period in ("all", "tout"):
-        return None, None, "tous"
-    # défaut : à venir (now .. +30 jours)
-    return now.strftime("%Y-%m-%d %H:%M"), (today0 + _td(days=30)).strftime("%Y-%m-%d 23:59"), "à venir"
+_now_iso = calendar_events_domain.now_iso
+_period_range = calendar_events_domain.period_range
 
 
 async def _ai_parse_when(text: str, model: str = None) -> dict:
-    """Convertit une expression en langage naturel ('rdv dentiste demain 14h30') en
-    {title, start_at 'YYYY-MM-DD HH:MM', end_at, all_day} en s'appuyant sur la date du jour."""
-    from datetime import date as _date
-    d = _date.today()
-    today_fr = f"{_FR_JOURS[d.weekday()]} {d.day} {_FR_MOIS[d.month - 1]} {d.year}"
-    prompt = (
-        f"Nous sommes le {today_fr} (date ISO {d.isoformat()}). "
-        f"Analyse cette demande de rendez-vous/événement et renvoie UNIQUEMENT un JSON valide, sans texte autour :\n"
-        f'{{"title": "...", "start_at": "YYYY-MM-DD HH:MM", "end_at": "YYYY-MM-DD HH:MM ou null", "all_day": false, "location": ""}}\n'
-        f"Règles : si aucune heure n'est précisée mets 09:00 et all_day=false ; "
-        f"'demain'=+1 jour, 'après-demain'=+2, un jour de semaine = sa prochaine occurrence. "
-        f"Le titre doit être court et propre (sans la date).\n\n"
-        f"Demande : « {text} »"
+    return await calendar_events_domain.parse_natural_when(
+        text,
+        generator=_ollama_generate,
+        model=model,
+        weekdays=_FR_JOURS,
+        months=_FR_MOIS,
     )
-    raw = await _ollama_generate(prompt, model=model, timeout=120)
-    import json as _json, re as _re
-    m = _re.search(r"\{.*\}", raw or "", _re.DOTALL)
-    if not m:
-        raise RuntimeError("Impossible d'interpréter la date.")
-    return _json.loads(m.group(0))
 
 
 async def execute_event_create(args: dict) -> dict:
-    """Crée un événement dans l'agenda local. Accepte des champs structurés OU un texte
-    libre ('natural') interprété par l'IA (ex : « rdv client mardi 14h »)."""
-    title = (args.get("title") or "").strip()
-    start_at = (args.get("start_at") or "").strip()
-    natural = (args.get("natural") or args.get("text") or "").strip()
-    end_at = (args.get("end_at") or "").strip() or None
-    all_day = bool(args.get("all_day", False))
-    location = (args.get("location") or "").strip()
-    description = (args.get("description") or "").strip()
-    reminder = args.get("reminder_minutes")
-    # Interprétation IA si pas de date explicite
-    if not start_at and (natural or title):
-        try:
-            parsed = await _ai_parse_when(natural or title, model=args.get("model"))
-            title = title or (parsed.get("title") or "").strip()
-            start_at = (parsed.get("start_at") or "").strip()
-            end_at = end_at or (parsed.get("end_at") or None)
-            all_day = all_day or bool(parsed.get("all_day"))
-            location = location or (parsed.get("location") or "").strip()
-        except Exception as e:
-            return {"error": f"Date non comprise : {e}. Précisez par ex. « réunion 2026-06-20 14:00 »."}
-    if not title:
-        return {"error": "Titre de l'événement requis."}
-    if not start_at:
-        return {"error": "Date/heure de début requise (start_at ou texte 'natural')."}
-    start_at = start_at.replace("T", " ")[:16]
-    if end_at:
-        end_at = str(end_at).replace("T", " ")[:16]
-    try:
-        rem = int(reminder) if reminder not in (None, "") else None
-    except Exception:
-        rem = None
-
-    # ── Si Google Agenda est connecté → on crée l'événement SUR Google (il apparaît sur
-    #    le téléphone + rappel natif), puis on synchronise pour l'afficher dans Marvin.
-    #    'local_only=true' force l'agenda local. Repli local automatique si Google échoue.
-    if _google_calendar_ready() and not args.get("local_only"):
-        try:
-            g_start = start_at if all_day else start_at.replace(" ", "T")
-            g_end = (end_at.replace(" ", "T") if (end_at and not all_day) else (end_at or "")) if end_at else ""
-            gres = await execute_calendar_create({
-                "title": title, "start": g_start, "end": g_end,
-                "location": location, "description": description, "reminder_minutes": rem,
-            })
-            if gres.get("success"):
-                try:
-                    await _sync_google_into_events()
-                except Exception:
-                    pass
-                return {"success": True, "event": gres, "target": "google",
-                        "message": f"📅 Créé sur ton Google Agenda : « {title} » le {start_at}"
-                                   + (f" (rappel {rem} min)" if rem else "")
-                                   + " — visible sur ton téléphone."}
-            # sinon : on retombe sur l'agenda local
-        except Exception:
-            pass
-
-    ev = db.create_event(title=title, start_at=start_at, end_at=end_at, description=description,
-                         location=location, all_day=all_day, reminder_minutes=rem,
-                         tags=args.get("tags"))
-    return {"success": True, "event": ev, "target": "local",
-            "message": f"📅 Événement créé : « {title} » le {start_at}" + (f" (rappel {rem} min avant)" if rem else "")}
+    return await calendar_events_domain.create_event(
+        args,
+        storage=db,
+        natural_parser=_ai_parse_when,
+        google_ready=_google_calendar_ready,
+        google_create=execute_calendar_create,
+        google_sync=_sync_google_into_events,
+    )
 
 
 async def execute_event_list(args: dict) -> dict:
-    """Liste les événements de l'agenda. 'period' = today/tomorrow/week/month/upcoming/all,
-    ou bornes explicites start/end (YYYY-MM-DD)."""
-    start = (args.get("start") or "").strip() or None
-    end = (args.get("end") or "").strip() or None
-    label = None
-    if not start and not end:
-        start, end, label = _period_range(args.get("period", "upcoming"))
-    limit = int(args.get("limit", 200))
-    events = db.list_events(start=start, end=end, limit=limit)
-    return {"success": True, "events": events, "count": len(events), "period": label or "personnalisé",
-            "message": f"{len(events)} événement(s) {('— ' + label) if label else ''}."}
+    return await calendar_events_domain.list_events(args, storage=db)
 
 
 async def execute_event_update(args: dict) -> dict:
-    """Modifie/replanifie un événement (par id). Champs : title, start_at, end_at, location, description, reminder_minutes."""
-    eid = (args.get("id") or args.get("event_id") or "").strip()
-    if not eid:
-        return {"error": "id de l'événement requis."}
-    updates = {k: args[k] for k in ("title", "start_at", "end_at", "location", "description", "reminder_minutes", "all_day", "color")
-               if k in args and args[k] is not None}
-    if "start_at" in updates:
-        updates["start_at"] = str(updates["start_at"]).replace("T", " ")[:16]
-        updates["reminded"] = False  # on re-notifiera pour la nouvelle heure
-    if not updates:
-        return {"error": "Aucun champ à modifier."}
-
-    # ── Si l'événement vient de Google → on le modifie SUR Google (sinon le sync écraserait).
-    try:
-        ev0 = db.get_event(eid)
-    except Exception:
-        ev0 = None
-    if ev0 and ev0.get("source") == "google" and ev0.get("external_id"):
-        try:
-            gargs = {"event_id": ev0["external_id"]}
-            for k_loc, k_g in (("title", "title"), ("description", "description"), ("location", "location")):
-                if k_loc in updates:
-                    gargs[k_g] = updates[k_loc]
-            if "start_at" in updates:
-                gargs["start"] = str(updates["start_at"]).replace(" ", "T")
-                # Déplacer le début SANS toucher la fin rendrait fin < début (Google refuse) :
-                # on conserve la durée d'origine si la fin n'est pas explicitement fournie.
-                if not updates.get("end_at"):
-                    try:
-                        from datetime import datetime as _dt2, timedelta as _td2
-                        _os = _dt2.fromisoformat(str(ev0.get("start_at")).replace(" ", "T")[:16])
-                        _oe = (_dt2.fromisoformat(str(ev0.get("end_at")).replace(" ", "T")[:16])
-                               if ev0.get("end_at") else _os + _td2(hours=1))
-                        _ns = _dt2.fromisoformat(str(updates["start_at"]).replace(" ", "T")[:16])
-                        gargs["end"] = (_ns + (_oe - _os)).strftime("%Y-%m-%dT%H:%M:%S")
-                    except Exception:
-                        pass
-            if updates.get("end_at"):
-                gargs["end"] = str(updates["end_at"]).replace(" ", "T")
-            gres = await execute_calendar_update(gargs)
-            if gres.get("success"):
-                try:
-                    await _sync_google_into_events()
-                except Exception:
-                    pass
-                return {"success": True, "event": gres, "target": "google",
-                        "message": f"📅 RDV mis à jour sur ton Google Agenda : « {gres.get('title') or ev0.get('title')} »."}
-        except Exception:
-            pass
-
-    ev = db.update_event(eid, updates)
-    if not ev:
-        return {"error": "Événement introuvable."}
-    return {"success": True, "event": ev, "target": "local", "message": f"📅 Événement mis à jour : « {ev.get('title')} »."}
+    return await calendar_events_domain.update_event(
+        args,
+        storage=db,
+        google_update=execute_calendar_update,
+        google_sync=_sync_google_into_events,
+    )
 
 
 async def execute_event_delete(args: dict) -> dict:
-    """Supprime un événement par id, ou par correspondance de titre si 'title' fourni."""
-    eid = (args.get("id") or args.get("event_id") or "").strip()
-    title = (args.get("title") or "").strip().lower()
-    ev_found = None
-    if not eid and title:
-        for ev in db.list_events(limit=500):
-            if title in (ev.get("title") or "").lower():
-                eid = ev["id"]; ev_found = ev
-                break
-    if not eid:
-        return {"error": "Aucun événement correspondant (fournissez 'id' ou 'title')."}
-    if ev_found is None:
-        try: ev_found = db.get_event(eid)
-        except Exception: ev_found = None
-    # Action irréversible → confirmation explicite (anti-erreur)
-    if not args.get("confirmed"):
-        label = (f"« {ev_found['title']} » du {(ev_found.get('start_at') or '')[:16]}"
-                 if ev_found else f"id {eid}")
-        return {"requiresConfirmation": True, "message": f"Supprimer définitivement l'événement {label} ?"}
-
-    # ── Si l'événement vient de Google → on le supprime SUR Google (sinon le sync le ramène).
-    if ev_found and ev_found.get("source") == "google" and ev_found.get("external_id"):
-        try:
-            gres = await execute_calendar_delete({"event_id": ev_found["external_id"], "confirmed": True})
-            if gres.get("success"):
-                try:
-                    await _sync_google_into_events()
-                except Exception:
-                    pass
-                db.delete_event(eid)  # nettoie la copie locale aussi
-                return {"success": True, "target": "google", "message": "🗑️ RDV supprimé de ton Google Agenda."}
-        except Exception:
-            pass
-
-    db.delete_event(eid)
-    return {"success": True, "target": "local", "message": "🗑️ Événement supprimé."}
+    return await calendar_events_domain.delete_event(
+        args,
+        storage=db,
+        google_delete=execute_calendar_delete,
+        google_sync=_sync_google_into_events,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -7836,18 +7660,20 @@ TOOLS_SPEC = [
         "end_at": {"type": "string", "description": "Fin optionnelle 'YYYY-MM-DD HH:MM'"},
         "location": {"type": "string", "description": "Lieu"},
         "all_day": {"type": "boolean", "description": "Toute la journée"},
-        "reminder_minutes": {"type": "integer", "description": "Rappel X minutes avant (notification + rappel Google)"},
+        "reminder_minutes": {"type": "integer", "minimum": 0, "maximum": 40320, "description": "Rappel X minutes avant (0 à 40320)"},
         "local_only": {"type": "boolean", "description": "Forcer l'agenda LOCAL même si Google est connecté"}},
        []),
     _t("event_list", "Liste les rendez-vous de l'agenda. Pour « mon agenda », « mes rendez-vous », « quels RDV cette semaine ».",
-       {"period": {"type": "string", "description": "today / tomorrow / week / month / upcoming / all"},
+       {"period": {"type": "string", "enum": ["today", "jour", "aujourd'hui", "aujourdhui", "tomorrow", "demain", "week", "semaine", "7days", "month", "mois", "30days", "upcoming", "all", "tout"], "description": "Période prédéfinie"},
         "start": {"type": "string", "description": "Borne début YYYY-MM-DD (optionnel)"},
-        "end": {"type": "string", "description": "Borne fin YYYY-MM-DD (optionnel)"}},
+        "end": {"type": "string", "description": "Borne fin YYYY-MM-DD (optionnel)"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 500, "description": "Nombre maximal d'événements"}},
        []),
     _t("event_update", "Modifie ou replanifie un événement existant (par id).",
        {"id": {"type": "string", "description": "Identifiant de l'événement"},
         "title": {"type": "string"}, "start_at": {"type": "string"}, "end_at": {"type": "string"},
-        "location": {"type": "string"}, "reminder_minutes": {"type": "integer"}},
+        "location": {"type": "string"},
+        "reminder_minutes": {"type": "integer", "minimum": 0, "maximum": 40320}},
        ["id"]),
     _t("event_delete", "Supprime un événement de l'agenda (par id, ou par titre approchant).",
        {"id": {"type": "string", "description": "Identifiant de l'événement"},

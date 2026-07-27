@@ -216,6 +216,9 @@ Google Calendar est isolé tout en gardant ses alias privés provisoires pour le
 connexion, Doctor et les outils d'agenda encore en cours d'extraction.
 Les abonnements iCalendar sont isolés avec URLs publiques masquées, récupération HTTP bornée
 et protection SSRF; les suppressions via LLM exigent une confirmation explicite.
+Les événements locaux/Google sont isolés avec cohérence de cible : aucun échec distant ne
+devient une mutation locale silencieuse. Le harness valide maintenant les types, enums,
+bornes et structures déclarés par les 344 schémas; l'unification UI/MCP reste à achever.
 
 ## 4. Validation obligatoire par tranche
 

@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.354 — événements agenda extraits dans tool_domains/calendar_events.py; validation
+# des schémas d'outils étendue aux types, enums, bornes, listes et objets imbriqués.
 # v2.353 — abonnements iCalendar extraits dans tool_domains/calendar_subscriptions.py.
 # v2.352 — Google Calendar extrait dans tool_domains/google_calendar.py.
 # v2.351 — OneDrive extrait dans tool_domains/onedrive.py.
