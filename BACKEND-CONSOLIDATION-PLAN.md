@@ -212,6 +212,8 @@ Google Drive dispose de sa propre frontière fournisseur; OneDrive conserve une 
 distincte afin de ne pas masquer les différences OAuth, Graph et stratégies d'upload.
 OneDrive est désormais isolé avec transport injectable et upload asynchrone en flux; les
 fichiers au-delà du contrat simple de 250 Mo exigent explicitement une upload session future.
+Google Calendar est isolé tout en gardant ses alias privés provisoires pour les routes de
+connexion, Doctor et les outils d'agenda encore en cours d'extraction.
 
 ## 4. Validation obligatoire par tranche
 

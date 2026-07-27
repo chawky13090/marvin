@@ -172,7 +172,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.351.0)
+## 9. État actuel (v2.352.0)
+
+**v2.352 (Google Calendar)** : compte de service, OAuth, normalisation RFC3339 et quatre
+opérations sont extraits vers `tool_domains/google_calendar.py`. Les appels SDK passent hors
+de la boucle asyncio, le repli OAuth après 404 reste actif et un déplacement préserve la durée.
 
 **v2.351 (OneDrive)** : OAuth Microsoft, liste, lecture bornée et upload en flux sont extraits
 vers `tool_domains/onedrive.py`. Tenant, identifiants et chemins Graph sont validés; l'upload

@@ -57,6 +57,7 @@ from tool_domains import itsm as itsm_domain
 from tool_domains import runtime_observability as runtime_observability_domain
 from tool_domains import google_drive as google_drive_domain
 from tool_domains import onedrive as onedrive_domain
+from tool_domains import google_calendar as google_calendar_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -896,365 +897,38 @@ screenshots_domain.configure_renderers(
 )
 
 
-_GOOGLE_SA_PATH = os.path.join(os.path.dirname(__file__), "data", "google_service_account.json")
+_GOOGLE_SA_PATH = str(google_calendar_domain.SERVICE_ACCOUNT_PATH)
 
 
-def _google_sa_email() -> str | None:
-    """Email du compte de service si une clé est présente (pour partager l'agenda)."""
-    try:
-        if os.path.exists(_GOOGLE_SA_PATH):
-            import json as _j
-            with open(_GOOGLE_SA_PATH, encoding="utf-8") as f:
-                return _j.load(f).get("client_email")
-    except Exception:
-        pass
-    return None
+_google_sa_email = google_calendar_domain.service_account_email
 
 
-def _resolve_calendar_id(requested: str | None) -> str:
-    """Avec un compte de service, « primary » = l'agenda VIDE du robot.
-    On cible donc l'agenda partagé configuré (google_calendar_id = ton email)."""
-    requested = (requested or "primary").strip()
-    if requested == "primary" and os.path.exists(_GOOGLE_SA_PATH):
-        cid = db.get_setting("google_calendar_id")
-        if cid:
-            return str(cid)
-    return requested
+_resolve_calendar_id = google_calendar_domain.resolve_calendar_id
 
 
-def _norm_google_dt(s: str) -> str:
-    """Google exige un RFC3339 complet avec secondes (sinon 400). 'YYYY-MM-DD HH:MM' →
-    'YYYY-MM-DDTHH:MM:SS'. Laisse les dates (toute-journée, sans 'T') intactes."""
-    if not s:
-        return s
-    s = str(s).replace(" ", "T")
-    if "T" not in s:
-        return s
-    try:
-        from datetime import datetime as _dt
-        return _dt.fromisoformat(s).strftime("%Y-%m-%dT%H:%M:%S")
-    except Exception:
-        return s
+_norm_google_dt = google_calendar_domain.normalize_datetime
 
 
-def _google_calendar_ready() -> bool:
-    """Vrai si l'agenda Google est configuré (sans appel réseau) : compte de service + agenda
-    cible défini, OU tokens OAuth présents (backend credentials ou table frontend oauth_tokens)."""
-    try:
-        if os.path.exists(_GOOGLE_SA_PATH) and db.get_setting("google_calendar_id"):
-            return True
-        import credentials_manager as cm
-        if cm.get_credential("google_access_token") or cm.get_credential("google_refresh_token"):
-            return True
-        with db.db() as connection:
-            row = connection.execute(
-                "SELECT access_token FROM oauth_tokens WHERE provider='google'"
-            ).fetchone()
-        return bool(row and row["access_token"])
-    except Exception:
-        return False
+_google_calendar_ready = google_calendar_domain.is_ready
 
 
-def _get_google_calendar_service(prefer_oauth: bool = False):
-    """Construit le service Google Calendar. Priorité au COMPTE DE SERVICE (permanent,
-    sans expiration) si une clé JSON est présente ; sinon OAuth (tokens utilisateur).
-    v2.137 — `prefer_oauth=True` force le repli OAuth même si le compte de service est
-    configuré : utilisé quand le compte de service renvoie 404 sur l'agenda ciblé (le
-    calendrier personnel n'a pas été partagé avec l'e-mail du compte de service — cas
-    fréquent, corrigible soit en partageant l'agenda, soit en retombant sur OAuth qui a
-    directement accès aux agendas de l'utilisateur connecté)."""
-    from googleapiclient.discovery import build
-
-    # 1) Compte de service (recommandé pour un agenda perso permanent)
-    if os.path.exists(_GOOGLE_SA_PATH) and not prefer_oauth:
-        from google.oauth2 import service_account
-        creds = service_account.Credentials.from_service_account_file(
-            _GOOGLE_SA_PATH, scopes=["https://www.googleapis.com/auth/calendar"])
-        return build("calendar", "v3", credentials=creds)
-
-    # 2) OAuth utilisateur (tokens)
-    import credentials_manager as cm
-    from google.oauth2.credentials import Credentials
-
-    access_token = cm.get_credential("google_access_token")
-    refresh_token = cm.get_credential("google_refresh_token")
-    client_id = cm.get_credential("google_client_id")
-    client_secret = cm.get_credential("google_client_secret")
-
-    # Pont : si le flux backend n'a pas de tokens, réutilise ceux du flux frontend
-    # (table oauth_tokens, provider='google'). Le client_id/secret backend sert au refresh.
-    if not access_token and not refresh_token:
-        try:
-            with db.db() as connection:
-                row = connection.execute(
-                    "SELECT access_token, refresh_token FROM oauth_tokens WHERE provider='google'"
-                ).fetchone()
-            if row:
-                access_token = row["access_token"]
-                refresh_token = row["refresh_token"]
-        except Exception:
-            pass
-
-    if not access_token and not refresh_token:
-        raise ValueError("Google non connecté. Configurez OAuth dans Paramètres > Connexions.")
-
-    creds = Credentials(
-        token=access_token,
-        refresh_token=refresh_token,
-        client_id=client_id,
-        client_secret=client_secret,
-        token_uri="https://oauth2.googleapis.com/token",
-        scopes=["https://www.googleapis.com/auth/calendar"],
-    )
-    return build("calendar", "v3", credentials=creds)
+_get_google_calendar_service = google_calendar_domain.build_service
 
 
 async def execute_calendar_list(args: dict) -> dict:
-    """Liste les événements Google Calendar pour une période donnée."""
-    from datetime import datetime, timezone, timedelta
-    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
-    days_ahead  = max(1, min(int(args.get("days", 7)), 90))
-    max_results = max(1, min(int(args.get("max_results", 20)), 50))
-
-    now = datetime.now(timezone.utc)
-
-    # Support time_min custom (ex. 1er du mois envoyé par le calendrier frontend)
-    raw_min = args.get("time_min", "")
-    if raw_min:
-        try:
-            from dateutil import parser as dtparser
-            time_min = dtparser.parse(raw_min).astimezone(timezone.utc).isoformat()
-        except Exception:
-            time_min = now.isoformat()
-    else:
-        time_min = now.isoformat()
-
-    time_max = (now + timedelta(days=days_ahead)).isoformat()
-
-    def _list_events(service):
-        events_result = service.events().list(
-            calendarId=calendar_id,
-            timeMin=time_min,
-            timeMax=time_max,
-            maxResults=max_results,
-            singleEvents=True,
-            orderBy="startTime",
-        ).execute()
-        events = []
-        for e in events_result.get("items", []):
-            start = e["start"].get("dateTime") or e["start"].get("date", "")
-            end   = e["end"].get("dateTime")   or e["end"].get("date", "")
-            events.append({
-                "id":          e.get("id", ""),
-                "title":       e.get("summary", "(Sans titre)"),
-                "start":       start,
-                "end":         end,
-                "location":    e.get("location", ""),
-                "description": (e.get("description", "") or "")[:300],
-                "organizer":   e.get("organizer", {}).get("email", ""),
-                "status":      e.get("status", ""),
-                "colorId":     e.get("colorId", ""),
-                "link":        e.get("htmlLink", ""),
-            })
-        return events
-
-    def _fetch():
-        # v2.137 — repli OAuth quand le compte de service renvoie 404 (l'agenda ciblé n'est
-        # pas partagé avec l'e-mail du compte de service) : trouvé en auditant 60 échecs
-        # historiques de calendar_list, tous ce même 404 sur calendars/<email>/events.
-        # Sans repli, un utilisateur dont l'agenda n'a jamais été partagé avec le compte de
-        # service voit TOUJOURS échouer calendar_list, alors qu'OAuth (s'il est configuré)
-        # a un accès direct à ses propres agendas sans configuration supplémentaire.
-        try:
-            return _list_events(_get_google_calendar_service())
-        except Exception as e:
-            from googleapiclient.errors import HttpError
-            _status = getattr(getattr(e, "resp", None), "status", None)
-            if isinstance(e, HttpError) and _status == 404:
-                try:
-                    return _list_events(_get_google_calendar_service(prefer_oauth=True))
-                except Exception:
-                    pass
-            raise
-
-    try:
-        loop = asyncio.get_running_loop()
-        events = await loop.run_in_executor(None, _fetch)
-        return {
-            "success":     True,
-            "calendar_id": calendar_id,
-            "period_days": days_ahead,
-            "count":       len(events),
-            "events":      events,
-        }
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_calendar_domain.list_events(args)
 
 
 async def execute_calendar_create(args: dict) -> dict:
-    """Crée un événement dans Google Calendar."""
-    title = args.get("title", "").strip()
-    start = args.get("start", "").strip()    # ISO 8601 ou date YYYY-MM-DD
-    end   = args.get("end",   "").strip()
-    if not title:
-        return {"error": "Paramètre 'title' requis."}
-    if not start:
-        return {"error": "Paramètre 'start' requis. Format : YYYY-MM-DDTHH:MM:SS ou YYYY-MM-DD."}
-
-    location    = args.get("location", "")
-    description = args.get("description", "")
-    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
-
-    # Déterminer si c'est un événement toute-journée ou avec heure précise
-    all_day = "T" not in start
-    if not end:
-        # v2.160 : 'start' mal formé (ex. valeur non-date) levait une ValueError non
-        # rattrapée → 500 au lieu d'une erreur de validation propre.
-        try:
-            if all_day:
-                # Toute la journée → fin = jour suivant
-                from datetime import datetime, timedelta
-                d = datetime.strptime(start, "%Y-%m-%d")
-                end = (d + timedelta(days=1)).strftime("%Y-%m-%d")
-            else:
-                # 1 heure par défaut
-                from datetime import datetime, timedelta
-                d = datetime.fromisoformat(start)
-                end = (d + timedelta(hours=1)).isoformat()
-        except ValueError:
-            return {"error": f"Date 'start' invalide : « {start} ». Format attendu : YYYY-MM-DDTHH:MM:SS ou YYYY-MM-DD."}
-
-    def _create():
-        service = _get_google_calendar_service()
-        if all_day:
-            event_body = {
-                "summary": title,
-                "start": {"date": start},
-                "end": {"date": end},
-            }
-        else:
-            event_body = {
-                "summary": title,
-                "start": {"dateTime": _norm_google_dt(start), "timeZone": "Europe/Paris"},
-                "end":   {"dateTime": _norm_google_dt(end),   "timeZone": "Europe/Paris"},
-            }
-        if location:
-            event_body["location"] = location
-        if description:
-            event_body["description"] = description
-        # Rappel Google natif → notifie aussi sur le téléphone
-        _rem = args.get("reminder_minutes")
-        if _rem not in (None, ""):
-            try:
-                event_body["reminders"] = {"useDefault": False,
-                                           "overrides": [{"method": "popup", "minutes": int(_rem)}]}
-            except Exception:
-                pass
-
-        created = service.events().insert(calendarId=calendar_id, body=event_body).execute()
-        s_raw = created.get("start", {})
-        e_raw = created.get("end",   {})
-        return {
-            "success":     True,
-            "message":     f"Événement créé : « {title} »",
-            "id":          created.get("id", ""),
-            "event_id":    created.get("id", ""),
-            "summary":     created.get("summary", title),
-            "start":       {"dateTime": s_raw.get("dateTime"), "date": s_raw.get("date")} if s_raw else {"dateTime": start},
-            "end":         {"dateTime": e_raw.get("dateTime"), "date": e_raw.get("date")} if e_raw else {"dateTime": end},
-            "location":    created.get("location", location),
-            "description": created.get("description", description),
-            "htmlLink":    created.get("htmlLink", ""),
-        }
-
-    try:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, _create)
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_calendar_domain.create_event(args)
 
 
 async def execute_calendar_delete(args: dict) -> dict:
-    """Supprime un événement Google Calendar par son ID."""
-    event_id    = args.get("event_id", "").strip()
-    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
-    if not event_id:
-        return {"error": "Paramètre 'event_id' requis."}
-
-    confirmed = args.get("confirmed", False)
-    if not confirmed:
-        return {
-            "requiresConfirmation": True,
-            "message": f"Supprimer l'événement Google Calendar ID «{event_id}» ?\n⚠️ Cette action est irréversible.",
-        }
-
-    def _delete():
-        service = _get_google_calendar_service()
-        service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
-        return {"success": True, "message": f"Événement {event_id} supprimé du calendrier."}
-
-    try:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, _delete)
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_calendar_domain.delete_event(args)
 
 
 async def execute_calendar_update(args: dict) -> dict:
-    """Met à jour un événement Google Calendar existant."""
-    event_id    = args.get("event_id", "").strip()
-    calendar_id = _resolve_calendar_id(args.get("calendar_id"))
-    if not event_id:
-        return {"error": "Paramètre 'event_id' requis."}
-
-    # Champs optionnels à mettre à jour
-    title       = args.get("title")
-    start       = args.get("start")
-    end         = args.get("end")
-    description = args.get("description")
-    location    = args.get("location")
-
-    def _update():
-        service = _get_google_calendar_service()
-        # Récupérer l'événement existant
-        existing = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
-
-        if title       is not None: existing["summary"]     = title
-        if description is not None: existing["description"] = description
-        if location    is not None: existing["location"]    = location
-
-        if start is not None:
-            if "T" in str(start).replace(" ", "T"):
-                existing["start"] = {"dateTime": _norm_google_dt(start), "timeZone": "Europe/Paris"}
-            else:
-                existing["start"] = {"date": start}
-        if end is not None:
-            if "T" in str(end).replace(" ", "T"):
-                existing["end"] = {"dateTime": _norm_google_dt(end), "timeZone": "Europe/Paris"}
-            else:
-                existing["end"] = {"date": end}
-
-        updated = service.events().update(
-            calendarId=calendar_id, eventId=event_id, body=existing
-        ).execute()
-
-        return {
-            "id":          updated.get("id"),
-            "title":       updated.get("summary", ""),
-            "start":       updated.get("start", {}),
-            "end":         updated.get("end", {}),
-            "description": updated.get("description", ""),
-            "location":    updated.get("location", ""),
-            "colorId":     updated.get("colorId"),
-            "success":     True,
-            "message":     f"Événement «{updated.get('summary')}» mis à jour.",
-        }
-
-    try:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, _update)
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_calendar_domain.update_event(args)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

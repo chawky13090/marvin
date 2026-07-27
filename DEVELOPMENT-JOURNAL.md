@@ -6191,3 +6191,41 @@ Séparer Microsoft Graph de Google Drive afin de préserver les contrats et cont
 
 Le commit de cette tranche peut être réverti atomiquement; aucun schéma ni donnée persistante
 n'est modifié.
+
+## 2026-07-27 — v2.352.0 — Domaine Google Calendar
+
+### Contexte
+
+Extraire Google Calendar sans modifier les outils d'agenda local, les abonnements iCal ni les
+trois méthodes de connexion conservées pour les installations futures.
+
+### Analyse et solution
+
+- Authentification, résolution d'agenda, normalisation des dates et CRUD Google étaient encore
+  mêlés à `tools.py` et leurs appels SDK synchrones bloquaient les coroutines FastAPI.
+- `tool_domains/google_calendar.py` possède désormais ces responsabilités. Les alias privés
+  historiques restent exposés pour `api/connections.py`, Doctor, les workers et l'agenda.
+- La priorité compte de service puis OAuth est conservée. Un 404 du compte de service déclenche
+  exactement un repli OAuth, sans masquer les autres erreurs.
+- Les dates, rappels, volumes et identifiants sont validés; `time_max` est calculé depuis le
+  `time_min` demandé plutôt que depuis l'heure courante.
+- Lorsqu'un début est déplacé sans nouvelle fin, la durée existante est préservée pour les
+  événements horaires comme pour les journées entières.
+- Toutes les opérations Google synchrones passent par `asyncio.to_thread`.
+
+### Validation observée
+
+- Tests ciblés : repli 404, fenêtre temporelle, bornes, RFC3339, création, fin invalide,
+  confirmation de suppression, conservation de durée, alias et registre réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **128/128 étapes** en
+  216,0 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.352.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel avec Turbopack : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **7 908 lignes** non vides mesurées par
+  PowerShell.
+
+### Rollback
+
+Réversion atomique du commit de tranche; aucun schéma, secret ni événement réel n'a été
+modifié par les tests, qui utilisent des services injectés.

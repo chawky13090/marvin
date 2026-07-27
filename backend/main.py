@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.352 — Google Calendar extrait dans tool_domains/google_calendar.py.
 # v2.351 — OneDrive extrait dans tool_domains/onedrive.py.
 # v2.350 — Google Drive extrait dans tool_domains/google_drive.py.
 # v2.349 — observabilité runtime extraite dans tool_domains/runtime_observability.py.
