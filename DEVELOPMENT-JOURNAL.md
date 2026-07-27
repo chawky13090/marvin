@@ -6026,3 +6026,41 @@ Continuer la séparation des domaines Windows avec validation des effets de bord
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 697 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.347.0 — Domaine recherche Windows
+
+### Demande
+
+Continuer la consolidation backend sans perte fonctionnelle et améliorer les frontières
+rencontrées lorsque cela renforce leur déterminisme et leur testabilité.
+
+### Constats et décisions
+
+- Les recherches Windows par nom et par contenu contenaient leur transport COM, la composition
+  SQL, la normalisation des résultats et les contrats d'outil directement dans `tools.py`.
+- Le domaine est extrait vers `tool_domains/system_search.py`; `tools.py` conserve deux façades
+  portant exactement les identités historiques du registre.
+- Les limites sont désormais bornées entre 1 et 100, les types sont validés par liste blanche
+  et les apostrophes sont échappées avant la composition des littéraux Windows Search.
+- Le transport COM ferme recordset, connexion et appartement COM dans tous les chemins, et il
+  reste exécuté hors de la boucle asyncio.
+
+### Fichiers
+
+- `backend/tool_domains/system_search.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_system_search.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Tests ciblés de requête, filtre, échappement, borne et façade réussis.
+- Architecture : **344/344 outils**, **346 routes**, 40 pages et 64 outils encadrés.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **123/123 étapes** en
+  206,4 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.347.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 498 lignes** non vides mesurées par
+  PowerShell.

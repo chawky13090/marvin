@@ -184,6 +184,9 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 62. le registre Windows : `tool_domains/windows_registry.py` possède point de restauration, lecture, export et écriture; chemins, noms, types et valeurs sont validés/encodés avant PowerShell, avec sauvegarde et confirmation sur mutation.
 63. les tweaks Windows : `tool_domains/windows_tweaks.py` possède télémétrie, débloat et réglages réseau; les dépendances registre sont injectées et le retrait UWP est limité au catalogue exact présenté par Marvin.
 64. Catharsis : `tool_domains/catharsis.py` possède scan et purge des caches; catégories et projections sont limitées au catalogue interne, les valeurs invalides sont neutralisées et toute suppression reste confirmée.
+65. la recherche Windows : `tool_domains/system_search.py` possède les requêtes par nom et
+contenu sur l'index Windows Search; limites et types sont bornés, les littéraux sont échappés
+et la durée COM est exécutée hors de la boucle asyncio.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

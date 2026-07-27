@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.347 — recherche Windows extraite dans tool_domains/system_search.py.
 import json
 import base64
 import re as _re

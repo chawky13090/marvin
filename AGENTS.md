@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.346.0)
+## 9. État actuel (v2.347.0)
+
+**v2.347 (recherche Windows)** : les recherches par nom et par contenu dans l'index
+Windows Search sont extraites vers `tool_domains/system_search.py`. Les limites sont bornées,
+les types filtrés par liste blanche, les littéraux SQL échappés et COM reste hors de la boucle
+asyncio. Les identités publiques `system_search` et `system_search_content` sont conservées.
 
 **v2.346 (Catharsis)** : scan et purge des caches Windows rejoignent
 `tool_domains/catharsis.py`. Le runner PowerShell est injecté; seules les catégories du

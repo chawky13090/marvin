@@ -202,6 +202,9 @@ Critère : `database.py` devient une façade d'import compatible. Toute opérati
 3. supprimer les imports inversés entre API, outils et persistance ;
 4. contrôler les cycles d'import et le temps d'import du backend.
 
+La recherche Windows est isolée derrière une frontière injectable, sans modifier les
+identités `system_search` et `system_search_content` du registre public.
+
 ## 4. Validation obligatoire par tranche
 
 - compilation Python ciblée ;
