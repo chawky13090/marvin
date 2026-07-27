@@ -5691,3 +5691,45 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 17 348 à **17 032 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.338.0 — Domaine documentation d'intervention
+
+### Demande
+
+Poursuivre la consolidation backend, améliorer les défauts rencontrés et vérifier chaque
+modification avant livraison.
+
+### Constats et décisions
+
+- Les 18 outils d'intervention, d'analyse, de livrables ITIL, d'actifs et de connaissance
+  formaient encore un domaine volumineux directement implémenté dans `tools.py`.
+- L'export mutualisé dépendait implicitement de `_HOME`; cette variable n'appartient pas au
+  domaine extrait et aurait provoqué une erreur lors des générations post-mortem, changement
+  et onboarding sans chemin explicite.
+- Plusieurs générateurs acceptaient un format arbitraire puis produisaient un PDF avec une
+  extension incohérente. Chaque fonction refuse désormais les formats qu'elle ne sait pas
+  réellement produire.
+- Le domaine est extrait dans `tool_domains/intervention_docs.py`. Les générateurs DOCX/PDF,
+  l'extraction de commandes et l'analyse de risque sont injectés au composition root.
+- Les limites de liste sont bornées à 1–500 et les champs textuels invalides produisent une
+  erreur structurée au lieu d'une exception de type.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/intervention_docs.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_intervention_docs.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Validation ciblée : compilation Python, test déterministe du domaine et
+  `scripts/check_architecture.py` réussis; architecture **344/344**, **346 routes**,
+  **40 pages** et **64 outils encadrés**.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **114/114 étapes** en
+  187,9 secondes. ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.338.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **10 040 lignes** mesurées par
+  PowerShell; aucune identité d'outil supprimée.

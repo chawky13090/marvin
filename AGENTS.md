@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.337.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.338.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.337.0)
+## 9. État actuel (v2.338.0)
+
+**v2.338 (documentation d'intervention)** : les 18 outils d'interventions, analyse de notes,
+rapports, procédures, fiches client, PRA, maintenance, runbooks, schémas, post-mortems,
+changements, onboarding, modèles, actifs et connaissance rejoignent
+`tool_domains/intervention_docs.py`. Les générateurs DOCX/PDF et l'analyse des commandes sont
+injectés; les formats réellement pris en charge et les limites de liste sont validés. Le
+chemin d'export mutualisé utilise désormais le bureau portable au lieu d'une variable globale
+absente. Les identités publiques et le registre 344/344 sont conservés.
 
 **v2.337 (diagnostic PC)** : les 10 outils de spécifications matérielles, GPU/températures,
 SMART, erreurs Windows, pilotes, tendance de santé, fiabilité des outils, trace de conversation

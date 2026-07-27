@@ -143,6 +143,11 @@ contrats d'entrée sont validés avant toute commande, interaction GUI ou termin
 Les 10 outils de diagnostic PC rejoignent `tool_domains/pc_diagnostics.py` en v2.337.0.
 PowerShell et Web sont injectés dans un ordre explicite; métriques, tendances et observabilité
 restent en lecture/persistance historique avec paramètres bornés.
+Les 18 outils de documentation d'intervention rejoignent
+`tool_domains/intervention_docs.py` en v2.338.0. CRUD, analyse de notes, rapports et procédures,
+livrables ITIL, actifs et recherche historique partagent une frontière explicite. Les
+générateurs et l'analyse de commandes sont injectés; formats et limites sont validés avant
+accès aux transports ou à la persistance.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

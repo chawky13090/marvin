@@ -62,7 +62,7 @@ flowchart LR
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
-| `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
+| `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, documentation d'intervention, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
@@ -175,6 +175,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 53. le noyau PDF : `tool_domains/pdf_core.py` possède lecture, métadonnées, fusion, découpage et rotation; sélections de pages, volumes, chiffrement et écritures atomiques sont gérés sans dépendance aux moteurs OCR/rendu.
 54. le PDF avancé : `tool_domains/pdf_advanced.py` possède filigrane, protection AES, extraction/rendu d'images, OCR, AcroForm, compression et numérotation; les transports et réglages OCR sont injectés, les dépendances optionnelles restent confinées.
 55. la connaissance documentaire : `tool_domains/document_knowledge.py` possède extraction multi-format, indexation Qdrant, Q/R RAG, inventaire, oubli et affinage de section; le magasin vectoriel reste injecté depuis le processus backend et les documents générés sont confinés par relation de chemin.
+56. la documentation d'intervention : `tool_domains/intervention_docs.py` possède le CRUD d'interventions, l'analyse de notes, les livrables ITIL, les actifs et la recherche historique; les générateurs DOCX/PDF et l'analyse de commandes sont injectés, les formats et volumes sont validés.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
