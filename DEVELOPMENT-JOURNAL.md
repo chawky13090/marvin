@@ -5432,3 +5432,53 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 17 724 à **17 348 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.331.0 — Connaissance documentaire RAG
+
+### Demande
+
+- Continuer la consolidation des domaines d'outils en préservant Qdrant mono-process,
+  le routage LLM et l'affinage des documents générés.
+
+### Constats et décisions
+
+- Extraction multi-format, découpage, indexation Qdrant, Q/R en deux passes, inventaire,
+  oubli et affinage ciblé étaient implémentés avec leurs helpers dans `tools.py`.
+- Le contrôle de confinement de l'affinage utilisait `startswith`; un dossier frère nommé
+  `documents_generes_evil` partageait le préfixe sans appartenir au stockage autorisé.
+- Le domaine rejoint `tool_domains/document_knowledge.py`. Réglages, générateur, rendu DOCX,
+  magasin vectoriel et dossier de documents sont injectés; le runtime utilise toujours
+  l'instance Qdrant du processus backend.
+- `Path.relative_to` remplace la comparaison textuelle de préfixe. Les métadonnées sont
+  remplacées atomiquement, les classeurs XLSX sont fermés dans un `finally` et les limites
+  document/chunks/concurrence/RAG sont explicites.
+- Les échecs d'indexation sont désormais distingués des succès avec `failed` et
+  `failed_count`; `documents` reflète les documents réellement indexés.
+- Les cinq identités du registre restent inchangées et aucun ancien helper RAG ne subsiste
+  dans `tools.py`.
+
+### Fichiers
+
+- `backend/tool_domains/document_knowledge.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_document_knowledge.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test documentaire : TXT/XLSX réels, chunks, index simulé sans second Qdrant, recherche en
+  deux passes, sources, oubli, affinage/rendu et métadonnées atomiques vérifiés.
+- Le chemin frère hostile `generated_evil` est explicitement refusé.
+- `scripts/check_marvin.py --quick` : **107/107 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.331.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 17 348 à **17 032 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

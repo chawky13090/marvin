@@ -123,6 +123,9 @@ frontière distincte afin de ne pas coupler le noyau aux dépendances ReportLab/
 Les neuf traitements avancés rejoignent `tool_domains/pdf_advanced.py` en v2.330.0 avec
 transport OCR et réglages injectés. La famille PDF est close : `tools.py` ne contient plus
 aucun corps `execute_pdf_*`, seulement les alias compatibles et les spécifications publiques.
+Indexation documentaire, Q/R sourcée, inventaire, oubli et affinage rejoignent
+`tool_domains/document_knowledge.py` en v2.331.0. Le magasin vectoriel partagé est injecté
+depuis le processus backend afin de préserver le verrou Qdrant mono-process.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

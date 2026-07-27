@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.330.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.331.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.330.0)
+## 9. État actuel (v2.331.0)
+
+**v2.331 (connaissance documentaire)** : extraction multi-format, indexation Qdrant,
+questions RAG en deux passes, liste, oubli et affinage ciblé rejoignent
+`tool_domains/document_knowledge.py`. Réglages, générateur, rendu DOCX et magasin vectoriel
+sont injectés; aucun second processus Qdrant n'est créé. Les cinq identités publiques sont
+conservées. XLSX est toujours fermé, volumes/concurrence sont bornés et l'affinage utilise
+`Path.relative_to` au lieu d'un préfixe textuel contournable. Le test couvre TXT/XLSX,
+deux recherches, provenance, oubli, métadonnées atomiques et chemin frère hostile.
 
 **v2.330 (PDF avancé)** : filigrane, protection AES-256, extraction d'images, rendu PNG,
 OCR hybride, champs/remplissage AcroForm, compression pikepdf et numérotation rejoignent

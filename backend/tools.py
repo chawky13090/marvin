@@ -20,6 +20,7 @@ from typing import Any
 
 import psutil
 import database as db
+import vector_store as vector_store_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -35,6 +36,7 @@ from tool_domains import screenshots as screenshots_domain
 from tool_domains import images as images_domain
 from tool_domains import pdf_core as pdf_core_domain
 from tool_domains import pdf_advanced as pdf_advanced_domain
+from tool_domains import document_knowledge as document_knowledge_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -6902,157 +6904,11 @@ async def execute_calendar_sync(args: dict) -> dict:
 # répond aux questions en citant les passages. 100 % local et privé.
 # ══════════════════════════════════════════════════════════════════════════════
 
-_DOC_EXTS = {".pdf", ".docx", ".txt", ".md", ".markdown", ".csv", ".tsv", ".log", ".json",
-             ".xlsx", ".pptx", ".html", ".htm", ".rtf", ".xml", ".yaml", ".yml", ".ini", ".rst"}
 
 
-def _indexed_docs() -> list:
-    docs = db.get_setting("indexed_documents")
-    if isinstance(docs, str):
-        try:
-            import json as _json
-            docs = _json.loads(docs)
-        except Exception:
-            docs = []
-    return docs if isinstance(docs, list) else []
 
 
-def _save_indexed_docs(docs: list):
-    db.set_setting("indexed_documents", docs)
 
-
-def _chunk_text(text: str, size: int = 900, overlap: int = 150) -> list:
-    text = " ".join((text or "").split())
-    if not text:
-        return []
-    chunks, i = [], 0
-    while i < len(text):
-        chunks.append(text[i:i + size])
-        i += max(1, size - overlap)
-    return chunks[:500]   # garde-fou : max 500 fragments / document
-
-
-def _extract_document_text(path: str) -> str:
-    ext = os.path.splitext(path)[1].lower()
-    if ext == ".pdf":
-        from pypdf import PdfReader
-        r = PdfReader(path)
-        return "\n".join((p.extract_text() or "") for p in r.pages)
-    if ext == ".docx":
-        import docx
-        d = docx.Document(path)
-        return "\n".join(p.text for p in d.paragraphs)
-    if ext == ".pptx":
-        from pptx import Presentation
-        prs = Presentation(path)
-        out = []
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    out.append(shape.text_frame.text)
-        return "\n".join(out)
-    if ext == ".xlsx":
-        import openpyxl
-        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-        out = []
-        for ws in wb.worksheets:
-            for row in ws.iter_rows(values_only=True):
-                out.append(" ".join(str(c) for c in row if c is not None))
-        return "\n".join(out)
-    with open(path, encoding="utf-8", errors="ignore") as f:
-        raw = f.read(500_000)
-    if ext in (".html", ".htm"):
-        import re as _re
-        raw = _re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
-        raw = _re.sub(r"(?s)<[^>]+>", " ", raw)
-        import html as _html
-        raw = _html.unescape(raw)
-    elif ext == ".rtf":
-        import re as _re
-        raw = _re.sub(r"\\'[0-9a-fA-F]{2}", "", raw)
-        raw = _re.sub(r"\\[a-zA-Z]+-?\d* ?", " ", raw)
-        raw = raw.replace("{", " ").replace("}", " ")
-    return raw
-
-
-def _document_index_collect_targets(path: str) -> list:
-    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, jamais directement dans l'event loop."""
-    targets = []
-    for root, _dirs, files in os.walk(path):
-        for f in files:
-            if os.path.splitext(f)[1].lower() in _DOC_EXTS:
-                targets.append(os.path.join(root, f))
-        if len(targets) > 200:
-            break
-    return targets
-
-
-async def execute_document_index(args: dict) -> dict:
-    """Indexe un fichier (ou tous les fichiers d'un dossier) pour pouvoir l'interroger ensuite."""
-    import vector_store as vs, uuid as _uuid
-    raw = (args.get("path") or "").strip()
-    if not raw:
-        return {"error": "Indiquez le chemin du fichier ou dossier à indexer."}
-    path = _resolve_path(raw)
-    if not os.path.exists(path):
-        return {"error": f"Introuvable : {path}"}
-
-    targets = []
-    if os.path.isdir(path):
-        # v2.163 : os.walk déporté sur un thread (même risque que file_large_finder v2.160
-        # si le dossier indexé est volumineux — la boucle break>200 ne coupe qu'APRÈS
-        # avoir déjà walké potentiellement beaucoup de fichiers).
-        targets = await asyncio.to_thread(_document_index_collect_targets, path)
-    elif os.path.splitext(path)[1].lower() in _DOC_EXTS:
-        targets = [path]
-    else:
-        return {"error": f"Type non pris en charge. Formats : {', '.join(sorted(_DOC_EXTS))}"}
-    if not targets:
-        return {"error": "Aucun document compatible trouvé."}
-
-    docs = _indexed_docs()
-    by_path = {d["path"]: d for d in docs}
-    indexed, total_chunks = [], 0
-    loop = asyncio.get_running_loop()
-
-    # Parallélisme piloté par le MODE : on EXTRAIT le texte des fichiers en parallèle (lecture
-    # PDF/Word lente) ; l'indexation vectorielle reste séquentielle (Qdrant = mono-process).
-    try:
-        conc = max(1, int(db.get_setting("task_concurrency") or 3))
-    except Exception:
-        conc = 3
-    sem = asyncio.Semaphore(conc)
-
-    async def _extract(fp):
-        async with sem:
-            try:
-                text = await loop.run_in_executor(None, _extract_document_text, fp)
-                return fp, _chunk_text(text)
-            except Exception as e:
-                return fp, e
-
-    extracted = await asyncio.gather(*[_extract(fp) for fp in targets[:200]])
-
-    for fp, chunks in extracted:
-        if isinstance(chunks, Exception):
-            indexed.append(f"{os.path.basename(fp)} (échec: {str(chunks)[:60]})")
-            continue
-        if not chunks:
-            continue
-        try:
-            doc_id = by_path.get(fp, {}).get("id") or _uuid.uuid4().hex[:12]
-            if fp in by_path:
-                vs.delete_doc_chunks(doc_id)   # réindexation : on remplace
-            name = os.path.basename(fp)
-            n = await vs.index_chunks(doc_id, name, fp, chunks)
-            total_chunks += n
-            by_path[fp] = {"id": doc_id, "name": name, "path": fp, "chunks": n, "indexed_at": _now_iso()}
-            indexed.append(name)
-        except Exception as e:
-            indexed.append(f"{os.path.basename(fp)} (échec: {str(e)[:60]})")
-    _save_indexed_docs(list(by_path.values()))
-    return {"success": True, "indexed": indexed, "documents": len(indexed), "chunks": total_chunks,
-            "message": f"📄 {len(indexed)} document(s) indexé(s) ({total_chunks} fragments). Tu peux maintenant poser des questions dessus."}
 
 
 # v2.143 — RAG AGENTIQUE (2ᵉ passe de retrieval si la 1ʳᵉ ne suffit pas), au lieu d'une
@@ -7061,195 +6917,9 @@ async def execute_document_index(args: dict) -> dict:
 # remplace le retrieval linéaire pour les questions complexes. Coût borné : AU PLUS 1
 # passe supplémentaire + 1 petit appel de jugement (pas une boucle non bornée comme
 # `web_deep_research`, le corpus local est petit — pas besoin de 6 passes).
-async def execute_document_ask(args: dict) -> dict:
-    """Pose une question à tes documents indexés : récupère les passages pertinents (avec
-    une 2ᵉ passe de recherche reformulée si la 1ʳᵉ ne suffit pas) et répond en les citant."""
-    import vector_store as vs
-    question = (args.get("question") or args.get("query") or "").strip()
-    if not question:
-        return {"error": "Pose une question (paramètre 'question')."}
-    try:
-        _k = int(args.get("k") or db.get_setting("rag_k") or 6)
-    except Exception:
-        _k = 6
-    if not _indexed_docs():
-        return {"error": "Aucun document indexé. Indexe d'abord un fichier ou un dossier."}
-
-    seen_texts: set[str] = set()
-    all_hits: list[dict] = []
-    current_query = question
-
-    hits = await vs.search(current_query, collections=["documents"], limit=_k)
-    for h in hits:
-        key = h["text"][:200]
-        if key not in seen_texts:
-            seen_texts.add(key)
-            all_hits.append(h)
-
-    if all_hits:
-        # Une seule vérification (pas de boucle) : le modèle juge si le 1er passage
-        # suffit, sinon reformule UNE requête complémentaire pour une 2ᵉ recherche.
-        digest = "\n\n".join(
-            f"[{i+1}] ({h['metadata'].get('name', '?')})\n{h['text'][:600]}"
-            for i, h in enumerate(all_hits[:8]))
-        judge_prompt = (
-            f"Question : {question}\n\nExtraits déjà trouvés dans les documents :\n{digest}\n\n"
-            "Ces extraits suffisent-ils pour répondre PRÉCISÉMENT à la question ? Réponds "
-            "UNIQUEMENT par « SUFFISANT » si oui, ou par UNE requête de recherche COURTE "
-            "(mots-clés reformulés différemment, pas une phrase) pour combler ce qui manque "
-            "— rien d'autre."
-        )
-        try:
-            verdict = (await _ollama_generate(judge_prompt, model=args.get("model"), timeout=45) or "").strip()
-        except Exception:
-            verdict = "SUFFISANT"
-        if (verdict and not verdict.upper().startswith("SUFFISANT") and len(verdict) <= 150
-                and verdict.strip().lower() != current_query.strip().lower()):
-            hits2 = await vs.search(verdict.strip(), collections=["documents"], limit=_k)
-            for h in hits2:
-                key = h["text"][:200]
-                if key not in seen_texts:
-                    seen_texts.add(key)
-                    all_hits.append(h)
-            current_query = verdict.strip()
-
-    if not all_hits:
-        return {"success": True, "answer": "Je n'ai trouvé aucun passage pertinent dans tes documents pour cette question.",
-                "sources": [], "message": "Aucun passage pertinent."}
-
-    context = "\n\n".join(f"[{i+1}] (source : {h['metadata'].get('name','?')})\n{h['text']}"
-                           for i, h in enumerate(all_hits[:_k * 2]))
-    prompt = (
-        "Tu réponds à la question de l'utilisateur en t'appuyant UNIQUEMENT sur les extraits de documents ci-dessous. "
-        "Réponds en français, précisément. Cite la source entre parenthèses (le nom du fichier). "
-        "Si l'information n'est pas dans les extraits, dis-le clairement.\n\n"
-        f"EXTRAITS :\n{context}\n\n"
-        f"QUESTION : {question}\n\nRÉPONSE :"
-    )
-    answer = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-    seen, sources = set(), []
-    for h in all_hits:
-        nm = h["metadata"].get("name", "?")
-        if nm not in seen:
-            seen.add(nm)
-            sources.append({"name": nm, "score": h.get("score"), "extrait": h["text"][:200]})
-    return {"success": True, "answer": (answer or "").strip(), "sources": sources,
-            "message": f"Réponse basée sur {len(sources)} document(s)"
-                       + (f" (2 passes de recherche)." if current_query != question else ".")}
 
 
-async def execute_document_list(args: dict) -> dict:
-    """Liste les documents indexés (interrogeables)."""
-    docs = _indexed_docs()
-    return {"success": True, "documents": docs, "count": len(docs)}
 
-
-async def execute_document_forget(args: dict) -> dict:
-    """Retire un document de l'index (par id ou nom)."""
-    import vector_store as vs
-    key = (args.get("id") or args.get("name") or "").strip().lower()
-    if not key:
-        return {"error": "Indique l'id ou le nom du document à oublier."}
-    docs = _indexed_docs()
-    keep, removed = [], None
-    for d in docs:
-        if d.get("id", "").lower() == key or d.get("name", "").lower() == key:
-            removed = d
-        else:
-            keep.append(d)
-    if not removed:
-        return {"error": "Document introuvable dans l'index."}
-    vs.delete_doc_chunks(removed["id"])
-    _save_indexed_docs(keep)
-    return {"success": True, "message": f"🗑️ « {removed.get('name')} » retiré de l'index."}
-
-
-async def execute_document_refine_section(args: dict) -> dict:
-    """Affine UNE section d'un document généré : développe, raccourcit, reformule…
-    Réécrit seulement la section demandée puis régénère le .docx (en-tête/signature conservés).
-    Ex : « développe la partie Diagnostic », « ajoute un tableau dans Solution »."""
-    import json as _json, re as _re
-    raw_file = (args.get("file") or "").strip()
-    section = (args.get("section") or "").strip()
-    instruction = (args.get("instruction") or "développe et complète cette section").strip()
-    extra = (args.get("notes") or "").strip()
-    if not raw_file or not section:
-        return {"error": "Fournis 'file' (le .docx généré) et 'section' (le titre à affiner)."}
-
-    # Sécurité : rester dans documents_generes
-    base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "documents_generes"))
-    docx_path = os.path.abspath(_resolve_path(raw_file))
-    if not docx_path.startswith(base):
-        # tolère un simple nom de fichier
-        docx_path = os.path.abspath(os.path.join(base, os.path.basename(raw_file)))
-    meta_path = docx_path + ".meta.json"
-    if not os.path.exists(meta_path):
-        return {"error": "Document non affinable (régénère-le d'abord avec la nouvelle version)."}
-    try:
-        with open(meta_path, encoding="utf-8") as f:
-            meta = _json.load(f)
-    except Exception as e:
-        return {"error": f"Métadonnées illisibles : {str(e)[:80]}"}
-
-    markdown = meta.get("markdown") or ""
-    # Localise la section « ## Titre » jusqu'au prochain titre de même niveau
-    pat = _re.compile(r"(^|\n)(#{2,3})\s*" + _re.escape(section) + r"\s*\n", _re.IGNORECASE)
-    m = pat.search(markdown)
-    if not m:
-        secs = meta.get("sections", [])
-        # match approximatif
-        cand = next((s for s in secs if section.lower() in s.lower() or s.lower() in section.lower()), None)
-        if cand:
-            section = cand
-            pat = _re.compile(r"(^|\n)(#{2,3})\s*" + _re.escape(section) + r"\s*\n", _re.IGNORECASE)
-            m = pat.search(markdown)
-    if not m:
-        return {"error": f"Section « {section} » introuvable. Sections : {', '.join(meta.get('sections', []))}"}
-
-    start = m.start() if m.start() == 0 else m.start() + 1
-    # fin = prochain titre ## ou # après la section
-    nxt = _re.search(r"\n#{1,3}\s", markdown[m.end():])
-    end = m.end() + nxt.start() if nxt else len(markdown)
-    current = markdown[start:end].strip()
-
-    prompt = (
-        f"Tu es un rédacteur professionnel francophone. Voici UNE section d'un document « {meta.get('subtitle','')} » "
-        f"intitulé « {meta.get('title','')} ».\n\nSECTION ACTUELLE :\n{current}\n\n"
-        f"CONSIGNE : {instruction}. Réécris cette section en français impeccable, COMPLÈTE et professionnelle "
-        f"(sous-titres, listes ou tableaux markdown si utile). Garde le même titre. "
-        f"Commence ta réponse par « ## {section} » et ne rédige QUE cette section.\n"
-        + (f"\nÉLÉMENTS À INTÉGRER :\n{extra}\n" if extra else "")
-        + "\nNOUVELLE VERSION :"
-    )
-    try:
-        new_sec = (await _ollama_generate(prompt, model=args.get("model"), timeout=240) or "").strip()
-    except Exception as e:
-        return {"error": f"Génération échouée : {str(e)[:120]}"}
-    if not new_sec:
-        return {"error": "La régénération n'a rien produit."}
-    if "##" not in new_sec[:80]:
-        new_sec = f"## {section}\n\n" + new_sec
-
-    new_markdown = markdown[:start] + new_sec.strip() + "\n\n" + markdown[end:]
-    new_markdown = _re.sub(r"\n{3,}", "\n\n", new_markdown)
-
-    r = await execute_file_create_docx({
-        "path": docx_path, "title": meta.get("title", "Document"), "subtitle": meta.get("subtitle", ""),
-        "content": new_markdown, "author": meta.get("author", "Marvin"),
-        "letterhead": meta.get("letterhead") or {}, "references": meta.get("references") or {},
-        "signature": meta.get("signature") or {}})
-    if r.get("error"):
-        return {"error": f"Rendu Word échoué : {r['error']}"}
-    meta["markdown"] = new_markdown
-    try:
-        with open(meta_path, "w", encoding="utf-8") as f:
-            _json.dump(meta, f, ensure_ascii=False)
-    except Exception:
-        pass
-    return {"success": True, "file": docx_path, "section": section,
-            "section_markdown": new_sec[:3000], "markdown": new_markdown[:6000],
-            "sections": meta.get("sections", []),
-            "message": f"✍️ Section « {section} » affinée → {os.path.basename(docx_path)}"}
 
 
 _UNIFIED_SOURCES_DEFAULT = ["documents", "files_name", "files_content", "notes", "tasks", "events", "memory"]
@@ -9630,6 +9300,20 @@ execute_pdf_form_fields = pdf_advanced_domain.form_fields
 execute_pdf_fill_form = pdf_advanced_domain.fill_form
 execute_pdf_compress = pdf_advanced_domain.compress
 execute_pdf_add_page_numbers = pdf_advanced_domain.add_page_numbers
+document_knowledge_domain.configure(
+    resolve_path=_resolve_path,
+    get_setting=db.get_setting,
+    set_setting=db.set_setting,
+    text_generator=_ollama_generate,
+    create_docx=execute_file_create_docx,
+    vector_store=vector_store_runtime,
+    generated_dir=Path(__file__).resolve().parent.parent / "data" / "documents_generes",
+)
+execute_document_index = document_knowledge_domain.index
+execute_document_ask = document_knowledge_domain.ask
+execute_document_list = document_knowledge_domain.list_documents
+execute_document_forget = document_knowledge_domain.forget
+execute_document_refine_section = document_knowledge_domain.refine_section
 
 
 
