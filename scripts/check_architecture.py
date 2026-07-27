@@ -268,6 +268,16 @@ def run() -> dict[str, int | str]:
     starter = (ROOT / "start.bat").read_text(encoding="utf-8-sig")
     if "check_runtime.mjs" not in starter or "/api/health" not in starter:
         raise CheckFailure("start.bat doit conserver le preflight runtime et le controle HTTP.")
+    consolidation_plan = (ROOT / "BACKEND-CONSOLIDATION-PLAN.md").read_text(
+        encoding="utf-8-sig"
+    )
+    if (
+        "gate de rollback obligatoire" not in consolidation_plan.lower()
+        or "réversibilité vérifiée" not in consolidation_plan.lower()
+    ):
+        raise CheckFailure(
+            "Le plan de consolidation doit conserver le gate de rollback vérifiable."
+        )
 
     main_source = (BACKEND / "main.py").read_text(encoding="utf-8-sig")
     health_source = (BACKEND / "api" / "health.py").read_text(encoding="utf-8-sig")
@@ -301,6 +311,13 @@ def run() -> dict[str, int | str]:
     unknown_guarded = sorted((dangerous | secure_blocked) - set(registry))
     if unknown_guarded:
         raise CheckFailure(f"Permissions visant des outils inexistants : {unknown_guarded}")
+    if (
+        "tool_gateway.execute_tool(" not in main_source
+        or "tool_gateway.coverage_report(" not in main_source
+    ):
+        raise CheckFailure(
+            "Les surfaces UI/MCP et le catalogue doivent utiliser le gateway commun."
+        )
 
     routes = fastapi_routes()
     if duplicates([f"{method} {path}" for method, path in routes]):
@@ -323,7 +340,8 @@ def run() -> dict[str, int | str]:
         "tools": len(registry),
         "routes": len(routes),
         "pages": len(expected_pages),
-        "guarded_tools": len(dangerous | secure_blocked),
+        "harness_tools": len(set(registry) & set(spec)),
+        "restricted_tools": len(dangerous | secure_blocked),
     }
 
 
@@ -337,7 +355,8 @@ def main() -> int:
         "Architecture OK - "
         f"Marvin {result['version']} | {result['tools']} outils | "
         f"{result['routes']} routes | {result['pages']} pages | "
-        f"{result['guarded_tools']} outils encadres"
+        f"harness {result['harness_tools']}/{result['tools']} | "
+        f"{result['restricted_tools']} restrictions renforcees"
     )
     return 0
 

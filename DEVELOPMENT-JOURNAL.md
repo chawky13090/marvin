@@ -6387,3 +6387,65 @@ ambiguës avant de poursuivre l'unification du harness.
 
 Réversion atomique du commit de tranche. Les tests n'écrivent qu'un fichier temporaire
 supprimé automatiquement et n'effectuent aucun appel réseau ni mutation utilisateur.
+
+## 2026-07-27 — v2.356.0 — Gateway déterministe 344/344 et gate de rollback
+
+### Contexte
+
+Unifier l'exécution directe depuis l'interface et MCP avec le même cœur logiciel que le chat,
+prouver que les 344 outils disposent du harness attendu et rendre la réversibilité obligatoire
+pour toutes les tranches suivantes.
+
+### Veille et décisions
+
+- OpenAI sépare les guardrails d'entrée/sortie, l'exécution des outils et la trace complète.
+  Source : https://openai.github.io/openai-agents-python/guardrails/ ;
+  https://openai.github.io/openai-agents-python/tracing/
+- Anthropic définit l'outil par un nom, une description et un schéma d'entrée; l'application
+  reste responsable de l'exécution et du résultat retourné au modèle.
+  Sources : https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works ;
+  https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-reference
+- Google décrit également une boucle où le modèle propose l'appel de fonction et où
+  l'application l'exécute. Marvin conserve donc la liberté de raisonnement du LLM, mais pas
+  le contrôle des autorisations, effets de bord ou preuves.
+  Source : https://ai.google.dev/gemini-api/docs/function-calling
+
+### Analyse et solution
+
+- `backend/tool_gateway.py` centralise validation de schéma, niveau d'autorisation,
+  confirmation selon la surface, reçu idempotent, capture d'exception, normalisation,
+  journal d'exécution et audit.
+- `/api/tools` et `/api/mcp/execute` utilisent le gateway commun tout en conservant leur
+  différence de confirmation : l'interface confirme avant l'appel; MCP ne reçoit aucune
+  confirmation implicite en mode Standard.
+- Le chat et le gateway utilisent le même exécuteur bas niveau `execute_registered_tool`;
+  le Runner conserve ses phases supplémentaires de préparation et post-validation.
+- `/api/tools/list` expose une preuve de couverture : 344 exécuteurs, 344 schémas,
+  couverture complète et 64 outils soumis à une restriction renforcée.
+- `scripts/check_architecture.py` refuse une désynchronisation registre/schémas, une surface
+  UI/MCP contournant le gateway ou la disparition du gate de rollback.
+- Le plan et `AGENTS.md` imposent désormais, pour chaque tranche, un état antérieur
+  identifiable, une procédure exacte et une réversibilité vérifiée. Une réversion Git
+  n'est suffisante que sans mutation persistante.
+
+### Validation observée
+
+- Test ciblé du gateway : validation avant exécution, blocage Sécurisé, confirmations UI/MCP,
+  mode Expert, capture d'exception, normalisation, logs, audit et couverture **344/344**.
+- Invariants : **Marvin 2.356.0**, **344 outils**, **346 routes**, **40 pages**,
+  harness **344/344** et **64 restrictions renforcées**.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **132/132 étapes**;
+  compilation de **204 fichiers Python**, ESLint **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.356.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Exécution UI réelle : `factorial(10)` retourne `3628800`; une expression numérique au lieu
+  d'une chaîne est refusée avant exécution avec `validation_failed=true`.
+- Exécution MCP réelle : `2+3` retourne `5` avec le contrat normalisé.
+- Smoke API avec frontend Turbopack actif : **28/28 contrats réussis**.
+
+### Rollback vérifié
+
+Cette tranche ne modifie aucun schéma ni donnée métier. Après création du commit atomique,
+`git revert <commit-v2.356>` restaure les routes précédentes et supprime
+`backend/tool_gateway.py` ainsi que son test. Le patch inverse est contrôlé avant commit;
+le backend peut ensuite être redémarré et validé avec `/api/health` et le smoke test.

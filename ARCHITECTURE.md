@@ -206,6 +206,9 @@ tous les outils avant le dispatch du Runner.
 73. les utilitaires déterministes : `tool_domains/deterministic_utilities.py` possède calcul,
 génération de mots de passe, empreintes, Base64, JSON et statistiques textuelles. Entrées,
 profondeur, complexité, sorties et opérations coûteuses sont bornées; aucun `eval` n'est utilisé.
+74. le gateway d'outils : `tool_gateway.py` applique le même cœur déterministe aux appels du
+chat, de l'interface et de MCP. Le catalogue `/api/tools/list` expose couverture, écarts,
+couches et restrictions; `check_architecture.py` interdit une couverture inférieure à 344/344.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

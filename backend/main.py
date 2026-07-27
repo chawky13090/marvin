@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.356 — gateway déterministe commun au chat, à l'UI et à MCP; couverture du harness
+# exposée et contrôlée à 344/344 outils.
 # v2.355 — calcul, mots de passe, empreintes, Base64, JSON et statistiques textuelles
 # extraits dans tool_domains/deterministic_utilities.py avec limites de ressources.
 # v2.354 — événements agenda extraits dans tool_domains/calendar_events.py; validation
@@ -27,6 +29,9 @@ from typing import Any
 
 import database as db
 import tools as tool_module
+import audit
+import engineering_runtime
+import tool_gateway
 from agent import run_agent, _refresh_model_cache
 import chat_turn_runtime
 from api.backups import router as backups_router
@@ -3207,70 +3212,55 @@ async def chat(req: ChatRequest):
 class ToolExecuteRequest(BaseModel):
     toolName: str
     args: dict = Field(default_factory=dict)
+    requestId: str | None = Field(default=None, max_length=160)
+    conversationId: str | None = Field(default=None, max_length=160)
+
+
+def _current_permission_level() -> int:
+    try:
+        value = db.get_setting("permission_level")
+        return int(value) if value is not None else DEFAULT_PERMISSION_LEVEL
+    except Exception:
+        # Le niveau par défaut reste autoritaire si le stockage des réglages
+        # est momentanément indisponible; l'exécution garde tous les autres
+        # contrôles du gateway.
+        return DEFAULT_PERMISSION_LEVEL
+
+
+async def _execute_through_gateway(
+    request: ToolExecuteRequest,
+    *,
+    source: str,
+    confirmed_by_ui: bool,
+) -> tool_gateway.ToolGatewayResult:
+    return await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            tool_name=request.toolName,
+            arguments=request.args,
+            source=source,
+            permission_level=_current_permission_level(),
+            conversation_id=request.conversationId,
+            request_id=request.requestId,
+            confirmed_by_ui=confirmed_by_ui,
+        ),
+        registry=tool_module.TOOLS_REGISTRY,
+        specifications=tool_module.TOOLS_SPEC,
+        database=db,
+        normalizer=engineering_runtime.normalize_tool_result,
+        audit_logger=audit.log_action,
+    )
 
 
 @app.post("/api/tools")
 async def execute_tool_endpoint(req: ToolExecuteRequest):
-    executor = tool_module.TOOLS_REGISTRY.get(req.toolName)
-    if not executor:
-        raise HTTPException(status_code=404, detail=f"Outil « {req.toolName} » introuvable")
-
-    # ── Vérification du niveau de permission ─────────────────────────────────
-    try:
-        perm_raw = db.get_setting("permission_level")
-        permission_level = int(perm_raw) if perm_raw is not None else DEFAULT_PERMISSION_LEVEL
-    except Exception:
-        permission_level = DEFAULT_PERMISSION_LEVEL
-
-    if permission_level == PERMISSION_SECURE and req.toolName in SECURE_BLOCKED_TOOLS:
-        return {
-            "result": {
-                "error": (
-                    f"🛡️ Permission refusée (niveau Sécurisé) : "
-                    f"l'outil '{req.toolName}' n'est pas autorisé dans ce mode. "
-                    f"Passez en mode Standard ou Expert dans Paramètres > Permissions."
-                )
-            }
-        }
-
-    args = dict(req.args)
-    # Niveau Expert ou confirmation manuelle → auto-confirm
-    if req.toolName in DANGEROUS_TOOLS:
-        args["confirmed"] = True
-    if permission_level == PERMISSION_EXPERT:
-        args["confirmed"] = True
-
-    import time as _time
-    t0 = _time.monotonic()
-    try:
-        result = await executor(args)
-        duration_ms = int((_time.monotonic() - t0) * 1000)
-        try:
-            import engineering_runtime as _engineering_runtime
-            result = _engineering_runtime.normalize_tool_result(
-                req.toolName, result, duration_ms=duration_ms,
-            )
-        except Exception:
-            pass
-        try:
-            db.log_execution(req.toolName, req.args, result, duration_ms)
-        except Exception:
-            pass
-        try:
-            import audit
-            audit.log_action(req.toolName, req.args, result, source="ui")
-        except Exception:
-            pass
-        return {"result": result}
-    except Exception as e:
-        try:
-            import traceback as _tb
-            import bug_log as _bug_log
-            _bug_log.log_bug("tool_exception", str(e), context={"args": req.args},
-                              traceback_str=_tb.format_exc(), tool_name=req.toolName)
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail=str(e))
+    outcome = await _execute_through_gateway(
+        req,
+        source="ui",
+        confirmed_by_ui=True,
+    )
+    if outcome.status_code == 404:
+        raise HTTPException(status_code=404, detail=outcome.result["error"])
+    return {"result": outcome.result}
 
 
 @app.get("/api/tools/list")
@@ -3283,6 +3273,10 @@ async def list_tools_endpoint():
         "tools": tool_module.TOOLS_SPEC,
         "count": len(tool_module.TOOLS_SPEC),
         "registry_synced": len(tool_module.TOOLS_REGISTRY) == len(tool_module.TOOLS_SPEC),
+        "harness": tool_gateway.coverage_report(
+            tool_module.TOOLS_REGISTRY,
+            tool_module.TOOLS_SPEC,
+        ),
     }
 
 
@@ -3305,54 +3299,14 @@ async def execute_tool_mcp(req: ToolExecuteRequest):
     rappeler avec confirmed=true s'il approuve. `security.screen_command()` reste
     de toute façon actif à l'intérieur de chaque outil (défense en profondeur).
     """
-    executor = tool_module.TOOLS_REGISTRY.get(req.toolName)
-    if not executor:
-        raise HTTPException(status_code=404, detail=f"Outil « {req.toolName} » introuvable")
-
-    try:
-        perm_raw = db.get_setting("permission_level")
-        permission_level = int(perm_raw) if perm_raw is not None else DEFAULT_PERMISSION_LEVEL
-    except Exception:
-        permission_level = DEFAULT_PERMISSION_LEVEL
-
-    if permission_level == PERMISSION_SECURE and req.toolName in SECURE_BLOCKED_TOOLS:
-        return {"result": {
-            "error": (
-                f"🛡️ Permission refusée (niveau Sécurisé) : l'outil '{req.toolName}' "
-                f"n'est pas autorisé dans ce mode. Passez en mode Standard ou Expert "
-                f"dans Marvin > Paramètres > Permissions."
-            )
-        }}
-
-    args = dict(req.args)
-    if permission_level == PERMISSION_EXPERT:
-        args["confirmed"] = True
-    # PAS de force-confirm en Standard/Sécurisé — voir docstring.
-
-    import time as _time
-    t0 = _time.monotonic()
-    try:
-        result = await executor(args)
-        duration_ms = int((_time.monotonic() - t0) * 1000)
-        try:
-            db.log_execution(req.toolName, req.args, result, duration_ms)
-        except Exception:
-            pass
-        try:
-            import audit
-            audit.log_action(req.toolName, req.args, result, source="mcp")
-        except Exception:
-            pass
-        return {"result": result}
-    except Exception as e:
-        try:
-            import traceback as _tb
-            import bug_log as _bug_log
-            _bug_log.log_bug("tool_exception", str(e), context={"args": req.args},
-                              traceback_str=_tb.format_exc(), tool_name=req.toolName)
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail=str(e))
+    outcome = await _execute_through_gateway(
+        req,
+        source="mcp",
+        confirmed_by_ui=False,
+    )
+    if outcome.status_code == 404:
+        raise HTTPException(status_code=404, detail=outcome.result["error"])
+    return {"result": outcome.result}
 
 
 @app.get("/api/mcp/config")

@@ -221,13 +221,19 @@ devient une mutation locale silencieuse. Le harness valide maintenant les types,
 bornes et structures déclarés par les 344 schémas; l'unification UI/MCP reste à achever.
 Les utilitaires déterministes sont isolés avec limites de ressources, primitives
 cryptographiques standard, décodage strict et calcul AST sans `eval`.
+Le gateway commun relie chat, UI et MCP au cœur déterministe. La couverture est prouvée à
+344/344; les 64 outils dangereux ou interdits en mode Sécurisé sont comptés séparément comme
+restrictions renforcées et non comme totalité du harness.
 
 ## 4. Validation obligatoire par tranche
 
 - compilation Python ciblée ;
 - test unitaire de la nouvelle frontière ;
 - test de compatibilité de la façade historique ;
-- test d'erreur, rollback ou indisponibilité pertinent ;
+- test d'erreur et d'indisponibilité pertinent ;
+- **gate de rollback obligatoire** : état antérieur identifié, procédure exacte documentée,
+  données et schémas évalués, puis réversibilité vérifiée sans dépendre d'un fichier non
+  versionné ; une tranche irréversible est refusée ou redessinée avant intégration ;
 - `scripts/check_architecture.py` ;
 - `scripts/check_marvin.py --quick` ;
 - redémarrage réel du backend ;
@@ -249,7 +255,9 @@ Le backend n'est déclaré consolidé que si :
 - les reprises SSE, reçus idempotents et missions longues passent ;
 - tous les tests rapides, le runtime réel et les smoke tests sont verts ;
 - `AGENTS.md`, `ARCHITECTURE.md` et `DEVELOPMENT-JOURNAL.md` reflètent l'état réel ;
-- l'arbre Git est propre et chaque tranche dispose d'un rollback par commit.
+- l'arbre Git est propre et chaque tranche dispose d'un rollback vérifié, par réversion
+  atomique du commit lorsqu'aucune donnée n'est migrée, ou par migration descendante/
+  restauration contrôlée lorsqu'un état persistant évolue.
 
 ## 6. Hors périmètre jusqu'à clôture
 

@@ -169,10 +169,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 - Journal partagé Codex/Claude : après toute évolution importante, ajouter une entrée datée dans
   `DEVELOPMENT-JOURNAL.md` avec la demande, les constats, les décisions, les fichiers modifiés et
   les validations réelles. Ne jamais y inscrire de secret ni de contenu d'e-mail confidentiel.
+- Rollback obligatoire : aucune tranche ne peut être déclarée terminée sans état antérieur
+  identifiable, procédure de retour exacte et réversibilité vérifiée. Une réversion Git suffit
+  uniquement si la tranche ne modifie ni schéma ni donnée persistante ; sinon fournir et tester
+  une migration descendante ou une restauration contrôlée.
 
 ---
 
-## 9. État actuel (v2.355.0)
+## 9. État actuel (v2.356.0)
+
+**v2.356 (gateway déterministe 344/344)** : `tool_gateway.py` unifie validation de schéma,
+permissions, confirmation, reçus idempotents, capture d'exception, contrat de résultat,
+journal d'exécution et audit pour le chat, l'interface Outils et MCP. Le catalogue expose la
+couverture réelle du harness; l'architecture exige **344/344** et distingue les 64 outils à
+restrictions renforcées.
 
 **v2.355 (utilitaires déterministes)** : calcul borné sans `eval`, mots de passe couvrant
 toutes les catégories, empreintes en flux, Base64 strict, JSON borné et statistiques textuelles
