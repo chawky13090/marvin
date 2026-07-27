@@ -148,6 +148,9 @@ Les 18 outils de documentation d'intervention rejoignent
 livrables ITIL, actifs et recherche historique partagent une frontière explicite. Les
 générateurs et l'analyse de commandes sont injectés; formats et limites sont validés avant
 accès aux transports ou à la persistance.
+Les cinq outils de sécurité des commandes rejoignent `tool_domains/command_safety.py` en
+v2.339.0. L'analyse demeure strictement statique; plateforme, risque, alternative,
+approbation et historique sont isolés, avec listes et volumes bornés.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

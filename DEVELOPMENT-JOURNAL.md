@@ -5733,3 +5733,39 @@ modification avant livraison.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **10 040 lignes** mesurées par
   PowerShell; aucune identité d'outil supprimée.
+
+## 2026-07-27 — v2.339.0 — Domaine sécurité des commandes
+
+### Demande
+
+Poursuivre sans interruption la consolidation backend et améliorer les défauts rencontrés.
+
+### Constats et décisions
+
+- Les cinq outils de sécurité des commandes et leurs deux analyseurs restaient dans
+  `tools.py`, alors que la documentation d'intervention dépend directement de ce contrat.
+- Le domaine est extrait dans `tool_domains/command_safety.py`; il analyse uniquement du texte
+  et n'exécute jamais les commandes observées.
+- Une valeur non textuelle et une collection `commands` non liste sont désormais refusées
+  proprement. L'historique borne sa limite à 1–500.
+- La façade historique et le registre utilisent exactement les objets du nouveau domaine;
+  la documentation d'intervention reçoit le même analyseur par injection.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/command_safety.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_command_safety.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Validation ciblée : test du domaine, régression documentation d'intervention et architecture
+  **344/344** réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **115/115 étapes** en
+  187,6 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.339.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **9 843 lignes** mesurées par PowerShell.

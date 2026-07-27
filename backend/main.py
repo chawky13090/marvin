@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.339 — sécurité des commandes extraite :
+# détection, analyse de risque, approbation et historique isolés sans exécution.
 # v2.338 — documentation d'intervention extraite :
 # interventions, analyse, livrables ITIL, actifs et connaissance isolés avec formats validés.
 # v2.337 — diagnostic PC extrait :

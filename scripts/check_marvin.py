@@ -142,6 +142,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine de contrôle PC", (python, "scripts/test_tool_domain_pc_control.py")),
         Stage("Domaine diagnostic PC", (python, "scripts/test_tool_domain_pc_diagnostics.py")),
         Stage("Documentation d'intervention", (python, "scripts/test_tool_domain_intervention_docs.py")),
+        Stage("Sécurité des commandes", (python, "scripts/test_tool_domain_command_safety.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),
