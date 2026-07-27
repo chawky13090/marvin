@@ -4729,6 +4729,48 @@ ignorée) :
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
 
+## 2026-07-27 — v2.332.0 — Domaine d'outils Réseau
+
+### Demande et périmètre
+
+- Poursuivre la consolidation backend avant tout chantier frontend.
+- Profiter de l'extraction pour corriger les défauts réels sans réduire les capacités.
+
+### Constats et décisions
+
+- Dix-neuf outils mélangeaient diagnostics passifs, scans actifs, TLS/SNMP, topologie et
+  inventaire persistant dans `tools.py`.
+- Le domaine rejoint `tool_domains/network.py`; la configuration réseau Windows est injectée
+  afin d'éviter une dépendance inverse vers la façade historique.
+- Les façades et les 19 identités `net_*` du registre restent inchangées.
+- Le scan simple réutilise le parseur borné commun. Ports, délais, compteur de ping, port et
+  action SNMP produisent désormais une erreur structurée en cas d'entrée invalide.
+- Les confirmations de scans CIDR larges, limites d'hôtes/ports et timeouts restent en place.
+
+### Fichiers
+
+- `backend/tool_domains/network.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_network.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation réelle
+
+- Compilation ciblée, test contractuel Réseau et contrôle d'architecture : réussis.
+- Le test couvre parseur de ports, CIDR borné et confirmation, VLSM, paramètres invalides,
+  injection Windows, façades et registre 344/344.
+- `scripts/check_marvin.py --quick` : **108/108 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.332.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 17 032 à **16 130 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.315.0 — Inventaire et intégrité des fichiers
 
 ### Demande

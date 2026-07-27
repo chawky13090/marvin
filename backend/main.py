@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.332 — domaine réseau extrait :
+# diagnostics, scans bornés, TLS/SNMP, topologie et inventaire isolés et validés.
 # v2.331 — connaissance documentaire RAG extraite :
 # indexation, Q/R, oubli et affinage confinés avec dépendances injectées.
 # v2.330 — traitements PDF avancés extraits :

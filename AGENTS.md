@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.331.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.332.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.331.0)
+## 9. État actuel (v2.332.0)
+
+**v2.332 (domaine Réseau)** : les 19 outils de diagnostic, résolution, scans bornés,
+HTTP/TLS, sous-réseaux, SNMP, topologie et inventaire sont extraits vers
+`tool_domains/network.py`. La configuration réseau Windows est injectée sans dépendance
+inverse vers `tools.py`; les identités du registre restent exactes. Ports, délais, compteurs
+et paramètres SNMP sont validés, les CIDR larges conservent leur confirmation et un test
+contractuel couvre helpers, limites, injection, façades et registre.
 
 **v2.331 (connaissance documentaire)** : extraction multi-format, indexation Qdrant,
 questions RAG en deux passes, liste, oubli et affinage ciblé rejoignent
