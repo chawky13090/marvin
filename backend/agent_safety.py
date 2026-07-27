@@ -71,6 +71,8 @@ def _validate_schema_value(path: str, value: object, schema: Mapping) -> str | N
                 error = _validate_schema_value(f"{path}.{name}", item, child_schema)
                 if error:
                     return error
+            elif schema.get("additionalProperties") is False:
+                return f"le paramètre '{path}.{name}' n'est pas déclaré par le schéma"
     return None
 
 
@@ -81,7 +83,7 @@ def validate_tool_args(
     required_by_name: Mapping[str, tuple[str, ...]] | None = None,
     schemas_by_name: Mapping[str, Mapping] | None = None,
 ) -> str | None:
-    """Valide les champs obligatoires, types, enums et bornes avant exécution."""
+    """Valide champs obligatoires, types, enums, bornes et propriétés avant exécution."""
     if not isinstance(args, dict):
         return f"⛔ Les arguments de '{tool_name}' doivent former un objet JSON."
     schemas = schemas_by_name or {}

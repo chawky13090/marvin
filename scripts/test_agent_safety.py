@@ -27,6 +27,7 @@ def main() -> int:
                     "tags": {"type": "array", "items": {"type": "string"}},
                 },
                 "required": ["path"],
+                "additionalProperties": False,
             },
         }
     },))
@@ -42,6 +43,9 @@ def main() -> int:
     )
     assert "tags[0]" in (
         validator("file_read", {"path": "x", "tags": [42]}) or ""
+    )
+    assert "extra" in (
+        validator("file_read", {"path": "x", "extra": True}) or ""
     )
     assert validator("unknown", {}) is None
 

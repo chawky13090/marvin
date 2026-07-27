@@ -6449,3 +6449,51 @@ Cette tranche ne modifie aucun schéma ni donnée métier. Après création du c
 `git revert <commit-v2.356>` restaure les routes précédentes et supprime
 `backend/tool_gateway.py` ainsi que son test. Le patch inverse est contrôlé avant commit;
 le backend peut ensuite être redémarré et validé avec `/api/health` et le smoke test.
+
+## 2026-07-27 — v2.357.0 — Contrats fermés pour les 344 outils
+
+### Contexte
+
+Empêcher qu'un LLM ou un client externe transmette un champ halluciné, mal orthographié ou
+non prévu à un outil, sans casser les confirmations ni les appels valides historiques.
+
+### Veille et décisions
+
+- JSON Schema autorise les propriétés supplémentaires par défaut; la valeur
+  `additionalProperties=false` les interdit explicitement.
+  Source : https://json-schema.org/understanding-json-schema/reference/object
+- OpenAI rappelle que les arguments produits par un modèle peuvent contenir des paramètres
+  hallucinés et doivent être validés dans l'application.
+  Source : https://platform.openai.com/docs/api-reference/fine-tuning/object?lang=python
+- Anthropic définit `input_schema` comme le contrat JSON Schema de l'entrée outil.
+  Source : https://docs.anthropic.com/ko/docs/agents-and-tools/tool-use/implement-tool-use
+
+### Analyse et solution
+
+- `_t()` ferme les 344 objets racine avec `additionalProperties=false`.
+- `agent_safety.py` refuse un champ racine absent de `properties` avant toute autorisation,
+  confirmation ou exécution.
+- L'audit préalable a détecté quatre confirmations réellement consommées mais non déclarées :
+  `email_automation_run`, `event_delete`, `itsm_ticket_create` et `system_cleanup`.
+  Elles ont été ajoutées avant la fermeture des contrats.
+- Les objets imbriqués explicitement conçus comme dictionnaires extensibles conservent leur
+  propre règle `additionalProperties`; aucune structure métier ouverte n'est fermée par erreur.
+
+### Validation observée
+
+- Tests ciblés : type, borne, enum, tableau et propriété inconnue; gateway **344/344**.
+- Audit runtime : **344/344 schémas fermés** et aucune confirmation dangereuse manquante.
+- Suite complète : **132/132 étapes** en **244,5 secondes**; compilation de 204 fichiers,
+  ESLint **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.357.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Test HTTP nominal : `6*7` retourne `42`.
+- Test HTTP négatif : la faute `expresson` est refusée avec `validation_failed=true` et
+  l'outil n'est pas exécuté.
+- Smoke API avec frontend Turbopack actif : **28/28 contrats réussis**.
+
+### Rollback vérifié
+
+Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomique du commit
+restaure les schémas ouverts et la version 2.356.0. Le patch inverse est contrôlé avant
+commit; après réversion, redémarrer le backend puis exécuter `/api/health` et le smoke test.

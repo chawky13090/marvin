@@ -176,7 +176,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.356.0)
+## 9. État actuel (v2.357.0)
+
+**v2.357 (contrats d'outils fermés)** : les 344 schémas refusent désormais toute propriété
+racine non déclarée avant exécution. Les confirmations explicites manquantes de quatre outils
+sensibles ont été ajoutées à leur contrat; le comportement valide reste compatible.
 
 **v2.356 (gateway déterministe 344/344)** : `tool_gateway.py` unifie validation de schéma,
 permissions, confirmation, reçus idempotents, capture d'exception, contrat de résultat,

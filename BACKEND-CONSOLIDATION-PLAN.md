@@ -224,6 +224,8 @@ cryptographiques standard, décodage strict et calcul AST sans `eval`.
 Le gateway commun relie chat, UI et MCP au cœur déterministe. La couverture est prouvée à
 344/344; les 64 outils dangereux ou interdits en mode Sécurisé sont comptés séparément comme
 restrictions renforcées et non comme totalité du harness.
+Les 344 schémas racine sont fermés (`additionalProperties=false`) : les arguments inconnus
+sont refusés avant exécution, sans retirer les paramètres valides existants.
 
 ## 4. Validation obligatoire par tranche
 

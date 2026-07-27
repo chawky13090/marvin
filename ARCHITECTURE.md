@@ -209,6 +209,9 @@ profondeur, complexité, sorties et opérations coûteuses sont bornées; aucun 
 74. le gateway d'outils : `tool_gateway.py` applique le même cœur déterministe aux appels du
 chat, de l'interface et de MCP. Le catalogue `/api/tools/list` expose couverture, écarts,
 couches et restrictions; `check_architecture.py` interdit une couverture inférieure à 344/344.
+75. les contrats d'outils fermés : les 344 schémas racine déclarent
+`additionalProperties=false`. Un champ halluciné ou mal orthographié est refusé avant
+permission, confirmation et effet de bord.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

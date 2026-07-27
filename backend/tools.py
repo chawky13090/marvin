@@ -6433,6 +6433,7 @@ def _t(name: str, description: str, properties: dict, required: list = None) -> 
                 "type": "object",
                 "properties": properties,
                 "required": required or [],
+                "additionalProperties": False,
             },
         },
     }
@@ -7179,7 +7180,8 @@ TOOLS_SPEC = [
        {"system": {"type": "string", "description": "Système ITSM (défaut 'glpi')"},
         "title": {"type": "string", "description": "Titre du ticket"},
         "description": {"type": "string", "description": "Description détaillée"},
-        "urgency": {"type": "number", "description": "Urgence GLPI 1 (très basse) à 5 (très haute)"}},
+        "urgency": {"type": "number", "description": "Urgence GLPI 1 (très basse) à 5 (très haute)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation explicite de création"}},
        ["title"]),
 
     _t("itsm_asset_list", "Liste le matériel enregistré dans l'inventaire d'un système ITSM (GLPI).",
@@ -7277,7 +7279,8 @@ TOOLS_SPEC = [
 
     _t("email_automation_run", "Traite les emails non lus selon le mode configuré (brouillon = prépare, autonome = ENVOIE). dry_run=true pour simuler sans envoyer.",
        {"mode": {"type": "string", "enum": ["manuel", "brouillon", "autonome"], "description": "Forcer un mode (sinon celui configuré)"},
-        "dry_run": {"type": "boolean", "description": "true = simulation sans envoi réel (recommandé pour tester)"}},
+        "dry_run": {"type": "boolean", "description": "true = simulation sans envoi réel (recommandé pour tester)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation explicite du traitement réel"}},
        []),
 
     _t("email_to_task", "Transforme un email en tâche actionnable (l'IA extrait l'action + l'échéance, puis crée la tâche).",
@@ -7335,7 +7338,8 @@ TOOLS_SPEC = [
        ["id"]),
     _t("event_delete", "Supprime un événement de l'agenda (par id, ou par titre approchant).",
        {"id": {"type": "string", "description": "Identifiant de l'événement"},
-        "title": {"type": "string", "description": "Ou titre à rechercher"}},
+        "title": {"type": "string", "description": "Ou titre à rechercher"},
+        "confirmed": {"type": "boolean", "description": "Confirmation explicite de suppression"}},
        []),
 
     # ── Agendas connectés (abonnements iCal) ───────────────────────────────────
@@ -7864,7 +7868,8 @@ TOOLS_SPEC = [
        []),
     _t("system_cleanup", "Analyse les fichiers temporaires et l'espace récupérable. delete=true vide les temp (action sensible, fichiers anciens uniquement).",
        {"delete": {"type": "boolean", "description": "true = supprimer réellement (sinon rapport seul)"},
-        "min_age_days": {"type": "number", "description": "Âge minimal des fichiers à supprimer en jours (défaut 1)"}},
+        "min_age_days": {"type": "number", "description": "Âge minimal des fichiers à supprimer en jours (défaut 1)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation explicite de suppression"}},
        []),
     _t("pptx_create", "Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces.",
        {"title": {"type": "string", "description": "Titre de la présentation (diapo de couverture)"},
