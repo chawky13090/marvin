@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.330 — traitements PDF avancés extraits :
+# rendu/OCR/formulaires/filigranes/protection/compression testés sur artefacts réels.
 # v2.329 — noyau PDF structurel extrait vers pdf_core :
 # lecture, info, fusion, split et rotation atomiques et bornés.
 # v2.328 — transformations d'images extraites et fiabilisées :

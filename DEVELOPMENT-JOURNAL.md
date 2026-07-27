@@ -5382,3 +5382,53 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 17 881 à **17 724 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.330.0 — Domaine PDF avancé
+
+### Demande
+
+- Achever la frontière PDF sans perdre les fonctions de rendu, OCR, formulaires, protection
+  et optimisation, avec dépendances explicites et tests d'artefacts.
+
+### Constats et décisions
+
+- Neuf traitements PDF dépendaient directement de ReportLab, pdfium, pikepdf, SQLite et du
+  générateur Ollama partagé à l'intérieur de `tools.py`.
+- Ils rejoignent `tool_domains/pdf_advanced.py`; résolveur, générateur OCR et lecteur de
+  réglages sont injectés. Les neuf identités publiques restent inchangées.
+- Filigrane, protection AES-256, extraction d'images, rendu PNG, OCR hybride, lecture/remplissage
+  AcroForm, compression et numérotation utilisent des limites explicites et des sorties
+  temporaires remplacées atomiquement.
+- L'OCR conserve le générateur historique `_ollama_generate`, donc le routage Cloud/local et
+  l'interdiction de repli local en Ultra restent autoritaires. Les pages possédant du texte
+  intégré évitent l'appel vision.
+- Les images extraites ont des noms confinés; les champs inconnus sont refusés avant écriture;
+  les pages sans annotation ne sont plus envoyées inutilement à pypdf, supprimant son
+  avertissement « No fields to update ».
+- Aucun corps `execute_pdf_*` ni ancien helper de sélection/encodage ne subsiste dans
+  `tools.py`; la famille PDF est entièrement extraite.
+
+### Fichiers
+
+- `backend/tool_domains/pdf_advanced.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_pdf_advanced.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test PDF avancé : filigrane, AES, extraction d'image embarquée, rendu PNG, OCR intégré et
+  vision simulée, formulaire interactif lu/rempli, champ inconnu, compression et pagination.
+- `scripts/check_marvin.py --quick` : **106/106 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.330.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 17 724 à **17 348 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

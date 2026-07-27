@@ -120,6 +120,9 @@ extraites par cohésion avant la séparation finale registre/catalogue.
 Le noyau pypdf (lecture, informations, fusion, découpage et rotation) rejoint
 `tool_domains/pdf_core.py` en v2.329.0. Les traitements PDF avancés et l'OCR restent une
 frontière distincte afin de ne pas coupler le noyau aux dépendances ReportLab/pdfium/Ollama.
+Les neuf traitements avancés rejoignent `tool_domains/pdf_advanced.py` en v2.330.0 avec
+transport OCR et réglages injectés. La famille PDF est close : `tools.py` ne contient plus
+aucun corps `execute_pdf_*`, seulement les alias compatibles et les spécifications publiques.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

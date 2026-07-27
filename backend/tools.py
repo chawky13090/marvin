@@ -34,6 +34,7 @@ from tool_domains import ocr as ocr_domain
 from tool_domains import screenshots as screenshots_domain
 from tool_domains import images as images_domain
 from tool_domains import pdf_core as pdf_core_domain
+from tool_domains import pdf_advanced as pdf_advanced_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -9413,44 +9414,6 @@ async def execute_ip_info(args: dict) -> dict:
 
 
 # ───────────────────────── PDF & Image toolkit (v2.34) ─────────────────────────
-_PAGES_SAFETY_CAP = 100000  # garde-fou : ne jamais matérialiser une liste démesurée (anti-OOM)
-
-
-def _parse_pages(spec, total: int) -> list:
-    """'1,3,5-8' -> indices 0-based [0,2,4,5,6,7]. 1-based input, clampé à [1,total].
-    Borné par _PAGES_SAFETY_CAP pour ne JAMAIS saturer la mémoire, même si 'total' est aberrant."""
-    try:
-        total = max(0, int(total))
-    except Exception:
-        total = 0
-    if total > _PAGES_SAFETY_CAP:
-        total = _PAGES_SAFETY_CAP
-    if not spec:
-        return list(range(total))
-    out = []
-    for part in str(spec).replace(" ", "").split(","):
-        if not part:
-            continue
-        try:
-            if "-" in part:
-                a, _, b = part.partition("-")
-                a = max(1, int(a)) if a else 1
-                b = min(int(b), total) if b else total   # clamp pour éviter une boucle démesurée
-                for p in range(a, b + 1):
-                    out.append(p - 1)
-            else:
-                p = int(part)
-                if 1 <= p <= total:
-                    out.append(p - 1)
-        except ValueError:
-            continue
-    # dédoublonner en conservant l'ordre
-    seen = set(); res = []
-    for p in out:
-        if p not in seen:
-            seen.add(p); res.append(p)
-    return res
-
 
 
 
@@ -9568,115 +9531,7 @@ async def execute_system_cleanup(args: dict) -> dict:
 
 
 # ───────────────────────── PDF avancé & lot d'images (v2.35) ─────────────────────
-async def execute_pdf_watermark(args: dict) -> dict:
-    """Appose un filigrane texte en diagonale sur chaque page d'un PDF."""
-    path = args.get("path", "").strip()
-    text = args.get("text", "").strip()
-    if not path or not text:
-        return {"error": "Paramètres 'path' et 'text' requis."}
-    try:
-        from pypdf import PdfReader, PdfWriter
-        from reportlab.pdfgen import canvas as _canvas
-        from reportlab.lib.colors import Color
-        import io as _io
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        opacity = float(args.get("opacity", 0.12))
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_filigrane.pdf")))
-        writer = PdfWriter()
-        for page in reader.pages:
-            w = float(page.mediabox.width); h = float(page.mediabox.height)
-            buf = _io.BytesIO()
-            c = _canvas.Canvas(buf, pagesize=(w, h))
-            c.saveState()
-            c.translate(w / 2, h / 2)
-            c.rotate(45)
-            c.setFillColor(Color(0.5, 0.5, 0.5, alpha=opacity))
-            fs = int(args.get("font_size", max(28, int(min(w, h) / 12))))
-            c.setFont("Helvetica-Bold", fs)
-            c.drawCentredString(0, 0, text)
-            c.restoreState(); c.save()
-            buf.seek(0)
-            stamp = PdfReader(buf).pages[0]
-            page.merge_page(stamp)
-            writer.add_page(page)
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "wb") as f:
-            writer.write(f)
-        return {"success": True, "path": out, "destination": out, "pages": len(reader.pages),
-                "message": f"Filigrane « {text} » apposé sur {len(reader.pages)} page(s) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
-
-async def execute_pdf_protect(args: dict) -> dict:
-    """Protège un PDF par mot de passe (chiffrement AES). owner_password optionnel."""
-    path = args.get("path", "").strip()
-    password = args.get("password", "")
-    if not path or not password:
-        return {"error": "Paramètres 'path' et 'password' requis."}
-    try:
-        from pypdf import PdfReader, PdfWriter
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        writer = PdfWriter()
-        for page in reader.pages:
-            writer.add_page(page)
-        try:
-            writer.encrypt(user_password=password, owner_password=args.get("owner_password") or None,
-                           algorithm="AES-256")
-        except TypeError:
-            writer.encrypt(password)  # compat anciennes versions
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_protege.pdf")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "wb") as f:
-            writer.write(f)
-        return {"success": True, "path": out, "destination": out, "encrypted": True,
-                "message": f"PDF protégé par mot de passe (AES-256) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_pdf_extract_images(args: dict) -> dict:
-    """Extrait les images intégrées d'un PDF vers un dossier."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfReader
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(rp.parent / f"{rp.stem}_images")))
-        out_dir.mkdir(parents=True, exist_ok=True)
-        reader = PdfReader(str(rp))
-        saved = []
-        for pi, page in enumerate(reader.pages):
-            try:
-                images = page.images
-            except Exception:
-                images = []
-            for ii, img in enumerate(images):
-                try:
-                    name = f"p{pi+1}_{ii+1}_{Path(img.name).stem}"[:40]
-                    ext = Path(img.name).suffix or ".png"
-                    op = out_dir / f"{name}{ext}"
-                    with open(op, "wb") as f:
-                        f.write(img.data)
-                    saved.append(str(op))
-                except Exception:
-                    continue
-        if not saved:
-            return {"success": True, "count": 0, "files": [], "output_dir": str(out_dir),
-                    "message": "Aucune image intégrée trouvée dans ce PDF."}
-        return {"success": True, "count": len(saved), "files": saved[:50], "output_dir": str(out_dir),
-                "path": saved[0], "message": f"{len(saved)} image(s) extraite(s) → {out_dir}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 
@@ -9761,174 +9616,26 @@ documents_domain.configure_generation(
     generated_dir=Path(__file__).resolve().parent.parent / "data" / "documents_generes",
 )
 execute_document_generate = documents_domain.generate
+pdf_advanced_domain.configure(
+    resolve_path=_resolve_path,
+    text_generator=_ollama_generate,
+    get_setting=db.get_setting,
+)
+execute_pdf_watermark = pdf_advanced_domain.watermark
+execute_pdf_protect = pdf_advanced_domain.protect
+execute_pdf_extract_images = pdf_advanced_domain.extract_images
+execute_pdf_to_images = pdf_advanced_domain.to_images
+execute_pdf_ocr = pdf_advanced_domain.ocr
+execute_pdf_form_fields = pdf_advanced_domain.form_fields
+execute_pdf_fill_form = pdf_advanced_domain.fill_form
+execute_pdf_compress = pdf_advanced_domain.compress
+execute_pdf_add_page_numbers = pdf_advanced_domain.add_page_numbers
 
 
-def _pil_to_b64(img, fmt: str = "PNG") -> str:
-    import io as _io
-    buf = _io.BytesIO()
-    img.save(buf, format=fmt)
-    return _base64.b64encode(buf.getvalue()).decode()
 
 
-async def execute_pdf_to_images(args: dict) -> dict:
-    """Convertit chaque page d'un PDF en image PNG (rendu via pypdfium2)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import pypdfium2 as pdfium
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(rp.parent / f"{rp.stem}_pages")))
-        out_dir.mkdir(parents=True, exist_ok=True)
-        scale = float(args.get("dpi", 150)) / 72.0
-        pages_spec = args.get("pages")
-        loop = asyncio.get_running_loop()
-
-        def _render():
-            pdf = pdfium.PdfDocument(str(rp))
-            n = len(pdf)
-            # ⚠️ Calculer les pages APRÈS avoir le vrai nombre de pages (jamais un sentinel géant)
-            page_idxs = _parse_pages(pages_spec, n) if pages_spec else range(n)
-            saved = []
-            for i in page_idxs:
-                if i < 0 or i >= n:
-                    continue
-                pil = pdf[i].render(scale=scale).to_pil()
-                op = out_dir / f"{rp.stem}_p{i+1}.png"
-                pil.save(str(op)); saved.append(str(op))
-            pdf.close()
-            return saved, n
-
-        saved, n = await loop.run_in_executor(None, _render)
-        return {"success": True, "count": len(saved), "files": saved[:50], "output_dir": str(out_dir),
-                "path": saved[0] if saved else "", "total_pages": n,
-                "message": f"{len(saved)} page(s) rendue(s) en PNG → {out_dir}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
-async def execute_pdf_ocr(args: dict) -> dict:
-    """OCR d'un PDF (même scanné) → texte. Utilise le texte intégré si présent, sinon rend la page et l'OCR via IA (llava)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfReader
-        import pypdfium2 as pdfium
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        total = len(reader.pages)
-        # Profondeur OCR (nb de pages) + qualité de rendu pilotées par le MODE de performance
-        try:
-            max_pages = int(args.get("max_pages") or db.get_setting("ocr_max_pages") or 15)
-        except Exception:
-            max_pages = 15
-        try:
-            ocr_scale = float(args.get("scale") or db.get_setting("ocr_scale") or 2.0)
-        except Exception:
-            ocr_scale = 2.0
-        targets = _parse_pages(args.get("pages"), total) if args.get("pages") else list(range(total))
-        targets = targets[:max_pages]
-        model = args.get("model", "llava-phi3")
-        loop = asyncio.get_running_loop()
-        out_pages = []
-        ocr_used = 0
-        pdf_doc = await loop.run_in_executor(None, lambda: pdfium.PdfDocument(str(rp)))
-        try:
-            for i in targets:
-                txt = ""
-                try:
-                    txt = (reader.pages[i].extract_text() or "").strip()
-                except Exception:
-                    txt = ""
-                if len(txt) < 25:  # page probablement scannée → OCR visuel
-                    def _render_page(idx=i, _scale=ocr_scale):
-                        pil = pdf_doc[idx].render(scale=_scale).to_pil()
-                        _cap = int(1920 * (_scale / 2.0))   # plafond de résolution selon la qualité du mode
-                        if max(pil.size) > _cap:
-                            r = _cap / max(pil.size)
-                            pil = pil.resize((int(pil.width*r), int(pil.height*r)))
-                        return _pil_to_b64(pil, "JPEG")
-                    b64 = await loop.run_in_executor(None, _render_page)
-                    txt = await _ollama_generate(
-                        "Extrais TOUT le texte de cette page. Retourne uniquement le texte brut, sans commentaire.",
-                        model=model, images=[b64], timeout=180)
-                    ocr_used += 1
-                out_pages.append(f"--- Page {i+1} ---\n{txt.strip()}")
-        finally:
-            await loop.run_in_executor(None, pdf_doc.close)
-        full = "\n\n".join(out_pages)
-        saved = None
-        if args.get("output_path"):
-            saved = _resolve_path(args["output_path"])
-            Path(saved).parent.mkdir(parents=True, exist_ok=True)
-            Path(saved).write_text(full, encoding="utf-8")
-        return {"success": True, "pages_processed": len(targets), "total_pages": total,
-                "ocr_pages": ocr_used, "text": full[:8000], "truncated": len(full) > 8000,
-                "path": saved, "message": f"OCR terminé : {len(targets)} page(s), {ocr_used} via vision IA"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_pdf_form_fields(args: dict) -> dict:
-    """Liste les champs de formulaire (AcroForm) remplissables d'un PDF."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfReader
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        fields = reader.get_fields() or {}
-        out = []
-        for name, f in fields.items():
-            out.append({"name": name, "type": str(f.get("/FT", "")).lstrip("/") or "text",
-                        "value": str(f.get("/V", "") or ""),
-                        "options": [str(o) for o in (f.get("/Opt") or [])][:20]})
-        return {"success": True, "count": len(out), "fields": out,
-                "message": f"{len(out)} champ(s) de formulaire" if out else "Aucun champ de formulaire (PDF non interactif)."}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_pdf_fill_form(args: dict) -> dict:
-    """Remplit les champs d'un formulaire PDF à partir d'un dictionnaire {champ: valeur}."""
-    path = args.get("path", "").strip()
-    data = args.get("data") or args.get("fields") or {}
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    if not isinstance(data, dict) or not data:
-        return {"error": "Paramètre 'data' requis : un objet {nom_du_champ: valeur}."}
-    try:
-        from pypdf import PdfReader, PdfWriter
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        writer = PdfWriter()
-        writer.append(reader)
-        filled = 0
-        data_str = {k: ("" if v is None else str(v)) for k, v in data.items()}
-        for page in writer.pages:
-            try:
-                writer.update_page_form_field_values(page, data_str, auto_regenerate=False)
-                filled += 1
-            except Exception:
-                continue
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_rempli.pdf")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "wb") as f:
-            writer.write(f)
-        return {"success": True, "path": out, "destination": out, "fields_set": len(data_str),
-                "message": f"Formulaire rempli ({len(data_str)} champ(s)) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 async def execute_pptx_create(args: dict) -> dict:
@@ -10142,90 +9849,7 @@ async def execute_text_to_speech(args: dict) -> dict:
         return _net_error(e, "synthèse vocale") if "_net_error" in globals() else {"error": str(e)}
 
 
-async def execute_pdf_compress(args: dict) -> dict:
-    """🗜️ Réduit le poids d'un PDF (recompression des flux + flux d'objets) via pikepdf."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        import pikepdf
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_compresse.pdf")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        orig = rp.stat().st_size
-        loop = asyncio.get_running_loop()
 
-        def _do():
-            with pikepdf.open(str(rp)) as pdf:
-                pdf.save(str(out), compress_streams=True, recompress_flate=True,
-                         object_stream_mode=pikepdf.ObjectStreamMode.generate)
-
-        await loop.run_in_executor(None, _do)
-        new = Path(out).stat().st_size
-        # Garantie : ne jamais produire un fichier plus gros que l'original
-        if new >= orig:
-            shutil.copy2(str(rp), str(out))
-            new = Path(out).stat().st_size
-            return {"success": True, "path": out, "destination": out,
-                    "original_kb": round(orig / 1024, 1), "compressed_kb": round(new / 1024, 1),
-                    "saved_pct": 0, "already_optimal": True,
-                    "message": f"PDF déjà optimal ({round(orig/1024,1)} Ko) — copie conservée → {out}"}
-        saved = round((1 - new / orig) * 100, 1) if orig else 0
-        return {"success": True, "path": out, "destination": out,
-                "original_kb": round(orig / 1024, 1), "compressed_kb": round(new / 1024, 1),
-                "saved_pct": saved,
-                "message": f"{round(orig/1024,1)} Ko → {round(new/1024,1)} Ko ({saved}% gagné) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_pdf_add_page_numbers(args: dict) -> dict:
-    """#️⃣ Ajoute une numérotation (ou un texte de pied/en-tête) sur chaque page d'un PDF.
-    format accepte {n} (numéro), {total} (total). position: bottom-center/right/left, top-*."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfReader, PdfWriter
-        from reportlab.pdfgen import canvas as _canvas
-        import io as _io
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        total = len(reader.pages)
-        fmt = args.get("format", "Page {n} / {total}")
-        position = (args.get("position", "bottom-center") or "bottom-center").lower()
-        start = int(args.get("start_number", 1))
-        size = int(args.get("font_size", 9))
-        writer = PdfWriter()
-        for i, page in enumerate(reader.pages):
-            w = float(page.mediabox.width); h = float(page.mediabox.height)
-            label = fmt.replace("{n}", str(i + start)).replace("{total}", str(total)).replace("{page}", str(i + start))
-            buf = _io.BytesIO()
-            c = _canvas.Canvas(buf, pagesize=(w, h))
-            c.setFont("Helvetica", size)
-            margin = 24
-            y = (h - margin) if "top" in position else margin
-            if "right" in position:
-                c.drawRightString(w - margin, y, label)
-            elif "left" in position:
-                c.drawString(margin, y, label)
-            else:
-                c.drawCentredString(w / 2, y, label)
-            c.save(); buf.seek(0)
-            page.merge_page(PdfReader(buf).pages[0])
-            writer.add_page(page)
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_numerote.pdf")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "wb") as f:
-            writer.write(f)
-        return {"success": True, "path": out, "destination": out, "pages": total,
-                "message": f"Numérotation ajoutée sur {total} page(s) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 async def execute_csv_to_chart(args: dict) -> dict:

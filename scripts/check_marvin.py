@@ -133,6 +133,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine captures documentaires", (python, "scripts/test_tool_domain_screenshots.py")),
         Stage("Domaine images", (python, "scripts/test_tool_domain_images.py")),
         Stage("Noyau PDF", (python, "scripts/test_tool_domain_pdf_core.py")),
+        Stage("PDF avancé", (python, "scripts/test_tool_domain_pdf_advanced.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),

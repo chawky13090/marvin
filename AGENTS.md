@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.329.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.330.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.329.0)
+## 9. État actuel (v2.330.0)
+
+**v2.330 (PDF avancé)** : filigrane, protection AES-256, extraction d'images, rendu PNG,
+OCR hybride, champs/remplissage AcroForm, compression pikepdf et numérotation rejoignent
+`tool_domains/pdf_advanced.py`. Les neuf identités du registre sont conservées. Résolveur,
+générateur OCR et réglages sont injectés; pages, DPI, échelle, champs et sorties sont bornés
+et atomiques. Les tests exécutent les neuf opérations sur des PDF réels, dont image embarquée,
+page scannée, formulaire interactif et relecture du résultat. La famille PDF est entièrement
+extraite de `tools.py`.
 
 **v2.329 (noyau PDF)** : lecture textuelle, métadonnées, fusion, découpage et rotation
 rejoignent `tool_domains/pdf_core.py`. Les cinq identités publiques sont conservées. La
