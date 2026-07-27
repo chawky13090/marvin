@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.343 — paramètres Windows extraits :
+# alimentation, thème, pare-feu, cartes réseau et hibernation isolés avec entrées sûres.
 # v2.342 — gestion Winget extraite :
 # recherche, inventaire, installation, mise à jour et retrait isolés avec identifiants validés.
 # v2.341 — santé client extraite :

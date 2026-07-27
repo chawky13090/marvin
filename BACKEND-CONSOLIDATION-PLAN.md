@@ -160,6 +160,9 @@ testable; formats, statuts et volumes sont bornés et les erreurs internes ne so
 Les six outils Winget rejoignent `tool_domains/winget.py` en v2.342.0. Résolution, parsing et
 exécution non interactive sont isolés; limites, sources et identifiants sont validés afin
 d'empêcher leur interprétation comme options CLI, sans modifier les confirmations mutantes.
+Les cinq outils de paramètres Windows rejoignent `tool_domains/windows_settings.py` en
+v2.343.0. Le transport est injecté, toutes les mutations restent confirmées et les noms de
+cartes réseau sont validés avant composition PowerShell.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

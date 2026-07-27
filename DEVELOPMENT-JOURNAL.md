@@ -5878,3 +5878,40 @@ Poursuivre les domaines d'outils avant la séparation du registre et du catalogu
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **9 017 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.343.0 — Domaine paramètres Windows
+
+### Demande
+
+Continuer les domaines d'outils en améliorant les défauts découverts.
+
+### Constats et décisions
+
+- Cinq outils de réglages Windows restaient dans `tools.py`.
+- Le nom d'une carte réseau était interpolé directement dans un script PowerShell. Une quote
+  ou un séparateur fourni dans ce nom pouvait altérer le script.
+- Le domaine rejoint `tool_domains/windows_settings.py`; le runner PowerShell et la lecture du
+  registre sont injectés. Les noms de cartes acceptent les caractères usuels Windows, sont
+  limités à 128 caractères et toute autre entrée est refusée avant transport.
+- Les actions et plans non textuels sont normalisés sans exception de type.
+- Les mutations alimentation, thème, pare-feu, carte et hibernation conservent leurs
+  confirmations explicites.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/windows_settings.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_windows_settings.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Test déterministe, absence d'appel PowerShell sur nom injecté et architecture **344/344**
+  réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **119/119 étapes** en
+  191,4 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.343.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 926 lignes** mesurées par PowerShell.

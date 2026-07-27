@@ -62,7 +62,7 @@ flowchart LR
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
-| `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, documentation d'intervention, sécurité et contrôles opérationnels, santé client, Winget, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
+| `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, documentation d'intervention, sécurité et contrôles opérationnels, santé client, Winget, paramètres Windows, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
@@ -180,6 +180,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 58. les contrôles opérationnels : `tool_domains/operations_safety.py` possède les modèles et exécutions déclaratives de pré/post-checks, les preuves et leur rapport; le type de checklist, les statuts, les lots et les formats sont contrôlés avant persistance.
 59. la santé client : `tool_domains/client_health.py` agrège documentation, actifs, incidents, commandes et sauvegardes en scores et recommandations, puis produit historique et synthèse mensuelle; limites, statuts et formats sont explicites.
 60. Winget : `tool_domains/winget.py` possède découverte, parsing, recherche, inventaire et mutations non interactives; limites, sources et identifiants sont validés, et toute mutation reste confirmée.
+61. les paramètres Windows : `tool_domains/windows_settings.py` possède alimentation, thème, pare-feu, cartes réseau et hibernation; le transport PowerShell est injecté et les valeurs composées dans un script sont validées avant exécution confirmée.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
