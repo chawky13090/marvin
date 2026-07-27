@@ -189,6 +189,8 @@ contenu sur l'index Windows Search; limites et types sont bornés, les littérau
 et la durée COM est exécutée hors de la boucle asyncio.
 66. l'ITSM : `tool_domains/itsm.py` possède le transport GLPI, les tickets et les actifs;
 sessions distantes, entrées, limites et confirmation des créations sont gérées par le domaine.
+67. l'observabilité runtime : `tool_domains/runtime_observability.py` possède les journaux de
+bugs et d'apprentissage; filtres, volumes et projections sont contrôlés avant exposition au LLM.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

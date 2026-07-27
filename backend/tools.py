@@ -54,6 +54,7 @@ from tool_domains import windows_tweaks as windows_tweaks_domain
 from tool_domains import catharsis as catharsis_domain
 from tool_domains import system_search as system_search_domain
 from tool_domains import itsm as itsm_domain
+from tool_domains import runtime_observability as runtime_observability_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -1638,20 +1639,7 @@ async def capture_system_snapshot() -> dict:
 
 
 async def execute_bug_log_list(args: dict) -> dict:
-    """Liste les VRAIS bugs récents (exceptions Python avec traceback complet, capturées
-    automatiquement dès qu'un outil ou une route plante) — pour un audit/débogage a posteriori,
-    typiquement après une période d'usage sans supervision. Différent de pc_tool_reliability
-    (qui trace les TAUX d'échec) : ceci donne le détail exploitable de chaque crash individuel."""
-    limit = max(1, min(int(args.get("limit", 20)), 100))
-    kind = args.get("kind")  # 'tool_exception' | 'http_exception' | None (tous)
-    import bug_log as _bug_log
-    bugs = _bug_log.recent(limit=limit, kind=kind)
-    return {
-        "success": True,
-        "count": len(bugs),
-        "bugs": bugs,
-        "note": "Chaque entrée a un traceback complet dans son champ 'traceback' — lis-le avant de proposer un correctif." if bugs else "Aucun bug enregistré sur la période.",
-    }
+    return await runtime_observability_domain.bug_log_list(args)
 
 
 
@@ -1686,15 +1674,7 @@ async def execute_itsm_asset_list(args: dict) -> dict:
 
 
 async def execute_skill_learning_log(args: dict) -> dict:
-    """Introspection : ce que Marvin a appris récemment (créations/améliorations de
-    compétences après échec ou succès, consolidations automatiques — y compris la
-    consolidation nocturne). Utilise ceci quand l'utilisateur demande ce que Marvin a
-    appris, pourquoi une compétence a changé, ou pour vérifier que l'apprentissage marche."""
-    import skills as _sk
-    skill_name = (args.get("skill") or "").strip() or None
-    limit = int(args.get("limit", 10))
-    summary = _sk.get_learning_log_for_llm(skill_name=skill_name, limit=limit)
-    return {"success": True, "summary": summary, "log": _sk.get_learning_log(limit=limit, skill_name=skill_name)}
+    return await runtime_observability_domain.skill_learning_log(args)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

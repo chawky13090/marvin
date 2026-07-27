@@ -206,6 +206,8 @@ La recherche Windows est isolée derrière une frontière injectable, sans modif
 identités `system_search` et `system_search_content` du registre public.
 Le connecteur ITSM est isolé avec transport injectable et fermeture garantie des sessions
 GLPI; l'ajout d'un autre backend ne doit pas étendre la façade `tools.py`.
+L'observabilité consommée par le LLM est isolée des producteurs de logs et injectée dans les
+tests, afin qu'une donnée interne mal formée ne casse pas un tour agentique.
 
 ## 4. Validation obligatoire par tranche
 

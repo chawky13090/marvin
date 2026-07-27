@@ -6094,3 +6094,31 @@ contrats publics ni diminuer les capacités de Marvin.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 411 lignes** non vides mesurées par
   PowerShell.
+
+## 2026-07-27 — v2.349.0 — Observabilité runtime
+
+### Demande
+
+Continuer la consolidation des outils et améliorer les responsabilités rencontrées sans
+régression fonctionnelle.
+
+### Constats et décisions
+
+- La lecture des bugs détaillés et du journal d'apprentissage dépendait directement de leurs
+  producteurs dans `tools.py`, avec conversions de limites susceptibles de lever une exception.
+- `tool_domains/runtime_observability.py` sépare désormais cette projection interne et rend
+  ses runtimes injectables pour les tests.
+- Les types de bug sont limités aux catégories réellement produites, les volumes sont bornés,
+  le nom de compétence est normalisé et les formats retournés sont contrôlés.
+- Les deux identités publiques du registre restent portées par des façades compatibles.
+
+### Validation
+
+- Tests ciblés des limites, filtres, normalisation, formats et identités du registre réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **125/125 étapes** en
+  203,0 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.349.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 391 lignes** non vides mesurées par
+  PowerShell.
