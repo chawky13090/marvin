@@ -166,6 +166,9 @@ cartes réseau sont validés avant composition PowerShell.
 Les quatre outils registre/restauration rejoignent `tool_domains/windows_registry.py` en
 v2.344.0. Chemins, noms, types et valeurs sont validés ou encodés avant PowerShell; sauvegarde
 et confirmation restent obligatoires pour les écritures.
+Les quatre tweaks Windows rejoignent `tool_domains/windows_tweaks.py` en v2.345.0. Le retrait
+UWP est borné au catalogue exact et dédupliqué; télémétrie et réseau utilisent les dépendances
+registre injectées et toutes les mutations restent confirmées.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

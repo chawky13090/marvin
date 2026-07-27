@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.345 — tweaks Windows extraits :
+# télémétrie, débloat borné et réglages réseau isolés avec catalogue sûr.
 # v2.344 — registre Windows extrait :
 # lecture, sauvegarde, écriture typée et point de restauration isolés avec valeurs sûres.
 # v2.343 — paramètres Windows extraits :

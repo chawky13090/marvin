@@ -50,6 +50,7 @@ from tool_domains import client_health as client_health_domain
 from tool_domains import winget as winget_domain
 from tool_domains import windows_settings as windows_settings_domain
 from tool_domains import windows_registry as windows_registry_domain
+from tool_domains import windows_tweaks as windows_tweaks_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -725,16 +726,6 @@ async def execute_webapp_create(args: dict) -> dict:
 #  restauration) et exige une confirmation. Tout est RÉVERSIBLE.
 # ══════════════════════════════════════════════════════════════════════════════
 
-_TELEMETRY_KEY = r"HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"
-_BLOATWARE = [
-    "Microsoft.BingNews", "Microsoft.BingWeather", "Microsoft.GamingApp", "Microsoft.GetHelp",
-    "Microsoft.Getstarted", "Microsoft.MicrosoftSolitaireCollection", "Microsoft.People",
-    "Microsoft.PowerAutomateDesktop", "Microsoft.Todos", "Microsoft.WindowsFeedbackHub",
-    "Microsoft.WindowsMaps", "Microsoft.Xbox.TCUI", "Microsoft.XboxGameOverlay",
-    "Microsoft.XboxGamingOverlay", "Microsoft.XboxIdentityProvider", "Microsoft.XboxSpeechToTextOverlay",
-    "Microsoft.ZuneMusic", "Microsoft.ZuneVideo", "Microsoft.YourPhone", "Clipchamp.Clipchamp",
-    "Microsoft.549981C3F5F10", "MicrosoftTeams", "Microsoft.MicrosoftStickyNotes",
-]
 
 
 
@@ -749,96 +740,12 @@ _BLOATWARE = [
 
 
 
-async def execute_tweak_telemetry(args: dict) -> dict:
-    """Statut / désactivation / réactivation de la télémétrie Windows (DiagTrack + AllowTelemetry)."""
-    action = (args.get("action") or "status").lower()
-    if action in ("status", "query", "get"):
-        svc = await execute_pc_run_powershell({"script": "(Get-Service DiagTrack -EA SilentlyContinue).Status",
-                                               "confirmed": True, "timeout": 15})
-        key = await execute_registry_get({"path": _TELEMETRY_KEY, "name": "AllowTelemetry"})
-        return {"success": True, "action": "status",
-                "diagtrack": (svc.get("stdout") or "").strip() or "inconnu",
-                "allow_telemetry": (key.get("value") if key.get("success") else "non défini (défaut : activé)")}
-    if action not in ("disable", "enable"):
-        return {"error": "action attendue : status | disable | enable"}
-    if not args.get("confirmed"):
-        verb = "Désactiver" if action == "disable" else "Réactiver"
-        return {"requiresConfirmation": True,
-                "message": f"{verb} la télémétrie Windows (service DiagTrack + clé AllowTelemetry) ? "
-                           f"(sauvegarde auto, totalement réversible)"}
-    backup = await _reg_backup(_TELEMETRY_KEY)
-    if action == "disable":
-        ps = (f"if(-not (Test-Path '{_TELEMETRY_KEY}')){{New-Item -Path '{_TELEMETRY_KEY}' -Force|Out-Null}};"
-              f"New-ItemProperty -Path '{_TELEMETRY_KEY}' -Name AllowTelemetry -Value 0 -PropertyType DWord -Force|Out-Null;"
-              "Stop-Service DiagTrack -Force -EA SilentlyContinue;"
-              "Set-Service DiagTrack -StartupType Disabled -EA SilentlyContinue;"
-              "Stop-Service dmwappushservice -Force -EA SilentlyContinue;"
-              "Set-Service dmwappushservice -StartupType Disabled -EA SilentlyContinue; 'OK'")
-    else:
-        ps = (f"New-ItemProperty -Path '{_TELEMETRY_KEY}' -Name AllowTelemetry -Value 1 -PropertyType DWord -Force -EA SilentlyContinue|Out-Null;"
-              "Set-Service DiagTrack -StartupType Automatic -EA SilentlyContinue; Start-Service DiagTrack -EA SilentlyContinue;"
-              "Set-Service dmwappushservice -StartupType Manual -EA SilentlyContinue; 'OK'")
-    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 45})
-    ok = "OK" in (r.get("stdout") or "")
-    return {"success": ok, "action": action, "backup": backup,
-            "message": (f"✅ Télémétrie {'désactivée' if action == 'disable' else 'réactivée'}." if ok else
-                        "❌ Échec — droits ADMINISTRATEUR requis."),
-            "detail": (r.get("stderr") or "")[:250]}
 
 
-async def execute_tweak_debloat_list(args: dict) -> dict:
-    """Liste les bloatwares d'usine (UWP) présents et désinstallables (lecture seule)."""
-    r = await execute_pc_run_powershell({"script": "Get-AppxPackage | Select-Object -ExpandProperty Name",
-                                         "confirmed": True, "timeout": 45})
-    installed = [i.strip() for i in (r.get("stdout") or "").splitlines() if i.strip()]
-    inst_lc = {i.lower() for i in installed}
-    present = [b for b in _BLOATWARE if b.lower() in inst_lc or any(i.startswith(b.lower()) for i in inst_lc)]
-    return {"success": True, "removable": present, "count": len(present),
-            "note": "Applications d'usine non essentielles détectées (réinstallables via le Microsoft Store)."}
 
 
-async def execute_tweak_debloat_remove(args: dict) -> dict:
-    """Désinstalle des applications UWP (bloatware). Nécessite confirmation."""
-    pkgs = args.get("packages") or ([args["package"]] if args.get("package") else [])
-    pkgs = [p for p in pkgs if isinstance(p, str) and p.strip()][:30]
-    if not pkgs:
-        return {"error": "Paramètre 'packages' (liste de noms UWP) requis."}
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True,
-                "message": f"Désinstaller {len(pkgs)} application(s) : {', '.join(pkgs)} ?"}
-    removed, failed = [], []
-    for p in pkgs:
-        safe = p.replace("'", "")
-        ps = f"Get-AppxPackage -Name '{safe}*' | Remove-AppxPackage -EA SilentlyContinue; 'done'"
-        r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 60})
-        (removed if r.get("returncode") == 0 else failed).append(p)
-    return {"success": bool(removed) or not failed, "removed": removed, "failed": failed,
-            "message": f"✅ {len(removed)} application(s) retirée(s)" + (f", {len(failed)} échec(s)" if failed else "")}
 
 
-async def execute_tweak_network_harden(args: dict) -> dict:
-    """Statut / application d'optimisations réseau légères (cache DNS, auto-tuning TCP)."""
-    action = (args.get("action") or "status").lower()
-    if action in ("status", "query", "get"):
-        ps = ("Get-DnsClientCache -EA SilentlyContinue | Measure-Object | "
-              "ForEach-Object { 'Entrees cache DNS: ' + $_.Count };"
-              "netsh int tcp show global")
-        r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 20})
-        return {"success": True, "action": "status", "output": (r.get("stdout") or "").strip()[:800]}
-    if action != "apply":
-        return {"error": "action attendue : status | apply"}
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True,
-                "message": "Appliquer un durcissement réseau léger (vider le cache DNS + ajuster l'auto-tuning TCP) ?"}
-    ps = ("Clear-DnsClientCache -EA SilentlyContinue;"
-          "netsh int tcp set global autotuninglevel=normal | Out-Null;"
-          "netsh int tcp set heuristics disabled | Out-Null; 'OK'")
-    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 40})
-    ok = "OK" in (r.get("stdout") or "")
-    return {"success": ok, "action": "apply",
-            "message": ("✅ Réseau optimisé (cache DNS vidé, TCP ajusté)." if ok else
-                        "❌ Échec — droits ADMINISTRATEUR requis pour netsh."),
-            "detail": (r.get("stderr") or "")[:200]}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -7577,6 +7484,16 @@ execute_system_restore_point = windows_registry_domain.execute_system_restore_po
 execute_registry_get = windows_registry_domain.execute_registry_get
 execute_registry_backup = windows_registry_domain.execute_registry_backup
 execute_registry_set = windows_registry_domain.execute_registry_set
+
+windows_tweaks_domain.configure(
+    run_powershell=execute_pc_run_powershell,
+    registry_get=execute_registry_get,
+    reg_backup=_reg_backup,
+)
+execute_tweak_telemetry = windows_tweaks_domain.execute_tweak_telemetry
+execute_tweak_debloat_list = windows_tweaks_domain.execute_tweak_debloat_list
+execute_tweak_debloat_remove = windows_tweaks_domain.execute_tweak_debloat_remove
+execute_tweak_network_harden = windows_tweaks_domain.execute_tweak_network_harden
 
 windows_settings_domain.configure(
     run_powershell=execute_pc_run_powershell,

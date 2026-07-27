@@ -5953,3 +5953,40 @@ Consolider les fondations des tweaks Windows sans perte de fonctionnalité.
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 850 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.345.0 — Domaine tweaks Windows
+
+### Demande
+
+Poursuivre la consolidation des outils Windows après le socle registre.
+
+### Constats et décisions
+
+- Quatre outils télémétrie, débloat et réseau dépendaient implicitement des helpers de registre
+  et restaient dans `tools.py`.
+- Le retrait UWP acceptait des noms libres puis les composait dans PowerShell après simple
+  suppression des apostrophes.
+- Le domaine rejoint `tool_domains/windows_tweaks.py`; runner, lecture et sauvegarde registre
+  sont injectés.
+- Les retraits acceptent uniquement les identités exactes de `_BLOATWARE`, en lot liste de
+  30 maximum et sans doublon. Une entrée extérieure au catalogue est refusée avant transport.
+- Toutes les mutations conservent confirmation et sauvegarde lorsque prévue.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/windows_tweaks.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_windows_tweaks.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Tests de catalogue, rejet d'injection sans appel PowerShell, confirmation, registre et
+  architecture **344/344** réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **121/121 étapes** en
+  193,8 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.345.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 766 lignes** mesurées par PowerShell.
