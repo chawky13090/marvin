@@ -5769,3 +5769,41 @@ Poursuivre sans interruption la consolidation backend et améliorer les défauts
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **9 843 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.340.0 — Contrôles opérationnels pré/post-intervention
+
+### Demande
+
+Poursuivre la consolidation des outils et garde-fous backend avec validation réelle.
+
+### Constats et décisions
+
+- Six outils et leurs modèles de checklist restaient implémentés dans `tools.py`.
+- `_ops_run_check` recevait un type attendu mais ne le vérifiait jamais : un appel pré-check
+  pouvait donc écrire dans un post-check, et inversement.
+- Un type de checklist inconnu était silencieusement traité comme un post-check; un format
+  documentaire inconnu était traité comme PDF avec une extension incohérente.
+- Le domaine rejoint `tool_domains/operations_safety.py`. Le type de checklist est vérifié
+  avant toute écriture, les statuts sont en liste blanche, les lots sont limités à 100 et les
+  formats à PDF, DOCX ou Markdown.
+- Les commandes proposées dans les checklists restent purement déclaratives : cette frontière
+  n'en exécute aucune.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/operations_safety.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_operations_safety.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Tests ciblés du domaine et de ses deux frontières dépendantes réussis.
+- Architecture statique : **344/344 outils**, **346 routes**, **40 pages**.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **116/116 étapes** en
+  188,1 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.340.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **9 513 lignes** mesurées par PowerShell.

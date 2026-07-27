@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.340 — contrôles opérationnels extraits :
+# pré/post-checks, preuves et rapport de validation isolés avec contrats stricts.
 # v2.339 — sécurité des commandes extraite :
 # détection, analyse de risque, approbation et historique isolés sans exécution.
 # v2.338 — documentation d'intervention extraite :
