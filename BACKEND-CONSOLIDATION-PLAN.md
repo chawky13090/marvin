@@ -103,7 +103,8 @@ L'identité persistante et le catalogue de modèles rejoignent `document_profile
 v2.320.0, sans changer les façades consommées par l'API et les générateurs.
 La création DOCX et les conversions DOCX/PDF rejoignent `tool_domains/documents.py` en
 v2.321.0. La génération IA orchestrée rejoint le même domaine en v2.322.0 avec transport et
-dossier injectés. Le générateur PDF natif reste à déplacer.
+dossier injectés. Le générateur PDF natif rejoint cette frontière en v2.323.0; la chaîne
+principale Fichiers/Documents est désormais extraite, avant les outils spécialisés restants.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

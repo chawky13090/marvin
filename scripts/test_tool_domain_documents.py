@@ -41,6 +41,23 @@ async def main() -> int:
         assert "Rapport" in text and "Test réussi." in text
         assert generated.tables and generated.tables[0].cell(1, 1).text == "OK"
 
+        with patch.object(documents, "_document_identity", return_value={}):
+            pdf_result = await documents.create_pdf({
+                "path": "report.pdf",
+                "title": "Rapport PDF",
+                "author": "Marvin",
+                "content": "## Résultat\n\nValidation **réussie**.",
+            })
+        assert pdf_result["success"] is True
+        pdf_path = base / "report.pdf"
+        assert pdf_path.exists() and pdf_path.read_bytes().startswith(b"%PDF")
+        from pypdf import PdfReader
+
+        pdf_text = "\n".join(
+            page.extract_text() or "" for page in PdfReader(str(pdf_path)).pages
+        )
+        assert "Rapport PDF" in pdf_text and "Validation" in pdf_text
+
         wrong_source = base / "notes.txt"
         wrong_source.write_text("notes", encoding="utf-8")
         rejected = await documents.convert_docx_to_pdf({"path": "notes.txt"})
@@ -80,6 +97,7 @@ async def main() -> int:
     assert tools.execute_file_convert_docx_to_pdf is documents.convert_docx_to_pdf
     assert tools.execute_document_convert_format is documents.convert_format
     assert tools.execute_document_generate is documents.generate
+    assert tools.execute_file_create_pdf is documents.create_pdf
     print("Tool Domain Documents OK - DOCX réel, conversions et façade.")
     return 0
 

@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.322.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.323.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.322.0)
+## 9. État actuel (v2.323.0)
+
+**v2.323 (générateur PDF natif)** : `file_create_pdf` rejoint
+`tool_domains/documents.py`. Identité, en-tête, styles, sommaire, pagination, tableaux,
+images, code/ASCII art et nettoyage des fichiers temporaires restent dans une frontière
+unique avec DOCX. Le test crée un PDF réel, contrôle sa signature `%PDF`, le relit avec
+`pypdf` et vérifie son texte.
 
 **v2.322 (génération IA documentaire)** : `document_generate` rejoint
 `tool_domains/documents.py`. Le transport LLM et le dossier `data/documents_generes` sont

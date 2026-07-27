@@ -5056,3 +5056,42 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 165 à **19 044 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.323.0 — Générateur PDF natif
+
+### Demande
+
+- Fermer la frontière documentaire principale en extrayant le rendu PDF natif.
+
+### Constats et décisions
+
+- `file_create_pdf` partageait déjà formatage, identité et résolveur avec le domaine
+  Documents mais restait un bloc de 331 lignes dans `tools.py`.
+- La fonction rejoint le domaine sans modifier ses styles, son TOC multi-passe, sa
+  pagination, les tableaux, images, blocs de code, ASCII art et nettoyages temporaires.
+- Les consommateurs historiques continuent d'appeler le même objet via la façade.
+- Le test produit un PDF réel, vérifie l'en-tête binaire `%PDF`, extrait son texte avec
+  `pypdf` et contrôle titre et contenu.
+
+### Fichiers
+
+- `backend/tool_domains/documents.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_documents.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test Documents : PDF réel, signature `%PDF`, relecture `pypdf`, titre, contenu et
+  cinquième alias de façade réussis, en plus des contrôles DOCX/conversions/génération IA.
+- `scripts/check_marvin.py --quick` : **99/99 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.323.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 044 à **18 716 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
