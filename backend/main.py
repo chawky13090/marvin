@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.336 — contrôle PC extrait :
+# commandes, bureau, GUI, presse-papiers et processus isolés avec entrées bornées.
 # v2.335 — domaine Web extrait :
 # recherche multi-provider, lecture navigateur et recherche profonde isolées.
 # v2.334 — domaine Windows extrait :

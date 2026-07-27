@@ -137,6 +137,9 @@ blanche afin qu'aucune entrée utilisateur ne devienne du code PowerShell.
 Les cinq outils Web rejoignent `tool_domains/web.py` en v2.335.0. Génération, réglages et
 transport HTTP/cache sont injectés; recherche simple, navigateur et Deep Research conservent
 leurs contrats tandis que providers et volumes sont bornés.
+Les 21 outils de contrôle PC rejoignent `tool_domains/pc_control.py` en v2.336.0. Les actions
+restent protégées par confirmation et `security`; chemins/formatage sont injectés et les
+contrats d'entrée sont validés avant toute commande, interaction GUI ou terminaison.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

@@ -4729,6 +4729,37 @@ ignorée) :
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
 
+## 2026-07-27 — v2.336.0 — Domaine de contrôle PC
+
+### Demande et périmètre
+
+- Séparer les interactions et effets de bord PC des diagnostics matériels.
+
+### Constats et décisions
+
+- Vingt-et-un outils couvraient chemins, navigation, applications, commandes, capture,
+  fenêtres, GUI, notifications, presse-papiers et processus dans `tools.py`.
+- Ils rejoignent `tool_domains/pc_control.py`; résolveur et formatage sont injectés.
+- Le runner PowerShell public reste l'unique dépendance du domaine Windows.
+- Les commandes/scripts vides, timeouts non numériques, PID invalides, index GUI et limites
+  de lecture incorrectes renvoient désormais une erreur structurée.
+- Confirmations, garde `security`, élévation séparée et encodage PowerShell sont conservés.
+
+### Validation réelle
+
+- Compilation ciblée, tests contrôle PC et Windows, architecture 344/344 : réussis.
+- Aucun processus, clic, frappe ou commande réelle n'est exécuté par le test.
+- `scripts/check_marvin.py --quick` : **112/112 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.336.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 13 898 à **12 913 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.335.0 — Domaine d'outils Web
 
 ### Demande et périmètre

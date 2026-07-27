@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.335.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.336.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.335.0)
+## 9. État actuel (v2.336.0)
+
+**v2.336 (contrôle PC)** : 21 outils de chemins, navigation, applications, commandes,
+PowerShell/élévation, métriques, captures, fenêtres, GUI, notifications, Ollama,
+presse-papiers et processus rejoignent `tool_domains/pc_control.py`. Résolveur de chemins et
+formatage sont injectés; Windows reçoit toujours le runner public. Commandes/scripts vides,
+timeouts, PID, index GUI et limites invalides sont refusés avant l'effet de bord. Toutes les
+confirmations et le garde `security` sont conservés.
 
 **v2.335 (domaine Web)** : recherche multi-provider, lecture HTTP, navigateur réel, recherche
 sourcée et Deep Research rejoignent `tool_domains/web.py`. Générateur, réglages, client HTTP,
