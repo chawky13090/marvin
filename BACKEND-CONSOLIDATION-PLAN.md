@@ -163,6 +163,9 @@ d'empêcher leur interprétation comme options CLI, sans modifier les confirmati
 Les cinq outils de paramètres Windows rejoignent `tool_domains/windows_settings.py` en
 v2.343.0. Le transport est injecté, toutes les mutations restent confirmées et les noms de
 cartes réseau sont validés avant composition PowerShell.
+Les quatre outils registre/restauration rejoignent `tool_domains/windows_registry.py` en
+v2.344.0. Chemins, noms, types et valeurs sont validés ou encodés avant PowerShell; sauvegarde
+et confirmation restent obligatoires pour les écritures.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

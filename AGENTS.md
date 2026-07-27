@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.343.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.344.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.343.0)
+## 9. État actuel (v2.344.0)
+
+**v2.344 (registre Windows)** : point de restauration, lecture, export et écriture du registre
+rejoignent `tool_domains/windows_registry.py`. Chemins, noms, types et valeurs sont validés et
+encodés selon leur type avant composition PowerShell. Les écritures conservent confirmation
+et sauvegarde préalable; les alias privés nécessaires aux tweaks restent compatibles.
 
 **v2.343 (paramètres Windows)** : alimentation, thème sombre, pare-feu, cartes réseau et
 hibernation rejoignent `tool_domains/windows_settings.py`. PowerShell et la lecture registre

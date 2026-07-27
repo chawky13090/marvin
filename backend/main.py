@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.344 — registre Windows extrait :
+# lecture, sauvegarde, écriture typée et point de restauration isolés avec valeurs sûres.
 # v2.343 — paramètres Windows extraits :
 # alimentation, thème, pare-feu, cartes réseau et hibernation isolés avec entrées sûres.
 # v2.342 — gestion Winget extraite :

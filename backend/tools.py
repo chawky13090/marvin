@@ -49,6 +49,7 @@ from tool_domains import operations_safety as operations_safety_domain
 from tool_domains import client_health as client_health_domain
 from tool_domains import winget as winget_domain
 from tool_domains import windows_settings as windows_settings_domain
+from tool_domains import windows_registry as windows_registry_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -724,7 +725,6 @@ async def execute_webapp_create(args: dict) -> dict:
 #  restauration) et exige une confirmation. Tout est RÉVERSIBLE.
 # ══════════════════════════════════════════════════════════════════════════════
 
-_REG_BACKUP_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "registry_backups")
 _TELEMETRY_KEY = r"HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"
 _BLOATWARE = [
     "Microsoft.BingNews", "Microsoft.BingWeather", "Microsoft.GamingApp", "Microsoft.GetHelp",
@@ -737,99 +737,16 @@ _BLOATWARE = [
 ]
 
 
-def _ps_reg_to_native(path: str) -> str:
-    """HKLM:\\SOFTWARE\\... → HKLM\\SOFTWARE\\... (format attendu par reg.exe)."""
-    p = (path or "").strip()
-    for k, v in (("HKLM:", "HKLM"), ("HKCU:", "HKCU"), ("HKCR:", "HKCR"), ("HKU:", "HKU"), ("HKCC:", "HKCC")):
-        if p.upper().startswith(k):
-            return v + p[len(k):]
-    return p.replace(":", "")
 
 
-async def _reg_backup(ps_path: str) -> str | None:
-    """Exporte une clé de registre en .reg (sauvegarde de secours)."""
-    import time as _t
-    try:
-        os.makedirs(_REG_BACKUP_DIR, exist_ok=True)
-        native = _ps_reg_to_native(ps_path)
-        safe = _re.sub(r"[^A-Za-z0-9]+", "_", native)[:60]
-        out = os.path.join(_REG_BACKUP_DIR, f"{safe}_{_t.strftime('%Y%m%d-%H%M%S')}.reg")
-        flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
-        p = await asyncio.to_thread(subprocess.run, ["reg", "export", native, out, "/y"], capture_output=True, text=True,
-                           timeout=30, creationflags=flags, encoding="utf-8", errors="replace")
-        if p.returncode == 0 and os.path.exists(out):
-            return os.path.abspath(out)
-    except Exception:
-        pass
-    return None
 
 
-async def execute_system_restore_point(args: dict) -> dict:
-    """Crée un point de restauration système (filet de sécurité avant optimisation)."""
-    desc = (args.get("description") or "Marvin — avant optimisation").replace("'", "")
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True, "message": f"Créer un point de restauration « {desc} » ?"}
-    ps = ("try { Enable-ComputerRestore -Drive 'C:\\' -EA SilentlyContinue } catch {};"
-          f"Checkpoint-Computer -Description '{desc}' -RestorePointType 'MODIFY_SETTINGS'; 'OK'")
-    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 120})
-    ok = "OK" in (r.get("stdout") or "") and not r.get("error")
-    return {"success": ok,
-            "message": ("✅ Point de restauration créé." if ok else
-                        "❌ Échec — Restauration système désactivée, droits ADMIN manquants, "
-                        "ou limite d'1 point / 24 h atteinte."),
-            "detail": (r.get("stderr") or r.get("error") or "")[:300]}
 
 
-async def execute_registry_get(args: dict) -> dict:
-    """Lit une valeur (ou toutes les valeurs) d'une clé de registre (lecture seule)."""
-    path = (args.get("path") or "").strip()
-    name = args.get("name")
-    if not path:
-        return {"error": "Paramètre 'path' requis (ex: HKLM:\\SOFTWARE\\Microsoft\\Windows)."}
-    if name:
-        ps = f"(Get-ItemProperty -Path '{path}' -Name '{name}' -EA Stop).'{name}'"
-    else:
-        ps = f"Get-ItemProperty -Path '{path}' -EA Stop | Format-List *"
-    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 20})
-    out = (r.get("stdout") or "").strip()
-    if r.get("returncode") != 0 or not out or out == "(aucune sortie)":
-        return {"success": False, "path": path, "message": "Clé ou valeur introuvable.",
-                "detail": (r.get("stderr") or "")[:200]}
-    return {"success": True, "path": path, "name": name, "value": out[:1500]}
 
 
-async def execute_registry_backup(args: dict) -> dict:
-    """Exporte une clé de registre dans un fichier .reg de secours."""
-    path = (args.get("path") or "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    out = await _reg_backup(path)
-    return ({"success": True, "backup": out, "message": f"✅ Sauvegarde : {out}"} if out
-            else {"success": False, "message": "❌ Export du registre échoué (droits ?)."})
 
 
-async def execute_registry_set(args: dict) -> dict:
-    """Écrit une valeur de registre — SAUVEGARDE AUTO de la clé d'abord + confirmation."""
-    path = (args.get("path") or "").strip()
-    name = (args.get("name") or "").strip()
-    value = args.get("value")
-    rtype = (args.get("type") or "DWord")
-    if not path or not name or value is None:
-        return {"error": "Paramètres 'path', 'name' et 'value' requis."}
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True,
-                "message": f"Modifier le registre {path}\\{name} = {value} ({rtype}) ? "
-                           f"(une sauvegarde .reg est faite automatiquement)"}
-    backup = await _reg_backup(path)
-    val = value if str(rtype).lower() in ("dword", "qword") else f"'{value}'"
-    ps = (f"if(-not (Test-Path '{path}')){{ New-Item -Path '{path}' -Force | Out-Null }};"
-          f"New-ItemProperty -Path '{path}' -Name '{name}' -Value {val} -PropertyType {rtype} -Force | Out-Null; 'OK'")
-    r = await execute_pc_run_powershell({"script": ps, "confirmed": True, "timeout": 30})
-    ok = "OK" in (r.get("stdout") or "")
-    return {"success": ok, "path": path, "name": name, "backup": backup,
-            "message": ("✅ Registre modifié (sauvegarde effectuée)." if ok else
-                        "❌ Échec — droits ADMINISTRATEUR probablement requis."),
-            "detail": (r.get("stderr") or "")[:250]}
 
 
 async def execute_tweak_telemetry(args: dict) -> dict:
@@ -7652,6 +7569,14 @@ execute_win_system_report = windows_domain.execute_win_system_report
 execute_win_update_status = windows_domain.execute_win_update_status
 execute_win_uptime = windows_domain.execute_win_uptime
 execute_win_users_list = windows_domain.execute_win_users_list
+
+windows_registry_domain.configure(run_powershell=execute_pc_run_powershell)
+_ps_reg_to_native = windows_registry_domain._ps_reg_to_native
+_reg_backup = windows_registry_domain._reg_backup
+execute_system_restore_point = windows_registry_domain.execute_system_restore_point
+execute_registry_get = windows_registry_domain.execute_registry_get
+execute_registry_backup = windows_registry_domain.execute_registry_backup
+execute_registry_set = windows_registry_domain.execute_registry_set
 
 windows_settings_domain.configure(
     run_powershell=execute_pc_run_powershell,

@@ -5915,3 +5915,41 @@ Continuer les domaines d'outils en améliorant les défauts découverts.
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 926 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.344.0 — Domaine registre Windows
+
+### Demande
+
+Consolider les fondations des tweaks Windows sans perte de fonctionnalité.
+
+### Constats et décisions
+
+- Lecture et écriture du registre interpolèrent directement chemin, nom, type et valeur dans
+  PowerShell. Retirer uniquement les apostrophes n'était pas une validation suffisante.
+- Point de restauration, lecture, export et écriture rejoignent
+  `tool_domains/windows_registry.py`; le runner PowerShell est injecté.
+- Les chemins sont limités aux providers HKLM/HKCU/HKCR/HKU/HKCC et refusent quotes,
+  séparateurs et retours ligne. Les noms suivent le même confinement.
+- DWord/QWord sont bornés numériquement; String/ExpandString échappent les quotes;
+  MultiString et Binary exigent des listes bornées et typées.
+- Les descriptions de points de restauration sont encodées comme littéraux PowerShell.
+- Sauvegarde préalable et confirmation d'écriture sont conservées.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/windows_registry.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_windows_registry.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Tests d'injection, types de registre, chaînes échappées, paramètres Windows et architecture
+  **344/344** réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **120/120 étapes** en
+  188,7 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.344.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 850 lignes** mesurées par PowerShell.
