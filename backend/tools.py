@@ -62,6 +62,7 @@ from tool_domains import calendar_subscriptions as calendar_subscriptions_domain
 from tool_domains import calendar_events as calendar_events_domain
 from tool_domains import deterministic_utilities as deterministic_utilities_domain
 from tool_domains import datetime_tools as datetime_tools_domain
+from tool_domains import unit_conversion as unit_conversion_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3209,136 +3210,7 @@ execute_calculator = deterministic_utilities_domain.calculator
 execute_datetime_info = datetime_tools_domain.datetime_info
 
 
-async def execute_unit_convert(args: dict) -> dict:
-    """Convertit une valeur d'une unité à une autre (longueur, masse, temp., vitesse, surface…)."""
-    value_raw = args.get("value")
-    from_unit = args.get("from_unit", "").strip().lower()
-    to_unit   = args.get("to_unit",   "").strip().lower()
-
-    if value_raw is None:
-        return {"error": "Paramètre 'value' requis"}
-    try:
-        value = float(value_raw)
-    except (TypeError, ValueError):
-        return {"error": f"Valeur numérique invalide : {value_raw!r}"}
-
-    # Définir toutes les conversions en termes d'une unité de base
-    # Format : { alias: (facteur_vers_base, unité_de_base) }
-    UNITS: dict[str, tuple[float, str]] = {
-        # Longueur (base: mètre)
-        "m": (1, "m"), "metre": (1, "m"), "meter": (1, "m"), "metres": (1, "m"), "meters": (1, "m"),
-        "km": (1000, "m"), "kilometre": (1000, "m"), "kilometer": (1000, "m"),
-        "cm": (0.01, "m"), "centimetre": (0.01, "m"), "centimeter": (0.01, "m"),
-        "mm": (0.001, "m"), "millimetre": (0.001, "m"), "millimeter": (0.001, "m"),
-        "mile": (1609.344, "m"), "miles": (1609.344, "m"), "mi": (1609.344, "m"),
-        "yard": (0.9144, "m"), "yards": (0.9144, "m"), "yd": (0.9144, "m"),
-        "foot": (0.3048, "m"), "feet": (0.3048, "m"), "ft": (0.3048, "m"),
-        "inch": (0.0254, "m"), "inches": (0.0254, "m"), "in": (0.0254, "m"),
-        "nm": (1e-9, "m"), "nanometre": (1e-9, "m"),
-        "au": (1.495978707e11, "m"),
-        "ly": (9.461e15, "m"),
-        # Masse (base: kg)
-        "kg": (1, "kg"), "kilogram": (1, "kg"), "kilogramme": (1, "kg"),
-        "g": (0.001, "kg"), "gram": (0.001, "kg"), "gramme": (0.001, "kg"),
-        "mg": (1e-6, "kg"), "milligram": (1e-6, "kg"),
-        "tonne": (1000, "kg"), "t": (1000, "kg"),
-        "lb": (0.45359237, "kg"), "pound": (0.45359237, "kg"), "pounds": (0.45359237, "kg"), "lbs": (0.45359237, "kg"),
-        "oz": (0.0283495, "kg"), "ounce": (0.0283495, "kg"), "ounces": (0.0283495, "kg"),
-        "stone": (6.35029, "kg"),
-        # Volume (base: litre)
-        "l": (1, "L"), "litre": (1, "L"), "liter": (1, "L"), "litres": (1, "L"), "liters": (1, "L"),
-        "ml": (0.001, "L"), "millilitre": (0.001, "L"), "milliliter": (0.001, "L"),
-        "cl": (0.01, "L"), "centilitre": (0.01, "L"),
-        "dl": (0.1, "L"), "decilitre": (0.1, "L"),
-        "m3": (1000, "L"), "m³": (1000, "L"),
-        "gallon": (3.78541, "L"), "gallons": (3.78541, "L"), "gal": (3.78541, "L"),
-        "pint": (0.473176, "L"), "pints": (0.473176, "L"), "pt": (0.473176, "L"),
-        "fl oz": (0.0295735, "L"),
-        # Vitesse (base: m/s)
-        "m/s": (1, "m/s"), "ms": (1, "m/s"),
-        "km/h": (1/3.6, "m/s"), "kmh": (1/3.6, "m/s"), "kph": (1/3.6, "m/s"),
-        "mph": (0.44704, "m/s"),
-        "knot": (0.514444, "m/s"), "knots": (0.514444, "m/s"), "kt": (0.514444, "m/s"),
-        # Surface (base: m²)
-        "m2": (1, "m²"), "m²": (1, "m²"),
-        "km2": (1e6, "m²"), "km²": (1e6, "m²"),
-        "cm2": (1e-4, "m²"), "cm²": (1e-4, "m²"),
-        "ha": (1e4, "m²"), "hectare": (1e4, "m²"),
-        "acre": (4046.86, "m²"), "acres": (4046.86, "m²"),
-        "ft2": (0.092903, "m²"), "sqft": (0.092903, "m²"),
-        # Énergie (base: joule)
-        "j": (1, "J"), "joule": (1, "J"), "joules": (1, "J"),
-        "kj": (1000, "J"), "kilojoule": (1000, "J"),
-        "cal": (4.184, "J"), "calorie": (4.184, "J"),
-        "kcal": (4184, "J"), "kilocalorie": (4184, "J"),
-        "kwh": (3.6e6, "J"), "wh": (3600, "J"),
-        "ev": (1.602e-19, "J"),
-        # Données numériques (base: octet/byte)
-        "b": (1, "o"), "byte": (1, "o"), "bytes": (1, "o"),
-        "ko": (1000, "o"), "kb": (1000, "o"), "kilobyte": (1000, "o"),
-        "mo": (1e6, "o"), "mb": (1e6, "o"), "megabyte": (1e6, "o"),
-        "go": (1e9, "o"), "gb": (1e9, "o"), "gigabyte": (1e9, "o"),
-        "to": (1e12, "o"), "tb": (1e12, "o"), "terabyte": (1e12, "o"),
-        "kib": (1024, "o"), "mib": (1048576, "o"), "gib": (1073741824, "o"),
-    }
-
-    # Températures — traitement spécial (pas linéaire pour certaines)
-    TEMP_UNITS = {"c", "celsius", "°c", "f", "fahrenheit", "°f", "k", "kelvin"}
-
-    def _temp_to_celsius(v: float, u: str) -> float:
-        if u in ("c", "celsius", "°c"):
-            return v
-        if u in ("f", "fahrenheit", "°f"):
-            return (v - 32) * 5 / 9
-        if u in ("k", "kelvin"):
-            return v - 273.15
-        raise ValueError(f"Unité de température inconnue : {u}")
-
-    def _celsius_to_unit(v: float, u: str) -> float:
-        if u in ("c", "celsius", "°c"):
-            return v
-        if u in ("f", "fahrenheit", "°f"):
-            return v * 9 / 5 + 32
-        if u in ("k", "kelvin"):
-            return v + 273.15
-        raise ValueError(f"Unité de température inconnue : {u}")
-
-    if from_unit in TEMP_UNITS or to_unit in TEMP_UNITS:
-        try:
-            celsius = _temp_to_celsius(value, from_unit)
-            result  = _celsius_to_unit(celsius, to_unit)
-        except ValueError as e:
-            return {"error": str(e)}
-        return {
-            "success":   True,
-            "value":     value,
-            "from_unit": from_unit,
-            "to_unit":   to_unit,
-            "result":    round(result, 6),
-            "formatted": f"{value} {from_unit} = {result:.6g} {to_unit}",
-        }
-
-    # Conversion linéaire
-    if from_unit not in UNITS:
-        return {"error": f"Unité source inconnue : '{from_unit}'. Exemples : m, km, kg, lb, L, °C, km/h…"}
-    if to_unit not in UNITS:
-        return {"error": f"Unité destination inconnue : '{to_unit}'."}
-
-    f_factor, f_base = UNITS[from_unit]
-    t_factor, t_base = UNITS[to_unit]
-    if f_base != t_base:
-        return {"error": f"Unités incompatibles : '{from_unit}' ({f_base}) ≠ '{to_unit}' ({t_base})"}
-
-    result = value * f_factor / t_factor
-    return {
-        "success":   True,
-        "value":     value,
-        "from_unit": from_unit,
-        "to_unit":   to_unit,
-        "result":    round(result, 9),
-        "formatted": f"{value} {from_unit} = {result:.6g} {to_unit}",
-    }
-
+execute_unit_convert = unit_conversion_domain.unit_convert
 
 execute_password_generate = deterministic_utilities_domain.password_generate
 

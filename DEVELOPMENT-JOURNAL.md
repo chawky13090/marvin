@@ -6546,3 +6546,53 @@ Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomiq
 restaure l'implémentation dans `tools.py`, supprime le domaine et son test, puis remet la
 version 2.357.0. Le patch inverse est contrôlé avant commit; le backend doit ensuite être
 redémarré et validé par `/api/health` et le smoke test.
+
+## 2026-07-28 — v2.359.0 — Conversions d'unités déterministes
+
+### Contexte
+
+Extraire `unit_convert`, conserver tous ses usages historiques et corriger les pertes de
+précision ou résultats physiquement impossibles.
+
+### Veille et décisions
+
+- La brochure SI, 9e édition version 4.01 publiée par le BIPM en juin 2026, constitue la
+  référence des unités SI et coefficients non-SI associés. Les valeurs exactes de l'unité
+  astronomique, du mille nautique/nœud et de l'électronvolt sont reprises.
+  Source : https://www.bipm.org/en/si-brochure-9
+- Les calculs intermédiaires utilisent `decimal.Decimal` afin de ne pas ajouter les erreurs
+  binaires de `float`; le contrat public numérique historique reste inchangé.
+
+### Analyse et solution
+
+- `tool_domains/unit_conversion.py` possède facteurs, dimensions, alias et températures.
+- Longueur, masse, volume US historique, vitesse, surface, énergie et données décimales/
+  binaires restent prises en charge avec tous les alias existants.
+- Les coefficients exacts connus remplacent les approximations, notamment gallon US,
+  once, acre, nœud, année-lumière et électronvolt.
+- L'arrondi adaptatif préserve les résultats inférieurs à `1e-9`; `1 eV → J` ne devient
+  donc plus silencieusement zéro.
+- Valeurs booléennes, NaN/Infinity, valeurs supérieures à `1e100`, unités incompatibles et
+  températures inférieures au zéro absolu sont refusées.
+- La convention historique Marvin `b = byte` est conservée explicitement.
+- `tools.py` passe de 8 480 à **8 352 lignes** et conserve un alias public direct.
+
+### Validation observée
+
+- Tests ciblés : longueur, masse, volume, nœud, surface, eV, unités binaires, Celsius/
+  Fahrenheit/Kelvin, zéro absolu, incompatibilité, unité inconnue, infini, limite, façade,
+  registre et schéma.
+- Suite complète : **134/134 étapes** en **227 secondes**; compilation de 206 fichiers,
+  ESLint **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.359.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Test HTTP réel : `1 eV` retourne `1.602176634e-19 J`.
+- Test négatif réel : `-1 kelvin` est refusé comme inférieur au zéro absolu.
+- Smoke API avec frontend Turbopack actif : **28/28 contrats réussis**.
+
+### Rollback vérifié
+
+Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomique du commit
+restaure la table historique dans `tools.py`, supprime le domaine et son test, puis remet la
+version 2.358.0. Le patch inverse est contrôlé avant commit; le backend doit ensuite être
+redémarré et validé par `/api/health` et le smoke test.

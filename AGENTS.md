@@ -176,7 +176,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.358.0)
+## 9. État actuel (v2.359.0)
+
+**v2.359 (conversions d'unités déterministes)** : `unit_convert` rejoint
+`tool_domains/unit_conversion.py`. Tous les alias historiques restent disponibles; les
+facteurs exacts ou de référence suivent la brochure SI/BIPM, les calculs utilisent `Decimal`,
+les valeurs non finies et températures sous le zéro absolu sont refusées, et les très petits
+résultats comme eV→J ne sont plus arrondis à zéro.
 
 **v2.358 (date et heure déterministes)** : `datetime_info` rejoint
 `tool_domains/datetime_tools.py`. Les fuseaux IANA invalides ne deviennent plus silencieusement

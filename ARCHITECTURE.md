@@ -215,6 +215,9 @@ permission, confirmation et effet de bord.
 76. la date et l'heure : `tool_domains/datetime_tools.py` possède horloge, parsing ISO,
 fuseaux IANA, différences et deltas. Les dates naïves conservent la convention UTC historique;
 les fuseaux inconnus et les deltas non bornés sont refusés explicitement.
+77. les conversions d'unités : `tool_domains/unit_conversion.py` possède facteurs,
+dimensions, alias et températures. Les calculs intermédiaires sont décimaux et finis;
+incompatibilités, valeurs extrêmes et températures physiquement impossibles sont refusées.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

@@ -228,6 +228,8 @@ Les 344 schémas racine sont fermés (`additionalProperties=false`) : les argume
 sont refusés avant exécution, sans retirer les paramètres valides existants.
 La date et l'heure sont isolées dans un domaine déterministe avec dépendance `tzdata`
 portable, fuseaux IANA explicites et deltas imbriqués strictement validés.
+Les conversions d'unités sont isolées avec facteurs de référence documentés, calcul décimal,
+compatibilité des dimensions et conservation de tous les alias publics historiques.
 
 ## 4. Validation obligatoire par tranche
 
