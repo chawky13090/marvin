@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.328.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.329.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.328.0)
+## 9. État actuel (v2.329.0)
+
+**v2.329 (noyau PDF)** : lecture textuelle, métadonnées, fusion, découpage et rotation
+rejoignent `tool_domains/pdf_core.py`. Les cinq identités publiques sont conservées. La
+sélection de pages est unique, ordonnée et bornée; sources, pages et texte ont des plafonds,
+et chaque PDF produit est remplacé atomiquement. Un PDF chiffré est désormais identifié sans
+lever `FileNotDecryptedError`; le nombre de pages inaccessible est signalé explicitement.
+Les tests créent et relisent de vrais PDF texte, fusionnés, découpés, tournés et chiffrés.
 
 **v2.328 (domaine Images)** : inspection, redimensionnement, assemblage PDF, rognage,
 rotation, compression et traitement en lot rejoignent `tool_domains/images.py`. Les sept

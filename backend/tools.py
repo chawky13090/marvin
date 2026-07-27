@@ -33,6 +33,7 @@ from tool_domains import spreadsheets as spreadsheets_domain
 from tool_domains import ocr as ocr_domain
 from tool_domains import screenshots as screenshots_domain
 from tool_domains import images as images_domain
+from tool_domains import pdf_core as pdf_core_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -296,6 +297,12 @@ execute_image_crop = images_domain.crop
 execute_image_rotate = images_domain.rotate
 execute_image_compress = images_domain.compress
 execute_image_batch = images_domain.batch
+pdf_core_domain.configure(resolve_path=_resolve_path)
+execute_pdf_read = pdf_core_domain.read
+execute_pdf_info = pdf_core_domain.info
+execute_pdf_merge = pdf_core_domain.merge
+execute_pdf_split = pdf_core_domain.split
+execute_pdf_rotate = pdf_core_domain.rotate
 
 
 execute_file_search_text = filesystem_domain.search_text
@@ -9403,78 +9410,6 @@ async def execute_ip_info(args: dict) -> dict:
 # SECTION 16 — Documents, Archives & Utilitaires couleur
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_pdf_read(args: dict) -> dict:
-    """Extrait le texte d'un fichier PDF (pypdf)."""
-    path = args.get("path", "").strip()
-    pages_arg = args.get("pages", None)   # "1-3", 2, ou None = tout
-    max_chars = int(args.get("max_chars", 4000))
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfReader
-        resolved = Path(_resolve_path(path))
-        if not resolved.exists():
-            return {"error": f"Fichier introuvable : {resolved}"}
-        reader = PdfReader(str(resolved))
-        total = len(reader.pages)
-        # Parse page selection
-        if pages_arg is None:
-            indices = list(range(total))
-        elif isinstance(pages_arg, str) and "-" in pages_arg:
-            s, e = pages_arg.split("-", 1)
-            indices = list(range(int(s) - 1, min(int(e), total)))
-        elif isinstance(pages_arg, (list, tuple)):
-            indices = [int(p) - 1 for p in pages_arg if 0 < int(p) <= total]
-        else:
-            indices = [int(pages_arg) - 1]
-        texts = []
-        for i in indices:
-            if 0 <= i < total:
-                t = (reader.pages[i].extract_text() or "").strip()
-                texts.append({"page": i + 1, "text": t})
-        full = "\n\n".join(f"[Page {t['page']}]\n{t['text']}" for t in texts)
-        return {
-            "success":    True,
-            "file":       str(resolved),
-            "total_pages": total,
-            "pages_read": len(texts),
-            "text":       full[:max_chars],
-            "truncated":  len(full) > max_chars,
-            "chars":      len(full),
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_pdf_info(args: dict) -> dict:
-    """Retourne les métadonnées d'un fichier PDF (titre, auteur, nb pages…)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfReader
-        resolved = Path(_resolve_path(path))
-        if not resolved.exists():
-            return {"error": f"Fichier introuvable : {resolved}"}
-        reader = PdfReader(str(resolved))
-        meta = reader.metadata or {}
-        stat = resolved.stat()
-        return {
-            "success":   True,
-            "file":      str(resolved),
-            "pages":     len(reader.pages),
-            "size_kb":   round(stat.st_size / 1024, 1),
-            "encrypted": reader.is_encrypted,
-            "title":     meta.get("/Title", "") or "",
-            "author":    meta.get("/Author", "") or "",
-            "subject":   meta.get("/Subject", "") or "",
-            "creator":   meta.get("/Creator", "") or "",
-            "producer":  meta.get("/Producer", "") or "",
-            "created":   str(meta.get("/CreationDate", "") or ""),
-            "modified":  str(meta.get("/ModDate", "") or ""),
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 # ───────────────────────── PDF & Image toolkit (v2.34) ─────────────────────────
@@ -9517,100 +9452,8 @@ def _parse_pages(spec, total: int) -> list:
     return res
 
 
-async def execute_pdf_merge(args: dict) -> dict:
-    """Fusionne plusieurs PDF en un seul fichier (dans l'ordre fourni)."""
-    sources = args.get("sources") or args.get("paths") or []
-    if isinstance(sources, str):
-        sources = [s.strip() for s in sources.replace("\n", ",").split(",") if s.strip()]
-    if len(sources) < 2:
-        return {"error": "Fournir au moins 2 PDF dans 'sources'."}
-    try:
-        from pypdf import PdfWriter, PdfReader
-        out = args.get("output_path", "").strip() or str(Path(_HOME) / "Desktop" / "fusion.pdf")
-        out = _resolve_path(out)
-        writer = PdfWriter()
-        total = 0
-        for src in sources:
-            rp = Path(_resolve_path(src))
-            if not rp.exists():
-                return {"error": f"PDF introuvable : {rp}"}
-            r = PdfReader(str(rp))
-            for pg in r.pages:
-                writer.add_page(pg); total += 1
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "wb") as f:
-            writer.write(f)
-        return {"success": True, "path": out, "destination": out, "pages": total,
-                "merged": len(sources), "message": f"{len(sources)} PDF fusionnés ({total} pages) → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
-async def execute_pdf_split(args: dict) -> dict:
-    """Découpe un PDF : soit une page par fichier (défaut), soit selon des plages.
-    pages='1-3,5' extrait ces pages dans UN fichier ; per_page=true sort un fichier par page."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        from pypdf import PdfWriter, PdfReader
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        total = len(reader.pages)
-        out_dir = Path(_resolve_path(args.get("output_dir", "").strip() or str(rp.parent)))
-        out_dir.mkdir(parents=True, exist_ok=True)
-        idxs = _parse_pages(args.get("pages"), total)
-        per_page = bool(args.get("per_page", not args.get("pages")))
-        created = []
-        if per_page:
-            for i in idxs:
-                w = PdfWriter(); w.add_page(reader.pages[i])
-                op = out_dir / f"{rp.stem}_p{i+1}.pdf"
-                with open(op, "wb") as f: w.write(f)
-                created.append(str(op))
-        else:
-            w = PdfWriter()
-            for i in idxs: w.add_page(reader.pages[i])
-            op = out_dir / f"{rp.stem}_extrait.pdf"
-            with open(op, "wb") as f: w.write(f)
-            created.append(str(op))
-        return {"success": True, "files": created, "count": len(created),
-                "path": created[0] if created else "", "destination": created[0] if created else "",
-                "message": f"{len(created)} fichier(s) créé(s) depuis {total} pages"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_pdf_rotate(args: dict) -> dict:
-    """Pivote des pages d'un PDF (angle multiple de 90 : 90, 180, 270)."""
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    try:
-        angle = int(args.get("angle", 90))
-        if angle % 90 != 0:
-            return {"error": "L'angle doit être un multiple de 90 (90, 180, 270)."}
-        from pypdf import PdfWriter, PdfReader
-        rp = Path(_resolve_path(path))
-        if not rp.exists():
-            return {"error": f"PDF introuvable : {rp}"}
-        reader = PdfReader(str(rp))
-        total = len(reader.pages)
-        targets = set(_parse_pages(args.get("pages"), total))
-        writer = PdfWriter()
-        for i, pg in enumerate(reader.pages):
-            if i in targets:
-                pg.rotate(angle)
-            writer.add_page(pg)
-        out = _resolve_path(args.get("output_path", "").strip() or str(rp.with_name(rp.stem + "_pivote.pdf")))
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "wb") as f: writer.write(f)
-        return {"success": True, "path": out, "destination": out, "rotated_pages": len(targets),
-                "message": f"{len(targets)} page(s) pivotée(s) de {angle}° → {out}"}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 

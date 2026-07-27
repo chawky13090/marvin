@@ -117,6 +117,9 @@ la sous-phase Fichiers/Documents est close et la suite porte sur les autres doma
 Les sept opérations d'images locales rejoignent `tool_domains/images.py` en v2.328.0 avec
 sorties atomiques, orientation EXIF et bornes uniformes. Les autres familles métier sont
 extraites par cohésion avant la séparation finale registre/catalogue.
+Le noyau pypdf (lecture, informations, fusion, découpage et rotation) rejoint
+`tool_domains/pdf_core.py` en v2.329.0. Les traitements PDF avancés et l'OCR restent une
+frontière distincte afin de ne pas coupler le noyau aux dépendances ReportLab/pdfium/Ollama.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

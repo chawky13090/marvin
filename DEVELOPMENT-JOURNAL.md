@@ -5335,3 +5335,50 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 18 204 à **17 881 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
+## 2026-07-27 — v2.329.0 — Noyau PDF structurel
+
+### Demande
+
+- Poursuivre l'extraction des domaines de `tools.py` sans perte de capacité, avec séparation
+  cohérente des dépendances et validation sur de vrais PDF.
+
+### Constats et décisions
+
+- Les quatorze outils PDF mélangent un noyau pypdf, ReportLab, pdfium, pikepdf et Ollama.
+  Les réunir dans un seul module aurait recréé une frontière fortement couplée.
+- Lecture, informations, fusion, découpage et rotation forment le noyau structurel et
+  rejoignent `tool_domains/pdf_core.py`; les traitements avancés/OCR suivront séparément.
+- La sélection de pages devient commune, dédupliquée, ordonnée et plafonnée à 100 000 pages.
+  Sources, caractères et volumes ont des limites explicites et les sorties utilisent toutes
+  un fichier temporaire puis `os.replace`.
+- Un test réel a révélé que `pdf_info` levait `FileNotDecryptedError` lors de l'accès aux
+  métadonnées d'un PDF chiffré. Il retourne maintenant `encrypted=true`, métadonnées vides,
+  `pages=0` et `page_count_unavailable=true`; les opérations exigeant le contenu refusent
+  explicitement le document tant qu'il n'est pas déverrouillé.
+- Les cinq identités du registre et tous les champs historiques de succès sont conservés.
+
+### Fichiers
+
+- `backend/tool_domains/pdf_core.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_pdf_core.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test PDF : texte/métadonnées, sélection, fusion de trois pages, split groupé et par page,
+  rotation sélective et PDF chiffré créés et relus avec pypdf.
+- `scripts/check_marvin.py --quick` : **105/105 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.329.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 17 881 à **17 724 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

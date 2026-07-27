@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.329 — noyau PDF structurel extrait vers pdf_core :
+# lecture, info, fusion, split et rotation atomiques et bornés.
 # v2.328 — transformations d'images extraites et fiabilisées :
 # EXIF normalisé, sorties atomiques, limites et lots récursifs réels.
 # v2.327 — captures documentaires extraites de la façade d'outils :
