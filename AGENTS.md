@@ -172,7 +172,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.349.0)
+## 9. État actuel (v2.350.0)
+
+**v2.350 (Google Drive)** : construction OAuth, liste, lecture Docs/Sheets et téléversement
+sont extraits vers `tool_domains/google_drive.py`. Les appels synchrones passent hors de la
+boucle asyncio, le flux d'upload est fermé sur Windows et les jetons OAuth frontend sont repris.
 
 **v2.349 (observabilité runtime)** : consultation des exceptions détaillées et du journal
 d'apprentissage est extraite vers `tool_domains/runtime_observability.py`. Types, limites,

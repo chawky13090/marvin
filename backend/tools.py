@@ -55,6 +55,7 @@ from tool_domains import catharsis as catharsis_domain
 from tool_domains import system_search as system_search_domain
 from tool_domains import itsm as itsm_domain
 from tool_domains import runtime_observability as runtime_observability_domain
+from tool_domains import google_drive as google_drive_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -1259,98 +1260,18 @@ async def execute_calendar_update(args: dict) -> dict:
 # SECTION 9B — Google Drive
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _get_google_drive_service():
-    """Construit le service Google Drive depuis les credentials stockés."""
-    import credentials_manager as cm
-    from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
-
-    access_token = cm.get_credential("google_access_token")
-    refresh_token = cm.get_credential("google_refresh_token")
-    client_id = cm.get_credential("google_client_id")
-    client_secret = cm.get_credential("google_client_secret")
-
-    if not access_token and not refresh_token:
-        raise ValueError("Google non connecté. Configurez OAuth dans Paramètres > Connexions.")
-
-    creds = Credentials(
-        token=access_token,
-        refresh_token=refresh_token,
-        client_id=client_id,
-        client_secret=client_secret,
-        token_uri="https://oauth2.googleapis.com/token",
-        scopes=["https://www.googleapis.com/auth/drive"],
-    )
-    return build("drive", "v3", credentials=creds)
 
 
 async def execute_google_drive_list(args: dict) -> dict:
-    """Liste les fichiers Google Drive."""
-    folder_id = args.get("folder_id", "root")
-    max_results = args.get("max_results", 30)
-    query = args.get("query", "")
-    try:
-        service = _get_google_drive_service()
-        q = f"'{folder_id}' in parents and trashed=false"
-        if query:
-            # Escape single quotes in query for Google Drive API query language
-            safe_query = query.replace("\\", "\\\\").replace("'", "\\'")
-            q += f" and name contains '{safe_query}'"
-        results = service.files().list(
-            q=q,
-            pageSize=max_results,
-            fields="files(id, name, mimeType, size, modifiedTime, parents)",
-        ).execute()
-        files = results.get("files", [])
-        for f in files:
-            f["type"] = "dossier" if f["mimeType"] == "application/vnd.google-apps.folder" else "fichier"
-        return {"success": True, "count": len(files), "files": files}
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_drive_domain.list_files(args)
 
 
 async def execute_google_drive_read(args: dict) -> dict:
-    """Lit le contenu d'un fichier Google Drive (Docs → texte, autres → téléchargement)."""
-    file_id = args.get("file_id", "")
-    if not file_id:
-        return {"error": "file_id requis"}
-    try:
-        service = _get_google_drive_service()
-        meta = service.files().get(fileId=file_id, fields="name,mimeType").execute()
-        mime = meta.get("mimeType", "")
-        name = meta.get("name", "")
-        if mime == "application/vnd.google-apps.document":
-            resp = service.files().export(fileId=file_id, mimeType="text/plain").execute()
-            return {"success": True, "name": name, "content": resp.decode("utf-8", errors="replace")[:50000]}
-        elif mime == "application/vnd.google-apps.spreadsheet":
-            resp = service.files().export(fileId=file_id, mimeType="text/csv").execute()
-            return {"success": True, "name": name, "content": resp.decode("utf-8", errors="replace")[:50000]}
-        else:
-            return {"error": f"Type de fichier non supporté pour la lecture directe : {mime}. Utilisez le téléchargement."}
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_drive_domain.read_file(args)
 
 
 async def execute_google_drive_upload(args: dict) -> dict:
-    """Téléverse un fichier local vers Google Drive."""
-    local_path = _resolve_path(args.get("local_path", ""))
-    folder_id = args.get("folder_id", "root")
-    file_name = args.get("file_name", "")
-    if not local_path:
-        return {"error": "local_path requis"}
-    try:
-        from googleapiclient.http import MediaFileUpload
-        service = _get_google_drive_service()
-        p = Path(local_path)
-        if not p.exists():
-            return {"error": f"Fichier introuvable : {local_path}"}
-        name = file_name or p.name
-        media = MediaFileUpload(str(p), resumable=True)
-        meta = {"name": name, "parents": [folder_id]}
-        result = service.files().create(body=meta, media_body=media, fields="id,name,webViewLink").execute()
-        return {"success": True, "message": f"Fichier téléversé : {name}", "file_id": result["id"], "link": result.get("webViewLink", "")}
-    except Exception as e:
-        return {"error": str(e)}
+    return await google_drive_domain.upload_file(args, resolve_path=_resolve_path)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

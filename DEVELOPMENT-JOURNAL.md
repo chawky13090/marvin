@@ -6122,3 +6122,34 @@ régression fonctionnelle.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 391 lignes** non vides mesurées par
   PowerShell.
+
+## 2026-07-27 — v2.350.0 — Domaine Google Drive
+
+### Demande
+
+Poursuivre les frontières fournisseur sans mélanger Google Drive et Microsoft OneDrive.
+
+### Constats et décisions
+
+- Le SDK Google synchrone était exécuté directement dans les coroutines FastAPI, bloquant la
+  boucle événementielle pendant les appels réseau.
+- Drive ignorait les jetons Google stockés par le flux OAuth frontend, contrairement au
+  calendrier qui possédait déjà ce pont de compatibilité.
+- `tool_domains/google_drive.py` possède désormais service OAuth, liste, export Docs/Sheets et
+  upload. Tous les appels SDK passent par `asyncio.to_thread`.
+- Le premier test Windows a détecté que `MediaFileUpload` gardait le fichier source ouvert;
+  le flux est maintenant fermé dans un `finally`, y compris après échec.
+- Limites, identifiants et nom distant sont contrôlés; les trois outils et leurs confirmations
+  externes restent inchangés dans le registre et les guardrails.
+
+### Validation
+
+- Tests ciblés : requête échappée, borne 1000, projection dossier, export texte, validation
+  du nom, upload, fermeture réelle du fichier temporaire et identités du registre réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **126/126 étapes** en
+  201,6 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.350.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 315 lignes** non vides mesurées par
+  PowerShell.

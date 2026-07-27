@@ -208,6 +208,8 @@ Le connecteur ITSM est isolé avec transport injectable et fermeture garantie de
 GLPI; l'ajout d'un autre backend ne doit pas étendre la façade `tools.py`.
 L'observabilité consommée par le LLM est isolée des producteurs de logs et injectée dans les
 tests, afin qu'une donnée interne mal formée ne casse pas un tour agentique.
+Google Drive dispose de sa propre frontière fournisseur; OneDrive conserve une frontière
+distincte afin de ne pas masquer les différences OAuth, Graph et stratégies d'upload.
 
 ## 4. Validation obligatoire par tranche
 
