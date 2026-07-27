@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.341.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.342.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.341.0)
+## 9. État actuel (v2.342.0)
+
+**v2.342 (Winget)** : résolution de l'exécutable, parsing tabulaire, recherche, inventaire,
+installation, mise à jour et désinstallation rejoignent `tool_domains/winget.py`. Les résultats
+sont bornés à 50; identifiants et sources ne peuvent plus être interprétés comme des options
+CLI. Les trois opérations mutantes conservent leurs confirmations obligatoires.
 
 **v2.341 (santé client)** : calcul des cinq axes de santé, lecture et historique, recommandations
 et compte-rendu mensuel rejoignent `tool_domains/client_health.py`. Historique, statuts et

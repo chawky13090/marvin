@@ -157,6 +157,9 @@ les générateurs documentaires sont injectés sans introduire d'exécution auto
 Les cinq outils de santé client rejoignent `tool_domains/client_health.py` en v2.341.0.
 Calcul multi-axes, recommandations, historique et synthèse mensuelle partagent une frontière
 testable; formats, statuts et volumes sont bornés et les erreurs internes ne sont plus exposées.
+Les six outils Winget rejoignent `tool_domains/winget.py` en v2.342.0. Résolution, parsing et
+exécution non interactive sont isolés; limites, sources et identifiants sont validés afin
+d'empêcher leur interprétation comme options CLI, sans modifier les confirmations mutantes.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

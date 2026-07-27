@@ -5843,3 +5843,38 @@ Continuer la consolidation backend avec amélioration des contrats et tests rée
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **9 187 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.342.0 — Domaine Winget
+
+### Demande
+
+Poursuivre les domaines d'outils avant la séparation du registre et du catalogue.
+
+### Constats et décisions
+
+- Six outils Winget et trois helpers de transport/parsing restaient dans `tools.py`.
+- La limite de recherche n'était pas bornée. Les identifiants et sources étaient transmis
+  comme arguments séparés, mais une valeur commençant par `--` pouvait encore être interprétée
+  par Winget comme une option.
+- Le domaine rejoint `tool_domains/winget.py`; résultats bornés à 1–50 et identifiants/sources
+  limités à la grammaire Winget attendue.
+- Installation, mise à jour et désinstallation exigent toujours une confirmation explicite.
+- Le test injecte un transport Winget déterministe : aucune installation réelle n'est lancée.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/winget.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_winget.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Test Winget et architecture **344/344** réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **118/118 étapes** en
+  188,5 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.342.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **9 017 lignes** mesurées par PowerShell.
