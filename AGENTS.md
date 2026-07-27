@@ -172,7 +172,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.350.0)
+## 9. État actuel (v2.351.0)
+
+**v2.351 (OneDrive)** : OAuth Microsoft, liste, lecture bornée et upload en flux sont extraits
+vers `tool_domains/onedrive.py`. Tenant, identifiants et chemins Graph sont validés; l'upload
+simple respecte la limite Microsoft de 250 Mo sans charger le fichier entier en mémoire.
 
 **v2.350 (Google Drive)** : construction OAuth, liste, lecture Docs/Sheets et téléversement
 sont extraits vers `tool_domains/google_drive.py`. Les appels synchrones passent hors de la

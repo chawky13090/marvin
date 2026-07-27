@@ -210,6 +210,8 @@ L'observabilité consommée par le LLM est isolée des producteurs de logs et in
 tests, afin qu'une donnée interne mal formée ne casse pas un tour agentique.
 Google Drive dispose de sa propre frontière fournisseur; OneDrive conserve une frontière
 distincte afin de ne pas masquer les différences OAuth, Graph et stratégies d'upload.
+OneDrive est désormais isolé avec transport injectable et upload asynchrone en flux; les
+fichiers au-delà du contrat simple de 250 Mo exigent explicitement une upload session future.
 
 ## 4. Validation obligatoire par tranche
 

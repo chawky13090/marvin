@@ -56,6 +56,7 @@ from tool_domains import system_search as system_search_domain
 from tool_domains import itsm as itsm_domain
 from tool_domains import runtime_observability as runtime_observability_domain
 from tool_domains import google_drive as google_drive_domain
+from tool_domains import onedrive as onedrive_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -1278,131 +1279,18 @@ async def execute_google_drive_upload(args: dict) -> dict:
 # SECTION 10 — Microsoft OneDrive
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def _get_ms_token() -> str:
-    """Obtient un access token Microsoft valide (refresh si nécessaire)."""
-    import credentials_manager as cm
-    import httpx
-
-    access_token = cm.get_credential("ms_access_token")
-    refresh_token = cm.get_credential("ms_refresh_token")
-    client_id = cm.get_credential("ms_client_id")
-    client_secret = cm.get_credential("ms_client_secret")
-    tenant_id = cm.get_credential("ms_tenant_id") or "common"
-
-    if not access_token and not refresh_token:
-        raise ValueError("Microsoft non connecté. Configurez OAuth dans Paramètres > Connexions.")
-
-    # Si access_token disponible, l'utiliser directement
-    if access_token:
-        return access_token
-
-    # Rafraîchir le token
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(
-            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-                "client_id": client_id,
-                "client_secret": client_secret or "",
-                "scope": "https://graph.microsoft.com/.default",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        new_token = data["access_token"]
-        cm.set_credential("ms_access_token", new_token)
-        if "refresh_token" in data:
-            cm.set_credential("ms_refresh_token", data["refresh_token"])
-        return new_token
 
 
 async def execute_onedrive_list(args: dict) -> dict:
-    """Liste les fichiers OneDrive."""
-    folder_id = args.get("folder_id", "root")
-    max_results = args.get("max_results", 30)
-    query = args.get("query", "")
-    try:
-        import httpx
-        token = await _get_ms_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        if query:
-            from urllib.parse import quote
-            url = f"https://graph.microsoft.com/v1.0/me/drive/root/search(q='{quote(query, safe='')}')"
-            params = {"$top": max_results}
-        else:
-            url = f"https://graph.microsoft.com/v1.0/me/drive/items/{folder_id}/children"
-            params = {"$top": max_results}
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(url, headers=headers, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-        items = data.get("value", [])
-        result = []
-        for item in items:
-            result.append({
-                "id": item["id"],
-                "name": item["name"],
-                "type": "dossier" if "folder" in item else "fichier",
-                "size": item.get("size", 0),
-                "modified": item.get("lastModifiedDateTime", ""),
-                "web_url": item.get("webUrl", ""),
-            })
-        return {"success": True, "count": len(result), "files": result}
-    except Exception as e:
-        return {"error": str(e)}
+    return await onedrive_domain.list_files(args)
 
 
 async def execute_onedrive_read(args: dict) -> dict:
-    """Lit le contenu d'un fichier OneDrive texte."""
-    file_id = args.get("file_id", "")
-    if not file_id:
-        return {"error": "file_id requis"}
-    try:
-        import httpx
-        token = await _get_ms_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.get(
-                f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/content",
-                headers=headers, follow_redirects=True,
-            )
-            resp.raise_for_status()
-        content = resp.text[:50000] if resp.headers.get("content-type", "").startswith("text/") else None
-        if content is None:
-            return {"error": "Contenu binaire non supporté pour lecture directe."}
-        return {"success": True, "content": content}
-    except Exception as e:
-        return {"error": str(e)}
+    return await onedrive_domain.read_file(args)
 
 
 async def execute_onedrive_upload(args: dict) -> dict:
-    """Téléverse un fichier local vers OneDrive."""
-    local_path = _resolve_path(args.get("local_path", ""))
-    dest_path = args.get("dest_path", "")  # ex: "Documents/rapport.pdf"
-    if not local_path:
-        return {"error": "local_path requis"}
-    try:
-        import httpx
-        token = await _get_ms_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        p = Path(local_path)
-        if not p.exists():
-            return {"error": f"Fichier introuvable : {local_path}"}
-        name = dest_path or p.name
-        with open(str(p), "rb") as f:
-            data = f.read()
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.put(
-                f"https://graph.microsoft.com/v1.0/me/drive/root:/{name}:/content",
-                headers={**headers, "Content-Type": "application/octet-stream"},
-                content=data,
-            )
-            resp.raise_for_status()
-            result = resp.json()
-        return {"success": True, "message": f"Fichier téléversé : {name}", "file_id": result.get("id", ""), "web_url": result.get("webUrl", "")}
-    except Exception as e:
-        return {"error": str(e)}
+    return await onedrive_domain.upload_file(args, resolve_path=_resolve_path)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

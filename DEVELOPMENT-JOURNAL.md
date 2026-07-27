@@ -6153,3 +6153,41 @@ Poursuivre les frontières fournisseur sans mélanger Google Drive et Microsoft 
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 315 lignes** non vides mesurées par
   PowerShell.
+
+## 2026-07-27 — v2.351.0 — Domaine OneDrive
+
+### Contexte
+
+Séparer Microsoft Graph de Google Drive afin de préserver les contrats et contraintes propres
+à chaque fournisseur.
+
+### Analyse et solution
+
+- OAuth, liste, lecture et upload OneDrive étaient directement mêlés à `tools.py`.
+- `tool_domains/onedrive.py` possède maintenant le renouvellement OAuth, les requêtes Graph et
+  les trois opérations. Jeton et transport sont injectables dans les tests.
+- Le tenant accepte uniquement les valeurs Microsoft prévues ou un UUID; identifiants,
+  recherches et segments de chemin sont bornés et encodés.
+- La lecture demande uniquement les 50 000 premiers octets et refuse le contenu binaire.
+- L'upload simple est limité au contrat Microsoft de 250 Mo et diffuse le fichier par blocs de
+  1 Mo. Le générateur ferme le handle dans tous les chemins, y compris transport interrompu.
+- La confirmation de l'upload reste portée par `DANGEROUS_TOOLS`; aucune action sortante n'est
+  devenue implicite.
+
+### Validation observée
+
+- Tests ciblés : projection, recherche échappée, limites, lecture partielle, chemin hostile,
+  upload en flux, fermeture du fichier et identités du registre réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **127/127 étapes** en
+  225,6 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.351.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Premier smoke : **22/28**, les six échecs étant tous des refus de connexion au frontend
+  arrêté. Après démarrage réel de Turbopack, le smoke réussit **28/28 contrats**.
+- Taille de `backend/tools.py` après extraction : **8 207 lignes** non vides mesurées par
+  PowerShell.
+
+### Rollback
+
+Le commit de cette tranche peut être réverti atomiquement; aucun schéma ni donnée persistante
+n'est modifié.

@@ -193,6 +193,8 @@ sessions distantes, entrées, limites et confirmation des créations sont géré
 bugs et d'apprentissage; filtres, volumes et projections sont contrôlés avant exposition au LLM.
 68. Google Drive : `tool_domains/google_drive.py` possède OAuth, liste, export et upload; les
 appels SDK sont hors boucle asyncio, les entrées sont bornées et les flux fichiers sont fermés.
+69. OneDrive : `tool_domains/onedrive.py` possède OAuth Microsoft et les appels Graph; lecture,
+chemins, tailles et upload simple en flux sont bornés selon les contrats du fournisseur.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
