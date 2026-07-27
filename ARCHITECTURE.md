@@ -218,6 +218,9 @@ les fuseaux inconnus et les deltas non bornés sont refusés explicitement.
 77. les conversions d'unités : `tool_domains/unit_conversion.py` possède facteurs,
 dimensions, alias et températures. Les calculs intermédiaires sont décimaux et finis;
 incompatibilités, valeurs extrêmes et températures physiquement impossibles sont refusées.
+78. la météo : `tool_domains/weather.py` possède géocodage et prévisions Open-Meteo.
+Transport et cache TTL sont injectés depuis la façade Web; paramètres, coordonnées et
+structures distantes sont contrôlés avant projection vers le Runner.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

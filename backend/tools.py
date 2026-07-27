@@ -63,6 +63,7 @@ from tool_domains import calendar_events as calendar_events_domain
 from tool_domains import deterministic_utilities as deterministic_utilities_domain
 from tool_domains import datetime_tools as datetime_tools_domain
 from tool_domains import unit_conversion as unit_conversion_domain
+from tool_domains import weather as weather_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3296,145 +3297,6 @@ async def execute_translate(args: dict) -> dict:
         return {"error": f"Traduction échouée : {e}"}
 
 
-# Cache for weather geocoding (city → lat/lon)
-# Same city geocoded → reuse the coords (saves ~200ms per call)
-_geocode_cache: dict = {}
-_GEOCODE_CACHE_MAX = 100
-
-# Reusable HTTPX client for weather API (HTTP/2, connection pooling)
-# Initialized lazily on first call
-_weather_client = None
-_weather_client_lock = None
-
-async def _get_weather_client():
-    """Singleton httpx client with connection pooling for fast repeat calls."""
-    global _weather_client, _weather_client_lock
-    if _weather_client_lock is None:
-        import asyncio as _aio
-        _weather_client_lock = _aio.Lock()
-    async with _weather_client_lock:
-        if _weather_client is None:
-            import httpx
-            # httpx.Timeout requires all 4 params (connect/read/write/pool) or a single default value
-            _weather_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(8.0, connect=3.0),
-                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
-            )
-        return _weather_client
-
-
-async def execute_weather(args: dict) -> dict:
-    """Récupère la météo actuelle ou prévisions via Open-Meteo (gratuit, sans clé API). Optimisé pour la rapidité."""
-    from datetime import datetime, timezone
-
-    city    = args.get("city", "Paris").strip()
-    country = args.get("country", "FR").strip()
-    days    = max(1, min(int(args.get("days", 1)), 7))
-
-    cache_key = f"{city.lower()}|{country.lower()}"
-
-    # 1. Géocodage — avec cache
-    if cache_key in _geocode_cache:
-        loc = _geocode_cache[cache_key]
-    else:
-        try:
-            client = await _get_weather_client()
-            geo = await client.get(
-                "https://geocoding-api.open-meteo.com/v1/search",
-                params={"name": city, "count": 5, "language": "fr", "format": "json"},
-            )
-            geo.raise_for_status()
-            geo_data = geo.json()
-        except Exception as e:
-            return {"error": f"Géocodage échoué : {e}"}
-
-        results = geo_data.get("results", [])
-        if not results:
-            return {"error": f"Ville '{city}' non trouvée"}
-
-        loc = next(
-            (r for r in results if r.get("country_code", "").upper() == country.upper()),
-            results[0]
-        )
-        # Cache for next time
-        if len(_geocode_cache) >= _GEOCODE_CACHE_MAX:
-            _geocode_cache.clear()
-        _geocode_cache[cache_key] = loc
-
-    lat, lon = loc["latitude"], loc["longitude"]
-    city_name = f"{loc.get('name', city)}, {loc.get('country', '')}"
-
-    # 2. Récupérer la météo via Open-Meteo (réutilise le client → plus rapide)
-    try:
-        client = await _get_weather_client()
-        weather = await client.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": lat, "longitude": lon,
-                "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code",
-                "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
-                "forecast_days": days,
-                "timezone": "auto",
-            },
-        )
-        weather.raise_for_status()
-        wdata = weather.json()
-    except Exception as e:
-        return {"error": f"API météo échouée : {e}"}
-
-    # Interprétation des codes WMO
-    WMO = {
-        0: "Ciel dégagé ☀️", 1: "Principalement dégagé 🌤️", 2: "Partiellement nuageux ⛅",
-        3: "Couvert ☁️", 45: "Brouillard 🌫️", 48: "Brouillard givrant 🌫️",
-        51: "Bruine légère 🌦️", 53: "Bruine modérée 🌦️", 55: "Bruine dense 🌦️",
-        61: "Pluie légère 🌧️", 63: "Pluie modérée 🌧️", 65: "Forte pluie 🌧️",
-        71: "Légère neige 🌨️", 73: "Neige modérée 🌨️", 75: "Forte neige ❄️",
-        77: "Grésil ❄️", 80: "Averses légères 🌦️", 81: "Averses modérées 🌦️",
-        82: "Averses violentes ⛈️", 85: "Averses de neige 🌨️", 86: "Fortes averses de neige ❄️",
-        95: "Orage ⛈️", 96: "Orage avec grêle ⛈️", 99: "Orage fort avec grêle ⛈️",
-    }
-
-    cur = wdata.get("current", {})
-    wmo_code = cur.get("weather_code", 0)
-    condition = WMO.get(wmo_code, f"Code {wmo_code}")
-
-    current_weather = {
-        "city":        city_name,
-        "condition":   condition,
-        "temperature": cur.get("temperature_2m"),
-        "feels_like":  cur.get("apparent_temperature"),
-        "humidity":    cur.get("relative_humidity_2m"),
-        "wind_speed":  cur.get("wind_speed_10m"),
-        "precipitation": cur.get("precipitation"),
-    }
-
-    # Prévisions journalières
-    daily = wdata.get("daily", {})
-    forecasts = []
-    if daily:
-        dates  = daily.get("time", [])
-        maxT   = daily.get("temperature_2m_max", [])
-        minT   = daily.get("temperature_2m_min", [])
-        precip = daily.get("precipitation_sum", [])
-        codes  = daily.get("weather_code", [])
-        for i in range(min(len(dates), days)):
-            forecasts.append({
-                "date":        dates[i],
-                "condition":   WMO.get(codes[i] if i < len(codes) else 0, "?"),
-                "temp_max":    maxT[i] if i < len(maxT) else None,
-                "temp_min":    minT[i] if i < len(minT) else None,
-                "precipitation": precip[i] if i < len(precip) else None,
-            })
-
-    return {
-        "success": True,
-        "current": current_weather,
-        "forecasts": forecasts,
-        "source": "Open-Meteo (open-meteo.com)",
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # SECTION 15 — Outils de traitement de données
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -5717,12 +5579,19 @@ web_domain.configure(
     get_http_client=_get_http_client, cache_get=_wcache_get, cache_set=_wcache_set,
     net_error=_net_error,
 )
+weather_domain.configure(
+    get_http_client=_get_http_client,
+    cache_get=_wcache_get,
+    cache_set=_wcache_set,
+    net_error=_net_error,
+)
 
 execute_web_browse = web_domain.execute_web_browse
 execute_web_browser_open = web_domain.execute_web_browser_open
 execute_web_deep_research = web_domain.execute_web_deep_research
 execute_web_research = web_domain.execute_web_research
 execute_web_search = web_domain.execute_web_search
+execute_weather = weather_domain.weather
 
 pc_diagnostics_domain.configure(
     run_powershell=execute_pc_run_powershell, web_search=execute_web_search
@@ -7441,7 +7310,8 @@ TOOLS_SPEC = [
     _t("weather", "Récupère la météo actuelle et les prévisions (jusqu'à 7 jours) via Open-Meteo (gratuit, sans clé API).",
        {"city":    {"type": "string", "description": "Nom de la ville (ex: Paris, Lyon, Toulouse)"},
         "country": {"type": "string", "description": "Code pays ISO 2 lettres (ex: FR, BE, CH). Aide à disambiguïser."},
-        "days":    {"type": "integer", "description": "Nombre de jours de prévisions (1 à 7, défaut : 1)"}},
+        "days":    {"type": "integer", "minimum": 1, "maximum": 7,
+                    "description": "Nombre de jours de prévisions (1 à 7, défaut : 1)"}},
        ["city"]),
 
     _t("translate", "Traduit du texte dans n'importe quelle langue via MyMemory (gratuit, sans clé, 1000 req/j).",

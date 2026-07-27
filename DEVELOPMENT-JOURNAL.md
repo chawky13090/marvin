@@ -6596,3 +6596,51 @@ Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomiq
 restaure la table historique dans `tools.py`, supprime le domaine et son test, puis remet la
 version 2.358.0. Le patch inverse est contrôlé avant commit; le backend doit ensuite être
 redémarré et validé par `/api/health` et le smoke test.
+
+## 2026-07-28 — v2.360.0 — Domaine météo Open-Meteo
+
+### Contexte
+
+Extraire la météo de `tools.py`, supprimer ses ressources globales parallèles et éviter qu'une
+ville homonyme d'un autre pays soit sélectionnée silencieusement.
+
+### Veille et décisions
+
+- L'API officielle de géocodage accepte `countryCode` au format ISO 3166-1 alpha-2 et retourne
+  des coordonnées WGS84. Marvin transmet maintenant ce filtre au serveur.
+  Source : https://open-meteo.com/en/docs/geocoding-api
+- L'API Forecast accepte `timezone=auto`, `forecast_days` et les variables `current`/`daily`
+  utilisées par Marvin. La borne produit reste volontairement à sept jours.
+  Source : https://open-meteo.com/en/docs
+
+### Analyse et solution
+
+- `tool_domains/weather.py` possède validation, géocodage, projection WMO et prévisions.
+- Le second `httpx.AsyncClient` global, jamais fermé, est supprimé. Le domaine reçoit le
+  client poolé, le cache TTL et la projection d'erreur du domaine Web commun.
+- Le cache permanent limité par un effacement total à 100 villes est supprimé; les coordonnées
+  utilisent désormais le cache TTL borné partagé.
+- Ville, code pays, nombre de jours, latitude, longitude et structures JSON distantes sont
+  contrôlés avant utilisation.
+- Un résultat d'un autre pays n'est plus choisi en repli silencieux. Les codes WMO 56, 57,
+  66 et 67 sont ajoutés et les unités retournées par le fournisseur sont exposées.
+- `tools.py` passe de 8 352 à **8 222 lignes** avec identité de façade conservée.
+
+### Validation observée
+
+- Tests ciblés sans réseau : pays transmis, cache réutilisé, projections actuelles/journalières,
+  unités, bornes, ville absente, erreur réseau, façade, registre et schéma.
+- Suite complète : **135/135 étapes** en **240,5 secondes**; compilation de 207 fichiers,
+  ESLint **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.360.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Appel Open-Meteo réel via `/api/tools` : `Paris, FR`, succès, fuseau `Europe/Paris`,
+  une prévision et provenance affichée.
+- Smoke API avec frontend Turbopack actif : **28/28 contrats réussis**.
+
+### Rollback vérifié
+
+Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomique du commit
+restaure le client/cache météo historiques dans `tools.py`, supprime le domaine et son test,
+puis remet la version 2.359.0. Le patch inverse est contrôlé avant commit; le backend doit
+ensuite être redémarré et validé par `/api/health` et le smoke test.

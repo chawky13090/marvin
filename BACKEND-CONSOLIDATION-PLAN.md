@@ -230,6 +230,8 @@ La date et l'heure sont isolées dans un domaine déterministe avec dépendance 
 portable, fuseaux IANA explicites et deltas imbriqués strictement validés.
 Les conversions d'unités sont isolées avec facteurs de référence documentés, calcul décimal,
 compatibilité des dimensions et conservation de tous les alias publics historiques.
+La météo Open-Meteo est isolée derrière le transport/cache Web commun, avec validation des
+entrées et réponses distantes; elle ne possède plus de client HTTP ou cache global séparé.
 
 ## 4. Validation obligatoire par tranche
 

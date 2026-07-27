@@ -176,7 +176,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.359.0)
+## 9. État actuel (v2.360.0)
+
+**v2.360 (domaine météo Open-Meteo)** : `weather` rejoint `tool_domains/weather.py`.
+Le domaine réutilise le transport HTTP et le cache TTL communs au lieu de conserver un
+second client jamais fermé et un cache permanent. Ville, pays ISO, jours, coordonnées et
+réponses sont validés; le filtre pays est appliqué par l'API de géocodage et les codes WMO
+56, 57, 66 et 67 ne sont plus absents.
 
 **v2.359 (conversions d'unités déterministes)** : `unit_convert` rejoint
 `tool_domains/unit_conversion.py`. Tous les alias historiques restent disponibles; les

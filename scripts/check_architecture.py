@@ -214,6 +214,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_agent_safety.py",
         ROOT / "scripts" / "test_tool_domain_datetime.py",
         ROOT / "scripts" / "test_tool_domain_unit_conversion.py",
+        ROOT / "scripts" / "test_tool_domain_weather.py",
         ROOT / "scripts" / "test_agent_protocol.py",
         ROOT / "scripts" / "test_agent_routing.py",
         ROOT / "scripts" / "test_agent_prompt.py",
