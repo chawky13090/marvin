@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.322 — génération IA documentaire extraite dans le domaine Documents :
+# générateur et dossier injectés, sidecar conservé et rendu DOCX réel testé.
 # v2.321 — création DOCX et conversions documentaires extraites :
 # domaine injectable, test DOCX réel et validation stricte de la source PDF.
 # v2.320 — identité persistante et catalogue documentaire extraits :

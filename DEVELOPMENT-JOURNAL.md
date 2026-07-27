@@ -5013,3 +5013,46 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 468 à **19 165 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.322.0 — Génération IA documentaire
+
+### Demande
+
+- Achever la frontière DOCX en déplaçant l'orchestration IA sans modifier son routage modèle.
+
+### Constats et décisions
+
+- `document_generate` dépendait de la position de `tools.py` via `__file__`; son déplacement
+  naïf aurait écrit dans un autre dossier.
+- Le générateur LLM et `data/documents_generes` sont maintenant injectés explicitement après
+  la définition du transport historique `_ollama_generate`.
+- Modes rapide/détaillé, rappel d'auteur, RAG documentaire, en-tête, références, signature,
+  sidecar Markdown et conversion PDF optionnelle sont conservés.
+- Le test injecte un LLM déterministe, génère le DOCX final dans un dossier contrôlé et
+  vérifie que le fichier existe.
+- Une première compilation a détecté que l'alias `execute_file_search_text`, situé entre les
+  blocs historiques, avait été retiré avec l'ancien générateur. Il a été restauré avant toute
+  version et les tests Filesystem + Documents ainsi que l'architecture ont été rejoués.
+
+### Fichiers
+
+- `backend/tool_domains/documents.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_documents.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `BACKEND-CONSOLIDATION-PLAN.md`
+- `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Tests ciblés Documents et Filesystem : génération IA injectée, chemin de sortie,
+  fichier final, quatre alias documentaires et alias de recherche restauré réussis.
+- `scripts/check_marvin.py --quick` : **99/99 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.322.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 165 à **19 044 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

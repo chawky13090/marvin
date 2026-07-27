@@ -54,10 +54,32 @@ async def main() -> int:
         })
         assert "pdf" in invalid_target["error"] and "docx" in invalid_target["error"]
 
+        async def generate_text(_prompt, **_kwargs):
+            return "# Document\n\n## Introduction\n\nContenu vérifié."
+
+        documents.configure_generation(
+            text_generator=generate_text,
+            generated_dir=base / "generated",
+        )
+        with (
+            patch.object(documents.db, "get_setting", return_value=None),
+            patch.object(documents, "_document_identity", return_value={}),
+        ):
+            generated_result = await documents.generate({
+                "title": "Procédure test",
+                "text": "Notes",
+                "template": "procedure",
+                "author": "Marvin",
+            })
+        assert generated_result["success"] is True
+        assert Path(generated_result["file"]).parent == base / "generated"
+        assert Path(generated_result["file"]).exists()
+
     documents.configure(resolve_path=tools._resolve_path)
     assert tools.execute_file_create_docx is documents.create_docx
     assert tools.execute_file_convert_docx_to_pdf is documents.convert_docx_to_pdf
     assert tools.execute_document_convert_format is documents.convert_format
+    assert tools.execute_document_generate is documents.generate
     print("Tool Domain Documents OK - DOCX réel, conversions et façade.")
     return 0
 

@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.321.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.322.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.321.0)
+## 9. État actuel (v2.322.0)
+
+**v2.322 (génération IA documentaire)** : `document_generate` rejoint
+`tool_domains/documents.py`. Le transport LLM et le dossier `data/documents_generes` sont
+injectés après initialisation, supprimant la dépendance fragile à la position de `__file__`.
+Modes rapide/détaillé, RAG, en-tête, signature, sidecar, PDF optionnel et routage Cloud
+historique sont conservés. Le test génère réellement le document final avec un LLM injecté.
 
 **v2.321 (domaine DOCX et conversions)** : création DOCX professionnelle, conversion
 DOCX→PDF via un thread COM dédié et conversion PDF→DOCX rejoignent

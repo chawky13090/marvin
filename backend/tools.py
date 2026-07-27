@@ -268,134 +268,6 @@ execute_file_convert_docx_to_pdf = documents_domain.convert_docx_to_pdf
 execute_document_convert_format = documents_domain.convert_format
 
 
-async def execute_document_generate(args: dict) -> dict:
-    """Génère un document professionnel COMPLET au format Word (.docx) à partir de notes
-    brutes, selon un modèle (rapport d'intervention, dossier pro, procédure...). Rédige
-    section par section pour un rendu complet et soigné. PDF optionnel."""
-    import re as _re
-    raw = (args.get("text") or args.get("raw") or args.get("notes") or "").strip()
-    tpl_key = (args.get("template") or "libre").strip()
-    tpl = _DOC_TEMPLATES.get(tpl_key, _DOC_TEMPLATES["libre"])
-    if not raw and not args.get("title"):
-        return {"error": "Fournis des notes (paramètre 'text') ou au moins un 'title'."}
-    title = (args.get("title") or "").strip() or (raw.split("\n")[0][:80] if raw else tpl["name"])
-
-    author = (args.get("author") or "").strip()
-    if not author:
-        try:
-            import learning
-            rec = await learning.recall("nom et prénom de l'utilisateur")
-            for f in rec.get("facts", []):
-                m = _re.search(r"appelle\s+([A-ZÀ-Ÿ][^\s,.;]+)", f)
-                if m:
-                    author = m.group(1)
-                    break
-        except Exception:
-            pass
-        author = author or "Marvin"
-
-    # Contexte optionnel depuis les documents indexés (RAG)
-    sources_ctx = ""
-    if args.get("use_documents"):
-        try:
-            import vector_store as vs
-            hits = await vs.search(raw or title, collections=["documents"], limit=4)
-            sources_ctx = "\n".join(f"- {h['text'][:400]}" for h in hits)
-        except Exception:
-            pass
-
-    sections = args.get("sections") or tpl["sections"]
-    # Mode par défaut piloté par le MODE de performance (rapide sur petite machine, detaille sur puissante)
-    mode = (args.get("mode") or db.get_setting("doc_default_mode") or "rapide").lower()
-    src_block = (f"\nCONTEXTE (extraits de documents) :\n{sources_ctx}\n" if sources_ctx else "")
-
-    if mode == "detaille":
-        # Section par section : plus complet/profond, mais plusieurs appels LLM (lent sur petit GPU).
-        md_parts = []
-        for section in sections[:8]:
-            prompt = (
-                f"Tu es un rédacteur professionnel francophone. Document de type « {tpl['name']} » "
-                f"intitulé « {title} ». Rédige UNIQUEMENT la section « {section} », COMPLÈTE et "
-                f"professionnelle, en français sans fautes. Commence par « ## {section} ». "
-                f"Sous-titres/listes/tableaux si utile, reste factuel.\n\n"
-                f"NOTES :\n{raw or '(peu d éléments — propose un contenu plausible)'}\n" + src_block + "\nRÉDACTION :"
-            )
-            try:
-                part = (await _ollama_generate(prompt, model=args.get("model"), timeout=180) or "").strip()
-            except Exception as e:
-                part = f"## {section}\n\n(génération échouée : {str(e)[:80]})"
-            if "##" not in part[:60]:
-                part = f"## {section}\n\n" + part
-            md_parts.append(part)
-        content = f"# {title}\n\n" + "\n\n".join(md_parts)
-    else:
-        # Une seule passe : génère tout le document d'un coup (rapide).
-        sec_list = "\n".join(f"## {s}" for s in sections)
-        prompt = (
-            f"Tu es un rédacteur professionnel francophone. Rédige un document COMPLET de type "
-            f"« {tpl['name']} » intitulé « {title} », en français impeccable (sans fautes), au format markdown.\n"
-            f"Respecte EXACTEMENT cette structure (une section « ## » par titre, dans l'ordre) :\n{sec_list}\n"
-            f"Chaque section doit être complète et professionnelle (sous-titres, listes ou tableaux si utile). "
-            f"Reste factuel, pas de remplissage.\n\n"
-            f"NOTES / ÉLÉMENTS FOURNIS :\n{raw or '(peu d éléments — propose un contenu plausible)'}\n"
-            + src_block + "\nDOCUMENT COMPLET (markdown) :"
-        )
-        try:
-            body = (await _ollama_generate(prompt, model=args.get("model"), timeout=240) or "").strip()
-        except Exception as e:
-            return {"error": f"Génération échouée : {str(e)[:120]}"}
-        content = body if body.lstrip().startswith("#") else f"# {title}\n\n{body}"
-
-    # ── En-tête / signature / références — CHOISIS par le rédacteur ──────────────
-    saved_lh = db.get_setting("doc_letterhead")
-    if isinstance(saved_lh, str):
-        try:
-            import json as _j; saved_lh = _j.loads(saved_lh)
-        except Exception:
-            saved_lh = {}
-    saved_lh = saved_lh if isinstance(saved_lh, dict) else {}
-    lh_arg = args.get("letterhead") if isinstance(args.get("letterhead"), dict) else {}
-    letterhead = {**saved_lh, **lh_arg} if args.get("include_header", True) else {}
-    references = {"client": (args.get("client") or "").strip(), "reference": (args.get("reference") or "").strip()}
-    signature = {}
-    if args.get("sign") or args.get("lieu"):
-        signature = {"name": (args.get("signataire") or saved_lh.get("signataire_name") or author),
-                     "title": (args.get("signataire_title") or saved_lh.get("signataire_title") or ""),
-                     "lieu": (args.get("lieu") or "").strip()}
-
-    safe = (_re.sub(r"[^\w\- ]", "", title)[:50].strip() or "document").replace(" ", "_")
-    out_dir = os.path.join(os.path.dirname(__file__), "..", "data", "documents_generes")
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"{safe}.docx")
-    r = await execute_file_create_docx({"path": out_path, "title": title, "subtitle": tpl["name"],
-                                        "content": content, "author": author,
-                                        "letterhead": letterhead, "references": references, "signature": signature})
-    if r.get("error"):
-        return {"error": f"Rendu Word échoué : {r['error']}"}
-    docx_path = r.get("path", out_path)
-    # Sidecar : permet d'affiner une section plus tard (document_refine_section)
-    try:
-        import json as _json
-        meta = {"title": title, "subtitle": tpl["name"], "template": tpl_key, "author": author,
-                "letterhead": letterhead, "references": references, "signature": signature,
-                "sections": sections, "markdown": content}
-        with open(docx_path + ".meta.json", "w", encoding="utf-8") as _mf:
-            _json.dump(meta, _mf, ensure_ascii=False)
-    except Exception:
-        pass
-    result = {"success": True, "file": docx_path, "title": title, "template": tpl["name"],
-              "author": author, "sections": sections, "markdown": content[:4000],
-              "message": f"📄 Document « {title} » généré ({len(sections)} sections) → {os.path.basename(docx_path)}"}
-    if args.get("pdf"):
-        try:
-            pr = await execute_file_convert_docx_to_pdf({"path": docx_path})
-            if pr.get("success"):
-                result["pdf"] = pr.get("path")
-        except Exception:
-            pass
-    return result
-
-
 execute_file_search_text = filesystem_domain.search_text
 
 
@@ -11088,6 +10960,13 @@ async def _ollama_generate(prompt: str, model: str = None, images: list = None, 
         except Exception as e3:
             last_err = e3
     raise last_err if last_err else RuntimeError("Ollama indisponible")
+
+
+documents_domain.configure_generation(
+    text_generator=_ollama_generate,
+    generated_dir=Path(__file__).resolve().parent.parent / "data" / "documents_generes",
+)
+execute_document_generate = documents_domain.generate
 
 
 def _pil_to_b64(img, fmt: str = "PNG") -> str:
