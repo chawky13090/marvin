@@ -234,6 +234,10 @@ La météo Open-Meteo est isolée derrière le transport/cache Web commun, avec 
 entrées et réponses distantes; elle ne possède plus de client HTTP ou cache global séparé.
 La traduction est isolée derrière le routage Ollama commun : aucun fournisseur externe ne
 contourne Hyper local, Ultra reste cloud-only et la provenance reflète le modèle exécuté.
+Extraction, diff, Markdown, regex et jointure sont isolés dans un domaine textuel déterministe.
+Les entrées/sorties sont bornées, le HTML est sûr par construction et les regex disposent
+d'un timeout natif. Le guardrail partagé fait respecter les bornes textuelles et de listes
+des schémas, au lieu de les laisser purement déclaratives.
 
 ## 4. Validation obligatoire par tranche
 

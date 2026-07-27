@@ -66,6 +66,7 @@ from tool_domains import datetime_tools as datetime_tools_domain
 from tool_domains import unit_conversion as unit_conversion_domain
 from tool_domains import weather as weather_domain
 from tool_domains import translation as translation_domain
+from tool_domains import text_processing as text_processing_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3230,88 +3231,8 @@ async def execute_hash_compute(args: dict) -> dict:
 execute_base64_tool = deterministic_utilities_domain.base64_tool
 
 
-async def execute_text_extract(args: dict) -> dict:
-    """Extrait des emails, URLs ou numéros de téléphone d'un texte."""
-    import re as _re
-
-    text    = args.get("text", "")
-    extract = args.get("extract", "all").lower()  # emails | urls | phones | all
-
-    if not text:
-        return {"error": "Paramètre 'text' requis."}
-
-    results = {}
-
-    if extract in ("emails", "all"):
-        emails = _re.findall(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", text)
-        results["emails"] = sorted(set(emails))
-
-    if extract in ("urls", "all"):
-        urls = _re.findall(
-            r"https?://[^\s\"\'\)\]>]+",
-            text,
-        )
-        results["urls"] = sorted(set(u.rstrip(".,;") for u in urls))
-
-    if extract in ("phones", "all"):
-        phones = _re.findall(
-            r"(?:\+33|0033|0)[1-9](?:[.\- ]?\d{2}){4}"
-            r"|(?:\+\d{1,3}[\s\-]?)?\(?\d{3,4}\)?[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}",
-            text,
-        )
-        results["phones"] = sorted(set(phones))
-
-    total = sum(len(v) for v in results.values())
-    return {
-        "success": True,
-        "extracted": extract,
-        **results,
-        "total_found": total,
-    }
-
-
-async def execute_diff_text(args: dict) -> dict:
-    """Compare deux textes et retourne les différences ligne par ligne."""
-    import difflib as _difflib
-
-    text_a    = args.get("text_a", "")
-    text_b    = args.get("text_b", "")
-    mode      = args.get("mode", "unified")  # unified | context | ndiff | ratio
-    n_context = int(args.get("context_lines", 3))
-
-    if mode == "ratio":
-        ratio = _difflib.SequenceMatcher(None, text_a, text_b).ratio()
-        return {
-            "success":     True,
-            "mode":        "ratio",
-            "similarity":  round(ratio * 100, 2),
-            "message":     f"Les textes sont similaires à {round(ratio*100,1)} %.",
-        }
-
-    lines_a = text_a.splitlines(keepends=True)
-    lines_b = text_b.splitlines(keepends=True)
-
-    if mode == "unified":
-        diff = list(_difflib.unified_diff(lines_a, lines_b, fromfile="texte_a", tofile="texte_b", n=n_context))
-    elif mode == "context":
-        diff = list(_difflib.context_diff(lines_a, lines_b, fromfile="texte_a", tofile="texte_b", n=n_context))
-    else:  # ndiff
-        diff = list(_difflib.ndiff(lines_a, lines_b))
-
-    diff_str = "".join(diff)
-    added   = diff_str.count("\n+")
-    removed = diff_str.count("\n-")
-
-    return {
-        "success":      True,
-        "mode":         mode,
-        "diff":         diff_str or "(Textes identiques)",
-        "lines_added":  added,
-        "lines_removed": removed,
-        "identical":    not bool(diff_str.strip()),
-    }
-
-
+execute_text_extract = text_processing_domain.text_extract
+execute_diff_text = text_processing_domain.diff_text
 
 
 async def execute_qr_generate(args: dict) -> dict:
@@ -3367,139 +3288,8 @@ async def execute_qr_generate(args: dict) -> dict:
 execute_json_tool = deterministic_utilities_domain.json_tool
 
 
-async def execute_markdown_convert(args: dict) -> dict:
-    """Convertit du Markdown en HTML ou en texte brut."""
-    import re as _re
-
-    text   = args.get("text", "")
-    to     = args.get("to", "html").lower()  # html | plain | stats
-
-    if not text:
-        return {"error": "Paramètre 'text' requis."}
-
-    if to == "stats":
-        headings = len(_re.findall(r"^#{1,6}\s", text, _re.MULTILINE))
-        links    = len(_re.findall(r"\[.+?\]\(.+?\)", text))
-        images   = len(_re.findall(r"!\[.+?\]\(.+?\)", text))
-        code_blocks = len(_re.findall(r"```", text)) // 2
-        return {"success": True, "headings": headings, "links": links, "images": images, "code_blocks": code_blocks}
-
-    if to == "plain":
-        # Strip markdown markup
-        plain = _re.sub(r"#+\s", "", text)
-        plain = _re.sub(r"\*{1,2}(.+?)\*{1,2}", r"\1", plain)
-        plain = _re.sub(r"_{1,2}(.+?)_{1,2}", r"\1", plain)
-        plain = _re.sub(r"`{1,3}(.+?)`{1,3}", r"\1", plain, flags=_re.DOTALL)
-        plain = _re.sub(r"!\[.*?\]\(.*?\)", "", plain)
-        plain = _re.sub(r"\[(.+?)\]\(.+?\)", r"\1", plain)
-        plain = _re.sub(r"^\s*[-*+]\s", "", plain, flags=_re.MULTILINE)
-        plain = _re.sub(r"^\s*\d+\.\s", "", plain, flags=_re.MULTILINE)
-        plain = _re.sub(r"---+|===+", "", plain)
-        return {"success": True, "format": "plain", "result": plain.strip()}
-
-    # HTML conversion (basic markdown → HTML)
-    html = text
-
-    # Code blocks first (to avoid processing inside them)
-    blocks = {}
-    def save_block(m):
-        key = f"__BLOCK_{len(blocks)}__"
-        lang = m.group(1) or ""
-        code = m.group(2).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        blocks[key] = f'<pre><code class="language-{lang}">{code}</code></pre>'
-        return key
-    html = _re.sub(r"```(\w*)\n?([\s\S]*?)```", save_block, html)
-
-    # Inline code
-    html = _re.sub(r"`([^`]+)`", r"<code>\1</code>", html)
-    # Headings
-    for i in range(6, 0, -1):
-        html = _re.sub(r"^#{" + str(i) + r"}\s+(.+)$", rf"<h{i}>\1</h{i}>", html, flags=_re.MULTILINE)
-    # Bold & italic
-    html = _re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", html)
-    html = _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
-    html = _re.sub(r"\*(.+?)\*", r"<em>\1</em>", html)
-    html = _re.sub(r"___(.+?)___", r"<strong><em>\1</em></strong>", html)
-    html = _re.sub(r"__(.+?)__", r"<strong>\1</strong>", html)
-    html = _re.sub(r"_(.+?)_", r"<em>\1</em>", html)
-    # Links and images
-    html = _re.sub(r"!\[(.+?)\]\((.+?)\)", r'<img src="\2" alt="\1">', html)
-    html = _re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', html)
-    # Lists
-    html = _re.sub(r"^[-*+]\s+(.+)$", r"<li>\1</li>", html, flags=_re.MULTILINE)
-    html = _re.sub(r"(<li>.*</li>\n?)+", lambda m: f"<ul>{m.group(0)}</ul>", html)
-    # Horizontal rule
-    html = _re.sub(r"^---+$", "<hr>", html, flags=_re.MULTILINE)
-    # Line breaks → paragraphs (double newline)
-    paragraphs = _re.split(r"\n\n+", html)
-    html = "\n".join(
-        f"<p>{p.strip()}</p>" if not _re.match(r"^<(h\d|ul|ol|li|pre|blockquote|hr)", p.strip()) else p.strip()
-        for p in paragraphs if p.strip()
-    )
-    # Restore code blocks
-    for key, val in blocks.items():
-        html = html.replace(key, val)
-
-    return {"success": True, "format": "html", "result": html}
-
-
-async def execute_regex_tool(args: dict) -> dict:
-    """Applique une expression régulière à un texte (recherche, extraction, remplacement)."""
-    import re as _re
-
-    pattern  = args.get("pattern", "")
-    text     = args.get("text", "")
-    action   = args.get("action", "findall").lower()  # findall | match | replace | split | test
-    replace  = args.get("replace", "")
-    flags_str = args.get("flags", "").upper()
-    max_results = int(args.get("max_results", 100))
-
-    if not pattern:
-        return {"error": "Paramètre 'pattern' requis."}
-    if not text and action != "test":
-        return {"error": "Paramètre 'text' requis."}
-
-    # Flags
-    flags = 0
-    if "I" in flags_str: flags |= _re.IGNORECASE
-    if "M" in flags_str: flags |= _re.MULTILINE
-    if "S" in flags_str: flags |= _re.DOTALL
-
-    try:
-        compiled = _re.compile(pattern, flags)
-    except _re.error as e:
-        return {"error": f"Expression régulière invalide : {e}"}
-
-    try:
-        if action == "test":
-            match = compiled.search(text)
-            return {"success": True, "action": "test", "matches": bool(match), "pattern": pattern}
-
-        if action == "findall":
-            matches = compiled.findall(text)[:max_results]
-            return {"success": True, "action": "findall", "count": len(matches), "matches": matches}
-
-        if action == "match":
-            m = compiled.match(text)
-            if not m:
-                return {"success": True, "action": "match", "matched": False}
-            return {"success": True, "action": "match", "matched": True,
-                    "groups": list(m.groups()), "span": list(m.span())}
-
-        if action == "replace":
-            result = compiled.sub(replace, text)
-            return {"success": True, "action": "replace", "result": result,
-                    "replacements": len(compiled.findall(text))}
-
-        if action == "split":
-            parts = compiled.split(text)[:max_results]
-            return {"success": True, "action": "split", "count": len(parts), "parts": parts}
-
-        return {"error": f"Action inconnue : {action}. Utilisez findall | match | replace | split | test."}
-    except Exception as e:
-        return {"error": str(e)}
-
-
+execute_markdown_convert = text_processing_domain.markdown_convert
+execute_regex_tool = text_processing_domain.regex_tool
 async def execute_csv_analyze(args: dict) -> dict:
     """Analyse un fichier CSV : aperçu, statistiques et valeurs uniques."""
     import csv as _csv, io as _io, statistics as _stats
@@ -4744,34 +4534,7 @@ async def execute_clipboard_append(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_text_join(args: dict) -> dict:
-    """Fusionne plusieurs textes avec un séparateur (jointure de lignes, CSV → texte, etc.)."""
-    texts     = args.get("texts", [])
-    separator = args.get("separator", "\n")
-    prefix    = args.get("prefix", "")
-    suffix    = args.get("suffix", "")
-    dedupe    = args.get("dedupe", False)       # supprimer les doublons
-
-    if not texts:
-        return {"error": "Paramètre 'texts' requis (liste de chaînes)."}
-    if isinstance(texts, str):
-        texts = [texts]
-
-    if dedupe:
-        seen = set(); unique = []
-        for t in texts:
-            if t not in seen:
-                seen.add(t); unique.append(t)
-        texts = unique
-
-    result = separator.join(f"{prefix}{t}{suffix}" for t in texts)
-    return {
-        "success":     True,
-        "result":      result,
-        "items":       len(texts),
-        "total_chars": len(result),
-    }
-
+execute_text_join = text_processing_domain.text_join
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 19 — Exécution de code Python (sandboxée)
@@ -7295,17 +7058,17 @@ TOOLS_SPEC = [
        ["data"]),
 
     _t("text_extract", "Extrait des emails, URLs et numéros de téléphone d'un texte.",
-       {"text":    {"type": "string", "description": "Texte source à analyser"},
+       {"text":    {"type": "string", "maxLength": 1000000, "description": "Texte source à analyser"},
         "extract": {"type": "string", "enum": ["emails", "urls", "phones", "all"],
                     "description": "Type à extraire (défaut : all)"}},
        ["text"]),
 
     _t("diff_text", "Compare deux textes et affiche les différences (unified diff ou ratio de similarité).",
-       {"text_a":        {"type": "string", "description": "Premier texte"},
-        "text_b":        {"type": "string", "description": "Second texte"},
+       {"text_a":        {"type": "string", "maxLength": 500000, "description": "Premier texte"},
+        "text_b":        {"type": "string", "maxLength": 500000, "description": "Second texte"},
         "mode":          {"type": "string", "enum": ["unified", "context", "ndiff", "ratio"],
                           "description": "Mode de diff (défaut : unified)"},
-        "context_lines": {"type": "integer", "description": "Lignes de contexte (défaut 3)"}},
+        "context_lines": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Lignes de contexte (défaut 3)"}},
        ["text_a", "text_b"]),
 
     _t("image_info", "Retourne les métadonnées d'une image (dimensions, format, taille, EXIF).",
@@ -7348,19 +7111,19 @@ TOOLS_SPEC = [
        []),
 
     _t("markdown_convert", "Convertit du Markdown en HTML, texte brut ou retourne des statistiques (titres, liens, blocs de code).",
-       {"text":   {"type": "string", "description": "Contenu Markdown à convertir"},
+       {"text":   {"type": "string", "maxLength": 1000000, "description": "Contenu Markdown à convertir"},
         "to":     {"type": "string", "enum": ["html", "plain", "stats"],
                    "description": "Format cible : html (défaut), plain (texte brut), stats"}},
        ["text"]),
 
     _t("regex_tool", "Applique une expression régulière à un texte : recherche, extraction, remplacement ou validation.",
-       {"pattern":     {"type": "string", "description": "Expression régulière"},
-        "text":        {"type": "string", "description": "Texte cible"},
+       {"pattern":     {"type": "string", "maxLength": 2048, "description": "Expression régulière"},
+        "text":        {"type": "string", "maxLength": 1000000, "description": "Texte cible"},
         "action":      {"type": "string", "enum": ["findall", "match", "replace", "split", "test"],
                         "description": "Action (défaut : findall)"},
-        "replace":     {"type": "string", "description": "Texte de remplacement (pour action replace)"},
-        "flags":       {"type": "string", "description": "Flags : I (insensible à la casse), M (multiline), S (dot-all)"},
-        "max_results": {"type": "integer", "description": "Limite de résultats (défaut 100)"}},
+        "replace":     {"type": "string", "maxLength": 100000, "description": "Texte de remplacement (pour action replace)"},
+        "flags":       {"type": "string", "pattern": "^[IMSims]*$", "description": "Flags : I (insensible à la casse), M (multiline), S (dot-all)"},
+        "max_results": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Limite de résultats (défaut 100)"}},
        ["pattern"]),
     # ── Section 16 ──────────────────────────────────────────────────────────
     _t("pdf_read", "Extrait le texte d'un fichier PDF page par page.",
@@ -7589,10 +7352,11 @@ TOOLS_SPEC = [
         "separator": {"type": "string", "description": "Séparateur entre l'ancien et le nouveau contenu (défaut : saut de ligne)"}},
        ["text"]),
     _t("text_join", "Fusionne une liste de textes avec un séparateur personnalisé (jointure, concaténation, déduplication).",
-       {"texts":     {"type": "array",   "description": "Liste des textes à fusionner"},
-        "separator": {"type": "string",  "description": "Séparateur entre les textes (défaut : saut de ligne)"},
-        "prefix":    {"type": "string",  "description": "Préfixe ajouté à chaque élément"},
-        "suffix":    {"type": "string",  "description": "Suffixe ajouté à chaque élément"},
+       {"texts":     {"type": "array", "minItems": 1, "maxItems": 10000,
+                      "items": {"type": "string"}, "description": "Liste des textes à fusionner"},
+        "separator": {"type": "string", "maxLength": 10000, "description": "Séparateur entre les textes (défaut : saut de ligne)"},
+        "prefix":    {"type": "string", "maxLength": 10000, "description": "Préfixe ajouté à chaque élément"},
+        "suffix":    {"type": "string", "maxLength": 10000, "description": "Suffixe ajouté à chaque élément"},
         "dedupe":    {"type": "boolean", "description": "Supprimer les doublons avant la fusion (défaut : false)"}},
        ["texts"]),
     # ── Section 19 ──────────────────────────────────────────────────────────

@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.361.0)
+## 9. État actuel (v2.362.0)
+
+**v2.362 (traitement textuel déterministe)** : extraction structurée, comparaison,
+conversion Markdown, expressions régulières et jointure rejoignent
+`tool_domains/text_processing.py`. Les volumes et résultats sont bornés, les calculs
+`difflib` quittent la boucle asyncio, le HTML échappe le contenu et filtre les schémas URL,
+et `regex` impose un timeout natif contre les motifs pathologiques. Le guardrail partagé
+applique désormais réellement `minLength`, `maxLength`, `pattern`, `minItems` et `maxItems`.
 
 **v2.361 (traduction confidentielle et traçable)** : `translate` rejoint
 `tool_domains/translation.py`. MyMemory n'est plus appelé directement : tout texte passe par

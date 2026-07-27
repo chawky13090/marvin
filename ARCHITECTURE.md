@@ -224,6 +224,11 @@ structures distantes sont contrôlés avant projection vers le Runner.
 79. la traduction : `tool_domains/translation.py` reçoit le générateur Ollama commun.
 Le routeur de confidentialité choisit local/cloud, le modèle réellement exécuté est remonté
 par le transport, et le contenu à traduire ne dispose d'aucun outil ni effet de bord.
+80. le traitement textuel : `tool_domains/text_processing.py` possède extraction, diff,
+Markdown, regex et jointure. Les opérations coûteuses quittent la boucle asyncio, les sorties
+sont bornées, le rendu HTML échappe les données non fiables et le moteur `regex` interrompt
+les motifs pathologiques. Le validateur central applique les bornes de chaînes et de listes
+déclarées dans les schémas avant l'exécution.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

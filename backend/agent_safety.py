@@ -54,6 +54,25 @@ def _validate_schema_value(path: str, value: object, schema: Mapping) -> str | N
             return f"le paramètre '{path}' doit être supérieur ou égal à {minimum}"
         if maximum is not None and value > maximum:
             return f"le paramètre '{path}' doit être inférieur ou égal à {maximum}"
+    if isinstance(value, str):
+        minimum, maximum = schema.get("minLength"), schema.get("maxLength")
+        if minimum is not None and len(value) < minimum:
+            return f"le paramètre '{path}' doit contenir au moins {minimum} caractère(s)"
+        if maximum is not None and len(value) > maximum:
+            return f"le paramètre '{path}' doit contenir au plus {maximum} caractère(s)"
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            try:
+                if re.search(pattern, value) is None:
+                    return f"le paramètre '{path}' ne respecte pas le format attendu"
+            except re.error:
+                return f"le schéma interne du paramètre '{path}' contient un motif invalide"
+    if isinstance(value, list):
+        minimum, maximum = schema.get("minItems"), schema.get("maxItems")
+        if minimum is not None and len(value) < minimum:
+            return f"le paramètre '{path}' doit contenir au moins {minimum} élément(s)"
+        if maximum is not None and len(value) > maximum:
+            return f"le paramètre '{path}' doit contenir au plus {maximum} élément(s)"
     if isinstance(value, list) and isinstance(schema.get("items"), Mapping):
         for index, item in enumerate(value):
             error = _validate_schema_value(f"{path}[{index}]", item, schema["items"])

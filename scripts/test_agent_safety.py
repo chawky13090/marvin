@@ -21,10 +21,16 @@ def main() -> int:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
+                    "path": {"type": "string", "minLength": 1, "maxLength": 20},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 500},
                     "mode": {"type": "string", "enum": ["text", "binary"]},
-                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "code": {"type": "string", "pattern": "^[A-Z]{2}$"},
+                    "tags": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 2,
+                        "items": {"type": "string"},
+                    },
                 },
                 "required": ["path"],
                 "additionalProperties": False,
@@ -43,6 +49,18 @@ def main() -> int:
     )
     assert "tags[0]" in (
         validator("file_read", {"path": "x", "tags": [42]}) or ""
+    )
+    assert "au moins 1" in (
+        validator("file_read", {"path": "x", "tags": []}) or ""
+    )
+    assert "au plus 2" in (
+        validator("file_read", {"path": "x", "tags": ["a", "b", "c"]}) or ""
+    )
+    assert "format attendu" in (
+        validator("file_read", {"path": "x", "code": "fr"}) or ""
+    )
+    assert "au plus 20" in (
+        validator("file_read", {"path": "x" * 21}) or ""
     )
     assert "extra" in (
         validator("file_read", {"path": "x", "extra": True}) or ""

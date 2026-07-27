@@ -6723,3 +6723,59 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   indexé avant commit.
 - Rollback : réversion atomique du commit documentaire correspondant ; aucune donnée ni
   configuration d'exécution n'est modifiée.
+
+## 2026-07-28 — v2.362.0 — Domaine textuel borné et regex interruptibles
+
+### Demande et constats
+
+- Poursuivre l'extraction de `tools.py` sans perte de fonctionnalité et avec rollback.
+- Cinq outils textuels vivaient encore dans la façade : extraction, diff, Markdown, regex
+  et jointure.
+- Le rendu Markdown injectait le texte ordinaire et les URL dans le HTML sans échappement.
+- Le moteur `re` n'avait aucun timeout : un motif à backtracking catastrophique pouvait
+  monopoliser le backend.
+- Les schémas pouvaient déclarer des longueurs, mais le validateur central n'appliquait pas
+  `minLength`, `maxLength`, `pattern`, `minItems` et `maxItems`.
+
+### Décisions et modifications
+
+- `backend/tool_domains/text_processing.py` possède les cinq outils et conserve leurs
+  identités publiques dans le registre.
+- Le rendu HTML échappe d'abord les données non fiables et n'autorise que HTTP/HTTPS pour
+  les images, plus HTTP/HTTPS/mailto pour les liens.
+- `regex==2026.7.19` est épinglé. Son timeout natif de 250 ms et ses bornes de motif, texte,
+  résultats et remplacements empêchent une regex pathologique de bloquer Marvin.
+- Les différences sont calculées hors de la boucle asyncio et leur sortie est limitée.
+- `agent_safety.py` applique les bornes de longueur et de collection avant permissions,
+  confirmations et effets de bord.
+- Références consultées : documentation Python `difflib` (complexité quadratique au pire,
+  générateurs de diff), documentation Python `html.escape`, documentation officielle du
+  projet `regex` sur les timeouts couvrant l'opération complète.
+
+### Validation
+
+- `scripts/test_agent_safety.py` couvre types, enums, nombres, longueurs, motifs et listes.
+- `scripts/test_tool_domain_text_processing.py` couvre les cinq façades, les limites,
+  l'échappement HTML, le filtrage `javascript:`, la limitation des remplacements et
+  l'interruption réelle d'une regex pathologique.
+- Tests ciblés : sécurité de l'agent et domaine textuel réussis.
+- `scripts/check_marvin.py --quick` : **137/137 étapes réussies**, dont le nouveau domaine,
+  la cohérence des
+  dépendances, compilation de 209 fichiers et lint frontend sans erreur (37 avertissements
+  historiques).
+- Redémarrage réel : `/api/health` expose **2.362.0**, Ollama disponible, 344 outils et
+  15 workers.
+- Appels HTTP réels via le gateway : Markdown échappe `<script>` et refuse `javascript:`,
+  la regex pathologique est interrompue à 250 ms, la jointure déduplique correctement.
+- `scripts/smoke_test_api.py` avec le frontend Turbopack existant : **28/28 contrats réussis**.
+
+### Rollback
+
+- Aucun schéma SQLite ni donnée utilisateur n'est modifié.
+- Réversion atomique du commit : restaure les cinq implémentations dans `tools.py`, retire
+  le domaine et son test, remet les schémas et le guardrail antérieurs puis ramène la version
+  à 2.361.0.
+- Après réversion, `regex` peut être désinstallé avec
+  `backend\.venv\Scripts\python.exe -m pip uninstall -y regex`; réinstaller ensuite les
+  dépendances depuis `backend\requirements.txt`. Le patch inverse indexé doit être vérifié
+  avant commit.
