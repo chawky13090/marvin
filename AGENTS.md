@@ -162,6 +162,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 ## 8. Conventions de travail
 
 - Frontend : JSX, pas de TypeScript. Coller au style existant des composants voisins.
+- **Rollback obligatoire pour chaque changement** : avant intégration, identifier l'état
+  antérieur, documenter la commande ou procédure exacte de retour arrière et vérifier sa
+  faisabilité. Pour un changement sans donnée persistante, le rollback doit pouvoir être
+  réalisé par réversion atomique du commit. Pour un changement de schéma, de configuration,
+  d'installation ou de données, fournir et tester une migration descendante, une restauration
+  contrôlée ou une sauvegarde exploitable. Une modification irréversible ou dont le rollback
+  dépend d'un artefact local non versionné doit être redessinée avant livraison.
 - App Router : un dossier préfixé `_` est **privé** (404) → nommer normalement les pages de test.
 - Canal `voiceText` dans `ChatContainer.handleSend` : `const text = (voiceText ?? localInput).trim()` — réutilisé pour **injecter** du contenu dans un message (ex. contenu d'un fichier joint, insertion de compétence).
 - Historique de version : ajouter un commentaire `# vX.Y — description` dans `main.py` et modifier uniquement `APP_VERSION` dans `backend/app_version.py` ; `scripts/check_architecture.py` contrôle les métadonnées npm.

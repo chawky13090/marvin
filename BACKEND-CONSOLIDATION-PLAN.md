@@ -243,7 +243,9 @@ contourne Hyper local, Ultra reste cloud-only et la provenance reflète le modè
 - test d'erreur et d'indisponibilité pertinent ;
 - **gate de rollback obligatoire** : état antérieur identifié, procédure exacte documentée,
   données et schémas évalués, puis réversibilité vérifiée sans dépendre d'un fichier non
-  versionné ; une tranche irréversible est refusée ou redessinée avant intégration ;
+  versionné ; ce gate s'applique à chaque changement de code, frontend, configuration,
+  script, dépendance, installation, documentation ou donnée ; une tranche irréversible est
+  refusée ou redessinée avant intégration ;
 - `scripts/check_architecture.py` ;
 - `scripts/check_marvin.py --quick` ;
 - redémarrage réel du backend ;

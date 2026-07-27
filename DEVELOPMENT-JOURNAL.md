@@ -6700,3 +6700,26 @@ Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomiq
 restaure MyMemory dans `tools.py`, supprime le domaine et son test, retire la métadonnée
 optionnelle du générateur et remet la version 2.360.0. Le patch inverse est contrôlé avant
 commit; le backend doit ensuite être redémarré et validé par `/api/health` et le smoke test.
+
+## 2026-07-28 — Critère transversal de rollback renforcé
+
+### Demande
+
+- Imposer une possibilité de rollback pour chaque changement en cas d'imprévu.
+
+### Décision
+
+- Le rollback devient un critère de fin transversal, y compris pour le frontend, les scripts,
+  la configuration, les dépendances, l'installation, la documentation et les données.
+- Un changement sans état persistant doit être réversible par commit atomique.
+- Un changement persistant doit disposer d'une migration descendante ou d'une restauration
+  contrôlée réellement exploitable.
+- Toute modification irréversible ou dépendant d'un artefact local non versionné doit être
+  redessinée avant intégration.
+
+### Validation et rollback de cette entrée
+
+- Validation : contrôle d'architecture, vérification du diff et test de réversion du patch
+  indexé avant commit.
+- Rollback : réversion atomique du commit documentaire correspondant ; aucune donnée ni
+  configuration d'exécution n'est modifiée.
