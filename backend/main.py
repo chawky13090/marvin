@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.335 — domaine Web extrait :
+# recherche multi-provider, lecture navigateur et recherche profonde isolées.
 # v2.334 — domaine Windows extrait :
 # raccourcis, services et diagnostics natifs isolés avec entrées PowerShell bornées.
 # v2.333 — domaine facturation extrait :

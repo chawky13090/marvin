@@ -134,6 +134,9 @@ web/PDF sont injectés, les montants et paiements sont validés et le registre r
 Les 14 outils Windows rejoignent `tool_domains/windows.py` en v2.334.0. Le runner PowerShell
 est injecté, les actions de service restent confirmées et les journaux utilisent une liste
 blanche afin qu'aucune entrée utilisateur ne devienne du code PowerShell.
+Les cinq outils Web rejoignent `tool_domains/web.py` en v2.335.0. Génération, réglages et
+transport HTTP/cache sont injectés; recherche simple, navigateur et Deep Research conservent
+leurs contrats tandis que providers et volumes sont bornés.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

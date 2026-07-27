@@ -4729,6 +4729,37 @@ ignorée) :
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
 
+## 2026-07-27 — v2.335.0 — Domaine d'outils Web
+
+### Demande et périmètre
+
+- Stabiliser la dépendance Web avant le contrôle PC et préserver Facturation.
+
+### Constats et décisions
+
+- Recherche multi-provider, lecture HTTP, navigateur, recherche sourcée et Deep Research
+  étaient répartis dans `tools.py` mais formaient une frontière unique.
+- Le domaine rejoint `tool_domains/web.py`. Générateur Ollama, réglages, client partagé,
+  cache TTL et projection d'erreur réseau sont injectés depuis la composition.
+- Provider, `max_results` et `max_chars` sont normalisés et bornés avant toute opération.
+- Les cinq identités publiques restent exactes; Facturation consomme toujours la façade
+  `execute_web_search`.
+
+### Validation réelle
+
+- Compilation ciblée, tests Web et Facturation, architecture 344/344 : réussis.
+- Le test couvre entrées invalides, bornes, injections, façades et registre.
+- `scripts/check_marvin.py --quick` : **111/111 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.335.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 14 325 à **13 898 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.334.0 — Domaine d'outils Windows
 
 ### Demande et périmètre
