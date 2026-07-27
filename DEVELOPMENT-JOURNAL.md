@@ -4970,3 +4970,46 @@ ignorée) :
 - Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
 - `tools.py` passe de 19 511 à **19 468 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+## 2026-07-27 — v2.321.0 — Domaine DOCX et conversions
+
+### Demande
+
+- Extraire les générateurs documentaires derrière une frontière testable sans perte de rendu.
+
+### Constats et décisions
+
+- Création DOCX, DOCX→PDF et PDF→DOCX forment une frontière cohérente autour des bibliothèques
+  documentaires et du résolveur de chemins.
+- Le domaine reçoit le résolveur portable par injection; formatage et identité proviennent
+  des modules partagés extraits aux versions précédentes.
+- `convert_docx_to_pdf` acceptait tout fichier avant de lancer Word et ne créait pas
+  explicitement le dossier de sortie. La source doit maintenant être un fichier `.docx` et
+  la destination est préparée avant le thread COM.
+- Le modèle COM dédié à usage unique et le `finally` de `pdf2docx` sont conservés.
+- Un vrai fichier DOCX est généré puis relu; titre, texte enrichi et cellule de tableau sont
+  vérifiés, au lieu de se limiter à un mock.
+
+### Fichiers
+
+- `backend/tool_domains/documents.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_documents.py`
+- `scripts/check_marvin.py`
+- `backend/app_version.py`, `backend/main.py`
+- `README.md`, `AGENTS.md`, `ARCHITECTURE.md`
+- `BACKEND-CONSOLIDATION-PLAN.md`, `package.json`, `package-lock.json`
+
+### Validation réelle
+
+- Test `test_tool_domain_documents.py` : génération DOCX réelle, réouverture, titre,
+  texte enrichi, tableau, source invalide, conversion non supportée et trois alias réussis.
+- `scripts/check_marvin.py --quick` : **99/99 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.321.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 19 468 à **19 165 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.

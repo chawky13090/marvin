@@ -101,6 +101,8 @@ Le formatage Markdown partagé des documents est extrait en v2.319.0; les géné
 gardent ainsi une seule grammaire avant leur déplacement vers le domaine documentaire.
 L'identité persistante et le catalogue de modèles rejoignent `document_profile.py` en
 v2.320.0, sans changer les façades consommées par l'API et les générateurs.
+La création DOCX et les conversions DOCX/PDF rejoignent `tool_domains/documents.py` en
+v2.321.0. La génération IA orchestrée et le générateur PDF natif restent à déplacer.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.320.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.321.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.320.0)
+## 9. État actuel (v2.321.0)
+
+**v2.321 (domaine DOCX et conversions)** : création DOCX professionnelle, conversion
+DOCX→PDF via un thread COM dédié et conversion PDF→DOCX rejoignent
+`tool_domains/documents.py`. Le résolveur portable est injecté et les trois fonctions du
+registre gardent leur identité. La source DOCX est désormais validée avant d'appeler Word,
+le dossier de sortie est créé explicitement et un DOCX réel avec tableau est testé.
 
 **v2.320 (profil documentaire)** : identité persistante, champs autorisés et dix modèles
 documentaires sont extraits vers `document_profile.py`. La mise à jour copie la valeur SQLite,

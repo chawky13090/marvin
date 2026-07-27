@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.321 — création DOCX et conversions documentaires extraites :
+# domaine injectable, test DOCX réel et validation stricte de la source PDF.
 # v2.320 — identité persistante et catalogue documentaire extraits :
 # liste blanche, copies défensives et façades API/outils compatibles.
 # v2.319 — formatage Markdown documentaire extrait dans document_formatting.py :
