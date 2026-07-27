@@ -232,6 +232,8 @@ Les conversions d'unités sont isolées avec facteurs de référence documentés
 compatibilité des dimensions et conservation de tous les alias publics historiques.
 La météo Open-Meteo est isolée derrière le transport/cache Web commun, avec validation des
 entrées et réponses distantes; elle ne possède plus de client HTTP ou cache global séparé.
+La traduction est isolée derrière le routage Ollama commun : aucun fournisseur externe ne
+contourne Hyper local, Ultra reste cloud-only et la provenance reflète le modèle exécuté.
 
 ## 4. Validation obligatoire par tranche
 

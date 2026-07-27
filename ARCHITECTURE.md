@@ -221,6 +221,9 @@ incompatibilités, valeurs extrêmes et températures physiquement impossibles s
 78. la météo : `tool_domains/weather.py` possède géocodage et prévisions Open-Meteo.
 Transport et cache TTL sont injectés depuis la façade Web; paramètres, coordonnées et
 structures distantes sont contrôlés avant projection vers le Runner.
+79. la traduction : `tool_domains/translation.py` reçoit le générateur Ollama commun.
+Le routeur de confidentialité choisit local/cloud, le modèle réellement exécuté est remonté
+par le transport, et le contenu à traduire ne dispose d'aucun outil ni effet de bord.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

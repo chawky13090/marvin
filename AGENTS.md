@@ -176,7 +176,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.360.0)
+## 9. État actuel (v2.361.0)
+
+**v2.361 (traduction confidentielle et traçable)** : `translate` rejoint
+`tool_domains/translation.py`. MyMemory n'est plus appelé directement : tout texte passe par
+le routage Ollama commun, donc Hyper reste local, Ultra reste cloud-only et les contenus
+sensibles suivent le garde-fou normal. Les tags sont validés selon un sous-ensemble BCP 47,
+le texte non fiable ne reçoit aucun outil et la réponse expose le modèle réellement utilisé,
+y compris après repli.
 
 **v2.360 (domaine météo Open-Meteo)** : `weather` rejoint `tool_domains/weather.py`.
 Le domaine réutilise le transport HTTP et le cache TTL communs au lieu de conserver un

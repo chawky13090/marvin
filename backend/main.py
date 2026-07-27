@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.361 — traduction extraite dans tool_domains/translation.py; routage
+# cloud/local autoritaire, BCP 47 borné et provenance du modèle réellement utilisé.
 # v2.360 — météo extraite dans tool_domains/weather.py; client/cache partagés,
 # filtrage pays serveur, validation des réponses et codes WMO complets.
 # v2.359 — conversions extraites dans tool_domains/unit_conversion.py; facteurs

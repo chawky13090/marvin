@@ -6644,3 +6644,59 @@ Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomiq
 restaure le client/cache météo historiques dans `tools.py`, supprime le domaine et son test,
 puis remet la version 2.359.0. Le patch inverse est contrôlé avant commit; le backend doit
 ensuite être redémarré et validé par `/api/health` et le smoke test.
+
+## 2026-07-28 — v2.361.0 — Traduction confidentielle et provenance réelle
+
+### Contexte
+
+Extraire `translate` et supprimer le contournement des profils de confidentialité causé par
+l'appel direct systématique au service MyMemory.
+
+### Veille et décisions
+
+- BCP 47/RFC 5646 définit les tags structurés de langue; Marvin accepte un sous-ensemble
+  conservateur couvrant langue, écriture, région et variantes usuelles.
+  Source : https://www.rfc-editor.org/info/rfc5646/
+- L'API Generate d'Ollama retourne le modèle et la réponse; Marvin remonte désormais le modèle
+  réellement exécuté, y compris après repli.
+  Source : https://docs.ollama.com/api/generate
+- Les Structured Outputs Ollama Cloud ne sont pas encore pris en charge. Le contrat utilise
+  donc des balises bornées et un parseur tolérant, sans prétendre imposer un schéma distant.
+  Source : https://docs.ollama.com/capabilities/structured-outputs
+
+### Analyse et solution
+
+- `tool_domains/translation.py` possède validation BCP 47, détection locale, préparation du
+  prompt non fiable, parsing et projection de provenance.
+- MyMemory et sa transmission externe parallèle sont supprimés. `_ollama_generate` applique
+  le routeur commun : Hyper local reste local, les contenus sensibles suivent la politique,
+  et Ultra ne peut pas revenir à un modèle local.
+- Le générateur accepte `return_metadata=true` sans modifier son retour historique par défaut.
+  Le modèle associé à la réponse réussie, primaire ou de repli, est alors retourné.
+- Le contenu source est encodé en chaîne JSON, explicitement qualifié de donnée non fiable et
+  aucun outil n'est exposé au modèle de traduction.
+- Les textes sont bornés à 30 000 caractères. Une même langue est traitée localement sans
+  appel LLM. Une réponse vide ou sans provenance est refusée.
+- `tools.py` passe de 8 222 à **8 167 lignes**, avec façade et registre inchangés.
+
+### Validation observée
+
+- Tests ciblés : auto-détection, normalisation `en-US`, même langue sans modèle, route cloud,
+  route locale, modèle exact, texte non fiable, balises/fallback, langue invalide, limite,
+  réponse vide, façade, registre et schéma.
+- Le test Ultra simule un timeout du modèle primaire puis vérifie que le résultat porte
+  exactement le second modèle cloud réellement exécuté et qu'aucun local n'est appelé.
+- Suite complète : **136/136 étapes** en **229,9 secondes**; compilation de 208 fichiers,
+  ESLint **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.361.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Traduction réelle via `/api/tools` : « Bonjour, comment allez-vous ? » devient
+  « Hello, how are you? », route `cloud`, modèle réel `qwen3.5:397b-cloud`.
+- Smoke API avec frontend Turbopack actif : **28/28 contrats réussis**.
+
+### Rollback vérifié
+
+Aucun schéma SQLite ni donnée utilisateur n'est modifié. La réversion atomique du commit
+restaure MyMemory dans `tools.py`, supprime le domaine et son test, retire la métadonnée
+optionnelle du générateur et remet la version 2.360.0. Le patch inverse est contrôlé avant
+commit; le backend doit ensuite être redémarré et validé par `/api/health` et le smoke test.

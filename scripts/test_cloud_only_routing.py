@@ -84,8 +84,13 @@ def test_internal_cloud_fallback() -> None:
         patch.object(cloud_routing, "require_cloud_model", return_value="glm-5.2:cloud"),
         patch("httpx.AsyncClient", Client),
     ):
-        result = asyncio.run(tools._ollama_generate("diagnostic", timeout=30))
-    assert result == "réponse cloud secondaire"
+        result = asyncio.run(
+            tools._ollama_generate("diagnostic", timeout=30, return_metadata=True)
+        )
+    assert result == {
+        "text": "réponse cloud secondaire",
+        "model": "glm-5.2:cloud",
+    }
     assert calls == ["deepseek-v4-pro:cloud", "glm-5.2:cloud"]
     assert all(cloud_routing.is_cloud_model(model) for model in calls)
 

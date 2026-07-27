@@ -20,6 +20,7 @@ from typing import Any
 
 import psutil
 import database as db
+import cloud_routing as cloud_routing_runtime
 import vector_store as vector_store_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
@@ -64,6 +65,7 @@ from tool_domains import deterministic_utilities as deterministic_utilities_doma
 from tool_domains import datetime_tools as datetime_tools_domain
 from tool_domains import unit_conversion as unit_conversion_domain
 from tool_domains import weather as weather_domain
+from tool_domains import translation as translation_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3216,87 +3218,6 @@ execute_unit_convert = unit_conversion_domain.unit_convert
 execute_password_generate = deterministic_utilities_domain.password_generate
 
 
-async def execute_translate(args: dict) -> dict:
-    """Traduit du texte via MyMemory (gratuit, 1000 req/j sans clé, + clé optionnelle)."""
-    import httpx
-    import urllib.parse
-
-    text    = args.get("text", "").strip()
-    # 'source'/'target' acceptés en alias de 'source_lang'/'target_lang' : sans ça, un appel
-    # avec le mauvais nom de paramètre retombe silencieusement sur les défauts (auto→en) au
-    # lieu de traduire vers la langue réellement demandée — pas une erreur visible, mais faux.
-    source  = (args.get("source_lang") or args.get("source") or "auto").lower()
-    target  = (args.get("target_lang") or args.get("target") or "en").lower()
-
-    if not text:
-        return {"error": "Paramètre 'text' requis."}
-    if not target:
-        return {"error": "Paramètre 'target_lang' requis. Ex: 'fr', 'en', 'es'."}
-
-    import credentials_manager as cm
-    api_key = cm.get_credential("mymemory_api_key") or ""
-
-    # MyMemory ne supporte pas "auto" comme code source — on détecte la langue
-    if source in ("auto", ""):
-        try:
-            from langdetect import detect as _detect
-            source = _detect(text[:200]) or "fr"
-        except Exception:
-            source = "fr"
-
-    # Si source == target, pas besoin de traduire
-    if source.lower() == target.lower():
-        return {
-            "success":    True,
-            "original":   text,
-            "translated": text,
-            "source_lang": source,
-            "target_lang": target,
-            "provider":   "local (même langue détectée)",
-            "note":       f"Le texte est déjà en '{source}' — aucune traduction nécessaire.",
-        }
-
-    # MyMemory attend le format "fr|en" pour langpair
-    langpair = f"{source}|{target}"
-
-    # Découper le texte si > 500 chars (limite MyMemory par requête)
-    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
-    translated_parts = []
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            for chunk in chunks:
-                params = {
-                    "q":        chunk,
-                    "langpair": langpair,
-                }
-                if api_key:
-                    params["key"] = api_key
-
-                resp = await client.get(
-                    "https://api.mymemory.translated.net/get",
-                    params=params,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                if data.get("responseStatus") == 200:
-                    translated_parts.append(data["responseData"]["translatedText"])
-                else:
-                    return {"error": f"Erreur MyMemory : {data.get('responseDetails', 'inconnue')}"}
-
-        translated = " ".join(translated_parts)
-        return {
-            "success":     True,
-            "original":    text,
-            "translated":  translated,
-            "source_lang": source,
-            "target_lang": target,
-            "provider":    "MyMemory (mymemory.translated.net)",
-        }
-    except Exception as e:
-        return {"error": f"Traduction échouée : {e}"}
-
-
 # SECTION 15 — Outils de traitement de données
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -3844,7 +3765,13 @@ async def execute_system_cleanup(args: dict) -> dict:
 
 
 # ════════════════ PDF render/OCR/forms, PPTX, conversions, IA (v2.36) ════════════
-async def _ollama_generate(prompt: str, model: str = None, images: list = None, timeout: int = 180) -> str:
+async def _ollama_generate(
+    prompt: str,
+    model: str = None,
+    images: list = None,
+    timeout: int = 180,
+    return_metadata: bool = False,
+) -> str | dict:
     """Appel texte (ou vision) à Ollama /api/generate, AVEC robustesse :
     - 1 essai primaire (timeout complet) + 1 retry primaire SEULEMENT si l'échec n'est pas
       un timeout (v2.137 — un timeout sur un gros prompt est structurel, pas transitoire) ;
@@ -3893,7 +3820,8 @@ async def _ollama_generate(prompt: str, model: str = None, images: list = None, 
         async with httpx.AsyncClient(timeout=to) as client:
             resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
             resp.raise_for_status()
-            return resp.json().get("response", "").strip()
+            text = resp.json().get("response", "").strip()
+            return {"text": text, "model": mdl} if return_metadata else text
 
     last_err = None
     # 1) Essai primaire, timeout complet.
@@ -3916,6 +3844,23 @@ async def _ollama_generate(prompt: str, model: str = None, images: list = None, 
         except Exception as e3:
             last_err = e3
     raise last_err if last_err else RuntimeError("Ollama indisponible")
+
+
+def _detect_translation_language(text: str) -> str:
+    try:
+        from langdetect import detect
+
+        return str(detect(text))
+    except Exception:
+        return "fr"
+
+
+translation_domain.configure(
+    generate=_ollama_generate,
+    detect_language=_detect_translation_language,
+    is_cloud_model=cloud_routing_runtime.is_cloud_model,
+)
+execute_translate = translation_domain.translate
 
 
 documents_domain.configure_generation(
@@ -7314,7 +7259,7 @@ TOOLS_SPEC = [
                     "description": "Nombre de jours de prévisions (1 à 7, défaut : 1)"}},
        ["city"]),
 
-    _t("translate", "Traduit du texte dans n'importe quelle langue via MyMemory (gratuit, sans clé, 1000 req/j).",
+    _t("translate", "Traduit du texte via Ollama en respectant le profil de confidentialité cloud/local actif.",
        {"text":        {"type": "string",  "description": "Texte à traduire"},
         "target_lang": {"type": "string",  "description": "Langue cible (code ISO 2 lettres : fr, en, es, de, it, pt, ar, zh, ja, ru…)"},
         "source_lang": {"type": "string",  "description": "Langue source (code ISO ou 'auto' pour détection automatique — défaut : auto)"}},

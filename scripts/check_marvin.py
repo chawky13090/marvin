@@ -162,6 +162,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Date et heure déterministes", (python, "scripts/test_tool_domain_datetime.py")),
         Stage("Conversions d'unités déterministes", (python, "scripts/test_tool_domain_unit_conversion.py")),
         Stage("Domaine météo Open-Meteo", (python, "scripts/test_tool_domain_weather.py")),
+        Stage("Domaine traduction Ollama", (python, "scripts/test_tool_domain_translation.py")),
         Stage("Gateway commun des 344 outils", (python, "scripts/test_tool_gateway.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
