@@ -100,6 +100,8 @@ from cron_runtime import (
     long_task_resume_tick as _long_task_resume_tick,
 )
 
+# v2.346 — nettoyage Catharsis extrait :
+# scan et purge confirmée limités au catalogue interne de caches Windows.
 # v2.345 — tweaks Windows extraits :
 # télémétrie, débloat borné et réglages réseau isolés avec catalogue sûr.
 # v2.344 — registre Windows extrait :

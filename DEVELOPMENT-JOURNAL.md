@@ -5990,3 +5990,39 @@ Poursuivre la consolidation des outils Windows après le socle registre.
   **344/344 outils** et **15 workers** supervisés.
 - Smoke API réel après redémarrage : **28/28 contrats réussis**.
 - Taille de `backend/tools.py` après extraction : **8 766 lignes** mesurées par PowerShell.
+
+## 2026-07-27 — v2.346.0 — Domaine nettoyage Catharsis
+
+### Demande
+
+Continuer la séparation des domaines Windows avec validation des effets de bord.
+
+### Constats et décisions
+
+- Le scan et la purge Catharsis étaient déjà construits depuis un catalogue interne mais
+  restaient couplés au monolithe.
+- Le domaine rejoint `tool_domains/catharsis.py`; le runner PowerShell est injecté.
+- `categories` doit être une liste. Seules les catégories internes sont retenues, sans doublon;
+  une chaîne ou un chemin libre ne produit aucun appel PowerShell.
+- Le scan ignore les clés étrangères, ramène les tailles négatives à zéro et neutralise les
+  tailles non numériques.
+- La purge conserve sa confirmation explicite et ses chemins statiques.
+
+### Fichiers modifiés
+
+- `backend/tool_domains/catharsis.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_catharsis.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation
+
+- Tests de projection, valeurs invalides, déduplication, absence d'injection et architecture
+  **344/344** réussis.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **122/122 étapes** en
+  194,3 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.346.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Smoke API réel après redémarrage : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **8 697 lignes** mesurées par PowerShell.

@@ -51,6 +51,7 @@ from tool_domains import winget as winget_domain
 from tool_domains import windows_settings as windows_settings_domain
 from tool_domains import windows_registry as windows_registry_domain
 from tool_domains import windows_tweaks as windows_tweaks_domain
+from tool_domains import catharsis as catharsis_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -754,84 +755,11 @@ async def execute_webapp_create(args: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 #  (id) -> (libellé, [chemins PowerShell], groupe)   — groupe = tuile dans l'UI
-_CLEAN_CATS = {
-    # ── Windows ──
-    "temp_user":     ("Fichiers temporaires (utilisateur)", [r"$env:TEMP\*"], "Windows"),
-    "temp_windows":  ("Fichiers temporaires (Windows)",     [r"C:\Windows\Temp\*"], "Windows"),
-    "thumbnails":    ("Cache des vignettes",                [r"$env:LOCALAPPDATA\Microsoft\Windows\Explorer\thumbcache_*.db"], "Windows"),
-    "prefetch":      ("Prefetch (préchargement)",           [r"C:\Windows\Prefetch\*"], "Windows"),
-    "recent":        ("Documents récents (raccourcis)",     [r"$env:APPDATA\Microsoft\Windows\Recent\*"], "Windows"),
-    "error_reports": ("Rapports d'erreurs (WER)",           [r"$env:LOCALAPPDATA\Microsoft\Windows\WER\*", r"$env:ProgramData\Microsoft\Windows\WER\*"], "Windows"),
-    "delivery_opt":  ("Cache Windows Update",               [r"C:\Windows\SoftwareDistribution\DeliveryOptimization\*"], "Windows"),
-    # ── Système ──
-    "crash_dumps":   ("Rapports de plantage (.dmp)",        [r"C:\Windows\Minidump\*", r"$env:LOCALAPPDATA\CrashDumps\*"], "Système"),
-    "dx_cache":      ("Cache shaders DirectX / GPU",        [r"$env:LOCALAPPDATA\D3DSCache\*", r"$env:LOCALAPPDATA\NVIDIA\DXCache\*"], "Système"),
-    "font_cache":    ("Cache des polices (logs)",           [r"$env:LOCALAPPDATA\FontCache\*"], "Système"),
-    # ── Navigateurs ──
-    "edge_cache":    ("Cache Microsoft Edge",               [r"$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache\*"], "Navigateurs"),
-    "chrome_cache":  ("Cache Google Chrome",                [r"$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache\*"], "Navigateurs"),
-    "firefox_cache": ("Cache Mozilla Firefox",              [r"$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*\cache2\*"], "Navigateurs"),
-}
 # Groupe d'affichage de la corbeille (catégorie spéciale, hors _CLEAN_CATS)
-_RECYCLE_GROUP = "Windows"
 
 
-async def execute_catharsis_scan(args: dict) -> dict:
-    """Analyse l'espace récupérable par catégorie (NE SUPPRIME RIEN)."""
-    lines = ["$o=@{}"]
-    for cid, (_label, paths, _grp) in _CLEAN_CATS.items():
-        # double quotes → PowerShell développe bien $env:TEMP, $env:LOCALAPPDATA, etc.
-        ps_paths = ",".join('"' + p + '"' for p in paths)
-        lines.append(
-            f"$s=0; foreach($p in @({ps_paths})){{ "
-            f"Get-ChildItem -Path $p -Recurse -Force -EA SilentlyContinue | "
-            f"ForEach-Object {{ $s += $_.Length }} }}; $o['{cid}']=[int64]$s")
-    lines.append("try{ $rb=((New-Object -ComObject Shell.Application).Namespace(10).Items() | "
-                 "ForEach-Object { $_.Size } | Measure-Object -Sum).Sum; $o['recycle_bin']=[int64]$rb }"
-                 "catch{ $o['recycle_bin']=0 }")
-    lines.append("$o | ConvertTo-Json -Compress")
-    r = await execute_pc_run_powershell({"script": ";".join(lines), "confirmed": True, "timeout": 150})
-    import json as _j
-    try:
-        data = _j.loads((r.get("stdout") or "{}").strip())
-    except Exception:
-        data = {}
-    labels = {cid: lbl for cid, (lbl, _p, _g) in _CLEAN_CATS.items()}
-    groups = {cid: g for cid, (_l, _p, g) in _CLEAN_CATS.items()}
-    labels["recycle_bin"] = "Corbeille"; groups["recycle_bin"] = _RECYCLE_GROUP
-    cats, total = [], 0
-    for cid, by in (data or {}).items():
-        by = int(by or 0)
-        total += by
-        cats.append({"id": cid, "label": labels.get(cid, cid), "group": groups.get(cid, "Autres"),
-                     "bytes": by, "mb": round(by / 1048576, 1)})
-    cats.sort(key=lambda c: -c["bytes"])
-    return {"success": True, "categories": cats, "total_mb": round(total / 1048576, 1)}
 
 
-async def execute_catharsis_clean(args: dict) -> dict:
-    """Purge les catégories choisies (ids issus de catharsis_scan). Demande confirmation."""
-    cats = [c for c in (args.get("categories") or []) if c in _CLEAN_CATS or c == "recycle_bin"]
-    if not cats:
-        return {"error": "Paramètre 'categories' requis (ids depuis catharsis_scan)."}
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True,
-                "message": f"Vider {len(cats)} catégorie(s) : {', '.join(cats)} ? "
-                           f"(suppression définitive de fichiers temporaires/caches)"}
-    lines = []
-    for cid in cats:
-        if cid == "recycle_bin":
-            lines.append("Clear-RecycleBin -Force -EA SilentlyContinue")
-            continue
-        for p in _CLEAN_CATS[cid][1]:
-            lines.append(f'Get-ChildItem -Path "{p}" -Force -EA SilentlyContinue | '
-                         f'Remove-Item -Recurse -Force -EA SilentlyContinue')
-    lines.append("'OK'")
-    r = await execute_pc_run_powershell({"script": ";".join(lines), "confirmed": True, "timeout": 240})
-    ok = "OK" in (r.get("stdout") or "")
-    return {"success": ok, "cleaned": cats,
-            "message": (f"✅ {len(cats)} catégorie(s) nettoyée(s)." if ok else
-                        "⚠️ Nettoyage partiel (certains fichiers étaient verrouillés/en usage).")}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -7494,6 +7422,10 @@ execute_tweak_telemetry = windows_tweaks_domain.execute_tweak_telemetry
 execute_tweak_debloat_list = windows_tweaks_domain.execute_tweak_debloat_list
 execute_tweak_debloat_remove = windows_tweaks_domain.execute_tweak_debloat_remove
 execute_tweak_network_harden = windows_tweaks_domain.execute_tweak_network_harden
+
+catharsis_domain.configure(run_powershell=execute_pc_run_powershell)
+execute_catharsis_scan = catharsis_domain.execute_catharsis_scan
+execute_catharsis_clean = catharsis_domain.execute_catharsis_clean
 
 windows_settings_domain.configure(
     run_powershell=execute_pc_run_powershell,
