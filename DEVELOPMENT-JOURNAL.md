@@ -6333,3 +6333,57 @@ la copie locale, et améliorer le harness de tous les outils pendant l'extractio
 
 Réversion atomique du commit de tranche. Les tests utilisent un stockage et des transports
 Google injectés; aucune donnée d'agenda réelle n'est créée, modifiée ou supprimée.
+
+## 2026-07-27 — v2.355.0 — Utilitaires déterministes
+
+### Contexte
+
+Extraire les utilitaires sans dépendance LLM et éliminer les opérations non bornées ou
+ambiguës avant de poursuivre l'unification du harness.
+
+### Veille et décisions
+
+- La documentation Python recommande `secrets` pour les mots de passe et jetons. Chaque mot
+  de passe généré couvre maintenant toutes les catégories demandées, sans boucle probabiliste.
+  Source : https://docs.python.org/3/library/secrets.html
+- `hashlib` documente les faiblesses de collision de MD5/SHA-1 et `file_digest` pour le
+  traitement en flux. Marvin recommande SHA-2/SHA-3/BLAKE2 et signale les deux algorithmes
+  historiques sans supprimer leur compatibilité.
+  Source : https://docs.python.org/3/library/hashlib.html
+- Le parseur JSON standard n'impose pas de limite de taille; Marvin ajoute donc des plafonds
+  explicites de taille, profondeur et sortie avant d'accepter une donnée non fiable.
+  Source : https://docs.python.org/3/library/json.html
+
+### Analyse et solution
+
+- `tool_domains/deterministic_utilities.py` possède calcul, mots de passe, empreintes,
+  Base64, JSON et statistiques textuelles.
+- Le calculateur n'utilise plus `eval`; un interpréteur AST limité contrôle profondeur,
+  nombre de nœuds, exposants, arguments et taille des entiers. Factorielle, combinaison,
+  permutation et fonctions mathématiques historiques restent disponibles avec bornes.
+- Tous les mots de passe demandés contiennent au moins un caractère de chaque catégorie,
+  puis sont mélangés par `secrets.SystemRandom`.
+- Le hachage de fichier utilise `hashlib.file_digest` hors de la boucle asyncio. SHA-3 et
+  BLAKE2 rejoignent les quatre algorithmes historiques.
+- Base64 utilise une validation stricte et distingue explicitement un résultat binaire.
+- JSON refuse NaN/Infinity, les entrées supérieures à 1 Mo, plus de 100 niveaux et les chemins
+  invalides. Les statistiques textuelles bornent aussi entrée et nombre de mots retournés.
+
+### Validation observée
+
+- Tests ciblés : calcul nominal, factorielle conservée, injection refusée, exposant et taille
+  bornés, catégories de cinq mots de passe, exclusions, fichier SHA-256 réel, avertissement
+  MD5, Base64 UTF-8/invalide, JSON format/requête/NaN et statistiques textuelles.
+- Suite complète : `scripts/check_marvin.py --quick` réussit **131/131 étapes** en
+  215,8 secondes; ESLint retourne **0 erreur** et 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.355.0**, Ollama disponible,
+  **344/344 outils** et **15 workers** supervisés.
+- Exécution réelle via `/api/tools` : `factorial(10)` retourne `3628800` avec contrat
+  d'exécution normalisé.
+- Smoke API réel avec Turbopack : **28/28 contrats réussis**.
+- Taille de `backend/tools.py` après extraction : **7 283 lignes** mesurées par PowerShell.
+
+### Rollback
+
+Réversion atomique du commit de tranche. Les tests n'écrivent qu'un fichier temporaire
+supprimé automatiquement et n'effectuent aucun appel réseau ni mutation utilisateur.

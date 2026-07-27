@@ -203,6 +203,9 @@ iCalendar récurrent, import Google et synchronisation; secrets, SSRF et volumes
 CRUD local et routage Google. Il refuse les intervalles invalides, les replis silencieux et
 les suppressions ambiguës. `agent_safety.py` valide les valeurs déclarées par les schémas de
 tous les outils avant le dispatch du Runner.
+73. les utilitaires déterministes : `tool_domains/deterministic_utilities.py` possède calcul,
+génération de mots de passe, empreintes, Base64, JSON et statistiques textuelles. Entrées,
+profondeur, complexité, sorties et opérations coûteuses sont bornées; aucun `eval` n'est utilisé.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

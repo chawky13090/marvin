@@ -172,7 +172,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.354.0)
+## 9. État actuel (v2.355.0)
+
+**v2.355 (utilitaires déterministes)** : calcul borné sans `eval`, mots de passe couvrant
+toutes les catégories, empreintes en flux, Base64 strict, JSON borné et statistiques textuelles
+rejoignent `tool_domains/deterministic_utilities.py`. SHA-3/BLAKE2 sont disponibles; MD5/SHA-1
+restent compatibles mais explicitement signalés comme vulnérables aux collisions.
 
 **v2.354 (événements agenda et schémas d'outils)** : création, liste, mise à jour et
 suppression des événements rejoignent `tool_domains/calendar_events.py`. Dates, durées,

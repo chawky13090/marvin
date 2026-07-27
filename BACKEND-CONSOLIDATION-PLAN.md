@@ -219,6 +219,8 @@ et protection SSRF; les suppressions via LLM exigent une confirmation explicite.
 Les événements locaux/Google sont isolés avec cohérence de cible : aucun échec distant ne
 devient une mutation locale silencieuse. Le harness valide maintenant les types, enums,
 bornes et structures déclarés par les 344 schémas; l'unification UI/MCP reste à achever.
+Les utilitaires déterministes sont isolés avec limites de ressources, primitives
+cryptographiques standard, décodage strict et calcul AST sans `eval`.
 
 ## 4. Validation obligatoire par tranche
 

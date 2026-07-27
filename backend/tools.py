@@ -60,6 +60,7 @@ from tool_domains import onedrive as onedrive_domain
 from tool_domains import google_calendar as google_calendar_domain
 from tool_domains import calendar_subscriptions as calendar_subscriptions_domain
 from tool_domains import calendar_events as calendar_events_domain
+from tool_domains import deterministic_utilities as deterministic_utilities_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3201,128 +3202,7 @@ execute_ssh_server_info = ssh_domain.server_info
 # SECTION 14 — Outils Utilitaires (Calculateur, Date/Heure, Météo)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_calculator(args: dict) -> dict:
-    """Évalue une expression mathématique de façon sécurisée."""
-    expr = args.get("expression", "").strip()
-    if not expr:
-        return {"error": "Paramètre 'expression' requis. Ex: '(12 + 4) * 3 / 2'"}
-
-    # Liste blanche de tokens autorisés : chiffres, opérateurs, fonctions math, constantes
-    import math as _math
-    import ast as _ast
-
-    _SAFE_NAMES = {
-        # constantes
-        "pi": _math.pi, "e": _math.e, "inf": _math.inf, "nan": _math.nan,
-        "tau": _math.tau,
-        # fonctions de base
-        "abs": abs, "round": round, "min": min, "max": max,
-        "int": int, "float": float,
-        # fonctions math
-        "sqrt": _math.sqrt, "cbrt": lambda x: x ** (1/3),
-        "sin": _math.sin, "cos": _math.cos, "tan": _math.tan,
-        "asin": _math.asin, "acos": _math.acos, "atan": _math.atan,
-        "atan2": _math.atan2,
-        "log": _math.log, "log2": _math.log2, "log10": _math.log10,
-        "exp": _math.exp, "pow": _math.pow,
-        "floor": _math.floor, "ceil": _math.ceil, "trunc": _math.trunc,
-        "factorial": _math.factorial, "gcd": _math.gcd,
-        "degrees": _math.degrees, "radians": _math.radians,
-        "hypot": _math.hypot, "comb": _math.comb, "perm": _math.perm,
-    }
-
-    try:
-        # Sécurité : parser l'AST et rejeter tout nœud non-autorisé
-        tree = _ast.parse(expr, mode="eval")
-
-        # Nœuds contexte (Load/Store/Del) — toujours inoffensifs, apparaissent dans ast.walk
-        _CTX_NODES = tuple(
-            getattr(_ast, n) for n in ("Load", "Store", "Del", "AugLoad", "AugStore", "Param")
-            if hasattr(_ast, n)
-        )
-
-        for node in _ast.walk(tree):
-            if isinstance(node, (_ast.Module, _ast.Expr, _ast.Expression)):
-                continue
-            if isinstance(node, _CTX_NODES):
-                continue
-            if isinstance(node, (_ast.BinOp, _ast.UnaryOp, _ast.BoolOp,
-                                   _ast.Compare, _ast.IfExp)):
-                continue
-            if isinstance(node, (_ast.Add, _ast.Sub, _ast.Mult, _ast.Div,
-                                   _ast.Mod, _ast.Pow, _ast.FloorDiv,
-                                   _ast.LShift, _ast.RShift, _ast.BitAnd,
-                                   _ast.BitOr, _ast.BitXor, _ast.Invert,
-                                   _ast.Not, _ast.UAdd, _ast.USub,
-                                   _ast.Eq, _ast.NotEq, _ast.Lt, _ast.LtE,
-                                   _ast.Gt, _ast.GtE,
-                                   _ast.And, _ast.Or)):
-                continue
-            if isinstance(node, _ast.Constant):
-                if not isinstance(node.value, (int, float, bool, complex)):
-                    raise ValueError(f"Constante non autorisée : {node.value!r}")
-                continue
-            if isinstance(node, _ast.Call):
-                # Vérifier que la fonction appelée est dans la whitelist
-                if isinstance(node.func, _ast.Name) and node.func.id in _SAFE_NAMES:
-                    continue
-                raise ValueError(f"Appel de fonction non autorisé : {_ast.unparse(node.func)}")
-            if isinstance(node, _ast.Name):
-                if node.id in _SAFE_NAMES:
-                    continue
-                raise ValueError(f"Nom non autorisé : {node.id!r}")
-            if isinstance(node, _ast.Tuple):
-                continue
-            # Arguments de la liste/keywords pour les appels de fonctions
-            if isinstance(node, (_ast.arguments, _ast.arg, _ast.keyword)):
-                continue
-            raise ValueError(f"Expression non autorisée : {type(node).__name__}")
-
-        result = eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, _SAFE_NAMES)
-
-        # Guard against infinite/NaN results
-        if isinstance(result, float):
-            if _math.isinf(result):
-                return {"error": "Résultat infini (division par zéro ou overflow)"}
-            if _math.isnan(result):
-                return {"error": "Résultat indéfini (NaN)"}
-
-        # Formater le résultat
-        if isinstance(result, float):
-            if result == int(result) and abs(result) < 1e15:
-                formatted = str(int(result))
-            else:
-                formatted = f"{result:.10g}"
-        elif isinstance(result, int):
-            # Truncate very large integers to avoid context window bloat
-            s = str(result)
-            if len(s) > 80:
-                formatted = f"{s[:40]}…[{len(s)} chiffres]"
-            else:
-                formatted = s
-        else:
-            formatted = str(result)
-
-        # Ensure result is JSON-serializable (large ints can be problematic)
-        result_serializable = formatted if isinstance(result, int) and abs(result) > 10**15 else result
-
-        return {
-            "success":    True,
-            "expression": expr,
-            "result":     result_serializable,
-            "formatted":  formatted,
-        }
-    except ZeroDivisionError:
-        return {"error": "Division par zéro"}
-    except OverflowError:
-        return {"error": "Dépassement de capacité (résultat trop grand)"}
-    except ValueError as e:
-        msg = str(e)
-        if "math domain" in msg:
-            return {"error": f"Domaine mathématique invalide : {msg}"}
-        return {"error": f"Expression non autorisée : {msg}"}
-    except Exception as e:
-        return {"error": f"Erreur de calcul : {e}"}
+execute_calculator = deterministic_utilities_domain.calculator
 
 
 async def execute_datetime_info(args: dict) -> dict:
@@ -3553,64 +3433,7 @@ async def execute_unit_convert(args: dict) -> dict:
     }
 
 
-async def execute_password_generate(args: dict) -> dict:
-    """Génère un mot de passe ou PIN sécurisé avec les critères choisis."""
-    import secrets
-    import string
-
-    length   = max(4, min(int(args.get("length", 16)), 128))
-    include  = set(args.get("include", ["letters", "digits", "symbols"]))
-    exclude  = str(args.get("exclude", ""))           # caractères à exclure
-    count    = max(1, min(int(args.get("count", 1)), 20))   # nombre de mots de passe
-    pin_mode = args.get("pin", False)                  # PIN numérique uniquement
-
-    if pin_mode:
-        charset = string.digits
-    else:
-        charset = ""
-        if "letters" in include:
-            charset += string.ascii_letters
-        if "digits" in include:
-            charset += string.digits
-        if "symbols" in include:
-            charset += "!@#$%^&*()-_=+[]{}|;:,.<>?"
-        if not charset:
-            charset = string.ascii_letters + string.digits
-
-    # Retirer les caractères exclus
-    for c in exclude:
-        charset = charset.replace(c, "")
-
-    if not charset:
-        return {"error": "Aucun caractère disponible après exclusions."}
-
-    passwords = []
-    for _ in range(count):
-        pwd = "".join(secrets.choice(charset) for _ in range(length))
-        # Forcer au moins un caractère de chaque catégorie demandée (sauf PIN)
-        if not pin_mode and count == 1:
-            tries = 0
-            while tries < 50:
-                ok = True
-                if "letters" in include and not any(c in string.ascii_letters for c in pwd):
-                    ok = False
-                if "digits" in include and not any(c in string.digits for c in pwd):
-                    ok = False
-                if "symbols" in include and not any(c in "!@#$%^&*()-_=+[]{}|;:,.<>?" for c in pwd):
-                    ok = False
-                if ok:
-                    break
-                pwd = "".join(secrets.choice(charset) for _ in range(length))
-                tries += 1
-        passwords.append(pwd)
-
-    return {
-        "success":   True,
-        "passwords": passwords,
-        "length":    length,
-        "charset_size": len(set(charset)),
-        "note": f"{'PIN numérique' if pin_mode else f'Mot de passe {length} caractères'} généré avec {len(set(charset))} caractères possibles",
-    }
+execute_password_generate = deterministic_utilities_domain.password_generate
 
 
 async def execute_translate(args: dict) -> dict:
@@ -3837,81 +3660,12 @@ async def execute_weather(args: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def execute_hash_compute(args: dict) -> dict:
-    """Calcule le hash cryptographique d'un texte ou fichier."""
-    import hashlib as _hashlib
-
-    algorithm = args.get("algorithm", "sha256").lower()
-    text      = args.get("text", "")
-    file_path = args.get("file_path", "")
-
-    supported = ["md5", "sha1", "sha256", "sha512"]
-    if algorithm not in supported:
-        return {"error": f"Algorithme non supporté. Utilisez : {', '.join(supported)}"}
-
-    h = _hashlib.new(algorithm)
-
-    if file_path:
-        try:
-            resolved = _resolve_path(file_path)
-            with open(resolved, "rb") as f:
-                for chunk in iter(lambda: f.read(65536), b""):
-                    h.update(chunk)
-            digest = h.hexdigest()
-            return {
-                "success":   True,
-                "algorithm": algorithm.upper(),
-                "hash":      digest,
-                "source":    "file",
-                "file":      str(resolved),
-            }
-        except FileNotFoundError:
-            return {"error": f"Fichier introuvable : {file_path}"}
-        except Exception as e:
-            return {"error": str(e)}
-    elif text:
-        h.update(text.encode("utf-8"))
-        return {
-            "success":   True,
-            "algorithm": algorithm.upper(),
-            "hash":      h.hexdigest(),
-            "source":    "text",
-        }
-    else:
-        return {"error": "Fournissez 'text' ou 'file_path'."}
+    return await deterministic_utilities_domain.hash_compute(
+        args, resolve_path=_resolve_path
+    )
 
 
-async def execute_base64_tool(args: dict) -> dict:
-    """Encode ou décode du Base64."""
-    import base64 as _b64
-
-    action = args.get("action", "encode").lower()  # encode | decode
-    data   = args.get("data", "")
-    url_safe = args.get("url_safe", False)
-
-    if not data:
-        return {"error": "Paramètre 'data' requis."}
-
-    try:
-        if action == "encode":
-            raw = data.encode("utf-8")
-            if url_safe:
-                result = _b64.urlsafe_b64encode(raw).decode("ascii")
-            else:
-                result = _b64.b64encode(raw).decode("ascii")
-            return {"success": True, "action": "encode", "result": result, "length": len(result)}
-        elif action == "decode":
-            try:
-                if url_safe:
-                    decoded = _b64.urlsafe_b64decode(data + "==").decode("utf-8")
-                else:
-                    decoded = _b64.b64decode(data + "==").decode("utf-8")
-            except UnicodeDecodeError:
-                decoded = f"<données binaires — {len(_b64.b64decode(data + '=='))} octets>"
-            return {"success": True, "action": "decode", "result": decoded}
-        else:
-            return {"error": "Action invalide. Utilisez 'encode' ou 'decode'."}
-    except Exception as e:
-        return {"error": str(e)}
+execute_base64_tool = deterministic_utilities_domain.base64_tool
 
 
 async def execute_text_extract(args: dict) -> dict:
@@ -4048,55 +3802,7 @@ async def execute_qr_generate(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_json_tool(args: dict) -> dict:
-    """Formate, valide, minifie ou interroge (JSONPath) un JSON."""
-    import json as _json
-
-    action = args.get("action", "format").lower()  # format | minify | validate | query
-    # 'json' accepté en alias de 'data' — le modèle confond parfois les deux noms.
-    data   = args.get("data") or args.get("json", "")
-    path   = args.get("path", "")  # JSONPath simple : "$.key.subkey[0]"
-
-    if not data:
-        return {"error": "Paramètre 'data' (JSON en texte) requis."}
-
-    try:
-        parsed = _json.loads(data)
-    except _json.JSONDecodeError as e:
-        return {"error": f"JSON invalide : {e}", "valid": False}
-
-    if action == "validate":
-        return {"success": True, "valid": True, "message": "JSON valide.", "type": type(parsed).__name__}
-
-    if action == "format":
-        return {"success": True, "result": _json.dumps(parsed, ensure_ascii=False, indent=2)}
-
-    if action == "minify":
-        return {"success": True, "result": _json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))}
-
-    if action == "query":
-        if not path:
-            return {"error": "Paramètre 'path' requis pour l'action 'query' (ex: 'key.subkey')."}
-        # Simple dot-notation traversal (subset of JSONPath)
-        keys = path.lstrip("$.").split(".")
-        current = parsed
-        try:
-            for k in keys:
-                if k == "": continue
-                # Gestion des indices : key[0]
-                bracket = k.find("[")
-                if bracket >= 0:
-                    idx = int(k[bracket+1:-1])
-                    k   = k[:bracket]
-                    if k: current = current[k]
-                    current = current[idx]
-                else:
-                    current = current[k]
-            return {"success": True, "result": _json.dumps(current, ensure_ascii=False, indent=2) if not isinstance(current, (str, int, float, bool)) else current}
-        except (KeyError, IndexError, TypeError) as e:
-            return {"error": f"Chemin introuvable : {path} — {e}"}
-
-    return {"error": f"Action inconnue : {action}. Utilisez format | minify | validate | query."}
+execute_json_tool = deterministic_utilities_domain.json_tool
 
 
 async def execute_markdown_convert(args: dict) -> dict:
@@ -4329,55 +4035,7 @@ async def execute_csv_analyze(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_text_stats(args: dict) -> dict:
-    """Calcule des statistiques sur un texte : mots, caractères, phrases, temps de lecture."""
-    import re as _re, collections as _coll
-
-    text    = args.get("text", "")
-    top_n   = int(args.get("top_words", 10))
-
-    if not text:
-        return {"error": "Paramètre 'text' requis."}
-
-    # Comptages de base
-    chars          = len(text)
-    chars_no_space = len(text.replace(" ", "").replace("\n", "").replace("\t", ""))
-    words_list     = _re.findall(r"\b\w+\b", text)
-    word_count     = len(words_list)
-    sentences      = len(_re.findall(r"[.!?]+", text)) or 1
-    paragraphs     = len([p for p in text.split("\n\n") if p.strip()])
-    lines          = text.count("\n") + 1
-
-    # Temps de lecture estimé (250 mots/min)
-    read_seconds = round(word_count / 250 * 60)
-    read_label = f"{read_seconds // 60}m {read_seconds % 60}s" if read_seconds >= 60 else f"{read_seconds}s"
-
-    # Mots les plus fréquents (stopwords basiques FR/EN filtrés)
-    stopwords = {
-        "le", "la", "les", "de", "du", "des", "et", "en", "un", "une",
-        "à", "au", "aux", "que", "qui", "dans", "est", "il", "elle",
-        "on", "se", "ce", "je", "tu", "vous", "nous", "ils", "elles",
-        "the", "a", "an", "of", "in", "to", "is", "it", "and", "or",
-        "for", "that", "this", "with", "are", "was", "be", "as", "at",
-    }
-    freq = _coll.Counter(
-        w.lower() for w in words_list if len(w) > 2 and w.lower() not in stopwords
-    )
-    top_words = [{"word": w, "count": c} for w, c in freq.most_common(top_n)]
-
-    return {
-        "success":        True,
-        "characters":     chars,
-        "chars_no_space": chars_no_space,
-        "words":          word_count,
-        "sentences":      sentences,
-        "paragraphs":     paragraphs,
-        "lines":          lines,
-        "avg_word_length": round(sum(len(w) for w in words_list) / max(1, word_count), 1),
-        "avg_words_per_sentence": round(word_count / sentences, 1),
-        "reading_time":   read_label,
-        "top_words":      top_words,
-    }
+execute_text_stats = deterministic_utilities_domain.text_stats
 
 
 async def execute_ip_info(args: dict) -> dict:
@@ -7975,7 +7633,7 @@ TOOLS_SPEC = [
        ["audio_path"]),
 
     # ── Utilitaires ───────────────────────────────────────────────────────────
-    _t("calculator", "Évalue une expression mathématique (arithmétique, trigonométrie, logarithmes, factorielle, etc.).",
+    _t("calculator", "Évalue une expression mathématique bornée (arithmétique, trigonométrie, logarithmes, factorielle, etc.).",
        {"expression": {"type": "string", "description": "Expression à évaluer. Exemples : '(12 + 4) * 3 / 2', 'sqrt(144)', 'sin(pi/2)', 'factorial(10)'"}},
        ["expression"]),
 
@@ -8008,19 +7666,19 @@ TOOLS_SPEC = [
        ["value", "from_unit", "to_unit"]),
 
     _t("password_generate", "Génère des mots de passe ou PINs sécurisés avec critères configurables.",
-       {"length":  {"type": "integer", "description": "Longueur du mot de passe (défaut 16, max 128)"},
-        "count":   {"type": "integer", "description": "Nombre de mots de passe à générer (défaut 1, max 20)"},
-        "include": {"type": "array",   "items": {"type": "string"},
+       {"length":  {"type": "integer", "minimum": 4, "maximum": 128, "description": "Longueur du mot de passe (défaut 16)"},
+        "count":   {"type": "integer", "minimum": 1, "maximum": 20, "description": "Nombre de mots de passe à générer (défaut 1)"},
+        "include": {"type": "array",   "items": {"type": "string", "enum": ["letters", "digits", "symbols"]},
                     "description": "Catégories incluses : ['letters', 'digits', 'symbols']. Défaut : les trois."},
         "exclude": {"type": "string",  "description": "Caractères à exclure (ex: 'Il1O0' pour éviter confusions)"},
         "pin":     {"type": "boolean", "description": "Mode PIN numérique uniquement (défaut false)"}},
        []),
 
     # ── Section 15 — traitement de données ────────────────────────────────────
-    _t("hash_compute", "Calcule le hash cryptographique (MD5/SHA1/SHA256/SHA512) d'un texte ou fichier.",
+    _t("hash_compute", "Calcule une empreinte d'un texte ou fichier. SHA-2/SHA-3/BLAKE2 sont recommandés; MD5/SHA-1 restent disponibles avec avertissement.",
        {"text":      {"type": "string", "description": "Texte à hacher"},
         "file_path": {"type": "string", "description": "Chemin du fichier à hacher"},
-        "algorithm": {"type": "string", "enum": ["md5", "sha1", "sha256", "sha512"],
+        "algorithm": {"type": "string", "enum": ["md5", "sha1", "sha256", "sha512", "sha3_256", "blake2b"],
                       "description": "Algorithme (défaut : sha256)"}},
        []),
 
@@ -8076,7 +7734,7 @@ TOOLS_SPEC = [
 
     _t("text_stats", "Analyse un texte : nombre de mots, caractères, phrases, temps de lecture et mots fréquents.",
        {"text":      {"type": "string",  "description": "Texte à analyser"},
-        "top_words": {"type": "integer", "description": "Nombre de mots fréquents à retourner (défaut 10)"}},
+        "top_words": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Nombre de mots fréquents à retourner (défaut 10)"}},
        ["text"]),
 
     _t("ip_info", "Retourne la géolocalisation et les infos réseau d'une adresse IP publique (ip-api.com, gratuit).",
