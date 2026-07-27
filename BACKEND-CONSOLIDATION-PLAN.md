@@ -129,6 +129,8 @@ depuis le processus backend afin de préserver le verrou Qdrant mono-process.
 Les 19 outils Réseau rejoignent `tool_domains/network.py` en v2.332.0. Diagnostics passifs,
 scans actifs bornés, TLS/SNMP, topologie et inventaire partagent désormais une frontière
 explicite; la configuration Windows est injectée et les identités publiques restent stables.
+Les 22 outils Facturation rejoignent `tool_domains/billing.py` en v2.333.0. Les transports
+web/PDF sont injectés, les montants et paiements sont validés et le registre reste inchangé.
 
 Critère : `tools.py` devient une façade et un composition root d'outils ; aucun domaine métier
 volumineux n'y est implémenté. Le contrôle 344/344 reste exact.

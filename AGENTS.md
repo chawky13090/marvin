@@ -30,7 +30,7 @@ niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr qua
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.332.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.333.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -172,7 +172,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.332.0)
+## 9. État actuel (v2.333.0)
+
+**v2.333 (domaine Facturation)** : les 22 outils clients, catalogue, devis, recherche marché,
+propositions, TCO, factures et pilotage rejoignent `tool_domains/billing.py`. Recherche web
+et rendu PDF sont injectés; la façade conserve les identités exactes. Les montants non finis,
+paiements négatifs et trop-perçus sont refusés, et les e-mails de devis normalisent les
+valeurs numériques issues de SQLite/JSON. Le test couvre validations, écritures simulées,
+façades et registre sans toucher aux données réelles.
 
 **v2.332 (domaine Réseau)** : les 19 outils de diagnostic, résolution, scans bornés,
 HTTP/TLS, sous-réseaux, SNMP, topologie et inventaire sont extraits vers

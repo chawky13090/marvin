@@ -4729,6 +4729,47 @@ ignorée) :
 - `tools.py` passe de 20 197 à **20 070 lignes**.
 - `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
 
+## 2026-07-27 — v2.333.0 — Domaine d'outils Facturation
+
+### Demande et périmètre
+
+- Continuer la consolidation backend et corriger les défauts rencontrés pendant l'extraction.
+
+### Constats et décisions
+
+- Les 22 outils clients, catalogue, devis, marché, proposition, TCO, factures et tableau de
+  bord formaient un agrégat cohérent de plus de 1 000 lignes dans `tools.py`.
+- Le domaine rejoint `tool_domains/billing.py`; recherche web et rendu PDF sont injectés.
+- Un paiement négatif ou supérieur au total pouvait être persisté. Ces montants sont refusés,
+  comme les valeurs `NaN`/infinies.
+- L'e-mail de devis formatait directement des valeurs SQLite/JSON et échouait sur une chaîne
+  numérique; la normalisation monétaire commune couvre désormais ce contrat.
+- Les 22 identités publiques et leurs objets dans `TOOLS_REGISTRY` restent inchangés.
+
+### Fichiers
+
+- `backend/tool_domains/billing.py`
+- `backend/tools.py`
+- `scripts/test_tool_domain_billing.py`
+- `scripts/check_marvin.py`
+- fichiers de version et documentation d'architecture
+
+### Validation réelle
+
+- Compilation ciblée, test Facturation et architecture 344/344 : réussis.
+- Le test simule les écritures de paiement sans modifier la base réelle et vérifie montants,
+  paiements partiels, refus des trop-perçus, façades et registre.
+- `scripts/check_marvin.py --quick` : **109/109 étapes réussies**.
+- Architecture : **344/344 outils**, **346 routes**, **40 pages** et
+  **64 outils encadrés**.
+- Compilation complète et dépendances Python : réussies.
+- Frontend : **0 erreur**, 37 avertissements historiques.
+- Redémarrage réel : `/api/health` expose **2.333.0**, Ollama disponible,
+  **344/344 outils** et **15 workers**.
+- Smoke test avec frontend Turbopack : **28/28 contrats HTTP réussis**.
+- `tools.py` passe de 16 130 à **14 909 lignes**.
+- `git diff --check` : réussi; seuls les avertissements LF/CRLF Windows attendus subsistent.
+
 ## 2026-07-27 — v2.332.0 — Domaine d'outils Réseau
 
 ### Demande et périmètre
