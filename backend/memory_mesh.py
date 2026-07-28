@@ -16,6 +16,10 @@ MESH_PATH = Path(DATA_DIR) / "memory_mesh.json"
 _LOCK = threading.RLock()
 
 
+class MemoryMeshError(RuntimeError):
+    """Signale un sidecar illisible afin d'éviter toute réécriture destructive."""
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -37,15 +41,20 @@ def _load() -> dict[str, dict[str, Any]]:
         return {}
     try:
         value = json.loads(MESH_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return value if isinstance(value, dict) else {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise MemoryMeshError("Memory Mesh illisible.") from exc
+    if not isinstance(value, dict):
+        raise MemoryMeshError("Le format Memory Mesh est invalide.")
+    return value
 
 
 def _save(value: dict[str, dict[str, Any]]) -> None:
     MESH_PATH.parent.mkdir(parents=True, exist_ok=True)
     temporary = MESH_PATH.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    with temporary.open("w", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
     os.replace(temporary, MESH_PATH)
 
 
@@ -99,6 +108,61 @@ def mark_used(memory_id: str | int) -> dict[str, Any] | None:
         record["updated_at"] = record["last_used_at"]
         _save(mesh)
         return record
+
+
+def remove(memory_id: str | int) -> bool:
+    """Retire les métadonnées d'un souvenir sans toucher aux autres entrées."""
+    with _LOCK:
+        mesh = _load()
+        removed = mesh.pop(str(memory_id), None) is not None
+        if removed:
+            _save(mesh)
+        return removed
+
+
+def clear() -> int:
+    """Vide le sidecar après nettoyage des stockages de contenu."""
+    with _LOCK:
+        mesh = _load()
+        count = len(mesh)
+        if count:
+            _save({})
+        return count
+
+
+def expired_ids(*, now: datetime | None = None) -> set[str]:
+    """Retourne les souvenirs dont la durée déclarée est effectivement échue."""
+    current = now or _now()
+    expired: set[str] = set()
+    with _LOCK:
+        records = _load()
+    for memory_id, record in records.items():
+        raw_expiry = record.get("expires_at")
+        if not raw_expiry:
+            continue
+        try:
+            expiry = datetime.fromisoformat(str(raw_expiry))
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            continue
+        if expiry <= current:
+            expired.add(str(memory_id))
+    return expired
+
+
+def filter_active(
+    memories: list[dict[str, Any]],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Exclut du prompt les souvenirs expirés, sans masquer les entrées legacy sans Mesh."""
+    expired = expired_ids(now=now)
+    return [
+        memory
+        for memory in memories
+        if str(memory.get("id") or "") not in expired
+    ]
 
 
 def list_metadata(*, kind: str | None = None) -> list[dict[str, Any]]:

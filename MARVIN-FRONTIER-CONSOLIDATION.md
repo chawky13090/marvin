@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.430.0
+Version courante auditée : 2.431.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -464,6 +464,11 @@ En v2.430.0, le routage modèle devient vérifiable depuis le chat : fournisseur
 confidentialité, Cloud-only et classification accompagnent chaque sélection et escalade.
 Une compétence promue vers Agent utilise également le modèle Agent comme repli local sûr,
 préservant la qualité en mode hybride sans affaiblir Hyper local ou Ultra Cloud-only.
+En v2.431.0, SQLite devient la source autoritative d'un cycle de vie commun avec Memory Mesh
+et Qdrant. Création, enrichissement, oubli, purge et consolidation utilisent la même
+frontière; une panne de projection reste visible et aucun oubli incomplet n'est déclaré
+réussi. Les souvenirs échus quittent immédiatement le prompt puis sont purgés par le worker.
+Un Mesh corrompu échoue fermé et n'est plus remplacé silencieusement.
 
 ## 10. Preuves minimales par grande capacité
 

@@ -285,6 +285,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),
         Stage("Domaine d'outils Mémoire", (python, "scripts/test_tool_domain_memory.py")),
+        Stage(
+            "Cycle de vie cohérent de la mémoire",
+            (python, "scripts/test_memory_lifecycle.py"),
+        ),
         Stage("Domaine d'outils Média", (python, "scripts/test_tool_domain_media.py")),
         Stage("Transport SSH partagé", (python, "scripts/test_ssh_transport.py")),
         Stage("Domaine d'outils SSH", (python, "scripts/test_tool_domain_ssh.py")),

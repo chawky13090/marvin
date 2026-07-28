@@ -120,10 +120,17 @@ async def memory_consolidation_worker() -> None:
     """Fusionne quotidiennement les doublons de memoire par regles deterministes."""
     await asyncio.sleep(40)
     import memory_consolidation
+    import memory_lifecycle
 
     while True:
         try:
-            result = memory_consolidation.consolidate_memories()
+            lifecycle = await memory_lifecycle.prune_expired()
+            result = await memory_consolidation.consolidate_memories()
+            if lifecycle.get("forgotten_count"):
+                print(
+                    "[Marvin] Rétention mémoire appliquée : "
+                    f"{lifecycle['forgotten_count']} souvenir(s) expiré(s)."
+                )
             if result.get("merged_count"):
                 print(f"[Marvin] Memoire consolidee : {result['merged_count']} doublon(s).")
         except Exception as exc:

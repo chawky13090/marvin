@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.430.0)
+## 9. État actuel (v2.431.0)
+
+**v2.431 (cycle de vie mémoire cohérent)** : SQLite reste la source autoritative, tandis que
+Memory Mesh et Qdrant sont des projections gérées par `memory_lifecycle.py`. Création,
+enrichissement, oubli unitaire/global, consolidation et expiration empruntent cette frontière.
+Une panne de projection est explicitement signalée; un oubli incomplet n'est jamais présenté
+comme réussi. Les souvenirs échus sont filtrés avant le prompt puis purgés quotidiennement.
+L'effacement global exige une confirmation explicite de bout en bout. Un sidecar Mesh
+corrompu échoue fermé et n'est pas écrasé; ses écritures sont atomiques et synchronisées.
 
 **v2.430 (provenance modèle vérifiable)** : chaque événement `model_info` expose désormais
 profil, modèle, fournisseur Ollama local/Cloud, mode de confidentialité, contrat Cloud-only

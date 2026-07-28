@@ -35,6 +35,7 @@ async def prepare_agent_context(
     build_system_prompt: Callable[[list[dict[str, Any]], int], str],
     cortex_prompt_block: Callable[[dict[str, Any]], str],
     get_real_paths: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
+    filter_memories: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None,
 ) -> PreparedAgentContext:
     """Construit messages, permissions et prompt de base avec replis non bloquants."""
     try:
@@ -92,6 +93,11 @@ async def prepare_agent_context(
         memories = []
     if not isinstance(memories, list):
         memories = []
+    if filter_memories is not None:
+        try:
+            memories = filter_memories(memories)
+        except Exception:
+            memories = []
     try:
         raw_permission = get_setting("permission_level")
         permission_level = (

@@ -5,33 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import database as db
-
-
-def _register_mesh(memory_id: str, content: str, category: str) -> None:
-    try:
-        import memory_mesh
-
-        memory_mesh.register(memory_id, content, category)
-    except Exception:
-        pass
-
-
-async def _index_memory(memory_id: str, content: str, category: str) -> None:
-    try:
-        from vector_store import index_memory
-
-        await index_memory(memory_id, content, category)
-    except Exception:
-        pass
-
-
-async def _delete_memory_index(memory_id: str) -> None:
-    try:
-        from vector_store import delete_document
-
-        await delete_document("memories", memory_id)
-    except Exception:
-        pass
+import memory_lifecycle
 
 
 async def _semantic_search(query: str, limit: int) -> list[dict[str, Any]]:
@@ -45,6 +19,8 @@ async def save(args: dict[str, Any]) -> dict[str, Any]:
     category = str(args.get("category") or "fact")
     if not content:
         return {"error": "Contenu requis"}
+    if category not in memory_lifecycle.MEMORY_CATEGORIES:
+        return {"error": "Catégorie de souvenir non prise en charge."}
     try:
         try:
             existing = db.get_memories()
@@ -55,27 +31,31 @@ async def save(args: dict[str, Any]) -> dict[str, Any]:
                 existing_content = str(memory.get("content") or "")
                 existing_norm = existing_content.strip().lower()
                 if existing_norm == content_norm:
-                    _register_mesh(memory["id"], existing_content or content, category)
+                    projection = await memory_lifecycle.refresh(memory, source="chat")
                     return {
                         "success": True,
                         "message": "Souvenir déjà enregistré (dédoublonnage)",
                         "memory": memory,
                         "duplicate": True,
+                        **projection,
                     }
                 if len(content_norm) > 20 and len(existing_norm) > 20:
                     if content_norm in existing_norm or existing_norm in content_norm:
                         if len(content_norm) > len(existing_norm):
-                            try:
-                                db.update_memory(memory["id"], content)
-                                _register_mesh(memory["id"], content, category)
-                                return {
-                                    "success": True,
-                                    "message": "Souvenir existant mis à jour avec plus de détails",
-                                    "memory": {**memory, "content": content},
-                                    "updated": True,
-                                }
-                            except Exception:
-                                pass
+                            refreshed = db.update_memory(memory["id"], content)
+                            if not refreshed:
+                                return {"error": "Le souvenir à enrichir est introuvable."}
+                            projection = await memory_lifecycle.refresh(
+                                refreshed,
+                                source="chat",
+                            )
+                            return {
+                                "success": True,
+                                "message": "Souvenir existant mis à jour avec plus de détails",
+                                "memory": refreshed,
+                                "updated": True,
+                                **projection,
+                            }
                         return {
                             "success": True,
                             "message": "Souvenir similaire déjà enregistré",
@@ -85,10 +65,18 @@ async def save(args: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             pass
 
-        memory = db.create_memory(content, category)
-        _register_mesh(memory["id"], content, category)
-        await _index_memory(memory["id"], content, category)
-        return {"success": True, "message": "Souvenir enregistré", "memory": memory}
+        memory = await memory_lifecycle.create(
+            content,
+            category,
+            source="chat",
+        )
+        return {
+            "success": True,
+            "message": "Souvenir enregistré",
+            "memory": memory,
+            "consistency": memory["consistency"],
+            "warnings": memory["warnings"],
+        }
     except Exception as exc:
         return {"error": str(exc)}
 
@@ -124,9 +112,13 @@ async def delete(args: dict[str, Any]) -> dict[str, Any]:
             "message": f"Oublier définitivement le souvenir {label} ?",
         }
     try:
-        db.delete_memory(memory_id)
-        await _delete_memory_index(memory_id)
-        return {"success": True, "message": f"Souvenir oublié : {memory_id}"}
+        result = await memory_lifecycle.forget(memory_id)
+        if not result["success"]:
+            return {
+                "error": "L'oubli n'est pas complet; le souvenir reste autoritatif.",
+                **result,
+            }
+        return {"success": True, "message": f"Souvenir oublié : {memory_id}", **result}
     except Exception as exc:
         return {"error": str(exc)}
 

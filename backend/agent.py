@@ -9,6 +9,7 @@ from typing import AsyncIterator
 import cloud_routing as _cr
 import cortex as _cortex
 import database as db
+import memory_mesh
 from intent_guard import skill_match_text
 from agent_prompt import build_system_prompt as _build_system_prompt
 from agent_protocol import encode_sse as _sse, to_ollama_messages as _to_ollama_messages
@@ -195,6 +196,7 @@ async def run_agent(
         build_system_prompt=_build_system_prompt,
         cortex_prompt_block=_cortex.prompt_block,
         get_real_paths=execute_pc_get_real_paths,
+        filter_memories=memory_mesh.filter_active,
     )
     _overflow = _base_context.overflow
     ollama_msgs = _base_context.ollama_messages

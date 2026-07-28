@@ -15,6 +15,7 @@ importés en base, etc.). Rester déterministe (comparaison de texte, pas de jug
 en réalité différents.
 """
 import database as db
+import memory_lifecycle
 
 
 def _overlap_score(a: str, b: str) -> float:
@@ -30,7 +31,7 @@ def _overlap_score(a: str, b: str) -> float:
     return 0.0
 
 
-def consolidate_memories(dry_run: bool = False, threshold: float = 0.75) -> dict:
+async def consolidate_memories(dry_run: bool = False, threshold: float = 0.75) -> dict:
     """Fusionne les souvenirs quasi-identiques (même catégorie, fort recouvrement de
     texte). Garde toujours le plus LONG/détaillé des deux, supprime l'autre. Best-effort :
     ne lève jamais. `dry_run=True` calcule les fusions sans rien supprimer (aperçu)."""
@@ -67,17 +68,25 @@ def consolidate_memories(dry_run: bool = False, threshold: float = 0.75) -> dict
                     })
                     to_delete.add(drop["id"])
 
+    failures = []
+    forgotten = set()
     if not dry_run:
         for mid in to_delete:
-            try:
-                db.delete_memory(mid)
-            except Exception:
-                pass
+            result = await memory_lifecycle.forget(str(mid))
+            if result.get("forgotten") is True:
+                forgotten.add(mid)
+            else:
+                failures.append({
+                    "id": str(mid),
+                    "stage": result.get("stage"),
+                    "error_type": result.get("error_type"),
+                })
 
     return {
-        "success": True,
+        "success": not failures,
         "total_before": len(memories),
-        "merged_count": len(to_delete),
+        "merged_count": len(to_delete) if dry_run else len(forgotten),
         "merges": merges,
+        "failures": failures,
         "dry_run": dry_run,
     }

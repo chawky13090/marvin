@@ -10139,3 +10139,48 @@ simultanément `Cloud strict` dans le badge de réponse.
 
 Rollback exact : `git revert <commit-v2.430>`. Aucun réglage, modèle installé, schéma, secret,
 donnée persistante ou accès réseau n'est modifié.
+
+## 2026-07-28 — v2.431.0 — Cycle de vie mémoire cohérent
+
+### Constat et décision
+
+SQLite, Memory Mesh et Qdrant possédaient des chemins de création et de suppression
+différents. L'API ne projetait pas toujours les nouveaux souvenirs; plusieurs suppressions
+laissaient des métadonnées ou des vecteurs fantômes; la consolidation supprimait uniquement
+SQLite. Les durées de rétention déclarées par le Mesh n'étaient ni appliquées au prompt ni
+purgées. Deux approches ont été comparées : multiplier les réparations périodiques
+best-effort, ou imposer une frontière de cycle de vie unique avec SQLite comme source
+autoritative. La seconde est retenue afin de rendre les échecs explicites et réessayables.
+
+### Implémentation, sécurité et observabilité
+
+`memory_lifecycle.py` coordonne création, reprojection, oubli unitaire/global et expiration.
+L'oubli retire Qdrant puis le Mesh avant SQLite et ne déclare jamais un succès partiel.
+L'agent exclut immédiatement du prompt les souvenirs échus; le worker les purge ensuite.
+API, outils et consolidation utilisent cette frontière. L'effacement global exige une
+confirmation transmise par le proxy Next.js. Les identifiants et catégories sont bornés;
+les catégories hors schéma reçoivent HTTP 422 au lieu d'une erreur SQLite 500. Un Mesh
+illisible échoue fermé et n'est pas remplacé; les écritures sont atomiques avec `fsync`.
+
+Aucun contenu de souvenir n'est ajouté aux logs techniques. Le worker ne publie que des
+compteurs agrégés; les pannes API passent par l'incident opaque global. Les retours de cycle
+de vie n'exposent que l'étape et la classe d'erreur. La dette restante est que le sidecar
+Mesh utilise un verrou intraprocessus; elle est bornée par l'architecture mono-processus
+FastAPI actuelle et devra être réévaluée avant tout déploiement multi-worker.
+
+### Validation et rollback
+
+Les contrats couvrent ordre d'oubli, panne Qdrant, panne Mesh, effacement partiel, corruption,
+expiration, filtrage du prompt, consolidation réelle et aperçu, API et confirmation frontend.
+Les tests ciblés Mémoire, Knowledge Mesh, contexte agent, workers, composition et architecture
+réussissent. Le gate consolidé réussit **193/193**, avec compilation Python et build
+Next.js 16.2.12 Turbopack. Après relance, les smokes live réussissent **28/28 API** et
+**40/40 pages**. Un scénario live refuse une catégorie invalide en 422, crée un souvenir
+synthétique avec `consistency=complete`, refuse l'effacement global non confirmé en 409,
+puis l'oublie sans résidu SQLite ni Mesh. L'aperçu de consolidation reste non destructif.
+Une seconde sonde vérifie aussi par l'outil `memory_search` que l'identifiant supprimé ne
+subsiste pas dans Qdrant.
+
+Rollback exact : `git revert <commit-v2.431>`. Aucun schéma n'est migré. Le seul enregistrement
+synthétique de validation a été supprimé par la nouvelle frontière et son absence a été
+vérifiée. Les données utilisateur, réglages, modèles, secrets et accès réseau restent inchangés.

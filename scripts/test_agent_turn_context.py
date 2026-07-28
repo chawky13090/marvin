@@ -40,7 +40,10 @@ async def main() -> int:
         default_permission_level=2,
         model_profiles={"agent": {"tools": True}},
         get_setting=settings.get,
-        get_memories=lambda: [{"content": "mémoire"}],
+        get_memories=lambda: [
+            {"id": "active", "content": "mémoire"},
+            {"id": "expired", "content": "mémoire expirée"},
+        ],
         get_conversation=lambda _id: {"project_id": "project-1"},
         get_project=lambda _id: {
             "name": "Production",
@@ -52,6 +55,9 @@ async def main() -> int:
         ),
         cortex_prompt_block=lambda _plan: ":cortex",
         get_real_paths=paths,
+        filter_memories=lambda memories: [
+            memory for memory in memories if memory["id"] != "expired"
+        ],
     )
     assert prepared.overflow == [messages[0]]
     assert prepared.permission_level == 3

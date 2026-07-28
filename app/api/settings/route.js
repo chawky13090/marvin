@@ -144,7 +144,10 @@ export async function POST(req) {
     }
 
     if (action === 'clear_memories') {
-      const r = await fetch(`${BACKEND}/api/memories`, { method: 'DELETE', signal: AbortSignal.timeout(8000) });
+      const r = await fetch(`${BACKEND}/api/memories?confirmed=true`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(30000),
+      });
       if (!r.ok) throw new Error(`Backend ${r.status}`);
       return NextResponse.json({ success: true, message: 'Toute la mémoire a été effacée.' });
     }
