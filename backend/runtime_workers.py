@@ -18,7 +18,16 @@ async def prewarm_default_models() -> None:
     """Precharge les profils agent et chat sans bloquer le demarrage FastAPI."""
     import httpx
 
+    import cloud_routing
     from config import MODEL_PROFILES, OLLAMA_URL
+
+    cloud_enabled, _cloud_overrides = cloud_routing.get_cloud_config()
+    if cloud_enabled and not cloud_routing.is_local_only_lockdown():
+        print(
+            "[Marvin] Ollama Cloud actif : modèles locaux disponibles à la demande, "
+            "sans préchargement RAM."
+        )
+        return
 
     models_to_warm = [
         MODEL_PROFILES.get("agent", {}).get("model", "qwen2.5:7b"),

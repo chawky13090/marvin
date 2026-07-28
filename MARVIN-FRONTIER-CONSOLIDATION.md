@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.432.0
+Version courante auditée : 2.433.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -475,6 +475,12 @@ snapshot de réparation sans laisser de fichier périmé. Le registre des jobs p
 copie valide, des écritures synchronisées, une récupération explicite et un état dégradé
 visible. Cette amélioration suit les principes communs aux agents de code modernes :
 environnement isolé, checkpoints, preuve de tests et restauration avant intégration.
+En v2.433.0, l'arbitrage de ressources aligne le runtime sur le contrat Cloud-first : aucun
+modèle local n'est préchargé quand Cloud est actif hors Hyper local. Debian et Windows
+publient un précheck RAM avant démarrage. Les deux runners ont exécuté réellement un bundle
+et ses tests dans leurs VM propres avec restauration du checkpoint avant et après; cette
+preuve ferme le défaut d'exécution native simple, mais pas encore l'E2E complet d'une mission
+LLM autonome interrompue puis reprise.
 
 ## 10. Preuves minimales par grande capacité
 

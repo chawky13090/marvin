@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.432.0)
+## 9. État actuel (v2.433.0)
+
+**v2.433 (arbitrage RAM Cloud/VM)** : quand Ollama Cloud est actif hors Hyper local, le
+worker de démarrage ne précharge plus les modèles locaux. Ils restent installés et sont
+chargés à la demande pour un contenu confidentiel, mais ne réservent plus 15 Go inutilement
+au détriment de Test Forge. Les runners Hyper-V Debian et Windows exposent mémoire libre,
+mémoire de démarrage et `memory_ready`; une insuffisance est refusée au précheck au lieu
+d'échouer tardivement dans `Start-VM`. Des smokes natifs réels prouvent Debian 13 avec Bats,
+Windows 11 avec compilation/unittest, checkpoints restaurés avant/après, moindre privilège,
+réseau Windows coupé et réseau hôte inchangé. Le snapshot Debian temporaire est supprimé.
 
 **v2.432 (acceptation Code Workspace transactionnelle)** : un candidat Code Forge reste
 hors du worktree tant que Test Forge, le contrat de production, les revues et les validations

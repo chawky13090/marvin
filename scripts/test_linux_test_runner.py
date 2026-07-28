@@ -29,6 +29,8 @@ def main() -> int:
             observed = {
                 "hyperv_access": True, "vm_exists": True, "checkpoint_exists": True,
                 "vm_state": "Off", "result_checkpoints": [], "switches": ["Default Switch"],
+                "host_free_memory_bytes": 8 * 1024**3,
+                "memory_startup_bytes": 4 * 1024**3,
             }
 
             def status_powershell(_script, *, input_text="", timeout=30):
@@ -41,6 +43,12 @@ def main() -> int:
                 json.dumps({"native_runner_version": 1}), encoding="utf-8",
             )
             assert linux_test_runner.status()["ready"] is True
+            observed["host_free_memory_bytes"] = 1024**3
+            low_memory = linux_test_runner.status()
+            assert low_memory["ready"] is False
+            assert low_memory["memory_ready"] is False
+            assert "Mémoire hôte insuffisante" in low_memory["error"]
+            observed["host_free_memory_bytes"] = 8 * 1024**3
             incomplete = linux_test_runner.execute({"main.sh": "#!/bin/bash\ntrue\n"})
             assert incomplete["production_ready"] is False
             assert "integration.sh" in incomplete["error"]

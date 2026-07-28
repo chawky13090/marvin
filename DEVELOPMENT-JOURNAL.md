@@ -10232,3 +10232,50 @@ Workspace expose un registre disponible et non dégradé.
 Rollback exact : `git revert <commit-v2.432>`. Aucun schéma, worktree utilisateur, mission
 existante, VM, secret ou réglage n'est migré. La réversion retire la lecture du fichier
 `.bak`; ce fichier inerte peut rester sur disque sans modifier le comportement antérieur.
+
+## 2026-07-28 — v2.433.0 — Arbitrage RAM et exécution native Debian/Windows
+
+### Incident observé et cause racine
+
+Le premier smoke Debian a été refusé par Hyper-V avec `0x800705AA` avant démarrage :
+2,29 Go de RAM libre pour 4 Go requis. `qwen2.5:14b`, préchauffé systématiquement pendant
+30 minutes, occupait environ 15 Go alors que cette installation utilise Ollama Cloud en
+priorité. La VM est restée arrêtée; aucun checkpoint de résultat et aucune modification
+réseau hôte n'ont été produits. Deux solutions ont été comparées : réduire arbitrairement
+la VM sous son profil testé, ou supprimer la réservation locale inutile en mode Cloud et
+vérifier la capacité avant `Start-VM`. La seconde préserve les environnements certifiés.
+
+### Implémentation, sécurité et fonctionnement
+
+`prewarm_default_models` consulte le contrat de confidentialité. Cloud actif hors Hyper local
+signifie modèles locaux disponibles à la demande, sans chargement RAM au démarrage. Cloud
+désactivé et Hyper local conservent le préchauffage antérieur; aucune image Ollama n'est
+désinstallée et la première demande locale recharge normalement le modèle.
+
+Les statuts Debian et Windows collectent auprès de Windows la RAM physique libre et
+`MemoryStartup` de la VM. `memory_ready` participe désormais à `ready`; l'interface et le
+routage reçoivent une cause précise avant exécution. Cette information ne contient ni
+processus, ni contenu, ni secret. Les credentials invités restent dans DPAPI. Le changement
+ne modifie ni mémoire de VM, ni switch, ni pare-feu, ni réseau hôte.
+
+### Preuves réelles
+
+Après `ollama stop qwen2.5:14b`, la RAM libre passe de 2,29 à 15,25 Go. Le smoke Debian réel
+exécute `integration.sh` et un test Bats dans `Marvin-Debian13-TestForge` :
+`production_ready=true`, marqueur complet, checkpoint restauré avant/après, réseau invité
+via Default Switch, `host_network_modified=false`, aucun montage hôte. Le snapshot de résultat
+est ensuite supprimé par restauration confirmée de `Marvin-Clean`; la VM termine arrêtée.
+
+Le smoke Windows réel compile et exécute `unittest` dans
+`Marvin-Windows11-TestForge` : `production_ready=true`, invité non administrateur,
+PowerShell 5.1, checkpoint restauré avant/après et adaptateur réseau déconnecté pendant
+l'exécution. Les tests unitaires couvrent aussi RAM insuffisante, Cloud sans préchauffage,
+mode local avec préchauffage, routage Cloud-only et superviseur Auto.
+
+Le gate consolidé réussit **193/193**, avec compilation Python et build Next.js 16.2.12
+Turbopack. Après relance Cloud-first, `ollama ps` reste vide, les deux runners restent prêts,
+et les smokes live réussissent **28/28 API** et **40/40 pages**.
+
+Rollback exact : `git revert <commit-v2.433>`. Aucun schéma ni donnée métier n'est migré.
+Le modèle local n'a pas été supprimé; Ollama peut le recharger à la demande. Les deux VM
+sont revenues à `Marvin-Clean`, arrêtées, sans snapshot temporaire.

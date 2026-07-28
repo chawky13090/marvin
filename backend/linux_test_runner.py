@@ -61,8 +61,9 @@ $ErrorActionPreference = 'Stop'
 Import-Module Hyper-V
 $vm = Get-VM -Name 'Marvin-Debian13-TestForge' -ErrorAction Stop
 $clean = Get-VMCheckpoint -VMName $vm.Name -Name 'Marvin-Clean' -ErrorAction Stop
+$os = Get-CimInstance Win32_OperatingSystem
 $results = @(Get-VMCheckpoint -VMName $vm.Name -ErrorAction SilentlyContinue | Where-Object Name -Like 'Marvin-Result-*' | ForEach-Object Name)
-[ordered]@{ hyperv_access=$true; vm_exists=$true; checkpoint_exists=($null -ne $clean); vm_state=[string]$vm.State; result_checkpoints=$results; switches=@(Get-VMNetworkAdapter -VMName $vm.Name | ForEach-Object SwitchName) } | ConvertTo-Json -Compress
+[ordered]@{ hyperv_access=$true; vm_exists=$true; checkpoint_exists=($null -ne $clean); vm_state=[string]$vm.State; result_checkpoints=$results; switches=@(Get-VMNetworkAdapter -VMName $vm.Name | ForEach-Object SwitchName); host_free_memory_bytes=([int64]$os.FreePhysicalMemory * 1KB); memory_startup_bytes=[int64]$vm.MemoryStartup } | ConvertTo-Json -Compress
 """
 
 
@@ -95,16 +96,25 @@ def status() -> dict[str, Any]:
         base["error"] = "Réponse Hyper-V Debian invalide."
         return base
     manual_active = state.get("status") == "manual_active"
+    memory_ready = (
+        str(base.get("vm_state") or "").casefold() != "off"
+        or int(base.get("host_free_memory_bytes") or 0)
+        >= int(base.get("memory_startup_bytes") or 0)
+    )
+    base["memory_ready"] = memory_ready
     base["ready"] = bool(
         base.get("checkpoint_exists") and base.get("credential_present")
-        and harness_ready and not manual_active
+        and harness_ready and not manual_active and memory_ready
     )
     if not base["ready"]:
         base["error"] = (
             "La VM est conservée pour un test manuel; restaurez la base saine avant une nouvelle validation."
             if manual_active else (
-                "La VM Debian doit être reprovisionnée une fois pour installer le harnais Test Forge natif."
-                if not harness_ready else "VM, checkpoint propre ou clé SSH DPAPI manquant."
+                "Mémoire hôte insuffisante pour démarrer la VM Debian; libérez le modèle local ou attendez sa décharge."
+                if not memory_ready else (
+                    "La VM Debian doit être reprovisionnée une fois pour installer le harnais Test Forge natif."
+                    if not harness_ready else "VM, checkpoint propre ou clé SSH DPAPI manquant."
+                )
             )
         )
     return base

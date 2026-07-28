@@ -108,6 +108,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module Hyper-V
 $vm = Get-VM -Name $env:MARVIN_VM_NAME
 $checkpoint = Get-VMCheckpoint -VMName $vm.Name -Name $env:MARVIN_CHECKPOINT_NAME -ErrorAction Stop
+$os = Get-CimInstance Win32_OperatingSystem
 [ordered]@{
   hyperv_access = $true
   vm_exists = ($null -ne $vm)
@@ -116,6 +117,8 @@ $checkpoint = Get-VMCheckpoint -VMName $vm.Name -Name $env:MARVIN_CHECKPOINT_NAM
   generation = $vm.Generation
   checkpoint_type = [string]$vm.CheckpointType
   switches = @((Get-VMNetworkAdapter -VMName $vm.Name | ForEach-Object SwitchName))
+  host_free_memory_bytes = ([int64]$os.FreePhysicalMemory * 1KB)
+  memory_startup_bytes = [int64]$vm.MemoryStartup
 } | ConvertTo-Json -Compress
 """
     env = os.environ.copy()
@@ -140,12 +143,22 @@ $checkpoint = Get-VMCheckpoint -VMName $vm.Name -Name $env:MARVIN_CHECKPOINT_NAM
         base["error"] = "Réponse Hyper-V invalide."
         return base
     base.update(observed)
+    memory_ready = (
+        str(base.get("vm_state") or "").casefold() != "off"
+        or int(base.get("host_free_memory_bytes") or 0)
+        >= int(base.get("memory_startup_bytes") or 0)
+    )
+    base["memory_ready"] = memory_ready
     base["ready"] = bool(
         base["hyperv_access"] and base["vm_exists"] and base["checkpoint_exists"]
-        and base["credential_present"]
+        and base["credential_present"] and memory_ready
     )
     if not base["ready"]:
-        base["error"] = "VM, checkpoint ou secret invité manquant."
+        base["error"] = (
+            "Mémoire hôte insuffisante pour démarrer la VM Windows; libérez le modèle local ou attendez sa décharge."
+            if not memory_ready
+            else "VM, checkpoint ou secret invité manquant."
+        )
     return base
 
 

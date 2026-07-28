@@ -91,10 +91,13 @@ async def _check_prewarm_deduplication() -> None:
 
     profiles = {"agent": {"model": "same:cloud"}, "chat": {"model": "same:cloud"}}
     import httpx
+    import cloud_routing
 
     with (
         patch.object(config, "MODEL_PROFILES", profiles),
         patch.object(config, "OLLAMA_URL", "http://ollama.invalid"),
+        patch.object(cloud_routing, "get_cloud_config", return_value=(False, {})),
+        patch.object(cloud_routing, "is_local_only_lockdown", return_value=False),
         patch.object(httpx, "AsyncClient", FakeClient),
     ):
         await runtime_workers.prewarm_default_models()
@@ -102,6 +105,19 @@ async def _check_prewarm_deduplication() -> None:
     assert calls[0][0] == "http://ollama.invalid/api/chat"
     assert calls[0][1]["model"] == "same:cloud"
     assert calls[0][1]["keep_alive"] == "30m"
+
+    calls.clear()
+    with (
+        patch.object(config, "MODEL_PROFILES", profiles),
+        patch.object(config, "OLLAMA_URL", "http://ollama.invalid"),
+        patch.object(cloud_routing, "get_cloud_config", return_value=(True, {
+            "agent": "frontier:cloud",
+        })),
+        patch.object(cloud_routing, "is_local_only_lockdown", return_value=False),
+        patch.object(httpx, "AsyncClient", FakeClient),
+    ):
+        await runtime_workers.prewarm_default_models()
+    assert calls == []
 
 
 async def _check_tool_index() -> None:

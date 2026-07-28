@@ -32,6 +32,8 @@ def main() -> int:
                 "hyperv_access": True, "vm_exists": True, "checkpoint_exists": True,
                 "vm_state": "Off", "generation": 2, "checkpoint_type": "ProductionOnly",
                 "switches": ["Marvin-TestForge"],
+                "host_free_memory_bytes": 8 * 1024**3,
+                "memory_startup_bytes": 6 * 1024**3,
             }
 
             def fake_run(*_args, **_kwargs):
@@ -44,6 +46,12 @@ def main() -> int:
                 confirmed=True,
             )
             assert configured["ready"] is True
+            observed["host_free_memory_bytes"] = 1024**3
+            low_memory = hyperv_test_runner.status()
+            assert low_memory["ready"] is False
+            assert low_memory["memory_ready"] is False
+            assert "Mémoire hôte insuffisante" in low_memory["error"]
+            observed["host_free_memory_bytes"] = 8 * 1024**3
             assert dpapi_secret_store.get_secret(hyperv_test_runner.PASSWORD_KEY) == "not-persisted-in-clear"
             assert "not-persisted-in-clear" not in dpapi_secret_store.PATH.read_text(encoding="utf-8")
             assert "not-persisted-in-clear" not in hyperv_test_runner.CONFIG_PATH.read_text(encoding="utf-8")
