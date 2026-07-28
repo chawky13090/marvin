@@ -319,6 +319,12 @@ dates, tailles, extensions, textes et sorties sont bornés. IMAP et les écritur
 quittent la boucle asyncio; les fichiers intermédiaires sont supprimés dans tous les chemins.
 Les créations de tâches passent encore par le domaine Productivity et les lecteurs de
 documents existants, sans dupliquer leur logique.
+102. la surveillance e-mail : `tool_domains/email_monitoring.py` possède la collecte des
+non-lus, leur classification IA par lots, les alertes et l'application des règles. Un lot non
+classifié n'est pas inscrit dans l'état `seen`, afin d'être repris au passage suivant. Les
+règles n'acceptent que déplacement, lecture ou non-lecture; volumes, comptes et dossiers sont
+bornés, les simulations n'effectuent aucune mutation distante et toutes les pannes partielles
+sont projetées dans le résultat.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

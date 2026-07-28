@@ -7757,3 +7757,42 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Rollback du code : réversion atomique du commit v2.384 après contrôle du patch inverse;
   redémarrer ensuite le backend et repasser le test ciblé, `/api/health`, le gate rapide et
   le smoke test.
+## 2026-07-28 — v2.385.0 — surveillance et règles e-mail
+
+### Contexte et constats
+
+- Surveillance et règles conservaient 145 lignes dans `tools.py`.
+- Seuls les 20 premiers nouveaux messages étaient envoyés au LLM, mais tous étaient ensuite
+  marqués vus; les suivants pouvaient donc ne jamais être classifiés.
+- Une réponse IA invalide était silencieuse, les pannes IMAP disparaissaient et deux passages
+  concurrents pouvaient notifier ou déplacer deux fois.
+- Une règle malformée pouvait lever; une action inconnue ou un déplacement sans dossier
+  pouvait être compté comme appliqué sans aucune mutation.
+
+### Solution
+
+- Nouveau `tool_domains/email_monitoring.py` avec stockage, comptes, IMAP, LLM, notifications
+  et mutations injectés.
+- Classification de 100 messages maximum en lots de 20; seuls les lots correctement décodés
+  sont inscrits dans `email_watch_seen`, les autres restent reprenables.
+- Ordre `seen` déterministe, alertes limitées, `max_notify` borné et erreurs partielles
+  retournées avec leur phase.
+- Règles limitées à 100, actions en liste blanche, compte et dossier validés, limite de scan
+  comprise entre 1 et 100, simulation sans mutation et résultat tronqué explicitement.
+- Verrous distincts de surveillance et classement; façades workers/API/registre conservées.
+
+### Validation et rollback
+
+- Test isolé : 22 messages et deux lots IA, plafond de notifications, simulation, réponse IA
+  invalide reprenable, concurrence, règles malformées/inconnues, move/mark, limite et panne
+  IMAP; identités de façade vérifiées.
+- Tests des workers de communication et des 13 routes de préférences repassés.
+- Architecture : 344 outils, 346 routes et harness 344/344; gate global réussi sur
+  156/156 étapes.
+- Backend réel redémarré en 2.385.0 : Ollama disponible et 15 workers; exécution HTTP
+  `email_apply_rules` ciblée sur un compte inexistant, sans lecture ni mutation distante.
+- Frontend Turbopack conservé et smoke test réel réussi sur 28/28 contrats.
+- Aucun schéma ni message distant n'est modifié pendant les tests; les mutations sont simulées.
+- Rollback du code : réversion atomique du commit v2.385 après contrôle du patch inverse;
+  redémarrer ensuite le backend et repasser le test ciblé, `/api/health`, le gate rapide et
+  le smoke test.

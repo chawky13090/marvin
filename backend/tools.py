@@ -85,6 +85,7 @@ from tool_domains import unified_search as unified_search_domain
 from tool_domains import screen_ocr as screen_ocr_domain
 from tool_domains import email_messages as email_messages_domain
 from tool_domains import email_productivity as email_productivity_domain
+from tool_domains import email_monitoring as email_monitoring_domain
 from tool_domains import email_automation as email_automation_domain
 import ssh_transport
 from document_formatting import (
@@ -1142,156 +1143,21 @@ execute_email_to_task = email_productivity_domain.to_task
 execute_email_attachment_summary = email_productivity_domain.attachment_summary
 
 
-async def execute_email_watch_check(args: dict) -> dict:
-    """🔔 Surveille les emails non lus, détecte les IMPORTANTS par IA et notifie sur le bureau.
-    Appelé périodiquement en arrière-plan. force=true ignore le réglage activé/désactivé ; dry_run=true ne notifie pas."""
-    import json as _json
-    from datetime import datetime as _dt
-    cfg = db.get_setting("email_watch")
-    if isinstance(cfg, str):
-        try: cfg = _json.loads(cfg)
-        except Exception: cfg = None
-    if not isinstance(cfg, dict):
-        cfg = {}
-    if not args.get("force") and not cfg.get("enabled"):
-        return {"success": True, "checked": 0, "important": 0, "message": "Surveillance désactivée."}
-    accounts_filter = cfg.get("accounts") or []
-    max_notify = int(cfg.get("max_notify", 5))
-    do_notify = not args.get("dry_run", False)
-
-    import email_manager as _em
-    loop = asyncio.get_running_loop()
-    accts = [a for a in _all_email_cfgs() if (not accounts_filter or a["username"] in accounts_filter)]
-    seen = set(db.get_setting("email_watch_seen") or [])
-    new_items = []
-    for a in accts:
-        try:
-            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
-                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                folder="INBOX", limit=15, offset=0))
-        except Exception:
-            continue
-        for e in inbox:
-            uid = str(e.get("id") or "")
-            key = f"{a['username']}:{uid}"
-            if not uid or key in seen or e.get("read"):
-                continue
-            new_items.append({"account": a["username"], "key": key, "from": e.get("from", ""), "subject": e.get("subject", "")})
-    if not new_items:
-        return {"success": True, "checked": 0, "important": 0, "message": "Aucun nouvel email non lu."}
-
-    # IA : repérer les importants (1 seul appel)
-    listing = "\n".join(f"{i+1}. De: {it['from']} | Objet: {it['subject']}" for i, it in enumerate(new_items[:20]))
-    prompt = ("Parmi ces nouveaux emails non lus, lesquels sont VRAIMENT IMPORTANTS (action requise, urgent, "
-              "vrai expéditeur attendant une réponse) — par opposition aux non importants (pub, newsletter, "
-              "notification automatique, réseaux sociaux) ? Réponds UNIQUEMENT par un JSON : {\"important\": [numéros]}.\n\n" + listing)
-    important_idx = set()
-    try:
-        raw = await _ollama_generate(prompt, model=args.get("model"), timeout=120)
-        import re as _re3
-        m = _re3.search(r"\{.*\}", raw or "", _re3.DOTALL)
-        if m:
-            d = _json.loads(m.group(0))
-            important_idx = {int(x) for x in d.get("important", []) if str(x).strip().lstrip("-").isdigit()}
-    except Exception:
-        important_idx = set()
-
-    alerts = db.get_setting("email_watch_alerts") or []
-    if isinstance(alerts, str):
-        try: alerts = _json.loads(alerts)
-        except Exception: alerts = []
-    if not isinstance(alerts, list):
-        alerts = []
-    notified = 0
-    for i, it in enumerate(new_items):
-        seen.add(it["key"])  # tous marqués vus (pas de re-notification)
-        if (i + 1) in important_idx and notified < max_notify:
-            if do_notify:
-                try:
-                    await execute_pc_notify({"title": f"📧 Email important — {it['from'][:40]}",
-                                             "message": (it["subject"] or "(sans objet)")[:140]})
-                except Exception:
-                    pass
-                # Alerte aussi sur Telegram (si activé)
-                await _telegram_notify(f"🔴 <b>Mail important</b>\nDe : {it['from'][:60]}\n{(it['subject'] or '(sans objet)')[:140]}")
-            alerts.insert(0, {"account": it["account"], "from": it["from"], "subject": it["subject"],
-                              "at": _dt.now().isoformat(timespec="seconds")})
-            notified += 1
-    db.set_setting("email_watch_seen", list(seen)[-1000:])
-    db.set_setting("email_watch_alerts", alerts[:50])
-    return {"success": True, "checked": len(new_items), "important": notified,
-            "message": f"{len(new_items)} nouvel(s) email(s) non lu(s), {notified} important(s) signalé(s)."}
 
 
-def _email_rules() -> list[dict]:
-    import json as _json
-    r = db.get_setting("email_rules")
-    if isinstance(r, str):
-        try: r = _json.loads(r)
-        except Exception: r = []
-    return r if isinstance(r, list) else []
-
-
-async def execute_email_apply_rules(args: dict) -> dict:
-    """🗂️ Applique les règles de classement aux emails récents : déplacer vers un dossier
-    ou marquer lu/non lu selon expéditeur/objet. dry_run=true pour simuler."""
-    rules = [r for r in _email_rules() if r.get("enabled", True) and (r.get("from_contains") or r.get("subject_contains"))]
-    if not rules:
-        return {"success": True, "applied": 0, "results": [], "message": "Aucune règle définie."}
-    dry_run = bool(args.get("dry_run", False))
-    only_account = args.get("account")
-    import email_manager as _em
-    loop = asyncio.get_running_loop()
-    accts = [a for a in _all_email_cfgs() if (not only_account or a["username"] == only_account)]
-    results = []
-    applied = 0
-    for a in accts:
-        try:
-            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
-                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                folder="INBOX", limit=int(args.get("limit", 25)), offset=0))
-        except Exception as e:
-            results.append({"account": a["username"], "action": "erreur", "reason": str(e)})
-            continue
-        for e in inbox:
-            uid = str(e.get("id") or "")
-            sender = (e.get("from") or "").lower()
-            subject = (e.get("subject") or "").lower()
-            for rule in rules:
-                if rule.get("account") and rule["account"] != a["username"]:
-                    continue
-                fc = (rule.get("from_contains") or "").lower().strip()
-                sc = (rule.get("subject_contains") or "").lower().strip()
-                if fc and fc not in sender:
-                    continue
-                if sc and sc not in subject:
-                    continue
-                act = rule.get("action", "move")
-                target = rule.get("folder", "")
-                label = f"{e.get('subject','(sans objet)')[:40]} → règle « {rule.get('name', act)} »"
-                if not dry_run:
-                    try:
-                        if act == "move" and target:
-                            await loop.run_in_executor(None, lambda a=a, uid=uid, target=target: _em.move_email(
-                                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                                uid=uid, dest_folder=target, folder="INBOX"))
-                        elif act == "mark_read":
-                            await loop.run_in_executor(None, lambda a=a, uid=uid: _em.mark_email(
-                                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                                uid=uid, folder="INBOX", seen=True))
-                        elif act == "mark_unread":
-                            await loop.run_in_executor(None, lambda a=a, uid=uid: _em.mark_email(
-                                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                                uid=uid, folder="INBOX", seen=False))
-                    except Exception as ex:
-                        results.append({"account": a["username"], "action": "échec", "detail": label, "reason": str(ex)})
-                        break
-                results.append({"account": a["username"], "action": act + (" (simulation)" if dry_run else ""),
-                                "detail": label, "folder": target})
-                applied += 1
-                break  # une seule règle par email (la première qui matche)
-    return {"success": True, "applied": applied, "dry_run": dry_run, "results": results[:60],
-            "message": f"{applied} email(s) classé(s) par règles" + (" (simulation)" if dry_run else "") + "."}
+email_monitoring_domain.configure(
+    get_setting=lambda key: db.get_setting(key),
+    set_setting=lambda key, value: db.set_setting(key, value),
+    list_accounts=lambda: _all_email_cfgs(),
+    fetch_inbox=lambda *args, **kwargs: email_manager_runtime.fetch_inbox(*args, **kwargs),
+    move_email=lambda *args, **kwargs: email_manager_runtime.move_email(*args, **kwargs),
+    mark_email=lambda *args, **kwargs: email_manager_runtime.mark_email(*args, **kwargs),
+    generate=lambda prompt, **kwargs: _ollama_generate(prompt, **kwargs),
+    desktop_notify=lambda args: execute_pc_notify(args),
+    telegram_notify=lambda text: _telegram_notify(text),
+)
+execute_email_watch_check = email_monitoring_domain.watch_check
+execute_email_apply_rules = email_monitoring_domain.apply_rules
 
 
 # ─────────────────────── Briefing du jour (assistant) v2.47 ───────────────────────

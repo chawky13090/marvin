@@ -317,6 +317,11 @@ La tranche v2.384 sépare les transformations productives dans
 jointe. Les dépendances métier existantes restent injectées, le JSON et les dates sont
 contrôlés, et les pièces jointes suivent une politique de taille, format et nettoyage
 temporaire explicite.
+La tranche v2.385 extrait la surveillance et les règles dans
+`tool_domains/email_monitoring.py`. La classification couvre tous les nouveaux messages par
+lots bornés et conserve pour reprise ceux qu'un LLM n'a pas classifiés. Les règles deviennent
+un contrat fermé, les pannes partielles sont visibles et deux verrous empêchent les doubles
+passages concurrents des workers et des actions manuelles.
 
 ## 4. Validation obligatoire par tranche
 

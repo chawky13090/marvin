@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.384.0)
+## 9. État actuel (v2.385.0)
+
+**v2.385 (surveillance e-mail)** : détection des messages importants et règles de classement
+rejoignent `tool_domains/email_monitoring.py`. Les dépendances de réglages, IMAP, mutations,
+notifications et LLM sont injectées. Jusqu'à 100 nouveaux messages sont classifiés par lots
+de 20; un lot IA invalide reste non vu pour être repris. Comptes, règles, actions, dossiers
+et volumes sont bornés; les actions inconnues ne sont plus comptées comme appliquées. Les
+pannes partielles et notifications défaillantes sont exposées, les exécutions concurrentes
+sont refusées et les deux anciens corps ont quitté `tools.py`.
 
 **v2.384 (productivité e-mail)** : conversion d'un e-mail en tâche et résumé de pièce jointe
 rejoignent `tool_domains/email_productivity.py`. Résolution de compte, IMAP, génération,
