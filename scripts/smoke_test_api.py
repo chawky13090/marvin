@@ -49,6 +49,13 @@ def backend_health() -> None:
     assert data.get("tools_count") == data.get("tools_spec_count")
     assert isinstance(data.get("ollama"), bool)
     assert isinstance(data.get("version"), str) and data["version"].count(".") == 2
+    generation = data.get("generation")
+    assert isinstance(generation, dict)
+    assert all(
+        isinstance(generation.get(key), int)
+        for key in ("total", "succeeded", "failed", "fallbacks", "retries", "attempts")
+    )
+    assert "prompt" not in json.dumps(generation).lower()
 
 
 def backend_openapi() -> None:

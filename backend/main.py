@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.391 — générations internes extraites; pool, routage et métriques sans contenu
 # v2.390 — Logos extrait; génération sérialisée, atomique et reproductible
 # v2.389 — Webapp extrait; HTML borné, atomique et réseau bloqué par CSP
 # v2.388 — Telegram extrait; secret masqué, entrées bornées et transport injectable
@@ -75,6 +76,7 @@ import audit
 import engineering_runtime
 import tool_gateway
 import web_runtime
+import generation_runtime
 from agent import run_agent, _refresh_model_cache
 import chat_turn_runtime
 from api.backups import router as backups_router
@@ -482,6 +484,7 @@ async def lifespan(app_instance):
             await web_browser.close()
         except Exception:
             pass
+        await generation_runtime.close()
         await web_runtime.close()
 
 # v2.79.0 — Compétences fiabilisées : (1) nomic-embed-text requis pour le matching

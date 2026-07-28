@@ -30,6 +30,7 @@ import vector_store as vector_store_runtime
 import voice_transcription as voice_transcription_runtime
 import web_runtime
 import proactive_briefing
+import generation_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -1553,85 +1554,13 @@ execute_system_cleanup = system_cleanup_domain.cleanup
 
 
 # ════════════════ PDF render/OCR/forms, PPTX, conversions, IA (v2.36) ════════════
-async def _ollama_generate(
-    prompt: str,
-    model: str = None,
-    images: list = None,
-    timeout: int = 180,
-    return_metadata: bool = False,
-) -> str | dict:
-    """Appel texte (ou vision) à Ollama /api/generate, AVEC robustesse :
-    - 1 essai primaire (timeout complet) + 1 retry primaire SEULEMENT si l'échec n'est pas
-      un timeout (v2.137 — un timeout sur un gros prompt est structurel, pas transitoire) ;
-    - repli sur un modèle plus léger (chat) avec un timeout réduit si le primaire échoue.
-    Retourne la réponse brute.
-
-    v2.122 — passe par `cloud_routing.resolve_model()` : c'est le point d'entrée UNIQUE
-    utilisé par 13+ outils (document_generate, email_*, text_summarize, document_ask...) et,
-    indirectement, par `skills.py` (upgrade_skill/suggest_skills, injecté comme callback) —
-    un seul endroit à corriger pour que TOUS ces appels bénéficient du même routage
-    cloud/sensibilité que la boucle de chat principale, au lieu de tomber systématiquement
-    en local sans jamais consulter le réglage Ollama Cloud de l'utilisateur. Les images
-    (OCR/vision) forcent toujours le local (cf. docstring de `resolve_model`)."""
-    import httpx, asyncio as _aio
-    import cloud_routing as _cr
-    primary = _cr.resolve_model(model, profile="agent", text_for_sensitivity=prompt, has_images=bool(images))
-    if _cr.is_cloud_only_mode():
-        need = "vision" if images else (_cr.detect_task(prompt) or "general")
-        try:
-            light = _cr.require_cloud_model(need, exclude=frozenset({primary}))
-        except _cr.CloudOnlyModelUnavailable:
-            light = None
-    else:
-        try:
-            light = MODEL_PROFILES.get("chat", {}).get("model") or "qwen2.5:3b"
-        except Exception:
-            light = "qwen2.5:3b"
-    # v2.137 — trouvé en corrigeant la lenteur de /api/skills/suggest (timeout 5 min dépassé,
-    # backend resté sain — pas un hang, juste un budget de temps catastrophique) : l'ancien
-    # schéma retentait le modèle PRIMAIRE 3× AU TIMEOUT COMPLET avant même d'essayer le repli
-    # léger — pire cas 3×240s = 12 minutes rien que pour le primaire. Un timeout n'est presque
-    # jamais un blip réseau transitoire pour un GROS prompt (comme les 120 messages analysés
-    # par suggest_skills) : la génération est structurellement lente, pas temporairement en
-    # panne — réessayer IDENTIQUE échoue de la même façon. Seules les erreurs non-timeout
-    # (connexion refusée, 5xx ponctuel) bénéficient vraiment d'un retry rapide. Nouveau schéma :
-    # 1 essai primaire au timeout complet, 1 SEUL retry primaire UNIQUEMENT si l'échec n'était
-    # PAS un timeout, puis repli léger avec un timeout RÉDUIT (modèle plus petit = plus rapide,
-    # pas besoin du budget complet). Pire cas : timeout + timeout_léger, au lieu de 4×timeout.
-    light_timeout = max(30, min(timeout, 60))
-    has_light_fallback = bool(light) and light != primary
-
-    async def _call(mdl: str, to: int):
-        payload = {"model": mdl, "prompt": prompt, "stream": False}
-        if images:
-            payload["images"] = images
-        async with httpx.AsyncClient(timeout=to) as client:
-            resp = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
-            resp.raise_for_status()
-            text = resp.json().get("response", "").strip()
-            return {"text": text, "model": mdl} if return_metadata else text
-
-    last_err = None
-    # 1) Essai primaire, timeout complet.
-    try:
-        return await _call(primary, timeout)
-    except Exception as e:
-        last_err = e
-        # 2) Retry primaire — SEULEMENT si l'échec n'était pas un timeout (connexion, 5xx
-        #    ponctuel) : réessayer un timeout identique à l'identique échouerait pareil.
-        if not isinstance(e, httpx.TimeoutException):
-            await _aio.sleep(1)
-            try:
-                return await _call(primary, timeout)
-            except Exception as e2:
-                last_err = e2
-    # 3) Repli sur le modèle léger, timeout réduit (petit modèle = rapide).
-    if has_light_fallback:
-        try:
-            return await _call(light, light_timeout)
-        except Exception as e3:
-            last_err = e3
-    raise last_err if last_err else RuntimeError("Ollama indisponible")
+generation_runtime.configure(
+    routing=cloud_routing_runtime,
+    base_url=OLLAMA_URL,
+    model_profiles=MODEL_PROFILES,
+    cloud_only_unavailable=cloud_routing_runtime.CloudOnlyModelUnavailable,
+)
+_ollama_generate = generation_runtime.generate
 
 
 long_tasks_domain.configure(

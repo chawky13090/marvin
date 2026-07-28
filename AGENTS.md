@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.390.0)
+## 9. État actuel (v2.391.0)
+
+**v2.391 (runtime de génération partagé)** : le point d'entrée `_ollama_generate`, consommé
+par plus de treize outils et services, rejoint `generation_runtime.py`. Résolution du modèle,
+contrat Ultra Cloud-only, retry non-timeout, repli et formats texte/métadonnées restent
+compatibles. Le runtime possède maintenant un pool HTTP fermé au shutdown, des timeouts
+distincts et bornés, ainsi que des compteurs agrégés par modèle, succès, échec, tentative,
+retry, repli et latence moyenne. Ces métriques sont exposées par `/api/health` sans prompt,
+image, réponse ni erreur détaillée. Tests dédiés et Cloud-only interdisent tout repli local.
 
 **v2.390 (logos locaux)** : génération et catalogue rejoignent
 `tool_domains/logos.py`. Les dimensions sont limitées à six tailles compatibles, nom,

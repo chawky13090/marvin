@@ -74,7 +74,7 @@ def test_internal_cloud_fallback() -> None:
         async def __aexit__(self, *args):
             return False
 
-        async def post(self, url: str, json: dict):
+        async def post(self, url: str, json: dict, timeout=None):
             calls.append(json["model"])
             return Response(json["model"])
 

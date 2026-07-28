@@ -10,6 +10,7 @@ from fastapi import APIRouter, Request
 from app_version import APP_VERSION
 from config import OLLAMA_URL
 import tools
+import generation_runtime
 
 router = APIRouter()
 _cache: dict = {}
@@ -72,6 +73,7 @@ async def health(request: Request):
             "version": APP_VERSION,
             "tools_count": len(tools.TOOLS_REGISTRY),
             "tools_spec_count": len(tools.TOOLS_SPEC),
+            "generation": generation_runtime.snapshot(),
         }
         _cache = {**result, "_ts": now}
         return _with_runtime(result, request)

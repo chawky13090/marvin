@@ -7986,3 +7986,45 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   le catalogue HTTP; smoke test réel 28/28 avec le frontend Turbopack.
 - Rollback : réversion atomique du commit v2.390 après contrôle du patch inverse; redémarrer
   le backend puis repasser test ciblé, `/api/health`, gate rapide et smoke test.
+
+## 2026-07-28 — v2.391.0 — runtime observable des générations internes
+
+### Constat, comparaison et amélioration proactive
+
+- `_ollama_generate` alimentait plus de treize outils mais mélangeait routage de
+  confidentialité, client HTTP, retry et repli dans `tools.py`.
+- Chaque tentative ouvrait un client HTTP. Aucun compteur ne permettait de mesurer modèle
+  choisi, retries, replis, échecs ou durée des générations internes.
+- Deux options ont été comparées : réutiliser directement le transport streaming du Runner,
+  ou extraire un runtime `/api/generate` dédié derrière la façade existante. Le second est
+  retenu : le protocole non-streaming de ces outils ne doit pas contaminer les événements SSE
+  du Runner, mais partage les mêmes règles de modèle.
+- L'amélioration proactive ajoute un pool HTTP possédé et fermé proprement, plus une
+  observabilité agrégée sans contenu. Elle suit les principes de tracing des générations
+  d'OpenAI et la combinaison monitoring/évaluations recommandée par Anthropic.
+
+### Solution
+
+- Nouveau `generation_runtime.py` avec routage, modèles, horloge, sommeil, exception Cloud
+  et fabrique client injectables.
+- Contrat historique conservé : un essai primaire; un retry seulement après erreur
+  non-timeout; un repli léger unique avec timeout réduit. Ultra ne sélectionne que du Cloud.
+- Timeout validé entre 5 et 900 secondes et transport poolé avec limites de connexions.
+- Statistiques thread-safe : total, succès, échecs, tentatives, retries, replis, durée moyenne
+  et compte par modèle. Aucun prompt, réponse, image ou détail d'exception n'est stocké.
+- Le pool est fermé dans le lifespan FastAPI; `/api/health` expose seulement l'agrégat.
+
+### Validation et rollback
+
+- Compilation et tests ciblés réussis : succès primaire, retry, timeout sans retry, replis
+  local/Cloud, format metadata, timeouts invalides, compteurs, absence de contenu, fermeture
+  et refus d'une reconfiguration qui abandonnerait un pool ouvert.
+- Tests Cloud-only, raisonnement parallèle, revue indépendante, traduction et architecture
+  passent; registre 344/344 et 346 routes préservés.
+- Gate rapide complet réussi sur 162 étapes. Backend réel redémarré en 2.391.0 avec Ollama,
+  344 outils et 15 workers; une traduction neutre exécutée via le gateway a incrémenté les
+  métriques, sans prompt ni réponse dans `/api/health`. Smoke test réel 28/28 avec Turbopack.
+- Références : https://openai.github.io/openai-agents-python/tracing/ et
+  https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+- Rollback : réversion atomique du commit v2.391 après contrôle du patch inverse; redémarrer
+  le backend puis repasser tests ciblés, `/api/health`, gate rapide et smoke test.
