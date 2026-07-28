@@ -3740,63 +3740,7 @@ async def execute_git_info(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_bulk_rename(args: dict) -> dict:
-    """Renomme en masse des fichiers dans un dossier selon un motif de recherche/remplacement."""
-    folder   = args.get("folder", "").strip()
-    pattern  = args.get("pattern", "").strip()  # regex ou texte à trouver dans le nom
-    replace  = args.get("replace", "")          # texte de remplacement
-    glob_pat = args.get("glob", "*")            # filtre de fichiers ex: "*.jpg"
-    dry_run  = args.get("dry_run", True)        # True = simuler seulement
-    confirmed = args.get("confirmed", False)
-
-    if not folder:
-        return {"error": "Paramètre 'folder' requis."}
-    if not pattern:
-        return {"error": "Paramètre 'pattern' requis."}
-
-    resolved = Path(_resolve_path(folder))
-    if not resolved.exists():
-        return {"error": f"Dossier introuvable : {resolved}"}
-
-    import re as _re, fnmatch as _fn
-    try:
-        files = [f for f in resolved.iterdir() if f.is_file()]
-        if glob_pat != "*":
-            files = [f for f in files if _fn.fnmatch(f.name, glob_pat)]
-
-        renames = []
-        for f in files:
-            new_name = _re.sub(pattern, replace, f.name)
-            if new_name != f.name:
-                renames.append({"old": f.name, "new": new_name, "old_path": str(f), "new_path": str(f.parent / new_name)})
-
-        if not renames:
-            return {"success": True, "message": "Aucun fichier ne correspond au motif.", "renamed": 0}
-
-        if dry_run and not confirmed:
-            return {
-                "requiresConfirmation": True,
-                "message": f"Renommer {len(renames)} fichier(s) dans {resolved.name} ?\nExemple : {renames[0]['old']} → {renames[0]['new']}",
-                "preview": renames[:10],
-            }
-
-        # Execute rename
-        done = []; errors = []
-        for r in renames:
-            try:
-                os.rename(r["old_path"], r["new_path"])
-                done.append(r)
-            except Exception as e:
-                errors.append({"file": r["old"], "error": str(e)})
-        return {
-            "success": True,
-            "folder": str(resolved),
-            "renamed": len(done),
-            "errors": errors,
-            "files": done[:50],
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_bulk_rename = filesystem_domain.bulk_rename
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -6648,13 +6592,15 @@ TOOLS_SPEC = [
         "count":  {"type": "integer", "description": "Nombre de commits pour l'action 'log' (défaut 10)"}},
        []),
     _t("bulk_rename", "Renomme en masse des fichiers d'un dossier selon un motif regex (avec confirmation et mode dry_run).",
-       {"folder":   {"type": "string", "description": "Dossier contenant les fichiers"},
-        "pattern":  {"type": "string", "description": "Expression régulière à trouver dans le nom de fichier"},
-        "replace":  {"type": "string", "description": "Texte de remplacement (peut utiliser des groupes de capture)"},
-        "glob":     {"type": "string", "description": "Filtre de fichiers ex: *.jpg (défaut: *)"},
+       {"folder":   {"type": "string", "maxLength": 32767, "description": "Dossier contenant les fichiers"},
+        "pattern":  {"type": "string", "maxLength": 1000, "description": "Expression régulière à trouver dans le nom de fichier"},
+        "replace":  {"type": "string", "maxLength": 1000, "description": "Texte de remplacement; groupes Python : \\g<1> ou \\g<nom>"},
+        "glob":     {"type": "string", "maxLength": 255, "description": "Filtre de fichiers ex: *.jpg (défaut: *)"},
         "dry_run":  {"type": "boolean", "description": "Si true, simule seulement et demande confirmation (défaut : true)"},
-        "confirmed":{"type": "boolean", "description": "Requis pour exécuter le renommage réel"}},
-       ["folder", "pattern"]),
+        "action":   {"type": "string", "enum": ["preview", "apply", "rollback"], "description": "Action explicite (défaut : preview/apply selon confirmation)"},
+        "rollback_manifest": {"type": "string", "maxLength": 32767, "description": "Manifeste retourné par une exécution pour restaurer les noms"},
+        "confirmed":{"type": "boolean", "description": "Requis pour appliquer ou restaurer"}},
+       []),
     # ── Section 18 ──────────────────────────────────────────────────────────
     _t("screen_ocr", "Capture l'écran et en extrait le texte via OCR (pytesseract). Combine screenshot + OCR en un seul appel.",
        {"lang":  {"type": "string", "description": "Langue OCR (défaut : fra+eng). Exemples : eng, fra, deu"},

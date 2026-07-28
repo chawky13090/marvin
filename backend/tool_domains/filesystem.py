@@ -13,8 +13,12 @@ import asyncio
 import codecs
 import fnmatch
 import heapq
+import json
+import uuid
 from pathlib import Path
 from typing import Any, Callable
+
+import regex as safe_regex
 
 
 _resolve_path: Callable[[str], str] | None = None
@@ -939,4 +943,298 @@ async def duplicate_finder(args: dict[str, Any]) -> dict[str, Any]:
             "hint": "Empreinte SHA-256 du fichier complet. Vérifiez avant toute suppression.",
         }
     except (OSError, TypeError, ValueError) as exc:
+        return {"error": str(exc)}
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _validate_filename(name: str) -> str:
+    if (
+        not name
+        or name in {".", ".."}
+        or Path(name).name != name
+        or any(character in name for character in '<>:"/\\|?*\0')
+        or name.endswith((" ", "."))
+    ):
+        raise ValueError(f"Nom de destination invalide : {name!r}")
+    stem = name.split(".", 1)[0].casefold()
+    if stem in {
+        "con", "prn", "aux", "nul",
+        *(f"com{index}" for index in range(1, 10)),
+        *(f"lpt{index}" for index in range(1, 10)),
+    }:
+        raise ValueError(f"Nom réservé par Windows : {name!r}")
+    return name
+
+
+def _load_rename_manifest(raw_path: str) -> tuple[Path, dict[str, Any], Path]:
+    manifest_path = Path(_resolve(raw_path)).resolve()
+    if not manifest_path.is_file() or manifest_path.suffix.lower() != ".json":
+        raise ValueError(f"Manifeste de rollback introuvable : {manifest_path}")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if payload.get("version") != 1 or payload.get("tool") != "bulk_rename":
+        raise ValueError("Manifeste bulk_rename invalide ou incompatible.")
+    root = Path(str(payload.get("root") or "")).resolve()
+    expected_parent = (root / ".marvin-rollback").resolve()
+    if manifest_path.parent != expected_parent:
+        raise ValueError("Le manifeste doit appartenir au dossier .marvin-rollback de la cible.")
+    operations = payload.get("operations")
+    if not root.is_dir() or not isinstance(operations, list) or not operations:
+        raise ValueError("Le manifeste ne contient aucune opération valide.")
+    for operation in operations:
+        if not isinstance(operation, dict):
+            raise ValueError("Opération de rollback invalide.")
+        for key in ("old", "new", "temporary"):
+            operation[key] = _validate_filename(str(operation.get(key) or ""))
+    return manifest_path, payload, root
+
+
+def _restore_rename_operations(root: Path, operations: list[dict[str, str]]) -> None:
+    to_restore: list[dict[str, str]] = []
+    for operation in operations:
+        old = root / operation["old"]
+        new = root / operation["new"]
+        temporary = root / operation["temporary"]
+        if old.exists():
+            if new.exists() or temporary.exists():
+                raise FileExistsError(
+                    f"Rollback ambigu : {old.name!r} existe avec une autre copie."
+                )
+            continue
+        if new.exists() and temporary.exists():
+            raise FileExistsError(
+                f"Rollback ambigu : cible et temporaire existent pour {old.name!r}."
+            )
+        if not new.exists() and not temporary.exists():
+            raise FileNotFoundError(
+                f"Rollback impossible : état absent pour {old.name!r}."
+            )
+        to_restore.append(operation)
+
+    moved_to_temporary: list[dict[str, str]] = []
+    try:
+        for operation in to_restore:
+            new = root / operation["new"]
+            temporary = root / operation["temporary"]
+            if new.exists():
+                new.rename(temporary)
+                moved_to_temporary.append(operation)
+        restored: list[dict[str, str]] = []
+        try:
+            for operation in reversed(to_restore):
+                temporary = root / operation["temporary"]
+                old = root / operation["old"]
+                temporary.rename(old)
+                restored.append(operation)
+        except OSError:
+            for operation in reversed(restored):
+                old = root / operation["old"]
+                temporary = root / operation["temporary"]
+                if old.exists() and not temporary.exists():
+                    old.rename(temporary)
+            raise
+    except OSError:
+        for operation in reversed(moved_to_temporary):
+            temporary = root / operation["temporary"]
+            new = root / operation["new"]
+            if temporary.exists() and not new.exists():
+                temporary.rename(new)
+        raise
+
+
+def _apply_bulk_rename(
+    root: Path,
+    operations: list[dict[str, str]],
+    manifest_path: Path,
+    manifest: dict[str, Any],
+) -> None:
+    _atomic_json(manifest_path, manifest)
+    staged: list[dict[str, str]] = []
+    try:
+        for operation in operations:
+            (root / operation["old"]).rename(root / operation["temporary"])
+            staged.append(operation)
+        for operation in operations:
+            (root / operation["temporary"]).rename(root / operation["new"])
+        manifest["status"] = "applied"
+        manifest["applied_at"] = time.time()
+        _atomic_json(manifest_path, manifest)
+    except OSError:
+        try:
+            _restore_rename_operations(root, operations)
+            manifest["status"] = "rolled_back_after_failure"
+        except OSError as rollback_error:
+            manifest["status"] = "recovery_required"
+            manifest["recovery_error"] = str(rollback_error)
+        manifest["failed_at"] = time.time()
+        _atomic_json(manifest_path, manifest)
+        raise
+
+
+async def bulk_rename(args: dict[str, Any]) -> dict[str, Any]:
+    """Planifie, applique ou annule un renommage transactionnel dans un dossier."""
+    action = str(args.get("action") or "").strip().lower()
+    rollback_manifest = str(args.get("rollback_manifest") or "").strip()
+    if rollback_manifest or action == "rollback":
+        if not rollback_manifest:
+            return {"error": "'rollback_manifest' est requis pour l'action rollback."}
+        if not args.get("confirmed"):
+            return {
+                "requiresConfirmation": True,
+                "message": f"Restaurer les noms depuis : {rollback_manifest} ?",
+            }
+        try:
+            manifest_path, manifest, root = _load_rename_manifest(rollback_manifest)
+            if manifest.get("status") == "rolled_back":
+                return {
+                    "success": True,
+                    "folder": str(root),
+                    "restored": 0,
+                    "already_rolled_back": True,
+                    "rollback_manifest": str(manifest_path),
+                }
+            await asyncio.to_thread(
+                _restore_rename_operations, root, manifest["operations"]
+            )
+            manifest["status"] = "rolled_back"
+            manifest["rolled_back_at"] = time.time()
+            await asyncio.to_thread(_atomic_json, manifest_path, manifest)
+            return {
+                "success": True,
+                "folder": str(root),
+                "restored": len(manifest["operations"]),
+                "rollback_manifest": str(manifest_path),
+                "rollback_available": False,
+            }
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            return {"error": str(exc), "rollback_manifest": rollback_manifest}
+
+    folder = str(args.get("folder") or "").strip()
+    pattern = str(args.get("pattern") or "").strip()
+    replacement = str(args.get("replace") or "")
+    glob_pattern = str(args.get("glob") or "*").strip()
+    if not folder:
+        return {"error": "Paramètre 'folder' requis."}
+    if not pattern:
+        return {"error": "Paramètre 'pattern' requis."}
+    if len(pattern) > 1_000 or len(replacement) > 1_000 or len(glob_pattern) > 255:
+        return {"error": "Motif, remplacement ou filtre trop long."}
+    if any(separator in glob_pattern for separator in ("/", "\\")):
+        return {"error": "Le filtre glob ne doit pas contenir de chemin."}
+    try:
+        root = Path(_resolve(folder)).resolve()
+        if not root.is_dir():
+            return {"error": f"Dossier introuvable : {root}"}
+        expression = safe_regex.compile(pattern)
+        files = sorted(
+            (
+                path
+                for path in root.iterdir()
+                if path.is_file() and not path.is_symlink()
+                and fnmatch.fnmatch(path.name, glob_pattern)
+            ),
+            key=lambda path: path.name.casefold(),
+        )
+        if len(files) > 5_000:
+            raise ValueError("Le renommage en lot est limité à 5 000 fichiers.")
+        run_id = uuid.uuid4().hex
+        operations: list[dict[str, str]] = []
+        for index, source in enumerate(files):
+            new_name = expression.sub(replacement, source.name, timeout=0.25)
+            if new_name != source.name:
+                operations.append(
+                    {
+                        "old": source.name,
+                        "new": _validate_filename(new_name),
+                        "temporary": f".marvin-rename-{run_id}-{index}.tmp",
+                    }
+                )
+        if not operations:
+            return {
+                "success": True,
+                "message": "Aucun fichier ne correspond au motif.",
+                "renamed": 0,
+            }
+
+        source_keys = {operation["old"].casefold() for operation in operations}
+        destination_keys: set[str] = set()
+        occupied = {
+            path.name.casefold()
+            for path in root.iterdir()
+            if path.name.casefold() not in source_keys
+        }
+        for operation in operations:
+            destination_key = operation["new"].casefold()
+            if destination_key in destination_keys:
+                raise FileExistsError(
+                    f"Plusieurs fichiers produisent la destination {operation['new']!r}."
+                )
+            if destination_key in occupied:
+                raise FileExistsError(
+                    f"La destination existe déjà : {operation['new']!r}."
+                )
+            destination_keys.add(destination_key)
+            if (root / operation["temporary"]).exists():
+                raise FileExistsError("Nom temporaire déjà utilisé; recommencez l'opération.")
+
+        preview = [
+            {
+                "old": operation["old"],
+                "new": operation["new"],
+                "old_path": str(root / operation["old"]),
+                "new_path": str(root / operation["new"]),
+            }
+            for operation in operations
+        ]
+        if not args.get("confirmed"):
+            return {
+                "requiresConfirmation": True,
+                "message": (
+                    f"Renommer {len(operations)} fichier(s) dans {root.name} ?\n"
+                    f"Exemple : {operations[0]['old']} → {operations[0]['new']}"
+                ),
+                "preview": preview[:10],
+                "preview_truncated": len(preview) > 10,
+            }
+
+        manifest_path = root / ".marvin-rollback" / f"bulk-rename-{run_id}.json"
+        manifest = {
+            "version": 1,
+            "tool": "bulk_rename",
+            "status": "planned",
+            "created_at": time.time(),
+            "root": str(root),
+            "operations": operations,
+        }
+        await asyncio.to_thread(
+            _apply_bulk_rename, root, operations, manifest_path, manifest
+        )
+        return {
+            "success": True,
+            "folder": str(root),
+            "renamed": len(operations),
+            "errors": [],
+            "files": preview[:50],
+            "files_truncated": len(preview) > 50,
+            "rollback_available": True,
+            "rollback_manifest": str(manifest_path),
+        }
+    except (
+        OSError,
+        TypeError,
+        ValueError,
+        safe_regex.error,
+        TimeoutError,
+    ) as exc:
         return {"error": str(exc)}

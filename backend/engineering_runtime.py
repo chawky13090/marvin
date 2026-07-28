@@ -59,6 +59,11 @@ def normalize_tool_result(tool_name: str, result: Any, *, duration_ms: int | Non
         status, retryable = "succeeded", False
         error_code = None
     summary = normalized.get("message") or normalized.get("error") or normalized.get("summary")
+    rollback_available = (
+        bool(normalized["rollback_available"])
+        if "rollback_available" in normalized
+        else bool(normalized.get("rollback") or normalized.get("rollback_manifest"))
+    )
     normalized["_contract"] = {
         "version": CONTRACT_VERSION,
         "tool": str(tool_name),
@@ -71,7 +76,7 @@ def normalize_tool_result(tool_name: str, result: Any, *, duration_ms: int | Non
         "evidence_count": len(normalized.get("evidence") or normalized.get("steps") or []),
         "artifact_count": len(normalized.get("artifacts") or normalized.get("files") or []),
         "next_actions": list(normalized.get("next_actions") or [])[:20],
-        "rollback_available": bool(normalized.get("rollback")),
+        "rollback_available": rollback_available,
     }
     return normalized
 

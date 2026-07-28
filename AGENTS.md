@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.366.0)
+## 9. État actuel (v2.367.0)
+
+**v2.367 (renommage transactionnel)** : `bulk_rename` rejoint
+`tool_domains/filesystem.py`. Le plan refuse noms Windows invalides, collisions et doublons
+avant mutation; le regex possède un timeout. L'application utilise des noms temporaires sur
+le même volume et écrit un manifeste atomique sous `.marvin-rollback`. Une action `rollback`
+restaure aussi un état intermédiaire après interruption et reste idempotente. L'outil rejoint
+les mutations dangereuses et exige désormais toujours une confirmation.
 
 **v2.366 (analyse avancée des fichiers)** : recherche des gros fichiers, lecture textuelle
 en lot et détection des doublons rejoignent `tool_domains/filesystem.py`. Les parcours sont

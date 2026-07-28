@@ -6976,3 +6976,51 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
 - aucune donnée ni aucun schéma persistant n'est modifié. Rollback : réversion atomique du
   commit v2.366 après validation obligatoire du patch inverse indexé.
+## 2026-07-28 — v2.367.0 — Renommage en lot transactionnel
+
+### Demande et risque corrigé
+
+- chaque changement et chaque mutation doivent disposer d'un rollback exploitable ;
+- l'ancien `bulk_rename` renommait séquentiellement, continuait après erreur, pouvait écraser
+  ou bloquer sur une collision et ne fournissait aucun moyen de revenir en arrière ;
+- `dry_run=false` permettait en outre de contourner la confirmation interne.
+
+### Solution
+
+- `bulk_rename` rejoint `tool_domains/filesystem.py` et `DANGEROUS_TOOLS` ;
+- les noms Windows interdits, destinations existantes, doublons de destination, chemins et
+  volumes supérieurs à 5 000 fichiers sont refusés avant mutation ;
+- `regex` exécute chaque substitution avec un timeout de 250 ms ;
+- une première phase déplace toutes les sources vers des noms uniques du même dossier, puis
+  une seconde phase matérialise les destinations. Toute panne déclenche la restauration ;
+- un manifeste JSON atomique sous `<dossier>/.marvin-rollback/` conserve le plan. L'action
+  `rollback` vérifie que le manifeste appartient bien à la cible, restaure un état appliqué
+  ou partiellement intermédiaire et devient idempotente après succès ;
+- le contrat partagé `engineering_runtime.normalize_tool_result` propage maintenant
+  correctement `rollback_available` et `rollback_manifest`; une restauration terminée peut
+  explicitement remettre cet indicateur à `false` ;
+- la confirmation est obligatoire pour appliquer comme pour restaurer.
+
+### Références vérifiées
+
+- documentation Python `Path.rename()` pour le renommage sur un même système de fichiers ;
+- documentation Python `os.replace()` pour le remplacement atomique du manifeste ;
+- documentation officielle du paquet `regex` pour le timeout couvrant toute substitution.
+
+### Validation initiale
+
+- test réel : prévisualisation, application de deux fichiers, manifeste durable, interruption
+  simulée au milieu de l'état temporaire, rollback complet puis second rollback idempotent ;
+- API HTTP réelle : première syntaxe de remplacement invalide refusée sans mutation, puis
+  deux renommages appliqués et deux noms originaux restaurés via le manifeste ;
+- test de collision : deux sources vers une même cible sont refusées sans modifier les noms ;
+- façade historique conservée; architecture : 344 outils, 346 routes, harness 344/344 et
+  **65** restrictions renforcées ;
+- gate rapide complet après correction du contrat : **139/139** étapes ;
+- redémarrage réel : `/api/health` expose **2.367.0**, Ollama disponible, 344 outils et
+  15 workers ;
+- API réelle après redémarrage : 2 fichiers renommés puis 2 restaurés, originaux présents,
+  `_contract.rollback_available=true` après application puis `false` après restauration ;
+- frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
+- rollback du changement de code : réversion atomique du commit v2.367 après validation du
+  patch inverse indexé. Aucun schéma SQLite n'est modifié.

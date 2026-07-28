@@ -27,6 +27,20 @@ def main() -> int:
     success = engineering_runtime.normalize_tool_result("file_read", {"success": True}, duration_ms=12)
     assert success["_contract"]["status"] == "succeeded"
     assert success["_contract"]["duration_ms"] == 12
+    reversible = engineering_runtime.normalize_tool_result(
+        "bulk_rename",
+        {"success": True, "rollback_manifest": "manifest.json"},
+    )
+    assert reversible["_contract"]["rollback_available"] is True
+    completed_rollback = engineering_runtime.normalize_tool_result(
+        "bulk_rename",
+        {
+            "success": True,
+            "rollback_manifest": "manifest.json",
+            "rollback_available": False,
+        },
+    )
+    assert completed_rollback["_contract"]["rollback_available"] is False
 
     failure = engineering_runtime.normalize_tool_result(
         "pc_run_command", {"success": False, "error": "code 1", "retryable": True},

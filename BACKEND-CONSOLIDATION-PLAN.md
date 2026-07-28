@@ -251,6 +251,9 @@ bornées et vérifiées, et les syntaxes de couleurs sont analysées par grammai
 Recherche des gros fichiers, lecture en lot et détection de doublons ont rejoint le domaine
 Filesystem. Les parcours et sorties sont bornés, les liens ne sont pas suivis et SHA-256 du
 contenu complet remplace le MD5 partiel pour éviter les faux doublons.
+Le renommage en lot a rejoint Filesystem dans une transaction à deux phases. Un manifeste
+atomique conserve anciennes, nouvelles et temporaires; le rollback sait restaurer un état
+appliqué ou interrompu. Toute collision est refusée avant le premier renommage.
 
 ## 4. Validation obligatoire par tranche
 

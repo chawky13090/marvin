@@ -106,6 +106,75 @@ async def main() -> int:
         )
         assert bounded["scan_truncated"] is True
 
+        rename_root = base / "rename"
+        rename_root.mkdir()
+        (rename_root / "alpha-01.txt").write_text("alpha", encoding="utf-8")
+        (rename_root / "beta-02.txt").write_text("beta", encoding="utf-8")
+        preview = await filesystem.bulk_rename(
+            {
+                "folder": "rename",
+                "pattern": r"^(.*)-(\d+)\.txt$",
+                "replace": r"\1.txt",
+                "glob": "*.txt",
+            }
+        )
+        assert preview["requiresConfirmation"] is True
+        assert len(preview["preview"]) == 2
+
+        applied = await filesystem.bulk_rename(
+            {
+                "folder": "rename",
+                "pattern": r"^(.*)-(\d+)\.txt$",
+                "replace": r"\1.txt",
+                "glob": "*.txt",
+                "confirmed": True,
+            }
+        )
+        assert applied["success"] is True and applied["renamed"] == 2
+        assert applied["rollback_available"] is True
+        manifest_path = Path(applied["rollback_manifest"])
+        assert manifest_path.is_file()
+        assert (rename_root / "alpha.txt").is_file()
+        assert (rename_root / "beta.txt").is_file()
+
+        manifest = __import__("json").loads(manifest_path.read_text(encoding="utf-8"))
+        first = manifest["operations"][0]
+        (rename_root / first["new"]).rename(rename_root / first["temporary"])
+        rolled_back = await filesystem.bulk_rename(
+            {
+                "action": "rollback",
+                "rollback_manifest": str(manifest_path),
+                "confirmed": True,
+            }
+        )
+        assert rolled_back["success"] is True and rolled_back["restored"] == 2
+        assert (rename_root / "alpha-01.txt").is_file()
+        assert (rename_root / "beta-02.txt").is_file()
+        repeated = await filesystem.bulk_rename(
+            {
+                "action": "rollback",
+                "rollback_manifest": str(manifest_path),
+                "confirmed": True,
+            }
+        )
+        assert repeated["already_rolled_back"] is True
+
+        collision_root = base / "collision"
+        collision_root.mkdir()
+        (collision_root / "a-1.txt").write_text("a", encoding="utf-8")
+        (collision_root / "a-2.txt").write_text("b", encoding="utf-8")
+        collision = await filesystem.bulk_rename(
+            {
+                "folder": "collision",
+                "pattern": r"-\d+",
+                "replace": "",
+                "confirmed": True,
+            }
+        )
+        assert "Plusieurs fichiers" in collision["error"]
+        assert (collision_root / "a-1.txt").is_file()
+        assert (collision_root / "a-2.txt").is_file()
+
     filesystem.configure(resolve_path=tools._resolve_path)
     assert tools.execute_file_write is filesystem.write
     assert tools.execute_file_list is filesystem.list_entries
@@ -121,6 +190,8 @@ async def main() -> int:
     assert tools.execute_file_large_finder is filesystem.large_finder
     assert tools.execute_file_batch_read is filesystem.batch_read
     assert tools.execute_file_duplicate_finder is filesystem.duplicate_finder
+    assert tools.execute_bulk_rename is filesystem.bulk_rename
+    assert "bulk_rename" in tools.DANGEROUS_TOOLS
     print("Tool Domain Filesystem OK - mutations, collisions, confirmation et façade.")
     return 0
 

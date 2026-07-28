@@ -245,6 +245,10 @@ façades historiques et les entrées du registre restent identiques.
 84. l'analyse avancée des fichiers : `tool_domains/filesystem.py` possède la recherche des
 gros fichiers, la lecture en lot et la détection de doublons. Les parcours sont bornés et
 sans suivi des liens; les lectures sont déportées et les doublons exigent un SHA-256 complet.
+85. le renommage transactionnel : `tool_domains/filesystem.py` possède `bulk_rename`.
+Validation et collisions précèdent tout effet; une permutation passe par des noms temporaires
+du même dossier. Le manifeste atomique permet un rollback explicite, idempotent et capable
+de reprendre un état intermédiaire après interruption.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

@@ -3,6 +3,8 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.367 — bulk_rename transactionnel extrait dans filesystem.py; manifeste
+# durable, collision préalable, reprise d'état intermédiaire et rollback explicite.
 # v2.366 — scans avancés de fichiers extraits dans filesystem.py; parcours borné,
 # lectures hors boucle asyncio et détection de doublons SHA-256 sur contenu complet.
 # v2.365 — QR, inventaire ZIP et couleurs rattachés aux domaines Images,
