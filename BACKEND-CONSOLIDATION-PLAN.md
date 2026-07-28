@@ -257,6 +257,9 @@ appliqué ou interrompu. Toute collision est refusée avant le premier renommage
 Les lectures HTTP publiques disposent d'une frontière anti-SSRF commune : résolution et IP
 publique contrôlées, connexion épinglée, SNI préservé, ports/budgets bornés et redirections
 revalidées. `web_browse` et `url_analyze` ne suivent plus automatiquement une destination.
+Les inspections Git et IP quittent aussi la façade historique. Git reste strictement en
+lecture seule, sans shell et avec sorties bornées; la géolocalisation IP utilise exclusivement
+HTTPS et le transport anti-SSRF. Les identités publiques du registre restent inchangées.
 
 ## 4. Validation obligatoire par tranche
 

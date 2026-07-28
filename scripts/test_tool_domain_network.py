@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,7 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
+import outbound_http
 import tools
 from tool_domains import network
 
@@ -55,6 +57,34 @@ async def _run() -> None:
         {"host": "127.0.0.1", "port": 70000}
     )
     assert "Port SNMP invalide" in invalid_snmp["error"]
+
+    ip_payload = (
+        b'{"success":true,"ip":"8.8.8.8","country":"United States",'
+        b'"country_code":"US","region":"California","city":"Mountain View",'
+        b'"postal":"94043","latitude":37.4,"longitude":-122.1,'
+        b'"timezone":{"id":"America/Los_Angeles"},'
+        b'"connection":{"asn":15169,"org":"Google","isp":"Google LLC"}}'
+    )
+    with patch.object(
+        outbound_http,
+        "fetch_public",
+        new=AsyncMock(
+            return_value=outbound_http.PublicResponse(
+                url="https://ipwho.is/8.8.8.8",
+                status_code=200,
+                headers={"content-type": "application/json"},
+                content=ip_payload,
+                elapsed_ms=10,
+            )
+        ),
+    ):
+        ip_info = await network.execute_ip_info({"ip": "8.8.8.8"})
+    assert ip_info["success"] is True
+    assert ip_info["asn"] == "15169"
+    assert ip_info["provider"] == "ipwho.is"
+    assert "globales" in (await network.execute_ip_info({"ip": "127.0.0.1"}))["error"]
+    assert "invalide" in (await network.execute_ip_info({"ip": "not-an-ip"}))["error"]
+    assert tools.execute_ip_info is network.execute_ip_info
 
     async def fake_windows_config(_args: dict) -> dict:
         return {"adapters": [{"Gateway": "192.0.2.1"}]}

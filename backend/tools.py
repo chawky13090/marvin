@@ -69,6 +69,7 @@ from tool_domains import translation as translation_domain
 from tool_domains import text_processing as text_processing_domain
 from tool_domains import structured_data as structured_data_domain
 from tool_domains import presentations as presentations_domain
+from tool_domains import git_repository as git_repository_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -290,6 +291,7 @@ def _resolve_path(raw: str) -> str:
 
 
 filesystem_domain.configure(resolve_path=_resolve_path)
+git_repository_domain.configure(resolve_path=_resolve_path)
 structured_data_domain.configure(resolve_path=_resolve_path)
 execute_file_list = filesystem_domain.list_entries
 execute_file_info = filesystem_domain.info
@@ -3252,39 +3254,7 @@ execute_csv_analyze = structured_data_domain.csv_analyze
 execute_text_stats = deterministic_utilities_domain.text_stats
 
 
-async def execute_ip_info(args: dict) -> dict:
-    """Retourne la géolocalisation et les infos d'une adresse IP (ip-api.com, gratuit)."""
-    import urllib.request as _req, json as _json
-
-    ip = args.get("ip", "").strip()
-    # IP vide = IP publique de la machine
-    target = ip if ip else ""
-
-    try:
-        url = f"http://ip-api.com/json/{target}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query"
-        with _req.urlopen(url, timeout=8) as resp:
-            data = _json.loads(resp.read().decode())
-
-        if data.get("status") != "success":
-            return {"error": data.get("message", "IP introuvable ou réservée")}
-
-        return {
-            "success":      True,
-            "ip":           data.get("query"),
-            "country":      data.get("country"),
-            "country_code": data.get("countryCode"),
-            "region":       data.get("regionName"),
-            "city":         data.get("city"),
-            "postal_code":  data.get("zip"),
-            "latitude":     data.get("lat"),
-            "longitude":    data.get("lon"),
-            "timezone":     data.get("timezone"),
-            "isp":          data.get("isp"),
-            "org":          data.get("org"),
-            "asn":          data.get("as"),
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_ip_info = network_domain.execute_ip_info
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3628,66 +3598,7 @@ execute_color_tool = deterministic_utilities_domain.color_tool
 execute_sqlite_query = structured_data_domain.sqlite_query
 execute_sqlite_tables = structured_data_domain.sqlite_tables
 
-async def execute_git_info(args: dict) -> dict:
-    """Retourne les informations Git d'un dépôt : branche, statut, derniers commits."""
-    path = args.get("path", ".").strip() or "."
-    action = args.get("action", "status")  # status | log | branches | diff
-
-    resolved = _resolve_path(path)
-    if not os.path.exists(resolved):
-        return {"error": f"Dossier introuvable : {resolved}"}
-
-    try:
-        def _git(cmd: list) -> str:
-            result = subprocess.run(
-                ["git", "-C", resolved] + cmd,
-                capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
-            )
-            return result.stdout.strip(), result.returncode
-
-        if action == "status":
-            out, rc = await asyncio.to_thread(_git, ["status", "--short", "--branch"])
-            if rc != 0:
-                return {"error": "Ce dossier n'est pas un dépôt Git ou git n'est pas installé."}
-            lines = out.splitlines()
-            branch_line = lines[0] if lines else ""
-            changes = [l for l in lines[1:] if l.strip()]
-            branch = branch_line.replace("## ", "").split("...")[0] if branch_line.startswith("## ") else branch_line
-            return {
-                "success":  True,
-                "repo":     resolved,
-                "branch":   branch,
-                "changes_count": len(changes),
-                "changes":  changes[:50],
-                "clean":    len(changes) == 0,
-            }
-        elif action == "log":
-            count = int(args.get("count", 10))
-            out, rc = await asyncio.to_thread(_git, ["log", f"--max-count={count}", "--oneline", "--no-color"])
-            if rc != 0:
-                return {"error": "Impossible d'accéder au log Git."}
-            commits = []
-            for line in out.splitlines():
-                if line.strip():
-                    parts = line.split(" ", 1)
-                    commits.append({"hash": parts[0], "message": parts[1] if len(parts) > 1 else ""})
-            return {"success": True, "repo": resolved, "commits": commits, "count": len(commits)}
-        elif action == "branches":
-            out, rc = await asyncio.to_thread(_git, ["branch", "-a", "--no-color"])
-            if rc != 0:
-                return {"error": "Impossible de lister les branches."}
-            branches = [b.strip().lstrip("* ") for b in out.splitlines() if b.strip()]
-            current = next((b.lstrip("* ") for b in out.splitlines() if b.startswith("*")), "")
-            return {"success": True, "repo": resolved, "current": current, "branches": branches}
-        elif action == "diff":
-            out, rc = await asyncio.to_thread(_git, ["diff", "--stat", "--no-color"])
-            return {"success": True, "repo": resolved, "diff_stat": out or "(aucune modification)"}
-        else:
-            return {"error": f"Action inconnue : {action}. Valeurs : status, log, branches, diff"}
-    except FileNotFoundError:
-        return {"error": "git n'est pas installé ou introuvable dans PATH."}
-    except Exception as e:
-        return {"error": str(e)}
+execute_git_info = git_repository_domain.git_info
 
 
 execute_bulk_rename = filesystem_domain.bulk_rename
@@ -6310,8 +6221,8 @@ TOOLS_SPEC = [
         "top_words": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Nombre de mots fréquents à retourner (défaut 10)"}},
        ["text"]),
 
-    _t("ip_info", "Retourne la géolocalisation et les infos réseau d'une adresse IP publique (ip-api.com, gratuit).",
-       {"ip": {"type": "string", "description": "Adresse IP à analyser (vide = IP publique de la machine)"}},
+    _t("ip_info", "Retourne via HTTPS la géolocalisation et les infos réseau d'une adresse IP publique globale (IPWhois, sans clé).",
+       {"ip": {"type": "string", "maxLength": 64, "description": "Adresse IPv4/IPv6 globale à analyser (vide = IP publique de la machine)"}},
        []),
 
     _t("markdown_convert", "Convertit du Markdown en HTML, texte brut ou retourne des statistiques (titres, liens, blocs de code).",
@@ -6536,10 +6447,10 @@ TOOLS_SPEC = [
        {"db_path": {"type": "string", "maxLength": 32767, "description": "Chemin du fichier SQLite (.db, .sqlite)"}},
        ["db_path"]),
     _t("git_info", "Retourne des informations sur un dépôt Git : branche, statut, commits, branches.",
-       {"path":   {"type": "string", "description": "Chemin du dépôt (défaut : dossier courant)"},
+       {"path":   {"type": "string", "maxLength": 32767, "description": "Chemin du dépôt (défaut : dossier courant)"},
         "action": {"type": "string", "enum": ["status", "log", "branches", "diff"],
                    "description": "status = fichiers modifiés, log = historique, branches = liste, diff = statistiques"},
-        "count":  {"type": "integer", "description": "Nombre de commits pour l'action 'log' (défaut 10)"}},
+        "count":  {"type": "integer", "minimum": 1, "maximum": 100, "description": "Nombre de commits pour l'action 'log' (défaut 10)"}},
        []),
     _t("bulk_rename", "Renomme en masse des fichiers d'un dossier selon un motif regex (avec confirmation et mode dry_run).",
        {"folder":   {"type": "string", "maxLength": 32767, "description": "Dossier contenant les fichiers"},

@@ -7067,3 +7067,55 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback du changement : réversion atomique du commit v2.368 après contrôle du patch inverse ;
 - le retour à l'ancien transport resterait techniquement possible mais réintroduirait la
   faiblesse SSRF documentée et ne doit servir qu'à un diagnostic temporaire.
+
+## 2026-07-28 — v2.369.0 — Inspections Git et IP bornées
+
+### Demande et critères
+
+- poursuivre l'extraction progressive de `tools.py` sans perte de fonctionnalité ;
+- améliorer chaque domaine extrait et le valider sur le runtime réel ;
+- conserver un rollback obligatoire pour chaque changement, y compris en cas d'imprévu.
+
+### Constats et décisions
+
+- `git_info` mélangeait encore orchestration, exécution de processus et projection dans la
+  façade historique ;
+- l'ancienne géolocalisation IP appelait un service HTTP non chiffré ;
+- la documentation officielle Git garantit la stabilité du format `status --porcelain=v1` ;
+  `for-each-ref --format=%(refname:short)` évite le parsing fragile d'une sortie destinée à
+  l'humain ;
+- IPWhois fournit un endpoint public HTTPS sans clé. Il est appelé au travers de la frontière
+  `outbound_http`, donc résolution publique, épinglage IP/SNI, redirections et budgets restent
+  contrôlés.
+
+### Solution
+
+- nouveau `tool_domains/git_repository.py` : actions fixes `status`, `log`, `branches` et
+  `diff`, lecture seule, aucun shell, terminal interactif désactivé, délai de 15 secondes,
+  stdout/stderr bornés et travail bloquant hors de la boucle asyncio ;
+- `ip_info` rejoint `tool_domains/network.py`, valide IPv4/IPv6 et refuse toute adresse
+  explicite non globale avant connexion ;
+- schémas publics bornés, identités historiques de façade et registre 344/344 conservés ;
+- tests réels sur un dépôt Git temporaire et transport IPWhois simulé sans effet externe.
+
+### Validation observée
+
+- tests ciblés Git et Réseau : réussis ;
+- architecture : Marvin **2.369.0**, **344 outils**, **346 routes**, harness **344/344** et
+  **65 restrictions** ;
+- gate rapide complet : **141/141** étapes ;
+- redémarrage réel : `/api/health` expose **2.369.0**, Ollama disponible, 344 outils et
+  15 workers ;
+- API réelle : `git_info` relit le commit `d298264`, `ip_info` obtient en HTTPS les données
+  publiques de `8.8.8.8`, et `127.0.0.1` est refusée avant tout appel réseau ;
+- frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
+- lint frontend : zéro erreur, 37 avertissements préexistants.
+
+### Rollback
+
+- aucun schéma SQLite, fichier utilisateur ni donnée persistante n'est modifié ;
+- la tranche doit être réversible par réversion atomique de son commit ;
+- avant commit, le patch indexé inverse est contrôlé avec
+  `git diff --cached --binary | git apply --cached --check --reverse` ;
+- après rollback, redémarrer le backend puis exécuter `/api/health`,
+  `scripts/check_marvin.py --quick` et `scripts/smoke_test_api.py`.

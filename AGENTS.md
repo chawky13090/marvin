@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.368.0)
+## 9. État actuel (v2.369.0)
+
+**v2.369 (inspections Git et IP)** : `git_info` rejoint
+`tool_domains/git_repository.py`. Les quatre actions sont en lecture seule, sans shell,
+avec formats Git stables, délais et sorties bornés. `ip_info` rejoint le domaine Réseau et
+remplace l'ancien endpoint HTTP par IPWhois en HTTPS via le transport public anti-SSRF.
+Seules les IPv4/IPv6 globales explicites sont acceptées; la façade 344 outils est conservée.
 
 **v2.368 (egress HTTP anti-SSRF)** : `outbound_http.py` fournit la frontière commune des
 téléchargements publics. HTTP/HTTPS et ports 80/443 seulement, identifiants URL interdits,

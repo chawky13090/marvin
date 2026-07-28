@@ -253,6 +253,10 @@ de reprendre un état intermédiaire après interruption.
 résolution DNS publique, épinglage IP/SNI, redirections manuelles revalidées et budgets.
 `web_browse` et `url_analyze` passent par ce guardrail; aucune redirection automatique ne
 peut les faire basculer vers localhost, une adresse privée ou un service de métadonnées.
+87. les inspections Git et IP : `tool_domains/git_repository.py` exécute quatre commandes
+Git de lecture à arguments fixes, sans shell, avec formats stables, délai et sorties bornés.
+`tool_domains/network.py` possède `ip_info`, qui valide les adresses globales puis appelle
+IPWhois en HTTPS à travers `outbound_http`; l'ancien transport HTTP non chiffré est supprimé.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import ipaddress as _ipaddress
+import json
 import re as _re
 import shutil
 import socket as _socket
@@ -13,6 +14,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 import database as db
+import outbound_http
 
 WinNetworkConfig = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 async def _missing_win_network_config(args: dict[str, Any]) -> dict[str, Any]:
@@ -29,6 +31,66 @@ def _net_error(exc: Exception, what: str = "la ressource") -> dict[str, Any]:
     if _is_offline_error(exc):
         return {"error": f"Pas de connexion internet (ou {what} injoignable). V?rifiez votre r?seau puis r?essayez.", "offline": True}
     return {"error": str(exc)}
+
+
+async def execute_ip_info(args: dict) -> dict:
+    """Retourne la géolocalisation d'une IP globale via l'endpoint HTTPS IPWhois."""
+    raw_ip = str(args.get("ip") or "").strip()
+    if len(raw_ip) > 64:
+        return {"error": "Adresse IP trop longue."}
+    if raw_ip:
+        try:
+            address = ipaddress.ip_address(raw_ip)
+        except ValueError:
+            return {"error": f"Adresse IP invalide : {raw_ip}"}
+        if not address.is_global:
+            return {"error": "Seules les adresses IP globales peuvent être géolocalisées."}
+        normalized_ip = address.compressed
+    else:
+        normalized_ip = ""
+    url = "https://ipwho.is/" + normalized_ip
+    try:
+        response = await outbound_http.fetch_public(
+            url,
+            max_bytes=100_000,
+            timeout=10.0,
+            headers={"User-Agent": "Marvin/2.369 (+ip-info)"},
+        )
+        if response.status_code >= 400:
+            return {"error": f"Service IPWhois indisponible : HTTP {response.status_code}"}
+        payload = json.loads(response.content.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Réponse IPWhois invalide.")
+        if payload.get("success") is False:
+            return {"error": str(payload.get("message") or "IP introuvable ou réservée")[:500]}
+        connection = payload.get("connection")
+        connection = connection if isinstance(connection, dict) else {}
+        timezone = payload.get("timezone")
+        timezone = timezone if isinstance(timezone, dict) else {}
+        latitude = payload.get("latitude")
+        longitude = payload.get("longitude")
+        if not isinstance(latitude, (int, float)) or not -90 <= latitude <= 90:
+            latitude = None
+        if not isinstance(longitude, (int, float)) or not -180 <= longitude <= 180:
+            longitude = None
+        return {
+            "success": True,
+            "ip": str(payload.get("ip") or normalized_ip),
+            "country": str(payload.get("country") or ""),
+            "country_code": str(payload.get("country_code") or ""),
+            "region": str(payload.get("region") or ""),
+            "city": str(payload.get("city") or ""),
+            "postal_code": str(payload.get("postal") or ""),
+            "latitude": latitude,
+            "longitude": longitude,
+            "timezone": str(timezone.get("id") or ""),
+            "isp": str(connection.get("isp") or ""),
+            "org": str(connection.get("org") or ""),
+            "asn": str(connection.get("asn") or ""),
+            "provider": "ipwho.is",
+        }
+    except (json.JSONDecodeError, OSError, TypeError, ValueError, outbound_http.httpx.HTTPError) as exc:
+        return _net_error(exc, "IPWhois")
 
 
 async def execute_net_ping(args: dict) -> dict:
