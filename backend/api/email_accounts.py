@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import email_account_service as accounts
 import email_manager
@@ -15,13 +15,13 @@ router = APIRouter()
 
 
 class EmailConfig(BaseModel):
-    provider: str = "custom"
-    imap_host: str
-    imap_port: int = 993
-    smtp_host: str
-    smtp_port: int = 587
-    username: str
-    password: str
+    provider: str = Field(default="custom", min_length=1, max_length=64)
+    imap_host: str = Field(min_length=1, max_length=253)
+    imap_port: int = Field(default=993, ge=1, le=65535)
+    smtp_host: str = Field(min_length=1, max_length=253)
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    username: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=12_000)
 
 
 @router.get("/api/email/providers")

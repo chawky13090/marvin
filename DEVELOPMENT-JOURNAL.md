@@ -9773,3 +9773,49 @@ Validation finale observée : gate consolidé **186/186**, architecture 344 outi
 344/344, compilation de 267 fichiers Python, lint sans erreur, build Next.js 16.2.6
 Turbopack réussi, smokes live API **28/28** et pages **40/40**. Backend v2.421.0 relancé
 avec Ollama disponible et 15 workers; frontend Turbopack relancé et HTTP 200.
+
+## 2026-07-28 — v2.422.0 — Coffre DPAPI des comptes e-mail
+
+### Analyse et choix
+
+Trois comptes conservaient au moins un mot de passe ou jeton dans le réglage JSON SQLite.
+Deux stratégies ont été comparées : quatre entrées DPAPI indépendantes par champ, ou une
+enveloppe versionnée par compte. L'enveloppe est retenue : identité de rotation/suppression
+unique, cohérence entre jeton d'accès et rafraîchissement, isolation d'un compte compromis et
+aucune clé globale partagée. La référence est dérivée par SHA-256 de l'adresse normalisée;
+elle ne contient pas l'adresse et l'enveloppe vérifie ce même identifiant à la relecture.
+
+### Implémentation, erreurs et observabilité
+
+- `email_account_vault.py` borne les quatre champs autorisés, refuse toute clé supplémentaire,
+  lie l'enveloppe à sa référence et utilise le coffre DPAPI atomique existant ;
+- `email_accounts.py` sépare projection persistée et résolution en mémoire, conserve les
+  façades, migre le JSON historique après écriture et relecture DPAPI, puis nettoie SQLite ;
+- une panne SQLite restaure les anciennes enveloppes; une panne de suppression DPAPI restaure
+  les métadonnées du compte; un formulaire vide conserve le secret existant ;
+- migration et rollback journalisent uniquement action, succès et nombre de comptes ;
+- le rollback explicite exige `--apply --accept-plaintext`, réécrit et relit SQLite avant
+  de supprimer les enveloppes.
+
+### Validation réelle et rollback
+
+Le snapshot chiffré `secretary_20260728_155834_035926.mrvbak` précède la migration. Les trois
+comptes et leurs trois ensembles de secrets ont migré; SQLite contient trois références et
+zéro valeur dans `password`, `access_token`, `refresh_token` ou `oauth_client_secret`.
+Le réglage historique `email_config`, détecté ensuite avec un secret résiduel, a rejoint la
+même enveloppe sans l'écraser; les deux réglages SQLite contiennent désormais zéro secret.
+Les trois configurations ont été résolues depuis DPAPI puis testées contre leurs serveurs
+IMAP/SMTP : **3/3 réussites**, sans envoi ni modification de message.
+
+Les tests isolés couvrent deux types d'authentification, huit comptes après concurrence,
+préservation du secret, compensation des deux persistances, suppression ciblée, migration
+descendante, remontée et coffre altéré en échec fermé. Rollback avant retour à v2.421 :
+`backend\.venv\Scripts\python.exe scripts\rollback-email-account-secrets.py --apply
+--accept-plaintext`, vérifier trois comptes avec champs secrets, puis
+`git revert <commit-v2.422>`. La restauration du snapshot préalable reste l'alternative
+intégrale si SQLite ou le coffre ne peut être relu.
+
+Validation finale observée : gate consolidé **187/187**, architecture 344 outils et harness
+344/344, compilation de 267 fichiers Python, lint sans erreur, build Next.js 16.2.6
+Turbopack réussi, smokes live API **28/28** et pages **40/40**. Backend v2.422.0 relancé
+avec Ollama disponible et 15 workers; frontend Turbopack relancé et HTTP 200.

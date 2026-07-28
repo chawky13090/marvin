@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.421.0)
+## 9. État actuel (v2.422.0)
+
+**v2.422 (coffre des comptes e-mail)** : chaque compte conserve désormais ses quatre champs
+sensibles dans une enveloppe DPAPI distincte, référencée depuis les métadonnées SQLite par
+un identifiant dérivé de l'adresse. La migration protège et relit chaque enveloppe avant de
+nettoyer SQLite; les façades historiques reconstruisent la configuration uniquement en
+mémoire. Écriture et suppression compensent une panne de l'autre persistance, les formulaires
+vides préservent le secret existant et un rollback explicite recrée l'ancien JSON en clair
+avant retour de version. Sur l'installation réelle, les trois comptes ont migré, zéro champ
+secret reste dans SQLite et les trois tests de connexion IMAP/SMTP ont réussi sans envoi.
 
 **v2.421 (intégrité des tours SSE)** : la migration 5 archive intégralement les événements
 dont le tour parent manque, puis retire uniquement ces lignes invalides. L'archive conserve

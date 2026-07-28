@@ -6,6 +6,7 @@ import inspect
 import sys
 from pathlib import Path
 from unittest.mock import patch
+from pydantic import ValidationError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +48,24 @@ def main() -> int:
     assert upsert.call_args.args[0]["auth_type"] == "app_password"
 
     import main
+    from api.email_accounts import EmailConfig
+
+    for invalid in (
+        {
+            "imap_host": "imap.example.test", "smtp_host": "smtp.example.test",
+            "username": "u@example.test", "password": "x", "imap_port": 0,
+        },
+        {
+            "imap_host": "imap.example.test", "smtp_host": "smtp.example.test",
+            "username": "u@example.test", "password": "x" * 12_001,
+        },
+    ):
+        try:
+            EmailConfig(**invalid)
+        except ValidationError:
+            pass
+        else:
+            raise AssertionError("La configuration e-mail hors limites doit être refusée.")
 
     expected = {
         ("/api/email/providers", "GET"),

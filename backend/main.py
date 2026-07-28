@@ -22,6 +22,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.404 — sources statiques officielles du Radar; erreurs de coquilles JavaScript supprimées
 # v2.403 — composition FastAPI finalisée; routes modèles et proactives extraites et typées
 
+# v2.422 — secrets e-mail multi-comptes migrés vers des enveloppes DPAPI
 # v2.421 — événements SSE orphelins archivés et intégrité défensive
 # v2.420 — sauvegardes AES-256-GCM, clé DPAPI et migration réversible
 

@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.421.0
+Version courante auditée : 2.422.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -425,6 +425,11 @@ les orphelins rejoignent une archive métier durable avant suppression, les conn
 échouent si `foreign_keys` n'est pas actif et chaque insertion vérifie indépendamment son
 parent. La base réelle passe de 27 à zéro violation FK; les 27 lignes archivées correspondent
 exactement au snapshot chiffré préalable.
+En v2.422.0, les secrets des comptes e-mail quittent le JSON SQLite pour des enveloppes
+DPAPI isolées par compte. La résolution reste derrière la façade existante, les mises à jour
+et suppressions compensent les pannes croisées, et la migration comme le rollback refusent
+les états non relus. Trois comptes réels ont migré avec zéro secret logique résiduel et
+trois connexions IMAP/SMTP validées sans effet métier sortant.
 
 ## 10. Preuves minimales par grande capacité
 
