@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.411.0
+Version courante auditée : 2.412.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -330,7 +330,7 @@ jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases perti
 L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
 traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
 
-| Ordre | Phase | État au 2.411.0 | Livraison et condition de sortie |
+| Ordre | Phase | État au 2.412.0 | Livraison et condition de sortie |
 |---:|---|---|---|
 | 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
 | 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
@@ -373,7 +373,9 @@ et tâches cron rejoignent quatre repositories injectables avec transactions, in
 et compatibilité des quatorze façades. En v2.411.0, la facturation rejoint un agrégat
 injectable unique : vingt façades compatibles, numérotation transactionnelle concurrente,
 montants finis, paiements bornés, cascade et rollback testés. La progression reste pilotée
-par agrégat cohésif et risque réel, jamais par le seul nombre de lignes.
+par agrégat cohésif et risque réel, jamais par le seul nombre de lignes. En v2.412.0, les
+contrôles opérationnels rejoignent un repository injectable qui garantit la cohérence entre
+checklist, point, résultat et preuve sans tronquer les preuves métier.
 
 ## 10. Preuves minimales par grande capacité
 

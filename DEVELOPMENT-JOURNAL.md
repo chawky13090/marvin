@@ -9172,3 +9172,55 @@ le titre temporaire, ce qui confirme la cascade réelle. Le smoke HTTP/Next.js r
 Rollback après commit : `git revert <commit-v2.411>`. La table additive
 `billing_sequences` peut rester inutilisée sans affecter l'ancien code; aucun document métier
 n'est supprimé. Après réversion, vérifier clients, devis, facture, contrat et numérotation.
+
+## 2026-07-28 — v2.412.0 — Repository des contrôles opérationnels
+
+### Contexte et décision
+
+Les préchecks/postchecks, leurs points, résultats et preuves forment un agrégat métier
+distinct de la documentation générée. Deux options ont été comparées : les déplacer avec les
+interventions documentaires, ou conserver une frontière Operations dédiée. La seconde est
+retenue afin que la conservation des preuves et les invariants de validation ne dépendent
+pas des formats DOCX/PDF ni des modèles rédactionnels.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/operations.py` avec connexion injectable ;
+- conservation par identité des neuf fonctions publiques de `database.py` ;
+- déplacement des quatre schémas, index et CRUD hors de la façade ;
+- création/relecture, mise à jour/relecture et lecture de l'agrégat effectuées dans une
+  transaction unique ;
+- vérification obligatoire que le point appartient à la checklist avant d'enregistrer un
+  résultat ;
+- vérification cohérente checklist/point/résultat avant de lier une preuve, empêchant les
+  preuves croisées entre interventions ;
+- `check_type` reste immuable lors d'une mise à jour ordinaire, conformément au garde
+  déterministe déjà appliqué par le domaine ;
+- ordre des points stable, index négatif refusé et colonnes de mise à jour en liste blanche ;
+- contenu des preuves métier conservé intégralement : il n'est pas confondu avec un log
+  technique expurgé ;
+- suppression transactionnelle de la checklist, de ses points, résultats et preuves.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- SQLite réel : checklist, point, création puis mise à jour d'un résultat, preuve et lecture
+  agrégée réussis ;
+- parent absent, item incohérent et preuve croisée refusés avant écriture ;
+- contenu complet de preuve relu à l'identique ;
+- collision et rollback, filtres, liste blanche, cascade et neuf identités de façade validés ;
+- domaines Contrôles opérationnels et Santé client réussis ;
+- `database.py` passe de 1 741 lignes/79 objets AST à 1 540 lignes/70 objets AST.
+
+L'architecture et la gate globale réussissent ensuite à **179/179 étapes** : 344 outils,
+harness 344/344, 354 routes, 40 pages, 255 fichiers Python compilés et lint frontend sans
+erreur. Le backend a été réellement redémarré en 2.412.0 avec Ollama et 15 workers. Les
+contrats HTTP réels `/api/ops/checks` et `/api/ops/evidence` exposent leurs collections et
+relisent les 7 checklists et 2 preuves actuellement présentes. Deux URLs au préfixe supposé
+`/api/operations` ont d'abord renvoyé 404 et ont été rejetées comme preuve avant la lecture
+des routes exactes. Le smoke HTTP/Next.js réussit à **28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.412>`. Aucun format de preuve n'est transformé.
+Après réversion, redémarrer puis vérifier checklist, résultat, rapport de validation et
+suppression en cascade.

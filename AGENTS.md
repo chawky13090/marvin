@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.411.0)
+## 9. État actuel (v2.412.0)
+
+**v2.412 (contrôles opérationnels)** : préchecks, postchecks, points, résultats et preuves
+métier rejoignent `repositories/operations.py`. Les neuf façades restent identiques.
+Résultats et preuves doivent appartenir aux mêmes checklist et item; les croisements
+incohérents sont refusés avant écriture. Les preuves métier restent intégralement conservées,
+la lecture agrégée est atomique et la suppression nettoie résultats, points et preuves.
 
 **v2.411 (persistance de facturation)** : clients, devis, catalogue, factures et contrats
 rejoignent `repositories/billing.py`. Les vingt façades restent identiques. Numéros DEV/FAC

@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.411.0
+Version auditée : 2.412.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -223,6 +223,10 @@ Clients, devis, catalogue, factures et contrats rejoignent `repositories/billing
 v2.411.0. Les vingt façades sont conservées. Numérotation annuelle concurrente, totaux,
 marges, TVA, échéances, paiements, filtres, cascade et rollback sont testés sur SQLite réel;
 le défaut historique de contrat sans date de début est corrigé.
+Préchecks, postchecks, points, résultats et preuves rejoignent
+`repositories/operations.py` en v2.412.0. Les neuf façades restent compatibles; cohérence
+check/item/résultat, conservation des preuves métier, lecture agrégée, cascade et rollback
+sont testés sur SQLite réel.
 
 ### Phase D — Composition et dépendances
 

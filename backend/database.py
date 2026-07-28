@@ -90,6 +90,18 @@ from repositories.notes import (
     list_notes,
     update_note,
 )
+from repositories.operations import (
+    ops_check_create,
+    ops_check_delete,
+    ops_check_get,
+    ops_check_list,
+    ops_check_update,
+    ops_evidence_create,
+    ops_evidence_list,
+    ops_item_create,
+    ops_result_set,
+    repository as operations_repository,
+)
 from repositories.network_inventory import (
     get_network_devices,
     repository as network_inventory_repository,
@@ -840,219 +852,6 @@ def doc_asset_delete(aid: str):
 # v2.30.0 — Operations Safety : Module 1 — Pre-Check / Post-Check
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _ensure_ops_tables(conn):
-    """Tables pour le module Pre-Check / Post-Check (validation d'intervention)."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops_checks (
-            id TEXT PRIMARY KEY,
-            intervention_id TEXT,
-            check_type TEXT NOT NULL DEFAULT 'precheck'
-                CHECK(check_type IN ('precheck','postcheck')),
-            title TEXT NOT NULL DEFAULT 'Checklist',
-            status TEXT NOT NULL DEFAULT 'pending'
-                CHECK(status IN ('pending','running','passed','failed','partial')),
-            summary TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            completed_at TEXT
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops_check_items (
-            id TEXT PRIMARY KEY,
-            check_id TEXT NOT NULL,
-            label TEXT NOT NULL,
-            category TEXT DEFAULT 'general',
-            expected TEXT DEFAULT '',
-            severity TEXT NOT NULL DEFAULT 'info'
-                CHECK(severity IN ('info','warning','critical')),
-            order_index INTEGER NOT NULL DEFAULT 0,
-            auto_command TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            FOREIGN KEY (check_id) REFERENCES ops_checks(id) ON DELETE CASCADE
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops_check_results (
-            id TEXT PRIMARY KEY,
-            check_id TEXT NOT NULL,
-            item_id TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'skipped'
-                CHECK(status IN ('ok','warning','failed','skipped')),
-            actual_value TEXT DEFAULT '',
-            notes TEXT DEFAULT '',
-            checked_at TEXT NOT NULL DEFAULT (datetime('now')),
-            FOREIGN KEY (check_id) REFERENCES ops_checks(id) ON DELETE CASCADE
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops_evidence (
-            id TEXT PRIMARY KEY,
-            check_id TEXT,
-            item_id TEXT,
-            result_id TEXT,
-            intervention_id TEXT,
-            evidence_type TEXT NOT NULL DEFAULT 'text'
-                CHECK(evidence_type IN ('text','command','file_path','screenshot','log')),
-            content TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ops_checks_interv ON ops_checks(intervention_id, check_type)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ops_items_check ON ops_check_items(check_id, order_index)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ops_results_check ON ops_check_results(check_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ops_evidence_interv ON ops_evidence(intervention_id)")
-
-
-# ── CRUD ops_checks ──────────────────────────────────────────────────────────
-
-def ops_check_create(data: dict) -> dict:
-    import uuid as _u
-    cid = str(_u.uuid4())
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        conn.execute("""
-            INSERT INTO ops_checks (id, intervention_id, check_type, title, status, summary)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (cid, data.get("intervention_id"), data.get("check_type", "precheck"),
-              data.get("title", "Checklist"), data.get("status", "pending"),
-              data.get("summary", "")))
-    return ops_check_get(cid)
-
-
-def ops_check_get(cid: str) -> dict | None:
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        row = conn.execute("SELECT * FROM ops_checks WHERE id = ?", (cid,)).fetchone()
-        if not row:
-            return None
-        d = row_to_dict(row)
-        items = conn.execute(
-            "SELECT * FROM ops_check_items WHERE check_id = ? ORDER BY order_index", (cid,)
-        ).fetchall()
-        results = conn.execute(
-            "SELECT * FROM ops_check_results WHERE check_id = ?", (cid,)
-        ).fetchall()
-        evidence = conn.execute(
-            "SELECT * FROM ops_evidence WHERE check_id = ? ORDER BY created_at", (cid,)
-        ).fetchall()
-    d["items"] = [row_to_dict(r) for r in items]
-    # Map results by item_id for convenience
-    results_list = [row_to_dict(r) for r in results]
-    res_by_item = {r["item_id"]: r for r in results_list}
-    for it in d["items"]:
-        it["result"] = res_by_item.get(it["id"])
-    d["results"] = results_list
-    d["evidence"] = [row_to_dict(r) for r in evidence]
-    return d
-
-
-def ops_check_list(intervention_id: str | None = None, check_type: str | None = None) -> list[dict]:
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        sql = "SELECT * FROM ops_checks WHERE 1=1"
-        params = []
-        if intervention_id:
-            sql += " AND intervention_id = ?"; params.append(intervention_id)
-        if check_type:
-            sql += " AND check_type = ?"; params.append(check_type)
-        sql += " ORDER BY created_at DESC"
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def ops_check_update(cid: str, data: dict) -> dict | None:
-    cols, vals = [], []
-    for key in ("title", "status", "summary", "completed_at"):
-        if key in data:
-            cols.append(f"{key} = ?"); vals.append(data[key])
-    if cols:
-        vals.append(cid)
-        with db() as conn:
-            _ensure_ops_tables(conn)
-            conn.execute(f"UPDATE ops_checks SET {', '.join(cols)} WHERE id = ?", vals)
-    return ops_check_get(cid)
-
-
-def ops_check_delete(cid: str):
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        conn.execute("DELETE FROM ops_checks WHERE id = ?", (cid,))
-        conn.execute("DELETE FROM ops_check_items WHERE check_id = ?", (cid,))
-        conn.execute("DELETE FROM ops_check_results WHERE check_id = ?", (cid,))
-        conn.execute("DELETE FROM ops_evidence WHERE check_id = ?", (cid,))
-
-
-def ops_item_create(check_id: str, data: dict) -> dict:
-    import uuid as _u
-    iid = str(_u.uuid4())
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        conn.execute("""
-            INSERT INTO ops_check_items (id, check_id, label, category, expected, severity, order_index, auto_command)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (iid, check_id, data.get("label", ""), data.get("category", "general"),
-              data.get("expected", ""), data.get("severity", "info"),
-              int(data.get("order_index", 0)), data.get("auto_command", "")))
-        row = conn.execute("SELECT * FROM ops_check_items WHERE id = ?", (iid,)).fetchone()
-    return row_to_dict(row)
-
-
-def ops_result_set(check_id: str, item_id: str, data: dict) -> dict:
-    """Enregistre ou met à jour le résultat d'un point de contrôle."""
-    import uuid as _u
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        existing = conn.execute(
-            "SELECT id FROM ops_check_results WHERE check_id = ? AND item_id = ?",
-            (check_id, item_id)
-        ).fetchone()
-        if existing:
-            rid = existing["id"]
-            conn.execute("""
-                UPDATE ops_check_results SET status = ?, actual_value = ?, notes = ?, checked_at = datetime('now')
-                WHERE id = ?
-            """, (data.get("status", "skipped"), data.get("actual_value", ""),
-                  data.get("notes", ""), rid))
-        else:
-            rid = str(_u.uuid4())
-            conn.execute("""
-                INSERT INTO ops_check_results (id, check_id, item_id, status, actual_value, notes)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (rid, check_id, item_id, data.get("status", "skipped"),
-                  data.get("actual_value", ""), data.get("notes", "")))
-        row = conn.execute("SELECT * FROM ops_check_results WHERE id = ?", (rid,)).fetchone()
-    return row_to_dict(row)
-
-
-def ops_evidence_create(data: dict) -> dict:
-    import uuid as _u
-    eid = str(_u.uuid4())
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        conn.execute("""
-            INSERT INTO ops_evidence (id, check_id, item_id, result_id, intervention_id, evidence_type, content)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (eid, data.get("check_id"), data.get("item_id"), data.get("result_id"),
-              data.get("intervention_id"), data.get("evidence_type", "text"),
-              data.get("content", "")))
-        row = conn.execute("SELECT * FROM ops_evidence WHERE id = ?", (eid,)).fetchone()
-    return row_to_dict(row)
-
-
-def ops_evidence_list(intervention_id: str | None = None, check_id: str | None = None) -> list[dict]:
-    with db() as conn:
-        _ensure_ops_tables(conn)
-        sql = "SELECT * FROM ops_evidence WHERE 1=1"
-        params = []
-        if intervention_id:
-            sql += " AND intervention_id = ?"; params.append(intervention_id)
-        if check_id:
-            sql += " AND check_id = ?"; params.append(check_id)
-        sql += " ORDER BY created_at DESC"
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # v2.30.0 — Operations Safety : Module 2 — Command Safety / Guardrails
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1606,7 +1405,7 @@ def _init_tables():
         network_inventory_repository.ensure_schema(conn)
         billing_repository.ensure_schema(conn)
         _ensure_doc_tables(conn)
-        _ensure_ops_tables(conn)
+        operations_repository.ensure_schema(conn)
         _ensure_cmd_safety_tables(conn)
         _ensure_health_tables(conn)
         _ensure_it_kb_tables(conn)
