@@ -183,7 +183,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.381.0)
+## 9. État actuel (v2.382.0)
+
+**v2.382 (nettoyage façade e-mail)** : les 440 lignes historiques devenues inactives après
+l'extraction de l'automatisation e-mail sont retirées de `tools.py`. Les anciens verrous,
+constantes et corps d'orchestration ne peuvent plus diverger du domaine autoritaire. Les
+façades privées nécessaires aux workers et à l'API restent identiques.
 
 **v2.381 (automatisation e-mail)** : l'orchestrateur multiboîte et la file différée rejoignent
 `tool_domains/email_automation.py`. Configuration, profils, round-robin, anti-boucle,

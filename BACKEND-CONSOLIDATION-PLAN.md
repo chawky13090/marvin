@@ -305,6 +305,8 @@ L'orchestrateur e-mail multiboîte et la file différée rejoignent
 `tool_domains/email_automation.py`. Les dépendances IMAP, rédaction, envoi et persistance sont
 injectées; simulation, équité, anti-boucle, retries et exclusion mutuelle partagent désormais
 un contrat déterministe.
+La tranche de nettoyage v2.382 retire ensuite 440 lignes historiques de `tools.py`; les
+workers, routes et registre utilisent exclusivement la frontière extraite.
 
 ## 4. Validation obligatoire par tranche
 

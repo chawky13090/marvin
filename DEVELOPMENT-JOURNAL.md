@@ -7520,6 +7520,22 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - vérifier le patch inverse indexé, réverter atomiquement le commit v2.381, redémarrer le
   backend et repasser les tests e-mail, le gate, health et smoke.
 
+## 2026-07-28 — v2.382.0 — suppression des corps e-mail historiques
+
+- Retrait de 440 lignes devenues inactives dans `tools.py` après l'extraction v2.381.
+- Suppression des deux anciens verrous, des constantes dupliquées et des trois corps
+  d'orchestration/flush/configuration.
+- Conservation des alias `_email_automation_cfg`, `_email_effective_profile`,
+  `execute_email_orchestrator_run` et `execute_email_outbox_flush`.
+- Test architectural ajouté pour interdire le retour des anciens corps et verrous.
+- Gate rapide : 153/153; architecture 344/344, 346 routes et compilation de 226 fichiers.
+- Backend réel 2.382.0 : Ollama disponible, 15 workers; simulation de 20 messages,
+  0 envoi, 0 brouillon et 0 élément différé.
+- Frontend Turbopack conservé; smoke réseau réel : 28/28 contrats.
+- Aucun schéma, réglage ou contenu utilisateur modifié.
+- Rollback : patch inverse indexé, réversion atomique du commit v2.382, redémarrage puis
+  tests e-mail, gate, health et smoke.
+
 ## 2026-07-28 — v2.378.0 — OCR écran borné et provenance visible
 
 ### Demande et constats

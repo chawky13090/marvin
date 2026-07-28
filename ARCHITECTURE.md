@@ -305,6 +305,8 @@ conservent le contrat historique.
 multiboîte et la file d'envoi différé. Les transports, réglages et actions de rédaction/envoi
 sont injectés; round-robin, idempotence, simulation sans écriture, anti-boucle, plafonds,
 retries et exclusion mutuelle sont testables sans réseau.
+La façade `tools.py` ne conserve aucun second corps d'automatisation e-mail : configuration,
+orchestrateur et flush sont des alias directs vers cette frontière.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

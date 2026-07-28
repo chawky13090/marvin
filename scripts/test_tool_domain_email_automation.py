@@ -174,6 +174,10 @@ async def main() -> None:
     assert tools.execute_email_orchestrator_run is email_automation.run
     assert tools.execute_email_outbox_flush is email_automation.flush_outbox
     assert tools.TOOLS_REGISTRY["email_automation_run"] is email_automation.run
+    tools_source = (BACKEND / "tools.py").read_text(encoding="utf-8")
+    assert "async def execute_email_orchestrator_run" not in tools_source
+    assert "_EMAIL_AUTOMATION_LOCK" not in tools_source
+    assert "_EMAIL_OUTBOX_LOCK" not in tools_source
     print("Email Automation Domain OK - équité, simulation, file, retry, verrou et façade.")
 
 
