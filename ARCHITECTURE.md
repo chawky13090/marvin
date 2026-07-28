@@ -285,6 +285,10 @@ crashs et timeouts ne sont plus confondus.
 tâches, événements, mémoire, e-mails et Web derrière neuf dépendances injectées. Les scopes,
 limites, concurrence et délais sont bornés; chaque source produit une provenance explicite et
 les pannes partielles ne sont plus masquées.
+95. le raisonnement parallèle : `parallel_reasoning.py` orchestre décomposition, travaux LLM
+sans outils et synthèse. Les volumes sont bornés, une trace identifie le pipeline et les échecs
+partiels ou de synthèse conservent les résultats intermédiaires. Cette frontière ne revendique
+pas les capacités de la boucle Runner outillée.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

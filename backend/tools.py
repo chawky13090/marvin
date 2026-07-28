@@ -22,6 +22,7 @@ import database as db
 import cloud_routing as cloud_routing_runtime
 import learning
 import model_council as model_council_runtime
+import parallel_reasoning as parallel_reasoning_runtime
 import python_execution as python_execution_runtime
 import mission_os as mission_os_runtime
 import vector_store as vector_store_runtime
@@ -2505,83 +2506,6 @@ async def execute_code_workspace_control(args: dict) -> dict:
         return {"success": False, "error": str(exc)}
 
 
-# v2.145 — « Ultra mode » (GPT-5.6 Sol, juillet 2026) : au lieu d'une seule chaîne de
-# raisonnement séquentielle, décompose un objectif en sous-tâches INDÉPENDANTES traitées
-# EN PARALLÈLE, puis synthétise. Positionnement HONNÊTE (pas de survente) : contrairement
-# à Ultra qui orchestre de vrais sous-agents avec accès aux outils (coordination "dans les
-# poids" du modèle), ceci décompose puis fait raisonner des appels LLM en parallèle SANS
-# accès aux outils — un vrai gain de rapidité/qualité sur les tâches qui se décomposent en
-# angles indépendants (ex. rédiger une politique de sécurité en 3 volets), pas un
-# framework d'agents généraliste. Complète `ai_model_council` (même question, plusieurs
-# modèles) avec l'axe perpendiculaire (même modèle/plusieurs modèles, sous-questions
-# différentes d'un même objectif).
-async def execute_ai_subagents_run(args: dict) -> dict:
-    """Décompose un objectif en sous-tâches indépendantes, les traite EN PARALLÈLE (raisonnement,
-    pas d'accès aux outils), puis synthétise en un résultat cohérent. Pour un objectif qui se
-    découpe naturellement en plusieurs angles (ex. « rédige une politique de sécurité couvrant
-    accès/incidents/sauvegardes ») — plus rapide et plus complet qu'un seul passage linéaire.
-    PAS pour une tâche qui nécessite des outils (fichiers, PC, web) — pour ça, la boucle
-    d'agent normale est plus appropriée."""
-    goal = (args.get("goal") or args.get("objectif") or "").strip()
-    if not goal:
-        return {"error": "Paramètre 'goal' requis (l'objectif à décomposer)."}
-    subtasks = args.get("subtasks") or []
-
-    if not subtasks:
-        decompose_prompt = (
-            f"Objectif : {goal}\n\n"
-            "Décompose cet objectif en 2 à 5 sous-tâches INDÉPENDANTES (chacune traitable "
-            "séparément, sans dépendre du résultat des autres). Réponds UNIQUEMENT par une "
-            "liste à puces, une sous-tâche par ligne, formulée comme une consigne claire — "
-            "rien d'autre (pas de préambule, pas de numérotation autre que les puces)."
-        )
-        try:
-            raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=90) or "")
-        except Exception:
-            raw = ""
-        subtasks = [
-            line.lstrip("-•* ").strip()
-            for line in raw.splitlines()
-            if line.strip() and line.lstrip().startswith(("-", "•", "*"))
-        ][:5]
-    if len(subtasks) < 2:
-        return {"error": "Impossible de décomposer cet objectif en sous-tâches indépendantes — utilise la boucle d'agent normale pour une tâche unique."}
-
-    async def _work(subtask: str):
-        prompt = (
-            f"Objectif global : {goal}\n\n"
-            f"Ta sous-tâche (traite UNIQUEMENT celle-ci, en profondeur) : {subtask}\n\n"
-            "Réponds de façon complète et autonome à cette sous-tâche."
-        )
-        try:
-            return await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-        except Exception as e:
-            return f"(échec : {str(e)[:100]})"
-
-    results = await asyncio.gather(*[_work(s) for s in subtasks])
-
-    digest = "\n\n".join(
-        f"### Sous-tâche {i+1} : {s}\n{(r or '').strip()}"
-        for i, (s, r) in enumerate(zip(subtasks, results)))
-    synth_prompt = (
-        f"Objectif global : {goal}\n\n"
-        f"Voici les résultats de {len(subtasks)} sous-tâches traitées en parallèle :\n\n{digest}\n\n"
-        "Fusionne ces résultats en UN document cohérent qui répond à l'objectif global — "
-        "structuré, sans répétition entre les parties, transitions naturelles entre les "
-        "sections. Ne résume pas superficiellement : intègre le contenu réel de chaque "
-        "sous-tâche."
-    )
-    synthesis = (await _ollama_generate(synth_prompt, model=args.get("model"), timeout=240) or "").strip()
-
-    return {
-        "success": True,
-        "answer": synthesis,
-        "subtasks": subtasks,
-        "subtask_results": [{"subtask": s, "result": (r or "")[:2000]} for s, r in zip(subtasks, results)],
-        "message": f"{len(subtasks)} sous-tâches traitées en parallèle puis fusionnées.",
-    }
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION VOICE — Transcription audio (faster-whisper)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2830,6 +2754,9 @@ long_tasks_domain.configure(
 execute_long_task_start = long_tasks_domain.start
 execute_long_task_status = long_tasks_domain.status
 execute_long_task_stop = long_tasks_domain.stop
+
+parallel_reasoning_runtime.configure(generate=_ollama_generate)
+execute_ai_subagents_run = parallel_reasoning_runtime.run
 
 
 def _detect_translation_language(text: str) -> str:

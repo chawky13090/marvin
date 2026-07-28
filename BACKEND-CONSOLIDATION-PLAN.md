@@ -286,6 +286,10 @@ La recherche fédérée rejoint `tool_domains/unified_search.py`. Les neuf sourc
 les scopes et limites invalides sont refusés, `["all"]` est corrigé et les lectures SQLite
 quittent la boucle asyncio. Une provenance par source expose durée, quantité, erreur ou timeout
 avec concurrence et volumes bornés.
+Le raisonnement parallèle rejoint `parallel_reasoning.py`. Cette frontière n'est pas présentée
+comme un système de sous-agents outillés : elle décompose, exécute jusqu'à cinq raisonnements
+LLM indépendants puis synthétise. Objectifs, résultats et contexte sont bornés; trace, partiels
+et phase d'échec restent observables.
 
 ## 4. Validation obligatoire par tranche
 

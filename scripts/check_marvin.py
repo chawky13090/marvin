@@ -192,6 +192,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Garde-fous d'intention", (python, "scripts/test_intent_guards.py")),
         Stage("Council Cloud et provenance", (python, "scripts/test_council.py")),
         Stage("Moteur Council injectable", (python, "scripts/test_model_council.py")),
+        Stage("Raisonnement parallèle borné", (python, "scripts/test_parallel_reasoning.py")),
         Stage("Mode Ultra strictement cloud", (python, "scripts/test_cloud_only_routing.py")),
         Stage("Contrats et routage Marvin Cortex", (python, "scripts/test_cortex.py")),
         Stage("Marvin Forge et métriques de fiabilité", (python, "scripts/test_forge.py")),

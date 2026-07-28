@@ -7432,6 +7432,56 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback du code : réversion atomique du commit v2.375 après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
 
+## 2026-07-28 — v2.377.0 — Raisonnement parallèle borné et honnête
+
+### Demande et constats
+
+- poursuivre la consolidation de l'orchestration agentique et des outils ;
+- `ai_subagents_run` conservait 65 lignes d'orchestration dans `tools.py` ;
+- malgré son nom historique, il n'exécute pas des agents outillés mais des raisonnements LLM
+  indépendants ;
+- objectif, sous-tâches et réponses intermédiaires n'étaient pas bornés ;
+- une sortie très longue pouvait gonfler sans limite le prompt de synthèse ;
+- les échecs individuels devenaient du texte puis disparaissaient derrière un succès global ;
+- une panne de synthèse remontait hors du contrat et perdait les résultats déjà acquis.
+
+### Solution
+
+- nouveau `parallel_reasoning.py`, avec générateur et identifiant de trace injectables ;
+- validation d'un objectif de 20 000 caractères maximum, de deux à cinq sous-tâches de
+  4 000 caractères et d'un nom de modèle borné ;
+- résultats intermédiaires limités à 12 000 caractères chacun et contexte de synthèse limité
+  à 50 000 caractères ;
+- phases `decomposition`, `parallel_work` et `synthesis` observables, avec `trace_id` ;
+- succès partiel explicite et erreurs individuelles exclues du prompt de synthèse ;
+- panne finale : résultats partiels retournés au lieu d'une exception ou d'un faux succès ;
+- politique publique `tool_access=false`, cohérente avec la capacité réelle.
+- provenance explicite du modèle de décomposition, de chaque worker et de la synthèse via le
+  mode métadonnées du transport Ollama.
+
+### Validation ciblée observée
+
+- compilation, façade et architecture : réussies, registre 344/344 ;
+- décomposition simulée, deux travaux concurrents, un échec et une synthèse : résultat partiel
+  correct, trace stable et erreur absente du prompt final ;
+- liste, objectif et nombre minimal invalides refusés ;
+- panne de synthèse injectée : phase, statut partiel et deux résultats intermédiaires conservés ;
+- le premier double de test classait le prompt de synthèse comme une sous-tâche car il testait
+  les marqueurs dans le mauvais ordre; le simulateur a été corrigé avant validation globale ;
+- architecture finale : Marvin 2.377.0, 344 outils, 346 routes, harness 344/344 et
+  65 restrictions ;
+- gate rapide final repassé après ajout de la provenance : 149/149 étapes ;
+- backend redémarré : `/api/health` expose 2.377.0, Ollama disponible et 15 workers ;
+- validation Ollama Cloud réelle : deux workers `minimax-m3:cloud`, synthèse
+  `glm-5.2:cloud`, 2/2 succès, trace présente, aucune troncature et durée 18,4 secondes ;
+- frontend Turbopack conservé, smoke test réel : 28/28 contrats.
+
+### Rollback
+
+- aucun schéma, réglage ou contenu utilisateur n'est modifié ;
+- rollback du code : réversion atomique du commit v2.377 après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
+
 ## 2026-07-28 — v2.376.0 — Recherche unifiée traçable et non bloquante
 
 ### Demande et constats

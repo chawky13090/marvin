@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.376.0)
+## 9. État actuel (v2.377.0)
+
+**v2.377 (raisonnement parallèle)** : `ai_subagents_run` rejoint
+`parallel_reasoning.py`. Le nom public historique est conservé, mais le contrat indique
+honnêtement que ces workers LLM n'ont aucun outil. Objectif, modèle, sous-tâches, résultats
+intermédiaires et contexte de synthèse sont bornés. Chaque exécution possède un `trace_id`;
+les échecs partiels restent visibles et une panne de synthèse retourne les travaux déjà
+obtenus au lieu de lever ou d'annoncer un faux succès. Les modèles réellement utilisés par
+la décomposition, chaque worker et la synthèse sont exposés.
 
 **v2.376 (recherche unifiée)** : `unified_search` rejoint
 `tool_domains/unified_search.py`. Les neuf sources sont injectables, les scopes strictement
