@@ -173,11 +173,26 @@ def run() -> dict[str, int | str]:
     ):
         if marker not in structured_source:
             raise CheckFailure(f"Fondation de journalisation incomplète : {marker}")
+    persistence_inventory_path = ROOT / "MARVIN-PERSISTENCE-INVENTORY.md"
+    if not persistence_inventory_path.is_file():
+        raise CheckFailure("L'inventaire autoritaire des persistances JSONL est absent.")
+    persistence_inventory = persistence_inventory_path.read_text(encoding="utf-8-sig")
+    for marker in (
+        "technical_log",
+        "domain_event_stream",
+        "evaluation_ledger",
+        "truth_ledger",
+        "persistence-inventory",
+    ):
+        if marker not in persistence_inventory:
+            raise CheckFailure(f"Inventaire de persistance incomplet : {marker}")
 
     required_scripts = {
         "check:runtime",
         "check:generation-runtime",
         "check:structured-logging",
+        "check:skill-match-logging",
+        "check:persistence-inventory",
         "check:architecture",
         "check:frontier-contract",
         "check:telegram",

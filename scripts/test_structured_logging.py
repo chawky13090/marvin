@@ -41,7 +41,7 @@ def run() -> None:
 
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        now = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
+        clock = {"now": datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)}
         store = StructuredJsonlStore(
             root / "runtime.jsonl",
             component="test",
@@ -49,7 +49,7 @@ def run() -> None:
             max_bytes=1024,
             max_archives=2,
             max_total_bytes=4096,
-            clock=lambda: now,
+            clock=lambda: clock["now"],
         )
         for index in range(20):
             assert store.write(
@@ -69,7 +69,7 @@ def run() -> None:
             root / "concurrent.jsonl",
             component="test.concurrent",
             max_bytes=1024 * 1024,
-            clock=lambda: now,
+            clock=lambda: clock["now"],
         )
         with ThreadPoolExecutor(max_workers=8) as pool:
             outcomes = list(
@@ -87,10 +87,23 @@ def run() -> None:
 
         old = root / "runtime.20200101T000000000000Z.0001.jsonl"
         old.write_text("{}\n", encoding="utf-8")
-        old_timestamp = (now - timedelta(days=8)).timestamp()
+        old_timestamp = (clock["now"] - timedelta(days=8)).timestamp()
         os.utime(old, (old_timestamp, old_timestamp))
         assert store.write("test.prune")
         assert not old.exists()
+        daily = StructuredJsonlStore(
+            root / "daily.jsonl",
+            component="test.daily",
+            max_bytes=1024 * 1024,
+            clock=lambda: clock["now"],
+        )
+        assert daily.write("test.day-one")
+        day_one_timestamp = clock["now"].timestamp()
+        os.utime(daily.path, (day_one_timestamp, day_one_timestamp))
+        clock["now"] += timedelta(days=1)
+        assert daily.write("test.day-two")
+        assert len(list(root.glob("daily.*.jsonl"))) == 1
+        assert daily.recent(2)[0]["event_name"] == "test.day-two"
         unavailable = StructuredJsonlStore(root, component="unavailable")
         assert unavailable.write("test.failure") is False
 

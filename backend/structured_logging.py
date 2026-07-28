@@ -145,9 +145,14 @@ class StructuredJsonlStore:
         )
 
     def _rotate_if_needed(self, projected_bytes: int) -> None:
-        if not self.path.exists() or self.path.stat().st_size + projected_bytes <= self.max_bytes:
+        if not self.path.exists():
             return
         now = self._clock().astimezone(timezone.utc)
+        modified = datetime.fromtimestamp(self.path.stat().st_mtime, timezone.utc)
+        size_due = self.path.stat().st_size + projected_bytes > self.max_bytes
+        day_due = modified.date() < now.date()
+        if not size_due and not day_due:
+            return
         stamp = now.strftime("%Y%m%dT%H%M%S%fZ")
         self._rotation_counter += 1
         archive = self.path.with_name(
@@ -157,6 +162,10 @@ class StructuredJsonlStore:
 
     def _prune(self) -> None:
         cutoff = self._clock().astimezone(timezone.utc) - timedelta(days=self.retention_days)
+        if self.path.exists():
+            modified = datetime.fromtimestamp(self.path.stat().st_mtime, timezone.utc)
+            if modified < cutoff:
+                self.path.unlink(missing_ok=True)
         for archive in self._archives():
             modified = datetime.fromtimestamp(archive.stat().st_mtime, timezone.utc)
             if modified < cutoff:
@@ -220,6 +229,7 @@ class StructuredJsonlStore:
     def recent(self, limit: int = 100) -> list[dict[str, Any]]:
         bounded_limit = min(max(int(limit), 1), 5000)
         with self._lock:
+            self._prune()
             paths = ([self.path] if self.path.exists() else []) + self._archives()
             result: list[dict[str, Any]] = []
             for path in paths:

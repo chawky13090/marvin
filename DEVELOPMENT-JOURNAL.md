@@ -8068,3 +8068,44 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   https://csrc.nist.gov/pubs/sp/800/92/r1/ipd
 - Rollback : `git revert <commit>`; les lecteurs historiques ignorent les champs enrichis.
   Redémarrer le backend puis repasser test ciblé, architecture, gate rapide, health et smoke.
+
+## 2026-07-28 — v2.393.0 — inventaire JSONL et confidentialité du matcher
+
+### Constat, comparaison et amélioration proactive
+
+- Treize chemins JSONL coexistaient sans classification autoritaire. Certains sont des logs
+  temporaires, mais d'autres portent la reprise des missions, les preuves d'évaluation ou la
+  vérité durable; une rotation uniforme aurait supprimé des données fonctionnelles.
+- Deux approches ont été comparées : imposer la même rétention à tous les JSONL, ou séparer
+  télémétrie et flux métier selon leur propriétaire. La seconde est retenue conformément aux
+  compromis documentés par le modèle Event Sourcing de Microsoft.
+- `skills_match_log.jsonl`, réellement diagnostique, réécrivait le fichier à chaque match,
+  était vulnérable aux écritures concurrentes et conservait 160 caractères de la demande en clair.
+- L'audit de v2.392 a aussi trouvé une limite : un petit fichier actif pouvait rester sous le
+  seuil de taille et conserver des événements au-delà de leur durée. Une rotation quotidienne
+  et une purge à la lecture corrigent ce cas.
+
+### Solution et impact de journalisation
+
+- `MARVIN-PERSISTENCE-INVENTORY.md` classe exhaustivement les 13 JSONL et définit les
+  invariants de migration : version, ordre, idempotence, corruption partielle et cycle de vie.
+- Le test AST ignore `.venv`, compare exactement sources et manifeste, puis impose
+  `StructuredJsonlStore` aux trois logs techniques déjà migrés.
+- Le matcher écrit désormais `skill.match` avec résultat, gagnant, dauphin et scores. La
+  requête est remplacée par longueur et SHA-256; les anciennes lignes sont expurgées en place
+  sans copie sensible. Rétention 30 jours, rotation quotidienne ou 10 Mio, budgets bornés.
+- Aucune donnée des dix flux métier ou registres restants n'est modifiée dans cette tranche.
+  Leur migration restera spécifique et réversible, sans appliquer la purge des logs.
+- Décision utilisateur confirmée : les preuves métier sont conservées avec leur propriétaire,
+  sans expiration arbitraire. Suppression explicite et confirmée seulement; archivage
+  vérifiable et correction par nouvelle version ou événement compensatoire.
+
+### Validation et rollback
+
+- Tests ciblés réussis : migration historique simulée, absence du texte brut, empreinte,
+  compatibilité des scores, borne de lecture, concurrence du logger, rotation quotidienne,
+  expiration, limite d'archives et panne best-effort.
+- Inventaire : 13/13 JSONL classifiés; logs techniques structurés : 3/3.
+- Référence : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+- Rollback applicatif : `git revert <commit>`. Les requêtes historiques expurgées ne sont
+  intentionnellement pas restaurables; toutes leurs métadonnées de diagnostic restent lisibles.

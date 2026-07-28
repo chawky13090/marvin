@@ -84,6 +84,8 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_frontier_consolidation_contract.py"),
         ),
         Stage("Journalisation structurée et bornée", (python, "scripts/test_structured_logging.py")),
+        Stage("Diagnostic privé du matching des skills", (python, "scripts/test_skill_match_logging.py")),
+        Stage("Inventaire des persistances JSONL", (python, "scripts/test_persistence_inventory.py")),
         Stage("Superviseur idempotent des workers", (python, "scripts/test_runtime_supervisor.py")),
         Stage("Workers de maintenance extraits", (python, "scripts/test_runtime_workers.py")),
         Stage("Workers e-mail et agenda extraits", (python, "scripts/test_communication_workers.py")),

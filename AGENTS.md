@@ -186,7 +186,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.392.0)
+## 9. État actuel (v2.393.0)
+
+**v2.393 (inventaire de persistance et matcher privé)** : les treize chemins JSONL du
+backend sont classifiés entre logs techniques, flux métier, registres d'évaluation et registre
+de vérité dans `MARVIN-PERSISTENCE-INVENTORY.md`; le gate refuse tout nouveau chemin non
+classifié. `skills_match_log.jsonl` rejoint le logger structuré et ne conserve plus la demande
+brute : longueur et SHA-256 remplacent le texte, y compris lors de la migration historique.
+Le logger tourne désormais quotidiennement en plus du seuil de taille et purge aussi à la lecture.
 
 **v2.392 (journalisation structurée)** : `structured_logging.py` fournit un schéma JSONL
 UTC corrélable, une expurgation récursive, une rotation par taille et une purge combinant

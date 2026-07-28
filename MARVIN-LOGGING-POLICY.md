@@ -90,12 +90,13 @@ Valeurs par défaut, configurables avec bornes :
 
 | Classe | Exemples | Rétention | Rotation | Budget maximal |
 |---|---|---:|---:|---:|
-| Audit | outils, approbations, mutations | 90 jours | 10 Mio/fichier | 30 archives et 300 Mio |
-| Incident | exceptions et erreurs exploitables | 30 jours | 10 Mio/fichier | 30 archives et 300 Mio |
-| Diagnostic détaillé temporaire | debug activé pour incident | 7 jours | 10 Mio/fichier | 10 archives et 100 Mio |
+| Audit | outils, approbations, mutations | 90 jours | quotidienne ou 10 Mio | 30 archives et 300 Mio |
+| Incident | exceptions et erreurs exploitables | 30 jours | quotidienne ou 10 Mio | 30 archives et 300 Mio |
+| Diagnostic détaillé temporaire | debug activé pour incident | 7 jours | quotidienne ou 10 Mio | 10 archives et 100 Mio |
 | Agrégats qualité | SLO, Forge, tendances sans contenu | 180 jours | stockage dédié borné | selon contrat du composant |
 
-La purge s'effectue à l'écriture et applique trois limites simultanées : âge, nombre
+La rotation s'effectue au changement de jour UTC ou avant dépassement de taille. La purge
+s'effectue à l'écriture et à la lecture et applique trois limites simultanées : âge, nombre
 d'archives et taille totale. Les archives les plus anciennes sont supprimées en premier.
 Une politique réglementaire ou contractuelle peut changer ces valeurs, mais doit être
 documentée; aucun journal n'est conservé indéfiniment par défaut.

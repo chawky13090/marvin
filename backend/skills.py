@@ -15,7 +15,10 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
+
+from structured_logging import StructuredJsonlStore, sanitize
 
 _SKILLS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "skills")
 _VERSIONS_DIR = os.path.join(_SKILLS_DIR, "_versions")
@@ -726,12 +729,66 @@ async def match(query: str, threshold: float = 0.72) -> dict | None:
 # append-only borné (garde les 500 dernières entrées) — coût quasi nul, aucune action
 # automatique déclenchée par ce journal, purement diagnostique pour l'instant.
 _MATCH_LOG_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "skills_match_log.jsonl")
-_MATCH_LOG_MAX = 500
+_MATCH_LOG_STORE = None
+_MATCH_LOG_STORE_PATH = None
+_MATCH_LOG_INIT_LOCK = threading.RLock()
+
+
+def _match_log_store() -> StructuredJsonlStore:
+    global _MATCH_LOG_STORE, _MATCH_LOG_STORE_PATH
+    resolved = os.path.abspath(_MATCH_LOG_FILE)
+    if _MATCH_LOG_STORE is None or _MATCH_LOG_STORE_PATH != resolved:
+        with _MATCH_LOG_INIT_LOCK:
+            if _MATCH_LOG_STORE is None or _MATCH_LOG_STORE_PATH != resolved:
+                _migrate_match_log(resolved)
+                _MATCH_LOG_STORE = StructuredJsonlStore.from_environment(
+                    resolved,
+                    component="skills.matcher",
+                    prefix="SKILL_MATCH_LOG",
+                    default_retention_days=30,
+                )
+                _MATCH_LOG_STORE_PATH = resolved
+    return _MATCH_LOG_STORE
+
+
+def _migrate_match_log(path: str) -> None:
+    """Expurge en place les requêtes historiques sans conserver de copie sensible."""
+    target = os.path.abspath(path)
+    if not os.path.isfile(target):
+        return
+    try:
+        rows = []
+        changed = False
+        with open(target, encoding="utf-8", errors="replace") as stream:
+            for line in stream:
+                try:
+                    row = json.loads(line)
+                except (TypeError, ValueError):
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                if isinstance(row.get("query"), str):
+                    row["query"] = sanitize({"query": row["query"]})["query"]
+                    changed = True
+                rows.append(row)
+        if not changed:
+            return
+        temporary = target + ".tmp"
+        with open(temporary, "w", encoding="utf-8", newline="\n") as stream:
+            for row in rows[-500:]:
+                stream.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+        os.replace(temporary, target)
+    except Exception:
+        try:
+            if os.path.exists(target + ".tmp"):
+                os.remove(target + ".tmp")
+        except OSError:
+            pass
 
 
 def _log_match_attempt(query: str, accepted, best, best_score: float, runner_up, runner_up_score: float):
     try:
-        entry = {
+        compatibility = {
             "at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "query": (query or "")[:160],
             "winner": accepted["name"] if accepted else None,
@@ -740,14 +797,12 @@ def _log_match_attempt(query: str, accepted, best, best_score: float, runner_up,
             "runner_up_score": round(runner_up_score, 3) if runner_up else 0.0,
             "gap": round(best_score - runner_up_score, 3) if (best and runner_up) else None,
         }
-        lines = []
-        if os.path.exists(_MATCH_LOG_FILE):
-            with open(_MATCH_LOG_FILE, encoding="utf-8") as f:
-                lines = f.readlines()
-        lines.append(json.dumps(entry, ensure_ascii=False) + "\n")
-        lines = lines[-_MATCH_LOG_MAX:]
-        with open(_MATCH_LOG_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
+        _match_log_store().write(
+            "skill.match",
+            severity="INFO",
+            outcome="matched" if accepted else "not_matched",
+            compatibility=compatibility,
+        )
     except Exception:
         pass  # best-effort, ne doit jamais casser le matching lui-même
 
@@ -757,12 +812,8 @@ def get_match_log(limit: int = 50) -> list:
     seuil/la formule, ou juger si un retrieval multi-compétences serait utile (cas où
     winner_score et runner_up_score sont proches = ambiguïté réelle entre 2 compétences)."""
     try:
-        if not os.path.exists(_MATCH_LOG_FILE):
-            return []
-        with open(_MATCH_LOG_FILE, encoding="utf-8") as f:
-            lines = f.readlines()
-        entries = [json.loads(l) for l in lines if l.strip()]
-        return list(reversed(entries))[:limit]
+        bounded_limit = min(max(int(limit), 0), 500)
+        return _match_log_store().recent(limit=bounded_limit) if bounded_limit else []
     except Exception:
         return []
 
