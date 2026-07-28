@@ -267,6 +267,9 @@ Le Council cinq modèles quitte la façade pour `model_council.py`. La frontièr
 workflow explicite panel parallèle → critique aveugle → arbitrage, avec cinq familles Cloud
 distinctes, budgets, provenance, identifiant de trace et dépendances injectables. Les profils
 Hyper local/sensibles restent bloqués et aucun repli local silencieux n'est introduit.
+La génération d'infographies rejoint `tool_domains/charts.py`. Les onze types partagent une
+validation stricte des dimensions et valeurs, un rendu `Figure` sans état global et une
+publication PNG atomique. Les séries incohérentes et nombres non finis sont refusés avant I/O.
 
 ## 4. Validation obligatoire par tranche
 

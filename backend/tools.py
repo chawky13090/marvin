@@ -72,6 +72,7 @@ from tool_domains import text_processing as text_processing_domain
 from tool_domains import structured_data as structured_data_domain
 from tool_domains import presentations as presentations_domain
 from tool_domains import git_repository as git_repository_domain
+from tool_domains import charts as charts_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -753,151 +754,14 @@ async def execute_search_semantic(args: dict) -> dict:
 # SECTION 8 — Infographies & Images
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_infographic_create(args: dict) -> dict:
-    """Crée une infographie/graphique matplotlib et la sauvegarde en PNG."""
-    chart_type = args.get("chart_type", "bar")   # bar, pie, line, horizontal_bar
-    title = args.get("title", "Graphique")
-    labels = args.get("labels", [])
-    values = args.get("values", [])
-    _op_raw = args.get("output_path", "")
-    if _op_raw:
-        output_path = _resolve_path(_op_raw)
-    else:
-        output_path = str(Path(_SYSTEM_PATHS["desktop"]) / f"infographie_{int(time.time())}.png")
-    colors = args.get("colors", None)
-    subtitle = args.get("subtitle", "")
-
-    _series = args.get("series") or []
-    if not labels:
-        return {"error": "Labels (étiquettes) requis"}
-    if not values and not _series:
-        return {"error": "Fournir 'values' (mono-série) ou 'series' (multi-série : [{name, values}])"}
-    if values and len(labels) != len(values):
-        return {"error": "Le nombre de labels doit correspondre au nombre de valeurs"}
-
-    # Run the blocking matplotlib operation in a thread pool to avoid blocking the event loop
-    def _render_chart():
-      try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        import matplotlib.patches as mpatches
-        import numpy as np
-
-        # Thème (sombre par défaut, clair optionnel)
-        theme = (args.get("theme") or "dark").lower()
-        GOLD = "#c9a84c"
-        if theme == "light":
-            BG, TEXT_COLOR, GRID_COLOR = "#ffffff", "#222222", "#dddddd"
-        else:
-            BG, TEXT_COLOR, GRID_COLOR = "#111111", "#c3c3c3", "#2a2a2a"
-        default_colors = [GOLD, "#e8c96d", "#5b9bd5", "#70ad47", "#ed7d31", "#a07830",
-                          "#d4b060", "#7030a0", "#c0504d", "#4bacc6"]
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        fig.patch.set_facecolor(BG)
-        ax.set_facecolor(BG)
-
-        used_colors = colors or (default_colors * 4)[:max(len(labels), 1)]
-        vals = [float(v) for v in values] if values else []
-        # Multi-séries : [{"name":..., "values":[...]}, ...]
-        series = args.get("series") or []
-        x = np.arange(len(labels))
-
-        def _style_axes(grid_axis="y"):
-            ax.set_xticks(x); ax.set_xticklabels(labels, color=TEXT_COLOR, fontsize=9, rotation=0)
-            ax.tick_params(colors=TEXT_COLOR)
-            ax.grid(axis=grid_axis, color=GRID_COLOR, linewidth=0.7)
-            for s in ax.spines.values():
-                s.set_color(GRID_COLOR)
-
-        ct = chart_type
-        if ct in ("pie", "donut"):
-            wedges, texts, autotexts = ax.pie(
-                vals, labels=labels, colors=used_colors, autopct="%1.1f%%", startangle=140,
-                pctdistance=0.8, textprops={"color": TEXT_COLOR, "fontsize": 10},
-                wedgeprops=dict(width=0.42) if ct == "donut" else None)
-            for at in autotexts:
-                at.set_color(BG if theme == "dark" else "#ffffff"); at.set_fontweight("bold")
-            if ct == "donut":
-                ax.text(0, 0, f"{sum(vals):g}", ha="center", va="center", color=GOLD, fontsize=16, fontweight="bold")
-        elif ct in ("line", "area", "multi_line"):
-            sset = series if series else [{"name": "", "values": vals}]
-            for idx, s in enumerate(sset):
-                c = used_colors[idx % len(used_colors)]
-                sv = [float(v) for v in s["values"]]
-                ax.plot(x, sv, color=c, linewidth=2.5, marker="o", markersize=6,
-                        markerfacecolor=BG, markeredgewidth=2, label=s.get("name", ""))
-                if ct == "area":
-                    ax.fill_between(x, sv, alpha=0.18, color=c)
-            _style_axes("y")
-            if series:
-                ax.legend(facecolor=BG, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR, fontsize=9)
-        elif ct == "scatter":
-            xv = [float(v) for v in (args.get("x_values") or x)]
-            ax.scatter(xv, vals, color=GOLD, s=80, alpha=0.8, edgecolors=BG, linewidths=1)
-            ax.tick_params(colors=TEXT_COLOR); ax.grid(color=GRID_COLOR, linewidth=0.7)
-            for sp in ax.spines.values():
-                sp.set_color(GRID_COLOR)
-        elif ct == "radar":
-            ax.remove()
-            ax = fig.add_subplot(111, polar=True); ax.set_facecolor(BG)
-            ang = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
-            sset = series if series else [{"name": "", "values": vals}]
-            for idx, s in enumerate(sset):
-                sv = [float(v) for v in s["values"]]; sv += sv[:1]
-                aa = ang + ang[:1]; c = used_colors[idx % len(used_colors)]
-                ax.plot(aa, sv, color=c, linewidth=2, label=s.get("name", ""))
-                ax.fill(aa, sv, color=c, alpha=0.15)
-            ax.set_xticks(ang); ax.set_xticklabels(labels, color=TEXT_COLOR, fontsize=9)
-            ax.tick_params(colors=TEXT_COLOR)
-            if series:
-                ax.legend(facecolor=BG, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR, fontsize=8, loc="upper right")
-        elif ct in ("grouped_bar", "stacked_bar") and series:
-            n = len(series); w = 0.8 / max(n, 1)
-            bottom = np.zeros(len(labels))
-            for idx, s in enumerate(series):
-                sv = np.array([float(v) for v in s["values"]]); c = used_colors[idx % len(used_colors)]
-                if ct == "stacked_bar":
-                    ax.bar(x, sv, bottom=bottom, color=c, width=0.55, label=s.get("name", "")); bottom += sv
-                else:
-                    ax.bar(x + idx * w - 0.4 + w / 2, sv, color=c, width=w, label=s.get("name", ""))
-            _style_axes("y")
-            ax.legend(facecolor=BG, edgecolor=GRID_COLOR, labelcolor=TEXT_COLOR, fontsize=9)
-        elif ct == "horizontal_bar":
-            y = np.arange(len(labels))
-            bars = ax.barh(y, vals, color=used_colors, edgecolor="none", height=0.55)
-            ax.set_yticks(y); ax.set_yticklabels(labels, color=TEXT_COLOR, fontsize=9)
-            ax.tick_params(colors=TEXT_COLOR); ax.grid(axis="x", color=GRID_COLOR, linewidth=0.7)
-            for sp in ax.spines.values():
-                sp.set_color(GRID_COLOR)
-            for bar, val in zip(bars, vals):
-                ax.text(bar.get_width() + max(vals) * 0.01, bar.get_y() + bar.get_height() / 2,
-                        f"{val:g}", va="center", color=TEXT_COLOR, fontsize=8)
-        else:  # bar (défaut)
-            bars = ax.bar(x, vals, color=used_colors, edgecolor="none", width=0.55)
-            _style_axes("y")
-            for bar, val in zip(bars, vals):
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(vals) * 0.01,
-                        f"{val:g}", ha="center", va="bottom", color=TEXT_COLOR, fontsize=8)
-
-        ax.set_title(title, color=GOLD, fontsize=14, fontweight="bold", pad=16)
-        if subtitle:
-            fig.text(0.5, 0.93, subtitle, ha="center", color=TEXT_COLOR, fontsize=9)
-
-        plt.tight_layout()
-        out = Path(output_path)
-        if not out.suffix:
-            out = out.with_suffix(".png")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(str(out), dpi=150, bbox_inches="tight", facecolor=BG)
-        plt.close(fig)
-        return {"success": True, "message": f"Infographie créée : {out}", "path": str(out)}
-      except Exception as e:
-        return {"error": str(e)}
-
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _render_chart)
+charts_domain.configure(
+    resolve_path=_resolve_path,
+    default_output=lambda: (
+        Path(_SYSTEM_PATHS["desktop"])
+        / f"infographie_{time.time_ns()}.png"
+    ),
+)
+execute_infographic_create = charts_domain.create
 
 
 
@@ -5160,15 +5024,15 @@ TOOLS_SPEC = [
 
     _t("infographic_create", "Crée un graphique PNG. Types : bar, horizontal_bar, pie, donut, line, area, multi_line, scatter, radar, grouped_bar, stacked_bar. Pour les multi-séries (grouped/stacked/multi_line/radar), fournir 'series' = [{name, values}].",
        {"chart_type": {"type": "string", "enum": ["bar", "horizontal_bar", "pie", "donut", "line", "area", "multi_line", "scatter", "radar", "grouped_bar", "stacked_bar"], "description": "Type de graphique"},
-        "title": {"type": "string", "description": "Titre du graphique"},
-        "labels": {"type": "array", "items": {"type": "string"}, "description": "Étiquettes (axe / catégories)"},
-        "values": {"type": "array", "items": {"type": "number"}, "description": "Valeurs (mono-série)"},
-        "series": {"type": "array", "description": "Multi-séries : [{\"name\":\"2024\",\"values\":[...]}, …]"},
-        "x_values": {"type": "array", "items": {"type": "number"}, "description": "Abscisses pour scatter"},
+        "title": {"type": "string", "maxLength": 500, "description": "Titre du graphique"},
+        "labels": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"type": "string", "maxLength": 200}, "description": "Étiquettes (axe / catégories)"},
+        "values": {"type": "array", "maxItems": 100, "items": {"type": "number"}, "description": "Valeurs (mono-série)"},
+        "series": {"type": "array", "maxItems": 20, "items": {"type": "object", "properties": {"name": {"type": "string", "maxLength": 200}, "values": {"type": "array", "maxItems": 100, "items": {"type": "number"}}}, "required": ["values"], "additionalProperties": False}, "description": "Multi-séries : [{\"name\":\"2024\",\"values\":[...]}, …]"},
+        "x_values": {"type": "array", "maxItems": 100, "items": {"type": "number"}, "description": "Abscisses pour scatter"},
         "theme": {"type": "string", "enum": ["dark", "light"], "description": "Thème (défaut sombre)"},
-        "output_path": {"type": "string", "description": "Chemin de sauvegarde PNG (défaut : Bureau)"},
-        "subtitle": {"type": "string", "description": "Sous-titre optionnel"},
-        "colors": {"type": "array", "items": {"type": "string"}, "description": "Couleurs HEX optionnelles"}},
+        "output_path": {"type": "string", "maxLength": 32767, "description": "Chemin de sauvegarde PNG (défaut : Bureau)"},
+        "subtitle": {"type": "string", "maxLength": 1000, "description": "Sous-titre optionnel"},
+        "colors": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"type": "string", "maxLength": 50}, "description": "Couleurs optionnelles reconnues par Matplotlib"}},
        ["title", "labels"]),
 
     _t("file_create_xlsx", "Crée un fichier Excel (.xlsx) avec titres, en-têtes et données.",

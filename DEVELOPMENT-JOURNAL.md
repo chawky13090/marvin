@@ -7222,3 +7222,51 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - après réversion, redémarrer le backend et repasser health, gate rapide, Council déterministe
   et smoke test. Un Council Cloud réel n'est requis à nouveau que si le transport ou le
   routage diffère après rollback.
+
+## 2026-07-28 — v2.372.0 — Graphiques PNG déterministes
+
+### Demande et critères
+
+- poursuivre l'extraction des responsabilités substantielles de `tools.py` ;
+- améliorer la robustesse au lieu de déplacer le code sans le corriger ;
+- tester les artefacts réellement produits et conserver un rollback complet.
+
+### Constats
+
+- `infographic_create` utilisait l'état global `matplotlib.pyplot`, fragile sous concurrence ;
+- listes, séries, couleurs et nombres n'étaient pas bornés ni complètement validés ;
+- une série de mauvaise longueur, `NaN`/infini ou certaines combinaisons type/données
+  échouaient tard pendant le rendu ;
+- le PNG final était écrit directement, donc une interruption pouvait laisser un artefact
+  partiel.
+
+### Solution
+
+- nouveau `tool_domains/charts.py` avec résolveur et chemin par défaut injectés ;
+- onze types rendus par une `matplotlib.figure.Figure` isolée, hors de la boucle asyncio ;
+- validation de 1 à 100 labels, 20 séries maximum, dimensions exactes, nombres finis,
+  règles pie/donut/radar/scatter/grouped/stacked, thème et couleurs ;
+- sortie temporaire voisine puis `os.replace` atomique vers le PNG final ;
+- schéma public enrichi avec les mêmes bornes et façade 344/344 inchangée.
+
+### Validation observée
+
+- le premier import a détecté le littéral JSON `false` utilisé par erreur dans le dictionnaire
+  Python ; il a été remplacé par `False` avant toute validation globale ;
+- test ciblé : les 11 types produisent de vrais PNG relus par Pillow, aucun temporaire ne
+  subsiste et six classes d'entrées invalides sont refusées ;
+- architecture : Marvin **2.372.0**, **344 outils**, **346 routes**, harness **344/344** et
+  **65 restrictions** ;
+- gate rapide complet : **144/144** étapes ;
+- `/api/health` : version **2.372.0**, Ollama disponible, 344 outils et 15 workers ;
+- API réelle : graphique `grouped_bar` à deux séries produit en 516 ms ;
+- inspection visuelle réelle : titre, sous-titre, légende, axes, couleurs et groupes lisibles ;
+- artefact de validation supprimé après inspection, état utilisateur inchangé ;
+- frontend Turbopack conservé, smoke test réel : **28/28** contrats.
+
+### Rollback
+
+- aucune donnée persistante, préférence ni schéma n'est modifié ;
+- rollback : réversion atomique du commit après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser test Graphiques, health, gate rapide et
+  smoke test. Aucun artefact de validation externe n'est requis pour restaurer l'état.

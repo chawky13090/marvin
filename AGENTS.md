@@ -183,7 +183,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.371.0)
+## 9. État actuel (v2.372.0)
+
+**v2.372 (graphiques déterministes)** : `infographic_create` rejoint
+`tool_domains/charts.py`. Onze types utilisent des objets `Figure` isolés sans état global
+`pyplot`; labels, nombres finis, séries, couleurs, thèmes et chemins sont bornés et validés.
+Les PNG sont écrits dans un fichier temporaire voisin puis remplacés atomiquement.
 
 **v2.371 (moteur Council)** : le panel cinq familles, la critique aveugle et l'arbitrage
 quittent `tools.py` pour `model_council.py`. Routage Cloud, réglage de concurrence, transport

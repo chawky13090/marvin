@@ -265,6 +265,10 @@ parcours illimité qui masquait les échecs.
 en parallèle borné, puis une critique anonymisée et un arbitrage. Le routage de confidentialité
 reste déterministe; aucun repli local n'est possible. Chaque exécution porte un `council_id`,
 les dépendances sont injectables et les volumes de contexte/réponse sont plafonnés.
+90. les graphiques : `tool_domains/charts.py` possède les onze rendus
+`infographic_create`. Chaque rendu utilise une `Figure` isolée, valide les dimensions,
+séries, nombres finis et couleurs, quitte la boucle asyncio et publie le PNG par remplacement
+atomique. La façade ne dépend plus de l'état global Matplotlib.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
