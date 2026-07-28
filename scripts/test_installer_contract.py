@@ -9,13 +9,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     installer = (ROOT / "INSTALLER-NOUVEAU-PC.bat").read_text(encoding="utf-8")
+    legacy_installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    cleanup = (ROOT / "scripts" / "cleanup-vm-diagnostic.ps1").read_text(encoding="utf-8")
+    model_plan = (ROOT / "scripts" / "plan_local_models.py").read_text(encoding="utf-8")
     verifier = (ROOT / "VERIFIER-INSTALLATION.bat").read_text(encoding="utf-8")
     report = (ROOT / "scripts" / "write-install-report.ps1").read_text(encoding="utf-8")
     assert "npm ci" in installer
     assert "nomic-embed-text" in installer
     assert "[1/9]" in installer
     assert "install-desktop-avatar.ps1" in installer
+    assert "plan_local_models.py" in installer
+    assert "qwen2.5:7b" not in installer
+    assert "llava-phi3" not in installer
     assert "write-install-report.ps1" in installer
+    assert "INSTALLER-NOUVEAU-PC.bat" in legacy_installer
+    assert "VOTRE_USERNAME" not in legacy_installer
+    assert "$PSScriptRoot" in cleanup
+    assert "C:\\Users\\Chawb" not in cleanup
+    assert "local_model_policy.recommend" in model_plan
     assert "Docker introuvable - Test Forge production indisponible" not in verifier
     assert "write-install-report.ps1" in verifier
     assert "install-capabilities.json" in report

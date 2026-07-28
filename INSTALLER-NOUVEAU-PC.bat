@@ -237,20 +237,26 @@ popd
 echo.
 
 :: ============================================================ [8/9] Modeles IA
-echo [8/9] Telechargement des modeles IA via Ollama ^(le plus long^)...
+echo [8/9] Selection et telechargement des modeles IA locaux adaptes...
 echo   Demarrage du service Ollama...
 start "" /B "!OLLAMA!" serve >nul 2>&1
 timeout /t 4 /nobreak >nul
-echo   - qwen2.5:7b ^(cerveau principal, ~4.7 Go^)...
-"!OLLAMA!" pull qwen2.5:7b
-if errorlevel 1 echo   [DEGRADE] qwen2.5:7b indisponible : les profils locaux seront limites.
+set "LOCAL_MODEL_PLAN=%TEMP%\marvin-local-model-plan-%RANDOM%.txt"
+backend\.venv\Scripts\python.exe scripts\plan_local_models.py > "!LOCAL_MODEL_PLAN!"
+if errorlevel 1 (
+    echo   [DEGRADE] Detection materielle impossible : aucun modele generatif impose.
+) else (
+    for /f "usebackq delims=" %%M in ("!LOCAL_MODEL_PLAN!") do (
+        echo   - %%M ^(selection dynamique selon GPU, RAM et disque^)...
+        "!OLLAMA!" pull "%%M"
+        if errorlevel 1 echo   [DEGRADE] %%M indisponible : le portefeuille local sera limite.
+    )
+)
+del "!LOCAL_MODEL_PLAN!" >nul 2>&1
 echo   - nomic-embed-text ^(memoire semantique locale^)...
 "!OLLAMA!" pull nomic-embed-text
 if errorlevel 1 echo   [DEGRADE] nomic-embed-text indisponible : l'indexation semantique sera limitee.
-echo   - llava-phi3 ^(vision / OCR, ~2.9 Go^)...
-"!OLLAMA!" pull llava-phi3
-if errorlevel 1 echo   [DEGRADE] llava-phi3 indisponible : la vision locale sera limitee.
-echo   [INFO] PC peu puissant ? Modele plus leger : "!OLLAMA!" pull qwen2.5:3b
+echo   [OK] Le portefeuille local a ete adapte a cette machine.
 echo.
 
 :: ============================================================ [9/9] Config

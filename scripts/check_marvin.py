@@ -202,6 +202,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Runtime partagé des générations", (python, "scripts/test_generation_runtime.py")),
         Stage("Politique dynamique des modèles locaux", (python, "scripts/test_local_model_policy.py")),
         Stage("Installation contrôlée des modèles locaux", (python, "scripts/test_local_model_installer.py")),
+        Stage("Plan modèles locaux de l'installateur", (python, "scripts/test_install_model_plan.py")),
         Stage("Routage des profils et modeles", (python, "scripts/test_agent_routing.py")),
         Stage("Construction du prompt systeme", (python, "scripts/test_agent_prompt.py")),
         Stage("Selection bornee des outils LLM", (python, "scripts/test_agent_tool_selection.py")),

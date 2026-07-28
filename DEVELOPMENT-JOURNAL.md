@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.439.0 — Installateur unique et modèles locaux adaptés au PC
+
+L'audit de portabilité a trouvé un chemin utilisateur absolu dans le nettoyage VM, ainsi qu'un
+ancien `install.ps1` encore présenté comme installateur autonome : URL de dépôt fictive,
+téléchargement Node invalide, architecture frontend obsolète et modèle Hermes imposé. Le
+conserver créait deux procédures contradictoires. Il devient une façade PowerShell stricte vers
+`INSTALLER-NOUVEAU-PC.bat`, avec racine `$PSScriptRoot`, attente et propagation du code de
+sortie. Le nettoyage VM dérive lui aussi sa cible du projet et contrôle qu'elle reste sous
+`data` avant `Remove-Item`.
+
+L'étape modèles de l'installateur imposait qwen2.5:7b et llava-phi3 sur toutes les machines.
+`plan_local_models.py` réutilise maintenant le catalogue et le budget matériel de Marvin,
+observe les modèles Ollama présents et émet uniquement les modèles manquants compatibles avec
+VRAM/RAM et réserve disque. `nomic-embed-text` reste une dépendance fonctionnelle explicite de
+la mémoire. Deux solutions ont été comparées : maintenir une seconde matrice dans le batch,
+simple mais divergente, ou réutiliser la politique backend après création du venv; cette
+dernière fournit une seule source de vérité. Les noms du catalogue suivent désormais une
+grammaire stricte avant d'atteindre la CLI, ce qui ferme l'injection de commande via manifeste.
+
+Validations réelles : syntaxe PowerShell 5.1 des deux scripts, contrat installateur, politique
+locale, plan dynamique/idempotent, compilation Python, avatar (33 assertions) et voix
+(10 assertions). Le plan exécuté sur cette machine est vide car tous les modèles recommandés
+sont déjà présents, ce qui prouve l'idempotence sans téléchargement. Aucun secret ni inventaire
+matériel n'est journalisé; le plan temporaire ne contient que des noms publics et est supprimé.
+Aucune donnée ni schéma n'est migré. Rollback exact : `git revert <commit-v2.439>`.
+
 ## 2026-07-29 — v2.438.0 — Continuité du fil actif et accessibilité des conversations
 
 La validation navigateur a reproduit la perte de contexte signalée : le fil « TEST PROVENANCE

@@ -20,6 +20,14 @@ def installed(name: str, gib: float) -> dict:
 
 def main() -> int:
     catalog = local_model_policy.load_catalog()
+    malformed = dict(catalog)
+    malformed["entries"] = [dict(catalog["entries"][0], name='qwen3:4b" & whoami')]
+    try:
+        local_model_policy.validate_catalog(malformed)
+    except local_model_policy.LocalModelPolicyError:
+        pass
+    else:
+        raise AssertionError("un nom de modèle injectant une commande doit être refusé")
     assert catalog["entries"]
 
     small_gpu = {

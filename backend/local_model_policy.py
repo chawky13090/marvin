@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,9 @@ CATALOG_PATH = Path(__file__).with_name("resources") / "local_model_catalog.json
 RUNTIME_ROLES = ("chat", "agent", "analysis", "vision")
 PORTFOLIO_ROLES = (*RUNTIME_ROLES, "coding")
 GIB = 1024 ** 3
+MODEL_NAME_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$"
+)
 
 
 class LocalModelPolicyError(RuntimeError):
@@ -23,6 +27,11 @@ def load_catalog(path: Path = CATALOG_PATH) -> dict[str, Any]:
         raise LocalModelPolicyError(
             f"Catalogue local illisible ({type(exc).__name__})."
         ) from exc
+    return validate_catalog(payload)
+
+
+def validate_catalog(payload: dict[str, Any]) -> dict[str, Any]:
+    """Valide aussi les noms avant toute utilisation en CLI Ollama."""
     entries = payload.get("entries")
     if payload.get("schema") != "marvin.local-model-catalog/1.0" or not isinstance(entries, list):
         raise LocalModelPolicyError("Schéma du catalogue local invalide.")
@@ -31,7 +40,7 @@ def load_catalog(path: Path = CATALOG_PATH) -> dict[str, Any]:
         name = str(entry.get("name") or "")
         roles = entry.get("roles")
         if (
-            not name or name in seen or not isinstance(roles, dict)
+            not MODEL_NAME_RE.fullmatch(name) or name in seen or not isinstance(roles, dict)
             or int(entry.get("size_bytes") or 0) <= 0
             or not str(entry.get("source_url") or "").startswith("https://ollama.com/")
         ):
