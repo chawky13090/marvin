@@ -19,6 +19,11 @@ Hyper-V, Docker, GPU et Ollama Cloud sont des capacités optionnelles : leur abs
 jamais empêcher l'installation du socle Marvin. Chaque fonction doit annoncer clairement son
 niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr quand il existe.
 
+**Critère de sécurité global** : chaque tranche fonctionnelle inclut une revue de surface
+d'attaque, validation, autorisation, secrets/données personnelles, concurrence, intégrité,
+dépendances et scénarios d'abus. Une dette de sécurité restante doit être inventoriée,
+justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérifié en la masquant.
+
 ---
 
 ## 2. Architecture & stack
@@ -186,7 +191,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.395.0)
+## 9. État actuel (v2.396.0)
+
+**v2.396 (preuves Coding Mission durables)** : chaque projet Code Workspace possède un flux
+append-only chaîné et vérifiable, avec séquences et curseurs de reprise stables. Les écritures
+d'état et de snapshots utilisent `fsync`; un échec de preuve restaure l'état, le snapshot ou
+le Delivery Pack précédent. L'API et l'interface exposent l'intégrité sans supprimer les
+événements historiques.
 
 **v2.395 (preuves Mission OS durables)** : `mission_events.jsonl` utilise le registre
 append-only chaîné. Les preuves d'actions retournent désormais leur séquence et leur hash;

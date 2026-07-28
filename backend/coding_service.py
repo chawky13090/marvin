@@ -195,6 +195,7 @@ def status(mission_id: str = "") -> dict[str, Any]:
         "project": mission,
         "manifest": coding_mission.latest_manifest(cleaned),
         "events": coding_mission.list_events(cleaned, limit=500),
+        "evidence_integrity": coding_mission.evidence_integrity(cleaned),
         "workspace": coding_workspace.status(cleaned) if coding_workspace.get(cleaned) else None,
         "auto_job": coding_jobs.latest_for_mission(cleaned),
         "artifacts": _artifact_preview(cleaned),

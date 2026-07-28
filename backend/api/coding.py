@@ -106,10 +106,21 @@ async def coding_project_detail(mission_id: str):
         "project": mission,
         "manifest": coding_mission.latest_manifest(mission_id),
         "events": coding_mission.list_events(mission_id, limit=500),
+        "evidence_integrity": coding_mission.evidence_integrity(mission_id),
         "workspace": coding_workspace.status(mission_id) if coding_workspace.get(mission_id) else None,
         "auto_job": coding_jobs.latest_for_mission(mission_id),
         "delivery_pack": coding_mission.read_delivery_pack(mission_id),
     }
+
+
+@router.get("/projects/{mission_id}/integrity")
+async def coding_project_integrity(mission_id: str):
+    try:
+        return coding_mission.evidence_integrity(mission_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/projects/{mission_id}/events/stream")

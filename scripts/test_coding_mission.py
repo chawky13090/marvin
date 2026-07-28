@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,13 @@ def main() -> int:
         original = coding_mission.ROOT
         coding_mission.ROOT = Path(temporary) / "coding_missions"
         try:
+            for invalid_id in ("", "a" * 31, "g" * 32, "../" + "a" * 29):
+                try:
+                    coding_mission.get(invalid_id)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("Un identifiant de mission invalide doit être refusé.")
             mission = coding_mission.create("Construire un service avancé", target_platforms=["windows", "linux"])
             mission = coding_mission.checkpoint(
                 mission["id"], "architected", expected_revision=0,
@@ -35,7 +43,15 @@ def main() -> int:
             assert coding_mission.latest_manifest(mission["id"])[0]["sha256"]
             assert coding_mission.list_missions()[0]["id"] == mission["id"]
             assert coding_mission.list_missions(status="failed") == []
-            assert coding_mission.list_events(mission["id"])[0]["type"] == "checkpoint"
+            newest = coding_mission.list_events(mission["id"])[0]
+            assert newest["type"] == "checkpoint"
+            assert newest["sequence"] == 3 and len(newest["record_hash"]) == 64
+            first_page = coding_mission.stream_events(mission["id"], after=0, limit=2)
+            assert [event["cursor"] for event in first_page["events"]] == [1, 2]
+            second_page = coding_mission.stream_events(
+                mission["id"], after=first_page["cursor"], limit=2
+            )
+            assert second_page["events"][0]["cursor"] == 3
             context = coding_mission.resume_context(mission["id"])
             assert context["revision"] == 2 and context["files"]["main.go"].startswith("package")
             try:
@@ -49,6 +65,48 @@ def main() -> int:
             assert coding_mission.list_missions(status="completed")[0]["id"] == mission["id"]
             events = (coding_mission.ROOT / mission["id"] / "events.jsonl").read_text(encoding="utf-8")
             assert len([line for line in events.splitlines() if json.loads(line)]) == 4
+            integrity = coding_mission.evidence_integrity(mission["id"])
+            assert integrity["valid"] is True
+            assert integrity["integrity_level"] == "tamper_evident"
+            assert integrity["signed_records"] == 4
+            assert integrity["retention"] == "owner_lifecycle"
+
+            mission_path = coding_mission.ROOT / mission["id"] / "mission.json"
+            before = mission_path.read_bytes()
+            with (coding_mission.ROOT / mission["id"] / "events.jsonl").open(
+                "a", encoding="utf-8", newline="\n"
+            ) as stream:
+                stream.write("corruption-complete\n")
+            try:
+                coding_mission.checkpoint(
+                    mission["id"],
+                    "testing",
+                    expected_revision=3,
+                    files={"main.go": "package main\n// nouvelle revision\n"},
+                )
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("Une preuve corrompue doit bloquer le checkpoint.")
+            assert mission_path.read_bytes() == before
+            assert not (
+                coding_mission.ROOT / mission["id"] / "snapshots" / "snapshot-0004.json"
+            ).exists()
+            assert coding_mission.evidence_integrity(mission["id"])["valid"] is False
+
+            existing = {path.name for path in coding_mission.ROOT.iterdir()}
+            with patch.object(
+                coding_mission.DurableEvidenceStore,
+                "append",
+                side_effect=RuntimeError("preuve indisponible"),
+            ):
+                try:
+                    coding_mission.create("Mission à annuler")
+                except RuntimeError:
+                    pass
+                else:
+                    raise AssertionError("La création sans preuve doit échouer.")
+            assert {path.name for path in coding_mission.ROOT.iterdir()} == existing
         finally:
             coding_mission.ROOT = original
     print("Advanced Coding Mission OK - snapshots, reprise, redaction et concurrence optimiste.")

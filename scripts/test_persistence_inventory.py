@@ -96,11 +96,11 @@ def run() -> None:
         if value[0] == "domain_event_stream" and value[2] == "structured"
     }
     assert structured_domain_streams == {
+        ("backend/coding_mission.py", "events.jsonl"),
         ("backend/mission_os.py", "mission_events.jsonl")
     }
-    assert "DurableEvidenceStore" in (ROOT / "backend" / "mission_os.py").read_text(
-        encoding="utf-8-sig"
-    )
+    for module, _filename in structured_domain_streams:
+        assert "DurableEvidenceStore" in (ROOT / module).read_text(encoding="utf-8-sig")
     for phrase in (
         "source de données durable",
         "idempotence",

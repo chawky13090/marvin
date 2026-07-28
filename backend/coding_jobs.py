@@ -19,6 +19,7 @@ import repository_intelligence
 import windows_validation
 import hyperv_test_runner
 import engineering_runtime
+import bug_log
 from config import DATA_DIR
 
 
@@ -65,11 +66,40 @@ _NON_RECOVERABLE_MARKERS = {
 RETRY_BASE_SECONDS = 5
 
 
-def _emit(mission_id: str, event_type: str, payload: dict[str, Any] | None = None) -> None:
+def _emit(
+    mission_id: str,
+    event_type: str,
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Ajoute une preuve sans rejouer l'étape si son stockage échoue."""
     try:
-        coding_mission.record_event(mission_id, event_type, payload or {})
-    except (KeyError, OSError, ValueError):
-        pass
+        evidence = coding_mission.record_event(mission_id, event_type, payload or {})
+        return {
+            "proof_recorded": True,
+            "sequence": evidence.get("sequence"),
+            "record_hash": evidence.get("record_hash"),
+        }
+    except (KeyError, OSError, RuntimeError, TimeoutError, ValueError) as exc:
+        warning = {
+            "at": _now(),
+            "event_type": str(event_type)[:100],
+            "error_type": type(exc).__name__,
+            "action_must_not_be_retried": True,
+        }
+        try:
+            job_id = str((payload or {}).get("job_id") or "")
+            job = get_job(job_id) if job_id else latest_for_mission(mission_id)
+            if job:
+                gaps = list(job.get("evidence_gaps") or [])[-19:]
+                _update(job["id"], evidence_gaps=[*gaps, warning])
+        except (OSError, TypeError, ValueError):
+            pass
+        bug_log.log_bug(
+            "coding_evidence_unavailable",
+            f"Preuve {str(event_type)[:100]} indisponible.",
+            context={"mission_id": mission_id, "event_type": str(event_type)[:100]},
+        )
+        return {"proof_recorded": False, **warning}
 
 
 def _validation_cache(result: dict[str, Any]) -> dict[str, Any]:

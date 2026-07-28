@@ -28,6 +28,7 @@ def run() -> None:
         assert len(signed["previous_hash"]) == 64
         integrity = store.verify()
         assert integrity["valid"] is True
+        assert integrity["integrity_level"] == "mixed_legacy_unsigned"
         assert integrity["legacy_records"] == 1
         assert integrity["signed_records"] == 1
         assert integrity["retention"] == "owner_lifecycle"
@@ -47,9 +48,15 @@ def run() -> None:
         concurrent = DurableEvidenceStore(concurrent_path, stream_name="test.concurrent")
         concurrent_integrity = concurrent.verify()
         assert concurrent_integrity["valid"] is True
+        assert concurrent_integrity["integrity_level"] == "tamper_evident"
         assert concurrent_integrity["signed_records"] == 100
         assert len(concurrent.recent(10)) == 10
         assert concurrent.recent(0) == []
+        first_page = concurrent.page(after=0, limit=7)
+        second_page = concurrent.page(after=first_page["cursor"], limit=7)
+        assert [item["cursor"] for item in first_page["records"]] == list(range(1, 8))
+        assert [item["cursor"] for item in second_page["records"]] == list(range(8, 15))
+        assert first_page["cursor"] == 7 and second_page["cursor"] == 14
 
         partial_path = root / "partial.jsonl"
         partial_store = DurableEvidenceStore(partial_path, stream_name="test.partial")

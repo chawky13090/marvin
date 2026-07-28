@@ -8208,3 +8208,67 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   console.
 - Rollback : `git revert <commit>`. Les champs additifs restent lisibles par l'ancien code;
   aucune preuve existante n'est réécrite ou supprimée.
+
+## 2026-07-28 — v2.396.0 — preuves et reprise des Coding Missions
+
+### Constat, comparaison et décision
+
+- Les Coding Missions conservent état, snapshots de fichiers, Delivery Pack et événements
+  nécessaires à la reprise d'un travail long. Leur JSONL par mission n'avait ni séquence,
+  chaîne d'intégrité, verrou interprocessus, `fsync` ni gestion déterministe d'un crash partiel.
+- Deux approches ont été comparées : reconstruire immédiatement tout l'état depuis le flux
+  Event Sourcing, ou conserver `mission.json` comme projection matérialisée et chaîner le flux
+  de preuves. La seconde est retenue : Microsoft rappelle que l'Event Sourcing complet est
+  coûteux et doit être appliqué seulement là où sa complexité est justifiée.
+- Innovation utile retenue : reçu de preuve par événement, curseur SSE de ligne stable,
+  compensation locale état/snapshot/livrable et visibilité directe de l'intégrité dans Code
+  Workspace. Une réécriture générale ou un nouveau service distribué n'apporterait aucun gain
+  mesuré sur cette installation locale Windows-first.
+
+### Solution et impact de journalisation
+
+- `coding_mission/events.jsonl` utilise `DurableEvidenceStore` par mission : schéma 1.0,
+  séquence, SHA-256 chaîné, verrou Windows/Linux, écriture vidée par `fsync`, quarantaine d'une
+  fin partielle et blocage sur corruption complète.
+- Les lectures récentes restent compatibles. La nouvelle pagination chronologique s'arrête
+  au dernier événement réellement livré : un lot de 200 ne saute plus le reste du flux lors
+  d'une reconnexion SSE.
+- `mission.json` est également vidé sur disque avant remplacement atomique. Si la preuve du
+  checkpoint échoue, état et snapshot sont restaurés; si celle du Delivery Pack échoue, le
+  fichier précédent est restauré. Une création interrompue ne laisse pas de mission fantôme.
+- Les événements runtime non transactionnels ne sont plus perdus silencieusement :
+  `coding_jobs._emit` retourne un reçu, conserve une `evidence_gap` bornée dans le job, écrit
+  un incident technique expurgé et interdit le rejeu automatique de l'étape.
+- L'API détail et `/api/coding/projects/{id}/integrity` exposent l'intégrité. Code Workspace
+  affiche les volumes vérifiés ou une alerte bloquante, ainsi que les lacunes de preuve du job.
+- Aucun secret ni contenu de fichier n'entre dans le log d'incident; seuls mission, type
+  d'événement et classe d'erreur sont conservés 30 jours. Les preuves restent avec la mission.
+- Revue de sécurité obligatoire : identifiants de mission limités à 32 caractères hexadécimaux,
+  chemins d'artefacts normalisés par le contrat bundle, charges et lectures bornées, secrets
+  expurgés, concurrence optimiste, verrou interprocessus et corruption bloquante. Les erreurs
+  de preuve ne déclenchent jamais le rejeu automatique d'un effet de bord.
+- Dette de sécurité explicitement conservée : les événements créés avant v2.396 n'ont pas de
+  signature et ne peuvent pas recevoir rétroactivement une garantie cryptographique honnête.
+  `integrity_level=mixed_legacy_unsigned` l'annonce dans l'API et l'interface; seuls les
+  nouveaux événements deviennent `tamper_evident`. Une réécriture des anciens événements
+  détruirait leur valeur probante et n'est donc pas retenue.
+
+### Validation et rollback
+
+- Tests ciblés réussis : chaîne et pagination du registre, création, quatre checkpoints,
+  snapshots, reprise, concurrence optimiste, compensation sur corruption complète, nettoyage
+  d'une création sans preuve, superviseur Auto, reprise/réparation et lacune de preuve visible.
+- Audit réel en lecture seule : quatre Coding Missions existantes, 961 événements historiques,
+  aucune corruption. Ces lignes restent intactes et seront suivies par les nouvelles preuves
+  chaînées au premier événement futur de chaque mission.
+- Gate rapide final exécuté après le durcissement de sécurité : 167/167 étapes, 344 outils,
+  348 routes, 236 fichiers Python compilés et frontend sans erreur ESLint.
+- Backend réel redémarré en 2.396.0; le projet courant expose 793 événements cohérents,
+  zéro corruption et `integrity_level=mixed_legacy_unsigned`, sans attribuer de signature
+  rétroactive. Smoke HTTP : 28/28 contrats.
+- Validation navigateur réelle de `/code` : le bandeau affiche « Registre cohérent »,
+  0 preuve chaînée et 793 événements historiques non signés; aucune erreur console.
+- Références : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+  et https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- Rollback applicatif : `git revert <commit>`. Les nouveaux champs sont additifs et les anciens
+  lecteurs ignorent les signatures; aucune preuve historique n'est réécrite.

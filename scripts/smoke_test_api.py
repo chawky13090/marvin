@@ -370,6 +370,16 @@ def coding_workspace_contracts() -> None:
     assert hyperv.get("network_mode") == "offline_native_execution"
     assert "guest_password" not in hyperv
     assert proxy_overview.get("projects") == overview.get("projects")
+    if projects.get("projects"):
+        mission_id = projects["projects"][0]["id"]
+        detail = fetch_json(f"{BACKEND}/api/coding/projects/{mission_id}")
+        integrity = fetch_json(f"{BACKEND}/api/coding/projects/{mission_id}/integrity")
+        assert detail.get("evidence_integrity", {}).get("valid") is True
+        assert integrity.get("valid") is True
+        assert integrity.get("integrity_level") in {
+            "tamper_evident", "mixed_legacy_unsigned"
+        }
+        assert integrity.get("retention") == "owner_lifecycle"
 
 
 TESTS: list[tuple[str, Callable[[], None]]] = [

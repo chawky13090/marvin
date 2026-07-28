@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -150,6 +151,27 @@ async def scenario(repository: Path) -> None:
         assert "raise RuntimeError('candidate')" in repair_evidence[1]
         assert retried["validation_cache"]["passed_steps"][0]["name"] == "unittest"
         assert coding_mission.get(third["id"])["completion_policy"] == "until_success"
+
+        with (
+            patch.object(
+                coding_jobs.coding_mission,
+                "record_event",
+                side_effect=TimeoutError("registre occupé"),
+            ),
+            patch.object(coding_jobs.bug_log, "log_bug") as log_bug,
+        ):
+            receipt = coding_jobs._emit(
+                third["id"],
+                "validation.proof.test",
+                {"job_id": retried["id"], "secret": "ne-pas-journaliser"},
+            )
+        assert receipt["proof_recorded"] is False
+        assert receipt["action_must_not_be_retried"] is True
+        assert receipt["error_type"] == "TimeoutError"
+        assert "secret" not in str(receipt)
+        gaps = coding_jobs.get_job(retried["id"])["evidence_gaps"]
+        assert gaps[-1]["event_type"] == "validation.proof.test"
+        log_bug.assert_called_once()
     finally:
         coding_jobs.code_forge.execute = original_execute
         coding_jobs.RETRY_BASE_SECONDS = original_retry_base

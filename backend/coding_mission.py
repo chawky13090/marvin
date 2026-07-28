@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from typing import Any
 
 import deliverable_bundle
 from config import DATA_DIR
+from durable_evidence_store import DurableEvidenceStore
 
 
 ROOT = Path(DATA_DIR) / "coding_missions"
@@ -44,7 +46,11 @@ def _redact(value: Any, key: str = "") -> Any:
 
 
 def _directory(mission_id: str) -> Path:
-    if not mission_id or any(char not in "0123456789abcdef" for char in mission_id):
+    if (
+        not isinstance(mission_id, str)
+        or len(mission_id) != 32
+        or any(char not in "0123456789abcdef" for char in mission_id)
+    ):
         raise ValueError("Identifiant de mission invalide.")
     return ROOT / mission_id
 
@@ -52,23 +58,35 @@ def _directory(mission_id: str) -> Path:
 def _atomic_write(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
     os.replace(temporary, path)
 
 
-def _event(mission_id: str, event_type: str, payload: dict[str, Any]) -> None:
-    path = _directory(mission_id) / "events.jsonl"
+def _event_store(mission_id: str) -> DurableEvidenceStore:
+    return DurableEvidenceStore(
+        _directory(mission_id) / "events.jsonl",
+        stream_name=f"marvin.coding_mission.{mission_id}",
+    )
+
+
+def _event(mission_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
     event = {"at": _now(), "type": event_type, "payload": _redact(payload)}
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    return _event_store(mission_id).append(event)
 
 
-def record_event(mission_id: str, event_type: str, payload: dict[str, Any] | None = None) -> None:
+def record_event(
+    mission_id: str,
+    event_type: str,
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Append a durable engineering-runtime event without mutating mission state."""
     if get(mission_id) is None:
         raise KeyError("Mission de coding introuvable.")
     with _LOCK:
-        _event(mission_id, str(event_type)[:100], payload or {})
+        return _event(mission_id, str(event_type)[:100], payload or {})
 
 
 def get(mission_id: str) -> dict[str, Any] | None:
@@ -102,43 +120,30 @@ def list_missions(*, limit: int = 100, status: str | None = None) -> list[dict[s
 
 
 def list_events(mission_id: str, *, limit: int = 500) -> list[dict[str, Any]]:
-    path = _directory(mission_id) / "events.jsonl"
-    if not path.exists():
+    if get(mission_id) is None:
         return []
-    events: list[dict[str, Any]] = []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
-    for line in lines:
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(event, dict):
-            events.append(event)
-    return events[-max(1, min(int(limit), 5000)):][::-1]
+    return _event_store(mission_id).recent(max(1, min(int(limit), 5000)))
 
 
 def stream_events(mission_id: str, *, after: int = 0, limit: int = 500) -> dict[str, Any]:
     """Return chronological events with stable line cursors for SSE resumption."""
-    path = _directory(mission_id) / "events.jsonl"
     if get(mission_id) is None:
         raise KeyError("Mission de coding introuvable.")
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    except OSError:
-        lines = []
-    start = max(0, int(after))
-    rows: list[dict[str, Any]] = []
-    for index, line in enumerate(lines[start:start + max(1, min(int(limit), 1000))], start=start + 1):
-        try:
-            value = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict):
-            rows.append({**value, "cursor": index})
-    return {"events": rows, "cursor": len(lines), "mission": get(mission_id)}
+    page = _event_store(mission_id).page(
+        after=max(0, int(after)),
+        limit=max(1, min(int(limit), 1000)),
+    )
+    return {
+        "events": page["records"],
+        "cursor": page["cursor"],
+        "mission": get(mission_id),
+    }
+
+
+def evidence_integrity(mission_id: str) -> dict[str, Any]:
+    if get(mission_id) is None:
+        raise KeyError("Mission de coding introuvable.")
+    return _event_store(mission_id).verify()
 
 
 def latest_manifest(mission_id: str) -> list[dict[str, Any]]:
@@ -203,14 +208,18 @@ def create(
     with _LOCK:
         directory = _directory(mission_id)
         directory.mkdir(parents=True, exist_ok=False)
-        _atomic_write(directory / "mission.json", mission)
-        _event(mission_id, "created", {
-            "target_platforms": mission["target_platforms"],
-            "autonomy": autonomy,
-            "budget": normalized_budget,
-            "repository": mission["repository"],
-            "conversation_id": mission["conversation_id"],
-        })
+        try:
+            _atomic_write(directory / "mission.json", mission)
+            _event(mission_id, "created", {
+                "target_platforms": mission["target_platforms"],
+                "autonomy": autonomy,
+                "budget": normalized_budget,
+                "repository": mission["repository"],
+                "conversation_id": mission["conversation_id"],
+            })
+        except Exception:
+            shutil.rmtree(directory, ignore_errors=True)
+            raise
     return mission
 
 
@@ -228,11 +237,14 @@ def checkpoint(
         mission = get(mission_id)
         if not mission:
             raise KeyError("Mission de coding introuvable.")
+        previous_mission = json.loads(json.dumps(mission, ensure_ascii=False))
         revision = int(mission.get("revision") or 0)
         if expected_revision is not None and revision != int(expected_revision):
             raise MissionConflict(f"Révision attendue {expected_revision}, révision courante {revision}.")
         revision += 1
         snapshot_name = None
+        snapshot_path: Path | None = None
+        previous_snapshot: bytes | None = None
         manifest: list[dict[str, Any]] = []
         if files is not None:
             normalized = {
@@ -253,8 +265,10 @@ def checkpoint(
                 for path, content in sorted(normalized.items())
             ]
             snapshot_name = f"snapshot-{revision:04d}.json"
+            snapshot_path = _directory(mission_id) / "snapshots" / snapshot_name
+            previous_snapshot = snapshot_path.read_bytes() if snapshot_path.exists() else None
             _atomic_write(
-                _directory(mission_id) / "snapshots" / snapshot_name,
+                snapshot_path,
                 {"revision": revision, "phase": phase, "files": normalized, "manifest": manifest},
             )
         entry = {"revision": revision, "at": _now(), "phase": phase,
@@ -273,8 +287,20 @@ def checkpoint(
             mission["status"] = "paused"
         else:
             mission["status"] = "running"
-        _atomic_write(_directory(mission_id) / "mission.json", mission)
-        _event(mission_id, "checkpoint", entry)
+        mission_path = _directory(mission_id) / "mission.json"
+        _atomic_write(mission_path, mission)
+        try:
+            _event(mission_id, "checkpoint", entry)
+        except Exception:
+            _atomic_write(mission_path, previous_mission)
+            if snapshot_path is not None:
+                if previous_snapshot is None:
+                    snapshot_path.unlink(missing_ok=True)
+                else:
+                    temporary = snapshot_path.with_suffix(snapshot_path.suffix + ".tmp")
+                    temporary.write_bytes(previous_snapshot)
+                    os.replace(temporary, snapshot_path)
+            raise
         return mission
 
 
@@ -296,11 +322,21 @@ def write_delivery_pack(mission_id: str, payload: dict[str, Any]) -> str:
     if get(mission_id) is None:
         raise KeyError("Mission de coding introuvable.")
     path = _directory(mission_id) / "delivery-pack.json"
+    previous = path.read_bytes() if path.exists() else None
     _atomic_write(path, _redact(payload))
-    record_event(mission_id, "delivery.pack.created", {
-        "path": str(path), "status": payload.get("status"),
-        "manifest_count": len(payload.get("manifest") or []),
-    })
+    try:
+        record_event(mission_id, "delivery.pack.created", {
+            "path": str(path), "status": payload.get("status"),
+            "manifest_count": len(payload.get("manifest") or []),
+        })
+    except Exception:
+        if previous is None:
+            path.unlink(missing_ok=True)
+        else:
+            temporary = path.with_suffix(path.suffix + ".tmp")
+            temporary.write_bytes(previous)
+            os.replace(temporary, path)
+        raise
     return str(path)
 
 

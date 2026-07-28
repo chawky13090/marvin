@@ -191,6 +191,30 @@ class DurableEvidenceStore:
                         rows.append(value)
             return list(reversed(rows))
 
+    def page(self, *, after: int = 0, limit: int = 500) -> dict[str, Any]:
+        """Lit une page chronologique avec des curseurs de ligne stables."""
+        start = max(0, int(after))
+        bounded = min(max(int(limit), 1), 10_000)
+        if not self.path.exists():
+            return {"records": [], "cursor": 0}
+        with self._thread_lock, _interprocess_lock(self._lock_path):
+            rows: list[dict[str, Any]] = []
+            cursor = 0
+            with self.path.open("r", encoding="utf-8", errors="replace") as stream:
+                for line_number, line in enumerate(stream, start=1):
+                    cursor = line_number
+                    if line_number <= start:
+                        continue
+                    try:
+                        value = json.loads(line)
+                    except (TypeError, ValueError):
+                        continue
+                    if isinstance(value, dict):
+                        rows.append({**value, "cursor": line_number})
+                        if len(rows) >= bounded:
+                            break
+            return {"records": rows, "cursor": cursor}
+
     def verify(self) -> dict[str, Any]:
         with self._thread_lock, _interprocess_lock(self._lock_path):
             rows, corrupt = self._rows_unlocked()
@@ -212,9 +236,18 @@ class DurableEvidenceStore:
                 if row.get("sequence") != index:
                     errors.append({"sequence": index, "reason": "sequence"})
             previous_hash = actual_hash
+        valid = corrupt == 0 and not errors
+        integrity_level = (
+            "invalid"
+            if not valid
+            else "mixed_legacy_unsigned"
+            if legacy
+            else "tamper_evident"
+        )
         return {
             "stream": self.stream_name,
-            "valid": corrupt == 0 and not errors,
+            "valid": valid,
+            "integrity_level": integrity_level,
             "records": len(rows),
             "signed_records": signed,
             "legacy_records": legacy,

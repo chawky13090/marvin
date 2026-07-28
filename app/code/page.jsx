@@ -375,6 +375,13 @@ export default function CodeWorkspacePage() {
         <div className={styles.detailHead}><div><div className={styles.meta}>MISSION {project.id} · RÉVISION {project.revision}</div><h2 style={{ margin: '7px 0 5px', fontSize: 18 }}>{project.request}</h2><div className={styles.meta}>Mode : {project.autonomy || 'supervised'} · Cibles : {(project.target_platforms || []).join(', ')} · mise à jour {shortDate(project.updated_at)}</div>{selected.workspace && <div className={styles.meta}>Worktree : {selected.workspace.worktree_root} · branche {selected.workspace.branch} · {selected.workspace.changed_count} changement(s)</div>}</div>
           <button className={styles.secondary} onClick={() => prepareChat(`Reprends la Coding Mission ${project.id}. Vérifie son dernier snapshot et poursuis la demande initiale sans recommencer depuis zéro.`)}>Reprendre dans le chat</button>
         </div>
+        {selected.evidence_integrity && <div className={selected.evidence_integrity.integrity_level === 'tamper_evident' ? styles.guardrail : styles.warning}>
+          {selected.evidence_integrity.integrity_level === 'tamper_evident'
+            ? `Preuves vérifiables · ${selected.evidence_integrity.records} événement(s) chaîné(s) · conservation avec la mission`
+            : selected.evidence_integrity.integrity_level === 'mixed_legacy_unsigned'
+              ? `Registre cohérent · ${selected.evidence_integrity.signed_records} preuve(s) chaînée(s) · ${selected.evidence_integrity.legacy_records} événement(s) historiques non signés dont l’intégrité antérieure ne peut pas être attestée`
+              : `Intégrité des preuves compromise · ${selected.evidence_integrity.corrupt_lines || 0} ligne(s) corrompue(s) · toute nouvelle livraison est bloquée`}
+        </div>}
         <div className={styles.phases}>{PHASES.map(phase => <div key={phase} className={`${styles.phase} ${completedPhases.has(phase) || project.phase === phase ? styles.phaseDone : ''}`}>{phase}</div>)}</div>
         {selected.auto_job && <section className={styles.autoJob}>
           <div className={styles.autoHead}><div><div className={styles.panelHeader} style={{ padding: 0, border: 0 }}>Superviseur Auto · {project.completion_policy || 'until_success'}</div><div className={styles.meta}>{selected.auto_job.id} · tentative {selected.auto_job.attempts} · échecs consécutifs {selected.auto_job.consecutive_failures || 0} · {Math.round(selected.auto_job.elapsed_seconds || 0)} s consommées</div></div>
@@ -382,6 +389,11 @@ export default function CodeWorkspacePage() {
           </div>
           <div className={styles.progressTrack}><span style={{ width: `${selected.auto_job.progress?.percent || 0}%` }} /></div>
           <div className={styles.jobStatus}><b style={{ color: statusColor(selected.auto_job.status) }}>{selected.auto_job.status}</b><span>{selected.auto_job.progress?.stage || 'queued'}</span><span>{selected.auto_job.error || 'Aucune erreur'}</span></div>
+          {!!selected.auto_job.evidence_gaps?.length && <div className={styles.warning}>
+            {selected.auto_job.evidence_gaps.length} preuve(s) d’exécution n’ont pas pu être
+            enregistrées. L’étape n’a pas été rejouée automatiquement ; vérifiez l’état réel
+            avant toute reprise.
+          </div>}
         </section>}
         {selected.auto_job?.result?.definition_of_done && <section className={styles.autoJob}>
           <div className={styles.panelHeader} style={{ padding: 0, border: 0 }}>Definition of Done</div>
