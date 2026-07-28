@@ -322,6 +322,10 @@ La tranche v2.385 extrait la surveillance et les règles dans
 lots bornés et conserve pour reprise ceux qu'un LLM n'a pas classifiés. Les règles deviennent
 un contrat fermé, les pannes partielles sont visibles et deux verrous empêchent les doubles
 passages concurrents des workers et des actions manuelles.
+La tranche v2.386 extrait le briefing quotidien dans `proactive_briefing.py`. Tâches,
+événements et boîtes deviennent des sources injectées, concurrentes, bornées et observables.
+Le service proactif et l'outil public partagent la même frontière; une indisponibilité
+partielle n'est plus transformée silencieusement en liste vide.
 
 ## 4. Validation obligatoire par tranche
 

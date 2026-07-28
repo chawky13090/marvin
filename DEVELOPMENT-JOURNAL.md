@@ -7796,3 +7796,54 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Rollback du code : réversion atomique du commit v2.385 après contrôle du patch inverse;
   redémarrer ensuite le backend et repasser le test ciblé, `/api/health`, le gate rapide et
   le smoke test.
+## 2026-07-28 — v2.386.0 — briefing proactif concurrent
+
+### Contexte et constats
+
+- `daily_briefing` conservait 60 lignes d'agrégation dans `tools.py`.
+- Les lectures SQLite étaient synchrones dans la boucle asyncio et les boîtes IMAP étaient
+  interrogées séquentiellement.
+- Toutes les pannes tâches, agenda et IMAP devenaient des listes vides indiscernables d'une
+  vraie absence de données.
+- Les tâches annulées ou marquées `completed` pouvaient rester présentées comme en attente.
+
+### Solution
+
+- Deux approches ont été comparées : déplacer l'agrégation dans `proactive_service.py`, ou
+  créer une frontière dédiée consommée à la fois par l'outil et le service. La frontière
+  dédiée est retenue : elle garde des primitives simples et composables, rend les dépendances
+  testables et évite de mélanger collecte, planification, notifications et voix.
+- Ce choix suit les recommandations d'Anthropic sur les patterns simples et les retours
+  environnementaux, celles d'OpenAI sur un Runner léger avec outils/guardrails/traces, et
+  celles de Google ADK sur l'évaluation de la trajectoire et l'observabilité des sources.
+- Nouveau `proactive_briefing.py` avec tâches, événements, comptes, IMAP, génération et
+  projection réseau injectés.
+- Tâches, événements et collecte e-mail démarrent ensemble; les boîtes sont limitées à
+  quatre appels simultanés et toutes les opérations bloquantes utilisent `asyncio.to_thread`.
+- Comptes, enregistrements, textes, listes et sortie LLM sont bornés.
+- `source_status`, `errors` et `partial` distinguent absence réelle et panne; les données
+  valides restent utilisées.
+- Le registre `daily_briefing` et `proactive_service` conservent le même contrat public.
+
+### Validation et rollback
+
+- Test isolé : concurrence mesurée, filtrage des statuts, date française, tâche urgente,
+  agenda, deux boîtes, panne IMAP partielle, panne SQLite, réponse vide, timeout LLM,
+  provenance et identité de façade.
+- Tests du service proactif et des workers de communication repassés.
+- Architecture 344 outils, 346 routes et harness 344/344; gate global 157/157.
+- Backend réel redémarré en 2.386.0 : Ollama disponible, 15 workers, catalogue HTTP synchronisé
+  et `daily_briefing` présent une seule fois; smoke test 28/28 avec Turbopack.
+- Aucun schéma ni contenu utilisateur n'est modifié par cette tranche.
+- Rollback du code : réversion atomique du commit v2.386 après contrôle du patch inverse;
+  redémarrer ensuite le backend et repasser test ciblé, `/api/health`, gate et smoke.
+
+### Références comparées
+
+- OpenAI Agents SDK : primitives Runner/outils/guardrails/sessions et tracing des générations,
+  outils, handoffs et guardrails — https://openai.github.io/openai-agents-python/
+- Anthropic, *Building effective agents* : simplicité, workflows déterministes lorsque le
+  chemin est connu, agents lorsque la flexibilité est requise et vérité terrain à chaque étape
+  — https://www.anthropic.com/engineering/building-effective-agents
+- Google ADK, *Why evaluate agents* : évaluer la trajectoire, l'usage des outils et la réponse
+  finale — https://adk.dev/evaluate/

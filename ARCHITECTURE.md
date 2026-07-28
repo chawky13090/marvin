@@ -60,6 +60,7 @@ flowchart LR
 | `document_profile.py` | Identité persistante, champs autorisés et catalogue de modèles documentaires |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
+| `proactive_briefing.py` | Agrégation concurrente et observable des tâches, événements et boîtes pour le briefing |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
 | `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, e-mails, documentation d'intervention, sécurité et contrôles opérationnels, santé client, Winget, registre/paramètres/tweaks/nettoyage Windows, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
@@ -325,6 +326,11 @@ classifié n'est pas inscrit dans l'état `seen`, afin d'être repris au passage
 règles n'acceptent que déplacement, lecture ou non-lecture; volumes, comptes et dossiers sont
 bornés, les simulations n'effectuent aucune mutation distante et toutes les pannes partielles
 sont projetées dans le résultat.
+103. le briefing proactif : `proactive_briefing.py` agrège tâches, agenda et boîtes IMAP avec
+des dépendances injectées. Les trois familles de sources s'exécutent en parallèle, les boîtes
+avec une concurrence de quatre; chaque statut contient quantité, durée ou erreur. Une source
+défaillante produit un résultat partiel explicite, sans effacer les données disponibles, et
+aucune lecture SQLite ou IMAP ne bloque la boucle asyncio.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

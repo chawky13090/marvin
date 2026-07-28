@@ -29,6 +29,7 @@ import mission_os as mission_os_runtime
 import vector_store as vector_store_runtime
 import voice_transcription as voice_transcription_runtime
 import web_runtime
+import proactive_briefing
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -1166,66 +1167,17 @@ _FR_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "a
             "septembre", "octobre", "novembre", "décembre"]
 
 
-async def execute_daily_briefing(args: dict) -> dict:
-    """🌅 Génère le briefing du jour : réunit les emails non lus + les tâches en attente
-    et produit une synthèse IA priorisée et motivante en français."""
-    from datetime import date as _date
-    d = _date.today()
-    today_fr = f"{_FR_JOURS[d.weekday()]} {d.day} {_FR_MOIS[d.month - 1]} {d.year}"
-    # Tâches en attente
-    try:
-        all_tasks = db.list_tasks(limit=50)
-    except Exception:
-        all_tasks = []
-    pending = [t for t in all_tasks if t.get("status") != "done"]
-    # Emails non lus (toutes boîtes)
-    import email_manager as _em
-    loop = asyncio.get_running_loop()
-    unread = []
-    for a in _all_email_cfgs():
-        try:
-            inbox = await loop.run_in_executor(None, lambda a=a: _em.fetch_inbox(
-                a["imap_host"], int(a.get("imap_port", 993)), a["username"], a["password"],
-                folder="INBOX", limit=12, offset=0))
-            unread += [{"from": e.get("from", ""), "subject": e.get("subject", ""), "account": a["username"]}
-                       for e in inbox if not e.get("read")]
-        except Exception:
-            continue
-    # Rendez-vous du jour (agenda local)
-    try:
-        events_today = db.list_events(start=d.strftime("%Y-%m-%d 00:00"),
-                                      end=d.strftime("%Y-%m-%d 23:59"), limit=30)
-    except Exception:
-        events_today = []
-    task_lines = "\n".join(
-        f"- [{t.get('priority', 'medium')}] {t.get('title', '')}" + (f" (échéance {t['due_date']})" if t.get("due_date") else "")
-        for t in pending[:15]) or "(aucune)"
-    mail_lines = "\n".join(f"- De {u['from']} : {u['subject']}" for u in unread[:20]) or "(aucun)"
-    event_lines = "\n".join(
-        f"- {(e.get('start_at') or '')[11:16] or 'journée'} : {e.get('title', '')}" + (f" @ {e['location']}" if e.get("location") else "")
-        for e in events_today) or "(aucun)"
-    prompt = (
-        f"Tu es l'assistant personnel de l'utilisateur. Rédige son BRIEFING DU JOUR en français, "
-        f"chaleureux mais concis et actionnable. Nous sommes le {today_fr}.\n\n"
-        f"RENDEZ-VOUS DU JOUR ({len(events_today)}) :\n{event_lines}\n\n"
-        f"TÂCHES EN ATTENTE ({len(pending)}) :\n{task_lines}\n\n"
-        f"EMAILS NON LUS ({len(unread)}) :\n{mail_lines}\n\n"
-        "Structure ta réponse :\n"
-        "1) Une salutation courte adaptée au moment.\n"
-        "2) 📅 AGENDA : rappelle les rendez-vous du jour dans l'ordre (s'il y en a).\n"
-        "3) 🔴 PRIORITÉS DU JOUR : les mails vraiment importants à traiter + les tâches urgentes (ignore pubs/newsletters/notifs).\n"
-        "4) 🟡 À VOIR : ce qui peut attendre.\n"
-        "5) Une phrase de motivation finale.\n"
-        "Sois synthétique, va à l'essentiel."
-    )
-    try:
-        briefing = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-    except Exception as e:
-        return _net_error(e, "briefing du jour") if "_net_error" in globals() else {"error": str(e)}
-    urgent = [t for t in pending if t.get("priority") == "high"]
-    return {"success": True, "briefing": (briefing or "").strip(), "date": today_fr,
-            "tasks_pending": len(pending), "tasks_urgent": len(urgent), "unread": len(unread),
-            "tasks": pending[:15], "events_today": events_today, "message": "Briefing du jour généré."}
+
+
+proactive_briefing.configure(
+    list_tasks=lambda **kwargs: db.list_tasks(**kwargs),
+    list_events=lambda **kwargs: db.list_events(**kwargs),
+    list_accounts=lambda: _all_email_cfgs(),
+    fetch_inbox=lambda *args, **kwargs: email_manager_runtime.fetch_inbox(*args, **kwargs),
+    generate=lambda prompt, **kwargs: _ollama_generate(prompt, **kwargs),
+    network_error=lambda error, resource: _net_error(error, resource),
+)
+execute_daily_briefing = proactive_briefing.build
 
 
 # ══════════════════════════════════════════════════════════════════════════════

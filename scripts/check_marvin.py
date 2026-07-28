@@ -83,6 +83,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Workers de maintenance extraits", (python, "scripts/test_runtime_workers.py")),
         Stage("Workers e-mail et agenda extraits", (python, "scripts/test_communication_workers.py")),
         Stage("Service proactif et voix du briefing", (python, "scripts/test_proactive_service.py")),
+        Stage("Briefing proactif concurrent", (python, "scripts/test_proactive_briefing.py")),
         Stage("Moteur cron et reprises longues", (python, "scripts/test_cron_runtime.py")),
         Stage("Migrations SQLite transactionnelles", (python, "scripts/test_db_migrations.py")),
         Stage("Initialisation SQLite Next.js", ("node", "--no-warnings", "scripts/test_database_init.mjs")),

@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.386 — briefing proactif extrait; sources concurrentes et pannes partielles visibles
 # v2.385 — surveillance e-mail extraite; lots complets, règles strictes et erreurs visibles
 # v2.384 — productivité e-mail extraite; JSON, pièces jointes et temporaires bornés
 # v2.383 — messages e-mail extraits; bornes, confirmation et multi-comptes concurrents

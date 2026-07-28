@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.385.0)
+## 9. État actuel (v2.386.0)
+
+**v2.386 (briefing proactif)** : construction du briefing quotidien rejoint
+`proactive_briefing.py`. Tâches, événements et boîtes IMAP sont injectés et collectés
+concurremment; les accès SQLite et réseau quittent la boucle asyncio. Quatre lectures IMAP
+maximum s'exécutent à la fois, les volumes/textes sont bornés et chaque source expose statut,
+durée, quantité ou erreur. Une panne partielle conserve les autres données; tâches terminées,
+annulées ou invalides ne gonflent plus les priorités. Le registre et `proactive_service`
+utilisent l'alias direct sans corps historique dans `tools.py`.
 
 **v2.385 (surveillance e-mail)** : détection des messages importants et règles de classement
 rejoignent `tool_domains/email_monitoring.py`. Les dépendances de réglages, IMAP, mutations,
