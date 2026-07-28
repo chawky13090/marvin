@@ -10184,3 +10184,51 @@ subsiste pas dans Qdrant.
 Rollback exact : `git revert <commit-v2.431>`. Aucun schéma n'est migré. Le seul enregistrement
 synthétique de validation a été supprimé par la nouvelle frontière et son absence a été
 vérifiée. Les données utilisateur, réglages, modèles, secrets et accès réseau restent inchangés.
+
+## 2026-07-28 — v2.432.0 — Acceptation transactionnelle de Code Workspace
+
+### Constat, comparaison et décision
+
+Le superviseur appliquait le candidat au worktree avant la validation Windows native. Un
+refus pouvait donc laisser un fichier invalide dans le workspace et contaminer la tentative
+suivante, notamment si le modèle ne renvoyait plus ce fichier. En parallèle,
+`coding_jobs.json` interprétait toute corruption comme une liste vide, avec risque d'écraser
+l'historique au prochain changement. Les architectures documentées de Codex et Gemini CLI
+convergent sur isolation, checkpoints, preuves d'exécution et restauration. Deux options ont
+été comparées : nettoyer a posteriori le worktree refusé, ou ne jamais l'altérer avant tous
+les gates. La seconde réduit les états intermédiaires et est retenue.
+
+### Implémentation, sécurité et observabilité
+
+Code Forge conserve le candidat dans le snapshot de mission, exécute Test Forge, contrat de
+production, revues et validation native, puis seulement applique les fichiers au worktree.
+Un refus indique désormais `workspace_applied=false`; la correction repart du snapshot
+précédent sans fichier périmé dans Git. L'application atomique et le budget de fichiers
+existants restent inchangés.
+
+Le registre des jobs écrit avec `fsync`, maintient une dernière copie JSON valide et récupère
+explicitement celle-ci si la primaire est corrompue. Si les deux copies sont invalides, il
+échoue fermé; le backend démarre néanmoins et journalise un incident technique. L'API et
+Code Workspace exposent `available`, `degraded` et `recovered_from_backup`, sans contenu de
+job. Diagnostics persistés et événements chaînés expurgent clés secrètes et secrets usuels
+en ligne tout en conservant les sorties nécessaires à la réparation.
+
+La copie `.bak` contient le même état métier local que le registre primaire et suit sa durée
+de vie; aucun nouveau journal n'est créé. Les erreurs de démarrage rejoignent `bug_log.jsonl`
+avec seulement la classe d'exception. Dette restante : les E2E natifs complets Debian et
+Windows avec panne réelle de VM restent nécessaires avant de passer le domaine `coding` de
+`partial` à `verified`.
+
+### Validation et rollback
+
+Le test du superviseur couvre désormais refus Windows, seconde tentative acceptée, absence
+du fichier refusé dans le worktree, snapshot de réparation, reprise primaire depuis backup,
+double corruption fermée et expurgation de secrets simulés. Coding Mission, Coding Service,
+présentation chat, composition, architecture et lint ciblé réussissent. Le gate consolidé
+réussit **193/193**, avec compilation Python, lint et build Next.js 16.2.12 Turbopack.
+Après relance, les smokes live réussissent **28/28 API** et **40/40 pages**; l'overview Code
+Workspace expose un registre disponible et non dégradé.
+
+Rollback exact : `git revert <commit-v2.432>`. Aucun schéma, worktree utilisateur, mission
+existante, VM, secret ou réglage n'est migré. La réversion retire la lecture du fichier
+`.bak`; ce fichier inerte peut rester sur disque sans modifier le comportement antérieur.

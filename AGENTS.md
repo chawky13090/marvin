@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.431.0)
+## 9. État actuel (v2.432.0)
+
+**v2.432 (acceptation Code Workspace transactionnelle)** : un candidat Code Forge reste
+hors du worktree tant que Test Forge, le contrat de production, les revues et les validations
+natives demandées ne sont pas tous acceptés. Un candidat refusé reste dans le snapshot de
+réparation mais ne contamine plus la tentative suivante; seule la livraison validée est
+appliquée atomiquement. `coding_jobs.json` utilise désormais `fsync`, une dernière copie
+valide et un échec fermé si les deux copies sont corrompues. Le backend reste disponible
+dans ce dernier cas et Code Workspace expose son état dégradé. Diagnostics persistés et
+événements de mission expurgent les secrets usuels sans perdre les preuves de correction.
 
 **v2.431 (cycle de vie mémoire cohérent)** : SQLite reste la source autoritative, tandis que
 Memory Mesh et Qdrant sont des projections gérées par `memory_lifecycle.py`. Création,

@@ -27,6 +27,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.421 — événements SSE orphelins archivés et intégrité défensive
 # v2.420 — sauvegardes AES-256-GCM, clé DPAPI et migration réversible
 
+# v2.432 — acceptation Code Workspace transactionnelle et jobs récupérables
 # v2.431 — cycle de vie mémoire cohérent entre SQLite, Mesh et Qdrant
 # v2.430 — provenance modèle/confidentialité visible et repli Agent cohérent
 # v2.429 — erreurs d'outils expurgées et observabilité UI/MCP explicite
@@ -175,8 +176,15 @@ async def lifespan(app_instance: FastAPI):
         supervisor.start("health-trend", _health_trend_worker)
         supervisor.start("cloud-model-fleet", model_market.sync_recommended_cloud_models)
         supervisor.start("engineering-radar", engineering_radar.background_worker)
-        coding_jobs.start_pending()
-        coding_jobs_started = True
+        try:
+            coding_jobs.start_pending()
+            coding_jobs_started = True
+        except coding_jobs.CodingJobStoreError as exc:
+            bug_log.log_bug(
+                "startup_coding_jobs",
+                type(exc).__name__,
+                context={"exception_type": type(exc).__name__},
+            )
         try:
             import skills
 

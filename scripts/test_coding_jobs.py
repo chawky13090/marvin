@@ -152,6 +152,102 @@ async def scenario(repository: Path) -> None:
         assert retried["validation_cache"]["passed_steps"][0]["name"] == "unittest"
         assert coding_mission.get(third["id"])["completion_policy"] == "until_success"
 
+        windows_calls = 0
+        windows_candidates = 0
+
+        async def windows_execute(
+            _request: str,
+            *,
+            evidence: str = "",
+            mission_id: str = "",
+            defer_acceptance: bool = False,
+        ) -> dict:
+            nonlocal windows_candidates
+            windows_candidates += 1
+            result = accepted_result()
+            result["files"] = (
+                {"stale.py": "raise RuntimeError('refused')\n"}
+                if windows_candidates == 1
+                else {"app.py": "print('windows accepted')\n"}
+            )
+            return result
+
+        def native_execute(*_args, **_kwargs) -> dict:
+            nonlocal windows_calls
+            windows_calls += 1
+            return {
+                "run_id": f"windows-{windows_calls}",
+                "production_ready": windows_calls > 1,
+                "tests_executed": True,
+                "steps": [{"name": "native", "passed": windows_calls > 1}],
+                "isolation": {"backend": "hyperv"},
+            }
+
+        coding_jobs.code_forge.execute = windows_execute
+        with (
+            patch.object(coding_jobs.windows_validation, "route", return_value={
+                "required_backend": "windows_cli_vm",
+                "certification_available": True,
+                "reason": "Validation Windows native requise.",
+            }),
+            patch.object(
+                coding_jobs.hyperv_test_runner,
+                "commands_for",
+                return_value=[["python", "app.py"]],
+            ),
+            patch.object(
+                coding_jobs.hyperv_test_runner,
+                "execute",
+                side_effect=native_execute,
+            ),
+        ):
+            fourth = coding_mission.create(
+                "Mission Windows transactionnelle",
+                target_platforms=["windows"],
+                autonomy="autonomous",
+                budget={
+                    "time_slice_minutes": 5,
+                    "max_consecutive_failures": 3,
+                    "max_files_changed": 5,
+                },
+            )
+            fourth_workspace = coding_workspace.create(
+                fourth["id"],
+                str(repository),
+                confirmed=True,
+            )
+            windows_job = coding_jobs.create_job(fourth["id"])
+            windows_completed = await wait_terminal(windows_job["id"])
+        assert windows_completed["status"] == "completed"
+        assert windows_completed["attempts"] == 2
+        assert windows_calls == 2 and windows_candidates == 2
+        worktree = Path(fourth_workspace["worktree_root"])
+        assert not (worktree / "stale.py").exists()
+        assert (worktree / "app.py").read_text(encoding="utf-8") == (
+            "print('windows accepted')\n"
+        )
+        paused_entries = [
+            entry for entry in coding_mission.get(fourth["id"])["history"]
+            if entry.get("phase") == "paused"
+        ]
+        assert paused_entries
+        assert any(
+            entry.get("state", {}).get("workspace_applied") is False
+            for entry in paused_entries
+        )
+
+        coding_mission.record_event(
+            third["id"],
+            "security.redaction.test",
+            {
+                "error": "authorization: bearer-value",
+                "password": "mission-password-value",
+            },
+        )
+        redacted_event = coding_mission.list_events(third["id"], limit=1)[0]
+        assert "bearer-value" not in str(redacted_event)
+        assert "mission-password-value" not in str(redacted_event)
+
         with (
             patch.object(
                 coding_jobs.coding_mission,
@@ -197,6 +293,42 @@ def main() -> int:
         coding_jobs.JOBS_PATH = root / "coding_jobs.json"
         try:
             asyncio.run(scenario(repository))
+            durable_rows = coding_jobs._load()
+            assert durable_rows
+            coding_jobs._update(
+                durable_rows[0]["id"],
+                error="password=job-password-value",
+                repair_context={"token": "job-token-value"},
+            )
+            persisted = coding_jobs.JOBS_PATH.read_text(encoding="utf-8")
+            assert "job-password-value" not in persisted
+            assert "job-token-value" not in persisted
+            durable_rows = coding_jobs._load()
+            backup = coding_jobs.JOBS_PATH.with_suffix(
+                coding_jobs.JOBS_PATH.suffix + ".bak"
+            )
+            assert backup.is_file()
+
+            coding_jobs.JOBS_PATH.write_text("{corrupt", encoding="utf-8")
+            recovered = coding_jobs._load()
+            assert recovered
+            recovered_status = coding_jobs.store_status()
+            assert recovered_status["available"] is True
+            assert recovered_status["degraded"] is True
+            assert recovered_status["recovered_from_backup"] is True
+            coding_jobs._write(recovered)
+            assert coding_jobs.store_status()["degraded"] is False
+
+            coding_jobs.JOBS_PATH.write_text("{corrupt", encoding="utf-8")
+            backup.write_text("{corrupt", encoding="utf-8")
+            try:
+                coding_jobs._load()
+            except coding_jobs.CodingJobStoreError:
+                pass
+            else:
+                raise AssertionError("Deux copies corrompues devaient échouer fermé.")
+            assert coding_jobs.store_status()["available"] is False
+            coding_jobs._write(durable_rows)
         finally:
             coding_mission.ROOT = old_missions
             coding_workspace.ROOT = old_workspaces

@@ -14,6 +14,7 @@ from typing import Any
 import deliverable_bundle
 from config import DATA_DIR
 from durable_evidence_store import DurableEvidenceStore
+from structured_logging import sanitize_text
 
 
 ROOT = Path(DATA_DIR) / "coding_missions"
@@ -41,7 +42,7 @@ def _redact(value: Any, key: str = "") -> Any:
     if isinstance(value, list):
         return [_redact(item) for item in value[:100]]
     if isinstance(value, str):
-        return value[:4000]
+        return sanitize_text(value, 4000)
     return value
 
 

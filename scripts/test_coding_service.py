@@ -83,6 +83,9 @@ def main() -> int:
     assert detailed["artifacts"]["files"][0]["path"] == "main.sh"
     assert "#!/bin/bash" in detailed["artifacts"]["files"][0]["content"]
     assert detailed["execution_capabilities"]["docker_linux"]["available"] is True
+    code_page = (ROOT / "app" / "code" / "page.jsx").read_text(encoding="utf-8")
+    assert "overview?.job_store?.degraded" in code_page
+    assert "dernière sauvegarde valide" in code_page
 
     snapshot_id = "c" * 32
     missing_snapshot_path = ROOT / "data" / "coding_workspaces" / snapshot_id / "repo" / "test.sh"

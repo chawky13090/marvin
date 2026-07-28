@@ -348,6 +348,11 @@ export default function CodeWorkspacePage() {
     </section>
 
     {error && <div className={styles.error}>{error}</div>}
+    {overview?.job_store?.degraded && <div className={overview.job_store.available ? styles.warning : styles.error}>
+      {overview.job_store.available
+        ? 'Le registre des missions Auto a été récupéré depuis sa dernière sauvegarde valide. La copie primaire sera réparée lors de la prochaine écriture.'
+        : 'Le registre des missions Auto et sa sauvegarde sont illisibles. Marvin reste disponible, mais aucune mission Auto ne sera reprise avant réparation.'}
+    </div>}
     <div className={styles.stats}>
       <Stat label="Projets" value={overview?.projects ?? '—'} color="#60a5fa" />
       <Stat label="En cours" value={overview?.running ?? '—'} color="#fbbf24" />

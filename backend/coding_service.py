@@ -180,15 +180,18 @@ def start(
 def status(mission_id: str = "") -> dict[str, Any]:
     cleaned = str(mission_id or "").strip()
     if not cleaned:
+        job_store = coding_jobs.store_status()
         return {
             "success": True,
             "projects": coding_mission.list_missions(limit=100),
-            "jobs": coding_jobs.list_jobs(limit=100),
+            "jobs": coding_jobs.list_jobs(limit=100) if job_store["available"] else [],
+            "job_store": job_store,
             "execution_capabilities": _execution_capabilities(),
         }
     mission = coding_mission.get(cleaned)
     if mission is None:
         raise CodingServiceError("Coding Mission introuvable.")
+    job_store = coding_jobs.store_status()
     return {
         "success": True,
         "mission_id": cleaned,
@@ -197,7 +200,12 @@ def status(mission_id: str = "") -> dict[str, Any]:
         "events": coding_mission.list_events(cleaned, limit=500),
         "evidence_integrity": coding_mission.evidence_integrity(cleaned),
         "workspace": coding_workspace.status(cleaned) if coding_workspace.get(cleaned) else None,
-        "auto_job": coding_jobs.latest_for_mission(cleaned),
+        "auto_job": (
+            coding_jobs.latest_for_mission(cleaned)
+            if job_store["available"]
+            else None
+        ),
+        "job_store": job_store,
         "artifacts": _artifact_preview(cleaned),
         "execution_capabilities": _execution_capabilities(),
         "delivery_pack": coding_mission.read_delivery_pack(cleaned),

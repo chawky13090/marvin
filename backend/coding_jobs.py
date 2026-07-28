@@ -20,6 +20,7 @@ import windows_validation
 import hyperv_test_runner
 import engineering_runtime
 import bug_log
+from structured_logging import sanitize_text
 from config import DATA_DIR
 
 
@@ -27,6 +28,12 @@ JOBS_PATH = Path(DATA_DIR) / "coding_jobs.json"
 _LOCK = threading.RLock()
 _TASKS: dict[str, asyncio.Task] = {}
 _SEMAPHORE = asyncio.Semaphore(1)
+_STORE_STATE: dict[str, Any] = {
+    "available": True,
+    "degraded": False,
+    "recovered_from_backup": False,
+    "error_type": None,
+}
 
 _PHASE_PROGRESS = {
     "planned": ("planning", 10),
@@ -64,6 +71,38 @@ _NON_RECOVERABLE_MARKERS = {
     "familles cloud", "secret manquant", "confirmation", "runner windows",
 }
 RETRY_BASE_SECONDS = 5
+_SECRET_KEYS = {
+    "password", "passwd", "token", "secret", "api_key", "apikey",
+    "authorization", "cookie", "credential", "private_key",
+}
+
+
+class CodingJobStoreError(RuntimeError):
+    """Le registre des jobs et sa sauvegarde ne peuvent pas être relus sûrement."""
+
+
+def _safe_state(value: Any, *, key: str = "", depth: int = 0) -> Any:
+    """Conserve les diagnostics de reprise tout en expurgeant les secrets usuels."""
+    if depth > 10:
+        return "<depth-limit>"
+    if any(marker in key.casefold() for marker in _SECRET_KEYS):
+        return "***"
+    if isinstance(value, dict):
+        return {
+            str(item_key)[:200]: _safe_state(
+                item_value,
+                key=str(item_key),
+                depth=depth + 1,
+            )
+            for item_key, item_value in list(value.items())[:500]
+        }
+    if isinstance(value, (list, tuple, set)):
+        return [_safe_state(item, depth=depth + 1) for item in list(value)[:500]]
+    if isinstance(value, str):
+        return sanitize_text(value, 60_000)
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return sanitize_text(value, 4_000)
 
 
 def _emit(
@@ -124,19 +163,91 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _decode_jobs(path: Path) -> list[dict[str, Any]]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, list) or any(not isinstance(row, dict) for row in value):
+        raise ValueError("Le registre des jobs doit être une liste d'objets.")
+    return value
+
+
 def _load() -> list[dict[str, Any]]:
-    try:
-        value = json.loads(JOBS_PATH.read_text(encoding="utf-8"))
-        return value if isinstance(value, list) else []
-    except (OSError, ValueError):
+    if not JOBS_PATH.exists():
+        _STORE_STATE.update({
+            "available": True,
+            "degraded": False,
+            "recovered_from_backup": False,
+            "error_type": None,
+        })
         return []
+    try:
+        rows = _decode_jobs(JOBS_PATH)
+        _STORE_STATE.update({
+            "available": True,
+            "degraded": False,
+            "recovered_from_backup": False,
+            "error_type": None,
+        })
+        return rows
+    except (OSError, ValueError, json.JSONDecodeError) as primary_error:
+        backup = JOBS_PATH.with_suffix(JOBS_PATH.suffix + ".bak")
+        try:
+            rows = _decode_jobs(backup)
+        except (OSError, ValueError, json.JSONDecodeError) as backup_error:
+            _STORE_STATE.update({
+                "available": False,
+                "degraded": True,
+                "recovered_from_backup": False,
+                "error_type": type(backup_error).__name__,
+            })
+            raise CodingJobStoreError(
+                "Le registre des jobs de code est illisible."
+            ) from primary_error
+        _STORE_STATE.update({
+            "available": True,
+            "degraded": True,
+            "recovered_from_backup": True,
+            "error_type": type(primary_error).__name__,
+        })
+        return rows
 
 
 def _write(rows: list[dict[str, Any]]) -> None:
     JOBS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    temporary = JOBS_PATH.with_suffix(".tmp")
-    temporary.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    backup = JOBS_PATH.with_suffix(JOBS_PATH.suffix + ".bak")
+    if JOBS_PATH.exists():
+        try:
+            current = _decode_jobs(JOBS_PATH)
+        except (OSError, ValueError, json.JSONDecodeError):
+            current = None
+        if current is not None:
+            backup_temporary = backup.with_suffix(backup.suffix + ".tmp")
+            with backup_temporary.open("w", encoding="utf-8", newline="\n") as stream:
+                json.dump(_safe_state(current), stream, ensure_ascii=False, indent=2)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(backup_temporary, backup)
+    temporary = JOBS_PATH.with_suffix(JOBS_PATH.suffix + ".tmp")
+    safe_rows = _safe_state(rows)
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        json.dump(safe_rows, stream, ensure_ascii=False, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
     os.replace(temporary, JOBS_PATH)
+    _STORE_STATE.update({
+        "available": True,
+        "degraded": False,
+        "recovered_from_backup": False,
+        "error_type": None,
+    })
+
+
+def store_status() -> dict[str, Any]:
+    """Expose uniquement l'état technique du registre, jamais son contenu."""
+    try:
+        _load()
+    except CodingJobStoreError:
+        pass
+    return dict(_STORE_STATE)
 
 
 def _update(job_id: str, **updates: Any) -> dict[str, Any] | None:
@@ -387,12 +498,7 @@ async def _run(job_id: str) -> None:
                 )
                 return
 
-            _update(job_id, progress={"stage": "apply_worktree", "percent": 88})
-            applied = await asyncio.to_thread(
-                coding_workspace.apply_files,
-                job["mission_id"], dict(result.get("files") or {}),
-                max_files_changed=int(budget.get("max_files_changed") or 50),
-            )
+            applied = None
             windows_route = None
             targets = {str(item).casefold() for item in mission.get("target_platforms") or []}
             all_targets_validated = True
@@ -442,6 +548,13 @@ async def _run(job_id: str) -> None:
             summary["definition_of_done"] = done
             validation_cache = _validation_cache(result)
             if all_targets_validated:
+                _update(job_id, progress={"stage": "apply_worktree", "percent": 94})
+                applied = await asyncio.to_thread(
+                    coding_workspace.apply_files,
+                    job["mission_id"], dict(result.get("files") or {}),
+                    max_files_changed=int(budget.get("max_files_changed") or 50),
+                )
+                summary["applied"] = applied
                 pack = engineering_runtime.delivery_pack(
                     mission, result, done,
                     workspace={"worktree_root": workspace.get("worktree_root"), "applied": applied},
@@ -466,7 +579,7 @@ async def _run(job_id: str) -> None:
                 )
                 coding_mission.checkpoint(
                     job["mission_id"], "paused", files=dict(result.get("files") or {}),
-                    state={"auto_job": job_id, "workspace_applied": True,
+                    state={"auto_job": job_id, "workspace_applied": False,
                            "all_targets_validated": False, "reason": reason},
                 )
                 synthetic = {**result, "error": reason}

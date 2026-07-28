@@ -84,6 +84,7 @@ async def coding_overview():
             "installer_online_integration_required": True,
             "debian_vm": linux_test_runner.status(),
         },
+        "job_store": coding_jobs.store_status(),
     }
 
 

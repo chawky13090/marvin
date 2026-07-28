@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.431.0
+Version courante auditée : 2.432.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -469,6 +469,12 @@ et Qdrant. Création, enrichissement, oubli, purge et consolidation utilisent la
 frontière; une panne de projection reste visible et aucun oubli incomplet n'est déclaré
 réussi. Les souvenirs échus quittent immédiatement le prompt puis sont purgés par le worker.
 Un Mesh corrompu échoue fermé et n'est plus remplacé silencieusement.
+En v2.432.0, Code Workspace sépare formellement candidat, validation et intégration : les
+fichiers n'atteignent le worktree qu'après tous les gates, tandis qu'un refus alimente le
+snapshot de réparation sans laisser de fichier périmé. Le registre des jobs possède une
+copie valide, des écritures synchronisées, une récupération explicite et un état dégradé
+visible. Cette amélioration suit les principes communs aux agents de code modernes :
+environnement isolé, checkpoints, preuve de tests et restauration avant intégration.
 
 ## 10. Preuves minimales par grande capacité
 
