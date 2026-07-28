@@ -274,6 +274,10 @@ L'exécuteur `code_python` rejoint `python_execution.py`. La frontière ne quali
 de sandbox : environnement minimal, sorties sur fichiers temporaires bornés, artefacts
 plafonnés, AST et timeout protègent le mode rapide; Test Forge/VM reste la seule frontière
 annoncée comme confinement système et réseau pour du code non fiable.
+Les missions longues rejoignent `tool_domains/long_tasks.py`. Persistance, Mission OS et
+génération sont injectés; objectifs, étapes et tags sont bornés. Une panne cron après création
+partielle déclenche une compensation en ordre inverse, dont le résultat est exposé au lieu de
+laisser une checklist orpheline.
 
 ## 4. Validation obligatoire par tranche
 

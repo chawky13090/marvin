@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.373.0)
+## 9. État actuel (v2.374.0)
+
+**v2.374 (tâches longues)** : proposition, création, état et arrêt rejoignent
+`tool_domains/long_tasks.py`. Le domaine injecte persistance, Mission OS et génération LLM,
+borne objectifs et étapes, produit un tag unique et conserve les trois identités publiques.
+Si la programmation cron échoue après création des tâches, une compensation les supprime en
+ordre inverse et expose le résultat du rollback. Les erreurs Mission OS ne sont plus
+silencieusement perdues et le contrat de succès indique l'action de rollback disponible.
 
 **v2.373 (exécution Python)** : `code_python` rejoint `python_execution.py`. `python -I`
 est désormais présenté correctement comme une isolation de processus/environnement, pas une

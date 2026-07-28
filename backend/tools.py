@@ -22,6 +22,7 @@ import database as db
 import cloud_routing as cloud_routing_runtime
 import model_council as model_council_runtime
 import python_execution as python_execution_runtime
+import mission_os as mission_os_runtime
 import vector_store as vector_store_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
@@ -73,6 +74,7 @@ from tool_domains import structured_data as structured_data_domain
 from tool_domains import presentations as presentations_domain
 from tool_domains import git_repository as git_repository_domain
 from tool_domains import charts as charts_domain
+from tool_domains import long_tasks as long_tasks_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -2677,176 +2679,6 @@ async def execute_ai_subagents_run(args: dict) -> dict:
     }
 
 
-# v2.145 — « ChatGPT Work » (tâche longue autonome, juillet 2026) : décompose un objectif en
-# checklist (table `tasks` déjà existante, tag `longtask:<slug>`) et programme un job CRON qui
-# relance un VRAI tour d'agent (outils complets, pas juste du texte — via `run_agent`, cf.
-# `main.py::_long_task_resume_tick`) toutes les 5 min jusqu'à ce que toutes les étapes soient
-# faites. Réutilise l'infra cron+tasks déjà existante et testée plutôt que d'inventer un
-# nouveau système d'exécution en arrière-plan. Positionnement HONNÊTE (pas de survente) :
-# reprise toutes les 5 min, pas un process qui tourne en continu pendant des heures comme
-# ChatGPT Work (infra cloud dédiée) — mais un vrai gain : Marvin continue d'avancer après
-# avoir répondu, sans qu'on ait à relancer chaque étape soi-même.
-async def execute_long_task_start(args: dict) -> dict:
-    """Démarre une tâche longue autonome : décompose l'objectif en étapes (visibles dans
-    Tâches), avance IMMÉDIATEMENT sur la première avec tes outils normaux, puis programme
-    une reprise automatique (toutes les 5 min) jusqu'à ce que tout soit fait. Pour un
-    objectif qui prend plusieurs étapes/outils et peut continuer sans supervision constante
-    (« occupe-toi de X en tâche de fond », « fais avancer ce projet pendant que je fais
-    autre chose »). PAS pour une question simple ou une action en un seul appel d'outil.
-    ÉTAPE 1 (sans confirmed) : propose le plan pour validation — ne crée RIEN encore.
-    ÉTAPE 2 (avec confirmed=true, mêmes 'goal'/'steps' que le plan proposé) : crée
-    réellement les tâches et programme la reprise automatique."""
-    goal = (args.get("goal") or "").strip()
-    conversation_id = args.get("_conversation_id")
-    if not goal:
-        return {"error": "Paramètre 'goal' requis."}
-    if not conversation_id:
-        return {"error": "Cette tâche longue doit être démarrée depuis une conversation active."}
-
-    # v2.151 — "Plan mode" (repris de ChatGPT Work, recherche menée avant implémentation) :
-    # un plan proposé puis approuvé avant exécution, plutôt qu'exécuté aveuglément dès la
-    # décomposition. Réutilise le même booléen `confirmed` que TOUS les autres outils
-    # dangereux de Marvin (pc_run_command, pc_gui_click...) — aucun nouveau concept introduit.
-    steps = [s.strip() for s in (args.get("steps") or []) if isinstance(s, str) and s.strip()][:8]
-    if not (args.get("confirmed") and steps):
-        decompose_prompt = (
-            f"Objectif : {goal}\n\n"
-            "Décompose en 2 à 8 ÉTAPES concrètes, dans l'ordre logique. IMPORTANT : ces étapes "
-            "seront exécutées PAR UN ASSISTANT IA AUTONOME disposant d'outils (fichiers, "
-            "commandes système, SSH, web, documents...) — PAS par un humain qui suit un mode "
-            "d'emploi. Formule chaque étape comme une action que l'IA peut accomplir elle-même "
-            "avec ses outils (ex. « lister les fichiers de X », « vérifier l'espace disque via "
-            "une commande système »), jamais une instruction manuelle du type « cliquez sur », "
-            "« appuyez sur la touche ». Réponds UNIQUEMENT par une liste à puces, une étape par "
-            "ligne — rien d'autre."
-        )
-        try:
-            raw = (await _ollama_generate(decompose_prompt, model=args.get("model"), timeout=90) or "")
-        except Exception:
-            raw = ""
-        steps = [
-            line.lstrip("-•* ").strip()
-            for line in raw.splitlines()
-            if line.strip() and line.lstrip().startswith(("-", "•", "*"))
-        ][:8]
-        if not steps:
-            return {"error": "Impossible de décomposer cet objectif en étapes claires — reformule plus précisément."}
-
-    if not args.get("confirmed"):
-        plan_text = "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
-        return {
-            "requiresConfirmation": True,
-            "goal": goal, "steps": steps,
-            "message": (f"Plan proposé pour « {goal} » ({len(steps)} étape(s)) :\n{plan_text}\n\n"
-                        "Confirme pour démarrer la tâche longue (les mêmes 'steps' seront repris "
-                        "tels quels), ou reformule l'objectif pour un plan différent."),
-        }
-
-    import re as _re, uuid as _uuid
-    slug = _re.sub(r"[^a-z0-9]+", "-", goal.lower())[:40].strip("-") or _uuid.uuid4().hex[:8]
-    tag = f"longtask:{slug}"
-    created = [db.create_task(title=step, description=f"Étape de la tâche longue : {goal}", tags=[tag])
-               for step in steps]
-
-    try:
-        db.create_cron_job(
-            name=f"Reprise tâche longue : {goal[:60]}",
-            tool_name="_long_task_resume",
-            args={"conversation_id": conversation_id, "slug": slug, "goal": goal},
-            schedule="every 5 minutes",
-        )
-    except Exception as e:
-        return {"error": f"Étapes créées mais échec de la programmation de reprise automatique : {str(e)[:150]}",
-                "steps": steps, "tag": tag}
-
-    mission = None
-    try:
-        import mission_os
-        mission = mission_os.create_mission(
-            goal=goal,
-            conversation_id=str(conversation_id),
-            tag=tag,
-            steps=steps,
-            task_ids=[t["id"] for t in created],
-        )
-    except Exception:
-        mission = None
-
-    return {
-        "success": True,
-        "goal": goal,
-        "steps": steps,
-        "tag": tag,
-        "task_ids": [t["id"] for t in created],
-        "mission_id": mission.get("id") if mission else None,
-        "message": (
-            f"{len(steps)} étape(s) créée(s) (visibles dans Tâches, tag « {tag} »). "
-            "Continue MAINTENANT sur la première étape avec tes outils normaux — la reprise "
-            "automatique (toutes les 5 min) prendra le relais pour les étapes restantes."
-        ),
-    }
-
-
-async def execute_long_task_status(args: dict) -> dict:
-    """Vérifie l'avancement d'une ou de toutes les tâches longues (voir long_task_start)."""
-    tag = (args.get("tag") or "").strip()
-    all_tasks = db.list_tasks(limit=200)
-    relevant = [t for t in all_tasks if any(tg.startswith("longtask:") for tg in (t.get("tags") or []))
-                and (not tag or tag in (t.get("tags") or []))]
-    if not relevant:
-        return {"success": True, "count": 0, "message": "Aucune tâche longue en cours."}
-    by_tag: dict[str, list] = {}
-    for t in relevant:
-        for tg in (t.get("tags") or []):
-            if tg.startswith("longtask:"):
-                by_tag.setdefault(tg, []).append(t)
-    groups = [
-        {"tag": tg, "total": len(tasks), "done": sum(1 for t in tasks if t.get("status") == "done"),
-         # v2.145 — bug trouvé en testant en réel : sans 'id', le modèle n'a AUCUN moyen de
-         # marquer une étape faite (task_update exige l'ID exact) — il inventait le tag ou
-         # un numéro de position à la place, échec systématique.
-         "steps": [{"id": t["id"], "title": t["title"], "status": t["status"]} for t in tasks]}
-        for tg, tasks in by_tag.items()
-    ]
-    try:
-        import mission_os
-        for group in groups:
-            mission = mission_os.find_active(tag=group["tag"])
-            if mission:
-                mission_os.sync_steps(mission["id"], [
-                    {"id": step["id"], "status": step["status"]} for step in group["steps"]
-                ])
-                group["mission_id"] = mission["id"]
-    except Exception:
-        pass
-    return {"success": True, "groups": groups, "message": f"{len(groups)} tâche(s) longue(s) trouvée(s)."}
-
-
-async def execute_long_task_stop(args: dict) -> dict:
-    """Arrête la reprise automatique d'une tâche longue (les étapes déjà faites restent, la
-    checklist reste consultable — seule la reprise en arrière-plan s'arrête)."""
-    tag = (args.get("tag") or "").strip()
-    slug = tag.split(":", 1)[-1] if ":" in tag else tag
-    if not slug:
-        return {"error": "Paramètre 'tag' requis (voir long_task_status pour la liste)."}
-    jobs = db.list_cron_jobs()
-    stopped = 0
-    for j in jobs:
-        if j.get("tool_name") == "_long_task_resume" and (j.get("args") or {}).get("slug") == slug:
-            db.update_cron_job(j["id"], {"enabled": False})
-            stopped += 1
-    try:
-        import mission_os
-        mission = mission_os.find_active(tag=f"longtask:{slug}")
-        if mission:
-            mission_os.stop_mission(mission["id"], "reprise automatique arrêtée")
-    except Exception:
-        pass
-    return {"success": True, "stopped": stopped,
-            "message": (f"{stopped} reprise(s) automatique(s) arrêtée(s)." if stopped
-                        else "Aucune reprise automatique trouvée pour ce tag.")}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION VOICE — Transcription audio (faster-whisper)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3085,6 +2917,16 @@ async def _ollama_generate(
         except Exception as e3:
             last_err = e3
     raise last_err if last_err else RuntimeError("Ollama indisponible")
+
+
+long_tasks_domain.configure(
+    database=db,
+    missions=mission_os_runtime,
+    generate=_ollama_generate,
+)
+execute_long_task_start = long_tasks_domain.start
+execute_long_task_status = long_tasks_domain.status
+execute_long_task_stop = long_tasks_domain.stop
 
 
 def _detect_translation_language(text: str) -> str:

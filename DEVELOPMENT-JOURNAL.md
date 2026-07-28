@@ -7336,3 +7336,52 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - les dossiers temporaires des tests et du runtime de validation ont été supprimés ;
 - rollback : réversion atomique du commit après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test Python, health, gate et smoke.
+
+## 2026-07-28 — v2.374.0 — Tâches longues extraites et démarrage compensable
+
+### Demande et constats
+
+- poursuivre la consolidation du backend sans perte de fonctionnalité ;
+- rendre chaque changement réversible en cas d'imprévu ;
+- les trois outils de tâches longues vivaient encore dans `tools.py` et importaient Mission OS
+  dynamiquement ;
+- si la création cron échouait, les tâches déjà écrites restaient orphelines ;
+- les erreurs de synchronisation Mission OS étaient silencieusement ignorées ;
+- deux objectifs identiques pouvaient produire le même tag et agréger leurs états.
+
+### Solution
+
+- nouveau domaine `tool_domains/long_tasks.py`, avec base, Mission OS, générateur et fabrique
+  d'identifiants injectables ;
+- proposition sans effet de bord, confirmation conservée et trois identités publiques inchangées ;
+- objectifs limités à 4 000 caractères, huit étapes de 1 000 caractères et tags uniques ;
+- création séquentielle suivie d'une compensation en ordre inverse si la planification échoue ;
+- résultat d'échec avec `rollback_complete` et détail des compensations éventuellement en échec ;
+- erreurs Mission OS projetées comme avertissements ou erreurs de synchronisation, sans transformer
+  une checklist et un cron valides en faux échec ;
+- résultat de démarrage avec rollback métier explicite vers `long_task_stop`.
+
+### Validation observée
+
+- compilation ciblée du domaine, de la façade et du test : réussie ;
+- test ciblé : plan sans écriture, création, état, arrêt, bornes et identités de façade réussis ;
+- panne cron injectée après deux créations : deux suppressions en ordre inverse, aucune tâche
+  résiduelle et `rollback_complete=true` ;
+- le premier import réel a détecté une configuration située avant `_ollama_generate`; l'ordre
+  de composition a été corrigé avant les contrôles globaux ;
+- architecture finale v2.374.0 : 344 outils, 346 routes, harness 344/344 et
+  65 restrictions ;
+- gate rapide final : 146/146 étapes, zéro erreur frontend et 37 avertissements préexistants ;
+- backend redémarré : `/api/health` expose v2.374.0, Ollama disponible, 344 outils et
+  15 workers ;
+- API réelle : `long_task_status` relit une mission existante et ses six étapes sans mutation ;
+- frontend Turbopack conservé, smoke test réel : 28/28 contrats.
+
+### Rollback
+
+- aucun schéma ni donnée utilisateur n'est modifié par les tests ;
+- une création métier incomplète se compense immédiatement; une mission créée peut arrêter sa
+  reprise via `long_task_stop` tout en conservant sa checklist d'audit ;
+- rollback du code : réversion atomique du commit v2.374 après vérification du patch inverse ;
+- après réversion, redémarrer le backend puis repasser le test ciblé antérieur, `/api/health`,
+  le gate rapide et le smoke test.

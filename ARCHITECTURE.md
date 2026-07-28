@@ -273,6 +273,10 @@ atomique. La façade ne dépend plus de l'état global Matplotlib.
 borne code, temps, sorties et artefacts, puis termine l'arbre au timeout. Le contrat expose
 explicitement l'absence de sandbox OS/réseau; les capacités hôte demandent confirmation.
 Tout code non fiable ou à certifier doit passer par Test Forge et son conteneur/sa VM.
+92. les tâches longues : `tool_domains/long_tasks.py` injecte base, Mission OS et génération.
+Le démarrage compense les tâches déjà écrites si le cron échoue, chaque tag est unique et les
+erreurs de synchronisation restent observables. L'arrêt désactive la reprise sans supprimer
+la checklist, ce qui préserve l'audit et fournit un rollback métier explicite.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
