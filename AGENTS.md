@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.369.0)
+## 9. État actuel (v2.370.0)
+
+**v2.370 (nettoyage système)** : `system_cleanup` rejoint
+`tool_domains/system_cleanup.py`. Le scan distingue désormais volume total et volume
+réellement récupérable selon l'âge, ne suit pas les liens, déduplique les racines, borne le
+nombre de fichiers et expose erreurs/troncature. La suppression reste une action confirmée;
+les tests ne travaillent que dans un répertoire temporaire isolé.
 
 **v2.369 (inspections Git et IP)** : `git_info` rejoint
 `tool_domains/git_repository.py`. Les quatre actions sont en lecture seule, sans shell,

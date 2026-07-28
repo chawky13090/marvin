@@ -257,6 +257,10 @@ peut les faire basculer vers localhost, une adresse privée ou un service de mé
 Git de lecture à arguments fixes, sans shell, avec formats stables, délai et sorties bornés.
 `tool_domains/network.py` possède `ip_info`, qui valide les adresses globales puis appelle
 IPWhois en HTTPS à travers `outbound_http`; l'ancien transport HTTP non chiffré est supprimé.
+88. le nettoyage système : `tool_domains/system_cleanup.py` possède le scan et la suppression
+confirmée des seuls fichiers temporaires assez anciens. Racines dédupliquées, liens ignorés,
+parcours borné, opérations bloquantes hors event loop et erreurs visibles remplacent le
+parcours illimité qui masquait les échecs.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

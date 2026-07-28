@@ -39,6 +39,7 @@ from tool_domains import pdf_core as pdf_core_domain
 from tool_domains import pdf_advanced as pdf_advanced_domain
 from tool_domains import document_knowledge as document_knowledge_domain
 from tool_domains import network as network_domain
+from tool_domains import system_cleanup as system_cleanup_domain
 from tool_domains import billing as billing_domain
 from tool_domains import windows as windows_domain
 from tool_domains import web as web_domain
@@ -3276,65 +3277,23 @@ execute_ip_info = network_domain.execute_ip_info
 execute_file_large_finder = filesystem_domain.large_finder
 
 
-def _system_cleanup_scan(candidates: list, cutoff: float, do_delete: bool) -> dict:
-    """Scan bloquant (os.walk + éventuelle suppression) — appelé via asyncio.to_thread,
-    jamais directement dans l'event loop (Temp peut contenir énormément de petits
-    fichiers, même risque que file_large_finder v2.160)."""
-    report = []
-    grand_total = 0; grand_files = 0; freed = 0; freed_files = 0
-    for d in candidates:
-        dtotal = 0; dfiles = 0
-        for dp, dns, fns in os.walk(d):
-            for fn in fns:
-                fp = os.path.join(dp, fn)
-                try:
-                    st = os.stat(fp)
-                    dtotal += st.st_size; dfiles += 1
-                    if do_delete and st.st_mtime < cutoff:
-                        try:
-                            os.remove(fp); freed += st.st_size; freed_files += 1
-                        except Exception:
-                            pass
-                except Exception:
-                    continue
-        grand_total += dtotal; grand_files += dfiles
-        report.append({"dir": d, "size_human": _fmt_bytes(dtotal), "files": dfiles})
-    return {"report": report, "grand_total": grand_total, "grand_files": grand_files,
-            "freed": freed, "freed_files": freed_files}
-
-
-async def execute_system_cleanup(args: dict) -> dict:
-    """Analyse (et, si delete=true, vide) les fichiers temporaires pour libérer de l'espace.
-    Sans delete=true : rapport seulement (aucune suppression). delete=true est une action sensible."""
+def _system_cleanup_candidates() -> list[str]:
     import tempfile
-    try:
-        candidates = []
-        seen = set()
-        for d in [tempfile.gettempdir(),
-                  os.environ.get("TEMP"), os.environ.get("TMP"),
-                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp"),
-                  os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Temp")]:
-            if d and os.path.isdir(d):
-                rd = os.path.normcase(os.path.abspath(d))
-                if rd not in seen:
-                    seen.add(rd); candidates.append(d)
-        min_age_days = float(args.get("min_age_days", 1))
-        cutoff = time.time() - min_age_days * 86400
-        do_delete = bool(args.get("delete", False))
-        scan = await asyncio.to_thread(_system_cleanup_scan, candidates, cutoff, do_delete)
-        grand_total, grand_files = scan["grand_total"], scan["grand_files"]
-        freed, freed_files = scan["freed"], scan["freed_files"]
-        res = {"success": True, "locations": scan["report"],
-               "reclaimable_human": _fmt_bytes(grand_total), "total_files": grand_files,
-               "deleted": do_delete}
-        if do_delete:
-            res["freed_human"] = _fmt_bytes(freed); res["freed_files"] = freed_files
-            res["message"] = f"Nettoyage : {_fmt_bytes(freed)} libérés ({freed_files} fichiers supprimés, > {min_age_days} j)"
-        else:
-            res["message"] = f"{_fmt_bytes(grand_total)} potentiellement récupérables dans {len(candidates)} dossiers temp. Relancez avec delete=true pour nettoyer."
-        return res
-    except Exception as e:
-        return {"error": str(e)}
+
+    return [
+        tempfile.gettempdir(),
+        os.environ.get("TEMP", ""),
+        os.environ.get("TMP", ""),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp"),
+        os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Temp"),
+    ]
+
+
+system_cleanup_domain.configure(
+    candidate_paths=_system_cleanup_candidates,
+    format_bytes=_fmt_bytes,
+)
+execute_system_cleanup = system_cleanup_domain.cleanup
 
 
 # ───────────────────────── PDF avancé & lot d'images (v2.35) ─────────────────────
@@ -6347,9 +6306,10 @@ TOOLS_SPEC = [
         "min_mb": {"type": "number", "minimum": 0, "maximum": 1000000, "description": "Taille minimale en Mo à considérer"},
         "max_files": {"type": "integer", "minimum": 1, "maximum": 1000000, "description": "Nombre maximal de fichiers parcourus (défaut 100000)"}},
        []),
-    _t("system_cleanup", "Analyse les fichiers temporaires et l'espace récupérable. delete=true vide les temp (action sensible, fichiers anciens uniquement).",
+    _t("system_cleanup", "Analyse les fichiers temporaires et l'espace réellement récupérable. delete=true supprime uniquement les fichiers assez anciens (action sensible).",
        {"delete": {"type": "boolean", "description": "true = supprimer réellement (sinon rapport seul)"},
-        "min_age_days": {"type": "number", "description": "Âge minimal des fichiers à supprimer en jours (défaut 1)"},
+        "min_age_days": {"type": "number", "minimum": 0, "maximum": 3650, "description": "Âge minimal des fichiers à supprimer en jours (défaut 1)"},
+        "max_files": {"type": "integer", "minimum": 1, "maximum": 500000, "description": "Nombre maximal de fichiers inspectés (défaut 500000)"},
         "confirmed": {"type": "boolean", "description": "Confirmation explicite de suppression"}},
        []),
     _t("pptx_create", "Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces.",

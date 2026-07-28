@@ -260,6 +260,9 @@ revalidées. `web_browse` et `url_analyze` ne suivent plus automatiquement une d
 Les inspections Git et IP quittent aussi la façade historique. Git reste strictement en
 lecture seule, sans shell et avec sorties bornées; la géolocalisation IP utilise exclusivement
 HTTPS et le transport anti-SSRF. Les identités publiques du registre restent inchangées.
+Le nettoyage système rejoint une frontière dédiée : seules les racines temporaires internes
+sont parcourues, sans suivi des liens et avec un plafond explicite. Le rapport sépare enfin
+volume observé et volume récupérable selon l'âge; suppressions et erreurs sont comptabilisées.
 
 ## 4. Validation obligatoire par tranche
 

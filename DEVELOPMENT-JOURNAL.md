@@ -7119,3 +7119,51 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   `git diff --cached --binary | git apply --cached --check --reverse` ;
 - après rollback, redémarrer le backend puis exécuter `/api/health`,
   `scripts/check_marvin.py --quick` et `scripts/smoke_test_api.py`.
+
+## 2026-07-28 — v2.370.0 — Nettoyage système borné
+
+### Demande et critères
+
+- poursuivre la transformation de `tools.py` en façade sans perdre de fonctionnalité ;
+- améliorer la robustesse des responsabilités extraites ;
+- ne valider aucun changement sans tests réels et possibilité de rollback.
+
+### Constats
+
+- `system_cleanup` parcourait sans plafond tous les fichiers des répertoires temporaires ;
+- le rapport présentait la taille de tous les fichiers comme récupérable, même lorsque leur
+  âge interdisait leur suppression ;
+- liens, erreurs d'accès et troncature n'étaient pas exposés ; les erreurs étaient ignorées ;
+- parcours, suppression et projection étaient mélangés dans `tools.py`.
+
+### Solution
+
+- nouveau `tool_domains/system_cleanup.py` avec dépendances injectées ;
+- racines existantes résolues et dédupliquées, liens ignorés, opérations bloquantes exécutées
+  hors de la boucle asyncio ;
+- plafond configurable de 1 à 500 000 fichiers et âge validé de 0 à 3 650 jours ;
+- volume total, volume récupérable, erreurs, troncature et suppression effective distingués ;
+- identité `execute_system_cleanup` et registre public conservés ;
+- test de scan et de suppression exclusivement dans un répertoire temporaire isolé.
+
+### Validation observée
+
+- test ciblé : âge, déduplication, plafond, suppression isolée et façade réussis ;
+- architecture : Marvin **2.370.0**, **344 outils**, **346 routes**, harness **344/344** et
+  **65 restrictions** ;
+- gate rapide complet repassé après chaque correction finale : **142/142** étapes ;
+- le test runtime non destructif a révélé puis permis de corriger le nombre de racines
+  réellement inspectées et l'accord grammatical au singulier ;
+- `/api/health` : version **2.370.0**, Ollama disponible, 344 outils et 15 workers ;
+- `/api/tools` réel avec `delete=false`, `max_files=25` : succès, troncature explicite,
+  aucune suppression et message cohérent ;
+- frontend Turbopack conservé, smoke test réel : **28/28** contrats ;
+- lint frontend : zéro erreur, 37 avertissements préexistants.
+
+### Rollback
+
+- les tests destructifs n'ont touché que leurs fichiers temporaires jetables ; aucune donnée
+  Marvin ni aucun fichier temporaire réel de l'utilisateur n'a été supprimé ;
+- aucun schéma ou état persistant applicatif n'est modifié ;
+- rollback de la tranche : réversion atomique du commit après validation du patch inverse ;
+- après réversion, redémarrer le backend et repasser health, gate rapide et smoke test.
