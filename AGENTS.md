@@ -186,7 +186,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.394.0)
+## 9. État actuel (v2.395.0)
+
+**v2.395 (preuves Mission OS durables)** : `mission_events.jsonl` utilise le registre
+append-only chaîné. Les preuves d'actions retournent désormais leur séquence et leur hash;
+les API Mission exposent l'intégrité. Création, checkpoint, pause, reprise, arrêt et
+synchronisation annulent leur mutation d'état si la preuve ne peut pas être enregistrée.
+Les événements historiques existants restent lisibles; les nouveaux prolongent la chaîne.
+Chaque outil exécuté produit un reçu de preuve persisté et visible dans le chat; si cette
+preuve manque après l'effet de bord, Marvin avertit l'utilisateur et interdit toute relance
+automatique de l'action.
 
 **v2.394 (preuves Forge durables)** : `durable_evidence_store.py` fournit un registre
 append-only sans expiration automatique, avec séquence, version de schéma, chaîne SHA-256,

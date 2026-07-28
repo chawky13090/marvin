@@ -8152,3 +8152,59 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Référence : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 - Rollback : `git revert <commit>`. Les champs de preuve supplémentaires sont additifs et
   ignorables par l'ancien lecteur; aucun fichier historique n'est réécrit.
+
+## 2026-07-28 — v2.395.0 — preuves d'actions Mission OS durables
+
+### Constat, comparaison et décision
+
+- Mission OS conserve les actions, checkpoints, pauses et reprises nécessaires aux missions
+  longues. Son JSONL était append-only mais non vérifiable, et la mutation de `missions.json`
+  précédait parfois une preuve dont l'écriture pouvait échouer.
+- Deux approches ont été comparées : faire du flux l'unique source Event Sourcing et rejouer
+  tout l'état, ou préserver le modèle actuel état matérialisé + registre de preuves. La seconde
+  est retenue pour éviter une migration risquée des missions actives; elle ajoute un rollback
+  applicatif immédiat lorsque la preuve ne peut pas être écrite.
+- Le passage à une transaction SQLite unique réduirait encore la fenêtre d'un crash système
+  entre l'état et la preuve. Il reste une amélioration future explicite, pas une garantie
+  inventée dans cette tranche.
+
+### Solution et impact de journalisation
+
+- `mission_events.jsonl` utilise `DurableEvidenceStore` : schéma, séquence, chaîne SHA-256,
+  verrou interprocessus, `fsync`, détection d'altération et quarantaine de fin partielle.
+- Les 719 preuves historiques restent intactes et lisibles. Aucune expiration automatique.
+- `record_action` renvoie `evidence_sequence` et `evidence_hash`, ce qui relie directement le
+  reçu remis au Runner à l'enregistrement durable.
+- Le hook d'observabilité retourne un `ObservationReceipt` typé : audit, exécution SQLite,
+  preuve Mission OS, apprentissage du routage, séquence, hash et erreurs par composant.
+- Le résultat SSE `tool_end` et le message outil persisté portent ce reçu. Après changement de
+  page, l'API conversations le rattache à l'appel d'outil et l'interface affiche soit la preuve
+  vérifiée, soit un avertissement explicite.
+- Une panne de preuve après effet de bord ne relance jamais l'outil : le reçu impose
+  `action_must_not_be_retried`, afin d'éviter un double envoi, une double écriture ou une
+  seconde mutation. Les messages d'exception et données sensibles ne sont pas projetés.
+- Création, checkpoint, synchronisation, arrêt, pause et reprise restaurent l'état précédent
+  si l'append de preuve échoue. Un retry restaure également l'état de tâche SQLite.
+- `/api/missions`, le détail d'une mission et `/api/missions/integrity` exposent l'intégrité.
+  Aucun log technique supplémentaire : les destinations auxiliaires restent isolées, mais
+  l'absence de preuve métier n'est plus silencieuse.
+
+### Validation et rollback
+
+- Tests ciblés réussis : preuve historique compatible, quatre nouvelles preuves signées,
+  secret expurgé, hash retourné, événement `mission_completed`, intégrité valide et rétention
+  propriétaire. Une corruption complète bloque le checkpoint et l'état est restauré exactement.
+- Tests Evolution Canvas, Agent Observability et lot d'outils sans régression. Ils couvrent
+  aussi le reçu vérifié, la panne d'une destination auxiliaire, la panne du registre durable,
+  l'absence de fuite du message interne et la persistance du hash avec le résultat d'outil.
+- Gate rapide complet : 167/167 étapes, 344 outils, 347 routes, 236 fichiers Python compilés
+  et frontend sans erreur ESLint (37 avertissements historiques).
+- Backend réel redémarré en 2.395.0. `/api/missions/integrity` confirme 724 preuves valides :
+  719 historiques, 5 chaînées, aucune corruption, dernier hash de 64 caractères et rétention
+  `owner_lifecycle`. La preuve 724 provient d'une validation de maintenance non destructive
+  passée par le hook d'observabilité réel.
+- Smoke HTTP réel : 28/28 contrats avec Ollama, FastAPI et frontend Turbopack. Contrôle
+  navigateur de l'accueil : navigation, historique, chat et contrôles présents; aucune erreur
+  console.
+- Rollback : `git revert <commit>`. Les champs additifs restent lisibles par l'ancien code;
+  aucune preuve existante n'est réécrite ou supprimée.

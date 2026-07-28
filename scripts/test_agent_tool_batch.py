@@ -11,6 +11,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from agent_observability import ObservationReceipt
 from agent_tool_batch import execute_tool_batch
 
 
@@ -57,7 +58,14 @@ async def main() -> int:
 
     async def observe(value):
         observed.append(value)
-        raise RuntimeError("observabilité indisponible")
+        return ObservationReceipt(
+            audit_recorded=True,
+            execution_recorded=True,
+            evidence_recorded=True,
+            routing_learned=True,
+            evidence_sequence=23,
+            evidence_hash="b" * 64,
+        )
 
     events = [
         event
@@ -109,6 +117,8 @@ async def main() -> int:
     ]
     assert [event["type"] for event in events] == ["tool_start", "tool_end"]
     assert events[1]["result"]["duration"] == 125
+    assert events[1]["evidence"]["proof_recorded"] is True
+    assert events[1]["evidence"]["sequence"] == 23
     assert read_signatures == {"forge:project"}
     assert runner.blocking[0][0] == "ai_test_forge"
     assert long_chains == [("teste", 1)]
@@ -119,6 +129,7 @@ async def main() -> int:
     assert len(persisted) == 2
     assert persisted[0][1]["tool_calls"][0]["toolCallId"] == "tool-call-1"
     assert persisted[1][1]["tool_results"][0]["result"]["production_ready"] is True
+    assert persisted[1][1]["tool_results"][0]["evidence"]["record_hash"] == "b" * 64
     print("Agent Tool Batch OK - dispatch, événements, preuves, état et persistance.")
     return 0
 

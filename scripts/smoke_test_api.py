@@ -335,6 +335,8 @@ def model_market_contracts() -> None:
     assert isinstance(evolution.get("experiments"), list)
     assert isinstance(evolution.get("allowed_targets"), dict)
     assert isinstance(missions.get("missions"), list)
+    assert missions.get("evidence_integrity", {}).get("valid") is True
+    assert missions.get("evidence_integrity", {}).get("retention") == "owner_lifecycle"
 
 
 def forge_evidence_contracts() -> None:

@@ -28,10 +28,14 @@ async def _run() -> None:
     with (
         patch.object(observability.audit, "log_action") as audit,
         patch.object(observability.db, "log_execution") as execution,
-        patch.object(observability.mission_os, "record_action") as proof,
+        patch.object(
+            observability.mission_os,
+            "record_action",
+            return_value={"evidence_sequence": 12, "evidence_hash": "a" * 64},
+        ) as proof,
         patch.object(observability.tool_router, "record_success", route),
     ):
-        await observability.record_tool_observation(observation)
+        receipt = await observability.record_tool_observation(observation)
     audit.assert_called_once_with(
         "net_ping", {"host": "127.0.0.1"}, {"success": True}, source="chat"
     )
@@ -41,19 +45,58 @@ async def _run() -> None:
     )
     proof.assert_called_once()
     route.assert_awaited_once_with("teste le serveur", "net_ping")
+    assert receipt.evidence_recorded is True
+    assert receipt.evidence_sequence == 12 and receipt.evidence_hash == "a" * 64
+    assert receipt.public_dict()["status"] == "verified"
 
     # Une destination en panne ne bloque ni les suivantes ni le tour.
     route = AsyncMock(return_value=None)
     with (
         patch.object(observability.audit, "log_action", side_effect=RuntimeError("audit HS")),
         patch.object(observability.db, "log_execution") as execution,
-        patch.object(observability.mission_os, "record_action") as proof,
+        patch.object(
+            observability.mission_os,
+            "record_action",
+            return_value={"evidence_sequence": 13, "evidence_hash": "b" * 64},
+        ) as proof,
         patch.object(observability.tool_router, "record_success", route),
     ):
-        await observability.record_tool_observation(observation)
+        receipt = await observability.record_tool_observation(observation)
     execution.assert_called_once()
     proof.assert_called_once()
     route.assert_awaited_once()
+    assert receipt.audit_recorded is False
+    assert receipt.evidence_recorded is True
+    assert receipt.errors == ("audit:RuntimeError",)
+
+    # Une preuve durable en panne est signalée sans transformer l'action en erreur
+    # ni divulguer le message interne de l'exception.
+    with (
+        patch.object(observability.audit, "log_action"),
+        patch.object(observability.db, "log_execution"),
+        patch.object(
+            observability.mission_os,
+            "record_action",
+            side_effect=RuntimeError("chemin privé et secret"),
+        ),
+        patch.object(observability.tool_router, "record_success", AsyncMock()),
+    ):
+        receipt = await observability.record_tool_observation(observation)
+    public = receipt.public_dict()
+    assert public["proof_recorded"] is False
+    assert public["action_must_not_be_retried"] is True
+    assert public["warnings"] == ["evidence:RuntimeError"]
+    assert "secret" not in str(public)
+
+    with (
+        patch.object(observability.audit, "log_action"),
+        patch.object(observability.db, "log_execution"),
+        patch.object(observability.mission_os, "record_action", return_value={}),
+        patch.object(observability.tool_router, "record_success", AsyncMock()),
+    ):
+        receipt = await observability.record_tool_observation(observation)
+    assert receipt.evidence_recorded is False
+    assert "evidence:invalid_receipt" in receipt.errors
 
     failed = observability.ToolObservation(
         conversation_id="conversation-1", user_query="test", tool_name="net_ping",

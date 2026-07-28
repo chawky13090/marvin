@@ -1507,6 +1507,27 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
         </div>
       )}
 
+      {tool.evidence?.proof_recorded && (
+        <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '6px' }}>
+          Preuve durable vérifiée · séquence {tool.evidence.sequence}
+        </div>
+      )}
+
+      {tool.evidence && !tool.evidence.proof_recorded && (
+        <div style={{
+          color: 'var(--warning)',
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          borderRadius: '6px',
+          padding: '7px 9px',
+          marginTop: '7px',
+          fontSize: '11px',
+        }}>
+          Action exécutée, mais sa preuve durable n’a pas pu être enregistrée. Ne pas relancer
+          automatiquement cette action ; vérifier son état réel.
+        </div>
+      )}
+
       {tool.result !== undefined && isCodingMissionTool && showMissionTracker && (
         <div style={{ marginTop: '10px' }}>
           <CodingMissionTracker result={tool.result} />

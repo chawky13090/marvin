@@ -5,21 +5,34 @@ import json
 import os
 import threading
 import uuid
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from config import DATA_DIR
+from durable_evidence_store import DurableEvidenceStore
 
 
 MISSIONS_PATH = Path(DATA_DIR) / "missions.json"
 EVENTS_PATH = Path(DATA_DIR) / "mission_events.jsonl"
 _LOCK = threading.RLock()
+_EVENT_STORE = None
+_EVENT_STORE_PATH = None
 _SECRET_KEYS = {"password", "token", "secret", "api_key", "private_key", "cookie", "authorization"}
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _event_store() -> DurableEvidenceStore:
+    global _EVENT_STORE, _EVENT_STORE_PATH
+    resolved = str(EVENTS_PATH.resolve())
+    if _EVENT_STORE is None or _EVENT_STORE_PATH != resolved:
+        _EVENT_STORE = DurableEvidenceStore(resolved, stream_name="marvin.mission.events")
+        _EVENT_STORE_PATH = resolved
+    return _EVENT_STORE
 
 
 def _redact(value: Any, key: str = "") -> Any:
@@ -59,10 +72,7 @@ def _event(event_type: str, mission_id: str | None, payload: dict[str, Any]) -> 
         "mission_id": mission_id,
         "payload": _redact(payload),
     }
-    EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with EVENTS_PATH.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
-    return event
+    return _event_store().append(event)
 
 
 def create_mission(
@@ -90,9 +100,14 @@ def create_mission(
     }
     with _LOCK:
         missions = _load()
+        previous = deepcopy(missions)
         missions.append(mission)
         _atomic_write(MISSIONS_PATH, missions)
-        _event("mission_created", mission["id"], {"goal": goal, "tag": tag, "steps": steps})
+        try:
+            _event("mission_created", mission["id"], {"goal": goal, "tag": tag, "steps": steps})
+        except Exception:
+            _atomic_write(MISSIONS_PATH, previous)
+            raise
     return mission
 
 
@@ -120,16 +135,31 @@ def find_active(*, conversation_id: str | None = None, tag: str | None = None) -
     )
 
 
-def _update(mission_id: str, mutator) -> dict[str, Any] | None:
+def _update(
+    mission_id: str,
+    mutator: Callable[[dict[str, Any]], dict[str, Any]],
+    *,
+    event_type: str | Callable[[dict[str, Any]], str | None] | None = None,
+    event_payload: dict[str, Any] | Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     with _LOCK:
         missions = _load()
+        previous = deepcopy(missions)
         for index, mission in enumerate(missions):
             if mission.get("id") != mission_id:
                 continue
-            updated = mutator(dict(mission))
+            updated = mutator(deepcopy(mission))
             updated["updated_at"] = _now()
             missions[index] = updated
             _atomic_write(MISSIONS_PATH, missions)
+            resolved_event_type = event_type(updated) if callable(event_type) else event_type
+            if resolved_event_type:
+                payload = event_payload(updated) if callable(event_payload) else (event_payload or {})
+                try:
+                    _event(resolved_event_type, mission_id, payload)
+                except Exception:
+                    _atomic_write(MISSIONS_PATH, previous)
+                    raise
             return updated
     return None
 
@@ -142,10 +172,12 @@ def checkpoint(mission_id: str, label: str, state: dict[str, Any] | None = None)
         mission["checkpoints"] = mission["checkpoints"][-100:]
         return mission
 
-    mission = _update(mission_id, mutate)
-    if mission:
-        _event("checkpoint", mission_id, checkpoint_value)
-    return mission
+    return _update(
+        mission_id,
+        mutate,
+        event_type="checkpoint",
+        event_payload=checkpoint_value,
+    )
 
 
 def sync_steps(mission_id: str, task_states: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -159,34 +191,49 @@ def sync_steps(mission_id: str, task_states: list[dict[str, Any]]) -> dict[str, 
             mission["status"] = "completed"
         return mission
 
-    mission = _update(mission_id, mutate)
-    if mission and mission.get("status") == "completed":
-        _event("mission_completed", mission_id, {"steps": mission.get("steps", [])})
-    return mission
+    return _update(
+        mission_id,
+        mutate,
+        event_type=lambda item: (
+            "mission_completed"
+            if item.get("status") == "completed"
+            else "mission_steps_synced"
+        ),
+        event_payload=lambda item: {
+            "status": item.get("status"),
+            "steps": item.get("steps", []),
+        },
+    )
 
 
 def stop_mission(mission_id: str, reason: str = "arrêt demandé") -> dict[str, Any] | None:
-    mission = _update(mission_id, lambda item: {**item, "status": "stopped", "stop_reason": reason[:500]})
-    if mission:
-        _event("mission_stopped", mission_id, {"reason": reason})
-    return mission
+    return _update(
+        mission_id,
+        lambda item: {**item, "status": "stopped", "stop_reason": reason[:500]},
+        event_type="mission_stopped",
+        event_payload={"reason": reason},
+    )
 
 
 def pause_mission(mission_id: str, reason: str = "pause demandée") -> dict[str, Any] | None:
-    mission = _update(mission_id, lambda item: {**item, "status": "paused", "pause_reason": reason[:500]})
-    if mission:
-        _event("mission_paused", mission_id, {"reason": reason})
-    return mission
+    return _update(
+        mission_id,
+        lambda item: {**item, "status": "paused", "pause_reason": reason[:500]},
+        event_type="mission_paused",
+        event_payload={"reason": reason},
+    )
 
 
 def resume_mission(mission_id: str) -> dict[str, Any] | None:
     mission = get_mission(mission_id)
     if not mission or mission.get("status") not in {"paused", "stopped"}:
         return None
-    mission = _update(mission_id, lambda item: {**item, "status": "running", "pause_reason": None})
-    if mission:
-        _event("mission_resumed", mission_id, {})
-    return mission
+    return _update(
+        mission_id,
+        lambda item: {**item, "status": "running", "pause_reason": None},
+        event_type="mission_resumed",
+        event_payload={},
+    )
 
 
 def retry_step(mission_id: str, step_index: int) -> dict[str, Any] | None:
@@ -195,6 +242,7 @@ def retry_step(mission_id: str, step_index: int) -> dict[str, Any] | None:
     step = next((item for item in (mission or {}).get("steps", []) if item.get("index") == step_index), None)
     if not step:
         return None
+    previous_status = str(step.get("status") or "pending")
     db.update_task(str(step["task_id"]), {"status": "pending"})
     def mutate(item):
         for current in item.get("steps", []):
@@ -202,9 +250,18 @@ def retry_step(mission_id: str, step_index: int) -> dict[str, Any] | None:
                 current["status"] = "pending"
         item["status"] = "running"
         return item
-    updated = _update(mission_id, mutate)
-    if updated:
-        _event("step_retry_requested", mission_id, {"step_index": step_index, "task_id": step["task_id"]})
+    try:
+        updated = _update(
+            mission_id,
+            mutate,
+            event_type="step_retry_requested",
+            event_payload={"step_index": step_index, "task_id": step["task_id"]},
+        )
+    except Exception:
+        db.update_task(str(step["task_id"]), {"status": previous_status})
+        raise
+    if updated is None:
+        db.update_task(str(step["task_id"]), {"status": previous_status})
     return updated
 
 
@@ -234,11 +291,15 @@ def record_action(
         "rollback": rollback_hint(tool_name),
     }
     with _LOCK:
-        _event("action_proof", mission.get("id") if mission else None, {
+        evidence = _event("action_proof", mission.get("id") if mission else None, {
             "conversation_id": conversation_id,
             **proof,
         })
-    return proof
+    return {
+        **proof,
+        "evidence_sequence": evidence["sequence"],
+        "evidence_hash": evidence["record_hash"],
+    }
 
 
 def rollback_hint(tool_name: str) -> str | None:
@@ -254,17 +315,16 @@ def rollback_hint(tool_name: str) -> str | None:
 
 
 def list_events(*, mission_id: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
-    if not EVENTS_PATH.exists():
-        return []
-    events: list[dict[str, Any]] = []
     with _LOCK:
-        for line in EVENTS_PATH.read_text(encoding="utf-8").splitlines():
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if mission_id and event.get("mission_id") != mission_id:
-                continue
-            events.append(event)
-    events.sort(key=lambda item: str(item.get("at") or ""), reverse=True)
-    return events[: max(1, min(int(limit), 5000))]
+        return _event_store().recent(
+            max(1, min(int(limit), 5000)),
+            predicate=(
+                (lambda event: event.get("mission_id") == mission_id)
+                if mission_id
+                else None
+            ),
+        )
+
+
+def evidence_integrity() -> dict[str, Any]:
+    return _event_store().verify()

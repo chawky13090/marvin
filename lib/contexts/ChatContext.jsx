@@ -297,14 +297,19 @@ export function ChatProvider({ children }) {
                   if (p.type === 'tool-invocation' && p.toolInvocation?.toolCallId === event.toolCallId) {
                     return {
                       ...p,
-                      toolInvocation: { ...p.toolInvocation, state: 'result', result: event.result },
+                      toolInvocation: {
+                        ...p.toolInvocation,
+                        state: 'result',
+                        result: event.result,
+                        evidence: event.evidence,
+                      },
                     };
                   }
                   return p;
                 });
                 const updatedInvocations = (m.toolInvocations || []).map(inv =>
                   inv.toolCallId === event.toolCallId
-                    ? { ...inv, state: 'result', result: event.result }
+                    ? { ...inv, state: 'result', result: event.result, evidence: event.evidence }
                     : inv
                 );
                 return { ...m, parts: updatedParts, toolInvocations: updatedInvocations,

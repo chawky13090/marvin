@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import Any, AsyncIterator, Awaitable, Callable
 
-from agent_observability import ToolObservation
+from agent_observability import ObservationReceipt, ToolObservation
 from agent_tool_dispatch import ToolDispatchRequest
 
 
@@ -35,7 +35,7 @@ async def execute_tool_batch(
     postprocess_tool_result: Callable[..., Awaitable[Any]],
     critique_action: Callable[..., Awaitable[Any]],
     scan_document: Callable[..., list[str]],
-    record_tool_observation: Callable[[ToolObservation], Awaitable[None]],
+    record_tool_observation: Callable[[ToolObservation], Awaitable[ObservationReceipt | None]],
     record_long_chain: Callable[[str, int], None],
     is_tooling_failure: Callable[[Any], bool],
     compact_tool_result: Callable[[Any], str],
@@ -126,18 +126,19 @@ async def execute_tool_batch(
             critique_action=critique_action,
             scan_document=scan_document,
         )
-        yield {
-            "type": "tool_end",
-            "toolCallId": tool_call_id,
-            "toolName": tool_name,
-            "result": result,
-        }
-
         if tool_name in {"ai_test_forge", "ai_code_forge"}:
             runner_state.update_blocking_outcome(tool_name, result)
 
+        evidence = {
+            "status": "unavailable",
+            "proof_recorded": False,
+            "sequence": None,
+            "record_hash": None,
+            "warnings": ["observation:missing_receipt"],
+            "action_must_not_be_retried": True,
+        }
         try:
-            await record_tool_observation(
+            receipt = await record_tool_observation(
                 ToolObservation(
                     conversation_id=conversation_id,
                     user_query=user_query,
@@ -147,8 +148,18 @@ async def execute_tool_batch(
                     duration_ms=duration_ms,
                 )
             )
-        except Exception:
-            pass
+            if isinstance(receipt, ObservationReceipt):
+                evidence = receipt.public_dict()
+        except Exception as exc:
+            evidence["warnings"] = [f"observation:{type(exc).__name__}"]
+
+        yield {
+            "type": "tool_end",
+            "toolCallId": tool_call_id,
+            "toolName": tool_name,
+            "result": result,
+            "evidence": evidence,
+        }
         long_chain_started = runner_state.record_tool(
             tool_name,
             arguments,
@@ -166,6 +177,7 @@ async def execute_tool_batch(
                 "toolCallId": tool_call_id,
                 "toolName": tool_name,
                 "result": result,
+                "evidence": evidence,
             }
         )
         ollama_messages.append(

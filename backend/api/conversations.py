@@ -50,6 +50,7 @@ async def get_conversation(cid: str):
                                 if invocation.get("toolCallId") == result.get("toolCallId"):
                                     invocation["state"] = "result"
                                     invocation["result"] = result.get("result")
+                                    invocation["evidence"] = result.get("evidence")
                             for part in last_asst.get("parts", []):
                                 if (
                                     part.get("type") == "tool-invocation"
@@ -58,6 +59,7 @@ async def get_conversation(cid: str):
                                 ):
                                     part["toolInvocation"]["state"] = "result"
                                     part["toolInvocation"]["result"] = result.get("result")
+                                    part["toolInvocation"]["evidence"] = result.get("evidence")
                 except Exception:
                     pass
             continue

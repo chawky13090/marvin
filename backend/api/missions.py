@@ -23,7 +23,15 @@ async def missions_list(
     limit: int = Query(default=100, ge=1, le=1000),
     status: str | None = Query(default=None, max_length=30),
 ):
-    return {"missions": mission_os.list_missions(limit=limit, status=status)}
+    return {
+        "missions": mission_os.list_missions(limit=limit, status=status),
+        "evidence_integrity": mission_os.evidence_integrity(),
+    }
+
+
+@router.get("/integrity")
+async def mission_integrity():
+    return mission_os.evidence_integrity()
 
 
 @router.get("/{mission_id}")
@@ -31,7 +39,11 @@ async def mission_detail(mission_id: str):
     mission = mission_os.get_mission(mission_id)
     if mission is None:
         raise HTTPException(status_code=404, detail="Mission introuvable.")
-    return {"mission": mission, "events": mission_os.list_events(mission_id=mission_id, limit=500)}
+    return {
+        "mission": mission,
+        "events": mission_os.list_events(mission_id=mission_id, limit=500),
+        "evidence_integrity": mission_os.evidence_integrity(),
+    }
 
 
 @router.get("/{mission_id}/events")

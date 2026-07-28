@@ -91,6 +91,16 @@ def run() -> None:
     assert "DurableEvidenceStore" in (ROOT / "backend" / "forge.py").read_text(
         encoding="utf-8-sig"
     )
+    structured_domain_streams = {
+        key for key, value in declared.items()
+        if value[0] == "domain_event_stream" and value[2] == "structured"
+    }
+    assert structured_domain_streams == {
+        ("backend/mission_os.py", "mission_events.jsonl")
+    }
+    assert "DurableEvidenceStore" in (ROOT / "backend" / "mission_os.py").read_text(
+        encoding="utf-8-sig"
+    )
     for phrase in (
         "source de données durable",
         "idempotence",
@@ -104,7 +114,8 @@ def run() -> None:
     print(
         "Persistence Inventory OK - "
         f"{len(declared)} JSONL classifiés, {len(structured_logs)} logs et "
-        f"{len(structured_evidence)} registre de preuves structurés."
+        f"{len(structured_evidence)} registre d'évaluation et "
+        f"{len(structured_domain_streams)} flux métier structurés."
     )
 
 
