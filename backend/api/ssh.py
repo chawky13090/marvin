@@ -6,7 +6,7 @@ import json
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import database as db
 import security
@@ -16,31 +16,57 @@ from tool_domains import ssh as ssh_domain
 router = APIRouter()
 
 
+def _ssh_error(exc: Exception) -> str:
+    name = type(exc).__name__
+    messages = {
+        "AuthenticationException": "Authentification SSH refusée.",
+        "BadAuthenticationType": "Méthode d'authentification SSH non acceptée.",
+        "PasswordRequiredException": "La clé SSH exige une passphrase.",
+        "TimeoutError": "Délai de connexion SSH dépassé.",
+        "socket.timeout": "Délai de connexion SSH dépassé.",
+        "FileNotFoundError": "Fichier distant introuvable.",
+        "PermissionError": "Permission SSH ou SFTP refusée.",
+        "SSHException": "Erreur de protocole SSH.",
+        "OSError": "Connexion réseau SSH impossible.",
+    }
+    message = messages.get(name, "Opération SSH impossible.")
+    try:
+        import audit
+        audit.log_action(
+            "ssh_operation_failed",
+            result={"success": False, "error_type": name},
+            source="runtime",
+        )
+    except Exception:
+        pass
+    return message
+
+
 class SSHConnectionCreate(BaseModel):
-    name: str
-    host: str
-    port: int = 22
-    username: str
-    password: str = ""
-    private_key: str = ""
-    key_passphrase: str = ""
-    connection_id: str = ""
+    name: str = Field(min_length=1, max_length=160)
+    host: str = Field(min_length=1, max_length=253)
+    port: int = Field(default=22, ge=1, le=65535)
+    username: str = Field(min_length=1, max_length=320)
+    password: str = Field(default="", max_length=12_000)
+    private_key: str = Field(default="", max_length=12_000)
+    key_passphrase: str = Field(default="", max_length=12_000)
+    connection_id: str = Field(default="", max_length=128)
 
 
 class SSHConnectionUpdate(BaseModel):
-    name: str
-    host: str
-    port: int = 22
-    username: str
-    password: str = ""
-    private_key: str = ""
-    key_passphrase: str = ""
+    name: str = Field(min_length=1, max_length=160)
+    host: str = Field(min_length=1, max_length=253)
+    port: int = Field(default=22, ge=1, le=65535)
+    username: str = Field(min_length=1, max_length=320)
+    password: str = Field(default="", max_length=12_000)
+    private_key: str = Field(default="", max_length=12_000)
+    key_passphrase: str = Field(default="", max_length=12_000)
 
 
 class SSHCommandRequest(BaseModel):
-    connection_id: str
-    command: str
-    timeout: int = 30
+    connection_id: str = Field(min_length=1, max_length=128)
+    command: str = Field(min_length=1, max_length=32_000)
+    timeout: int = Field(default=30, ge=1, le=300)
 
 
 @router.get("/api/ssh")
@@ -96,7 +122,7 @@ async def test_ssh(body: SSHConnectionCreate):
     except Exception as exc:
         if body.connection_id:
             db.set_ssh_test_result(body.connection_id, False)
-        return {"success": False, "error": str(exc)}
+        return {"success": False, "error": _ssh_error(exc)}
 
 
 @router.post("/api/ssh/exec")
@@ -128,7 +154,7 @@ async def exec_ssh(body: SSHCommandRequest):
             pass
         return result
     except Exception as exc:
-        return {"stdout": "", "stderr": str(exc), "exit_code": -1, "command": body.command}
+        return {"stdout": "", "stderr": _ssh_error(exc), "exit_code": -1, "command": body.command}
 
 
 @router.get("/api/ssh/exec/stream")
@@ -157,7 +183,7 @@ async def exec_ssh_stream(connection_id: str, command: str):
             db.touch_ssh_connection(connection_id)
             client.close()
         except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': _ssh_error(exc)})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -179,7 +205,7 @@ async def ssh_shell_ws(websocket: WebSocket, sid: str):
             None, lambda: client.invoke_shell(term="xterm-256color", width=80, height=24))
     except Exception as exc:
         try:
-            await websocket.send_json({"type": "error", "message": str(exc)})
+            await websocket.send_json({"type": "error", "message": _ssh_error(exc)})
         except Exception:
             pass
         await websocket.close()
@@ -263,7 +289,7 @@ async def download_ssh_file(sid: str, path: str):
     try:
         data = await asyncio.get_running_loop().run_in_executor(None, run)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=_ssh_error(exc)) from exc
     filename = path.rstrip("/").rsplit("/", 1)[-1] or "download"
     return Response(content=data, media_type="application/octet-stream",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
@@ -290,4 +316,4 @@ async def upload_ssh_file(sid: str, remote_path: str = Form(...), file: UploadFi
         db.touch_ssh_connection(sid)
         return {"success": True, "remote_path": remote_path, "size": size}
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=_ssh_error(exc)) from exc

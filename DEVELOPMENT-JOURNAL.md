@@ -9774,6 +9774,48 @@ Validation finale observée : gate consolidé **186/186**, architecture 344 outi
 Turbopack réussi, smokes live API **28/28** et pages **40/40**. Backend v2.421.0 relancé
 avec Ollama disponible et 15 workers; frontend Turbopack relancé et HTTP 200.
 
+## 2026-07-28 — v2.423.0 — Coffre DPAPI des connexions SSH
+
+### Décision et périmètre
+
+Deux connexions SSH contenaient chacune au moins un secret dans SQLite. Une enveloppe DPAPI
+par identifiant est retenue face aux entrées indépendantes par champ : cohérence atomique
+mot de passe/clé/passphrase, suppression ciblée et absence de clé partagée. Les colonnes
+historiques restent présentes pour compatibilité de schéma, mais sont vidées. Une connexion
+ponctuelle fournie à une requête n'est jamais persistée.
+
+### Implémentation et sécurité
+
+- `ssh_connection_vault.py` borne et authentifie l'enveloppe logique, exige mot de passe ou
+  clé privée et refuse tout champ secret inconnu ;
+- le repository migre et relit avant nettoyage, résout uniquement à la demande, conserve
+  les secrets lors d'une mise à jour vide et compense création/mise à jour/suppression ;
+- le rollback confirmé réécrit les anciennes colonnes avant suppression des enveloppes ;
+- les modèles API bornent noms, hôtes, ports, identifiants, clés, commandes et délais ;
+- les six chemins d'erreur HTTP, SSE, WebSocket et SFTP ne renvoient plus `str(exc)` :
+  catégories françaises bornées au client et classe seule dans l'audit.
+
+### Preuves réelles et rollback
+
+Le snapshot chiffré `secretary_20260728_161837_898330.mrvbak` précède la migration.
+Deux connexions ont migré : deux références DPAPI, zéro ligne avec mot de passe, clé privée
+ou passphrase SQLite, et deux résolutions authentifiées. Un probe `true` réussit sur une
+cible; la seconde retourne `TimeoutError`, ce qui établit une indisponibilité réseau et non
+un défaut de déchiffrement.
+
+Les tests couvrent mot de passe, clé privée OpenSSH multi-ligne, passphrase, quatre créations
+concurrentes, collision d'identifiant, champ vide, suppression compensée, rollback, transport,
+bornes API, onze routes et absence de détail privé dans les erreurs/audits. Rollback avant
+retour à v2.422 : `backend\.venv\Scripts\python.exe
+scripts\rollback-ssh-connection-secrets.py --apply --accept-plaintext`, vérifier deux lignes
+avec secrets, puis `git revert <commit-v2.423>`. La restauration du snapshot préalable reste
+le rollback intégral si une persistance est illisible.
+
+Validation finale observée : gate consolidé **187/187**, architecture 344 outils et harness
+344/344, lint sans erreur, build Next.js 16.2.6 Turbopack réussi, smokes live API **28/28**
+et pages **40/40**. Backend v2.423.0 relancé avec Ollama disponible et 15 workers; frontend
+Turbopack relancé et HTTP 200.
+
 ## 2026-07-28 — v2.422.0 — Coffre DPAPI des comptes e-mail
 
 ### Analyse et choix

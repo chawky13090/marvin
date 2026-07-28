@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.422.0)
+## 9. État actuel (v2.423.0)
+
+**v2.423 (coffre des connexions SSH)** : mot de passe, clé privée et passphrase des
+connexions persistantes rejoignent une enveloppe DPAPI distincte par identifiant. Les colonnes
+historiques restent pour compatibilité mais sont vidées; les connexions ponctuelles restent
+uniquement en mémoire. Création, mise à jour et suppression compensent les pannes croisées;
+migration et rollback sont explicites. Les deux connexions réelles ont migré avec zéro secret
+SQLite et se résolvent depuis DPAPI. Une cible exécute le probe non mutant; l'autre est
+actuellement hors réseau (`TimeoutError`). Les routes SSH n'exposent plus le texte brut des
+exceptions et auditent uniquement leur classe.
 
 **v2.422 (coffre des comptes e-mail)** : chaque compte conserve désormais ses quatre champs
 sensibles dans une enveloppe DPAPI distincte, référencée depuis les métadonnées SQLite par

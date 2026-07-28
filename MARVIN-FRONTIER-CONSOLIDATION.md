@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.422.0
+Version courante auditée : 2.423.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -430,6 +430,11 @@ DPAPI isolées par compte. La résolution reste derrière la façade existante, 
 et suppressions compensent les pannes croisées, et la migration comme le rollback refusent
 les états non relus. Trois comptes réels ont migré avec zéro secret logique résiduel et
 trois connexions IMAP/SMTP validées sans effet métier sortant.
+En v2.423.0, les secrets SSH persistants utilisent une enveloppe DPAPI par connexion et les
+colonnes historiques sont nettoyées après relecture. Les connexions ponctuelles ne sont pas
+persistées. Les mutations compensent les pannes entre coffre et SQLite, tandis que toutes
+les surfaces HTTP/SSE/WebSocket/SFTP remplacent les exceptions brutes par une catégorie
+expurgée et un audit sans contenu.
 
 ## 10. Preuves minimales par grande capacité
 
