@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.400.0",
+  "version": "2.401.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -15,6 +15,7 @@
     "check:persistence-inventory": "backend\\.venv\\Scripts\\python.exe scripts\\test_persistence_inventory.py",
     "check:durable-evidence": "backend\\.venv\\Scripts\\python.exe scripts\\test_durable_evidence_store.py",
     "check:forge-evidence": "backend\\.venv\\Scripts\\python.exe scripts\\test_forge_evidence.py",
+    "check:credentials-vault": "backend\\.venv\\Scripts\\python.exe scripts\\test_credentials_vault.py",
     "check:chat-presentation": "node scripts/test_chat_presentation.mjs",
     "check:voice": "node scripts/test_voice_frontend.mjs",
     "check:avatar": "node scripts/test_desktop_avatar.mjs",

@@ -9,9 +9,10 @@ import time
 import httpx
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import credentials_manager as credentials
+from secret_vault import SecretVaultError
 import database as db
 import tools as tool_module
 import email_accounts
@@ -31,28 +32,64 @@ GMAIL_IMAP_SCOPES = ["https://mail.google.com/"]
 
 @router.get("/api/credentials")
 async def get_credentials():
-    return {
-        "credentials": credentials.get_all_credentials(),
-        "groups": credentials.get_group_status(),
-    }
+    try:
+        return {
+            "credentials": credentials.get_all_credentials(),
+            "groups": credentials.get_group_status(),
+            "security": credentials.security_status(),
+        }
+    except SecretVaultError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Le coffre sécurisé Windows est indisponible.",
+        ) from exc
 
 
 class CredentialSetRequest(BaseModel):
-    value: str
+    value: str = Field(min_length=0, max_length=16_384)
 
 
 @router.put("/api/credentials/{name}")
 async def set_credential(name: str, body: CredentialSetRequest):
     if name not in credentials.CREDENTIAL_DEFINITIONS:
         raise HTTPException(status_code=404, detail=f"Credential inconnu : {name}")
-    credentials.set_credential(name, body.value)
+    try:
+        credentials.set_credential(name, body.value)
+    except (SecretVaultError, ValueError) as exc:
+        raise HTTPException(
+            status_code=503 if isinstance(exc, SecretVaultError) else 422,
+            detail=(
+                "Le coffre sécurisé Windows est indisponible."
+                if isinstance(exc, SecretVaultError)
+                else str(exc)
+            ),
+        ) from exc
     return {"success": True}
 
 
 @router.delete("/api/credentials/{name}")
 async def delete_credential(name: str):
-    credentials.delete_credential(name)
+    if name not in credentials.CREDENTIAL_DEFINITIONS:
+        raise HTTPException(status_code=404, detail=f"Credential inconnu : {name}")
+    try:
+        credentials.delete_credential(name)
+    except SecretVaultError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Le coffre sécurisé Windows est indisponible.",
+        ) from exc
     return {"success": True}
+
+
+@router.get("/api/credentials/security")
+async def get_credentials_security():
+    try:
+        return credentials.security_status()
+    except SecretVaultError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Le coffre sécurisé Windows est indisponible.",
+        ) from exc
 
 
 def _google_flow():

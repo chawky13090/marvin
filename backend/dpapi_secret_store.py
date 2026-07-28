@@ -8,6 +8,9 @@ import os
 import re
 import sys
 import threading
+import time
+import uuid
+from contextlib import contextmanager
 from ctypes import wintypes
 from pathlib import Path
 
@@ -64,19 +67,70 @@ def _crypt(value: bytes, *, protect: bool) -> bytes:
             kernel32.LocalFree(description)
 
 
-def _load() -> dict[str, str]:
+@contextmanager
+def _interprocess_lock(timeout_seconds: float = 5.0):
+    lock_path = PATH.with_suffix(PATH.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as handle:
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise SecretStoreError("Le verrou du coffre DPAPI est indisponible.")
+                time.sleep(0.02)
+        try:
+            yield
+        finally:
+            handle.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _load_unlocked() -> dict[str, str]:
+    if not PATH.exists():
+        return {}
     try:
         value = json.loads(PATH.read_text(encoding="utf-8"))
-        return {str(key): str(item) for key, item in value.items()} if isinstance(value, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    except (OSError, ValueError) as exc:
+        raise SecretStoreError("Le coffre DPAPI est illisible ou corrompu.") from exc
+    if not isinstance(value, dict):
+        raise SecretStoreError("Le coffre DPAPI possède un format invalide.")
+    rows: dict[str, str] = {}
+    for key, item in value.items():
+        if not _KEY.fullmatch(str(key)) or not isinstance(item, str):
+            raise SecretStoreError("Le coffre DPAPI contient une entrée invalide.")
+        rows[str(key)] = item
+    return rows
 
 
-def _write(value: dict[str, str]) -> None:
+def _write_unlocked(value: dict[str, str]) -> None:
     PATH.parent.mkdir(parents=True, exist_ok=True)
-    temporary = PATH.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, indent=2, sort_keys=True), encoding="utf-8")
-    os.replace(temporary, PATH)
+    temporary = PATH.with_name(f".{PATH.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+            json.dump(value, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, PATH)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def set_secret(key: str, value: str) -> None:
@@ -85,16 +139,17 @@ def set_secret(key: str, value: str) -> None:
     if not value or len(value) > 16_384:
         raise SecretStoreError("Valeur de secret vide ou trop longue.")
     encrypted = base64.b64encode(_crypt(value.encode("utf-8"), protect=True)).decode("ascii")
-    with _LOCK:
-        rows = _load()
+    with _LOCK, _interprocess_lock():
+        rows = _load_unlocked()
         rows[key] = encrypted
-        _write(rows)
+        _write_unlocked(rows)
 
 
 def get_secret(key: str) -> str | None:
     if not _KEY.fullmatch(key):
         raise SecretStoreError("Nom de secret invalide.")
-    encoded = _load().get(key)
+    with _LOCK, _interprocess_lock():
+        encoded = _load_unlocked().get(key)
     if not encoded:
         return None
     try:
@@ -104,11 +159,16 @@ def get_secret(key: str) -> str | None:
 
 
 def has_secret(key: str) -> bool:
-    return key in _load()
+    if not _KEY.fullmatch(key):
+        raise SecretStoreError("Nom de secret invalide.")
+    with _LOCK, _interprocess_lock():
+        return key in _load_unlocked()
 
 
 def delete_secret(key: str) -> None:
-    with _LOCK:
-        rows = _load()
+    if not _KEY.fullmatch(key):
+        raise SecretStoreError("Nom de secret invalide.")
+    with _LOCK, _interprocess_lock():
+        rows = _load_unlocked()
         rows.pop(key, None)
-        _write(rows)
+        _write_unlocked(rows)

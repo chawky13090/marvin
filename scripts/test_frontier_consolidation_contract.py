@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "MARVIN-FRONTIER-CONSOLIDATION.md"
+SECURITY_REGISTER = ROOT / "SECURITY-DEBT-REGISTER.md"
 EXPECTED_DOMAINS = {
     "runner", "sessions", "tools", "models", "memory", "coding", "isolation",
     "persistence", "api", "workers", "observability", "security", "frontend",
@@ -108,6 +109,21 @@ def run() -> dict[str, int]:
         raise ContractError("Le contrôle de réversibilité du patch doit rester documenté.")
     if "`git revert <commit>`" not in text:
         raise ContractError("Le rollback atomique après commit doit rester documenté.")
+    if not SECURITY_REGISTER.is_file():
+        raise ContractError("Le registre central de dette de sécurité est absent.")
+    security_text = SECURITY_REGISTER.read_text(encoding="utf-8-sig")
+    for requirement in (
+        "SEC-001",
+        "SEC-002",
+        "SEC-003",
+        "SEC-004",
+        "SEC-005",
+        "Critère de fermeture",
+    ):
+        if requirement not in security_text:
+            raise ContractError(
+                f"Le registre de sécurité ne contient pas l'exigence : {requirement}"
+            )
     return {
         "domains": len(matrix),
         "verified": sum(status == "verified" for status in matrix.values()),

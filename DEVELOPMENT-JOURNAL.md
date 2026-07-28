@@ -8542,3 +8542,93 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   chaînée(s) · 65 historique(s) non signé(s) » et aucune erreur ni alerte console.
 - Rollback applicatif : `git revert <commit>`. Le nouveau format est additif; les 65 lignes
   historiques restent compatibles. Une réversion ne supprime aucune nouvelle preuve.
+
+## 2026-07-28 — v2.401.0 — Coffre DPAPI des identifiants globaux
+
+### Contexte, analyse et choix
+
+- Exigence : aucune dette de sécurité ne doit être ignorée et la sécurité devient une étape
+  de sortie obligatoire pour chaque partie du projet. Un registre central
+  `SECURITY-DEBT-REGISTER.md` classe désormais chaque risque confirmé, sa sévérité, son état
+  et sa preuve de fermeture.
+- Audit réel sans lecture ni affichage des valeurs : 17 champs globaux classés secrets,
+  un secret historique présent dans SQLite, zéro déjà protégé dans le coffre commun, trois
+  comptes e-mail, deux connexions SSH, zéro ligne OAuth historique et quatorze sauvegardes
+  SQLite en clair. Les trois derniers ensembles restent explicitement ouverts dans le
+  registre; ils ne sont pas déclarés sécurisés par cette tranche.
+- Trois approches ont été comparées. Un coffre SaaS/entreprise apporte contrôle central,
+  rotation et audit, mais ajoute disponibilité réseau, compte externe et complexité à
+  l'installation locale. Un mot de passe maître avec chiffrement applicatif améliore la
+  portabilité, mais impose dérivation, récupération, rotation et UX cryptographique. DPAPI
+  utilisateur est retenu pour le socle Windows hors ligne : moindre dépendance et isolation
+  par identité Windows, avec réauthentification obligatoire lors d'une migration vers un
+  autre PC. Microsoft confirme que `CryptProtectData` lie normalement le déchiffrement aux
+  mêmes identifiants utilisateur et au même ordinateur :
+  https://learn.microsoft.com/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata
+- La recommandation OWASP de stockage dédié, moindre privilège, cycle de vie, audit sans
+  secret et rotation reste la cible :
+  https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
+
+### Implémentation et sécurité
+
+- `dpapi_secret_store.py` ne transforme plus un JSON illisible en coffre vide. Corruption,
+  format ou entrée invalide bloquent lecture et écriture. Un verrou interprocessus borné
+  complète le verrou de thread; les écritures utilisent un temporaire unique, `fsync` et
+  remplacement atomique.
+- `secret_vault.py` fournit une frontière commune. Les propriétaires sont remplacés par une
+  empreinte SHA-256 dans les clés persistées; valeurs et identités sont bornées. Chaque
+  écriture DPAPI est relue et comparée en temps constant avant succès.
+- `credentials_manager.py` conserve les champs publics dans SQLite et place clés API,
+  secrets clients et jetons sous DPAPI. La migration est idempotente et fail-closed. Une
+  valeur SQLite écrite tardivement par une ancienne instance gagne et est protégée avant
+  nettoyage, ce qui permet un déploiement progressif sans perte de mise à jour.
+- Le catalogue inclut maintenant les trois identifiants GLPI réellement consommés par le
+  domaine ITSM; leur omission aurait cassé cette fonctionnalité avec une validation fermée.
+- L'API borne les valeurs à 16 384 caractères, refuse les noms inconnus, masque toujours les
+  secrets, expurge les erreurs du coffre et expose uniquement un statut agrégé. Les créations,
+  suppressions, migrations et rollbacks produisent un audit sans valeur sensible.
+- Toutes les connexions SQLite Python et Next.js activent `secure_delete=ON`,
+  `trusted_schema=OFF` et `cell_size_check=ON`. La documentation SQLite précise que
+  `secure_delete` doit précéder les mises à jour sensibles et qu'un `VACUUM` retire les
+  traces historiques :
+  https://www.sqlite.org/pragma.html#pragma_secure_delete et
+  https://www.sqlite.org/lang_vacuum.html
+
+### Migration, validation et rollback
+
+- Migration réelle observée : un secret global migré, seize absents, zéro valeur historique
+  logique restante et un secret protégé DPAPI. Aucune valeur ni taille de valeur n'a été
+  affichée.
+- Tests observés : migration historique, masquage API, champ public inchangé, écriture tardive
+  d'une ancienne version, vingt écritures concurrentes, absence de propriétaire et de secret
+  en clair dans le coffre, corruption fail-closed sans nettoyage SQLite, suppression,
+  identifiant inconnu et confirmation obligatoire du rollback.
+- Contrats ciblés observés avant version : hygiène SQLite, initialisation better-sqlite3,
+  architecture 344/344 et smoke API 28/28. La gate complète, le redémarrage 2.401 et le
+  contrôle HTTP final sont consignés après leur exécution.
+- Rollback : arrêter Marvin, exécuter
+  `backend\.venv\Scripts\python.exe scripts\rollback-credentials-vault.py
+  --confirm-plaintext-rollback`, vérifier le compteur sans valeur affichée, puis seulement
+  réverter le commit. Le script refuse de fonctionner tant que le port backend répond.
+- Limite explicite : DPAPI ne rend pas les secrets portables. Les métadonnées et données
+  restent migrables, mais une nouvelle machine doit réautoriser les fournisseurs. Les anciens
+  fichiers SQLite et sauvegardes peuvent encore conserver des traces physiques; chiffrement
+  des sauvegardes, migration e-mail/SSH, checkpoint et `VACUUM` restent des tranches
+  obligatoires ouvertes, pas une dette acceptée.
+- Gate rapide finale observée : 168/168 étapes, 344 outils/harness, 354 routes, compilation
+  backend et zéro erreur ESLint; les 37 avertissements frontend historiques restent
+  inventoriés. Backend réel redémarré en 2.401.0, Ollama connecté et 15 workers disponibles.
+  L'endpoint agrégé confirme un secret DPAPI, zéro secret global historique logique et aucune
+  valeur secrète projetée. Smoke HTTP/Next.js : 28/28 contrats.
+
+### Veille agentique Kimi ajoutée au plan global
+
+- Le guide Kimi « Frameworks d'agents IA » du 22 juillet 2026 confirme cinq primitives déjà
+  présentes dans Marvin : planificateur, exécutant, session, outils/API et checkpoints.
+  Installer LangGraph, CrewAI, Microsoft Agent Framework ou Mastra sans benchmark ajouterait
+  dépendance, surface supply-chain et migration sans bénéfice démontré.
+- Le contrat global ajoute les écarts utiles : graphe durable typé, handoffs versionnés,
+  manifestes de capacités et permissions, context engineering mesurable, évaluations par
+  nœud et studio d'exécution lisible. L'article reste une source secondaire promotionnelle;
+  chaque affirmation et API devra être vérifiée dans sa documentation primaire avant code.
+- Source examinée : https://www.kimi.com/fr/resources/ai-agents-frameworks

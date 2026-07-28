@@ -17,6 +17,9 @@ def get_conn(path: str | Path = DB_PATH) -> sqlite3.Connection:
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA busy_timeout=10000")
+    connection.execute("PRAGMA secure_delete=ON")
+    connection.execute("PRAGMA trusted_schema=OFF")
+    connection.execute("PRAGMA cell_size_check=ON")
     return connection
 
 
@@ -38,4 +41,3 @@ def row_to_dict(row: sqlite3.Row | dict | None) -> dict | None:
     if row is None:
         return None
     return dict(row)
-

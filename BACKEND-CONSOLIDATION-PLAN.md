@@ -333,6 +333,10 @@ partielle n'est plus transformée silencieusement en liste vide.
 
 ## 4. Validation obligatoire par tranche
 
+- revue et mise à jour de `SECURITY-DEBT-REGISTER.md` : aucune dette découverte ne peut être
+  omise, minimisée ou fermée sans preuve; les entrées, sorties, persistances, privilèges,
+  secrets, réseau, logs, dépendances, concurrence et rollback sont réévalués pour chaque
+  composant modifié ;
 - compilation Python ciblée ;
 - test unitaire de la nouvelle frontière ;
 - test de compatibilité de la façade historique ;

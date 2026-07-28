@@ -196,7 +196,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.400.0)
+## 9. État actuel (v2.401.0)
+
+**v2.401 (coffre des identifiants globaux)** : les clés API, secrets clients et jetons
+globaux quittent SQLite pour un coffre DPAPI lié à l'utilisateur Windows. La migration est
+idempotente et fail-closed : chiffrement, relecture en temps constant, puis seulement
+nettoyage de la valeur historique. Le coffre refuse désormais tout JSON corrompu au lieu de
+le remplacer silencieusement, sérialise les processus concurrents et écrit atomiquement avec
+`fsync`. L'API masque toujours les valeurs et expose uniquement un état agrégé. Un rollback
+explicite exige Marvin arrêté et une confirmation de la dégradation en clair. Les connexions
+SQLite activent `secure_delete`, désactivent `trusted_schema` et contrôlent les cellules.
+`SECURITY-DEBT-REGISTER.md` est le gate central : e-mail, SSH, sauvegardes, exposition LAN,
+ACL, compte de service et effacement sélectif restent ouverts et ne sont pas déclarés sûrs.
 
 **v2.400 (preuves Truth Ledger)** : les affirmations et leurs preuves utilisent désormais
 `DurableEvidenceStore`. La lecture vérifie la chaîne sous le même verrou que la projection,

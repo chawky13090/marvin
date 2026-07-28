@@ -62,6 +62,15 @@ Windows installable plutôt que copiés mécaniquement :
 - Microsoft : cycle de vie, sécurité, packaging et déploiement Windows —
   https://learn.microsoft.com/windows/apps/package-and-deploy/
 
+Le guide Kimi du 22 juillet 2026 constitue une veille secondaire utile pour sa synthèse
+planificateur/exécutant/session/outils/checkpoints et son panorama LangGraph, CrewAI,
+Microsoft Agent Framework, OpenAI Agents SDK et Mastra :
+https://www.kimi.com/fr/resources/ai-agents-frameworks
+Il est éditorial et promotionnel, pas une spécification. Aucune dépendance ni affirmation
+technique (par exemple sandbox « native » ou niveau de fiabilité) n'est adoptée sans
+confirmation dans la documentation primaire du framework et benchmark reproductible dans
+Marvin.
+
 ## 3. Décision d'architecture globale
 
 Deux stratégies réalistes sont retenues comme comparaison permanente :
@@ -77,6 +86,39 @@ et les parcours utilisateur sont préservés ou migrés de façon réversible.
 
 Marvin reste un monolithe modulaire Windows-first. Les conteneurs et VM sont des environnements
 de validation de livrables, pas une fragmentation obligatoire du produit.
+
+### Écarts agentiques ajoutés après la veille Kimi
+
+Marvin possède déjà les cinq primitives décrites dans le guide : planification,
+exécution, état de session, outils/API et checkpoints Forge. Le plan n'ajoute donc pas un
+framework généraliste par imitation. Il ajoute les contrats manquants suivants derrière les
+frontières existantes :
+
+1. **Graphe d'exécution typé et durable** : chaque nœud déclare entrée, sortie, précondition,
+   budget, timeout, retry borné, compensation, preuve et état terminal. Le moteur existant
+   Runner/Mission OS reste la base; LangGraph ou Microsoft Agent Framework ne sont retenus
+   que s'ils battent ce socle sur reprise, maintenance, coût et sécurité.
+2. **Handoffs versionnés** : Planner, chercheurs, Council, codeurs, vérificateurs et
+   exécutants échangent des enveloppes typées avec objectif, contexte minimal, provenance,
+   autorisations déléguées, budget et critère de fin. Aucun texte libre ne peut élargir une
+   capacité ou une permission.
+3. **Manifestes de capacités et permissions** : chaque outil expose version, schéma,
+   effets de bord, réseau, données lues/écrites, confirmation, isolation, idempotence et
+   rollback. Un futur adaptateur MCP consomme ces manifestes sans contourner le gateway des
+   344 outils.
+4. **Context engineering mesurable** : séparation formelle Session/State/Memory, budgets par
+   source, snapshots de reprise, compression avec provenance et tests de perte d'information.
+   Une grande fenêtre de contexte ne remplace pas cette discipline.
+5. **Évaluation par nœud et bout en bout** : résultat, trajectoire, coût, latence, appels
+   inutiles, violations de politique et qualité de reprise rejoignent Forge. Les graders LLM
+   restent secondaires aux assertions déterministes et aux preuves d'exécution.
+6. **Studio d'exécution lisible** : Mission Canvas affichera graphe, état, décisions,
+   permissions, preuves, blocages, reprise et coût sans exposer les raisonnements privés ni
+   noyer l'utilisateur dans les traces brutes.
+
+Gate d'adoption d'un framework externe : threat model et provenance du paquet, versions
+figées, SBOM/licence, maintenance, compatibilité Windows/Ollama Cloud, test de panne, migration
+et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est refusée.
 
 ## 4. Matrice exhaustive
 
