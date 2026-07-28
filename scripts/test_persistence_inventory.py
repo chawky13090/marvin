@@ -97,6 +97,7 @@ def run() -> None:
     }
     assert structured_domain_streams == {
         ("backend/coding_mission.py", "events.jsonl"),
+        ("backend/engineering_radar.py", "events.jsonl"),
         ("backend/mission_os.py", "mission_events.jsonl")
     }
     for module, _filename in structured_domain_streams:

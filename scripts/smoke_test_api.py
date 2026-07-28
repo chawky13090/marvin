@@ -363,6 +363,9 @@ def coding_workspace_contracts() -> None:
     assert isinstance(overview.get("projects"), int)
     assert isinstance(overview.get("languages"), list)
     assert isinstance(overview.get("knowledge", {}).get("sources"), list)
+    assert overview.get("knowledge", {}).get("evidence_integrity", {}).get(
+        "integrity_level"
+    ) in {"tamper_evident", "mixed_legacy_unsigned", "invalid"}
     assert isinstance(projects.get("projects"), list)
     assert isinstance(jobs.get("jobs"), list)
     assert hyperv.get("backend") == "hyperv_powershell_direct"

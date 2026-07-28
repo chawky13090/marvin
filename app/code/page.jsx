@@ -527,7 +527,15 @@ export default function CodeWorkspacePage() {
       </article>
     </div>}
 
-    {tab === 'knowledge' && <div className={styles.grid}>{knowledge.map(source => <article className={styles.card} key={source.id}>
+    {tab === 'knowledge' && <div className={styles.grid}>
+      {overview?.knowledge?.evidence_integrity && <div className={overview.knowledge.evidence_integrity.integrity_level === 'tamper_evident' ? styles.guardrail : styles.warning}>
+        {overview.knowledge.evidence_integrity.integrity_level === 'tamper_evident'
+          ? `Preuves Radar vérifiables · ${overview.knowledge.evidence_integrity.records} changement(s) chaîné(s)`
+          : overview.knowledge.evidence_integrity.integrity_level === 'mixed_legacy_unsigned'
+            ? `Registre Radar cohérent · ${overview.knowledge.evidence_integrity.signed_records} preuve(s) chaînée(s) · ${overview.knowledge.evidence_integrity.legacy_records} événement(s) historiques non signés`
+            : `Intégrité des preuves Radar compromise · ${overview.knowledge.evidence_integrity.corrupt_lines || 0} ligne(s) corrompue(s)`}
+      </div>}
+      {knowledge.map(source => <article className={styles.card} key={source.id}>
       <div className={styles.cardTitle}>{source.title || source.id}</div><div className={styles.meta}>{source.language} · {source.kind}</div>
       <div className={styles.check}><span>Fraîcheur</span><b style={{ color: statusColor(source.freshness) }}>{source.freshness}</b></div>
       <div className={styles.check}><span>Actualisée</span><b>{shortDate(source.retrieved_at)}</b></div>

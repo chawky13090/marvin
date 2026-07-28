@@ -73,7 +73,8 @@ async def coding_overview():
         "failed": sum(item.get("status") == "failed" for item in missions),
         "languages": language_registry.matrix(),
         "knowledge": {
-            key: value for key, value in radar.items() if key != "context"
+            **{key: value for key, value in radar.items() if key != "context"},
+            "evidence_integrity": engineering_radar.evidence_integrity(),
         },
         "windows_validation": windows_validation.route(["main.ps1", "main.Tests.ps1"]),
         "test_forge": {

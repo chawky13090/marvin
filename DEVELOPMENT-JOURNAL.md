@@ -8272,3 +8272,69 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   et https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 - Rollback applicatif : `git revert <commit>`. Les nouveaux champs sont additifs et les anciens
   lecteurs ignorent les signatures; aucune preuve historique n'est réécrite.
+
+## 2026-07-28 — v2.397.0 — preuves et transport sécurisé Engineering Radar
+
+### Contexte, comparaison et décision
+
+- Périmètre : `engineering_radar.py`, API Knowledge/Code Workspace, rendu du Radar, inventaire
+  JSONL et tests. Les 19 sources officielles, leurs cadences, le format de contexte et leurs
+  identités publiques sont conservés.
+- Deux approches ont été comparées : externaliser le Radar dans un service de connaissance
+  séparé, ou consolider le composant local derrière un état matérialisé atomique et un flux de
+  preuves append-only. La seconde est retenue : surface d'exploitation et dépendances plus
+  faibles, fonctionnement local préservé et rollback par commit, sans empêcher une extraction
+  future derrière les mêmes contrats.
+- Amélioration inspirée de l'Event Sourcing : un changement de documentation n'est plus un
+  simple log. Il reçoit schéma, séquence et chaîne SHA-256 dans `DurableEvidenceStore`; une
+  écriture de l'état sans preuve est compensée par restauration de la version précédente.
+- Les erreurs d'actualisation sont de la télémétrie technique : elles rejoignent
+  `bug_log.jsonl`, avec type d'erreur et identifiant de source uniquement. Elles ne polluent
+  plus la preuve métier et aucun détail de transport, secret ou chemin n'est exposé par l'API.
+
+### Revue de sécurité obligatoire
+
+- Défaut élevé corrigé : `follow_redirects=True` émettait une requête vers la destination avant
+  de vérifier le domaine final. Le transport suit désormais au plus cinq redirections,
+  validées avant chaque requête, en HTTPS et uniquement vers l'hôte officiel initial présent
+  dans la liste blanche et sur le port HTTPS standard. Les URLs avec identifiants sont
+  refusées et l'URL de résultat est revalidée avant persistance.
+- Défaut moyen corrigé : le corps HTTP était matérialisé avant la limite. La lecture est
+  maintenant en flux et borne à 4 Mio le contenu décompressé, ce qui limite mémoire et bombes
+  de compression applicatives.
+- Intégrité : état et preuve sont compensés si l'ajout append-only échoue; les écritures d'état
+  utilisent fichier temporaire, `flush`, `fsync` et remplacement atomique.
+- Injection indirecte : le contenu téléchargé demeure encadré par
+  `BEGIN_UNTRUSTED_OFFICIAL_DOCUMENTATION`, empreinté et analysé par `evidence_fabric`; il
+  n'acquiert aucun droit d'outil.
+- Dette de sécurité résiduelle bornée : le registre réel contient 19 événements historiques
+  cohérents mais non signés. Leur intégrité antérieure ne peut pas être attestée; ils restent
+  lisibles et l'UI les signale comme `mixed_legacy_unsigned`. Aucune signature rétroactive
+  trompeuse n'est créée. Cette dette disparaîtra avec le cycle de vie explicite de l'état Radar,
+  pas par rotation silencieuse.
+- Les dépendances n'ont pas changé dans cette tranche. Le domaine global `security` reste
+  `partial` jusqu'aux tests d'abus de toutes les surfaces; cette correction locale ne vaut pas
+  certification globale.
+
+### Fichiers et validations réelles
+
+- Backend : `backend/engineering_radar.py`, `backend/api/knowledge.py`,
+  `backend/api/coding.py`, `backend/app_version.py`, `backend/main.py`.
+- Frontend : `app/code/page.jsx` expose le niveau d'intégrité sans déclarer les événements
+  historiques comme vérifiés.
+- Contrats : `MARVIN-PERSISTENCE-INVENTORY.md`,
+  `MARVIN-FRONTIER-CONSOLIDATION.md`, `AGENTS.md`, `README.md`, métadonnées npm et tests.
+- Test ciblé : sources officielles simulées, cache, détection de langage, contenu injectif
+  inerte, preuves chaînées, redirection hostile bloquée avant la seconde requête, redirection
+  même domaine, limite de taille, non-divulgation et restauration après panne de preuve.
+- Gate rapide réel : 167/167 étapes, 344 outils, 349 routes, 236 fichiers Python compilés,
+  zéro erreur ESLint; 37 avertissements frontend historiques restent recensés.
+- Backend réel redémarré en 2.397.0 avec Ollama connecté; smoke HTTP/Next.js : 28/28 contrats.
+- Validation navigateur réelle `/code` > Documentation : « Registre Radar cohérent ·
+  0 preuve(s) chaînée(s) · 19 événement(s) historiques non signés »; aucune erreur console.
+- Références : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing,
+  https://learn.microsoft.com/en-us/azure/architecture/patterns/compensating-transaction et
+  https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- Rollback : `git revert <commit>`. Le format est additif et les anciens événements restent
+  lisibles. La réversion du code ne réécrit ni ne supprime les preuves; l'état matérialisé a
+  déjà été restauré par compensation lors de tout échec testé.

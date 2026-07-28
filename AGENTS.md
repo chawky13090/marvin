@@ -184,6 +184,11 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 - Journalisation obligatoire : toute évolution doit analyser les événements, la corrélation,
   les données interdites, la rotation, la rétention, les pannes et les tests conformément à
   `MARVIN-LOGGING-POLICY.md`. Une tranche sans impact de logs doit le justifier explicitement.
+- Sécurité obligatoire : chaque évolution doit analyser sa surface d'attaque, ses entrées,
+  autorisations, secrets, données personnelles, dépendances, accès réseau, concurrence,
+  intégrité, abus et tests négatifs. Aucune dette de sécurité ne peut être ignorée ou masquée :
+  toute dette résiduelle doit être inventoriée, bornée, justifiée, assortie d'un traitement et
+  empêche le statut `verified` tant qu'elle n'est pas acceptée explicitement.
 - Rollback obligatoire : aucune tranche ne peut être déclarée terminée sans état antérieur
   identifiable, procédure de retour exacte et réversibilité vérifiée. Une réversion Git suffit
   uniquement si la tranche ne modifie ni schéma ni donnée persistante ; sinon fournir et tester
@@ -191,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.396.0)
+## 9. État actuel (v2.397.0)
+
+**v2.397 (preuves et transport Engineering Radar)** : les changements de sources officielles
+utilisent le registre append-only chaîné et l'interface expose honnêtement son niveau
+d'intégrité. Une écriture d'état sans preuve est compensée. Le transport HTTPS valide chaque
+redirection avant la requête, reste sur l'hôte officiel attendu et borne le contenu
+décompressé en flux. Les erreurs techniques expurgées rejoignent le journal d'incidents au
+lieu du flux métier.
 
 **v2.396 (preuves Coding Mission durables)** : chaque projet Code Workspace possède un flux
 append-only chaîné et vérifiable, avec séquences et curseurs de reprise stables. Les écritures

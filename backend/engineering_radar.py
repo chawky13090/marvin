@@ -6,17 +6,20 @@ import hashlib
 import json
 import os
 import re
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
 import evidence_fabric
 import language_registry
+import bug_log
 from config import DATA_DIR
+from durable_evidence_store import DurableEvidenceStore
 
 
 ROOT = Path(DATA_DIR) / "engineering_radar"
@@ -68,6 +71,8 @@ SOURCES: tuple[dict[str, Any], ...] = (
      "url": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines", "max_age_hours": 336},
 )
 ALLOWED_HOSTS = frozenset((urlparse(item["url"]).hostname or "").casefold() for item in SOURCES)
+_EVENT_STORE: DurableEvidenceStore | None = None
+_EVENT_STORE_PATH: str | None = None
 
 
 def _now() -> datetime:
@@ -81,7 +86,10 @@ def _iso(value: datetime | None = None) -> str:
 def _atomic_write(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
     os.replace(temporary, path)
 
 
@@ -95,11 +103,25 @@ def _load() -> dict[str, Any]:
     return value if isinstance(value, dict) else {"version": 1, "sources": {}}
 
 
-def _event(event_type: str, payload: dict[str, Any]) -> None:
-    EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+def _event_store() -> DurableEvidenceStore:
+    global _EVENT_STORE, _EVENT_STORE_PATH
+    resolved = str(EVENTS_PATH.resolve())
+    if _EVENT_STORE is None or _EVENT_STORE_PATH != resolved:
+        _EVENT_STORE = DurableEvidenceStore(
+            resolved,
+            stream_name="marvin.engineering_radar.events",
+        )
+        _EVENT_STORE_PATH = resolved
+    return _EVENT_STORE
+
+
+def _event(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
     event = {"at": _iso(), "type": event_type, "payload": payload}
-    with EVENTS_PATH.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    return _event_store().append(event)
+
+
+def evidence_integrity() -> dict[str, Any]:
+    return _event_store().verify()
 
 
 def _due(source: dict[str, Any], current: dict[str, Any] | None, *, force: bool) -> bool:
@@ -122,26 +144,71 @@ def _extract_text(html: str) -> tuple[str, str]:
     return title[:300], text
 
 
+def _validate_fetch_url(url: str, expected_host: str) -> str:
+    parsed = urlparse(str(url or ""))
+    host = (parsed.hostname or "").casefold()
+    if parsed.scheme != "https" or host != expected_host or host not in ALLOWED_HOSTS:
+        raise ValueError("Redirection hors domaine officiel attendu.")
+    if parsed.port not in (None, 443):
+        raise ValueError("Port non standard interdit pour une source documentaire.")
+    if parsed.username or parsed.password:
+        raise ValueError("Identifiants interdits dans une URL documentaire.")
+    return parsed.geturl()
+
+
+async def _fetch_with_client(
+    source: dict[str, Any],
+    headers: dict[str, str],
+    client: httpx.AsyncClient,
+) -> FetchResult:
+    source_host = (urlparse(source["url"]).hostname or "").casefold()
+    current_url = _validate_fetch_url(source["url"], source_host)
+    for redirect_count in range(6):
+        async with client.stream("GET", current_url, headers=headers) as response:
+            if response.status_code in {301, 302, 303, 307, 308}:
+                if redirect_count >= 5:
+                    raise ValueError("Trop de redirections documentaires.")
+                location = response.headers.get("location")
+                if not location:
+                    raise ValueError("Redirection documentaire sans destination.")
+                current_url = _validate_fetch_url(
+                    urljoin(current_url, location),
+                    source_host,
+                )
+                continue
+            if response.status_code == 304:
+                return {
+                    "status": 304,
+                    "url": current_url,
+                    "body": "",
+                    "headers": {
+                        key.casefold(): value for key, value in response.headers.items()
+                    },
+                }
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > MAX_RESPONSE_BYTES:
+                    raise ValueError("Documentation officielle trop volumineuse.")
+            encoding = response.encoding or "utf-8"
+            return {
+                "status": response.status_code,
+                "url": current_url,
+                "body": bytes(body).decode(encoding, errors="replace"),
+                "headers": {
+                    key.casefold(): value for key, value in response.headers.items()
+                },
+            }
+    raise ValueError("Redirections documentaires invalides.")
+
+
 async def _http_fetch(source: dict[str, Any], headers: dict[str, str]) -> FetchResult:
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(20.0, connect=8.0), follow_redirects=True,
-        headers={"User-Agent": "Marvin-Engineering-Radar/1.0", **headers},
+        timeout=httpx.Timeout(20.0, connect=8.0),
+        follow_redirects=False,
+        headers={"User-Agent": "Marvin-Engineering-Radar/1.0"},
     ) as client:
-        response = await client.get(source["url"])
-    final_host = (urlparse(str(response.url)).hostname or "").casefold()
-    source_host = (urlparse(source["url"]).hostname or "").casefold()
-    if final_host != source_host or final_host not in ALLOWED_HOSTS:
-        raise ValueError(f"Redirection hors domaine officiel attendu : {final_host}")
-    if len(response.content) > MAX_RESPONSE_BYTES:
-        raise ValueError(
-            f"Documentation officielle trop volumineuse : {len(response.content)} octets."
-        )
-    return {
-        "status": response.status_code,
-        "url": str(response.url),
-        "body": response.text if response.status_code != 304 else "",
-        "headers": {key.casefold(): value for key, value in response.headers.items()},
-    }
+        return await _fetch_with_client(source, headers, client)
 
 
 async def refresh(
@@ -178,6 +245,10 @@ async def refresh(
                 continue
             if status != 200:
                 raise RuntimeError(f"HTTP {status}")
+            result_url = _validate_fetch_url(
+                str(result.get("url") or source["url"]),
+                (urlparse(source["url"]).hostname or "").casefold(),
+            )
             title, text = _extract_text(str(result.get("body") or ""))
             if len(text) < 200:
                 raise RuntimeError("Documentation officielle vide ou trop courte.")
@@ -186,23 +257,47 @@ async def refresh(
             headers = {str(k).casefold(): str(v) for k, v in dict(result.get("headers") or {}).items()}
             record = {
                 "id": source["id"], "language": source["language"], "kind": source["kind"],
-                "title": title or source["id"], "url": str(result.get("url") or source["url"]),
+                "title": title or source["id"], "url": result_url,
                 "retrieved_at": _iso(), "max_age_hours": source["max_age_hours"],
                 "content_sha256": digest, "etag": headers.get("etag"),
                 "last_modified": headers.get("last-modified"), "status": "current",
                 "changed": changed, "content_guard": evidence_fabric.scan_untrusted_content(text),
                 "text": text,
             }
-            records[source["id"]] = record
-            (updated if changed else unchanged).append(source["id"])
             if changed:
-                _event("official_source_changed", {"id": source["id"], "language": source["language"],
-                                                    "sha256": digest, "url": record["url"]})
+                previous_state = deepcopy(state)
+                previous_records = deepcopy(records)
+                records[source["id"]] = record
+                next_state = {"version": 1, "updated_at": _iso(), "sources": records}
+                _atomic_write(STATE_PATH, next_state)
+                try:
+                    _event("official_source_changed", {
+                        "id": source["id"],
+                        "language": source["language"],
+                        "sha256": digest,
+                        "url": record["url"],
+                    })
+                except Exception:
+                    records = previous_records
+                    state = previous_state
+                    _atomic_write(STATE_PATH, previous_state)
+                    raise
+                state = next_state
+                updated.append(source["id"])
+            else:
+                records[source["id"]] = record
+                unchanged.append(source["id"])
         except Exception as exc:  # errors are persisted and never block Marvin startup
-            errors.append({"id": source["id"], "error": f"{type(exc).__name__}: {str(exc)[:300]}"})
+            error_type = type(exc).__name__
+            errors.append({"id": source["id"], "error": error_type})
+            bug_log.log_bug(
+                "engineering_radar_refresh",
+                "Actualisation d'une source officielle impossible.",
+                context={"source_id": source["id"], "error_type": error_type},
+            )
             if current:
                 current["status"] = "refresh_error"
-                current["last_error"] = errors[-1]["error"]
+                current["last_error"] = error_type
                 records[source["id"]] = current
     state = {"version": 1, "updated_at": _iso(), "sources": records}
     _atomic_write(STATE_PATH, state)
@@ -271,7 +366,14 @@ async def background_worker() -> None:
         try:
             await refresh()
         except Exception as exc:
-            message = f"{type(exc).__name__}: {str(exc)[:300]}"
-            _event("background_refresh_failed", {"error": message})
-            print(f"[Marvin] Engineering Knowledge Radar : actualisation échouée ({message}).")
+            error_type = type(exc).__name__
+            bug_log.log_bug(
+                "engineering_radar_background",
+                "Actualisation globale du radar impossible.",
+                context={"error_type": error_type},
+            )
+            print(
+                "[Marvin] Engineering Knowledge Radar : actualisation échouée "
+                f"({error_type})."
+            )
         await asyncio.sleep(6 * 60 * 60)

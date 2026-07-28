@@ -56,7 +56,15 @@ async def engineering_radar_view(
     if language and languages[0] not in language_registry.PROFILES:
         raise HTTPException(status_code=422, detail="Langage inconnu dans la matrice Marvin.")
     result = engineering_radar.context(languages, max_chars=200_000)
-    return {key: value for key, value in result.items() if key != "context"}
+    return {
+        **{key: value for key, value in result.items() if key != "context"},
+        "evidence_integrity": engineering_radar.evidence_integrity(),
+    }
+
+
+@router.get("/engineering-radar/integrity")
+async def engineering_radar_integrity():
+    return engineering_radar.evidence_integrity()
 
 
 @router.post("/engineering-radar/refresh")
@@ -66,4 +74,5 @@ async def engineering_radar_refresh(
     languages = [language_registry.normalize(language)] if language else None
     if languages and languages[0] not in language_registry.PROFILES:
         raise HTTPException(status_code=422, detail="Langage inconnu dans la matrice Marvin.")
-    return await engineering_radar.refresh(languages)
+    result = await engineering_radar.refresh(languages)
+    return {**result, "evidence_integrity": engineering_radar.evidence_integrity()}
