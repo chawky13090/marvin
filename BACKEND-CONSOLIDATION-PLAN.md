@@ -312,6 +312,11 @@ La tranche v2.383 extrait ensuite les huit outils unitaires vers
 l'injection des transports; consultation, envoi confirmé et assistance IA sont bornés,
 non bloquants et testés en isolation. Une panne partielle lors d'un briefing multiboîte reste
 observable sans supprimer les résultats disponibles.
+La tranche v2.384 sépare les transformations productives dans
+`tool_domains/email_productivity.py` : tâche structurée depuis un message et résumé de pièce
+jointe. Les dépendances métier existantes restent injectées, le JSON et les dates sont
+contrôlés, et les pièces jointes suivent une politique de taille, format et nettoyage
+temporaire explicite.
 
 ## 4. Validation obligatoire par tranche
 

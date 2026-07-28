@@ -7723,3 +7723,37 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Rollback du code : réversion atomique du commit v2.383 après contrôle du patch inverse
   indexé; redémarrer ensuite le backend et repasser le test ciblé, `/api/health`, le gate
   rapide et le smoke test.
+## 2026-07-28 — v2.384.0 — productivité e-mail bornée
+
+### Contexte et constats
+
+- `email_to_task` et `email_attachment_summary` conservaient 121 lignes de logique dans la
+  façade `tools.py`.
+- L'extraction de tâche utilisait une regex JSON gloutonne et acceptait une date arbitraire.
+- Une pièce jointe était matérialisée sans limite explicite, avec I/O directe dans la boucle,
+  et le nom fourni par le serveur pouvait participer au suffixe temporaire.
+
+### Solution
+
+- Nouveau domaine `tool_domains/email_productivity.py` avec résolution de compte, transports,
+  LLM, création de tâche et lecteurs documentaires injectés.
+- Décodage du premier objet JSON valide, priorité en liste blanche et date ISO stricte.
+- Corps, objet, expéditeur, description, prompt et résultat bornés.
+- Pièces jointes limitées à 25 Mio; basename neutralisé, extensions autorisées explicitement,
+  écriture hors boucle et suppression du temporaire en `finally`.
+- Les deux identités publiques restent des alias directs; les anciens corps sont retirés.
+
+### Validation et rollback
+
+- Test isolé : message direct/UID, JSON bruité, repli de priorité/date, erreur de persistance,
+  texte/PDF, traversal de nom, format et type invalides, dépassement de taille, panne LLM,
+  nettoyage physique du temporaire et identités de façade.
+- Compatibilité e-mail complète : messages, automatisation, OAuth2, boîte, préférences,
+  surveillance et routes réussis; architecture 344 outils, 346 routes et harness 344/344.
+- Gate rapide global réussi sur 155/155 étapes.
+- Backend réel redémarré en 2.384.0 : Ollama disponible, 15 workers et exécution HTTP sûre
+  d'`email_to_task` sans entrée, sans création de donnée; smoke test 28/28 avec Turbopack.
+- Aucun schéma ni contenu utilisateur existant n'est migré par cette tranche.
+- Rollback du code : réversion atomique du commit v2.384 après contrôle du patch inverse;
+  redémarrer ensuite le backend et repasser le test ciblé, `/api/health`, le gate rapide et
+  le smoke test.

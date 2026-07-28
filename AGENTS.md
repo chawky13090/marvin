@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.383.0)
+## 9. État actuel (v2.384.0)
+
+**v2.384 (productivité e-mail)** : conversion d'un e-mail en tâche et résumé de pièce jointe
+rejoignent `tool_domains/email_productivity.py`. Résolution de compte, IMAP, génération,
+création de tâche et lecteurs PDF/DOCX sont injectés. Le JSON LLM est décodé sans regex
+gloutonne; priorité et date ISO sont contrôlées. Les pièces jointes sont limitées à 25 Mio,
+leur nom est neutralisé, leurs formats sont filtrés et les temporaires sont toujours nettoyés.
+Les deux identités du registre sont conservées sans corps historique dans `tools.py`.
 
 **v2.383 (messages e-mail)** : liste publique des comptes, consultation, lecture, recherche,
 envoi confirmé, brouillon IA, résumé et briefing multiboîte rejoignent

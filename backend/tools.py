@@ -84,6 +84,7 @@ from tool_domains import system_self_test as system_self_test_domain
 from tool_domains import unified_search as unified_search_domain
 from tool_domains import screen_ocr as screen_ocr_domain
 from tool_domains import email_messages as email_messages_domain
+from tool_domains import email_productivity as email_productivity_domain
 from tool_domains import email_automation as email_automation_domain
 import ssh_transport
 from document_formatting import (
@@ -1123,129 +1124,22 @@ execute_email_orchestrator_run = email_automation_domain.run
 execute_email_outbox_flush = email_automation_domain.flush_outbox
 
 
-async def execute_email_to_task(args: dict) -> dict:
-    """✅ Transforme un email en TÂCHE actionnable (IA extrait l'action + l'échéance). Fournir 'uid' ou 'body'."""
-    account = args.get("account")
-    original = (args.get("body") or "").strip()
-    subject = (args.get("subject") or "").strip()
-    sender = (args.get("from") or "").strip()
-    uid = str(args.get("uid", "")).strip()
-    if uid and not original:
-        cfg = _get_email_cfg(account)
-        if not cfg:
-            return {"error": "Email non configuré."}
-        try:
-            import email_manager as _em
-            loop = asyncio.get_running_loop()
-            msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
-                cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
-                uid=uid, folder=args.get("folder", "INBOX")))
-            original = (msg.get("body") or msg.get("text") or "").strip()
-            subject = subject or (msg.get("subject") or "")
-            sender = sender or (msg.get("from") or "")
-        except Exception as e:
-            return {"error": f"Lecture de l'email impossible : {e}"}
-    if not original and not subject:
-        return {"error": "Aucun contenu : fournir 'uid' ou 'body'."}
-
-    from datetime import date as _date
-    today = _date.today().isoformat()
-    prompt = (
-        "À partir de cet email, définis UNE tâche à faire. Réponds UNIQUEMENT par un objet JSON valide "
-        "(aucun texte autour), au format exact :\n"
-        '{"title": "...", "description": "...", "priority": "low|medium|high", "due_date": "YYYY-MM-DD ou null"}\n'
-        f"- title : court, actionnable, commence par un verbe (français).\n"
-        f"- due_date : déduis l'échéance si l'email en mentionne une (aujourd'hui = {today}), sinon null.\n"
-        "- priority : selon l'urgence/importance.\n\n"
-        f"De : {sender}\nObjet : {subject}\n\n{original[:4000]}"
-    )
-    try:
-        raw = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-    except Exception as e:
-        return _net_error(e, "extraction tâche IA") if "_net_error" in globals() else {"error": str(e)}
-    # Extraction robuste du JSON
-    import json as _json, re as _re2
-    data = None
-    m = _re2.search(r"\{.*\}", raw or "", _re2.DOTALL)
-    if m:
-        try:
-            data = _json.loads(m.group(0))
-        except Exception:
-            data = None
-    if not isinstance(data, dict):
-        data = {"title": (subject or (raw or "").strip()[:80] or "Tâche depuis email")}
-    title = str(data.get("title") or subject or "Tâche depuis email").strip()[:200]
-    prio = str(data.get("priority") or "medium").lower()
-    if prio not in ("low", "medium", "high"):
-        prio = "medium"
-    due = data.get("due_date")
-    if not due or str(due).lower() in ("null", "none", "aucune", "n/a"):
-        due = None
-    desc = str(data.get("description") or "").strip()
-    if subject:
-        desc = (desc + f"\n\n— Issu de l'email « {subject} »" + (f" de {sender}" if sender else "")).strip()
-    res = await execute_task_create({"title": title, "description": desc, "priority": prio,
-                                     "due_date": due, "tags": ["email"]})
-    if res.get("error"):
-        return res
-    return {"success": True, "task": res.get("task"), "title": title, "priority": prio, "due_date": due,
-            "message": f"Tâche créée : « {title} »" + (f" (échéance {due})" if due else "")}
 
 
-async def execute_email_attachment_summary(args: dict) -> dict:
-    """📎 Résume par IA une pièce jointe d'un email (PDF, Word, texte). uid + name requis."""
-    account = args.get("account")
-    uid = str(args.get("uid", "")).strip()
-    name = args.get("name", "")
-    if not uid:
-        return {"error": "Paramètre 'uid' requis."}
-    cfg = _get_email_cfg(account)
-    if not cfg:
-        return {"error": "Email non configuré."}
-    import email_manager as _em, tempfile as _tmp, os as _os, uuid as _uuid
-    loop = asyncio.get_running_loop()
-    try:
-        # v2.160 : un uid invalide/mal formé faisait planter la commande IMAP FETCH
-        # (exception non rattrapée → 500) au lieu d'un message d'erreur propre.
-        att = await loop.run_in_executor(None, lambda: _em.fetch_attachment(
-            cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
-            uid=uid, name=name, folder=args.get("folder", "INBOX")))
-    except Exception as e:
-        return {"error": f"Pièce jointe introuvable (uid invalide ou email inaccessible) : {e}"}
-    if not att or not att.get("data"):
-        return {"error": "Pièce jointe introuvable."}
-    fname = att["name"]
-    ext = _os.path.splitext(fname)[1].lower()
-    path = _os.path.join(_tmp.gettempdir(), f"marvin_att_{_uuid.uuid4().hex[:8]}{ext}")
-    try:
-        with open(path, "wb") as f:
-            f.write(att["data"])
-        text = ""
-        if ext == ".pdf":
-            r = await execute_pdf_read({"path": path, "max_chars": 14000})
-            text = r.get("text") or r.get("content") or ""
-        elif ext in (".docx",):
-            r = await execute_docx_to_text({"path": path, "format": "text"})
-            text = r.get("text", "")
-        elif ext in (".txt", ".csv", ".md", ".log", ".json"):
-            with open(path, "r", encoding="utf-8", errors="replace") as _f:
-                text = _f.read(20000)
-        else:
-            return {"error": f"Type non pris en charge pour le résumé : {ext or fname}. (PDF, Word .docx, texte supportés)"}
-        if not (text or "").strip():
-            return {"error": f"Impossible d'extraire du texte de « {fname} » (document vide ou scanné)."}
-        prompt = (f"Résume en français cette pièce jointe nommée « {fname} ». Donne : **Résumé** (2-4 phrases), "
-                  f"**Points clés** (puces), et **À retenir / action** s'il y a lieu. Base-toi uniquement sur le contenu.\n\n{text[:13000]}")
-        summary = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-        return {"success": True, "name": fname, "size": att.get("size"), "summary": (summary or "").strip(),
-                "message": f"Résumé de « {fname} » généré."}
-    except Exception as e:
-        return _net_error(e, "résumé pièce jointe") if "_net_error" in globals() else {"error": str(e)}
-    finally:
-        try:
-            _os.remove(path)
-        except Exception:
-            pass
+email_productivity_domain.configure(
+    get_account=lambda account=None: _get_email_cfg(account),
+    fetch_email=lambda *args, **kwargs: email_manager_runtime.fetch_email(*args, **kwargs),
+    fetch_attachment=lambda *args, **kwargs: email_manager_runtime.fetch_attachment(
+        *args, **kwargs
+    ),
+    generate=lambda prompt, **kwargs: _ollama_generate(prompt, **kwargs),
+    create_task=lambda args: execute_task_create(args),
+    read_pdf=lambda args: execute_pdf_read(args),
+    read_docx=lambda args: execute_docx_to_text(args),
+    network_error=lambda error, resource: _net_error(error, resource),
+)
+execute_email_to_task = email_productivity_domain.to_task
+execute_email_attachment_summary = email_productivity_domain.attachment_summary
 
 
 async def execute_email_watch_check(args: dict) -> dict:

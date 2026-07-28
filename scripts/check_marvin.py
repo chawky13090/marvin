@@ -225,6 +225,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Memory Mesh et Truth Ledger", (python, "scripts/test_knowledge_mesh.py")),
         Stage("Orchestrateur email sans effet de bord", (python, "scripts/test_email_orchestrator.py")),
         Stage("Domaine messages email", (python, "scripts/test_tool_domain_email_messages.py")),
+        Stage("Domaine productivité email", (python, "scripts/test_tool_domain_email_productivity.py")),
         Stage("Domaine automatisation email", (python, "scripts/test_tool_domain_email_automation.py")),
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),

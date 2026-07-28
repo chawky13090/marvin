@@ -313,6 +313,12 @@ et le générateur sont injectés; les opérations IMAP/SMTP sortent de la boucl
 entrées et sorties sont bornées et une panne d'une boîte ne supprime pas le briefing des autres.
 Les huit exécuteurs historiques sont des alias directs; OAuth et les secrets restent résolus
 par `email_accounts` sans être exposés au modèle.
+101. la productivité e-mail : `tool_domains/email_productivity.py` transforme un message en
+tâche structurée et résume les pièces jointes autorisées. Le parsing JSON, les priorités,
+dates, tailles, extensions, textes et sorties sont bornés. IMAP et les écritures temporaires
+quittent la boucle asyncio; les fichiers intermédiaires sont supprimés dans tous les chemins.
+Les créations de tâches passent encore par le domaine Productivity et les lecteurs de
+documents existants, sans dupliquer leur logique.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
