@@ -1,20 +1,15 @@
 """Restaure un snapshot Marvin réel dans une base temporaire isolée."""
-
 from __future__ import annotations
-
 import argparse
 import hashlib
-import shutil
 import sqlite3
 import sys
 import tempfile
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
-
 import backup
 from backup import BackupService
 
@@ -37,14 +32,10 @@ def main() -> int:
     )
     parser.add_argument("--filename")
     arguments = parser.parse_args()
-
-    entries = backup.list_backups()
     selected = next(
         (
-            entry
-            for entry in entries
-            if arguments.filename is None
-            or entry["filename"] == arguments.filename
+            entry for entry in backup.list_backups()
+            if arguments.filename is None or entry["filename"] == arguments.filename
         ),
         None,
     )
@@ -52,22 +43,17 @@ def main() -> int:
         raise SystemExit("Sauvegarde demandée introuvable.")
     source = Path(selected["path"])
     sidecar = source.with_suffix(source.suffix + ".sha256")
-    if not sidecar.is_file():
-        raise SystemExit(
-            "La preuve isolée exige une sauvegarde v2.419 avec SHA-256."
-        )
-
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         isolated_database = root / "secretary-restored.db"
         isolated_backups = root / "backups"
         isolated_backups.mkdir()
         copied_source = isolated_backups / source.name
-        shutil.copy2(source, copied_source)
-        shutil.copy2(
-            sidecar,
-            copied_source.with_suffix(copied_source.suffix + ".sha256"),
-        )
+        copied_source.write_bytes(source.read_bytes())
+        if sidecar.is_file():
+            copied_source.with_suffix(
+                copied_source.suffix + ".sha256"
+            ).write_bytes(sidecar.read_bytes())
         connection = sqlite3.connect(isolated_database)
         try:
             connection.execute("CREATE TABLE marker(value TEXT)")
@@ -75,11 +61,8 @@ def main() -> int:
             connection.commit()
         finally:
             connection.close()
-
         service = BackupService(
-            isolated_database,
-            isolated_backups,
-            keep_last=4,
+            isolated_database, isolated_backups, keep_last=4,
             event_logger=lambda *_: None,
         )
         restored = service.restore(source.name)
@@ -87,12 +70,15 @@ def main() -> int:
             raise SystemExit(
                 f"Restauration isolée échouée: {restored.get('error_code')}"
             )
-        source_hash = _logical_sha256(copied_source)
-        restored_hash = _logical_sha256(isolated_database)
-        if source_hash != restored_hash:
-            raise SystemExit(
-                "Le contenu logique restauré diffère de la source."
-            )
+        if source.suffix == ".mrvbak":
+            materialized = root / "source-materialized.db"
+            with service._materialize(copied_source) as plain:
+                materialized.write_bytes(plain.read_bytes())
+            source_hash = _logical_sha256(materialized)
+        else:
+            source_hash = _logical_sha256(copied_source)
+        if source_hash != _logical_sha256(isolated_database):
+            raise SystemExit("Le contenu logique restauré diffère de la source.")
         if restored["foreign_key_violations"] < 0:
             raise SystemExit("Compteur relationnel invalide.")
         print(

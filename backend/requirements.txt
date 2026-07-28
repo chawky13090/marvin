@@ -49,6 +49,7 @@ faster-whisper==1.2.1
 # --- Système Windows / presse-papiers / notifications ---
 pywin32==311
 pyperclip==1.11.0
+cryptography==48.0.1      # v2.420 — AES-256-GCM des sauvegardes, clé protégée par DPAPI
 psutil==7.2.2
 plyer==2.1.0
 pywinauto==0.6.9         # v2.149 — agent GUI local (lecture/clic/frappe UI Automation, pas de vision/cloud)

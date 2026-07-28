@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.419.0
+Version courante auditée : 2.420.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -413,6 +413,13 @@ sérialisé, avec publication atomique, contrôles SQLite, SHA-256, rotation cou
 compensation automatique testée. La phase reste `partial` tant que SEC-005 n'a pas livré
 le format chiffré authentifié, la migration des sauvegardes historiques et sa restauration
 réelle sous le compte Windows.
+
+En v2.420.0, cette limite est levée : chaque nouvelle sauvegarde est un conteneur versionné
+AES-256-GCM dont la clé de données aléatoire est enveloppée par DPAPI utilisateur. Le service
+conserve la lecture des `.db` historiques, tandis qu'une migration explicite fournit dry-run,
+montée et descente idempotente sans écrasement de collision. La preuve réelle a exécuté une
+montée de 14 fichiers, une descente de 15 fichiers, puis une remontée de 15 fichiers et une
+restauration logique exacte. La non-portabilité DPAPI reste explicitement suivie par SEC-012.
 
 ## 10. Preuves minimales par grande capacité
 

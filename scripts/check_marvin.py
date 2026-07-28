@@ -159,6 +159,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Sauvegarde et restauration SQLite",
             (python, "scripts/test_backup_service.py"),
         ),
+        Stage(
+            "Migration chiffrée et rollback des sauvegardes",
+            (python, "scripts/test_backup_migration.py"),
+        ),
         Stage("Fermeture garantie des connexions SQLite", (python, "scripts/test_db_connection_hygiene.py")),
         Stage("Politiques textuelles de l'agent", (python, "scripts/test_agent_policy.py")),
         Stage("Sécurité déterministe de l'agent", (python, "scripts/test_agent_safety.py")),

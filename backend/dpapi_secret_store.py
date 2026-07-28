@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import ctypes
 import json
+import hashlib
 import os
 import re
 import sys
@@ -38,22 +39,37 @@ def _blob(value: bytes) -> tuple[_DATA_BLOB, ctypes.Array]:
 
 
 def _crypt(value: bytes, *, protect: bool) -> bytes:
+    return _crypt_with_context(
+        value,
+        protect=protect,
+        entropy=_ENTROPY,
+        description=_DESCRIPTION,
+    )
+
+
+def _crypt_with_context(
+    value: bytes,
+    *,
+    protect: bool,
+    entropy: bytes,
+    description: str,
+) -> bytes:
     if sys.platform != "win32":
         raise SecretStoreError("DPAPI est disponible uniquement sous Windows.")
     source, source_buffer = _blob(value)
-    entropy, entropy_buffer = _blob(_ENTROPY)
+    entropy_blob, entropy_buffer = _blob(entropy)
     destination = _DATA_BLOB()
-    description = wintypes.LPWSTR()
+    returned_description = wintypes.LPWSTR()
     crypt32 = ctypes.windll.crypt32
     kernel32 = ctypes.windll.kernel32
     if protect:
         ok = crypt32.CryptProtectData(
-            ctypes.byref(source), _DESCRIPTION, ctypes.byref(entropy), None, None,
+            ctypes.byref(source), description, ctypes.byref(entropy_blob), None, None,
             0x1, ctypes.byref(destination),
         )
     else:
         ok = crypt32.CryptUnprotectData(
-            ctypes.byref(source), ctypes.byref(description), ctypes.byref(entropy), None, None,
+            ctypes.byref(source), ctypes.byref(returned_description), ctypes.byref(entropy_blob), None, None,
             0x1, ctypes.byref(destination),
         )
     _ = source_buffer, entropy_buffer
@@ -63,8 +79,43 @@ def _crypt(value: bytes, *, protect: bool) -> bytes:
         return ctypes.string_at(destination.pbData, destination.cbData)
     finally:
         kernel32.LocalFree(destination.pbData)
-        if description:
-            kernel32.LocalFree(description)
+        if returned_description:
+            kernel32.LocalFree(returned_description)
+
+
+def _purpose_context(purpose: str) -> tuple[bytes, str]:
+    if not _KEY.fullmatch(purpose):
+        raise SecretStoreError("Contexte DPAPI invalide.")
+    entropy = hashlib.sha256(
+        b"marvin-dpapi-purpose-v1\0" + purpose.encode("ascii")
+    ).digest()
+    return entropy, f"Marvin {purpose}"
+
+
+def protect_bytes(value: bytes, *, purpose: str) -> bytes:
+    """Protège des octets pour l'utilisateur Windows courant et un usage précis."""
+    if not isinstance(value, bytes) or not value or len(value) > 65_536:
+        raise SecretStoreError("Charge binaire DPAPI invalide.")
+    entropy, description = _purpose_context(purpose)
+    return _crypt_with_context(
+        value,
+        protect=True,
+        entropy=entropy,
+        description=description,
+    )
+
+
+def unprotect_bytes(value: bytes, *, purpose: str) -> bytes:
+    """Déprotège des octets uniquement dans le même contexte DPAPI."""
+    if not isinstance(value, bytes) or not value or len(value) > 131_072:
+        raise SecretStoreError("Charge binaire DPAPI invalide.")
+    entropy, description = _purpose_context(purpose)
+    return _crypt_with_context(
+        value,
+        protect=False,
+        entropy=entropy,
+        description=description,
+    )
 
 
 @contextmanager

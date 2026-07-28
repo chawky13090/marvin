@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.419.0)
+## 9. État actuel (v2.420.0)
+
+**v2.420 (sauvegardes chiffrées réversibles)** : les nouvelles sauvegardes utilisent un
+conteneur versionné AES-256-GCM. Une clé aléatoire distincte par fichier est protégée par
+DPAPI pour l'utilisateur Windows courant; en-tête et contenu sont authentifiés, les écritures
+sont temporaires puis atomiques et aucun snapshot SQLite temporaire ne subsiste. Les `.db`
+historiques restent lisibles. `scripts/migrate-backups.py` fournit un dry-run, une montée
+chiffrée et une descente recréant le manifeste SHA-256. Sur l'installation réelle, 14
+sauvegardes historiques et une nouvelle ont subi montée, rollback complet puis remontée;
+les 15 fichiers finaux sont chiffrés et une restauration isolée retrouve exactement le
+contenu logique avec les 27 violations FK historiques déjà inventoriées.
 
 **v2.419 (sauvegarde et restauration SQLite)** : les trois façades historiques passent par
 un service injectable et sérialisé. Chaque nouvelle sauvegarde utilise l'Online Backup API,

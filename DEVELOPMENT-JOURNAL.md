@@ -9683,3 +9683,50 @@ fichiers `.sha256` peuvent rester : l'ancienne version les ignore. Les snapshots
 demeurent compatibles. Aucune donnée ni migration de schéma n'est modifiée par la réversion.
 Vérifier ensuite `GET /api/backups` et créer une sauvegarde manuelle. Ne restaurer la base
 active pendant le rollback qu'en cas d'incident de données indépendant du code.
+
+## 2026-07-28 — v2.420.0 — Sauvegardes chiffrées et migration réversible
+
+### Décision et conception
+
+Deux options ont été comparées : chiffrer directement la base avec une clé permanente, ou
+utiliser une clé de données aléatoire par sauvegarde et l'envelopper avec DPAPI. La seconde
+réduit l'impact de la compromission d'une clé de fichier et conserve une frontière Windows
+explicite. Le format `MRVBAK01` utilise AES-256-GCM en flux, authentifie l'en-tête versionné,
+borne ses métadonnées et ne publie le fichier qu'après déchiffrement et contrôle SQLite.
+Les erreurs et événements ne contiennent ni clé, nonce, chemin, contenu ni message technique.
+
+### Modifications
+
+- `backup_encryption.py` : chiffrement/déchiffrement authentifié en flux ;
+- `dpapi_secret_store.py` : protection binaire par contexte sans casser le coffre historique ;
+- `backup.py` et `api/backups.py` : `.mrvbak` par défaut, lecture legacy `.db`, validation,
+  rotation, compensation et contrat API compatibles ;
+- `backup_migration.py` et `scripts/migrate-backups.py` : dry-run, montée, descente,
+  validation SQLite, contrôle SHA historique, collisions refusées et suppression après preuve ;
+- tests et vérificateur de restauration adaptés au format chiffré ;
+- dépendance directe et reproductible `cryptography==48.0.1`.
+
+### Preuves réelles
+
+- DPAPI réel : protection/relecture sous le compte Windows courant et mauvais contexte refusé ;
+- AES-GCM : fichier de 2,5 Mo déchiffré à l'identique et altération refusée sans résidu ;
+- service : snapshot, legacy, corruption, compensation, huit créations concurrentes et rotation ;
+- migration temporaire : dry-run, montée, descente, contenu exact et collision sans écrasement ;
+- données réelles : montée de 14 `.db`, descente vérifiée de 15 `.mrvbak`, remontée vérifiée
+  de 15 `.db`; état final de 15 `.mrvbak` et zéro sauvegarde SQLite en clair ;
+- restauration isolée du dernier fichier : contenu logique exact et 27 violations FK
+  historiques inchangées, déjà suivies par SEC-014.
+
+### Rollback
+
+Avant de revenir au code v2.419, exécuter Marvin arrêté :
+`backend\.venv\Scripts\python.exe scripts\migrate-backups.py --direction down --apply`.
+Vérifier ensuite la présence des `.db` et `.db.sha256`, puis appliquer
+`git revert <commit-v2.420>` et redémarrer Marvin. Cette descente a réellement été exécutée
+sur les 15 sauvegardes avant leur remontée finale. DPAPI lie volontairement les fichiers au
+compte et à la machine; SEC-012 conserve le besoin futur d'un export portable distinct.
+
+Validation finale observée : gate consolidé **186/186**, 344 outils et harness 344/344,
+compilation de 265 fichiers Python, lint sans erreur; build Next.js 16.2.6 Turbopack réussi;
+smokes live API **28/28** et pages **40/40**. Backend v2.420.0 relancé avec Ollama disponible
+et 15 workers; frontend Turbopack relancé et HTTP 200.

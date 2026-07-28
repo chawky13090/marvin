@@ -9,17 +9,19 @@ import re
 import sqlite3
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from config import DB_PATH, DATA_DIR
+from backup_encryption import decrypt_file, encrypt_file
 
 
 BACKUP_DIR = DATA_DIR / "backups"
 KEEP_LAST = 14
 _BACKUP_NAME = re.compile(
-    r"^secretary_\d{8}_\d{6}(?:_\d{6})?(?:_\d+)?\.db$"
+    r"^secretary_\d{8}_\d{6}(?:_\d{6})?(?:_\d+)?\.(?:db|mrvbak)$"
 )
 _CHECKSUM = re.compile(r"^[0-9a-f]{64}$")
 
@@ -122,10 +124,10 @@ class BackupService:
         stamp = self._clock().astimezone(timezone.utc).strftime(
             "%Y%m%d_%H%M%S_%f"
         )
-        candidate = self.backup_dir / f"secretary_{stamp}.db"
+        candidate = self.backup_dir / f"secretary_{stamp}.mrvbak"
         suffix = 1
         while candidate.exists():
-            candidate = self.backup_dir / f"secretary_{stamp}_{suffix}.db"
+            candidate = self.backup_dir / f"secretary_{stamp}_{suffix}.mrvbak"
             suffix += 1
         return candidate
 
@@ -161,7 +163,8 @@ class BackupService:
 
     def _prune_locked(self) -> tuple[int, int]:
         backups = sorted(
-            self.backup_dir.glob("secretary_*.db"),
+            list(self.backup_dir.glob("secretary_*.db"))
+            + list(self.backup_dir.glob("secretary_*.mrvbak")),
             key=lambda path: (path.stat().st_mtime_ns, path.name),
             reverse=True,
         )
@@ -182,24 +185,33 @@ class BackupService:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         self._integrity(self.database_path, full=False)
         destination = self._next_destination()
-        temporary = destination.with_name(
-            f".{destination.name}.{uuid.uuid4().hex}.partial"
-        )
+        snapshot = self.backup_dir / f".snapshot.{uuid.uuid4().hex}.db"
+        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.partial")
         try:
-            self._copy_database(self.database_path, temporary)
+            self._copy_database(self.database_path, snapshot)
             foreign_key_violations = self._integrity(
-                temporary,
+                snapshot,
                 full=False,
             )
-            self._fsync(temporary)
+            self._fsync(snapshot)
+            encryption = encrypt_file(snapshot, temporary)
+            verified = self.backup_dir / f".verify.{uuid.uuid4().hex}.db"
+            try:
+                decrypted = decrypt_file(temporary, verified)
+                self._integrity(verified, full=False)
+                if decrypted != encryption:
+                    raise ValueError("La vérification chiffrée a échoué.")
+            finally:
+                verified.unlink(missing_ok=True)
             os.replace(temporary, destination)
-            digest = self._sha256(destination)
-            self._write_checksum(destination, digest)
+            digest = str(encryption["sha256"])
         except BaseException:
             temporary.unlink(missing_ok=True)
             destination.unlink(missing_ok=True)
             self._checksum_path(destination).unlink(missing_ok=True)
             raise
+        finally:
+            snapshot.unlink(missing_ok=True)
         deleted, rotation_errors = self._prune_locked() if prune else (0, 0)
         return {
             "success": True,
@@ -207,6 +219,8 @@ class BackupService:
             "path": str(destination),
             "size_kb": round(destination.stat().st_size / 1024, 1),
             "sha256": digest,
+            "encrypted": True,
+            "portable": False,
             "integrity_verified": True,
             "foreign_key_violations": foreign_key_violations,
             "rotation_deleted": deleted,
@@ -254,6 +268,18 @@ class BackupService:
         self._copy_database(source, self.database_path)
         return self._integrity(self.database_path, full=True)
 
+    @contextmanager
+    def _materialize(self, source: Path):
+        if source.suffix == ".db":
+            yield source
+            return
+        temporary = self.backup_dir / f".restore.{uuid.uuid4().hex}.db"
+        try:
+            decrypt_file(source, temporary)
+            yield temporary
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def restore(self, filename: str) -> dict[str, Any]:
         with self._lock:
             pre_restore: dict[str, Any] | None = None
@@ -261,11 +287,15 @@ class BackupService:
             try:
                 source = self._resolve_backup(filename)
                 phase = "validate"
-                foreign_key_violations = self._integrity(source, full=True)
-                checksum_verified = self._verify_checksum(source)
-                pre_restore = self._create_locked(prune=False)
-                phase = "restore"
-                restored_foreign_key_violations = self._restore_from(source)
+                with self._materialize(source) as materialized:
+                    foreign_key_violations = self._integrity(materialized, full=True)
+                    checksum_verified = (
+                        True if source.suffix == ".mrvbak"
+                        else self._verify_checksum(source)
+                    )
+                    pre_restore = self._create_locked(prune=False)
+                    phase = "restore"
+                    restored_foreign_key_violations = self._restore_from(materialized)
                 if (
                     restored_foreign_key_violations
                     != foreign_key_violations
@@ -300,7 +330,8 @@ class BackupService:
                 compensation_error: str | None = None
                 if pre_restore and pre_restore.get("path"):
                     try:
-                        self._restore_from(Path(pre_restore["path"]))
+                        with self._materialize(Path(pre_restore["path"])) as rollback:
+                            self._restore_from(rollback)
                         compensated = True
                     except Exception as rollback_exc:
                         compensation_error = type(rollback_exc).__name__
@@ -346,7 +377,8 @@ class BackupService:
             if not self.backup_dir.is_dir():
                 return []
             backups = sorted(
-                self.backup_dir.glob("secretary_*.db"),
+                list(self.backup_dir.glob("secretary_*.db"))
+                + list(self.backup_dir.glob("secretary_*.mrvbak")),
                 key=lambda path: (path.stat().st_mtime_ns, path.name),
                 reverse=True,
             )[:365]
@@ -360,6 +392,8 @@ class BackupService:
                         tz=timezone.utc,
                     ).isoformat(),
                     "checksum_available": self._checksum_path(path).is_file(),
+                    "encrypted": path.suffix == ".mrvbak",
+                    "portable": False if path.suffix == ".mrvbak" else None,
                 }
                 for path in backups
             ]

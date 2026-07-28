@@ -28,7 +28,7 @@ class RestoreRequest(BaseModel):
     filename: str = Field(
         min_length=28,
         max_length=64,
-        pattern=r"^secretary_\d{8}_\d{6}(?:_\d{6})?(?:_\d+)?\.db$",
+        pattern=r"^secretary_\d{8}_\d{6}(?:_\d{6})?(?:_\d+)?\.(?:db|mrvbak)$",
     )
     confirmed: StrictBool = False
 

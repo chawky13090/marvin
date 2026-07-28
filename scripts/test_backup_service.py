@@ -65,7 +65,10 @@ def main() -> int:
         assert first["foreign_key_violations"] == 0
         assert len(first["sha256"]) == 64
         assert Path(first["path"]).is_file()
-        assert Path(first["path"] + ".sha256").is_file()
+        assert first["filename"].endswith(".mrvbak")
+        assert first["encrypted"] is True
+        assert first["portable"] is False
+        assert not Path(first["path"] + ".sha256").exists()
 
         _write_value(database, "courant")
         restored = service.restore(first["filename"])
@@ -76,7 +79,8 @@ def main() -> int:
         assert restored["compensated"] is False
         assert _read_value(database) == "initial"
         assert Path(restored["pre_restore_backup"]).is_file()
-        assert service.list()[0]["checksum_available"] is True
+        assert service.list()[0]["encrypted"] is True
+        assert service.list()[0]["checksum_available"] is False
 
         legacy = backups / "secretary_20260728_120000.db"
         source = sqlite3.connect(database)
@@ -93,11 +97,10 @@ def main() -> int:
         assert _read_value(database) == "initial"
 
         tampered = service.create()
-        sidecar = Path(tampered["path"] + ".sha256")
-        sidecar.write_text(
-            f"{'0' * 64}  {tampered['filename']}\n",
-            encoding="ascii",
-        )
+        tampered_path = Path(tampered["path"])
+        payload = bytearray(tampered_path.read_bytes())
+        payload[-20] ^= 1
+        tampered_path.write_bytes(payload)
         _write_value(database, "avant-rejet")
         rejected = service.restore(tampered["filename"])
         assert rejected["success"] is False
@@ -164,7 +167,7 @@ def main() -> int:
         rotation_results = [rotating.create() for _ in range(4)]
         assert all(result["success"] for result in rotation_results)
         assert len(rotating.list()) == 2
-        assert len(list((root / "rotating").glob("*.sha256"))) == 2
+        assert not list((root / "rotating").glob("*.sha256"))
         assert not list((root / "rotating").glob("*.partial"))
 
         absent = BackupService(
