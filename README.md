@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.382.0**
+**Version 2.383.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 344 outils pour agir sur Windows, les
@@ -23,6 +23,8 @@ explicitement activé et protégé par les modes de confidentialité de Marvin.
 - Diagnostic réseau, SSH, SNMP, Nmap, topologie et suivi des équipements.
 - Lecture et génération Word, PDF, Excel et PowerPoint, OCR et recherche documentaire.
 - Gmail, Outlook, Google Calendar, iCal, tâches, notes et briefings proactifs.
+- Les outils e-mail sont multi-comptes, compatibles OAuth, bornés et conservent une
+  confirmation obligatoire avant chaque envoi manuel.
 - Recherche web avec navigateur réel et SearXNG local optionnel.
 - Council v2 avec cinq familles Ollama Cloud, critique croisée et arbitrage traçable.
 - Model Market avec routage par rôle, scorecards passives, parc Ollama Cloud

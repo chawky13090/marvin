@@ -183,7 +183,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.382.0)
+## 9. État actuel (v2.383.0)
+
+**v2.383 (messages e-mail)** : liste publique des comptes, consultation, lecture, recherche,
+envoi confirmé, brouillon IA, résumé et briefing multiboîte rejoignent
+`tool_domains/email_messages.py`. Les transports IMAP/SMTP, la génération et la projection
+d'erreur sont injectés; dossiers, tailles, offsets et sorties sont bornés. Les opérations
+bloquantes quittent la boucle asyncio et le briefing de toutes les boîtes tolère une panne
+partielle sans repli silencieux. OAuth, sélection du compte et confirmations restent
+inchangés; les huit identités publiques sont des alias directs et les anciens corps ont été
+retirés de `tools.py`.
 
 **v2.382 (nettoyage façade e-mail)** : les 440 lignes historiques devenues inactives après
 l'extraction de l'automatisation e-mail sont retirées de `tools.py`. Les anciens verrous,

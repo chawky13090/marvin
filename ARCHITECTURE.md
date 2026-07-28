@@ -62,7 +62,7 @@ flowchart LR
 | `chat_turn_runtime.py` | Producteurs de tours détachés, journal SSE durable, curseurs de reconnexion et reprise sûre |
 | `intent_guard.py` | Intentions déterministes avant LLM : aucun outil, commande texte, Council et Code Workspace |
 | `tools.py` | Implémentations, registre et schémas des outils exposés au LLM |
-| `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, documentation d'intervention, sécurité et contrôles opérationnels, santé client, Winget, registre/paramètres/tweaks/nettoyage Windows, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
+| `tool_domains/` | Implémentations métier extraites (Fichiers, Documents/PDF, e-mails, documentation d'intervention, sécurité et contrôles opérationnels, santé client, Winget, registre/paramètres/tweaks/nettoyage Windows, Web, Réseau, Facturation, contrôle/diagnostic PC, Windows, Quiz, Base IT, Tâches/Notes, Mémoire, Média, SSH); `tools.py` conserve la façade et les contrats publics pendant la migration |
 | `config.py` | Profils de modèles, ports et politiques de permission |
 | `database.py` | Façade historique d'accès SQLite et compatibilité défensive des domaines métier |
 | `email_account_service.py` | Résolution partagée des comptes e-mail, façade multi-comptes et projection publique sans secrets |
@@ -307,6 +307,12 @@ sont injectés; round-robin, idempotence, simulation sans écriture, anti-boucle
 retries et exclusion mutuelle sont testables sans réseau.
 La façade `tools.py` ne conserve aucun second corps d'automatisation e-mail : configuration,
 orchestrateur et flush sont des alias directs vers cette frontière.
+100. les messages e-mail : `tool_domains/email_messages.py` possède la projection publique
+des comptes, lecture, recherche, envoi confirmé, rédaction, résumé et briefing. Les transports
+et le générateur sont injectés; les opérations IMAP/SMTP sortent de la boucle asyncio, les
+entrées et sorties sont bornées et une panne d'une boîte ne supprime pas le briefing des autres.
+Les huit exécuteurs historiques sont des alias directs; OAuth et les secrets restent résolus
+par `email_accounts` sans être exposés au modèle.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

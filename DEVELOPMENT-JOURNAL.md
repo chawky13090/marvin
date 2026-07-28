@@ -7682,3 +7682,44 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - aucun schéma, réglage ou contenu utilisateur n'est modifié ;
 - rollback du code : réversion atomique du commit v2.376 après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
+
+## 2026-07-28 — v2.383.0 — domaine des messages e-mail
+
+### Contexte et constats
+
+- La consolidation doit continuer sans perte fonctionnelle, avec test réel et rollback
+  obligatoire à chaque tranche.
+- Huit outils de consultation, envoi et assistance IA e-mail conservaient 259 lignes de
+  logique métier dans `tools.py`, en plus du domaine d'automatisation déjà extrait.
+- Les conversions de limites pouvaient lever sur une valeur invalide, les appels IMAP/SMTP
+  étaient dispersés et le briefing multiboîte interrogeait les comptes séquentiellement.
+
+### Solution
+
+- Création de `tool_domains/email_messages.py` pour la liste publique des comptes, la
+  consultation, la lecture, la recherche, l'envoi confirmé, le brouillon, le résumé et le
+  briefing.
+- Injection explicite de la résolution multi-comptes, des transports IMAP/SMTP, du générateur
+  LLM et de la projection des erreurs réseau.
+- Bornes sur dossier, compte, UID, recherche, destinataires, contenus, modèles et sorties.
+- Exécution des transports synchrones via `asyncio.to_thread`; collecte concurrente des
+  boîtes dans le briefing `__all__`, avec conservation des résultats lorsqu'une boîte échoue.
+- Conservation des huit noms du registre, d'OAuth, des confirmations et de l'intégration avec
+  l'automatisation; retrait des anciens corps devenus inactifs de `tools.py`.
+
+### Validation et rollback
+
+- Test contractuel sans réseau : comptes sans secrets, limites, dossiers invalides, lecture,
+  recherche, clarification, confirmation, envoi simulé, génération IA, panne partielle et
+  identités de façade.
+- Tests d'automatisation e-mail et compilation ciblée repassés après suppression des anciens
+  corps.
+- Architecture : 344 outils, 346 routes, harness 344/344 et 65 restrictions; gate rapide
+  complet réussi sur 154/154 étapes.
+- Backend réel redémarré en 2.383.0 : Ollama disponible, 15 workers; appel HTTP
+  `email_accounts` réussi sur trois comptes sans champ secret exposé.
+- Frontend Turbopack conservé et smoke test réel réussi sur 28/28 contrats.
+- Aucun schéma, réglage, jeton ni message utilisateur n'est modifié par cette tranche.
+- Rollback du code : réversion atomique du commit v2.383 après contrôle du patch inverse
+  indexé; redémarrer ensuite le backend et repasser le test ciblé, `/api/health`, le gate
+  rapide et le smoke test.

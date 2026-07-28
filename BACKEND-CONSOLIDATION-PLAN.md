@@ -307,6 +307,11 @@ injectées; simulation, équité, anti-boucle, retries et exclusion mutuelle par
 un contrat déterministe.
 La tranche de nettoyage v2.382 retire ensuite 440 lignes historiques de `tools.py`; les
 workers, routes et registre utilisent exclusivement la frontière extraite.
+La tranche v2.383 extrait ensuite les huit outils unitaires vers
+`tool_domains/email_messages.py`. La façade conserve seulement la résolution des comptes et
+l'injection des transports; consultation, envoi confirmé et assistance IA sont bornés,
+non bloquants et testés en isolation. Une panne partielle lors d'un briefing multiboîte reste
+observable sans supprimer les résultats disponibles.
 
 ## 4. Validation obligatoire par tranche
 

@@ -83,6 +83,7 @@ from tool_domains import long_tasks as long_tasks_domain
 from tool_domains import system_self_test as system_self_test_domain
 from tool_domains import unified_search as unified_search_domain
 from tool_domains import screen_ocr as screen_ocr_domain
+from tool_domains import email_messages as email_messages_domain
 from tool_domains import email_automation as email_automation_domain
 import ssh_transport
 from document_formatting import (
@@ -1082,269 +1083,29 @@ def _list_email_accounts() -> list[dict]:
     return [_email_accounts.public(account) for account in _email_accounts.list_raw()]
 
 
-async def execute_email_accounts(args: dict) -> dict:
-    """Liste les boîtes mail connectées (multi-comptes). Utile pour savoir lesquelles cibler."""
-    accts = _list_email_accounts()
-    if not accts:
-        return {"success": True, "count": 0, "accounts": [],
-                "message": "Aucune boîte mail configurée. Allez dans Paramètres > Email."}
-    return {"success": True, "count": len(accts), "accounts": accts,
-            "default": accts[0]["username"],
-            "message": f"{len(accts)} boîte(s) connectée(s) : " + ", ".join(a["username"] for a in accts)}
 
 
-async def execute_email_list(args: dict) -> dict:
-    """Liste les emails récents de la boîte de réception."""
-    cfg = _get_email_cfg(args.get("account"))
-    if not cfg:
-        return {"error": "Email non configuré. Allez dans Paramètres > Email pour configurer votre boîte."}
-    folder = args.get("folder", "INBOX")
-    limit = max(1, min(int(args.get("limit", 20)), 50))
-    offset = int(args.get("offset", 0))
-    try:
-        import email_manager as _em
-        loop = asyncio.get_running_loop()
-        emails = await loop.run_in_executor(None, lambda: _em.fetch_inbox(
-            cfg["imap_host"], int(cfg.get("imap_port", 993)),
-            cfg["username"], cfg["password"],
-            folder=folder, limit=limit, offset=offset,
-        ))
-        return {"success": True, "folder": folder, "count": len(emails), "emails": emails}
-    except Exception as e:
-        return {"error": str(e)}
 
 
-async def execute_email_read(args: dict) -> dict:
-    """Lit le contenu complet d'un email par son UID."""
-    cfg = _get_email_cfg(args.get("account"))
-    if not cfg:
-        return {"error": "Email non configuré."}
-    uid = str(args.get("uid", "")).strip()
-    if not uid:
-        return {"error": "Paramètre 'uid' requis."}
-    folder = args.get("folder", "INBOX")
-    try:
-        import email_manager as _em
-        loop = asyncio.get_running_loop()
-        msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
-            cfg["imap_host"], int(cfg.get("imap_port", 993)),
-            cfg["username"], cfg["password"],
-            uid=uid, folder=folder,
-        ))
-        return {"success": True, "email": msg}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_email_search(args: dict) -> dict:
-    """Recherche des emails par sujet, expéditeur ou mot-clé."""
-    cfg = _get_email_cfg(args.get("account"))
-    if not cfg:
-        return {"error": "Email non configuré."}
-    query = args.get("query", "").strip()
-    if not query:
-        return {"error": "Paramètre 'query' requis."}
-    folder = args.get("folder", "INBOX")
-    limit = max(1, min(int(args.get("limit", 20)), 50))
-    try:
-        import email_manager as _em
-        loop = asyncio.get_running_loop()
-        emails = await loop.run_in_executor(None, lambda: _em.search_emails(
-            cfg["imap_host"], int(cfg.get("imap_port", 993)),
-            cfg["username"], cfg["password"],
-            query=query, folder=folder, limit=limit,
-        ))
-        return {"success": True, "query": query, "count": len(emails), "emails": emails}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_email_send(args: dict) -> dict:
-    """Envoie un email via SMTP."""
-    cfg = _get_email_cfg(args.get("account"))
-    if not cfg:
-        return {"error": "Email non configuré."}
-    to = args.get("to", "").strip()
-    subject = args.get("subject", "").strip()
-    body = args.get("body", "").strip()
-    # Clarification (anti-erreur) : ne jamais deviner un envoi incomplet → demander
-    if not to:
-        return {"needsClarification": True, "message": "Il me manque le destinataire. À qui dois-je envoyer ce mail ?"}
-    if not subject:
-        return {"needsClarification": True, "message": "Quel doit être l'objet de ce mail ?"}
-    if not body:
-        return {"needsClarification": True, "message": "Que dois-je écrire dans le corps du mail ?"}
-    if not args.get("confirmed"):
-        return {"requiresConfirmation": True, "message": f"Envoyer l'email à {to} — Objet : {subject} ?\n\n{body[:300]}"}
-    cc = args.get("cc", "")
-    try:
-        import email_manager as _em
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, lambda: _em.send_email(
-            cfg.get("smtp_host", cfg["imap_host"].replace("imap.", "smtp.")),
-            int(cfg.get("smtp_port", 587)),
-            cfg["username"], cfg["password"],
-            to=to, subject=subject, body=body, cc=cc,
-            reply_to=args.get("reply_to", ""),
-            in_reply_to=args.get("in_reply_to", ""),
-            references=args.get("references", ""),
-            auto_submitted=bool(args.get("auto_submitted", False)),
-        ))
-        return {"success": True, "message": f"Email envoyé à {to}", "detail": result}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def execute_email_draft_reply(args: dict) -> dict:
-    """✨ Rédige par IA la meilleure réponse à un email, en français impeccable (sans fautes).
-    Fournir 'uid' (l'email sera lu automatiquement) OU le contenu ('body'/'subject'/'from').
-    'instruction' = consigne libre (ex : 'accepte poliment', 'demande un délai d'une semaine')."""
-    account = args.get("account")
-    original = (args.get("body") or "").strip()
-    subject = (args.get("subject") or "").strip()
-    sender = (args.get("from") or args.get("from_addr") or "").strip()
-    # Lire l'email depuis la boîte si seul l'uid est fourni
-    uid = str(args.get("uid", "")).strip()
-    if uid and not original:
-        cfg = _get_email_cfg(account)
-        if not cfg:
-            return {"error": "Email non configuré."}
-        try:
-            import email_manager as _em
-            loop = asyncio.get_running_loop()
-            msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
-                cfg["imap_host"], int(cfg.get("imap_port", 993)),
-                cfg["username"], cfg["password"],
-                uid=uid, folder=args.get("folder", "INBOX")))
-            original = (msg.get("body") or msg.get("text") or "").strip()
-            subject = subject or (msg.get("subject") or "")
-            sender = sender or (msg.get("from") or msg.get("from_addr") or "")
-        except Exception as e:
-            return {"error": f"Lecture de l'email impossible : {e}"}
-    if not original:
-        return {"error": "Aucun contenu à traiter : fournir 'uid' (email à lire) ou 'body'."}
-
-    instruction = (args.get("instruction") or args.get("intent") or "").strip()
-    tone = args.get("tone") or "professionnel, clair et courtois"
-    lang = args.get("language") or "français"
-    signature = args.get("signature") or ""
-    prompt = (
-        f"Tu es un assistant expert en rédaction d'emails. Rédige LA meilleure réponse à l'email ci-dessous, "
-        f"en {lang}, dans un style {tone}, avec une orthographe et une grammaire IRRÉPROCHABLES (zéro faute). "
-        f"Structure : formule d'appel adaptée, corps clair et bien tourné, formule de politesse finale. "
-        f"Réponds UNIQUEMENT avec le corps de l'email (pas d'objet, pas d'explication, pas de balises).\n\n"
-        f"=== EMAIL REÇU ===\nDe : {sender or '(inconnu)'}\nObjet : {subject or '(sans objet)'}\n\n{original[:5000]}\n\n"
-    )
-    if instruction:
-        prompt += f"=== CONSIGNE pour ta réponse ===\n{instruction}\n\n"
-    if signature:
-        prompt += f"Termine par cette signature :\n{signature}\n\n"
-    prompt += "=== TA RÉPONSE (corps de l'email uniquement) ==="
-    try:
-        draft = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-        draft = (draft or "").strip()
-        if not draft:
-            return {"error": "L'IA n'a pas produit de réponse. Réessayez."}
-        re_subject = subject if subject.lower().startswith("re:") else (f"Re: {subject}" if subject else "Re:")
-        return {"success": True, "draft": draft, "to": sender, "subject": re_subject,
-                "account": account, "message": "Brouillon de réponse généré."}
-    except Exception as e:
-        return _net_error(e, "rédaction IA") if "_net_error" in globals() else {"error": str(e)}
-
-
-async def execute_email_summarize(args: dict) -> dict:
-    """📝 Résume un email par IA en français : synthèse, points clés, action attendue.
-    Fournir 'uid' (lecture auto) OU le contenu ('body')."""
-    account = args.get("account")
-    original = (args.get("body") or "").strip()
-    subject = (args.get("subject") or "").strip()
-    sender = (args.get("from") or args.get("from_addr") or "").strip()
-    uid = str(args.get("uid", "")).strip()
-    if uid and not original:
-        cfg = _get_email_cfg(account)
-        if not cfg:
-            return {"error": "Email non configuré."}
-        try:
-            import email_manager as _em
-            loop = asyncio.get_running_loop()
-            msg = await loop.run_in_executor(None, lambda: _em.fetch_email(
-                cfg["imap_host"], int(cfg.get("imap_port", 993)), cfg["username"], cfg["password"],
-                uid=uid, folder=args.get("folder", "INBOX")))
-            original = (msg.get("body") or msg.get("text") or "").strip()
-            subject = subject or (msg.get("subject") or "")
-            sender = sender or (msg.get("from") or "")
-        except Exception as e:
-            return {"error": f"Lecture de l'email impossible : {e}"}
-    if not original:
-        return {"error": "Aucun contenu à résumer : fournir 'uid' ou 'body'."}
-    prompt = (
-        "Résume cet email en français, de manière concise et claire. Donne exactement :\n"
-        "**Résumé** : 2-3 phrases.\n**Points clés** : 2 à 4 puces.\n"
-        "**Action attendue** : ce que je dois faire (ou « Aucune action requise »).\n"
-        "N'invente rien, base-toi uniquement sur le contenu.\n\n"
-        f"De : {sender or '(inconnu)'}\nObjet : {subject or '(sans objet)'}\n\n{original[:6000]}"
-    )
-    try:
-        summary = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-        return {"success": True, "summary": (summary or "").strip(),
-                "subject": subject, "from": sender, "message": "Résumé généré."}
-    except Exception as e:
-        return _net_error(e, "résumé IA") if "_net_error" in globals() else {"error": str(e)}
-
-
-async def execute_email_digest(args: dict) -> dict:
-    """🧠 Briefing IA de la boîte : scanne les emails récents et les PRIORISE (urgent/à traiter/info).
-    account = adresse d'une boîte, ou '__all__' pour toutes."""
-    account = args.get("account")
-    limit = max(3, min(int(args.get("limit", 15)), 25))
-    folder = args.get("folder", "INBOX")
-    try:
-        import email_manager as _em
-        loop = asyncio.get_running_loop()
-
-        def _fetch(cfg):
-            ems = _em.fetch_inbox(cfg["imap_host"], int(cfg.get("imap_port", 993)),
-                                  cfg["username"], cfg["password"], folder=folder, limit=limit, offset=0)
-            for e in ems:
-                e["_account"] = cfg["username"]
-            return ems
-
-        if account == "__all__":
-            emails = []
-            for a in _all_email_cfgs():
-                try:
-                    emails += await loop.run_in_executor(None, lambda a=a: _fetch(a))
-                except Exception:
-                    continue
-        else:
-            cfg = _get_email_cfg(account)
-            if not cfg:
-                return {"error": "Email non configuré."}
-            emails = await loop.run_in_executor(None, lambda: _fetch(cfg))
-
-        if not emails:
-            return {"success": True, "digest": "Aucun email récent à analyser.", "count": 0}
-        emails.sort(key=lambda e: e.get("date") or "", reverse=True)
-        emails = emails[:limit]
-        lignes = []
-        for i, e in enumerate(emails, 1):
-            box = f" [{e.get('_account')}]" if account == "__all__" else ""
-            lignes.append(f"{i}. De : {e.get('from','?')} | Objet : {e.get('subject','(sans objet)')}{box}")
-        prompt = (
-            "Tu es mon assistant. Voici la liste de mes emails récents. Fais-moi un BRIEFING en français :\n"
-            "- Classe-les par priorité avec une pastille : 🔴 (urgent / à traiter vite), 🟡 (à traiter), ⚪ (info / promo / newsletter).\n"
-            "- Pour chaque email important, UNE ligne très courte : qui, de quoi, et l'action suggérée.\n"
-            "- Regroupe les ⚪ peu importants en une seule ligne à la fin.\n"
-            "- Termine par : « 👉 À TRAITER EN PRIORITÉ : … ».\n"
-            "Sois synthétique et concret.\n\n=== EMAILS ===\n" + "\n".join(lignes)
-        )
-        digest = await _ollama_generate(prompt, model=args.get("model"), timeout=180)
-        return {"success": True, "digest": (digest or "").strip(), "count": len(emails),
-                "message": f"Briefing de {len(emails)} email(s) généré."}
-    except Exception as e:
-        return _net_error(e, "briefing IA") if "_net_error" in globals() else {"error": str(e)}
-
-
+email_messages_domain.configure(
+    get_account=lambda account=None: _get_email_cfg(account),
+    list_accounts=lambda: _all_email_cfgs(),
+    list_public_accounts=lambda: _list_email_accounts(),
+    fetch_inbox=lambda *args, **kwargs: email_manager_runtime.fetch_inbox(*args, **kwargs),
+    fetch_email=lambda *args, **kwargs: email_manager_runtime.fetch_email(*args, **kwargs),
+    search_emails=lambda *args, **kwargs: email_manager_runtime.search_emails(*args, **kwargs),
+    send_email=lambda *args, **kwargs: email_manager_runtime.send_email(*args, **kwargs),
+    generate=lambda prompt, **kwargs: _ollama_generate(prompt, **kwargs),
+    network_error=lambda error, resource: _net_error(error, resource),
+)
+execute_email_accounts = email_messages_domain.accounts
+execute_email_list = email_messages_domain.list_messages
+execute_email_read = email_messages_domain.read
+execute_email_search = email_messages_domain.search
+execute_email_send = email_messages_domain.send
+execute_email_draft_reply = email_messages_domain.draft_reply
+execute_email_summarize = email_messages_domain.summarize
+execute_email_digest = email_messages_domain.digest
 
 
 email_automation_domain.configure(
