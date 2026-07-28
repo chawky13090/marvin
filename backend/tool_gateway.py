@@ -131,6 +131,7 @@ async def execute_tool(
             request.arguments,
             result,
             duration_ms,
+            conversation_id=request.conversation_id,
         )
     except Exception:
         pass

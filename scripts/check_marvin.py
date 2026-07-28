@@ -119,6 +119,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Repositories projets et artefacts",
             (python, "scripts/test_project_artifact_repositories.py"),
         ),
+        Stage(
+            "Repository des exécutions et de la fiabilité",
+            (python, "scripts/test_execution_repository.py"),
+        ),
         Stage("Fermeture garantie des connexions SQLite", (python, "scripts/test_db_connection_hygiene.py")),
         Stage("Politiques textuelles de l'agent", (python, "scripts/test_agent_policy.py")),
         Stage("Sécurité déterministe de l'agent", (python, "scripts/test_agent_safety.py")),

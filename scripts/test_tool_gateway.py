@@ -15,11 +15,11 @@ from config import PERMISSION_EXPERT, PERMISSION_SECURE, PERMISSION_STANDARD
 
 
 class Database:
-    logs: list[tuple] = []
+    logs: list[tuple[tuple, dict]] = []
 
     @classmethod
-    def log_execution(cls, *values):
-        cls.logs.append(values)
+    def log_execution(cls, *values, **options):
+        cls.logs.append((values, options))
 
 
 def normalize(name, result, *, duration_ms):
@@ -121,6 +121,7 @@ async def main() -> None:
             {"path": "x"},
             "ui",
             PERMISSION_STANDARD,
+            conversation_id="conversation-ui",
             confirmed_by_ui=True,
         ),
         registry=registry,
@@ -130,6 +131,7 @@ async def main() -> None:
         audit_logger=audit,
     )
     assert ui.result["success"] and calls[-1]["confirmed"] is True
+    assert Database.logs[-1][1]["conversation_id"] == "conversation-ui"
 
     mcp = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(

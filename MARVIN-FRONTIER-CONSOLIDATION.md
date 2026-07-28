@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.408.0
+Version courante auditée : 2.409.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -330,7 +330,7 @@ jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases perti
 L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
 traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
 
-| Ordre | Phase | État au 2.408.0 | Livraison et condition de sortie |
+| Ordre | Phase | État au 2.409.0 | Livraison et condition de sortie |
 |---:|---|---|---|
 | 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
 | 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
@@ -367,8 +367,9 @@ fonctions de façade. L'agenda local et les miroirs externes rejoignent à leur 
 repository injectable en v2.407.0, avec remplacement par source atomique et migration
 défensive. En v2.408.0, projets, captures et logos rejoignent trois repositories séparés;
 leurs neuf façades et relations sont testées sur SQLite réel. Les tranches suivantes
-continuent par agrégat cohésif et risque réel; elles ne sont jamais pilotées par le seul
-nombre de lignes.
+continuent en v2.409.0 avec les traces d'outils et la fiabilité : le stockage technique est
+borné et expurgé, distinct des preuves métier durables. La progression reste pilotée par
+agrégat cohésif et risque réel, jamais par le seul nombre de lignes.
 
 ## 10. Preuves minimales par grande capacité
 

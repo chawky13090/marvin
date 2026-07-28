@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.408.0",
+  "version": "2.409.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -39,6 +39,7 @@
     "check:personal-data-repositories": "backend\\.venv\\Scripts\\python.exe scripts\\test_personal_data_repositories.py",
     "check:event-repository": "backend\\.venv\\Scripts\\python.exe scripts\\test_event_repository.py",
     "check:project-artifact-repositories": "backend\\.venv\\Scripts\\python.exe scripts\\test_project_artifact_repositories.py",
+    "check:execution-repository": "backend\\.venv\\Scripts\\python.exe scripts\\test_execution_repository.py",
     "check:db-connection-hygiene": "backend\\.venv\\Scripts\\python.exe scripts\\test_db_connection_hygiene.py",
     "check:agent-policy": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_policy.py",
     "check:agent-safety": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_safety.py",

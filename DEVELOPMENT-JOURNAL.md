@@ -9003,3 +9003,63 @@ retrouvé dans la liste puis supprimé. Le smoke HTTP/Next.js réussit à **28/2
 Rollback après commit : `git revert <commit-v2.408>`. Aucun format de donnée n'est transformé.
 Après réversion, rejouer le test repository, redémarrer le backend et vérifier projets,
 captures documentaires et logos.
+
+## 2026-07-28 — v2.409.0 — Repository des exécutions et de la fiabilité
+
+### Contexte et décision
+
+`tool_executions` sert de télémétrie technique pour l'historique, les diagnostics et les taux
+d'échec. Deux options ont été comparées : conserver les arguments/résultats bruts pour faciliter
+le débogage, au risque de persister des secrets et contenus utilisateur, ou expurger la
+télémétrie tout en conservant les preuves métier complètes dans Mission OS et les registres
+dédiés. La seconde est retenue. Un log technique n'est pas une preuve métier et ne doit pas
+devenir une copie durable de données sensibles.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/executions.py` avec connexion injectable ;
+- conservation des cinq façades : journal, trace conversation, liste, statistiques et
+  fiabilité ;
+- extraction du seul schéma `tool_executions`; `_ensure_tool_tables` conserve encore les
+  snapshots, modèles et cron puis délègue cette table au repository ;
+- expurgation récursive avant écriture avec le filtre partagé : secrets remplacés et contenus
+  volumineux représentés par longueur et SHA-256 ;
+- résultat non sérialisable converti en représentation bornée au lieu de faire perdre toute
+  l'observation ;
+- pagination bornée à 1 000 lignes, offset borné et trace conversation limitée à 5 000
+  événements ;
+- fenêtres de fiabilité normalisées entre 1 et 3 650 jours, sans modificateur temporel
+  incohérent ;
+- statistiques calculées en une agrégation pour total/succès, avec ordre déterministe en cas
+  d'égalité ;
+- les données historiques existantes restent lisibles et ne sont pas réécrites silencieusement.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation repository/façade/test réussie ;
+- SQLite réel : succès, échec, corrélation, secrets, empreinte de contenu, JSON corrompu,
+  pagination, statistiques, fiabilité globale/récente, migration et rollback réussis ;
+- les cinq identités de façade sont conservées ;
+- observabilité du Runner, gateway 344/344 et diagnostic PC réussis ;
+- `database.py` passe de 2 660 lignes/101 objets AST à 2 508 lignes/96 objets AST.
+
+La première validation HTTP après redémarrage a trouvé un défaut réel hors du repository :
+`tool_gateway.py` transmettait bien l'identifiant de conversation à l'exécuteur idempotent,
+mais l'omettait lors de `log_execution`. L'outil était donc compté avec
+`conversation_id = NULL`. Le gateway transmet désormais explicitement cet identifiant au
+repository et son test contractuel vérifie la corrélation, afin que chat, UI et MCP produisent
+la même trace exploitable.
+
+Composition, architecture et gate globale réussissent ensuite. La gate observe
+**176/176 étapes**, 249 modules backend compilés, le registre 344/344 et le lint frontend.
+Le backend a été réellement redémarré en 2.409.0 avec Ollama, 344 outils et 15 workers.
+Un calcul `21*2` exécuté via `/api/tools` a retourné 42 ; sa ligne d'historique relue par
+`/api/history` porte le même `conversation_id`, et les agrégats de statistiques/fiabilité
+sont consultables. Cette seconde validation confirme la correction de corrélation trouvée
+par le premier essai. Le smoke HTTP/Next.js réussit à **28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.409>`. Les nouvelles lignes déjà expurgées
+restent lisibles après réversion; aucune donnée brute ne peut être reconstruite depuis une
+empreinte. Rejouer le test repository et l'observabilité, redémarrer puis vérifier l'historique.

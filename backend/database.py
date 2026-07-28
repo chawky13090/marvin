@@ -36,6 +36,14 @@ from repositories.events import (
     repository as event_repository,
     update_event,
 )
+from repositories.executions import (
+    get_conversation_trace,
+    get_execution_stats,
+    get_tool_reliability,
+    list_executions,
+    log_execution,
+    repository as execution_repository,
+)
 from repositories.logos import create_logo, list_logos
 from repositories.memories import (
     clear_all_memories,
@@ -118,38 +126,7 @@ from repositories.workflows import (
 
 def _ensure_tool_tables(conn):
     """Crée les nouvelles tables si elles n'existent pas encore (migration transparente)."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS tool_executions (
-            id TEXT PRIMARY KEY,
-            tool_name TEXT NOT NULL,
-            args TEXT DEFAULT '{}',
-            result TEXT,
-            success INTEGER NOT NULL DEFAULT 1,
-            duration_ms INTEGER,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_tool_executions_created
-        ON tool_executions(created_at DESC)
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_tool_executions_tool
-        ON tool_executions(tool_name, created_at DESC)
-    """)
-    # v2.139 — corrélation par conversation (traçabilité 2026) : trouvé en implémentant ce
-    # même chantier que la boucle de chat (agent.py) n'écrivait JAMAIS dans tool_executions —
-    # seuls les appels via /api/tools (boutons UI), cron, ssh_exec REST et email_send y
-    # figuraient. Le tableau de bord de fiabilité v2.138 ne voyait donc qu'une fraction du
-    # vrai usage. Colonne ajoutée pour permettre de reconstituer la chronologie d'un tour de
-    # conversation complet, pas seulement des lignes isolées.
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(tool_executions)").fetchall()}
-    if "conversation_id" not in cols:
-        conn.execute("ALTER TABLE tool_executions ADD COLUMN conversation_id TEXT")
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tool_executions_conversation
-            ON tool_executions(conversation_id, created_at ASC)
-        """)
+    execution_repository.ensure_schema(conn)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS system_snapshots (
             id TEXT PRIMARY KEY,
@@ -195,7 +172,6 @@ def _ensure_tool_tables(conn):
     """)
     # Performance indexes for cron scheduler
     conn.execute("CREATE INDEX IF NOT EXISTS idx_cron_enabled_next ON cron_jobs(enabled, next_run)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_exec_success ON tool_executions(success, created_at DESC)")
 
 
 def _ensure_billing_tables(conn):
@@ -2193,134 +2169,6 @@ def _init_tables():
         apply_migrations(conn)
 
 _init_tables()
-
-
-def log_execution(tool_name: str, args: dict, result: dict, duration_ms: int, conversation_id: str | None = None) -> dict:
-    eid = str(uuid.uuid4())
-    success = 0 if result.get("error") or result.get("success") is False else 1
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute(
-            """INSERT INTO tool_executions (id, tool_name, args, result, success, duration_ms, conversation_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (eid, tool_name, json.dumps(args), json.dumps(result), success, duration_ms, conversation_id)
-        )
-    return {"id": eid, "tool_name": tool_name, "success": bool(success), "duration_ms": duration_ms}
-
-
-def get_conversation_trace(conversation_id: str) -> list[dict]:
-    """v2.139 — chronologie complète des appels d'outils d'une conversation, dans l'ordre,
-    avec la durée de chacun — remplace le recomptage manuel des tool_start fait plusieurs
-    fois cette session pour diagnostiquer une lenteur."""
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        rows = conn.execute(
-            "SELECT * FROM tool_executions WHERE conversation_id = ? ORDER BY created_at ASC",
-            (conversation_id,)
-        ).fetchall()
-    out = []
-    for r in rows:
-        d = row_to_dict(r)
-        d["success"] = bool(d.get("success", 1))
-        out.append(d)
-    return out
-
-
-def list_executions(tool_name: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
-    sql = "SELECT * FROM tool_executions WHERE 1=1"
-    params = []
-    if tool_name:
-        sql += " AND tool_name = ?"
-        params.append(tool_name)
-    sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        rows = conn.execute(sql, params).fetchall()
-    result = []
-    for r in rows:
-        d = row_to_dict(r)
-        if d.get("args") and isinstance(d["args"], str):
-            try:
-                d["args"] = json.loads(d["args"])
-            except Exception:
-                d["args"] = {}
-        if d.get("result") and isinstance(d["result"], str):
-            try:
-                d["result"] = json.loads(d["result"])
-            except Exception:
-                d["result"] = {}
-        d["success"] = bool(d.get("success", 1))
-        result.append(d)
-    return result
-
-
-def get_execution_stats() -> dict:
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        total = conn.execute("SELECT COUNT(*) as c FROM tool_executions").fetchone()["c"]
-        success = conn.execute("SELECT COUNT(*) as c FROM tool_executions WHERE success = 1").fetchone()["c"]
-        by_tool = conn.execute(
-            "SELECT tool_name, COUNT(*) as c FROM tool_executions GROUP BY tool_name ORDER BY c DESC LIMIT 10"
-        ).fetchall()
-    return {
-        "total": total,
-        "success": success,
-        "failed": total - success,
-        "by_tool": [{"tool": r["tool_name"], "count": r["c"]} for r in by_tool],
-    }
-
-
-def get_tool_reliability(min_calls: int = 3, days: int = 90, recent_days: int = 7) -> list[dict]:
-    """v2.138 — taux d'ÉCHEC par outil (pas juste le volume comme `get_execution_stats`) : les
-    données existaient déjà dans `tool_executions` mais n'étaient jamais agrégées par fiabilité,
-    seulement par volume d'appels. Sert de tableau de bord pour repérer les outils qui échouent
-    SYSTÉMATIQUEMENT (candidats à une correction) plutôt que ceux qui échouent juste souvent
-    parce qu'ils sont beaucoup appelés. `min_calls` filtre le bruit statistique (1 échec sur 1
-    appel = 100% mais non significatif).
-    v2.159 — trouvé en auditant les "pires" outils de ce tableau de bord un par un (pas en
-    devinant) : les 5 pires étaient TOUS déjà corrigés (fix de repli OCR, OAuth calendrier...)
-    ou n'étaient jamais de vrais bugs (rejet de validation correct, appel de test contre une IP
-    volontairement injoignable) — mais la fenêtre de 90 jours les faisait encore ressortir en
-    tête, aucun moyen de distinguer "cassé maintenant" de "cassé il y a 3 semaines, corrigé
-    depuis". Ajout d'un second taux calculé sur `recent_days` (7j par défaut) dans LA MÊME
-    requête — un outil avec un mauvais taux sur 90j mais un taux récent à 0% est un signal de
-    "déjà réglé", pas une priorité de correction."""
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        rows = conn.execute(
-            """SELECT tool_name,
-                      COUNT(*) as total,
-                      SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
-                      SUM(CASE WHEN created_at >= datetime('now', ?) THEN 1 ELSE 0 END) as recent_total,
-                      SUM(CASE WHEN created_at >= datetime('now', ?) AND success = 1 THEN 1 ELSE 0 END) as recent_success_count
-               FROM tool_executions
-               WHERE created_at >= datetime('now', ?)
-               GROUP BY tool_name
-               HAVING total >= ?
-               ORDER BY (1.0 * (total - success_count) / total) DESC, total DESC""",
-            (f"-{int(recent_days)} days", f"-{int(recent_days)} days", f"-{int(days)} days", min_calls)
-        ).fetchall()
-    out = []
-    for r in rows:
-        total = r["total"]
-        success_count = r["success_count"]
-        failed = total - success_count
-        recent_total = r["recent_total"] or 0
-        recent_success = r["recent_success_count"] or 0
-        recent_failed = recent_total - recent_success
-        out.append({
-            "tool": r["tool_name"],
-            "total_calls": total,
-            "success_count": success_count,
-            "failed_count": failed,
-            "failure_rate_pct": round(100.0 * failed / total, 1) if total else 0.0,
-            "recent_days": recent_days,
-            "recent_calls": recent_total,
-            "recent_failure_rate_pct": round(100.0 * recent_failed / recent_total, 1) if recent_total else None,
-            "likely_already_fixed": failed > 0 and recent_total >= min_calls and recent_failed == 0,
-        })
-    return out
 
 
 # ── Inventaire réseau persistant (v2.139 — mini-CMDB) ──────────────────────────

@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.409 — traces d'outils et fiabilité extraites, bornées et expurgées
 # v2.408 — projets, captures et logos extraits vers trois repositories injectables
 # v2.407 — agenda local et miroirs externes extraits vers un repository injectable
 # v2.406 — mémoires, tâches et notes extraites vers trois repositories injectables
