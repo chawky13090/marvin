@@ -8475,3 +8475,70 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   lisibles, les neuf modèles Cloud accessibles et aucune erreur ni alerte console n'est émise.
 - Rollback applicatif : `git revert <commit>`. Les enveloppes de preuve sont additives; les
   lecteurs historiques restent compatibles et aucun enregistrement existant n'est réécrit.
+
+## 2026-07-28 — v2.400.0 — Truth Ledger durable et fail-closed
+
+### Contexte, alternatives et décision
+
+- Périmètre : registre d'affirmations Cortex, synthèse de preuves, API Knowledge, indicateur
+  Forge et reçu visible dans la trace du chat. Les 65 réponses historiques et leurs 1 077
+  affirmations ne sont ni réécrites ni supprimées.
+- Deux approches ont été comparées : conserver un fichier analytique tolérant qui ignore les
+  lignes invalides, ou traiter Truth Ledger comme une preuve métier append-only. La seconde
+  est retenue : une altération ne doit jamais produire des métriques apparemment fiables.
+- `DurableEvidenceStore.recent_verified()` vérifie et projette sous le même verrou
+  interprocessus. Cela évite une fenêtre TOCTOU entre un contrôle d'intégrité et la lecture.
+  Une chaîne altérée bloque les métriques et tout nouvel ajout; l'API retourne un état
+  explicite et Forge affiche l'incident au lieu d'utiliser silencieusement des lignes partielles.
+- Un validateur de schéma optionnel rejoint le registre commun et s'exécute sous le même
+  verrou lors de la vérification, de la lecture et de l'ajout. Il protège spécialement les
+  lignes historiques non signées : un JSON syntaxiquement valide mais avec claims, compteurs,
+  scores ou catalogues malformés est classé `record_schema` et bloque le flux.
+- Un échec d'écriture après génération ne déclenche pas de nouvelle génération. La réponse
+  reste disponible, la trace Cortex expose `evidence_persisted=false` et un incident technique
+  expurgé permet le diagnostic.
+
+### Revue de sécurité, confidentialité et observabilité
+
+- Identifiant de conversation limité à 100 caractères selon une grammaire fermée. Réponse
+  limitée à 200 000 caractères, 100 sources, 100 citations, 100 outils de preuve, 50
+  contradictions et 20 000 caractères de contenu observé par source. Le registre commun
+  impose en plus 2 Mio par preuve.
+- Les URLs persistées doivent être HTTP(S), contenir un hôte, ne pas embarquer d'identifiants
+  et utiliser les ports 80 ou 443. Les identifiants et alias de citation sont normalisés sur
+  une grammaire fermée; aucune URL `javascript:`, credential URL ou port arbitraire n'entre
+  dans le registre.
+- Les contenus observés restent des données non fiables dans Evidence Fabric. Ils servent au
+  calcul déterministe, mais le registre public ne conserve que leur empreinte et les
+  métadonnées projetées, pas le texte source brut.
+- Le log technique d'échec ne reçoit ni réponse, ni affirmation, ni conversation, ni URL, ni
+  exception brute : uniquement composant et classe d'erreur. Sa rétention reste de 30 jours.
+- Dette de sécurité non ignorée : Truth Ledger conserve volontairement des affirmations issues
+  des conversations. Les ACL du compte Windows les protègent, mais il n'existe pas encore de
+  chiffrement applicatif par enregistrement ni de workflow d'oubli sélectif avec preuve de
+  suppression. Ces exigences rejoignent le chantier de protection globale au repos,
+  sauvegarde/restauration et droit à l'oubli; le domaine `security` reste `partial`.
+- Dette historique non ignorée : les 65 lignes présentes sont cohérentes mais non signées.
+  Elles seront annoncées `mixed_legacy_unsigned`; aucune garantie cryptographique rétroactive
+  n'est inventée.
+
+### Validation et rollback
+
+- Test ciblé observé : ligne historique compatible, nouvelle preuve signée, 20 écritures
+  concurrentes sans séquence dupliquée, filtres conversation, limites, URL `javascript:`,
+  identifiants URL et port 8443 refusés, altération détectée, lecture et extension bloquées,
+  ligne historique au schéma hostile refusée, échec Cortex visible et log sans message sensible.
+- Inventaire observé : les 13 JSONL backend sont classifiés et structurés; trois logs
+  techniques, six registres d'évaluation, trois flux métier et un Truth Ledger.
+- L'API expose `/api/knowledge/truth-ledger/integrity`; `/truth-ledger` et
+  `/evidence-summary` retournent l'intégrité et un motif de blocage sans projeter de métriques
+  non fiables.
+- Gate rapide observée : 167/167 étapes, 344 outils, 353 routes, 236 fichiers Python compilés
+  et zéro erreur ESLint; 37 avertissements frontend historiques restent inventoriés.
+- Backend réel redémarré en 2.400.0 avec Ollama connecté; Truth Ledger réel : 65 lignes
+  cohérentes, zéro corruption, zéro preuve chaînée et 65 lignes historiques non signées.
+  Smoke HTTP/Next.js : 28/28 contrats.
+- Validation navigateur réelle de `/forge` : « Truth Ledger cohérent · 0 preuve(s)
+  chaînée(s) · 65 historique(s) non signé(s) » et aucune erreur ni alerte console.
+- Rollback applicatif : `git revert <commit>`. Le nouveau format est additif; les 65 lignes
+  historiques restent compatibles. Une réversion ne supprime aucune nouvelle preuve.

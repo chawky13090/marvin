@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.399.0)
+## 9. État actuel (v2.400.0)
+
+**v2.400 (preuves Truth Ledger)** : les affirmations et leurs preuves utilisent désormais
+`DurableEvidenceStore`. La lecture vérifie la chaîne sous le même verrou que la projection,
+sans fenêtre de concurrence; l'API et Forge bloquent les métriques si le registre est altéré.
+Réponses, sources, citations, outils et contradictions sont bornés. Les URLs doivent être
+HTTP(S), sans identifiants et sur les ports standards. Un échec d'écriture ne disparaît plus :
+le chat affiche `evidence_persisted=false` et le log technique ne reçoit que la classe d'erreur.
+Un validateur de schéma est appliqué sous le même verrou aux lignes historiques et signées :
+un JSON valide mais métier malformé bloque aussi lecture et extension du registre.
 
 **v2.399 (preuves Model Market et Research Swarm)** : observations de routage et runs de
 recherche utilisent `DurableEvidenceStore`, avec séquences et chaîne SHA-256. Une télémétrie

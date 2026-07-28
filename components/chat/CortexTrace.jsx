@@ -14,6 +14,7 @@ export default function CortexTrace({ message }) {
   const privacy = provenance?.privacy_route || contract?.resolved?.privacy;
   const debt = provenance?.truth_ledger?.epistemic_debt;
   const flaggedSources = provenance?.truth_ledger?.source_firewall?.flagged_count || 0;
+  const ledgerPersisted = provenance?.truth_ledger?.evidence_persisted;
 
   return (
     <div style={{ marginLeft: 40, width: 'fit-content', maxWidth: 'calc(100% - 48px)', fontSize: 10, color: 'var(--text-muted)' }}>
@@ -36,6 +37,9 @@ export default function CortexTrace({ message }) {
             {provenance?.evidence_coverage && <span>🔗 {provenance.evidence_coverage === 'cited' ? `${provenance.citations?.length || 0} citation(s)` : provenance.evidence_coverage === 'missing' ? 'preuves manquantes' : provenance.evidence_coverage === 'tool_evidence' ? 'preuves par outils' : 'preuves non demandées'}</span>}
             {debt && <span title="Part des affirmations insuffisamment étayées">Dette de preuve {Math.round((debt.score || 0) * 100)} %</span>}
             {flaggedSources > 0 && <span style={{ color: '#fbbf24' }}>{flaggedSources} source(s) filtrée(s)</span>}
+            {ledgerPersisted === false && (
+              <span style={{ color: '#fb7185' }}>preuve Truth Ledger non persistée</span>
+            )}
           </div>
           {graph.length > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
             {graph.map((node, index) => (

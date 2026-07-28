@@ -17,15 +17,35 @@ async def memory_mesh_view(kind: str | None = Query(default=None, max_length=30)
 
 @router.get("/truth-ledger")
 async def truth_ledger_view(
-    conversation_id: str | None = Query(default=None, max_length=100),
+    conversation_id: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+    ),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
-    return {"records": truth_ledger.list_records(conversation_id=conversation_id, limit=limit)}
+    integrity = truth_ledger.evidence_integrity()
+    return {
+        "records": (
+            truth_ledger.list_records(conversation_id=conversation_id, limit=limit)
+            if integrity["valid"]
+            else []
+        ),
+        "evidence_integrity": integrity,
+        "blocked_reason": None if integrity["valid"] else "truth_ledger_integrity_invalid",
+    }
+
+
+@router.get("/truth-ledger/integrity")
+async def truth_ledger_integrity():
+    return truth_ledger.evidence_integrity()
 
 
 @router.get("/evidence-summary")
 async def evidence_summary(limit: int = Query(default=200, ge=1, le=1000)):
-    records = truth_ledger.list_records(limit=limit)
+    integrity = truth_ledger.evidence_integrity()
+    records = truth_ledger.list_records(limit=limit) if integrity["valid"] else []
     claims = sum(int(item.get("claim_count") or 0) for item in records)
     sourced = sum(int(item.get("sourced_count") or 0) for item in records)
     unsupported = sum(int(item.get("unsupported_count") or 0) for item in records)
@@ -45,6 +65,8 @@ async def evidence_summary(limit: int = Query(default=200, ge=1, le=1000)):
             int((item.get("source_firewall") or {}).get("flagged_count") or 0)
             for item in records
         ),
+        "evidence_integrity": integrity,
+        "blocked_reason": None if integrity["valid"] else "truth_ledger_integrity_invalid",
     }
 
 

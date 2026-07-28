@@ -108,6 +108,15 @@ def run() -> None:
     }
     for module, _filename in structured_domain_streams:
         assert "DurableEvidenceStore" in (ROOT / module).read_text(encoding="utf-8-sig")
+    structured_truth = {
+        key for key, value in declared.items()
+        if value[0] == "truth_ledger" and value[2] == "structured"
+    }
+    assert structured_truth == {
+        ("backend/truth_ledger.py", "truth_ledger.jsonl"),
+    }
+    for module, _filename in structured_truth:
+        assert "DurableEvidenceStore" in (ROOT / module).read_text(encoding="utf-8-sig")
     for phrase in (
         "source de données durable",
         "idempotence",
@@ -122,7 +131,8 @@ def run() -> None:
         "Persistence Inventory OK - "
         f"{len(declared)} JSONL classifiés, {len(structured_logs)} logs et "
         f"{len(structured_evidence)} registres d'évaluation et "
-        f"{len(structured_domain_streams)} flux métier structurés."
+        f"{len(structured_domain_streams)} flux métier et "
+        f"{len(structured_truth)} registre de vérité structurés."
     )
 
 

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import bug_log
 
 AXES = {
     "effort": {"auto", "instant", "standard", "deep", "mission"},
@@ -256,6 +257,7 @@ def provenance(
     urls = list(dict.fromkeys(re.findall(r"https?://[^\s)\]>]+", answer or "")))[:20]
     requested_evidence = compiled["resolved"]["evidence"] in {"web", "primary", "connected"}
     ledger = None
+    ledger_error = None
     if conversation_id and answer.strip():
         try:
             import truth_ledger
@@ -266,7 +268,13 @@ def provenance(
                 evidence_tools=evidence_tools,
                 reviewed=critique or "ai_model_council" in names or "ai_cortex_search" in names or "ai_research_swarm" in names or "ai_adaptive_team" in names or "ai_code_forge" in names,
             )
-        except Exception:
+        except Exception as exc:
+            ledger_error = type(exc).__name__
+            bug_log.log_bug(
+                "truth_ledger_evidence",
+                "Persistance de la preuve de réponse impossible.",
+                context={"error_type": ledger_error},
+            )
             ledger = None
     return {
         "contract": compiled,
@@ -289,7 +297,13 @@ def provenance(
             "unsupported_count": ledger["unsupported_count"],
             "epistemic_debt": ledger.get("epistemic_debt"),
             "source_firewall": ledger.get("source_firewall"),
-        } if ledger else None),
+            "evidence_persisted": True,
+            "sequence": ledger.get("sequence"),
+            "record_hash": ledger.get("record_hash"),
+        } if ledger else {
+            "evidence_persisted": False,
+            "error_type": ledger_error,
+        } if ledger_error else None),
     }
 
 

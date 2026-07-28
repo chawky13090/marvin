@@ -80,6 +80,7 @@ export default function ForgePage() {
     && arenaIntegrity.every(item => item.integrity_level === 'tamper_evident');
   const arenaSigned = arenaIntegrity.reduce((sum, item) => sum + item.signed_records, 0);
   const arenaLegacy = arenaIntegrity.reduce((sum, item) => sum + item.legacy_records, 0);
+  const truthIntegrity = evidence?.evidence_integrity;
 
   async function submitArena(event) {
     event.preventDefault();
@@ -186,6 +187,15 @@ export default function ForgePage() {
           <Metric label="Couverture preuves" value={percent(evidence?.claim_coverage)} color="#fbbf24" />
           <Metric label="Dette épistémique" value={percent(evidence?.average_epistemic_debt)} color="#fb7185" />
         </div>
+        {truthIntegrity && (
+          <div style={{ color: truthIntegrity.valid ? truthIntegrity.legacy_records ? '#fbbf24' : '#34d399' : '#fb7185', fontSize: 11, margin: '-10px 0 18px' }}>
+            {truthIntegrity.valid
+              ? truthIntegrity.legacy_records
+                ? `Truth Ledger cohérent · ${truthIntegrity.signed_records} preuve(s) chaînée(s) · ${truthIntegrity.legacy_records} historique(s) non signé(s)`
+                : `Truth Ledger vérifiable · ${truthIntegrity.signed_records} preuve(s) chaînée(s)`
+              : 'Truth Ledger compromis · métriques de preuve bloquées jusqu’à réparation'}
+          </div>
+        )}
 
         <div style={{ border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', background: 'rgba(255,255,255,.02)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px,2fr) 85px repeat(4,80px)', gap: 8, padding: '10px 14px', color: 'var(--text-muted)', fontSize: 11, borderBottom: '1px solid var(--border)' }}>

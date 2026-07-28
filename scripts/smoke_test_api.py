@@ -351,6 +351,7 @@ def forge_evidence_contracts() -> None:
     duels = fetch_json(f"{BACKEND}/api/forge/arena/matches/stats")
     integrity = fetch_json(f"{BACKEND}/api/forge/arena/integrity")
     evidence = fetch_json(f"{BACKEND}/api/knowledge/evidence-summary?limit=1")
+    truth_integrity = fetch_json(f"{BACKEND}/api/knowledge/truth-ledger/integrity")
     assert isinstance(scenarios.get("scenarios"), list)
     assert isinstance(leaderboard.get("systems"), list)
     assert isinstance(submissions.get("submissions"), list)
@@ -362,6 +363,8 @@ def forge_evidence_contracts() -> None:
     )
     assert isinstance(evidence.get("records"), int)
     assert "average_epistemic_debt" in evidence
+    assert evidence.get("evidence_integrity", {}).get("valid") is True
+    assert truth_integrity.get("valid") is True
 
 
 def coding_workspace_contracts() -> None:

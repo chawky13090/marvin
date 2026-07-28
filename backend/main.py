@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.400 — Truth Ledger chaîné; limites, URLs sûres et échec de preuve visible
 # v2.399 — Model Market et Research Swarm chaînés; transport Cloud borné et erreurs expurgées
 # v2.398 — Frontier Arena chaînée; votes uniques et classements fail-closed
 # v2.397 — Engineering Radar chaîné; transport officiel borné et compensable

@@ -49,7 +49,7 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `frontier_arena.py` — `frontier_arena_votes.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
 | `model_market.py` — `model_market_observations.jsonl` | evaluation_ledger | Model Market | archivage explicite | structuré |
 | `research_swarm.py` — `research_swarm_runs.jsonl` | evaluation_ledger | Research Swarm | archivage explicite | structuré |
-| `truth_ledger.py` — `truth_ledger.jsonl` | truth_ledger | Memory Mesh | contrat mémoire | à consolider |
+| `truth_ledger.py` — `truth_ledger.jsonl` | truth_ledger | Memory Mesh | contrat mémoire | structuré |
 
 <!-- persistence-inventory
 backend/audit.py|audit.jsonl|technical_log|90d|structured
@@ -64,7 +64,7 @@ backend/frontier_arena.py|frontier_arena_matches.jsonl|evaluation_ledger|explici
 backend/frontier_arena.py|frontier_arena_votes.jsonl|evaluation_ledger|explicit_archive|structured
 backend/model_market.py|model_market_observations.jsonl|evaluation_ledger|explicit_archive|structured
 backend/research_swarm.py|research_swarm_runs.jsonl|evaluation_ledger|explicit_archive|structured
-backend/truth_ledger.py|truth_ledger.jsonl|truth_ledger|memory_contract|pending
+backend/truth_ledger.py|truth_ledger.jsonl|truth_ledger|memory_contract|structured
 -->
 
 ## 3. Invariants de migration

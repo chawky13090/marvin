@@ -136,13 +136,40 @@ def _interprocess_lock(path: Path, timeout_seconds: float = 5.0) -> Iterator[Non
 class DurableEvidenceStore:
     """Préserve les preuves sans rétention automatique et détecte les altérations."""
 
-    def __init__(self, path: str | Path, *, stream_name: str) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        stream_name: str,
+        record_validator: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
         self.path = Path(path).resolve()
         self.stream_name = str(stream_name).strip()[:120]
         if not self.stream_name:
             raise ValueError("Le nom du registre de preuves est requis.")
+        self._record_validator = record_validator
         self._thread_lock = _path_lock(self.path)
         self._lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+
+    def _integrity_unlocked(
+        self,
+        rows: list[dict[str, Any]],
+        corrupt: int,
+    ) -> dict[str, Any]:
+        report = _integrity_report(self.stream_name, rows, corrupt)
+        if self._record_validator is None:
+            return report
+        schema_errors = []
+        for index, row in enumerate(rows, start=1):
+            try:
+                self._record_validator(row)
+            except Exception:
+                schema_errors.append({"sequence": index, "reason": "record_schema"})
+        if schema_errors:
+            report["valid"] = False
+            report["integrity_level"] = "invalid"
+            report["errors"] = (report["errors"] + schema_errors)[:50]
+        return report
 
     def _repair_partial_tail_unlocked(self) -> Path | None:
         if not self.path.exists() or self.path.stat().st_size == 0:
@@ -228,7 +255,7 @@ class DurableEvidenceStore:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._repair_partial_tail_unlocked()
             rows, corrupt = self._rows_unlocked()
-            if not _integrity_report(self.stream_name, rows, corrupt)["valid"]:
+            if not self._integrity_unlocked(rows, corrupt)["valid"]:
                 raise RuntimeError(
                     "L'intégrité du registre est compromise; ajout refusé avant réparation."
                 )
@@ -249,7 +276,7 @@ class DurableEvidenceStore:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._repair_partial_tail_unlocked()
             rows, corrupt = self._rows_unlocked()
-            if not _integrity_report(self.stream_name, rows, corrupt)["valid"]:
+            if not self._integrity_unlocked(rows, corrupt)["valid"]:
                 raise RuntimeError(
                     "L'intégrité du registre est compromise; ajout refusé avant réparation."
                 )
@@ -281,6 +308,29 @@ class DurableEvidenceStore:
                         rows.append(value)
             return list(reversed(rows))
 
+    def recent_verified(
+        self,
+        limit: int = 200,
+        *,
+        predicate: Callable[[dict[str, Any]], bool] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Vérifie puis projette les lignes sous le même verrou, sans fenêtre TOCTOU."""
+        bounded = min(max(int(limit), 0), 100_000)
+        if bounded == 0:
+            return []
+        with self._thread_lock, _interprocess_lock(self._lock_path):
+            rows, corrupt = self._rows_unlocked()
+            report = self._integrity_unlocked(rows, corrupt)
+            if not report["valid"]:
+                raise RuntimeError(
+                    "L'intégrité du registre est compromise; lecture fiable impossible."
+                )
+            selected: deque[dict[str, Any]] = deque(maxlen=bounded)
+            for row in rows:
+                if predicate is None or predicate(row):
+                    selected.append(row)
+            return list(reversed(selected))
+
     def page(self, *, after: int = 0, limit: int = 500) -> dict[str, Any]:
         """Lit une page chronologique avec des curseurs de ligne stables."""
         start = max(0, int(after))
@@ -308,4 +358,4 @@ class DurableEvidenceStore:
     def verify(self) -> dict[str, Any]:
         with self._thread_lock, _interprocess_lock(self._lock_path):
             rows, corrupt = self._rows_unlocked()
-        return _integrity_report(self.stream_name, rows, corrupt)
+        return self._integrity_unlocked(rows, corrupt)
