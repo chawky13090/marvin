@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.375.0)
+## 9. État actuel (v2.376.0)
+
+**v2.376 (recherche unifiée)** : `unified_search` rejoint
+`tool_domains/unified_search.py`. Les neuf sources sont injectables, les scopes strictement
+validés et `["all"]` couvre réellement toutes les sources. Les lectures SQLite quittent la
+boucle asyncio; concurrence, limite et délai sont bornés. Chaque source expose statut,
+latence, nombre de résultats et erreur éventuelle au lieu de transformer les pannes e-mail
+ou Web en résultats vides.
 
 **v2.375 (auto-diagnostic)** : `system_self_test` rejoint
 `tool_domains/system_self_test.py`. Son catalogue de sondes en lecture seule est explicite,

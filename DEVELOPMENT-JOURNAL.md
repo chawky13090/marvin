@@ -7431,3 +7431,47 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - aucun schéma, réglage ou donnée utilisateur n'est modifié par la tranche ou ses tests ;
 - rollback du code : réversion atomique du commit v2.375 après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
+
+## 2026-07-28 — v2.376.0 — Recherche unifiée traçable et non bloquante
+
+### Demande et constats
+
+- poursuivre la consolidation des outils avec contrats vérifiables ;
+- `unified_search` conservait 94 lignes de fédération et neuf dépendances dans `tools.py` ;
+- `scope=["all"]`, format produit par le schéma public, était filtré jusqu'à zéro source ;
+- les scopes inconnus disparaissaient silencieusement et un `limit` invalide pouvait lever ;
+- notes, tâches et événements interrogeaient SQLite dans la boucle asyncio ;
+- les erreurs e-mail et Web étaient transformées en listes vides sans provenance.
+
+### Solution
+
+- nouveau `tool_domains/unified_search.py` avec neuf frontières injectées ;
+- validation de la requête, des scopes, de `account` et d'une limite comprise entre 1 et 15 ;
+- `all`, chaîne ou liste, couvre les neuf sources avec déduplication et ordre déterministe ;
+- lectures SQLite exécutées via `asyncio.to_thread` ;
+- quatre sources concurrentes maximum et attente individuelle de 45 secondes ;
+- statut, durée, quantité et erreur par source; erreurs partielles conservées sans perdre les
+  résultats des autres sources ;
+- textes, extraits et volumes projetés restent bornés.
+
+### Validation ciblée observée
+
+- compilation, façade et architecture : réussies, registre 344/344 ;
+- défaut `["all"]` corrigé et neuf sources réellement appelées ;
+- scope inconnu, limite invalide et requête de plus de 1 000 caractères refusés ;
+- erreur d'index et timeout injecté projetés dans `source_status` et `errors` ;
+- exécution réelle en lecture seule sur notes et tâches : deux sources réussies, latences
+  respectives de 6 ms et 4 ms, aucun résultat et aucune erreur ;
+- architecture finale : Marvin 2.376.0, 344 outils, 346 routes, harness 344/344 et
+  65 restrictions ;
+- gate rapide final : 148/148 étapes ;
+- backend redémarré : `/api/health` expose 2.376.0, Ollama disponible et 15 workers ;
+- route HTTP réelle `/api/search/unified` : notes et tâches réussies en 4 ms chacune, aucune
+  erreur et politique projetée ;
+- frontend Turbopack conservé, smoke test réel : 28/28 contrats.
+
+### Rollback
+
+- aucun schéma, réglage ou contenu utilisateur n'est modifié ;
+- rollback du code : réversion atomique du commit v2.376 après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.

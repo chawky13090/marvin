@@ -282,6 +282,10 @@ L'auto-diagnostic rejoint `tool_domains/system_self_test.py`. Le catalogue sûr 
 donnée explicite, les appels sont concurrents avec une borne de quatre, chaque attente possède
 un timeout et le résultat distingue absence, erreur métier, crash et timeout. Le mode sans Web
 exclut toutes les sondes qui exigent réellement Internet.
+La recherche fédérée rejoint `tool_domains/unified_search.py`. Les neuf sources sont injectées,
+les scopes et limites invalides sont refusés, `["all"]` est corrigé et les lectures SQLite
+quittent la boucle asyncio. Une provenance par source expose durée, quantité, erreur ou timeout
+avec concurrence et volumes bornés.
 
 ## 4. Validation obligatoire par tranche
 

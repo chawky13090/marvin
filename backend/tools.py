@@ -20,6 +20,7 @@ from typing import Any
 import psutil
 import database as db
 import cloud_routing as cloud_routing_runtime
+import learning
 import model_council as model_council_runtime
 import python_execution as python_execution_runtime
 import mission_os as mission_os_runtime
@@ -76,6 +77,7 @@ from tool_domains import git_repository as git_repository_domain
 from tool_domains import charts as charts_domain
 from tool_domains import long_tasks as long_tasks_domain
 from tool_domains import system_self_test as system_self_test_domain
+from tool_domains import unified_search as unified_search_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -2306,106 +2308,6 @@ async def execute_calendar_sync(args: dict) -> dict:
 
 
 
-_UNIFIED_SOURCES_DEFAULT = ["documents", "files_name", "files_content", "notes", "tasks", "events", "memory"]
-_UNIFIED_SOURCES_ALL = _UNIFIED_SOURCES_DEFAULT + ["emails", "web"]
-
-
-async def execute_unified_search(args: dict) -> dict:
-    """RECHERCHE UNIFIÉE : cherche le même terme PARTOUT à la fois — documents indexés,
-    fichiers du PC (nom + contenu), notes, tâches, agenda, mémoire, (emails et web en option).
-    Renvoie les résultats groupés par source. Idéal pour « retrouve tout ce qui concerne X »."""
-    query = (args.get("query") or "").strip()
-    if not query:
-        return {"error": "Indique ce que tu cherches (paramètre 'query')."}
-    scope = args.get("scope") or _UNIFIED_SOURCES_DEFAULT
-    if isinstance(scope, str):
-        scope = _UNIFIED_SOURCES_ALL if scope == "all" else [scope]
-    scope = [s for s in scope if s in _UNIFIED_SOURCES_ALL]
-    per = max(1, min(int(args.get("limit", 5)), 15))
-    q_low = query.lower()
-
-    async def _documents():
-        import vector_store as vs
-        hits = await vs.search(query, collections=["documents"], limit=per)
-        return [{"name": h["metadata"].get("name", "?"), "snippet": (h.get("text") or "")[:200],
-                 "path": h["metadata"].get("path"), "score": round(h.get("score", 0), 3)} for h in hits]
-
-    async def _files_name():
-        r = await execute_system_search({"query": query, "max_results": per})
-        return [{"name": x.get("name"), "path": x.get("path"), "is_dir": x.get("is_dir"),
-                 "size_kb": x.get("size_kb")} for x in (r.get("results") or [])][:per]
-
-    async def _files_content():
-        r = await execute_system_search_content({"query": query, "max_results": per})
-        return [{"name": x.get("name"), "path": x.get("path"), "snippet": x.get("snippet")}
-                for x in (r.get("results") or [])][:per]
-
-    async def _notes():
-        rows = db.list_notes(search=query, limit=per)
-        return [{"id": n.get("id"), "title": n.get("title"), "snippet": (n.get("content") or "")[:160]} for n in rows]
-
-    async def _tasks():
-        out = []
-        for t in db.list_tasks(limit=200):
-            hay = (str(t.get("title", "")) + " " + str(t.get("description") or "")).lower()
-            if q_low in hay:
-                out.append({"id": t.get("id"), "title": t.get("title"), "status": t.get("status"),
-                            "priority": t.get("priority"), "due_date": t.get("due_date")})
-            if len(out) >= per:
-                break
-        return out
-
-    async def _events():
-        out = []
-        for e in db.list_events(limit=400):
-            hay = (str(e.get("title", "")) + " " + str(e.get("description") or "") + " " + str(e.get("location") or "")).lower()
-            if q_low in hay:
-                out.append({"id": e.get("id"), "title": e.get("title"), "start_at": e.get("start_at"),
-                            "location": e.get("location"), "source": e.get("source")})
-            if len(out) >= per:
-                break
-        return out
-
-    async def _memory():
-        import learning
-        rec = await learning.recall(query, max_facts=per, max_qa=3)
-        items = [{"type": "fait", "text": f} for f in rec.get("facts", [])]
-        items += [{"type": "q/r", "text": f"{qa.get('q', '')} → {qa.get('a', '')}"} for qa in rec.get("qa", [])]
-        return items[:per]
-
-    async def _emails():
-        r = await execute_email_search({"query": query, "account": args.get("account")})
-        if r.get("error"):
-            return []
-        return [{"subject": m.get("subject"), "from": m.get("from") or m.get("from_addr"),
-                 "date": m.get("date"), "uid": m.get("uid")} for m in (r.get("emails") or [])][:per]
-
-    async def _web():
-        try:
-            r = await execute_web_search({"query": query})
-        except Exception:
-            return []
-        return [{"title": x.get("title"), "url": x.get("url"), "snippet": (x.get("snippet") or x.get("description") or "")[:200]}
-                for x in (r.get("results") or [])][:per]
-
-    funcs = {"documents": _documents, "files_name": _files_name, "files_content": _files_content,
-             "notes": _notes, "tasks": _tasks, "events": _events, "memory": _memory,
-             "emails": _emails, "web": _web}
-    active = [s for s in scope if s in funcs]
-    gathered = await asyncio.gather(*[funcs[s]() for s in active], return_exceptions=True)
-    results, errors = {}, {}
-    for s, g in zip(active, gathered):
-        if isinstance(g, Exception):
-            results[s] = []
-            errors[s] = str(g)[:120]
-        else:
-            results[s] = g
-    total = sum(len(v) for v in results.values())
-    return {"success": True, "query": query, "total": total, "results": results,
-            "errors": errors or None,
-            "message": f"🔎 {total} résultat(s) pour « {query} » dans {len([s for s in active if results.get(s)])} source(s)."}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION NOTIFICATIONS EXTERNES — Telegram (recevoir les alertes sur le téléphone)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3683,6 +3585,19 @@ execute_web_deep_research = web_domain.execute_web_deep_research
 execute_web_research = web_domain.execute_web_research
 execute_web_search = web_domain.execute_web_search
 execute_weather = weather_domain.weather
+
+unified_search_domain.configure(
+    vector_search=vector_store_runtime.search,
+    system_search=execute_system_search,
+    system_search_content=execute_system_search_content,
+    list_notes=db.list_notes,
+    list_tasks=db.list_tasks,
+    list_events=db.list_events,
+    memory_recall=learning.recall,
+    email_search=execute_email_search,
+    web_search=execute_web_search,
+)
+execute_unified_search = unified_search_domain.search
 
 pc_diagnostics_domain.configure(
     run_powershell=execute_pc_run_powershell, web_search=execute_web_search

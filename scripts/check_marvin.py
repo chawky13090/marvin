@@ -146,6 +146,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Nettoyage système borné", (python, "scripts/test_tool_domain_system_cleanup.py")),
         Stage("Tâches longues compensables", (python, "scripts/test_tool_domain_long_tasks.py")),
         Stage("Auto-diagnostic borné", (python, "scripts/test_tool_domain_system_self_test.py")),
+        Stage("Recherche unifiée traçable", (python, "scripts/test_tool_domain_unified_search.py")),
         Stage("Domaine de contrôle PC", (python, "scripts/test_tool_domain_pc_control.py")),
         Stage("Domaine diagnostic PC", (python, "scripts/test_tool_domain_pc_diagnostics.py")),
         Stage("Documentation d'intervention", (python, "scripts/test_tool_domain_intervention_docs.py")),
