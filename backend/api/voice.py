@@ -1,6 +1,5 @@
 """Transcription Whisper locale et synthèse vocale Edge-TTS."""
 
-import asyncio
 import os
 import re
 import tempfile
@@ -10,11 +9,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 import database as db
+import voice_transcription
 
 
 router = APIRouter(tags=["voice"])
-_whisper_model = None
-_whisper_lock = asyncio.Lock()
 
 
 def _whisper_model_size() -> str:
@@ -27,49 +25,12 @@ def _whisper_model_size() -> str:
     return os.getenv("WHISPER_MODEL", "small")
 
 
-async def _get_whisper():
-    global _whisper_model
-    async with _whisper_lock:
-        if _whisper_model is None:
-            def load():
-                from faster_whisper import WhisperModel
-
-                threads = min(8, os.cpu_count() or 4)
-                try:
-                    return WhisperModel(
-                        _whisper_model_size(),
-                        device="cpu",
-                        compute_type="int8",
-                        cpu_threads=threads,
-                        num_workers=1,
-                    )
-                except Exception:
-                    return WhisperModel(
-                        "base",
-                        device="cpu",
-                        compute_type="int8",
-                        cpu_threads=threads,
-                        num_workers=1,
-                    )
-
-            _whisper_model = await asyncio.get_running_loop().run_in_executor(None, load)
-    return _whisper_model
-
-
-async def prewarm_whisper():
-    try:
-        await asyncio.sleep(2)
-        await _get_whisper()
-    except Exception:
-        pass
+voice_transcription.configure(model_provider=_whisper_model_size)
+prewarm_whisper = voice_transcription.prewarm
 
 
 @router.post("/api/voice/transcribe")
 async def voice_transcribe(file: UploadFile = File(...), language: str = Form("fr")):
-    audio_bytes = await file.read()
-    if len(audio_bytes) < 1000:
-        raise HTTPException(status_code=400, detail="Fichier audio trop court ou vide")
-
     extension = ".webm"
     if file.content_type:
         content_type = file.content_type.lower()
@@ -87,35 +48,25 @@ async def voice_transcribe(file: UploadFile = File(...), language: str = Form("f
             extension = detected
 
     temporary_path = None
+    bytes_written = 0
     try:
         with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temporary:
-            temporary.write(audio_bytes)
             temporary_path = temporary.name
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                bytes_written += len(chunk)
+                if bytes_written > voice_transcription.MAX_AUDIO_BYTES:
+                    raise HTTPException(status_code=413, detail="Fichier audio supérieur à 512 Mio")
+                temporary.write(chunk)
 
-        model = await _get_whisper()
-        requested_language = (language or "fr").strip().lower()
-        language_argument = None if requested_language in ("auto", "", "detect") else requested_language
-        french_prompt = (
-            "Transcription en français, avec les accents et la ponctuation. "
-            "L'utilisateur parle à son assistant Marvin."
-        )
-
-        def transcribe():
-            segments, info = model.transcribe(
-                temporary_path,
-                beam_size=5,
-                best_of=5,
-                language=language_argument,
-                vad_filter=True,
-                condition_on_previous_text=False,
-                initial_prompt=french_prompt if language_argument in (None, "fr") else None,
-                no_speech_threshold=0.6,
-                temperature=0.0,
-            )
-            return " ".join(segment.text.strip() for segment in segments).strip(), info.language
-
-        text, detected_language = await asyncio.get_running_loop().run_in_executor(None, transcribe)
-        return {"success": True, "text": text, "language": detected_language}
+        result = await voice_transcription.transcribe_file(temporary_path, language=language)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Transcription échouée"))
+        return result
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Transcription échouée : {error}")
     finally:

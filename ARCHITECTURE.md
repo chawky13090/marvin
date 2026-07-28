@@ -293,6 +293,10 @@ pas les capacités de la boucle Runner outillée.
 applique vision puis Tesseract selon une méthode validée et expose modèle, Cloud et tentatives.
 Pixels, prompt et texte sont bornés; le temporaire est toujours supprimé et une capture
 conservée est publiée atomiquement avec rollback.
+97. la transcription locale : `voice_transcription.py` fournit à l'API et à l'outil agentique
+un cache Whisper LRU commun limité à deux modèles, un verrou de chargement et un verrou
+d'inférence par modèle. Formats, taille, langue, modèle et texte sont bornés; l'upload HTTP
+est écrit par blocs et le repli vers `base` reste explicitement visible.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

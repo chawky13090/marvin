@@ -294,6 +294,10 @@ L'OCR écran rejoint `tool_domains/screen_ocr.py`. Capture, région, pixels, pro
 sont bornés; les opérations bloquantes quittent la boucle asyncio. Le routage vision conserve
 le contrat local/Ultra Cloud et devient visible dans le résultat. Les échecs de vision et de
 Tesseract ne sont plus masqués, et temporaire, sauvegarde atomique et rollback sont testés.
+La transcription Whisper rejoint `voice_transcription.py`. L'API vocale et le registre
+d'outils ne chargent plus deux copies concurrentes du modèle. Cache LRU, chargement,
+inférences, limites et validation sont mutualisés; le streaming d'upload empêche une allocation
+non bornée et chaque repli de modèle est observable.
 
 ## 4. Validation obligatoire par tranche
 

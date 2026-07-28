@@ -7432,6 +7432,30 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback du code : réversion atomique du commit v2.375 après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
 
+## 2026-07-28 — v2.379.0 — transcription Whisper partagée et bornée
+
+### Constat
+
+- l'API vocale et l'outil agentique maintenaient deux caches Whisper indépendants ;
+- les paramètres de chargement et de transcription divergeaient ;
+- l'upload HTTP était lu intégralement en mémoire sans plafond explicite ;
+- le repli silencieux vers `base` ne permettait pas d'établir le modèle réellement utilisé.
+
+### Solution
+
+- nouveau service `backend/voice_transcription.py`, partagé par les deux façades ;
+- cache LRU de deux modèles, chargement sérialisé et inférence sérialisée par modèle ;
+- listes blanches pour modèles, langues et formats, fichier limité à 512 Mio et texte borné ;
+- upload HTTP écrit par blocs de 1 Mio avec suppression systématique du temporaire ;
+- résultat structuré avec modèle demandé/utilisé, repli éventuel et provenance locale.
+
+### Validation et rollback
+
+- test déterministe sans réseau : cache, façade, repli, éviction, limites et préchauffage ;
+- aucun schéma ni contenu utilisateur modifié ;
+- rollback : vérifier le patch inverse indexé, réversion atomique du commit v2.379, redémarrage
+  du backend, puis test ciblé, gate rapide, health et smoke.
+
 ## 2026-07-28 — v2.378.0 — OCR écran borné et provenance visible
 
 ### Demande et constats

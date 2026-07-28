@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.378.0)
+## 9. État actuel (v2.379.0)
+
+**v2.379 (transcription Whisper)** : l'API vocale et l'outil `voice_transcribe` utilisent
+désormais `voice_transcription.py`. Le cache LRU commun est limité à deux modèles, les
+chargements et inférences sont verrouillés, et modèles, langues, formats, tailles et sortie
+sont bornés. L'upload HTTP est traité par blocs; le repli vers `base` et la provenance locale
+restent visibles.
 
 **v2.378 (OCR écran)** : `screen_ocr` rejoint `tool_domains/screen_ocr.py`. Région,
 méthode, langue, prompt, pixels et texte sont bornés; capture, redimensionnement, Tesseract

@@ -26,6 +26,7 @@ import parallel_reasoning as parallel_reasoning_runtime
 import python_execution as python_execution_runtime
 import mission_os as mission_os_runtime
 import vector_store as vector_store_runtime
+import voice_transcription as voice_transcription_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -2511,49 +2512,30 @@ async def execute_code_workspace_control(args: dict) -> dict:
 # SECTION VOICE — Transcription audio (faster-whisper)
 # ══════════════════════════════════════════════════════════════════════════════
 
-_whisper_model_cache: dict = {}
+def _configured_whisper_model() -> str:
+    try:
+        configured = db.get_setting("whisper_model")
+        if configured and str(configured).strip():
+            return str(configured).strip()
+    except Exception:
+        pass
+    return os.getenv("WHISPER_MODEL", "small")
+
+
+voice_transcription_runtime.configure(model_provider=_configured_whisper_model)
+
 
 async def execute_voice_transcribe(args: dict) -> dict:
     """Transcrit un fichier audio local en texte via Whisper (faster-whisper)."""
-    audio_path = args.get("audio_path", "").strip()
-    model_size = args.get("model", "small")   # tiny, base, small, medium, large-v3
-    language = args.get("language", None)    # None = détection auto
+    audio_path = str(args.get("audio_path") or "").strip()
     if not audio_path:
-        return {"error": "Paramètre 'audio_path' requis."}
+        return {"success": False, "error": "Paramètre 'audio_path' requis."}
     resolved = _resolve_path(audio_path)
-    if not os.path.exists(resolved):
-        return {"error": f"Fichier introuvable : {resolved}"}
-
-    def _transcribe():
-        global _whisper_model_cache
-        if model_size not in _whisper_model_cache:
-            try:
-                from faster_whisper import WhisperModel
-            except ImportError:
-                raise RuntimeError("faster-whisper non installé. Exécutez : pip install faster-whisper")
-            _whisper_model_cache[model_size] = WhisperModel(model_size, device="cpu", compute_type="int8")
-        model = _whisper_model_cache[model_size]
-        segments, info = model.transcribe(
-            resolved,
-            beam_size=5,
-            language=language,
-            vad_filter=True,
-        )
-        text = " ".join(seg.text.strip() for seg in segments).strip()
-        return text, info.language
-
-    try:
-        loop = asyncio.get_running_loop()
-        text, lang = await loop.run_in_executor(None, _transcribe)
-        return {
-            "success": True,
-            "audio_file": resolved,
-            "text": text,
-            "language": lang,
-            "char_count": len(text),
-        }
-    except Exception as e:
-        return {"error": f"Transcription échouée : {e}"}
+    return await voice_transcription_runtime.transcribe_file(
+        resolved,
+        model_name=args.get("model"),
+        language=args.get("language"),
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
