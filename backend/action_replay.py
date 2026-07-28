@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -12,6 +13,7 @@ from db_connection import db
 
 
 _PROCESS_TOKEN = uuid.uuid4().hex
+_LOGGER = logging.getLogger(__name__)
 _ACTION_PARTS = frozenset({
     "apply", "clean", "convert", "copy", "create", "delete", "execute", "fill",
     "generate", "install", "kill", "mark", "merge", "move", "protect", "remove",
@@ -171,12 +173,19 @@ async def execute_once(
     except Exception as exc:
         # L'action a deja eu lieu : ne jamais masquer son resultat ni tenter un second
         # passage parce que la persistance du recu a echoue apres coup.
+        incident = uuid.uuid4().hex
+        _LOGGER.warning(
+            "action_receipt_persistence_failure error_type=%s incident=%s",
+            type(exc).__name__,
+            incident,
+        )
         return _with_replay(
             result,
             reused=False,
             state="receipt_error",
             key=key,
             receipt_persisted=False,
-            warning=str(exc)[:200],
+            warning=f"Le reçu n'a pas pu être persisté. Incident : {incident}.",
+            incident=incident,
         )
     return _with_replay(result, reused=False, state="completed", key=key, receipt_persisted=True)

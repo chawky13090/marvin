@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 import audit
@@ -203,6 +203,19 @@ async def _execute_through_gateway(
     )
 
 
+def _tool_outcome_response(outcome: tool_gateway.ToolGatewayResult):
+    payload: dict[str, Any] = {"result": outcome.result}
+    observation_errors = tuple(getattr(outcome, "observation_errors", ()))
+    if observation_errors:
+        payload["observability"] = {
+            "status": "degraded",
+            "errors": list(observation_errors),
+        }
+    if outcome.status_code != 200:
+        return JSONResponse(status_code=outcome.status_code, content=payload)
+    return payload
+
+
 @router.post("/api/tools")
 async def execute_tool_endpoint(request: ToolExecuteRequest):
     outcome = await _execute_through_gateway(
@@ -210,9 +223,7 @@ async def execute_tool_endpoint(request: ToolExecuteRequest):
         source="ui",
         confirmed_by_ui=True,
     )
-    if outcome.status_code == 404:
-        raise HTTPException(status_code=404, detail=outcome.result["error"])
-    return {"result": outcome.result}
+    return _tool_outcome_response(outcome)
 
 
 @router.get("/api/tools/list")
@@ -236,9 +247,7 @@ async def execute_tool_mcp(request: ToolExecuteRequest):
         source="mcp",
         confirmed_by_ui=False,
     )
-    if outcome.status_code == 404:
-        raise HTTPException(status_code=404, detail=outcome.result["error"])
-    return {"result": outcome.result}
+    return _tool_outcome_response(outcome)
 
 
 @router.get("/api/mcp/config")

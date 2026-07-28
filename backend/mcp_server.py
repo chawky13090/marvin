@@ -37,8 +37,10 @@ Prérequis : le backend Marvin (uvicorn main:app, port 8005) doit déjà tourner
 """
 import os
 import json
+import logging
 import sys
 import time
+import uuid
 import anyio
 import httpx
 import mcp.types as types
@@ -46,6 +48,18 @@ from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
 BACKEND_URL = os.environ.get("MARVIN_BACKEND_URL", "http://127.0.0.1:8005")
+_LOGGER = logging.getLogger(__name__)
+
+
+def _incident(error: Exception, operation: str) -> str:
+    incident = uuid.uuid4().hex
+    _LOGGER.warning(
+        "mcp_bridge_failure operation=%s error_type=%s incident=%s",
+        operation,
+        type(error).__name__,
+        incident,
+    )
+    return incident
 
 server = Server("marvin", version="1.0.0", instructions=(
     "Marvin — assistant IA local pour technicien informatique. Expose les outils "
@@ -86,12 +100,16 @@ async def _fetch_tools() -> list[types.Tool]:
 async def handle_list_tools() -> list[types.Tool]:
     try:
         return await _fetch_tools()
-    except Exception as e:
+    except Exception as error:
         # Backend Marvin injoignable — remonter un catalogue vide plutôt que
         # planter le serveur MCP (le client affichera juste "aucun outil").
+        incident = _incident(error, "list_tools")
         return [types.Tool(
             name="marvin_backend_unreachable",
-            description=f"Backend Marvin injoignable sur {BACKEND_URL} ({e}). Lancez start.bat puis reconnectez ce serveur MCP.",
+            description=(
+                "Backend Marvin injoignable. Lancez start.bat puis reconnectez "
+                f"ce serveur MCP. Incident : {incident}."
+            ),
             inputSchema={"type": "object", "properties": {}},
         )]
 
@@ -108,7 +126,12 @@ async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent
         if r.status_code == 404:
             return [types.TextContent(type="text", text=f"Outil « {name} » introuvable côté Marvin.")]
         r.raise_for_status()
-        result = r.json().get("result", {})
+        payload = r.json()
+        result = payload.get("result", {})
+        observability = payload.get("observability")
+        if isinstance(result, dict) and isinstance(observability, dict):
+            result = dict(result)
+            result["_observability"] = observability
         import json as _json
         return [types.TextContent(type="text", text=_json.dumps(result, ensure_ascii=False, default=str))]
     except httpx.ConnectError:
@@ -116,8 +139,12 @@ async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent
             f"❌ Impossible de joindre le backend Marvin sur {BACKEND_URL}. "
             f"Lancez start.bat (ou uvicorn main:app --port 8005) puis réessayez."
         ))]
-    except Exception as e:
-        return [types.TextContent(type="text", text=f"❌ Erreur : {e}")]
+    except Exception as error:
+        incident = _incident(error, "call_tool")
+        return [types.TextContent(
+            type="text",
+            text=f"Erreur interne du pont MCP. Incident : {incident}.",
+        )]
 
 
 async def main():

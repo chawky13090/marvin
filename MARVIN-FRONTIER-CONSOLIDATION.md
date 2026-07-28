@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.428.0
+Version courante auditée : 2.429.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -457,6 +457,9 @@ condensat du request ID. La panne du logger ne peut plus laisser le tour en cour
 En v2.428.0, la même règle s'applique aux événements déjà formés par le transport Ollama :
 corps HTTP distant, exception, traceback, endpoint et modèle ne sont jamais projetés dans le
 chat. Catégorie opérationnelle, code HTTP sûr et incident opaque préservent le diagnostic.
+En v2.429.0, la frontière outils étend ce contrat aux exécuteurs, reçus idempotents et pont
+MCP. Les pannes d'observation ne sont plus silencieuses : elles accompagnent le résultat sous
+une projection bornée et sans donnée métier. Les 344 schémas et exécuteurs restent identiques.
 
 ## 10. Preuves minimales par grande capacité
 

@@ -34,6 +34,7 @@ persistances, ses privilèges, son exposition réseau, ses secrets, ses logs et 
 | SEC-015 | Élevée | VERIFIED | Dépendances frontend | La v2.426 met Next.js à niveau de 16.2.6 vers 16.2.12 pour les correctifs App Router/Turbopack et force `sharp` 0.35.3 afin de retirer les versions libvips vulnérables. `npm audit --omit=dev` retourne zéro vulnérabilité. Le build Turbopack, les contrats frontend, l'installateur et les parcours live empêchent une promotion non testée. |
 | SEC-016 | Élevée | VERIFIED | Erreurs SSE durables | La v2.427 supprime le texte brut des exceptions du flux navigateur et de SQLite. Un incident opaque est retourné; seuls classe d'erreur, incident et condensat de requête rejoignent le journal technique. Les tests couvrent secret simulé, persistance, panne du logger et statut terminal invalide. |
 | SEC-017 | Élevée | VERIFIED | Transport Ollama | La v2.428 empêche les erreurs déjà converties en événements SSE de contourner SEC-016. Corps HTTP, message brut, traceback, URL et modèle sont supprimés de la projection publique; catégories, statut HTTP sûr et incident opaque restent disponibles. |
+| SEC-018 | Élevée | VERIFIED | Exécution des outils et MCP | La v2.429 remplace message, arguments et traceback d'une exception d'outil par un incident opaque et des métadonnées de forme. Les pannes de reçu, normalisation, exécution et audit sont expurgées et explicitement propagées. Le pont MCP masque ses exceptions et possède un test dédié dans le gate. |
 
 ## Critère de fermeture
 

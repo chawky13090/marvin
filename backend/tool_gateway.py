@@ -34,6 +34,7 @@ class ToolGatewayResult:
     result: Any
     executed: bool
     status_code: int = 200
+    observation_errors: tuple[str, ...] = ()
 
 
 def coverage_report(
@@ -121,10 +122,11 @@ async def execute_tool(
         registry=registry,
     )
     duration_ms = max(0, int((time.monotonic() - started) * 1000))
+    observation_errors: list[str] = []
     try:
         result = normalizer(request.tool_name, result, duration_ms=duration_ms)
-    except Exception:
-        pass
+    except Exception as exc:
+        observation_errors.append(f"normalizer:{type(exc).__name__}")
     try:
         database.log_execution(
             request.tool_name,
@@ -133,8 +135,8 @@ async def execute_tool(
             duration_ms,
             conversation_id=request.conversation_id,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        observation_errors.append(f"execution:{type(exc).__name__}")
     try:
         audit_logger(
             request.tool_name,
@@ -142,6 +144,10 @@ async def execute_tool(
             result,
             source=request.source,
         )
-    except Exception:
-        pass
-    return ToolGatewayResult(result, True)
+    except Exception as exc:
+        observation_errors.append(f"audit:{type(exc).__name__}")
+    return ToolGatewayResult(
+        result,
+        True,
+        observation_errors=tuple(observation_errors),
+    )

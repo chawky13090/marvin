@@ -48,7 +48,7 @@ async def main() -> None:
         }
 
     async def broken(arguments):
-        raise RuntimeError("panne simulée")
+        raise RuntimeError("secret-interne token=abc")
 
     registry = {
         "calculator": calculator,
@@ -165,9 +165,39 @@ async def main() -> None:
         normalizer=normalize,
         audit_logger=audit,
     )
-    assert "panne simulée" in failure.result["error"]
+    assert "erreur interne" in failure.result["error"]
+    assert "secret-interne" not in str(failure.result)
     assert failure.result["normalized"] is True
     assert Database.logs and AUDIT[-1][3] == "mcp"
+
+    def broken_normalizer(*_args, **_kwargs):
+        raise RuntimeError("normalisation indisponible")
+
+    class BrokenDatabase:
+        @staticmethod
+        def log_execution(*_args, **_kwargs):
+            raise OSError("base indisponible")
+
+    def broken_audit(*_args, **_kwargs):
+        raise OSError("audit indisponible")
+
+    degraded = await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            "calculator", {"expression": "1+1"}, "ui", PERMISSION_STANDARD
+        ),
+        registry=registry,
+        specifications=specifications,
+        database=BrokenDatabase,
+        normalizer=broken_normalizer,
+        audit_logger=broken_audit,
+    )
+    assert degraded.executed is True
+    assert degraded.result["success"] is True
+    assert degraded.observation_errors == (
+        "normalizer:RuntimeError",
+        "execution:OSError",
+        "audit:OSError",
+    )
 
     report = tool_gateway.coverage_report(tools.TOOLS_REGISTRY, tools.TOOLS_SPEC)
     assert report["complete"] is True

@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.428.0)
+## 9. État actuel (v2.429.0)
+
+**v2.429 (frontière outils observable)** : une exception inattendue d'un exécuteur ne
+projette plus son message, ses arguments ni sa pile dans le chat, SQLite, l'audit ou MCP.
+Un incident opaque relie le résultat au journal expurgé. La panne de persistance d'un reçu
+idempotent conserve le résultat réel mais masque l'exception et interdit toujours le rejeu.
+Le gateway expose les pannes de normalisation, journal d'exécution et audit sous un état
+d'observabilité dégradé; UI et MCP le propagent et les refus utilisent leur vrai statut HTTP.
+Le serveur MCP possède désormais son propre contrat dans le gate global.
 
 **v2.428 (transport Ollama expurgé)** : les erreurs HTTP, connexion, timeout, protocole et
 exceptions inconnues sont catégorisées avant création d'un événement SSE. Corps HTTP,

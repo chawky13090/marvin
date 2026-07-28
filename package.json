@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.428.0",
+  "version": "2.429.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -19,6 +19,7 @@
     "check:email-account-vault": "backend\\.venv\\Scripts\\python.exe scripts\\test_email_account_vault.py",
     "check:oauth-migration": "backend\\.venv\\Scripts\\python.exe scripts\\test_oauth_legacy_migration.py",
     "check:agent-gateway-api": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_gateway_api.py",
+    "check:mcp-server-boundary": "backend\\.venv\\Scripts\\python.exe scripts\\test_mcp_server_boundary.py",
     "check:model-proactive-api": "backend\\.venv\\Scripts\\python.exe scripts\\test_model_proactive_api.py",
     "check:main-composition": "backend\\.venv\\Scripts\\python.exe scripts\\test_main_composition.py",
     "check:chat-presentation": "node scripts/test_chat_presentation.mjs",

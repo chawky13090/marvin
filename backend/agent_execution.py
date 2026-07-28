@@ -7,8 +7,11 @@ appels d'outils emis sous forme textuelle. Il ne decide ni du modele ni de la st
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import re
+import uuid
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,30 +20,46 @@ from config import DANGEROUS_TOOLS
 from tools import TOOLS_REGISTRY
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 def log_tool_exception(
     tool_name: str,
     tool_args: dict[str, Any],
     ex: Exception,
     conversation_id: str | None,
 ) -> dict[str, str]:
-    """Journalise la pile complete sans permettre au journal de casser le tour."""
+    """Journalise une panne d'outil sans exposer arguments, exception ou pile."""
+    incident = uuid.uuid4().hex
+    argument_keys = sorted(str(key)[:80] for key in tool_args)[:50]
+    argument_shape_hash = hashlib.sha256(
+        json.dumps(argument_keys, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()[:16]
     try:
-        import traceback
-
         import bug_log
 
         bug_log.log_bug(
             "tool_exception",
-            str(ex),
-            context={"args": tool_args},
-            traceback_str=traceback.format_exc(),
+            "Un exécuteur d'outil a levé une exception interne.",
+            context={
+                "error_type": type(ex).__name__,
+                "incident": incident,
+                "argument_count": len(tool_args),
+                "argument_shape_hash": argument_shape_hash,
+            },
             conversation_id=conversation_id,
             tool_name=tool_name,
         )
-    except Exception:
-        # Le chemin d'erreur principal doit rester disponible meme si le journal est HS.
-        pass
-    return {"error": str(ex)}
+    except Exception as log_error:
+        _LOGGER.warning(
+            "tool_exception_log_unavailable error_type=%s incident=%s",
+            type(log_error).__name__,
+            incident,
+        )
+    return {
+        "error": f"L'outil a rencontré une erreur interne. Incident : {incident}.",
+        "incident": incident,
+    }
 
 
 async def execute_registered_tool(

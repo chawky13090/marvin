@@ -58,7 +58,11 @@ async def _exercise_routes() -> None:
     assert "secret interne" not in body
     assert "autre demande" in body
 
-    outcome = SimpleNamespace(status_code=200, result={"success": True})
+    outcome = SimpleNamespace(
+        status_code=200,
+        result={"success": True},
+        observation_errors=(),
+    )
     with patch.object(
         agent_gateway,
         "_execute_through_gateway",
@@ -72,6 +76,40 @@ async def _exercise_routes() -> None:
         "source": "ui",
         "confirmed_by_ui": True,
     }
+
+    degraded = SimpleNamespace(
+        status_code=200,
+        result={"success": True},
+        observation_errors=("audit:OSError",),
+    )
+    with patch.object(
+        agent_gateway,
+        "_execute_through_gateway",
+        AsyncMock(return_value=degraded),
+    ):
+        response = await agent_gateway.execute_tool_endpoint(
+            agent_gateway.ToolExecuteRequest(toolName="date_now")
+        )
+    assert response["observability"] == {
+        "status": "degraded",
+        "errors": ["audit:OSError"],
+    }
+
+    refused = SimpleNamespace(
+        status_code=403,
+        result={"error": "Permission refusée", "permission_denied": True},
+        observation_errors=(),
+    )
+    with patch.object(
+        agent_gateway,
+        "_execute_through_gateway",
+        AsyncMock(return_value=refused),
+    ):
+        response = await agent_gateway.execute_tool_endpoint(
+            agent_gateway.ToolExecuteRequest(toolName="date_now")
+        )
+    assert response.status_code == 403
+    assert json.loads(response.body)["result"]["permission_denied"] is True
 
 
 def _expect_invalid(factory) -> None:

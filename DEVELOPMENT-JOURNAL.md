@@ -10076,3 +10076,37 @@ lint sans erreur et build Next.js 16.2.12 Turbopack. Après relance, les smokes 
 
 Rollback exact : `git revert <commit-v2.428>`. Aucun schéma, donnée persistante, dépendance,
 permission ou accès réseau n'est modifié.
+
+## 2026-07-28 — v2.429.0 — Frontière outils expurgée et observable
+
+### Constat et choix
+
+Le chemin commun des 344 outils retournait le texte brut d'une exception et journalisait
+exception, traceback et arguments complets. Une panne post-effet de la persistance du reçu
+retournait aussi son message brut. Enfin, le gateway UI/MCP ignorait silencieusement les
+pannes de normalisation, journal d'exécution et audit. Deux approches ont été comparées :
+masquage par noms de champs, insuffisant pour les messages et valeurs libres, ou projection
+fermée avec incident opaque et métadonnées de forme. La seconde est retenue. Le résultat
+métier d'une action déjà exécutée reste prioritaire et Marvin refuse toujours son rejeu si
+le reçu n'est pas démontrable.
+
+### Implémentation, sécurité et observabilité
+
+`agent_execution.py` ne conserve que type d'erreur, incident, nombre d'arguments et empreinte
+de leurs noms; ni valeurs, message ni pile ne sont transmis. `action_replay.py` conserve le
+résultat réel mais remplace l'erreur de persistance par un incident. `tool_gateway.py` retourne
+explicitement les destinations d'observation dégradées sans contenu sensible. Les routes UI
+et MCP propagent cet état; validation, permission et absence d'outil utilisent désormais le
+statut HTTP prévu. Le pont MCP masque les exceptions de catalogue et d'appel, tout en relayant
+l'état d'observabilité. Aucun des 344 exécuteurs ou schémas n'est supprimé ou modifié.
+
+### Tests et rollback
+
+Les contrats ciblés couvrent succès, exception avec faux token et chemin privé, panne du
+logger, panne du reçu après effet, normalizer, SQLite, audit, statuts HTTP et pont MCP. Le
+nouveau `scripts/test_mcp_server_boundary.py` rejoint le gate consolidé, qui réussit désormais
+**192/192**, dont compilation, lint sans erreur et build Next.js 16.2.12 Turbopack. Après
+relance, v2.429.0 expose Ollama disponible, 344 outils et 15 workers; les smokes live
+réussissent **28/28 API** et **40/40 pages**. Une requête réelle vers un outil inexistant
+retourne HTTP 404 au lieu d'un succès HTTP trompeur. Rollback exact :
+`git revert <commit-v2.429>`. Aucun schéma ni donnée persistante n'est migré.

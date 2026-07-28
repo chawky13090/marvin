@@ -106,6 +106,8 @@ async def _exercise(path: Path) -> None:
         assert receipt_failure["success"] is True
         assert receipt_failure["_replay"]["state"] == "receipt_error"
         assert receipt_failure["_replay"]["receipt_persisted"] is False
+        assert len(receipt_failure["_replay"]["incident"]) == 32
+        assert "disque plein" not in str(receipt_failure)
 
 
 def main() -> int:

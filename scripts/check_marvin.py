@@ -111,6 +111,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         ),
         Stage("API Chat, outils et MCP extraite", (python, "scripts/test_agent_gateway_api.py")),
         Stage(
+            "Frontière du serveur MCP",
+            (python, "scripts/test_mcp_server_boundary.py"),
+        ),
+        Stage(
             "API modèles et proactive extraite",
             (python, "scripts/test_model_proactive_api.py"),
         ),

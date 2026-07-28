@@ -46,19 +46,40 @@ async def _exercise_execution() -> None:
     )
     assert unknown == {"error": "Outil inconnu : missing"}
 
-    failing = AsyncMock(side_effect=RuntimeError("panne controlee"))
+    failing = AsyncMock(
+        side_effect=RuntimeError("secret-interne C:\\chemin\\prive token=abc")
+    )
     with (
         patch.object(execution, "execute_once", side_effect=replay),
-        patch.object(execution, "log_tool_exception", return_value={"error": "panne controlee"}),
+        patch("bug_log.log_bug") as log_bug,
     ):
         failed = await execution.execute_registered_tool(
             "sample_tool",
-            {},
+            {"password": "secret-value", "path": "C:\\prive"},
             "conversation-1",
             "request-1",
             registry={"sample_tool": failing},
         )
-    assert failed == {"error": "panne controlee"}
+    assert len(failed["incident"]) == 32
+    assert failed["incident"] in failed["error"]
+    assert "secret" not in str(failed)
+    logged = log_bug.call_args
+    assert logged.args[:2] == (
+        "tool_exception",
+        "Un exécuteur d'outil a levé une exception interne.",
+    )
+    assert logged.kwargs["context"]["error_type"] == "RuntimeError"
+    assert "secret" not in str(logged)
+
+    with patch("bug_log.log_bug", side_effect=OSError("journal indisponible")):
+        degraded = execution.log_tool_exception(
+            "sample_tool",
+            {"token": "secret-value"},
+            RuntimeError("secret-interne"),
+            "conversation-1",
+        )
+    assert len(degraded["incident"]) == 32
+    assert "secret" not in str(degraded)
 
 
 def main() -> int:
