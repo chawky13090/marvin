@@ -67,6 +67,16 @@ assert.match(
   /tool\.result !== undefined && !isCodingMissionTool/,
   'le suivi de mission ne doit pas etre enferme dans les details techniques',
 );
+assert.match(
+  messageBubbleSource,
+  /privacyMode === 'ultra_cloud'[\s\S]*?'Cloud strict'/,
+  'la provenance Ultra Cloud doit être visible dans le chat',
+);
+assert.match(
+  messageBubbleSource,
+  /privacyMode === 'sensitive_local'[\s\S]*?'Local · contenu sensible'/,
+  'le repli confidentiel local doit être visible dans le chat',
+);
 const trackerSource = fs.readFileSync(new URL('../components/chat/CodingMissionTracker.jsx', import.meta.url), 'utf8');
 assert.match(trackerSource, /setInterval\(refresh, 3000\)/, 'le suivi doit continuer si le flux SSE est interrompu');
 assert.match(trackerSource, /Tu peux changer de page/, 'la persistance apres navigation doit etre expliquee');

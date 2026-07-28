@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.429.0
+Version courante auditée : 2.430.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -460,6 +460,10 @@ chat. Catégorie opérationnelle, code HTTP sûr et incident opaque préservent 
 En v2.429.0, la frontière outils étend ce contrat aux exécuteurs, reçus idempotents et pont
 MCP. Les pannes d'observation ne sont plus silencieuses : elles accompagnent le résultat sous
 une projection bornée et sans donnée métier. Les 344 schémas et exécuteurs restent identiques.
+En v2.430.0, le routage modèle devient vérifiable depuis le chat : fournisseur, mode de
+confidentialité, Cloud-only et classification accompagnent chaque sélection et escalade.
+Une compétence promue vers Agent utilise également le modèle Agent comme repli local sûr,
+préservant la qualité en mode hybride sans affaiblir Hyper local ou Ultra Cloud-only.
 
 ## 10. Preuves minimales par grande capacité
 

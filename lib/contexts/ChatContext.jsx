@@ -200,6 +200,10 @@ export function ChatProvider({ children }) {
                     profile: event.profile,
                     model: event.model,
                     label: event.label,
+                    provider: event.provider,
+                    privacyMode: event.privacyMode,
+                    cloudOnly: Boolean(event.cloudOnly),
+                    sensitive: Boolean(event.sensitive),
                   },
                 };
               }));

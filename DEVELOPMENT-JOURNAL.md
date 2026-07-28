@@ -10110,3 +10110,32 @@ relance, v2.429.0 expose Ollama disponible, 344 outils et 15 workers; les smokes
 réussissent **28/28 API** et **40/40 pages**. Une requête réelle vers un outil inexistant
 retourne HTTP 404 au lieu d'un succès HTTP trompeur. Rollback exact :
 `git revert <commit-v2.429>`. Aucun schéma ni donnée persistante n'est migré.
+
+## 2026-07-28 — v2.430.0 — Provenance modèle et confidentialité visibles
+
+### Constat et décision
+
+Les contrats déterministes prouvaient déjà Hyper local prioritaire et Ultra strictement
+Cloud, mais le navigateur ne recevait que profil, modèle et libellé. L'utilisateur ne pouvait
+donc pas vérifier si une réponse avait réellement utilisé Ollama local ou Cloud ni pourquoi.
+De plus, lorsqu'une compétence promouvait le profil Chat vers Agent, le repli confidentiel
+restait celui du petit profil Chat. Deux options ont été comparées : déduire la provenance
+dans le frontend depuis le nom du modèle, fragile et dupliqué, ou la produire au point de
+décision backend. La seconde est retenue comme source unique.
+
+### Implémentation et validation
+
+`ModelConfig.event()` projette fournisseur, mode de confidentialité, Cloud-only et indicateur
+sensible, avec surcharges typées pour les escalades. Les deux consommateurs frontend
+conservent les champs et `MessageBubble` affiche une provenance lisible. L'escalade de
+compétence met à jour le repli local vers le profil Agent, sans changer le chemin Ultra.
+Les contrats Model Config, Cloud-only, Loop Policy, présentation chat, compilation Python,
+architecture et lint ciblé réussissent; ESLint rapporte zéro erreur et seulement six
+avertissements préexistants sur `MessageBubble`. Le gate consolidé réussit **192/192**, dont
+compilation et build Next.js 16.2.12 Turbopack. Après relance, les smokes live réussissent
+**28/28 API** et **40/40 pages**. Un test navigateur réel envoie une demande sans outil :
+Marvin répond exactement `TEST PROVENANCE OK` via `deepseek-v4-pro:cloud` et affiche
+simultanément `Cloud strict` dans le badge de réponse.
+
+Rollback exact : `git revert <commit-v2.430>`. Aucun réglage, modèle installé, schéma, secret,
+donnée persistante ou accès réseau n'est modifié.

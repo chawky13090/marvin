@@ -298,7 +298,19 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
     </div>
   ) : null;
 
-  // Badge modèle (affiché sous les réponses de l'assistant en mode auto)
+  const provenanceLabel = message.modelInfo?.privacyMode === 'ultra_cloud'
+    ? 'Cloud strict'
+    : message.modelInfo?.privacyMode === 'hyper_local'
+      ? 'Local protégé'
+      : message.modelInfo?.privacyMode === 'sensitive_local'
+        ? 'Local · contenu sensible'
+        : message.modelInfo?.provider === 'ollama_cloud'
+          ? 'Ollama Cloud'
+          : message.modelInfo?.provider === 'ollama_local'
+            ? 'Ollama local'
+            : null;
+
+  // Badge modèle et provenance (affiché sous les réponses de l'assistant)
   const modelBadge = !isUser && message.modelInfo ? (
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: '5px',
@@ -309,6 +321,12 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
       <span>{message.modelInfo.label}</span>
       <span style={{ opacity: 0.5 }}>·</span>
       <span style={{ fontFamily: 'monospace', fontSize: '9px' }}>{message.modelInfo.model}</span>
+      {provenanceLabel && (
+        <>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>{provenanceLabel}</span>
+        </>
+      )}
     </div>
   ) : null;
 

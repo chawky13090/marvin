@@ -35,6 +35,7 @@ persistances, ses privilèges, son exposition réseau, ses secrets, ses logs et 
 | SEC-016 | Élevée | VERIFIED | Erreurs SSE durables | La v2.427 supprime le texte brut des exceptions du flux navigateur et de SQLite. Un incident opaque est retourné; seuls classe d'erreur, incident et condensat de requête rejoignent le journal technique. Les tests couvrent secret simulé, persistance, panne du logger et statut terminal invalide. |
 | SEC-017 | Élevée | VERIFIED | Transport Ollama | La v2.428 empêche les erreurs déjà converties en événements SSE de contourner SEC-016. Corps HTTP, message brut, traceback, URL et modèle sont supprimés de la projection publique; catégories, statut HTTP sûr et incident opaque restent disponibles. |
 | SEC-018 | Élevée | VERIFIED | Exécution des outils et MCP | La v2.429 remplace message, arguments et traceback d'une exception d'outil par un incident opaque et des métadonnées de forme. Les pannes de reçu, normalisation, exécution et audit sont expurgées et explicitement propagées. Le pont MCP masque ses exceptions et possède un test dédié dans le gate. |
+| SEC-019 | Moyenne | VERIFIED | Provenance modèle et confidentialité | La v2.430 transporte et affiche fournisseur local/Cloud, mode de confidentialité, Cloud-only et classification sensible sur chaque sélection, y compris l'escalade de compétence. Les contrats prouvent la priorité Hyper local, l'absence de repli local en Ultra et le repli Agent cohérent en mode hybride. |
 
 ## Critère de fermeture
 

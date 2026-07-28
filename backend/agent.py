@@ -253,9 +253,16 @@ async def run_agent(
                 await _enrichments.cancel_pending()
                 yield _sse({"type": "error", "message": str(exc), "cloud_only": True})
                 return
-            yield _sse({"type": "model_info", "profile": "agent", "model": active_model,
-                        "label": (f"☁️ Cloud strict · compétence {_skill['name']}"
-                                  if _ultra else f"🛠️ Compétence : {_skill['name']}")})
+            _local_fallback_model = _agent_local
+            yield _sse(_model_config.event(
+                profile_name="agent",
+                active_model=active_model,
+                label=(
+                    f"☁️ Cloud strict · compétence {_skill['name']}"
+                    if _ultra
+                    else f"🛠️ Compétence : {_skill['name']}"
+                ),
+            ))
 
     # Compaction : résume les messages anciens (sortis de la fenêtre) et l'injecte dans le
     # prompt système → Marvin garde le fil des longues conversations sans tout réenvoyer.

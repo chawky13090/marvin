@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.429.0)
+## 9. État actuel (v2.430.0)
+
+**v2.430 (provenance modèle vérifiable)** : chaque événement `model_info` expose désormais
+profil, modèle, fournisseur Ollama local/Cloud, mode de confidentialité, contrat Cloud-only
+et classification sensible. Les deux runtimes frontend conservent ces champs et le chat
+affiche `Cloud strict`, `Local protégé`, `Local · contenu sensible`, `Ollama Cloud` ou
+`Ollama local`. Lorsqu'une compétence fait monter Chat vers Agent, son repli confidentiel
+monte aussi vers le modèle Agent au lieu de retomber sur le petit modèle Chat. Hyper local
+reste prioritaire et Ultra reste strictement Cloud sans repli local.
 
 **v2.429 (frontière outils observable)** : une exception inattendue d'un exécuteur ne
 projette plus son message, ses arguments ni sa pile dans le chat, SQLite, l'audit ou MCP.

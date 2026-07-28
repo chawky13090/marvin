@@ -56,6 +56,11 @@ async def _run() -> None:
         ultra = await models.resolve_model_config(messages, "code sensible", "local:14b", _plan("local"))
     assert ultra.active_model == "kimi:cloud"
     assert ultra.label == "☁️ Cloud strict · kimi:cloud"
+    ultra_event = ultra.event()
+    assert ultra_event["provider"] == "ollama_cloud"
+    assert ultra_event["privacyMode"] == "ultra_cloud"
+    assert ultra_event["cloudOnly"] is True
+    assert ultra_event["sensitive"] is True
     require.assert_called_once_with("coding", requested_model=None)
 
     with (
@@ -67,6 +72,18 @@ async def _run() -> None:
         private = await models.resolve_model_config(messages, "secret", "glm:cloud", _plan("local"))
     assert private.profile_name == "agent"
     assert not private.active_model.endswith(":cloud")
+    private_event = private.event()
+    assert private_event["provider"] == "ollama_local"
+    assert private_event["privacyMode"] == "sensitive_local"
+
+    escalated_event = private.event(
+        profile_name="agent",
+        active_model="glm:cloud",
+        label="Compétence",
+    )
+    assert escalated_event["profile"] == "agent"
+    assert escalated_event["provider"] == "ollama_cloud"
+    assert escalated_event["label"] == "Compétence"
 
     refresh = AsyncMock(return_value=None)
     with (
@@ -88,6 +105,16 @@ async def _run() -> None:
 
 def main() -> int:
     asyncio.run(_run())
+    agent_source = (BACKEND / "agent.py").read_text(encoding="utf-8-sig")
+    assert "_local_fallback_model = _agent_local" in agent_source
+    assert "_model_config.event(" in agent_source
+    for frontend in (
+        ROOT / "lib" / "contexts" / "ChatContext.jsx",
+        ROOT / "lib" / "hooks" / "useSecretary.js",
+    ):
+        source = frontend.read_text(encoding="utf-8-sig")
+        for field in ("provider", "privacyMode", "cloudOnly", "sensitive"):
+            assert field in source
     import agent
     assert callable(agent._resolve_model_config)
     print("Agent Model Config OK - auto, manuel, local, Ultra Cloud et façade.")

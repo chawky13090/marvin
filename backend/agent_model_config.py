@@ -29,12 +29,37 @@ class ModelConfig:
     ultra_cloud_only: bool
     sensitive: bool
 
-    def event(self) -> dict[str, Any]:
+    def event(
+        self,
+        *,
+        profile_name: str | None = None,
+        active_model: str | None = None,
+        label: str | None = None,
+    ) -> dict[str, Any]:
+        selected_model = active_model or self.active_model
+        selected_profile = profile_name or self.profile_name
+        privacy_mode = (
+            "hyper_local"
+            if self.lockdown
+            else (
+                "ultra_cloud"
+                if self.ultra_cloud_only
+                else (
+                    "sensitive_local"
+                    if self.sensitive and not is_cloud_model(selected_model)
+                    else "standard"
+                )
+            )
+        )
         return {
             "type": "model_info",
-            "profile": self.profile_name,
-            "model": self.active_model,
-            "label": self.label,
+            "profile": selected_profile,
+            "model": selected_model,
+            "label": label or self.label,
+            "provider": "ollama_cloud" if is_cloud_model(selected_model) else "ollama_local",
+            "privacyMode": privacy_mode,
+            "cloudOnly": self.ultra_cloud_only,
+            "sensitive": self.sensitive,
         }
 
 
