@@ -278,6 +278,10 @@ Les missions longues rejoignent `tool_domains/long_tasks.py`. Persistance, Missi
 génération sont injectés; objectifs, étapes et tags sont bornés. Une panne cron après création
 partielle déclenche une compensation en ordre inverse, dont le résultat est exposé au lieu de
 laisser une checklist orpheline.
+L'auto-diagnostic rejoint `tool_domains/system_self_test.py`. Le catalogue sûr devient une
+donnée explicite, les appels sont concurrents avec une borne de quatre, chaque attente possède
+un timeout et le résultat distingue absence, erreur métier, crash et timeout. Le mode sans Web
+exclut toutes les sondes qui exigent réellement Internet.
 
 ## 4. Validation obligatoire par tranche
 

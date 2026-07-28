@@ -7385,3 +7385,49 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback du code : réversion atomique du commit v2.374 après vérification du patch inverse ;
 - après réversion, redémarrer le backend puis repasser le test ciblé antérieur, `/api/health`,
   le gate rapide et le smoke test.
+
+## 2026-07-28 — v2.375.0 — Auto-diagnostic borné et observable
+
+### Demande et constats
+
+- poursuivre la consolidation des outils et de l'observabilité ;
+- `system_self_test` conservait 93 lignes de catalogue et d'orchestration dans `tools.py` ;
+- les 43 à 45 sondes étaient exécutées séquentiellement sans timeout individuel ;
+- une sonde lente pouvait immobiliser tout le diagnostic ;
+- `include_web=false` n'excluait pas `ip_info`, malgré son appel Internet ;
+- une catégorie inconnue produisait un faux succès vide.
+
+### Solution
+
+- nouveau `tool_domains/system_self_test.py` avec registre et catalogue injectables ;
+- catalogue immuable de sondes explicitement sans mutation et résultat dans l'ordre déclaré ;
+- concurrence bornée à quatre appels, attente individuelle limitée à trente secondes ;
+- statuts distincts `ok`, `erreur`, `crash`, `absent` et `timeout`, avec détails bornés ;
+- validation stricte de `category` et `include_web`, catégories disponibles en cas d'absence ;
+- `ip_info`, `web_search` et `weather` sont exclus lorsque le Web n'est pas demandé ;
+- la politique effective est projetée dans le résultat pour rendre la preuve lisible.
+
+### Validation ciblée observée
+
+- compilation du domaine, de la façade et du test : réussie ;
+- succès, erreur métier, crash, absence, filtrage Web, catégorie inconnue et timeout injecté :
+  réussis ;
+- identités de façade et du registre conservées ;
+- exécution réelle directe, catégorie `outils` : 7/7 réussis, registre 344, ordre stable et
+  `include_web=false` ;
+- architecture finale : Marvin 2.375.0, 344 outils, 346 routes, harness 344/344 et
+  65 restrictions ;
+- gate rapide final : 147/147 étapes ;
+- backend redémarré : `/api/health` expose 2.375.0, Ollama disponible et 15 workers ;
+- gateway HTTP réel : catégorie `calcul`, 1/1 réussi, politique sans Web et borne de concurrence
+  projetées dans le résultat ;
+- frontend Turbopack conservé, smoke test réel : 28/28 contrats.
+
+### Limite et rollback
+
+- `asyncio.wait_for` borne l'attente et annule la coroutine; il ne peut pas interrompre de force
+  un travail natif que l'outil aurait déjà délégué à un thread. Les outils système conservent
+  leurs propres délais et bornes ;
+- aucun schéma, réglage ou donnée utilisateur n'est modifié par la tranche ou ses tests ;
+- rollback du code : réversion atomique du commit v2.375 après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.

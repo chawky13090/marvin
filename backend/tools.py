@@ -75,6 +75,7 @@ from tool_domains import presentations as presentations_domain
 from tool_domains import git_repository as git_repository_domain
 from tool_domains import charts as charts_domain
 from tool_domains import long_tasks as long_tasks_domain
+from tool_domains import system_self_test as system_self_test_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -3532,99 +3533,8 @@ execute_audio_volume = media_domain.audio_volume
 # SECTION 30 — Auto-diagnostic de Marvin
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_system_self_test(args: dict) -> dict:
-    """
-    🩺 Auto-diagnostic : Marvin teste un échantillon de ses propres outils (sûrs,
-    lecture seule) et rapporte leur état + latence. include_web=true ajoute les
-    outils réseau. Permet de vérifier en un appel que tout fonctionne.
-    """
-    category = (args.get("category") or "").lower().strip()
-    include_web = bool(args.get("include_web", False))
-    SAFE = [
-        ("calcul", "calculator", {"expression": "2+2"}),
-        ("date", "datetime_info", {}),
-        ("conversion", "unit_convert", {"value": 1, "from_unit": "km", "to_unit": "m"}),
-        ("crypto", "hash_compute", {"text": "x", "algorithm": "md5"}),
-        ("texte", "json_tool", {"data": "{}", "operation": "format"}),
-        ("système", "pc_system_info", {}),
-        ("disque", "win_disk_info", {}),
-        ("système", "win_uptime", {}),
-        ("devis", "billing_catalog_list", {}),
-        ("base IT", "it_kb_list", {}),
-        ("base IT", "it_kb_recommend", {"need": "antivirus pme"}),
-        ("mémoire", "memory_list", {}),
-        ("notes", "note_list", {}),
-        ("tâches", "task_list", {}),
-        ("chemins", "pc_get_real_paths", {}),
-        ("documentation", "doc_intervention_list", {}),
-        # v2.106 — élargissement (couverture ~18→46 outils) pour un vrai audit,
-        # à charge d'exclure explicitement tout ce qui a un effet de bord (écriture,
-        # e-mail, réseau destructif, tweak système…).
-        ("réseau", "ip_info", {}),
-        ("réseau", "net_ping", {"host": "127.0.0.1", "count": 1}),
-        ("système", "pc_process_list", {}),
-        ("système", "pc_window_list", {}),
-        ("système", "pc_installed_software", {}),
-        ("système", "win_services_list", {}),
-        ("système", "win_startup_programs", {}),
-        ("système", "win_users_list", {}),
-        ("système", "pc_gpu_status", {}),
-        ("système", "pc_hardware_specs", {}),
-        ("système", "win_update_status", {}),
-        ("outils", "password_generate", {}),
-        ("outils", "base64_tool", {"data": "test", "action": "encode"}),
-        ("outils", "color_tool", {"color": "#ffffff"}),
-        ("outils", "regex_tool", {"pattern": "a+", "text": "aaa", "action": "findall"}),
-        ("outils", "text_stats", {"text": "Bonjour le monde."}),
-        ("outils", "diff_text", {"text_a": "a", "text_b": "b"}),
-        ("outils", "pc_clipboard_get", {}),
-        ("agenda", "calendar_list", {}),
-        ("email", "email_accounts", {}),
-        ("mémoire", "memory_search", {"query": "test"}),
-        ("recherche", "search_semantic", {"query": "test"}),
-        ("devis", "billing_client_list", {}),
-        ("devis", "billing_quote_list", {}),
-        ("devis", "billing_invoice_list", {}),
-        ("documentation", "doc_template_list", {}),
-        ("ssh", "ssh_list", {}),
-    ]
-    if include_web:
-        SAFE += [
-            ("web", "web_search", {"query": "test", "max_results": 2}),
-            ("météo", "weather", {"city": "Paris"}),
-        ]
-    results = []
-    for cat, name, a in SAFE:
-        if category and category not in cat.lower() and category not in name:
-            continue
-        fn = TOOLS_REGISTRY.get(name)
-        if not fn:
-            results.append({"tool": name, "category": cat, "status": "absent"})
-            continue
-        t0 = time.time()
-        try:
-            r = await fn(a)
-            ok = not (isinstance(r, dict) and r.get("error"))
-            results.append({"tool": name, "category": cat,
-                            "status": "ok" if ok else "erreur",
-                            "detail": "" if ok else str(r.get("error"))[:90],
-                            "ms": int((time.time() - t0) * 1000)})
-        except Exception as e:
-            results.append({"tool": name, "category": cat, "status": "crash",
-                            "detail": str(e)[:90], "ms": int((time.time() - t0) * 1000)})
-    ok = sum(1 for r in results if r["status"] == "ok")
-    failed = [r for r in results if r["status"] != "ok"]
-    return {
-        "success": True,
-        "registry_total": len(TOOLS_REGISTRY),
-        "tested": len(results), "ok": ok, "failed": len(failed),
-        "failures": failed,
-        "results": results,
-        "summary": (f"✅ {ok}/{len(results)} outils testés OK (sur {len(TOOLS_REGISTRY)} au total)."
-                    if not failed else
-                    f"⚠️ {ok}/{len(results)} OK — {len(failed)} à vérifier : "
-                    + ", ".join(f['tool'] for f in failed)),
-    }
+system_self_test_domain.configure(registry_provider=lambda: TOOLS_REGISTRY)
+execute_system_self_test = system_self_test_domain.run
 
 
 # ══════════════════════════════════════════════════════════════════════════════

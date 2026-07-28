@@ -277,6 +277,10 @@ Tout code non fiable ou à certifier doit passer par Test Forge et son conteneur
 Le démarrage compense les tâches déjà écrites si le cron échoue, chaque tag est unique et les
 erreurs de synchronisation restent observables. L'arrêt désactive la reprise sans supprimer
 la checklist, ce qui préserve l'audit et fournit un rollback métier explicite.
+93. l'auto-diagnostic : `tool_domains/system_self_test.py` possède un catalogue explicite de
+sondes sans mutation, un ordre de rapport déterministe, une concurrence de quatre et un délai
+d'attente individuel. Les dépendances réseau sont classées séparément; erreurs, absences,
+crashs et timeouts ne sont plus confondus.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

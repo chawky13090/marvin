@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.374.0)
+## 9. État actuel (v2.375.0)
+
+**v2.375 (auto-diagnostic)** : `system_self_test` rejoint
+`tool_domains/system_self_test.py`. Son catalogue de sondes en lecture seule est explicite,
+injectable et ordonné. Les exécutions sont limitées à quatre appels concurrents et trente
+secondes d'attente par outil; absences, erreurs métier, crashs et timeouts sont distingués.
+`include_web=false` exclut désormais aussi `ip_info`, qui dépend réellement du réseau.
 
 **v2.374 (tâches longues)** : proposition, création, état et arrêt rejoignent
 `tool_domains/long_tasks.py`. Le domaine injecte persistance, Mission OS et génération LLM,
