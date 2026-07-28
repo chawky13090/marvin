@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.404.0
+Version courante auditée : 2.405.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -330,7 +330,7 @@ jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases perti
 L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
 traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
 
-| Ordre | Phase | État au 2.402.0 | Livraison et condition de sortie |
+| Ordre | Phase | État au 2.405.0 | Livraison et condition de sortie |
 |---:|---|---|---|
 | 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
 | 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
@@ -358,11 +358,11 @@ La phase **1 — Composition backend** est vérifiée en v2.403.0 :
   l'import borné à 30 secondes et la fermeture ordonnée du lifespan ;
 - la gate globale a réussi sur 171 étapes.
 
-La phase active devient **2 — Persistance modulaire**. La première tranche doit produire un
-inventaire AST et transactionnel de `database.py`, identifier les agrégats, consommateurs,
-transactions, verrous, données sensibles, migrations et tests réels. L'extraction commencera
-par le domaine présentant le meilleur rapport cohésion/risque; elle ne sera pas pilotée par le
-seul nombre de lignes.
+La phase active devient **2 — Persistance modulaire**. L'inventaire AST et transactionnel de
+`database.py` a confirmé dix agrégats et de nombreux consommateurs de façade. La première
+frontière, les paramètres globaux, rejoint `repositories/settings.py` en v2.405.0 avec
+injection de connexion, compatibilité JSON et SQL paramétré. Les tranches suivantes continuent
+par agrégat cohésif et risque réel; elles ne sont jamais pilotées par le seul nombre de lignes.
 
 ## 10. Preuves minimales par grande capacité
 

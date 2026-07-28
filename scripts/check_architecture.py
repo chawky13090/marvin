@@ -271,6 +271,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_db_migrations.py",
         ROOT / "scripts" / "test_database_init.mjs",
         ROOT / "scripts" / "test_conversation_repository.py",
+        ROOT / "scripts" / "test_settings_repository.py",
         ROOT / "scripts" / "test_db_connection_hygiene.py",
         ROOT / "scripts" / "test_credentials_vault.py",
         ROOT / "scripts" / "test_agent_gateway_api.py",

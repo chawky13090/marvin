@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.404.0)
+## 9. État actuel (v2.405.0)
+
+**v2.405 (persistance des paramètres)** : `get_setting` et `set_setting` rejoignent
+`repositories/settings.py` derrière un repository injectable. La façade historique
+`database.py` conserve les mêmes identités publiques. Types JSON, texte historique, paramètres
+SQL, fermeture, échec de sérialisation et atomicité sont testés sur une base SQLite temporaire
+réelle.
 
 **v2.404 (sources Engineering Radar)** : les pages npm et TypeScript rendues uniquement par
 JavaScript, qui produisaient des erreurs à chaque démarrage, sont remplacées par deux sources

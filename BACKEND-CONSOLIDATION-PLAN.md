@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.404.0
+Version auditée : 2.405.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -197,6 +197,11 @@ Extraire par agrégat transactionnel :
 
 Critère : `database.py` devient une façade d'import compatible. Toute opération passe par
 `db()` ou un repository injectable, avec fermeture, commit et rollback garantis.
+
+État : la première frontière est extraite en v2.405.0. Les paramètres globaux rejoignent
+`repositories/settings.py` derrière un repository injectable. La façade `database.py`
+conserve exactement `get_setting` et `set_setting`; lectures, types JSON historiques,
+paramètres SQL, fermeture et atomicité sont couverts sur une base temporaire réelle.
 
 ### Phase D — Composition et dépendances
 

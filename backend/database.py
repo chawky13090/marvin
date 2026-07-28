@@ -33,6 +33,7 @@ from repositories.ssh_connections import (
     touch_ssh_connection,
     update_ssh_connection,
 )
+from repositories.settings import get_setting, set_setting
 from repositories.workflows import (
     create_workflow,
     create_workflow_run,
@@ -422,27 +423,6 @@ def count_events_by_source(source: str) -> int:
 
 
 # ── Paramètres ────────────────────────────────────────────────────────────────
-
-def get_setting(key: str, default=None):
-    with db() as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-    if row is None:
-        return default
-    val = row["value"]
-    try:
-        return json.loads(val)
-    except Exception:
-        return val
-
-
-def set_setting(key: str, value):
-    serialized = value if isinstance(value, str) else json.dumps(value)
-    with db() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-            (key, serialized)
-        )
-
 
 # ── Projets ───────────────────────────────────────────────────────────────────
 # Table normalement créée par lib/database/init.js (Next.js) au premier lancement du

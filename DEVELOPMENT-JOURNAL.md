@@ -8809,3 +8809,61 @@ réellement observés :
 
 Rollback après commit : `git revert <commit-v2.404>`. Aucun schéma n'est modifié. L'ancien
 cache reste lisible et sera remplacé seulement après une actualisation réussie et prouvée.
+
+## 2026-07-28 — v2.405.0 — Première frontière de persistance : paramètres
+
+### Contexte, comparaison et décision
+
+La phase de persistance a commencé par une cartographie de `database.py` : 3 138 lignes,
+143 objets AST et dix agrégats transactionnels déjà identifiés dans le plan. Deux approches
+ont été comparées :
+
+1. déplacer plusieurs CRUD simultanément pour réduire rapidement le fichier, avec une surface
+   de régression importante sur les nombreux consommateurs ;
+2. extraire un agrégat cohésif derrière la façade existante, prouver injection, compatibilité,
+   fermeture et atomicité, puis répéter ce patron.
+
+La seconde est retenue. Elle suit le principe repository déjà validé pour conversations, SSH
+et workflows. La documentation Python rappelle que le context manager natif d'une connexion
+SQLite ne ferme pas la connexion; Marvin conserve donc sa frontière `db()` qui commit,
+rollback et ferme explicitement. SQLite garantit l'atomicité transactionnelle, mais un
+repository doit encore borner lui-même le cycle de vie de chaque connexion.
+
+### Implémentation et sécurité
+
+- ajout de `repositories/settings.py` avec `SettingsRepository` et scope de connexion
+  injectable ;
+- conservation exacte des façades publiques `database.get_setting` et
+  `database.set_setting`, donc aucun consommateur n'est migré de force ;
+- conservation des types JSON et du comportement historique des chaînes contenant du JSON ;
+- remplacement de `INSERT OR REPLACE` par l'UPSERT SQLite `ON CONFLICT DO UPDATE`, qui met à
+  jour la ligne existante sans sémantique implicite de suppression/réinsertion ;
+- requêtes toujours paramétrées : une clé ressemblant à une injection SQL reste une donnée ;
+- ajout du test au package, à la gate globale et au contrôle d'architecture.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation Python réussie ;
+- repository paramètres réussi sur une base SQLite temporaire réelle : défaut, texte,
+  dictionnaire, liste, entier, booléen, null, ancien JSON, JSON invalide, clé hostile,
+  sérialisation refusée et façade ;
+- hygiène SQLite réussie ;
+- routage Ultra Cloud-only réussi ;
+- architecture réussie : 344 outils, 354 routes, 40 pages, harness 344/344 ;
+- gate globale réussie : **172/172 étapes**, compilation de 241 modules backend et lint
+  frontend inclus ;
+- backend réellement redémarré en 2.405.0 : santé, Ollama, 344 outils et 15 workers valides ;
+- lecture d'un paramètre réel et écriture du preset Ultra réussies, avec état Cloud-only
+  confirmé et aucun repli local ;
+- smoke HTTP/Next.js réussi : **28/28 contrats**.
+
+Le premier passage du test a révélé que son inspection finale utilisait le context manager
+sqlite3 natif sans fermer la connexion. Sous Windows, la suppression du fichier temporaire a
+échoué avec `WinError 32`. Le test utilise désormais `contextlib.closing`; cette correction
+ne masque pas le verrou et documente le contrat réel attendu.
+
+Rollback après commit : `git revert <commit-v2.405>`. Aucun schéma ni donnée applicative n'est
+modifié par la tranche. Après réversion, exécuter le test repository, le contrôle
+d'architecture, redémarrer le backend et relire les paramètres de confidentialité.
