@@ -9730,3 +9730,46 @@ Validation finale observée : gate consolidé **186/186**, 344 outils et harness
 compilation de 265 fichiers Python, lint sans erreur; build Next.js 16.2.6 Turbopack réussi;
 smokes live API **28/28** et pages **40/40**. Backend v2.420.0 relancé avec Ollama disponible
 et 15 workers; frontend Turbopack relancé et HTTP 200.
+
+## 2026-07-28 — v2.421.0 — Intégrité relationnelle des tours SSE
+
+### Constat et décision
+
+La base réelle contenait 27 événements `chat_turn_events` sans parent, répartis entre deux
+requêtes du 22 juillet 2026. Le schéma possède bien `ON DELETE CASCADE` et la frontière
+SQLite actuelle active les clés étrangères. L'origine historique exacte ne peut donc pas
+être affirmée; la cause compatible avec les preuves est un ancien processus ou une ancienne
+connexion n'appliquant pas la contrainte. Deux réponses ont été comparées : supprimer les
+lignes comme données inutilisables, ou les archiver intégralement avant réparation. La
+seconde est retenue afin de préserver les preuves métier et permettre l'analyse/rollback.
+
+### Implémentation et sécurité
+
+- migration 5 transactionnelle : table d'archive métier sans FK, copie idempotente des seuls
+  orphelins, puis suppression bornée aux lignes effectivement archivées et toujours sans parent ;
+- conservation sans expiration de `request_id`, séquence, JSON et dates; aucun contenu n'est
+  ajouté aux logs techniques ;
+- `db_connection.get_conn` échoue fermé si `PRAGMA foreign_keys` ne vaut pas 1 ;
+- `_append_event` utilise `INSERT ... SELECT ... WHERE EXISTS` et refuse explicitement
+  l'absence du tour parent, défense indépendante de la configuration de connexion ;
+- rollback de données séparé, confirmé par deux options et réservé à Marvin arrêté.
+
+### Validation réelle et rollback
+
+Un snapshot chiffré préalable `secretary_20260728_154158_219723.mrvbak` a été créé avec
+27 violations déclarées. Backend arrêté, la migration 5 a archivé 27 événements de deux
+requêtes; `foreign_key_check=0`, `orphan_events=0` et `quick_check=ok`. Les quatre champs
+métier des 27 archives ont été comparés au snapshot préalable : effectif et SHA-256 logique
+identiques. Les tests couvrent migration fraîche, archive, rollback, confirmation, parent
+absent et hygiène des connexions.
+
+Rollback de données, Marvin arrêté :
+`backend\.venv\Scripts\python.exe scripts\rollback-chat-turn-orphans.py --apply
+--accept-invalid-state`. Cette opération restaure volontairement les violations historiques;
+la méthode privilégiée pour un rollback intégral reste la restauration du snapshot chiffré
+préalable, puis `git revert <commit-v2.421>`.
+
+Validation finale observée : gate consolidé **186/186**, architecture 344 outils et harness
+344/344, compilation de 267 fichiers Python, lint sans erreur, build Next.js 16.2.6
+Turbopack réussi, smokes live API **28/28** et pages **40/40**. Backend v2.421.0 relancé
+avec Ollama disponible et 15 workers; frontend Turbopack relancé et HTTP 200.

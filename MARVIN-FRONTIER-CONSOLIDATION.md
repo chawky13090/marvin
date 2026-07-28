@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.420.0
+Version courante auditée : 2.421.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -420,6 +420,11 @@ conserve la lecture des `.db` historiques, tandis qu'une migration explicite fou
 montée et descente idempotente sans écrasement de collision. La preuve réelle a exécuté une
 montée de 14 fichiers, une descente de 15 fichiers, puis une remontée de 15 fichiers et une
 restauration logique exacte. La non-portabilité DPAPI reste explicitement suivie par SEC-012.
+En v2.421.0, l'intégrité relationnelle des tours SSE est réparée sans perte de preuve :
+les orphelins rejoignent une archive métier durable avant suppression, les connexions
+échouent si `foreign_keys` n'est pas actif et chaque insertion vérifie indépendamment son
+parent. La base réelle passe de 27 à zéro violation FK; les 27 lignes archivées correspondent
+exactement au snapshot chiffré préalable.
 
 ## 10. Preuves minimales par grande capacité
 

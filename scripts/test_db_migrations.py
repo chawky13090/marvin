@@ -21,6 +21,7 @@ from db_migrations import (
     apply_migrations,
     current_schema_version,
 )
+from chat_turn_integrity import integrity_summary, restore_archived_orphans
 
 
 def _connection() -> sqlite3.Connection:
@@ -103,7 +104,7 @@ def _check_catalog_order() -> None:
 
 def _check_fresh_marvin_schema() -> None:
     connection = _connection()
-    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4]
+    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5]
     tables = {
         row[0]
         for row in connection.execute(
@@ -125,6 +126,7 @@ def _check_fresh_marvin_schema() -> None:
         "action_receipts",
         "chat_turns",
         "chat_turn_events",
+        "chat_turn_event_orphan_archive",
         "schema_migrations",
     }
     assert expected <= tables, expected - tables
@@ -141,12 +143,38 @@ def _check_fresh_marvin_schema() -> None:
     connection.close()
 
 
+def _check_orphan_archive_and_data_rollback() -> None:
+    connection = _connection()
+    assert apply_migrations(connection, MIGRATIONS[:4]) == [1, 2, 3, 4]
+    connection.commit()
+    connection.execute("PRAGMA foreign_keys=OFF")
+    connection.execute(
+        """INSERT INTO chat_turn_events
+           (request_id, sequence, event_json, created_at)
+           VALUES ('missing', 1, '{"type":"done"}', '2026-07-22 08:24:33')"""
+    )
+    connection.commit()
+    connection.execute("PRAGMA foreign_keys=ON")
+    assert apply_migrations(connection, MIGRATIONS) == [5]
+    connection.commit()
+    assert integrity_summary(connection) == {
+        "orphan_events": 0,
+        "archived_events": 1,
+        "archived_requests": 1,
+    }
+    restored = restore_archived_orphans(connection, confirmed=True)
+    assert restored == {"success": True, "restored_events": 1}
+    assert integrity_summary(connection)["orphan_events"] == 1
+    connection.close()
+
+
 def main() -> int:
     _check_apply_once()
     _check_failed_migration_rolls_back()
     _check_drift_and_schema_ahead()
     _check_catalog_order()
     _check_fresh_marvin_schema()
+    _check_orphan_archive_and_data_rollback()
     print("Migrations SQLite OK - idempotence, checksum, rollback et compatibilite.")
     return 0
 

@@ -221,6 +221,41 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX IF NOT EXISTS idx_chat_turn_events_request ON chat_turn_events(request_id, sequence)",
         ),
     ),
+    Migration(
+        version=5,
+        name="archive-orphaned-chat-turn-events",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS chat_turn_event_orphan_archive (
+                request_id TEXT NOT NULL,
+                sequence INTEGER NOT NULL,
+                event_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                archived_at TEXT NOT NULL DEFAULT (datetime('now')),
+                reason TEXT NOT NULL
+                    CHECK(reason = 'missing-chat-turn-parent'),
+                PRIMARY KEY (request_id, sequence)
+            )""",
+            """INSERT OR IGNORE INTO chat_turn_event_orphan_archive
+               (request_id, sequence, event_json, created_at, reason)
+               SELECT event.request_id, event.sequence, event.event_json,
+                      event.created_at, 'missing-chat-turn-parent'
+               FROM chat_turn_events AS event
+               LEFT JOIN chat_turns AS turn
+                 ON turn.request_id = event.request_id
+               WHERE turn.request_id IS NULL""",
+            """DELETE FROM chat_turn_events
+               WHERE EXISTS (
+                   SELECT 1 FROM chat_turn_event_orphan_archive AS archive
+                   WHERE archive.request_id = chat_turn_events.request_id
+                     AND archive.sequence = chat_turn_events.sequence
+                     AND archive.reason = 'missing-chat-turn-parent'
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM chat_turns
+                   WHERE chat_turns.request_id = chat_turn_events.request_id
+               )""",
+        ),
+    ),
 )
 
 

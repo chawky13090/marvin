@@ -39,6 +39,20 @@ async def _exercise(path: Path) -> None:
 
     fingerprint = chat_turn_runtime.payload_hash({"messages": [{"role": "user", "content": "test"}]})
     with patch.object(chat_turn_runtime, "db", scope):
+        try:
+            chat_turn_runtime._append_event(
+                "parent-absent",
+                {"type": "done"},
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Un événement sans tour parent doit être refusé.")
+        with db(path) as connection:
+            assert connection.execute(
+                "SELECT COUNT(*) FROM chat_turn_events WHERE request_id = 'parent-absent'"
+            ).fetchone()[0] == 0
+
         first_stream = chat_turn_runtime.subscribe(
             request_id="turn-1", fingerprint=fingerprint, conversation_id="conv-1",
             producer_factory=producer,

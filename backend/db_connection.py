@@ -16,6 +16,11 @@ def get_conn(path: str | Path = DB_PATH) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA foreign_keys=ON")
+    if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+        connection.close()
+        raise sqlite3.OperationalError(
+            "SQLite n'a pas activé l'intégrité référentielle."
+        )
     connection.execute("PRAGMA busy_timeout=10000")
     connection.execute("PRAGMA secure_delete=ON")
     connection.execute("PRAGMA trusted_schema=OFF")

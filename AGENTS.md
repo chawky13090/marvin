@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.420.0)
+## 9. État actuel (v2.421.0)
+
+**v2.421 (intégrité des tours SSE)** : la migration 5 archive intégralement les événements
+dont le tour parent manque, puis retire uniquement ces lignes invalides. L'archive conserve
+requête, séquence, JSON et horodatage sans expiration; un rollback explicite peut restaurer
+l'état historique invalide avec Marvin arrêté. Chaque connexion vérifie maintenant que les
+clés étrangères sont réellement actives et l'insertion d'un événement exige aussi son parent,
+même si une connexion future était mal configurée. Sur la base réelle, les 27 événements de
+deux tours ont été archivés à l'identique (empreinte logique comparée au snapshot chiffré),
+zéro orphelin et zéro violation FK restent, avec `quick_check=ok`.
 
 **v2.420 (sauvegardes chiffrées réversibles)** : les nouvelles sauvegardes utilisent un
 conteneur versionné AES-256-GCM. Une clé aléatoire distincte par fichier est protégée par

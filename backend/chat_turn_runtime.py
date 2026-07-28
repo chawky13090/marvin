@@ -93,10 +93,21 @@ def _append_event(request_id: str, event: dict[str, Any]) -> int:
             (request_id,),
         ).fetchone()
         sequence = int(row["next_sequence"])
-        connection.execute(
-            "INSERT INTO chat_turn_events (request_id, sequence, event_json) VALUES (?, ?, ?)",
-            (request_id, sequence, json.dumps(event, ensure_ascii=False, default=str)),
+        cursor = connection.execute(
+            """INSERT INTO chat_turn_events (request_id, sequence, event_json)
+               SELECT ?, ?, ?
+               WHERE EXISTS (
+                   SELECT 1 FROM chat_turns WHERE request_id = ?
+               )""",
+            (
+                request_id,
+                sequence,
+                json.dumps(event, ensure_ascii=False, default=str),
+                request_id,
+            ),
         )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Le tour parent est absent; événement SSE refusé.")
         conversation_id = event.get("conversationId") if event.get("type") == "conv_id" else None
         if conversation_id:
             connection.execute(
