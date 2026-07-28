@@ -15,6 +15,9 @@ que les IA de pointe » sans mesure reproductible. Il impose plutôt, pour chaqu
 4. des tests de trajectoire et de résultat adaptés au risque ;
 5. une preuve d'exécution réelle quand elle est sûre et non destructive ;
 6. un rollback exact, vérifié avant chaque commit.
+7. une amélioration proactive, utile et mesurable inspirée des meilleures pratiques ou
+   innovations pertinentes; si aucune n'est justifiée, la décision de ne pas complexifier
+   doit être motivée dans le journal.
 
 Les statuts ont un sens strict :
 
@@ -116,13 +119,14 @@ Une tranche n'est livrable que si les éléments applicables sont présents :
 1. état initial et risque de perte fonctionnelle ;
 2. comparaison d'au moins deux approches pour toute décision significative ;
 3. choix motivé selon sécurité, résilience, maintenabilité, performance et dépendance ;
-4. tests ciblés ajoutés avant ou avec la correction ;
-5. compilation, architecture et gate rapide ;
-6. validation HTTP ou UI réelle, sûre et non destructive ;
-7. smoke test et contrôle des journaux ;
-8. documentation dans `AGENTS.md` et `DEVELOPMENT-JOURNAL.md` ;
-9. `git diff --check`, staging exact et contrôle du patch inverse ;
-10. commit atomique, version alignée et commande de rollback documentée.
+4. amélioration proactive évaluée face aux meilleures pratiques et innovations pertinentes ;
+5. tests ciblés ajoutés avant ou avec la correction ;
+6. compilation, architecture et gate rapide ;
+7. validation HTTP ou UI réelle, sûre et non destructive ;
+8. smoke test et contrôle des journaux ;
+9. documentation dans `AGENTS.md` et `DEVELOPMENT-JOURNAL.md` ;
+10. `git diff --check`, staging exact et contrôle du patch inverse ;
+11. commit atomique, version alignée et commande de rollback documentée.
 
 Les tests déterministes vérifient en priorité le résultat réel et les effets de bord. Les
 évaluations LLM complètent ces tests pour la qualité ouverte, sans remplacer les assertions

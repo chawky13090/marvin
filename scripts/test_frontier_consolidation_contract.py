@@ -78,6 +78,8 @@ def run() -> dict[str, int]:
         raise ContractError(f"Couverture invalide : absents={missing}, inconnus={unknown}")
     if "au moins deux approches" not in text.lower():
         raise ContractError("La comparaison de deux approches doit rester obligatoire.")
+    if "amélioration proactive" not in text.lower():
+        raise ContractError("L'amélioration proactive doit rester obligatoire par tranche.")
     if "git apply --cached --check --reverse" not in text:
         raise ContractError("Le contrôle de réversibilité du patch doit rester documenté.")
     if "`git revert <commit>`" not in text:

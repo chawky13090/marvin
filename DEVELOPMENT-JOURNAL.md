@@ -7948,3 +7948,41 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   sont restées dans un répertoire temporaire supprimé à la fin.
 - Rollback : réversion atomique du commit v2.389 après contrôle du patch inverse; redémarrer
   le backend puis repasser test ciblé, `/api/health`, gate rapide et smoke test.
+
+## 2026-07-28 — v2.390.0 — logos locaux reproductibles et atomiques
+
+### Constat, comparaison et amélioration proactive
+
+- `logo_generate` mélangeait disponibilité GPU, paramètres, diffusion, fichier et SQLite.
+  Une taille non numérique levait, une dimension arbitraire pouvait saturer la mémoire GPU,
+  deux générations pouvaient se concurrencer et une panne SQLite laissait un PNG orphelin.
+- Deux options ont été comparées : déplacer seulement les deux fonctions ou créer une
+  frontière injectable qui possède tout le cycle fichier-catalogue. La seconde est retenue,
+  car le résultat observable inclut à la fois le PNG et son enregistrement.
+- En plus de la correction, une seed explicite et bornée est ajoutée : elle rend une création
+  reproductible, ce qui améliore les évaluations et la réutilisation sans imposer un modèle.
+- Le contrat global impose maintenant cette recherche d'amélioration proactive à chaque
+  tranche, ou une justification écrite lorsque la simplicité est préférable.
+
+### Solution
+
+- Nouveau `tool_domains/logos.py`; disponibilité, générateur, catalogue, racine et identifiant
+  sont injectés.
+- Tailles autorisées : 256, 384, 512, 640, 768 et 1024 pixels; seed 32 bits optionnelle.
+- Une génération GPU simultanée, opérations bloquantes hors event loop, fichier temporaire
+  puis remplacement atomique.
+- Si la génération, le fichier ou SQLite échoue, les résidus sont supprimés et une erreur
+  bornée est retournée. La liste est limitée à 200 entrées et projette uniquement cinq champs.
+- Les identités `logo_generate` et `logo_list` sont conservées.
+
+### Validation et rollback
+
+- Compilation et test ciblé réussis sur de vrais fichiers temporaires avec faux GPU :
+  paramètres invalides, seed, PNG, nettoyage, catalogue, indisponibilité et façades.
+- Contrat frontier et architecture réussis : seize domaines, 344 outils, 346 routes,
+  harness 344/344. Aucun modèle réel n'a été téléchargé ou chargé.
+- Gate rapide réussi sur 161 étapes; backend réel redémarré en 2.390.0 avec Ollama,
+  344 outils et 15 workers. `logo_generate` et `logo_list` apparaissent chacun une fois dans
+  le catalogue HTTP; smoke test réel 28/28 avec le frontend Turbopack.
+- Rollback : réversion atomique du commit v2.390 après contrôle du patch inverse; redémarrer
+  le backend puis repasser test ciblé, `/api/health`, gate rapide et smoke test.

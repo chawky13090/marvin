@@ -90,6 +90,7 @@ from tool_domains import email_monitoring as email_monitoring_domain
 from tool_domains import email_automation as email_automation_domain
 from tool_domains import telegram as telegram_domain
 from tool_domains import webapp as webapp_domain
+from tool_domains import logos as logos_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -990,51 +991,17 @@ async def execute_skill_learning_log(args: dict) -> dict:
 # SECTION OCR — Extraction de texte par vision (llava-phi3)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_logo_generate(args: dict) -> dict:
-    """Génère un logo localement (GPU, sd-turbo) à partir d'une description, l'enregistre
-    dans data/logos/ et le référence en base pour réutilisation future (logo_list). Né d'un
-    échec réel : sans cet outil, le seul recours était d'écrire du code System.Drawing à la
-    main via PowerShell -- fragile et lent. Jamais de génération d'image via un shell."""
-    name = (args.get("name") or "logo").strip()
-    prompt = (args.get("prompt") or args.get("description") or "").strip()
-    if not prompt:
-        return {"error": "Paramètre 'prompt' requis (description visuelle du logo à générer)."}
-    size = int(args.get("size") or 512)
+import local_image as local_image_runtime
 
-    import local_image as _limg
-    import uuid as _uuid
-    from config import DATA_DIR as _DATA_DIR
-    avail = _limg.is_available()
-    if not avail["ok"]:
-        return {"error": avail["reason"]}
-
-    slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "logo"
-    out_path = str(Path(_DATA_DIR) / "logos" / f"{slug}-{_uuid.uuid4().hex[:8]}.png")
-
-    result = await asyncio.to_thread(_limg.generate_logo_image, prompt, out_path, size)
-    if not result.get("success"):
-        return {"error": result.get("error", "Échec de la génération d'image.")}
-
-    db.create_logo(name, prompt, result["path"])
-    return {
-        "success": True,
-        "message": f"Logo généré en {result['generation_seconds']}s ({result['device']}) : {result['path']}",
-        "path": result["path"],
-        "name": name,
-    }
-
-
-async def execute_logo_list(args: dict) -> dict:
-    """Liste les logos déjà générés (nom, prompt, chemin) — à consulter avant d'en régénérer
-    un pour un client/contexte déjà rencontré, pour réutiliser au lieu de dupliquer."""
-    limit = int(args.get("limit") or 50)
-    logos = db.list_logos(limit=limit)
-    return {
-        "success": True,
-        "count": len(logos),
-        "logos": [{"id": l["id"], "name": l["name"], "prompt": l.get("prompt", ""),
-                   "path": l["path"], "created_at": l.get("created_at")} for l in logos],
-    }
+logos_domain.configure(
+    availability=local_image_runtime.is_available,
+    generate_image=local_image_runtime.generate_logo_image,
+    create_record=db.create_logo,
+    list_records=db.list_logos,
+    output_root=Path(__file__).resolve().parent.parent / "data" / "logos",
+)
+execute_logo_generate = logos_domain.generate
+execute_logo_list = logos_domain.list_logos
 
 
 
@@ -2930,7 +2897,8 @@ TOOLS_SPEC = [
     _t("logo_generate", "Génère un LOGO/icône localement (GPU, aucune donnée envoyée au cloud) à partir d'une description visuelle, l'enregistre dans une base réutilisable. À utiliser chaque fois qu'un logo/icône de marque est demandé pour un document ou une mise en page — JAMAIS en écrivant du code (PowerShell/System.Drawing, Python...) à la main : lent, fragile, et ce n'est pas le rôle d'un shell. Vérifie d'abord logo_list si un logo existe déjà pour ce nom/contexte.",
        {"name": {"type": "string", "description": "Nom court identifiant ce logo (ex. nom de l'entreprise/du projet) — sert de clé de réutilisation"},
         "prompt": {"type": "string", "description": "Description visuelle du logo souhaité (style, symbole, couleurs) — en anglais de préférence, le modèle de génération d'image le comprend mieux"},
-        "size": {"type": "integer", "description": "Taille en pixels, carré (défaut 512)"}},
+        "size": {"type": "integer", "enum": [256, 384, 512, 640, 768, 1024], "description": "Taille carrée en pixels (défaut 512)"},
+        "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295, "description": "Graine optionnelle pour reproduire exactement une génération"}},
        ["name", "prompt"]),
 
     _t("logo_list", "Liste les logos déjà générés localement (nom, description, chemin) — à consulter AVANT logo_generate pour réutiliser un logo existant plutôt que d'en régénérer un nouveau pour le même client/contexte.",

@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.390 — Logos extrait; génération sérialisée, atomique et reproductible
 # v2.389 — Webapp extrait; HTML borné, atomique et réseau bloqué par CSP
 # v2.388 — Telegram extrait; secret masqué, entrées bornées et transport injectable
 # v2.387 — contrat global de consolidation, preuves et rollback contrôlés

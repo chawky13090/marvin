@@ -183,7 +183,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.389.0)
+## 9. État actuel (v2.390.0)
+
+**v2.390 (logos locaux)** : génération et catalogue rejoignent
+`tool_domains/logos.py`. Les dimensions sont limitées à six tailles compatibles, nom,
+description, seed, résultats et liste sont bornés. Une seule génération GPU s'exécute à la
+fois; disponibilité, diffusion et SQLite quittent la boucle asyncio. Le PNG est produit sous
+un nom temporaire puis remplacé atomiquement; une panne du catalogue supprime le fichier
+orphelin. L'amélioration proactive ajoute une seed validée pour rendre une génération
+reproductible et expose taille, durée, appareil et octets sans modifier les deux outils.
+
+**Règle transversale active** : chaque tranche doit désormais rechercher une amélioration
+utile et mesurable face aux meilleures pratiques ou innovations pertinentes, en plus de la
+consolidation et des corrections. Une absence d'amélioration doit être motivée afin de ne pas
+ajouter de complexité sans bénéfice.
 
 **v2.389 (mini-applications Web)** : `webapp_create` rejoint
 `tool_domains/webapp.py`. Le HTML reste autonome avec scripts et styles inline, mais toute
