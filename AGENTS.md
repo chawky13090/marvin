@@ -183,7 +183,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.370.0)
+## 9. État actuel (v2.371.0)
+
+**v2.371 (moteur Council)** : le panel cinq familles, la critique aveugle et l'arbitrage
+quittent `tools.py` pour `model_council.py`. Routage Cloud, réglage de concurrence, transport
+HTTP et identifiant de trace sont injectables. Question, preuves et réponses sont bornées;
+confidentialité, diversité, retries, provenance et absence de repli local restent autoritaires.
 
 **v2.370 (nettoyage système)** : `system_cleanup` rejoint
 `tool_domains/system_cleanup.py`. Le scan distingue désormais volume total et volume

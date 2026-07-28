@@ -263,6 +263,10 @@ HTTPS et le transport anti-SSRF. Les identités publiques du registre restent in
 Le nettoyage système rejoint une frontière dédiée : seules les racines temporaires internes
 sont parcourues, sans suivi des liens et avec un plafond explicite. Le rapport sépare enfin
 volume observé et volume récupérable selon l'âge; suppressions et erreurs sont comptabilisées.
+Le Council cinq modèles quitte la façade pour `model_council.py`. La frontière expose un
+workflow explicite panel parallèle → critique aveugle → arbitrage, avec cinq familles Cloud
+distinctes, budgets, provenance, identifiant de trace et dépendances injectables. Les profils
+Hyper local/sensibles restent bloqués et aucun repli local silencieux n'est introduit.
 
 ## 4. Validation obligatoire par tranche
 

@@ -261,6 +261,10 @@ IPWhois en HTTPS à travers `outbound_http`; l'ancien transport HTTP non chiffr�
 confirmée des seuls fichiers temporaires assez anciens. Racines dédupliquées, liens ignorés,
 parcours borné, opérations bloquantes hors event loop et erreurs visibles remplacent le
 parcours illimité qui masquait les échecs.
+89. le moteur Council : `model_council.py` orchestre exactement cinq familles Ollama Cloud,
+en parallèle borné, puis une critique anonymisée et un arbitrage. Le routage de confidentialité
+reste déterministe; aucun repli local n'est possible. Chaque exécution porte un `council_id`,
+les dépendances sont injectables et les volumes de contexte/réponse sont plafonnés.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

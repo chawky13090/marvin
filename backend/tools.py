@@ -21,6 +21,7 @@ from typing import Any
 import psutil
 import database as db
 import cloud_routing as cloud_routing_runtime
+import model_council as model_council_runtime
 import vector_store as vector_store_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
@@ -2611,175 +2612,13 @@ async def execute_telegram_send(args: dict) -> dict:
 # approfondie/exhaustive, jamais déclenché par défaut sur une question simple.
 
 
-# v2.211 — Council v2 : cinq familles cloud, cinq rôles indépendants, critique aveugle puis
-# arbitrage. Aucun repli local silencieux : la provenance exposée est celle de l'appel réel.
-async def execute_ai_model_council(args: dict) -> dict:
-    """Conseil de cinq modèles Ollama Cloud appartenant à cinq familles différentes.
-
-    Le premier tour est indépendant. Un membre critique ensuite les réponses anonymisées,
-    puis un autre arbitre l'ensemble dans l'ordre inverse pour réduire le biais de position.
-    """
-    question = (args.get("question") or args.get("query") or "").strip()
-    if not question:
-        return {"error": "Paramètre 'question' requis."}
-    evidence = (args.get("evidence") or args.get("context") or "").strip()
-    panel_size = 5
-
-    import cloud_routing as _cr
-    import httpx as _hx
-    cloud_enabled, _ = _cr.get_cloud_config()
-    if not cloud_enabled:
-        return {"error": "Le mode cloud n'est pas activé — Council v2 exige cinq modèles Ollama Cloud."}
-    if _cr.is_local_only_lockdown():
-        return {"error": "Le mode Hyper local interdit Council Cloud. Passe en mode Normal, Tout cloud ou Ultra débridé."}
-    sensitive = _cr.is_sensitive_text(question + "\n" + evidence)
-    if sensitive and not _cr.is_ultra_unrestricted():
-        return {"error": "Donnée sensible détectée : les cinq avis cloud sont bloqués hors mode Ultra débridé."}
-
-    need = _cr.detect_task(question) or "general"
-    candidates = _cr.list_distinct_cloud_models(need)
-    if len(candidates) < panel_size:
-        return {
-            "error": f"Council v2 requiert 5 familles cloud distinctes ; {len(candidates)} seulement sont disponibles.",
-            "available_models": candidates,
-        }
-
-    roles = (
-        ("analyste", "Construis la meilleure solution et explicite les hypothèses décisives."),
-        ("critique", "Cherche les erreurs, contre-exemples, risques et hypothèses cachées."),
-        ("vérificateur", "Contrôle la solidité factuelle, les preuves et ce qui reste incertain."),
-        ("alternatif", "Propose une approche réellement différente et compare ses compromis."),
-        ("praticien", "Transforme l'analyse en décision concrète, testable et priorisée."),
-    )
-    try:
-        concurrency = max(1, min(int(db.get_setting("council_concurrency") or 3), panel_size))
-    except Exception:
-        concurrency = 3
-    semaphore = asyncio.Semaphore(concurrency)
-
-    async def _cloud_call(client, model: str, prompt: str, phase: str) -> dict:
-        started = time.perf_counter()
-        attempts = []
-        async with semaphore:
-            for attempt in range(1, 3):
-                try:
-                    response = await client.post(
-                        f"{OLLAMA_URL}/api/generate",
-                        json={"model": model, "prompt": prompt, "stream": False},
-                    )
-                    response.raise_for_status()
-                    text = (response.json().get("response") or "").strip()
-                    if not text:
-                        raise RuntimeError("réponse vide")
-                    return {
-                        "ok": True, "model": model, "family": _cr.model_family(model),
-                        "source": "ollama_cloud", "phase": phase, "answer": text,
-                        "attempts": attempt, "duration_ms": int((time.perf_counter() - started) * 1000),
-                    }
-                except Exception as exc:
-                    attempts.append(f"{type(exc).__name__}: {str(exc)[:180]}")
-                    if isinstance(exc, _hx.TimeoutException):
-                        break
-                    if attempt == 1:
-                        await asyncio.sleep(0.5)
-        return {
-            "ok": False, "model": model, "family": _cr.model_family(model),
-            "source": "ollama_cloud", "phase": phase, "attempts": len(attempts),
-            "duration_ms": int((time.perf_counter() - started) * 1000), "errors": attempts,
-        }
-
-    context_block = f"\n\nÉLÉMENTS VÉRIFIÉS FOURNIS :\n{evidence[:12000]}" if evidence else ""
-    async with _hx.AsyncClient(timeout=_hx.Timeout(150.0, connect=10.0)) as client:
-        selected = candidates[:panel_size]
-        prompts = []
-        for index, ((role, instruction), model) in enumerate(zip(roles, selected)):
-            prompts.append((model, (
-                f"Tu es le membre {index + 1} d'un conseil, rôle : {role}. {instruction}\n"
-                "Travaille indépendamment : ne suppose pas ce que diront les autres. Réponds en français "
-                "avec les sections Recommandation, Raisons, Preuves ou vérifications nécessaires, Risques, "
-                f"Incertitudes et Confiance (0-100).\n\nQUESTION :\n{question}{context_block}"
-            )))
-        results = list(await asyncio.gather(*[
-            _cloud_call(client, model, prompt, "independent") for model, prompt in prompts
-        ]))
-        panel_attempt_log = []
-        for index, result in enumerate(results):
-            result["slot"] = index + 1
-            result["role"] = roles[index][0]
-            panel_attempt_log.append(dict(result))
-
-        # Un membre défaillant est remplacé par une AUTRE famille disponible. Aucun repli
-        # local n'est autorisé, sinon la provenance et la diversité seraient mensongères.
-        reserve = candidates[panel_size:]
-        for index, result in enumerate(list(results)):
-            if result.get("ok"):
-                continue
-            while reserve:
-                replacement = reserve.pop(0)
-                retried = await _cloud_call(client, replacement, prompts[index][1], "independent_replacement")
-                retried["slot"] = index + 1
-                retried["role"] = roles[index][0]
-                panel_attempt_log.append(dict(retried))
-                results[index] = retried
-                if retried.get("ok"):
-                    break
-
-        successful = [item for item in results if item.get("ok")]
-        if len(successful) != panel_size or len({_cr.model_family(x["model"]) for x in successful}) != panel_size:
-            return {
-                "error": "Impossible d'obtenir cinq réponses cloud issues de cinq familles distinctes.",
-                "attempted": panel_attempt_log,
-            }
-
-        anonymous = [
-            {"id": chr(65 + i), "answer": item["answer"][:4500]}
-            for i, item in enumerate(successful)
-        ]
-        forward_digest = "\n\n".join(f"[AVIS {x['id']}]\n{x['answer']}" for x in anonymous)
-        critic_prompt = (
-            "Tu es le contradicteur d'un conseil. Les avis sont anonymisés : ne devine pas les modèles. "
-            "Identifie les affirmations non étayées, contradictions, consensus trompeurs et l'avis minoritaire "
-            "qui pourrait être juste. Termine par les critères que l'arbitre doit appliquer.\n\n"
-            f"QUESTION : {question}\n\n{forward_digest}"
-        )
-        critique = await _cloud_call(client, successful[3]["model"], critic_prompt, "cross_critique")
-
-        reverse_digest = "\n\n".join(
-            f"[AVIS {x['id']}]\n{x['answer']}" for x in reversed(anonymous)
-        )
-        judge_prompt = (
-            "Tu es l'arbitre final. Les cinq avis sont anonymisés et présentés dans un ordre inversé par "
-            "rapport au contradicteur. Ne vote pas à la majorité : juge les preuves, le respect des contraintes, "
-            "les risques et l'applicabilité. Préserve explicitement un désaccord important au lieu de fabriquer "
-            "un consensus. Réponds en français avec : Réponse retenue, Pourquoi, Consensus solide, Désaccords, "
-            "Incertitudes, Plan d'action et Confiance globale (0-100).\n\n"
-            f"QUESTION : {question}\n\nAVIS :\n{reverse_digest}\n\n"
-            f"REVUE CONTRADICTOIRE :\n{critique.get('answer', 'indisponible')[:5000]}"
-        )
-        judge_order = [successful[0], successful[2], successful[1], successful[4]]
-        arbitration = None
-        for judge in judge_order:
-            attempt = await _cloud_call(client, judge["model"], judge_prompt, "arbitration")
-            if attempt.get("ok"):
-                arbitration = attempt
-                break
-        if not arbitration:
-            return {"error": "Les cinq avis ont répondu, mais l'arbitrage cloud a échoué.", "panel": successful}
-
-    return {
-        "success": True,
-        "answer": arbitration["answer"],
-        "models_consulted": [item["model"] for item in successful],
-        "families": [item["family"] for item in successful],
-        "panel_size": panel_size,
-        "concurrency": concurrency,
-        "individual_answers": successful,
-        "panel_attempt_log": panel_attempt_log,
-        "critique": critique,
-        "arbitration": arbitration,
-        "privacy_mode": "ultra_unrestricted" if _cr.is_ultra_unrestricted() else "cloud_non_sensitive",
-        "message": "Council v2 terminé : 5 familles cloud, critique croisée et arbitrage traçable.",
-    }
+# Council : panel parallèle, critique et arbitrage vivent dans une frontière injectable.
+model_council_runtime.configure(
+    routing=cloud_routing_runtime,
+    get_setting=db.get_setting,
+    ollama_url=OLLAMA_URL,
+)
+execute_ai_model_council = model_council_runtime.run
 
 
 # v2.214 — Cortex Search explore plusieurs stratégies, puis les soumet à cinq
@@ -5843,8 +5682,8 @@ TOOLS_SPEC = [
        "obligatoirement si l'utilisateur dit « mode Council », « Model Council » ou demande cinq "
        "modèles. Pour une recherche web, effectue d'abord la recherche puis passe les faits vérifiés "
        "dans evidence. Ne jamais l'utiliser spontanément pour une question simple.",
-       {"question": {"type": "string", "description": "La question à poser à plusieurs modèles"},
-        "evidence": {"type": "string", "description": "Faits ou sources déjà vérifiés à soumettre aux cinq modèles (optionnel)"}},
+       {"question": {"type": "string", "maxLength": 50000, "description": "La question à poser à plusieurs modèles"},
+        "evidence": {"type": "string", "maxLength": 12000, "description": "Faits ou sources déjà vérifiés à soumettre aux cinq modèles (optionnel)"}},
        ["question"]),
     _t("ai_cortex_search",
        "CORTEX SEARCH : explore 2 à 3 stratégies indépendantes avec Ollama Cloud, puis les "

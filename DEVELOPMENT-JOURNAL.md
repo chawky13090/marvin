@@ -7167,3 +7167,58 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - aucun schéma ou état persistant applicatif n'est modifié ;
 - rollback de la tranche : réversion atomique du commit après validation du patch inverse ;
 - après réversion, redémarrer le backend et repasser health, gate rapide et smoke test.
+
+## 2026-07-28 — v2.371.0 — Moteur Council injectable et traçable
+
+### Demande et critères
+
+- rapprocher le cœur agentique des frontières explicites utilisées par les architectures
+  OpenAI, Anthropic et Google ;
+- préserver exactement cinq modèles Ollama Cloud de familles distinctes ;
+- interdire tout repli local silencieux et conserver les règles de confidentialité ;
+- tester le vrai Council, pas seulement la façade.
+
+### Références officielles vérifiées
+
+- Anthropic, *Building Effective Agents* : parallélisation pour plusieurs perspectives,
+  séparation évaluateur/optimiseur et prompts spécialisés ;
+- OpenAI, *A practical guide to building AI agents* : guardrails déterministes et LLM,
+  observabilité, évaluations et seuils d'échec bornés ;
+- Google Cloud, *Multi-agent AI system* : coordinateur explicite, agents spécialisés,
+  raffinement itératif, validation finale et traçage.
+
+### Solution
+
+- nouveau `model_council.py` : panel parallèle de cinq rôles, remplacement Cloud borné,
+  critique anonymisée puis arbitrage dans un ordre différent ;
+- routage Cloud, réglage de concurrence, client HTTP, attente et génération d'identifiant
+  injectables pour des tests sans réseau ;
+- `council_id` ajouté à chaque exécution pour relier panel, critique et arbitrage ;
+- question limitée à 50 000 caractères, preuves à 12 000 et chaque réponse à 30 000 ;
+- validation déterministe de cinq familles distinctes avant le premier appel ;
+- confidentialité Hyper local/sensible inchangée et aucune branche de repli local ;
+- façade `execute_ai_model_council` et registre 344/344 conservés.
+
+### Validation observée
+
+- tests simulés : cinq familles, concurrence, sept appels panel/critique/arbitrage,
+  confidentialité, limites et identité de façade réussis ;
+- tests Council historiques et Ultra cloud-only réussis ;
+- architecture : Marvin **2.371.0**, **344 outils**, **346 routes**, harness **344/344** et
+  **65 restrictions** ;
+- gate rapide complet : **143/143** étapes ;
+- `/api/health` : version **2.371.0**, Ollama disponible, 344 outils et 15 workers ;
+- Council réel via `/api/tools` : succès en 112 secondes, identifiant
+  `council-fef02c6748a2`, panel de cinq familles `deepseek`, `qwen`, `glm`, `nemotron`,
+  `mistral`, critique et arbitrage réussis ;
+- le premier essai PowerShell accentué a été rejeté avant Council pour encodage du corps ;
+  la preuve réelle a été relancée avec un corps UTF-8 explicite ;
+- frontend Turbopack conservé, smoke test réel : **28/28** contrats.
+
+### Rollback
+
+- aucun schéma, réglage, secret ou contenu utilisateur n'est modifié ;
+- rollback : réversion atomique du commit après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser health, gate rapide, Council déterministe
+  et smoke test. Un Council Cloud réel n'est requis à nouveau que si le transport ou le
+  routage diffère après rollback.
