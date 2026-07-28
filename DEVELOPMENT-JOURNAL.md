@@ -7879,3 +7879,39 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Aucun comportement runtime, schéma, donnée utilisateur ou interface publique n'est modifié.
 - Rollback : réversion atomique du commit v2.387 après contrôle du patch inverse; repasser
   ensuite le test contractuel, l'architecture, le gate rapide, `/api/health` et le smoke test.
+
+## 2026-07-28 — v2.388.0 — frontière Telegram sans fuite de secret
+
+### Constat et comparaison
+
+- Telegram mélangeait dans `tools.py` la lecture de configuration, le transport HTTP,
+  l'outil sortant et les notifications best-effort des workers.
+- L'exception réseau brute et le corps de réponse distant étaient renvoyés. L'URL Telegram
+  contenant le jeton du bot, certaines erreurs pouvaient donc exposer ce secret.
+- Deux options ont été comparées : réutiliser le client Web générique avec retries ou créer
+  un transport Telegram dédié injectable. Le second est retenu : un retry après une réponse
+  perdue peut produire un double envoi, alors que le transport injectable reste testable.
+
+### Solution
+
+- Nouveau `tool_domains/telegram.py` avec configuration, transport et projection publique
+  séparés; jeton et chat_id sont validés avant tout appel.
+- Les messages saisis par l'utilisateur échappent le HTML. Les notifications internes
+  explicitement formatées conservent le HTML Telegram.
+- Texte borné à la limite Telegram, timeout de 15 secondes et aucun retry implicite.
+- Les échecs exposent type et code HTTP utiles, jamais l'URL, le corps distant ou le jeton.
+- `_telegram_cfg`, `_send_telegram`, `_telegram_notify`, `execute_telegram_send` et l'identité
+  du registre sont conservés par alias directs.
+
+### Validation et rollback
+
+- Compilation ciblée, test Telegram sans réseau, service proactif, surveillance e-mail et
+  architecture exécutés avec succès; 344 outils, 346 routes et harness 344/344.
+- Le test couvre configuration absente/invalide, HTML, désactivation, panne, HTTP 429,
+  non-divulgation du jeton et identités de façade.
+- Gate rapide complet réussi sur 159 étapes; backend réel redémarré en 2.388.0 avec Ollama,
+  344 outils et 15 workers. Le catalogue HTTP contient exactement un `telegram_send` et le
+  smoke test réel passe sur 28/28 contrats avec le frontend Turbopack.
+- Aucun message Telegram réel n'a été envoyé et aucune configuration n'a été modifiée.
+- Rollback : réversion atomique du commit v2.388 après contrôle du patch inverse; redémarrer
+  le backend puis repasser le test ciblé, `/api/health`, le gate rapide et le smoke test.

@@ -154,6 +154,7 @@ def run() -> dict[str, int | str]:
         "check:runtime",
         "check:architecture",
         "check:frontier-contract",
+        "check:telegram",
         "check:runtime-supervisor",
         "check:runtime-workers",
         "check:communication-workers",
@@ -262,6 +263,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_knowledge_mesh.py",
         ROOT / "scripts" / "test_engineering_radar.py",
         ROOT / "scripts" / "test_frontier_consolidation_contract.py",
+        ROOT / "scripts" / "test_tool_domain_telegram.py",
         ROOT / "scripts" / "smoke_test_api.py",
     ]
     missing_files = [str(path.relative_to(ROOT)) for path in required_files if not path.exists()]

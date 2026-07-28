@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.387.0)
+## 9. État actuel (v2.388.0)
+
+**v2.388 (notifications Telegram)** : configuration, validation des identifiants, transport
+HTTP et envoi rejoignent `tool_domains/telegram.py`. L'outil sortant conserve la confirmation
+obligatoire du gateway; les messages utilisateur échappent le HTML tandis que les alertes
+internes gardent leur mise en forme. Le transport ne fait aucun retry implicite susceptible
+de dupliquer une notification. Les corps d'erreur et exceptions réseau ne sont plus projetés
+au modèle, car l'URL Telegram contient le jeton du bot. Les façades API, workers, surveillance
+e-mail et registre restent identiques et sont couvertes par un test sans réseau réel.
 
 **v2.387 (contrat global de consolidation)** : `MARVIN-FRONTIER-CONSOLIDATION.md`
 étend formellement le chantier à tout le produit : Runner, sessions, outils, modèles,

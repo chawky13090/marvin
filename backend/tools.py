@@ -88,6 +88,7 @@ from tool_domains import email_messages as email_messages_domain
 from tool_domains import email_productivity as email_productivity_domain
 from tool_domains import email_monitoring as email_monitoring_domain
 from tool_domains import email_automation as email_automation_domain
+from tool_domains import telegram as telegram_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -1315,54 +1316,11 @@ async def execute_calendar_sync(args: dict) -> dict:
 # SECTION NOTIFICATIONS EXTERNES — Telegram (recevoir les alertes sur le téléphone)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _telegram_cfg() -> dict:
-    cfg = db.get_setting("telegram_config")
-    if isinstance(cfg, str):
-        try:
-            import json as _json
-            cfg = _json.loads(cfg)
-        except Exception:
-            cfg = {}
-    return cfg if isinstance(cfg, dict) else {}
-
-
-async def _send_telegram(text: str) -> dict:
-    cfg = _telegram_cfg()
-    token = (cfg.get("bot_token") or "").strip()
-    chat_id = str(cfg.get("chat_id") or "").strip()
-    if not token or not chat_id:
-        return {"error": "Telegram non configuré (jeton du bot + chat_id requis)."}
-    import httpx
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text[:3500], "parse_mode": "HTML",
-                      "disable_web_page_preview": True},
-            )
-        if r.status_code != 200:
-            return {"error": f"Telegram {r.status_code}: {r.text[:150]}"}
-        return {"success": True}
-    except Exception as e:
-        return {"error": str(e)[:150]}
-
-
-async def _telegram_notify(text: str):
-    """Envoi best-effort (ne lève jamais) — utilisé par les workers."""
-    try:
-        if (_telegram_cfg().get("enabled")):
-            await _send_telegram(text)
-    except Exception:
-        pass
-
-
-async def execute_telegram_send(args: dict) -> dict:
-    """Envoie un message sur ton Telegram (alerte, rappel, note). Nécessite la config Telegram."""
-    text = (args.get("text") or args.get("message") or "").strip()
-    if not text:
-        return {"error": "Texte du message requis."}
-    r = await _send_telegram(text)
-    return r if r.get("error") else {"success": True, "message": "📲 Message envoyé sur Telegram."}
+telegram_domain.configure(get_setting=db.get_setting)
+_telegram_cfg = telegram_domain.get_config
+_send_telegram = telegram_domain.send
+_telegram_notify = telegram_domain.notify
+execute_telegram_send = telegram_domain.execute_send
 
 
 # ══════════════════════════════════════════════════════════════════════════════

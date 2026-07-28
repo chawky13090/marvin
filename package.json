@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.387.0",
+  "version": "2.388.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -14,6 +14,7 @@
     "check:avatar": "node scripts/test_desktop_avatar.mjs",
     "check:architecture": "backend\\.venv\\Scripts\\python.exe scripts\\check_architecture.py",
     "check:frontier-contract": "backend\\.venv\\Scripts\\python.exe scripts\\test_frontier_consolidation_contract.py",
+    "check:telegram": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_domain_telegram.py",
     "check:runtime-supervisor": "backend\\.venv\\Scripts\\python.exe scripts\\test_runtime_supervisor.py",
     "check:runtime-workers": "backend\\.venv\\Scripts\\python.exe scripts\\test_runtime_workers.py",
     "check:communication-workers": "backend\\.venv\\Scripts\\python.exe scripts\\test_communication_workers.py",
