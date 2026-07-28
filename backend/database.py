@@ -24,6 +24,20 @@ from repositories.conversations import (
     update_conversation_title,
     upgrade_conversation_title_silent,
 )
+from repositories.memories import (
+    clear_all_memories,
+    create_memory,
+    delete_memory,
+    get_memories,
+    update_memory,
+)
+from repositories.notes import (
+    create_note,
+    delete_note,
+    get_note,
+    list_notes,
+    update_note,
+)
 from repositories.ssh_connections import (
     delete_ssh_connection,
     get_ssh_connection,
@@ -34,6 +48,13 @@ from repositories.ssh_connections import (
     update_ssh_connection,
 )
 from repositories.settings import get_setting, set_setting
+from repositories.tasks import (
+    create_task,
+    delete_task,
+    get_task,
+    list_tasks,
+    update_task,
+)
 from repositories.workflows import (
     create_workflow,
     create_workflow_run,
@@ -48,196 +69,9 @@ from repositories.workflows import (
 
 # ── Mémoires ──────────────────────────────────────────────────────────────────
 
-def create_memory(content: str, category: str = "fact") -> dict:
-    mid = str(uuid.uuid4())
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO memories (id, category, content) VALUES (?, ?, ?)",
-            (mid, category, content)
-        )
-    return {"id": mid, "category": category, "content": content}
-
-
-def get_memories() -> list[dict]:
-    with db() as conn:
-        rows = conn.execute("SELECT * FROM memories ORDER BY created_at DESC").fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def delete_memory(mid: str):
-    with db() as conn:
-        conn.execute("DELETE FROM memories WHERE id = ?", (mid,))
-
-
-def clear_all_memories():
-    with db() as conn:
-        conn.execute("DELETE FROM memories")
-
-
-def update_memory(mid: str, content: str = None, category: str = None) -> dict | None:
-    """Update memory content and/or category. Returns updated record or None."""
-    with db() as conn:
-        existing = conn.execute("SELECT * FROM memories WHERE id = ?", (mid,)).fetchone()
-        if not existing:
-            return None
-        new_content = content if content is not None else existing["content"]
-        new_category = category if category is not None else existing["category"]
-        conn.execute(
-            "UPDATE memories SET content = ?, category = ?, updated_at = datetime('now') WHERE id = ?",
-            (new_content, new_category, mid)
-        )
-        row = conn.execute("SELECT * FROM memories WHERE id = ?", (mid,)).fetchone()
-    return row_to_dict(row) if row else None
-
-
 # ── Tâches ────────────────────────────────────────────────────────────────────
 
-def create_task(
-    title: str,
-    description: str = "",
-    priority: str = "medium",
-    due_date: str | None = None,
-    tags: list | None = None,
-) -> dict:
-    tid = str(uuid.uuid4())
-    with db() as conn:
-        conn.execute(
-            """INSERT INTO tasks (id, title, description, priority, due_date, tags)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (tid, title, description, priority, due_date, json.dumps(tags or []))
-        )
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (tid,)).fetchone()
-    return _parse_task(row_to_dict(row))
-
-
-def get_task(tid: str) -> dict | None:
-    with db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (tid,)).fetchone()
-    return _parse_task(row_to_dict(row))
-
-
-def list_tasks(status: str | None = None, priority: str | None = None, limit: int = 50) -> list[dict]:
-    sql = "SELECT * FROM tasks WHERE 1=1"
-    params = []
-    if status:
-        sql += " AND status = ?"
-        params.append(status)
-    if priority:
-        sql += " AND priority = ?"
-        params.append(priority)
-    sql += " ORDER BY CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, created_at DESC LIMIT ?"
-    params.append(limit)
-    with db() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [_parse_task(row_to_dict(r)) for r in rows]
-
-
-def update_task(tid: str, updates: dict) -> dict | None:
-    fields, values = [], []
-    for k in ("title", "description", "status", "priority", "due_date"):
-        if k in updates:
-            fields.append(f"{k} = ?")
-            values.append(updates[k])
-    if "tags" in updates:
-        fields.append("tags = ?")
-        values.append(json.dumps(updates["tags"]))
-    if not fields:
-        return get_task(tid)
-    fields.append("updated_at = datetime('now')")
-    values.append(tid)
-    with db() as conn:
-        conn.execute(f"UPDATE tasks SET {', '.join(fields)} WHERE id = ?", values)
-    return get_task(tid)
-
-
-def delete_task(tid: str):
-    with db() as conn:
-        conn.execute("DELETE FROM tasks WHERE id = ?", (tid,))
-
-
-def _parse_task(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("tags") and isinstance(row["tags"], str):
-        try:
-            row["tags"] = json.loads(row["tags"])
-        except Exception:
-            row["tags"] = []
-    return row
-
-
 # ── Notes ─────────────────────────────────────────────────────────────────────
-
-def create_note(title: str, content: str = "", tags: list | None = None, pinned: bool = False) -> dict:
-    nid = str(uuid.uuid4())
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO notes (id, title, content, tags, pinned) VALUES (?, ?, ?, ?, ?)",
-            (nid, title, content, json.dumps(tags or []), 1 if pinned else 0)
-        )
-        row = conn.execute("SELECT * FROM notes WHERE id = ?", (nid,)).fetchone()
-    return _parse_note(row_to_dict(row))
-
-
-def get_note(nid: str) -> dict | None:
-    with db() as conn:
-        row = conn.execute("SELECT * FROM notes WHERE id = ?", (nid,)).fetchone()
-    return _parse_note(row_to_dict(row))
-
-
-def list_notes(search: str | None = None, pinned: bool | None = None, limit: int = 50) -> list[dict]:
-    sql = "SELECT * FROM notes WHERE 1=1"
-    params = []
-    if search:
-        sql += " AND (title LIKE ? OR content LIKE ?)"
-        params.extend([f"%{search}%", f"%{search}%"])
-    if pinned is not None:
-        sql += " AND pinned = ?"
-        params.append(1 if pinned else 0)
-    sql += " ORDER BY pinned DESC, updated_at DESC LIMIT ?"
-    params.append(limit)
-    with db() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [_parse_note(row_to_dict(r)) for r in rows]
-
-
-def update_note(nid: str, updates: dict) -> dict | None:
-    fields, values = [], []
-    for k in ("title", "content"):
-        if k in updates:
-            fields.append(f"{k} = ?")
-            values.append(updates[k])
-    if "tags" in updates:
-        fields.append("tags = ?")
-        values.append(json.dumps(updates["tags"]))
-    if "pinned" in updates:
-        fields.append("pinned = ?")
-        values.append(1 if updates["pinned"] else 0)
-    if not fields:
-        return get_note(nid)
-    fields.append("updated_at = datetime('now')")
-    values.append(nid)
-    with db() as conn:
-        conn.execute(f"UPDATE notes SET {', '.join(fields)} WHERE id = ?", values)
-    return get_note(nid)
-
-
-def delete_note(nid: str):
-    with db() as conn:
-        conn.execute("DELETE FROM notes WHERE id = ?", (nid,))
-
-
-def _parse_note(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("tags") and isinstance(row["tags"], str):
-        try:
-            row["tags"] = json.loads(row["tags"])
-        except Exception:
-            row["tags"] = []
-    row["pinned"] = bool(row.get("pinned", 0))
-    return row
-
 
 # ── Agenda / Événements (store local) ───────────────────────────────────────────
 

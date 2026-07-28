@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.405.0)
+## 9. État actuel (v2.406.0)
+
+**v2.406 (persistance personnelle)** : mémoires, tâches et notes rejoignent respectivement
+`repositories/memories.py`, `repositories/tasks.py` et `repositories/notes.py`. Les quinze
+fonctions historiques restent des façades identiques dans `database.py`. CRUD, filtres,
+JSON dégradé, champs de mise à jour autorisés, fermeture et rollback sont testés sur SQLite
+réel.
 
 **v2.405 (persistance des paramètres)** : `get_setting` et `set_setting` rejoignent
 `repositories/settings.py` derrière un repository injectable. La façade historique

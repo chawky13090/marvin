@@ -8867,3 +8867,48 @@ ne masque pas le verrou et documente le contrat réel attendu.
 Rollback après commit : `git revert <commit-v2.405>`. Aucun schéma ni donnée applicative n'est
 modifié par la tranche. Après réversion, exécuter le test repository, le contrôle
 d'architecture, redémarrer le backend et relire les paramètres de confidentialité.
+
+## 2026-07-28 — v2.406.0 — Repositories mémoires, tâches et notes
+
+### Contexte et décision
+
+La deuxième tranche de persistance couvre les données personnelles simples. Deux conceptions
+ont été comparées : un unique repository « productivité », plus court mais mélangeant trois
+cycles de vie, ou trois repositories cohésifs réunis seulement par une même gate de
+régression. La seconde est retenue pour préserver une responsabilité et une interface
+injectable par agrégat sans créer de processus ni de service supplémentaires.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/memories.py`, `repositories/tasks.py` et
+  `repositories/notes.py` ;
+- conservation des quinze fonctions publiques dans `database.py` par alias exacts ;
+- création et relecture restent dans une même transaction ;
+- mise à jour et relecture des tâches/notes sont désormais dans une même transaction, ce qui
+  supprime la fenêtre de concurrence entre deux connexions de l'ancienne implémentation ;
+- seuls les champs de mise à jour autorisés composent le SQL; toutes les valeurs et tous les
+  identifiants restent liés par paramètres ;
+- les tags JSON historiques invalides restent tolérés sous forme de liste vide ;
+- aucun schéma, endpoint, outil, permission ou format de sortie n'est modifié.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation des trois repositories, de la façade et du test réussie ;
+- base SQLite temporaire réelle : CRUD, filtres, ordre, booléen épinglé, JSON, identifiant
+  absent, champ inconnu ignoré, clé primaire dupliquée et rollback réussis ;
+- façades `database.py` vérifiées par identité pour les quinze fonctions ;
+- domaines d'outils Tâches/Notes et Mémoire réussis, registre inchangé à 344/344.
+
+Composition, architecture et gate globale ont ensuite réussi. La gate observe
+**173/173 étapes**, 244 modules backend compilés, le registre 344/344 et le lint frontend.
+Le backend a été réellement redémarré en 2.406.0 avec Ollama et 15 workers. Un parcours HTTP
+réel a créé, modifié, relu puis supprimé une tâche et une note temporaires, ainsi que créé,
+relu puis supprimé un souvenir temporaire. Statut, tags, contenu, épinglage et catégorie ont
+été vérifiés; aucune donnée de test n'a été conservée. Le smoke HTTP/Next.js réussit à
+**28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.406>`. Aucun schéma ni jeu de données n'est
+transformé; la réversion remet les corps dans la façade. Rejouer les tests des trois
+repositories, redémarrer le backend et vérifier les trois API.
