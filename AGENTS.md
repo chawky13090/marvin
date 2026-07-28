@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.423.0)
+## 9. État actuel (v2.424.0)
+
+**v2.424 (propriétaire OAuth unique)** : FastAPI est désormais l'unique propriétaire des
+flux OAuth Google et Microsoft, et le coffre DPAPI l'unique persistance des jetons. Les
+anciennes routes Next.js redirigent vers FastAPI; leurs callbacks historiques répondent 410
+et demandent une reconnexion au lieu de traiter un code avec un `redirect_uri` incompatible.
+La migration 6 copie et relit tout ancien jeton SQLite dans DPAPI, préserve un jeton actuel
+déjà autoritatif, remplace la table par des métadonnées sans secret et conserve une copie
+DPAPI dédiée au rollback. Sur la base réelle, le schéma est en version 6, la table contient
+zéro ligne et aucune colonne de jeton; intégrité SQLite et clés étrangères sont valides.
 
 **v2.423 (coffre des connexions SSH)** : mot de passe, clé privée et passphrase des
 connexions persistantes rejoignent une enveloppe DPAPI distincte par identifiant. Les colonnes

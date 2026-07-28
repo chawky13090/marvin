@@ -67,12 +67,7 @@ def is_ready() -> bool:
             "google_access_token"
         ) or credentials_manager.get_credential("google_refresh_token"):
             return True
-        with database.db() as connection:
-            row = connection.execute(
-                "SELECT access_token, refresh_token FROM oauth_tokens "
-                "WHERE provider='google'"
-            ).fetchone()
-        return bool(row and (row["access_token"] or row["refresh_token"]))
+        return False
     except Exception:
         return False
 
@@ -96,18 +91,6 @@ def build_service(prefer_oauth: bool = False) -> Any:
     refresh_token = credentials_manager.get_credential("google_refresh_token")
     client_id = credentials_manager.get_credential("google_client_id")
     client_secret = credentials_manager.get_credential("google_client_secret")
-    if not access_token and not refresh_token:
-        try:
-            with database.db() as connection:
-                row = connection.execute(
-                    "SELECT access_token, refresh_token FROM oauth_tokens "
-                    "WHERE provider='google'"
-                ).fetchone()
-            if row:
-                access_token = row["access_token"]
-                refresh_token = row["refresh_token"]
-        except Exception:
-            pass
     if not access_token and not refresh_token:
         raise ValueError(
             "Google non connecté. Configurez OAuth dans Paramètres > Connexions."

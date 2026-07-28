@@ -256,6 +256,34 @@ MIGRATIONS: tuple[Migration, ...] = (
                )""",
         ),
     ),
+    Migration(
+        version=6,
+        name="oauth-token-tombstone",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS oauth_token_migration_metadata (
+                provider TEXT PRIMARY KEY,
+                token_type TEXT,
+                scope TEXT,
+                expires_at TEXT,
+                migrated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            """CREATE TABLE oauth_tokens_safe (
+                provider TEXT PRIMARY KEY
+                    CHECK(provider IN ('google','microsoft')),
+                token_type TEXT,
+                scope TEXT,
+                expires_at TEXT,
+                migrated_at TEXT NOT NULL
+            )""",
+            """INSERT INTO oauth_tokens_safe
+               (provider,token_type,scope,expires_at,migrated_at)
+               SELECT provider,token_type,scope,expires_at,migrated_at
+               FROM oauth_token_migration_metadata""",
+            "DROP TABLE oauth_tokens",
+            "ALTER TABLE oauth_tokens_safe RENAME TO oauth_tokens",
+            "DROP TABLE oauth_token_migration_metadata",
+        ),
+    ),
 )
 
 

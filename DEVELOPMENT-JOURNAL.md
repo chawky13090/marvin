@@ -9861,3 +9861,48 @@ Validation finale observée : gate consolidé **187/187**, architecture 344 outi
 344/344, compilation de 267 fichiers Python, lint sans erreur, build Next.js 16.2.6
 Turbopack réussi, smokes live API **28/28** et pages **40/40**. Backend v2.422.0 relancé
 avec Ollama disponible et 15 workers; frontend Turbopack relancé et HTTP 200.
+## 2026-07-28 — v2.424.0 — Propriétaire OAuth unique et tombstone SQLite
+
+### Analyse et choix
+
+Deux implémentations OAuth coexistaient : FastAPI persistait déjà les secrets dans le coffre
+DPAPI, tandis que quatre anciennes routes Next.js déléguaient à deux services JavaScript
+capables d'écrire `access_token` et `refresh_token` dans SQLite. Conserver deux propriétaires
+aurait maintenu les divergences de `redirect_uri`, les courses d'écriture et une persistance
+en clair. Le choix retenu est un propriétaire unique : FastAPI orchestre Google et Microsoft,
+DPAPI conserve les secrets, SQLite ne conserve que des métadonnées non sensibles.
+
+### Implémentation, sécurité et observabilité
+
+- les routes de départ Next.js redirigent vers les endpoints FastAPI existants ;
+- les anciens callbacks répondent HTTP 410 avec une consigne de reconnexion, car transférer
+  leur code vers un callback différent violerait le contrat OAuth ;
+- les deux services JavaScript devenus sans référence sont retirés après recherche globale ;
+- les fallbacks SQLite disparaissent de Connections, Google Calendar et Google Drive ;
+- la migration protège une copie de rollback et, si nécessaire, le secret autoritatif dans
+  DPAPI, relit en temps constant, puis seulement efface les lignes ;
+- la migration 6 remplace les colonnes secrètes par provider, type, scope, expiration et date ;
+- aucune donnée de jeton n'est journalisée. La tranche ne crée aucun nouveau flux réseau.
+
+### Validation réelle et rollback
+
+Le snapshot chiffré `secretary_20260728_163857_452746.mrvbak` a été créé avant migration,
+avec contrôle d'intégrité réussi et zéro violation de clé étrangère. La base réelle est
+désormais au schéma 6 : colonnes `provider`, `token_type`, `scope`, `expires_at`,
+`migrated_at`, zéro ligne, `quick_check=ok` et zéro violation FK.
+
+Les tests isolés couvrent Google et Microsoft, priorité d'un secret actuel, chiffrement DPAPI,
+absence de valeur en clair, tombstone, base neuve, callbacks obsolètes, refus du rollback sans
+double confirmation et restauration exacte des lignes historiques. Rollback avec Marvin
+arrêté : `backend\.venv\Scripts\python.exe
+scripts\rollback-oauth-token-tombstone.py --apply --accept-plaintext`, vérifier le schéma 5,
+puis réverter le commit v2.424. Ce rollback réintroduit volontairement du clair; la
+restauration du snapshot chiffré est l'alternative intégrale.
+
+Validation finale observée : les **188 contrôles non-build sur 189** du gate consolidé ont
+réussi; le build intégré a été bloqué comme prévu parce que Turbopack tournait. Après arrêt
+du frontend, le build Next.js 16.2.6 Turbopack a réussi séparément, ce qui valide les
+**189/189 étapes** sans contourner le verrou. Smokes live API **28/28** et pages **40/40**.
+Backend v2.424.0 relancé avec Ollama disponible, 344 outils et 15 workers; frontend
+Turbopack relancé et HTTP 200. Les routes OAuth live répondent 302 vers FastAPI et les
+callbacks historiques 410.

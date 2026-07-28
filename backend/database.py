@@ -8,6 +8,7 @@ Utilise le module sqlite3 standard de Python (thread-safe avec check_same_thread
 """
 from db_connection import db
 from db_migrations import apply_migrations
+from oauth_legacy_migration import migrate_legacy_tokens
 from repositories.billing import (
     billing_catalog_create,
     billing_catalog_delete,
@@ -224,6 +225,10 @@ def _init_tables():
         # La baseline est enregistree seulement apres la reussite de tous les
         # initialiseurs historiques. Les prochains changements de schema seront
         # portes par db_migrations.py sans retirer les garde-fous existants.
+        # Le coffre externe est vérifié avant la suppression transactionnelle
+        # des anciens jetons; ce commit sépare volontairement les deux systèmes.
+        migrate_legacy_tokens(conn)
+        conn.commit()
         apply_migrations(conn)
 
 

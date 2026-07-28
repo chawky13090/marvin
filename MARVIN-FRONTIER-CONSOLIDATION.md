@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.423.0
+Version courante auditée : 2.424.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -435,6 +435,13 @@ colonnes historiques sont nettoyées après relecture. Les connexions ponctuelle
 persistées. Les mutations compensent les pannes entre coffre et SQLite, tandis que toutes
 les surfaces HTTP/SSE/WebSocket/SFTP remplacent les exceptions brutes par une catégorie
 expurgée et un audit sans contenu.
+En v2.424.0, FastAPI devient l'unique propriétaire OAuth Google/Microsoft. Les anciennes
+routes Next.js redirigent vers lui et leurs callbacks incompatibles sont fermés explicitement.
+Les jetons historiques sont protégés et relus dans DPAPI avant nettoyage; la migration 6
+remplace les colonnes secrètes par un tombstone de métadonnées. La base réelle est saine et
+le rollback exact est testé. La phase Persistance reste `partial` jusqu'à la fermeture ou
+l'acceptation explicite des dettes restantes, notamment compte de service Google, ACL,
+cycle de vie des secrets et portabilité.
 
 ## 10. Preuves minimales par grande capacité
 

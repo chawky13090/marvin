@@ -93,6 +93,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Coffre DPAPI des comptes e-mail",
             (python, "scripts/test_email_account_vault.py"),
         ),
+        Stage(
+            "Migration OAuth SQLite vers DPAPI",
+            (python, "scripts/test_oauth_legacy_migration.py"),
+        ),
         Stage("API Chat, outils et MCP extraite", (python, "scripts/test_agent_gateway_api.py")),
         Stage(
             "API modèles et proactive extraite",

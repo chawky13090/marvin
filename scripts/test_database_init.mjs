@@ -25,6 +25,15 @@ try {
   for (const name of ['projects', 'conversations', 'messages', 'cron_jobs', 'settings']) {
     assert.ok(tables.has(name), `Table absente sur base neuve : ${name}`);
   }
+  const oauthColumns = new Set(
+    database.prepare('PRAGMA table_info(oauth_tokens)').all().map(({ name }) => name),
+  );
+  assert.deepEqual(
+    oauthColumns,
+    new Set(['provider', 'token_type', 'scope', 'expires_at', 'migrated_at']),
+  );
+  assert.ok(!oauthColumns.has('access_token'));
+  assert.ok(!oauthColumns.has('refresh_token'));
   closeDb();
   console.log('Initialiseur SQLite Next.js OK - base neuve et index cron.');
 } finally {

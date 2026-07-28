@@ -104,7 +104,7 @@ def _check_catalog_order() -> None:
 
 def _check_fresh_marvin_schema() -> None:
     connection = _connection()
-    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5]
+    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5, 6]
     tables = {
         row[0]
         for row in connection.execute(
@@ -138,6 +138,17 @@ def _check_fresh_marvin_schema() -> None:
         row[1] for row in connection.execute("PRAGMA table_info(messages)")
     }
     assert "client_request_id" in message_columns
+    oauth_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(oauth_tokens)")
+    }
+    assert oauth_columns == {
+        "provider",
+        "token_type",
+        "scope",
+        "expires_at",
+        "migrated_at",
+    }
+    assert {"access_token", "refresh_token"}.isdisjoint(oauth_columns)
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
     connection.close()
@@ -155,7 +166,7 @@ def _check_orphan_archive_and_data_rollback() -> None:
     )
     connection.commit()
     connection.execute("PRAGMA foreign_keys=ON")
-    assert apply_migrations(connection, MIGRATIONS) == [5]
+    assert apply_migrations(connection, MIGRATIONS) == [5, 6]
     connection.commit()
     assert integrity_summary(connection) == {
         "orphan_events": 0,

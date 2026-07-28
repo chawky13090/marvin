@@ -23,7 +23,6 @@ def _limit(value: Any, default: int = 30) -> int:
 
 def build_service() -> Any:
     import credentials_manager
-    import database
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 
@@ -32,18 +31,6 @@ def build_service() -> Any:
     client_id = credentials_manager.get_credential("google_client_id")
     client_secret = credentials_manager.get_credential("google_client_secret")
 
-    if not access_token and not refresh_token:
-        try:
-            with database.db() as connection:
-                row = connection.execute(
-                    "SELECT access_token, refresh_token FROM oauth_tokens "
-                    "WHERE provider='google'"
-                ).fetchone()
-            if row:
-                access_token = row["access_token"]
-                refresh_token = row["refresh_token"]
-        except Exception:
-            pass
     if not access_token and not refresh_token:
         raise ValueError(
             "Google non connecté. Configurez OAuth dans Paramètres > Connexions."

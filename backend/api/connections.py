@@ -274,20 +274,6 @@ async def google_oauth_status():
     access_token = credentials.get_credential("google_access_token")
     refresh_token = credentials.get_credential("google_refresh_token")
     source = "backend"
-    if not access_token and not refresh_token:
-        try:
-            with db.db() as connection:
-                row = connection.execute(
-                    "SELECT access_token, refresh_token FROM oauth_tokens WHERE provider='google'"
-                ).fetchone()
-            if row and row["access_token"]:
-                access_token, refresh_token, source = (
-                    row["access_token"],
-                    row["refresh_token"],
-                    "frontend",
-                )
-        except Exception:
-            pass
     has_tokens = bool(access_token or refresh_token)
     if has_tokens:
         try:
