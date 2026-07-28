@@ -6935,3 +6935,44 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - cette tranche ne modifie ni schéma ni donnée persistante. Rollback : réversion atomique du
   commit v2.365; avant commit, le patch inverse indexé doit réussir avec
   `git diff --cached --binary | git apply --cached --check --reverse`.
+## 2026-07-28 — v2.366.0 — Analyse avancée des fichiers
+
+### Demande et décision
+
+- continuer l'extraction de `tools.py` en améliorant chaque frontière ;
+- traiter d'abord les trois opérations en lecture seule; `bulk_rename`, qui modifie les noms,
+  reste volontairement dans une tranche transactionnelle distincte avec rollback métier.
+
+### Changements
+
+- `file_large_finder`, `file_batch_read` et `file_duplicate_finder` rejoignent
+  `tool_domains/filesystem.py` ;
+- les parcours `os.walk(..., followlinks=False)` excluent liens, `.git`, `node_modules` et
+  dossiers système, avec budgets explicites et indicateurs `scan_truncated` ;
+- la lecture en lot accepte au maximum 20 chemins, valide l'encodage, distingue exactement
+  une lecture complète d'une troncature et quitte la boucle asyncio ;
+- les doublons sont groupés par taille puis vérifiés par SHA-256 du fichier complet.
+  L'ancien MD5 des seuls 64 premiers Kio pouvait déclarer identiques deux fichiers aux fins
+  différentes ;
+- les schémas publics exposent les bornes réellement appliquées.
+
+### Références vérifiées
+
+- documentation Python `os.walk` : `followlinks=False`, filtrage top-down et comportement
+  fondé sur `scandir()` ;
+- documentation Python `hashlib.file_digest()` : empreinte efficace d'un flux binaire complet ;
+- documentation Python `Path.open()` : encodage et fermeture déterministe des lectures.
+
+### Validation et rollback
+
+- test Filesystem réel : tailles ordonnées, lecture tronquée exacte, encodage invalide,
+  doublons complets et budget de parcours : succès ;
+- architecture : 344 outils, 346 routes, harness 344/344, 64 restrictions renforcées ;
+- gate rapide complet : **139/139** étapes ;
+- redémarrage réel : `/api/health` expose **2.366.0**, Ollama disponible, 344 outils et
+  15 workers ;
+- API réelle `/api/tools` : trois fichiers parcourus, deux plus gros remontés, lecture
+  exactement tronquée à 10 caractères et une paire de doublons SHA-256 complète détectée ;
+- frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
+- aucune donnée ni aucun schéma persistant n'est modifié. Rollback : réversion atomique du
+  commit v2.366 après validation obligatoire du patch inverse indexé.

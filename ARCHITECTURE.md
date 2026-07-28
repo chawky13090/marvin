@@ -242,6 +242,9 @@ conteneurs Open XML avant parsing. Les sorties sont atomiques, les volumes born�
 QR PNG atomique; `tool_domains/archives.py` possède l'inventaire ZIP borné avec contrôle CRC;
 `tool_domains/deterministic_utilities.py` possède la conversion stricte HEX/RGB/HSL. Les
 façades historiques et les entrées du registre restent identiques.
+84. l'analyse avancée des fichiers : `tool_domains/filesystem.py` possède la recherche des
+gros fichiers, la lecture en lot et la détection de doublons. Les parcours sont bornés et
+sans suivi des liens; les lectures sont déportées et les doublons exigent un SHA-256 complet.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

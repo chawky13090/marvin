@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.365.0)
+## 9. État actuel (v2.366.0)
+
+**v2.366 (analyse avancée des fichiers)** : recherche des gros fichiers, lecture textuelle
+en lot et détection des doublons rejoignent `tool_domains/filesystem.py`. Les parcours sont
+bornés, ne suivent pas les liens et quittent la boucle asyncio. Les doublons sont maintenant
+prouvés par SHA-256 du contenu complet au lieu d'un MD5 limité aux premiers 64 Kio, qui
+pouvait produire des faux positifs. Les limites et troncatures sont explicites.
 
 **v2.365 (formats locaux déterministes)** : génération QR rejoint
 `tool_domains/images.py`, l'inventaire ZIP `tool_domains/archives.py` et la conversion

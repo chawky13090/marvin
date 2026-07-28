@@ -248,6 +248,9 @@ l'extraction Word conserve l'ordre réel du document.
 Génération QR, inventaire ZIP et conversion de couleurs ont rejoint les domaines Images,
 Archives et Utilitaires déterministes. Les écritures sont atomiques, les archives sont
 bornées et vérifiées, et les syntaxes de couleurs sont analysées par grammaires fermées.
+Recherche des gros fichiers, lecture en lot et détection de doublons ont rejoint le domaine
+Filesystem. Les parcours et sorties sont bornés, les liens ne sont pas suivis et SHA-256 du
+contenu complet remplace le MD5 partiel pour éviter les faux doublons.
 
 ## 4. Validation obligatoire par tranche
 

@@ -3303,50 +3303,7 @@ async def execute_ip_info(args: dict) -> dict:
 
 
 
-def _file_large_finder_scan(root: Path, top: int, threshold: float) -> tuple[list, int]:
-    """Scan bloquant (os.walk) — appelé via asyncio.to_thread, jamais directement dans l'event loop."""
-    import heapq
-    # Tas borné : on ne garde JAMAIS plus de `top` fichiers en mémoire (anti-OOM sur gros disques)
-    heap = []  # min-heap de (taille, chemin)
-    scanned = 0
-    for dp, dns, fns in os.walk(root):
-        dns[:] = [d for d in dns if d.lower() not in ("$recycle.bin", "system volume information")]
-        for fn in fns:
-            try:
-                fp = os.path.join(dp, fn)
-                sz = os.path.getsize(fp)
-                scanned += 1
-                if sz >= threshold:
-                    if len(heap) < top:
-                        heapq.heappush(heap, (sz, fp))
-                    elif sz > heap[0][0]:
-                        heapq.heapreplace(heap, (sz, fp))
-            except Exception:
-                continue
-    return sorted(heap, reverse=True), scanned
-
-
-async def execute_file_large_finder(args: dict) -> dict:
-    """Trouve les plus gros fichiers d'un dossier (récursif) — pour repérer ce qui prend de la place."""
-    directory = args.get("directory") or args.get("path") or _HOME
-    try:
-        root = Path(_resolve_path(directory))
-        if not root.exists():
-            return {"error": f"Dossier introuvable : {root}"}
-        top = max(1, min(int(args.get("top", 20)), 500))
-        threshold = float(args.get("min_mb", 0)) * 1024 * 1024
-        # v2.160 : le scan récursif (os.walk) peut prendre plusieurs minutes sur un gros
-        # dossier (mesuré 145s sur le home réel de l'utilisateur, 132 Go) — déporté sur un
-        # thread pour ne pas geler tout le backend pendant ce temps (même classe de bug que
-        # v2.96/v2.152 : jamais de blocage synchrone dans une fonction async).
-        items, scanned = await asyncio.to_thread(_file_large_finder_scan, root, top, threshold)
-        total = sum(s for s, _ in items)
-        return {"success": True, "directory": str(root), "count": len(items),
-                "total_human": _fmt_bytes(total),
-                "files": [{"path": p, "size_bytes": s, "size_human": _fmt_bytes(s)} for s, p in items],
-                "message": f"{len(items)} plus gros fichiers ({_fmt_bytes(total)})"}
-    except Exception as e:
-        return {"error": str(e)}
+execute_file_large_finder = filesystem_domain.large_finder
 
 
 def _system_cleanup_scan(candidates: list, cutoff: float, do_delete: bool) -> dict:
@@ -3941,45 +3898,7 @@ async def execute_screen_ocr(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def execute_file_batch_read(args: dict) -> dict:
-    """Lit plusieurs fichiers texte en une seule requête et retourne leur contenu agrégé."""
-    paths       = args.get("paths", [])
-    max_per_file = int(args.get("max_chars_per_file", 5000))
-    encoding    = args.get("encoding", "utf-8")
-
-    if not paths:
-        return {"error": "Paramètre 'paths' requis (liste de chemins de fichiers)."}
-    if isinstance(paths, str):
-        paths = [p.strip() for p in paths.split(",") if p.strip()]
-
-    results = []
-    total_chars = 0
-    for raw_path in paths[:20]:  # max 20 fichiers
-        resolved = _resolve_path(raw_path.strip())
-        entry = {"path": resolved, "success": False}
-        try:
-            with open(resolved, encoding=encoding, errors="replace") as f:
-                content = f.read(max_per_file)
-            entry.update({
-                "success":   True,
-                "content":   content,
-                "chars":     len(content),
-                "truncated": len(content) >= max_per_file,
-            })
-            total_chars += len(content)
-        except FileNotFoundError:
-            entry["error"] = "Fichier introuvable"
-        except Exception as e:
-            entry["error"] = str(e)
-        results.append(entry)
-
-    return {
-        "success":     True,
-        "files_read":  sum(1 for r in results if r.get("success")),
-        "files_error": sum(1 for r in results if r.get("error")),
-        "total_chars": total_chars,
-        "files":       results,
-    }
+execute_file_batch_read = filesystem_domain.batch_read
 
 
 async def execute_clipboard_append(args: dict) -> dict:
@@ -4319,87 +4238,7 @@ execute_it_kb_add = it_knowledge_domain.add
 
 
 
-def _file_duplicate_finder_scan(resolved: Path, min_size: int, max_files: int) -> dict:
-    """Scan bloquant (os.walk + hash MD5) — appelé via asyncio.to_thread, jamais
-    directement dans l'event loop (même risque que file_large_finder v2.160 : un gros
-    dossier peut prendre plusieurs dizaines de secondes)."""
-    import hashlib as _hl
-    # 1. Group by size (fast pre-filter)
-    size_map = {}
-    scanned = 0
-    for root, dirs, files in os.walk(str(resolved)):
-        dirs[:] = [d for d in dirs if d not in ('$RECYCLE.BIN', 'System Volume Information', 'node_modules', '.git')]
-        for fname in files:
-            if scanned >= max_files:
-                break
-            fpath = os.path.join(root, fname)
-            try:
-                sz = os.path.getsize(fpath)
-                if sz >= min_size:
-                    size_map.setdefault(sz, []).append(fpath)
-                    scanned += 1
-            except Exception:
-                pass
-        if scanned >= max_files:
-            break
-
-    # 2. For sizes with >1 file, compute hash
-    duplicates = []
-    total_wasted = 0
-    for sz, paths in size_map.items():
-        if len(paths) < 2:
-            continue
-        hash_map = {}
-        for p in paths:
-            try:
-                h = _hl.md5()
-                with open(p, "rb") as f:
-                    # Hash first 64KB for speed (good enough for dedup detection)
-                    h.update(f.read(65536))
-                hash_map.setdefault(h.hexdigest(), []).append(p)
-            except Exception:
-                pass
-        for hsh, dups in hash_map.items():
-            if len(dups) > 1:
-                duplicates.append({
-                    "size_kb": round(sz/1024, 1),
-                    "count": len(dups),
-                    "files": dups,
-                })
-                total_wasted += sz * (len(dups) - 1)
-
-    duplicates.sort(key=lambda d: d["size_kb"] * d["count"], reverse=True)
-    return {"scanned": scanned, "duplicates": duplicates, "total_wasted": total_wasted}
-
-
-async def execute_file_duplicate_finder(args: dict) -> dict:
-    """
-    Trouve les fichiers en double dans un dossier (par taille puis hash MD5).
-    Utile pour le nettoyage de disque. Ne supprime rien.
-    """
-    path = args.get("path", "").strip()
-    if not path:
-        return {"error": "Paramètre 'path' requis."}
-    resolved = Path(_resolve_path(path))
-    if not resolved.exists():
-        return {"error": f"Dossier introuvable : {resolved}"}
-    min_size = int(args.get("min_size_kb", 10)) * 1024  # ignore tiny files
-    max_files = int(args.get("max_files", 5000))
-
-    try:
-        scan = await asyncio.to_thread(_file_duplicate_finder_scan, resolved, min_size, max_files)
-        duplicates = scan["duplicates"]
-        return {
-            "success": True,
-            "root": str(resolved),
-            "scanned": scan["scanned"],
-            "duplicate_groups": len(duplicates),
-            "wasted_space_mb": round(scan["total_wasted"]/1024**2, 1),
-            "duplicates": duplicates[:50],
-            "hint": "Hash sur les 64 premiers Ko (rapide). Vérifiez avant toute suppression.",
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_file_duplicate_finder = filesystem_domain.duplicate_finder
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -6698,9 +6537,10 @@ TOOLS_SPEC = [
         "recursive": {"type": "boolean", "description": "Inclure les sous-dossiers"}},
        ["directory", "operation"]),
     _t("file_large_finder", "Liste les plus gros fichiers d'un dossier (récursif) pour repérer ce qui occupe l'espace disque.",
-       {"directory": {"type": "string", "description": "Dossier à analyser (défaut : dossier personnel)"},
-        "top": {"type": "integer", "description": "Nombre de fichiers à retourner (défaut 20)"},
-        "min_mb": {"type": "number", "description": "Taille minimale en Mo à considérer"}},
+       {"directory": {"type": "string", "maxLength": 32767, "description": "Dossier à analyser (défaut : dossier personnel)"},
+        "top": {"type": "integer", "minimum": 1, "maximum": 500, "description": "Nombre de fichiers à retourner (défaut 20)"},
+        "min_mb": {"type": "number", "minimum": 0, "maximum": 1000000, "description": "Taille minimale en Mo à considérer"},
+        "max_files": {"type": "integer", "minimum": 1, "maximum": 1000000, "description": "Nombre maximal de fichiers parcourus (défaut 100000)"}},
        []),
     _t("system_cleanup", "Analyse les fichiers temporaires et l'espace récupérable. delete=true vide les temp (action sensible, fichiers anciens uniquement).",
        {"delete": {"type": "boolean", "description": "true = supprimer réellement (sinon rapport seul)"},
@@ -6822,9 +6662,11 @@ TOOLS_SPEC = [
         "save":  {"type": "boolean","description": "Sauvegarder le screenshot sur le Bureau (défaut : false)"}},
        []),
     _t("file_batch_read", "Lit plusieurs fichiers texte en une seule requête et retourne leur contenu agrégé.",
-       {"paths":              {"type": "array",   "description": "Liste des chemins de fichiers à lire"},
-        "max_chars_per_file": {"type": "integer", "description": "Limite de caractères par fichier (défaut 5000)"},
-        "encoding":           {"type": "string",  "description": "Encodage (défaut utf-8)"}},
+       {"paths":              {"type": "array", "minItems": 1, "maxItems": 20,
+                               "items": {"type": "string", "maxLength": 32767},
+                               "description": "Liste des chemins de fichiers à lire"},
+        "max_chars_per_file": {"type": "integer", "minimum": 1, "maximum": 100000, "description": "Limite de caractères par fichier (défaut 5000)"},
+        "encoding":           {"type": "string", "maxLength": 64, "description": "Encodage Python reconnu (défaut utf-8)"}},
        ["paths"]),
     _t("clipboard_append", "Ajoute du texte au contenu actuel du presse-papiers (append) sans écraser ce qui est déjà dedans.",
        {"text":      {"type": "string", "description": "Texte à ajouter au presse-papiers"},
@@ -7039,9 +6881,9 @@ TOOLS_SPEC = [
        {}, []),
     _t("file_duplicate_finder",
        "Trouve les fichiers en double dans un dossier (par taille + hash). Utile pour le nettoyage disque. Ne supprime rien.",
-       {"path": {"type": "string", "description": "Dossier à analyser"},
-        "min_size_kb": {"type": "integer", "description": "Taille minimale en Ko (défaut 10)"},
-        "max_files": {"type": "integer", "description": "Limite de fichiers scannés (défaut 5000)"}},
+       {"path": {"type": "string", "maxLength": 32767, "description": "Dossier à analyser"},
+        "min_size_kb": {"type": "integer", "minimum": 0, "maximum": 1000000000, "description": "Taille minimale en Ko (défaut 10)"},
+        "max_files": {"type": "integer", "minimum": 1, "maximum": 1000000, "description": "Limite de fichiers scannés (défaut 5000)"}},
        ["path"]),
 
     # ── Section 27 — v2.32 Édition vidéo / GIF (ffmpeg local) ─────────────

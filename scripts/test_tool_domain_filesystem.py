@@ -66,6 +66,46 @@ async def main() -> int:
         deleted = await filesystem.delete({"path": "docs/b.txt", "confirmed": True})
         assert deleted["success"] and not (base / "docs/b.txt").exists()
 
+        duplicate_payload = ("Marvin vérifie le fichier complet.\n" * 100).encode("utf-8")
+        (base / "docs/duplicate-a.bin").write_bytes(duplicate_payload)
+        (base / "docs/duplicate-b.bin").write_bytes(duplicate_payload)
+        (base / "docs/same-prefix.bin").write_bytes(
+            duplicate_payload[:64] + b"different-tail"
+        )
+        large = await filesystem.large_finder(
+            {"directory": "docs", "top": 2, "min_mb": 0, "max_files": 100}
+        )
+        assert large["success"] is True and large["count"] == 2
+        assert large["scan_truncated"] is False
+        assert large["files"][0]["size_bytes"] >= large["files"][1]["size_bytes"]
+
+        batch = await filesystem.batch_read(
+            {
+                "paths": ["docs/data.csv", "docs/missing.txt"],
+                "max_chars_per_file": 8,
+                "encoding": "utf-8",
+            }
+        )
+        assert batch["files_read"] == 1 and batch["files_error"] == 1
+        assert batch["files"][0]["content"] == "name,val"
+        assert batch["files"][0]["truncated"] is True
+        assert "error" in await filesystem.batch_read(
+            {"paths": ["docs/data.csv"], "encoding": "not-an-encoding"}
+        )
+
+        duplicates = await filesystem.duplicate_finder(
+            {"path": "docs", "min_size_kb": 1, "max_files": 100}
+        )
+        assert duplicates["success"] is True
+        assert duplicates["duplicate_groups"] == 1
+        assert duplicates["duplicates"][0]["count"] == 2
+        assert len(duplicates["duplicates"][0]["sha256"]) == 64
+        assert duplicates["hash_algorithm"] == "sha256-full"
+        bounded = await filesystem.duplicate_finder(
+            {"path": "docs", "min_size_kb": 0, "max_files": 1}
+        )
+        assert bounded["scan_truncated"] is True
+
     filesystem.configure(resolve_path=tools._resolve_path)
     assert tools.execute_file_write is filesystem.write
     assert tools.execute_file_list is filesystem.list_entries
@@ -78,6 +118,9 @@ async def main() -> int:
     assert tools.execute_file_move is filesystem.move
     assert tools.execute_file_copy is filesystem.copy
     assert tools.execute_file_create_folder is filesystem.create_folder
+    assert tools.execute_file_large_finder is filesystem.large_finder
+    assert tools.execute_file_batch_read is filesystem.batch_read
+    assert tools.execute_file_duplicate_finder is filesystem.duplicate_finder
     print("Tool Domain Filesystem OK - mutations, collisions, confirmation et façade.")
     return 0
 

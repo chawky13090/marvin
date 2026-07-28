@@ -10,7 +10,9 @@ import csv
 import io
 import re
 import asyncio
+import codecs
 import fnmatch
+import heapq
 from pathlib import Path
 from typing import Any, Callable
 
@@ -697,4 +699,244 @@ async def create_folder(args: dict[str, Any]) -> dict[str, Any]:
         Path(path).mkdir(parents=True, exist_ok=True)
         return {"success": True, "message": f"Dossier créé : {path}"}
     except Exception as exc:
+        return {"error": str(exc)}
+
+
+def _format_bytes_precise(size: int) -> str:
+    value = float(size)
+    for unit in ("o", "Ko", "Mo", "Go", "To"):
+        if value < 1024:
+            return f"{value:.0f} {unit}" if unit == "o" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} Po"
+
+
+def _walk_files(root: Path, maximum: int):
+    count = 0
+    excluded = {"$recycle.bin", "system volume information", ".git", "node_modules"}
+    for directory, directories, files in os.walk(root, followlinks=False):
+        directories[:] = [
+            name
+            for name in directories
+            if name.casefold() not in excluded
+            and not Path(directory, name).is_symlink()
+        ]
+        for name in files:
+            if count >= maximum:
+                return
+            path = Path(directory, name)
+            if path.is_symlink():
+                continue
+            count += 1
+            yield path
+
+
+def _large_files_scan(
+    root: Path, top: int, threshold: int, max_files: int
+) -> tuple[list[tuple[int, str]], int, bool]:
+    heap: list[tuple[int, str]] = []
+    scanned = 0
+    for path in _walk_files(root, max_files + 1):
+        if scanned >= max_files:
+            return sorted(heap, reverse=True), scanned, True
+        scanned += 1
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        candidate = (size, str(path))
+        if size >= threshold:
+            if len(heap) < top:
+                heapq.heappush(heap, candidate)
+            elif size > heap[0][0]:
+                heapq.heapreplace(heap, candidate)
+    return sorted(heap, reverse=True), scanned, False
+
+
+async def large_finder(args: dict[str, Any]) -> dict[str, Any]:
+    directory = str(args.get("directory") or args.get("path") or "~")
+    try:
+        root = Path(_resolve(directory))
+        if not root.is_dir():
+            return {"error": f"Dossier introuvable : {root}"}
+        top = int(args.get("top", 20))
+        min_mb = float(args.get("min_mb", 0))
+        max_files = int(args.get("max_files", 100_000))
+        if not 1 <= top <= 500:
+            raise ValueError("'top' doit être compris entre 1 et 500.")
+        if not 0 <= min_mb <= 1_000_000:
+            raise ValueError("'min_mb' doit être compris entre 0 et 1 000 000.")
+        if not 1 <= max_files <= 1_000_000:
+            raise ValueError("'max_files' doit être compris entre 1 et 1 000 000.")
+        items, scanned, truncated = await asyncio.to_thread(
+            _large_files_scan,
+            root,
+            top,
+            int(min_mb * 1024 * 1024),
+            max_files,
+        )
+        total = sum(size for size, _ in items)
+        return {
+            "success": True,
+            "directory": str(root),
+            "count": len(items),
+            "scanned": scanned,
+            "scan_truncated": truncated,
+            "total_human": _format_bytes_precise(total),
+            "files": [
+                {
+                    "path": path,
+                    "size_bytes": size,
+                    "size_human": _format_bytes_precise(size),
+                }
+                for size, path in items
+            ],
+            "message": f"{len(items)} plus gros fichiers ({_format_bytes_precise(total)})",
+        }
+    except (OSError, TypeError, ValueError) as exc:
+        return {"error": str(exc)}
+
+
+def _batch_read_sync(
+    paths: list[str], max_chars: int, encoding: str
+) -> tuple[list[dict[str, Any]], int]:
+    results: list[dict[str, Any]] = []
+    total_chars = 0
+    for raw_path in paths:
+        resolved = _resolve(raw_path.strip())
+        entry: dict[str, Any] = {"path": resolved, "success": False}
+        try:
+            path = Path(resolved)
+            if not path.is_file():
+                raise FileNotFoundError(path)
+            with path.open(encoding=encoding, errors="replace") as stream:
+                content = stream.read(max_chars + 1)
+            truncated = len(content) > max_chars
+            content = content[:max_chars]
+            entry.update(
+                {
+                    "success": True,
+                    "content": content,
+                    "chars": len(content),
+                    "truncated": truncated,
+                }
+            )
+            total_chars += len(content)
+        except FileNotFoundError:
+            entry["error"] = "Fichier introuvable"
+        except (OSError, UnicodeError, ValueError) as exc:
+            entry["error"] = str(exc)
+        results.append(entry)
+    return results, total_chars
+
+
+async def batch_read(args: dict[str, Any]) -> dict[str, Any]:
+    paths = args.get("paths", [])
+    if isinstance(paths, str):
+        paths = [part.strip() for part in paths.split(",") if part.strip()]
+    if not isinstance(paths, list) or not paths:
+        return {"error": "Paramètre 'paths' requis (liste de chemins de fichiers)."}
+    if len(paths) > 20 or not all(isinstance(path, str) and path.strip() for path in paths):
+        return {"error": "'paths' doit contenir entre 1 et 20 chemins non vides."}
+    try:
+        max_chars = int(args.get("max_chars_per_file", 5_000))
+        if not 1 <= max_chars <= 100_000:
+            raise ValueError("'max_chars_per_file' doit être compris entre 1 et 100 000.")
+        encoding = str(args.get("encoding") or "utf-8").strip()
+        codecs.lookup(encoding)
+        results, total_chars = await asyncio.to_thread(
+            _batch_read_sync, paths, max_chars, encoding
+        )
+        return {
+            "success": True,
+            "files_read": sum(bool(item.get("success")) for item in results),
+            "files_error": sum(bool(item.get("error")) for item in results),
+            "total_chars": total_chars,
+            "files": results,
+        }
+    except (LookupError, TypeError, ValueError) as exc:
+        return {"error": f"Paramètres de lecture invalides : {exc}"}
+
+
+def _duplicate_scan(root: Path, min_size: int, max_files: int) -> dict[str, Any]:
+    by_size: dict[int, list[Path]] = {}
+    scanned = 0
+    truncated = False
+    for path in _walk_files(root, max_files + 1):
+        if scanned >= max_files:
+            truncated = True
+            break
+        scanned += 1
+        try:
+            size = path.stat().st_size
+            if size >= min_size:
+                by_size.setdefault(size, []).append(path)
+        except OSError:
+            continue
+    duplicates: list[dict[str, Any]] = []
+    wasted = 0
+    for size, paths in by_size.items():
+        if len(paths) < 2:
+            continue
+        by_digest: dict[str, list[str]] = {}
+        for path in paths:
+            try:
+                with path.open("rb") as stream:
+                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                by_digest.setdefault(digest, []).append(str(path))
+            except OSError:
+                continue
+        for digest, matches in by_digest.items():
+            if len(matches) > 1:
+                duplicates.append(
+                    {
+                        "sha256": digest,
+                        "size_kb": round(size / 1024, 1),
+                        "count": len(matches),
+                        "files": matches,
+                    }
+                )
+                wasted += size * (len(matches) - 1)
+    duplicates.sort(
+        key=lambda item: item["size_kb"] * item["count"], reverse=True
+    )
+    return {
+        "scanned": scanned,
+        "scan_truncated": truncated,
+        "duplicates": duplicates,
+        "total_wasted": wasted,
+    }
+
+
+async def duplicate_finder(args: dict[str, Any]) -> dict[str, Any]:
+    raw_path = str(args.get("path") or "").strip()
+    if not raw_path:
+        return {"error": "Paramètre 'path' requis."}
+    root = Path(_resolve(raw_path))
+    if not root.is_dir():
+        return {"error": f"Dossier introuvable : {root}"}
+    try:
+        min_size_kb = int(args.get("min_size_kb", 10))
+        max_files = int(args.get("max_files", 5_000))
+        if not 0 <= min_size_kb <= 1_000_000_000:
+            raise ValueError("'min_size_kb' doit être positif et borné.")
+        if not 1 <= max_files <= 1_000_000:
+            raise ValueError("'max_files' doit être compris entre 1 et 1 000 000.")
+        scan = await asyncio.to_thread(
+            _duplicate_scan, root, min_size_kb * 1024, max_files
+        )
+        duplicates = scan["duplicates"]
+        return {
+            "success": True,
+            "root": str(root),
+            "scanned": scan["scanned"],
+            "scan_truncated": scan["scan_truncated"],
+            "duplicate_groups": len(duplicates),
+            "wasted_space_mb": round(scan["total_wasted"] / 1024**2, 1),
+            "duplicates": duplicates[:50],
+            "groups_truncated": len(duplicates) > 50,
+            "hash_algorithm": "sha256-full",
+            "hint": "Empreinte SHA-256 du fichier complet. Vérifiez avant toute suppression.",
+        }
+    except (OSError, TypeError, ValueError) as exc:
         return {"error": str(exc)}
