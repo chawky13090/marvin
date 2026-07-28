@@ -290,6 +290,10 @@ Le raisonnement parallèle rejoint `parallel_reasoning.py`. Cette frontière n'e
 comme un système de sous-agents outillés : elle décompose, exécute jusqu'à cinq raisonnements
 LLM indépendants puis synthétise. Objectifs, résultats et contexte sont bornés; trace, partiels
 et phase d'échec restent observables.
+L'OCR écran rejoint `tool_domains/screen_ocr.py`. Capture, région, pixels, prompt et sortie
+sont bornés; les opérations bloquantes quittent la boucle asyncio. Le routage vision conserve
+le contrat local/Ultra Cloud et devient visible dans le résultat. Les échecs de vision et de
+Tesseract ne sont plus masqués, et temporaire, sauvegarde atomique et rollback sont testés.
 
 ## 4. Validation obligatoire par tranche
 

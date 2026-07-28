@@ -289,6 +289,10 @@ les pannes partielles ne sont plus masquées.
 sans outils et synthèse. Les volumes sont bornés, une trace identifie le pipeline et les échecs
 partiels ou de synthèse conservent les résultats intermédiaires. Cette frontière ne revendique
 pas les capacités de la boucle Runner outillée.
+96. l'OCR écran : `tool_domains/screen_ocr.py` capture et redimensionne hors de la boucle,
+applique vision puis Tesseract selon une méthode validée et expose modèle, Cloud et tentatives.
+Pixels, prompt et texte sont bornés; le temporaire est toujours supprimé et une capture
+conservée est publiée atomiquement avec rollback.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

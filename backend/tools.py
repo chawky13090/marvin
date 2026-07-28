@@ -79,6 +79,7 @@ from tool_domains import charts as charts_domain
 from tool_domains import long_tasks as long_tasks_domain
 from tool_domains import system_self_test as system_self_test_domain
 from tool_domains import unified_search as unified_search_domain
+from tool_domains import screen_ocr as screen_ocr_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -2942,99 +2943,12 @@ execute_bulk_rename = filesystem_domain.bulk_rename
 # SECTION 18 — Outils composés & productivité
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def execute_screen_ocr(args: dict) -> dict:
-    """
-    Capture l'écran et en extrait le texte via l'IA vision (llava) ou pytesseract.
-    Méthode 1 (recommandée) : Ollama + llava-phi3 (no extra install needed).
-    Méthode 2 (fallback)     : pytesseract si installé + tesseract binary.
-    """
-    region   = args.get("region", None)    # [x, y, w, h] ou None = écran entier
-    save     = args.get("save", False)     # True = sauvegarder le screenshot
-    method   = args.get("method", "auto")  # auto | vision | tesseract
-    prompt   = args.get("prompt", "Extrais tout le texte visible dans cette image. Retourne uniquement le texte brut.")
-
-    try:
-        import mss as _mss
-        from PIL import Image as PILImg
-        import io as _io, tempfile as _tmp
-
-        with _mss.mss() as sct:
-            if region and len(region) == 4:
-                x, y, w, h = region
-                mon = {"left": x, "top": y, "width": w, "height": h}
-            else:
-                mon = sct.monitors[0]  # Virtual screen (all monitors combined)
-            shot = sct.grab(mon)
-            img  = PILImg.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
-
-        screen_size = list(shot.size)
-
-        # Reduce size for faster OCR (max 1920px)
-        max_dim = 1920
-        if max(img.size) > max_dim:
-            ratio    = max_dim / max(img.size)
-            img      = img.resize((int(img.width * ratio), int(img.height * ratio)), PILImg.LANCZOS)
-
-        # Save to temp PNG
-        tmp = _tmp.NamedTemporaryFile(suffix=".png", delete=False)
-        img.save(tmp.name, "PNG")
-        tmp.close()
-        tmp_path = tmp.name
-
-        text = ""
-        ocr_method_used = "none"
-
-        # Method 1: Ollama vision (llava-phi3)
-        if method in ("auto", "vision"):
-            try:
-                result = await execute_ocr_extract({"image_path": tmp_path, "prompt": prompt})
-                if result.get("text") and not result.get("error"):
-                    text = result["text"].strip()
-                    ocr_method_used = "vision (llava)"
-            except Exception:
-                pass
-
-        # Method 2: pytesseract fallback
-        if not text and method in ("auto", "tesseract"):
-            try:
-                import pytesseract
-                lang = args.get("lang", "fra+eng")
-                try:
-                    text = pytesseract.image_to_string(img, lang=lang, config="--oem 3 --psm 6").strip()
-                except Exception:
-                    text = pytesseract.image_to_string(img, config="--oem 3 --psm 6").strip()
-                if text:
-                    ocr_method_used = "tesseract"
-            except Exception:
-                pass
-
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
-        result = {
-            "success":     True,
-            "text":        text,
-            "text_length": len(text),
-            "screen_size": screen_size,
-            "method":      ocr_method_used,
-        }
-
-        if save:
-            saved_path = Path(_SYSTEM_PATHS["desktop"]) / f"screen_ocr_{int(time.time())}.png"
-            PILImg.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX").save(str(saved_path))
-            result["saved_to"] = str(saved_path)
-
-        if not text:
-            result["warning"] = "Aucun texte extrait. Installez Tesseract ou assurez-vous que llava-phi3 est disponible dans Ollama."
-
-        return result
-
-    except ImportError as e:
-        return {"error": f"Dépendance manquante : {e}. Installez 'mss' avec : pip install mss"}
-    except Exception as e:
-        return {"error": str(e)}
+screen_ocr_domain.configure(
+    vision_ocr=execute_ocr_extract,
+    is_cloud_model=cloud_routing_runtime.is_cloud_model,
+    output_dir=_SYSTEM_PATHS["desktop"],
+)
+execute_screen_ocr = screen_ocr_domain.extract
 
 
 execute_file_batch_read = filesystem_domain.batch_read
@@ -5574,10 +5488,12 @@ TOOLS_SPEC = [
         "confirmed":{"type": "boolean", "description": "Requis pour appliquer ou restaurer"}},
        []),
     # ── Section 18 ──────────────────────────────────────────────────────────
-    _t("screen_ocr", "Capture l'écran et en extrait le texte via OCR (pytesseract). Combine screenshot + OCR en un seul appel.",
+    _t("screen_ocr", "Capture l'écran et en extrait le texte. La vision suit la confidentialité Marvin : locale hors Ultra, Cloud en Ultra débridé. Le résultat expose moteur, modèle et route Cloud.",
        {"lang":  {"type": "string", "description": "Langue OCR (défaut : fra+eng). Exemples : eng, fra, deu"},
         "region":{"type": "array",  "description": "Région [x, y, largeur, hauteur] ou null pour tout l'écran"},
-        "save":  {"type": "boolean","description": "Sauvegarder le screenshot sur le Bureau (défaut : false)"}},
+        "save":  {"type": "boolean","description": "Sauvegarder le screenshot sur le Bureau (défaut : false)"},
+        "method":{"type": "string", "enum": ["auto", "vision", "tesseract"], "description": "Moteur OCR (défaut : auto)"},
+        "prompt":{"type": "string", "maxLength": 4000, "description": "Instruction OCR vision optionnelle"}},
        []),
     _t("file_batch_read", "Lit plusieurs fichiers texte en une seule requête et retourne leur contenu agrégé.",
        {"paths":              {"type": "array", "minItems": 1, "maxItems": 20,

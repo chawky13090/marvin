@@ -7432,6 +7432,59 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback du code : réversion atomique du commit v2.375 après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
 
+## 2026-07-28 — v2.378.0 — OCR écran borné et provenance visible
+
+### Demande et constats
+
+- poursuivre la consolidation multimodale et des guardrails ;
+- `screen_ocr` conservait 93 lignes de capture, fichiers temporaires et OCR dans `tools.py` ;
+- régions négatives ou gigantesques, méthode, langue et prompt n'étaient pas validés ;
+- capture, redimensionnement, Tesseract et sauvegarde bloquaient la boucle asyncio ;
+- erreurs vision et Tesseract étaient toutes ignorées ;
+- le résultat ne révélait ni modèle ni utilisation éventuelle du Cloud en mode Ultra ;
+- le nettoyage temporaire n'était pas garanti par un `finally` et les noms horodatés pouvaient
+  entrer en collision.
+
+### Solution
+
+- nouveau `tool_domains/screen_ocr.py` avec capture, vision, Tesseract, classification Cloud,
+  sortie et identifiant injectables ;
+- région limitée à 16 384 pixels par dimension et 100 mégapixels, coordonnées contrôlées ;
+- méthodes `auto`, `vision`, `tesseract`, langue Tesseract et prompt de 4 000 caractères validés ;
+- image de travail ramenée à 1 920 pixels, texte limité à 200 000 caractères ;
+- opérations bloquantes exécutées via `asyncio.to_thread` ;
+- provenance `method`, `model`, `cloud` et liste ordonnée des tentatives ;
+- politique existante conservée : vision locale hors Ultra, Cloud obligatoire en Ultra débridé ;
+- temporaire supprimé en `finally`, sauvegarde PNG atomique à identifiant unique et rollback
+  par suppression du chemin retourné.
+
+### Validation ciblée observée
+
+- compilation, façade et architecture : réussies, registre 344/344 ;
+- capture 2 560 × 1 440 ramenée à 1 920 × 1 080 ;
+- provenance Cloud simulée, sauvegarde réelle et temporaire supprimé ;
+- panne vision suivie d'un repli Tesseract réussi, deux tentatives visibles ;
+- région, booléen, méthode et prompt invalides refusés ;
+- absence des deux moteurs simulée : `success=false`, erreur publique et deux tentatives
+  conservées au lieu d'un faux succès ;
+- architecture finale : Marvin 2.378.0, 344 outils, 346 routes, harness 344/344 et
+  65 restrictions ;
+- gate rapide final repassé après correction du faux succès : 150/150 étapes ;
+- backend redémarré : `/api/health` expose 2.378.0, Ollama disponible et 15 workers ;
+- capture HTTP réelle en Tesseract local : écran 3 840 × 2 160, traitement 1 920 × 1 080,
+  aucune sauvegarde, aucun Cloud et aucune restitution du texte dans les logs ;
+- Tesseract n'est pas installé sur cette machine : l'API retourne désormais `success=false`
+  avec la cause exacte. Le mode vision reste disponible selon le profil de confidentialité ;
+- frontend Turbopack conservé, smoke test réel : 28/28 contrats.
+
+### Rollback
+
+- les tests utilisent un dossier temporaire automatiquement supprimé et ne capturent pas
+  l'écran utilisateur ;
+- une capture sauvegardée expose son chemin et un rollback explicite ;
+- rollback du code : réversion atomique du commit v2.378 après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser test ciblé, health, gate et smoke.
+
 ## 2026-07-28 — v2.377.0 — Raisonnement parallèle borné et honnête
 
 ### Demande et constats

@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.377.0)
+## 9. État actuel (v2.378.0)
+
+**v2.378 (OCR écran)** : `screen_ocr` rejoint `tool_domains/screen_ocr.py`. Région,
+méthode, langue, prompt, pixels et texte sont bornés; capture, redimensionnement, Tesseract
+et sauvegarde quittent la boucle asyncio. La route vision respecte la politique existante :
+locale hors Ultra et Cloud en Ultra débridé. Moteur, modèle, statut Cloud et tentatives sont
+exposés; le temporaire est supprimé en `finally` et la sauvegarde PNG atomique possède un
+rollback explicite.
 
 **v2.377 (raisonnement parallèle)** : `ai_subagents_run` rejoint
 `parallel_reasoning.py`. Le nom public historique est conservé, mais le contrat indique
