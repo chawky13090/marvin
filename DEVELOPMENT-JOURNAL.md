@@ -7270,3 +7270,69 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback : réversion atomique du commit après contrôle du patch inverse ;
 - après réversion, redémarrer le backend et repasser test Graphiques, health, gate rapide et
   smoke test. Aucun artefact de validation externe n'est requis pour restaurer l'état.
+
+## 2026-07-28 — v2.373.0 — Exécution Python bornée et garantie corrigée
+
+### Demande et critères
+
+- consolider les outils selon des harness explicites et vérifiables ;
+- préserver la capacité de calcul rapide sans présenter une isolation inexistante ;
+- réserver les affirmations de confinement fort à Test Forge/VM ;
+- garantir tests réels, nettoyage des artefacts et rollback.
+
+### Références officielles vérifiées
+
+- Python 3.14, option `-I` : ignore variables `PYTHON*`, user site et chemin du script, mais
+  ne définit pas une sandbox du système d'exploitation ;
+- Microsoft Win32 Job Objects : primitive Windows permettant de gérer et terminer un arbre
+  de processus comme une unité ;
+- Anthropic Claude Code : le confinement utile exige des frontières fichiers et réseau ;
+- OpenAI Codex : le mode autonome est décrit avec un sandbox de workspace et réseau désactivé.
+
+### Constats
+
+- le texte public qualifiait le sous-processus `python -I` de « vrai Code Interpreter isolé » ;
+- toutes les variables d'environnement du backend, donc potentiellement des secrets, étaient
+  recopiées dans le processus enfant ;
+- `communicate()` accumulait stdout/stderr sans borne en mémoire ;
+- le timeout terminait seulement le processus parent, pas explicitement ses descendants ;
+- code, artefacts et imports tiers n'étaient pas plafonnés ou classés assez finement.
+
+### Solution
+
+- nouveau `python_execution.py` avec racine, interpréteur et identifiant injectables ;
+- résultat explicite : `isolation=process_only`, `sandboxed=false`,
+  `network_isolated=false`, `environment_inherited=false` ;
+- environnement enfant réduit aux variables système nécessaires, `TEMP`, `HOME` et cache
+  Matplotlib redirigés vers le dossier d'exécution ;
+- code limité à 100 000 caractères, délai à 60 secondes, stdout à 64 Ko, stderr à 32 Ko et
+  artefacts à 100 ;
+- stdout/stderr passent par des fichiers temporaires, donc aucune accumulation non bornée ;
+- analyse AST renforcée : modules non approuvés, I/O NumPy/Pandas/Matplotlib, introspection
+  spéciale et appels sensibles exigent confirmation ;
+- NumPy, Pandas et Matplotlib restent disponibles sans confirmation pour le calcul pur ;
+- timeout : terminaison récursive via `psutil`, avec `taskkill /T` ou groupe POSIX en repli ;
+- Test Forge/VM reste la seule voie annoncée pour du code non fiable ou une certification.
+
+### Validation observée
+
+- calcul pur et NumPy réussis ; résultat structuré capturé ;
+- quatre familles de capacités hôte refusées sans confirmation ;
+- exécution confirmée : création d'artefact réussie, secret du parent absent de l'enfant ;
+- stdout de 100 Ko tronqué à 64 Ko sans saturation mémoire ;
+- boucle infinie terminée au timeout réel d'une seconde ;
+- syntaxe, timeout et taille invalides refusés ;
+- architecture : Marvin **2.373.0**, **344 outils**, **346 routes**, harness **344/344** et
+  **65 restrictions** ;
+- gate rapide complet : **145/145** étapes ;
+- `/api/health` : version **2.373.0**, Ollama disponible, 344 outils et 15 workers ;
+- API réelle : somme des carrés retournée à `285` en 63 ms avec les garanties explicites ;
+- dossier de validation supprimé après preuve ;
+- frontend Turbopack conservé, smoke test réel : **28/28** contrats.
+
+### Rollback
+
+- aucun schéma, secret, réglage ou donnée utilisateur n'est modifié ;
+- les dossiers temporaires des tests et du runtime de validation ont été supprimés ;
+- rollback : réversion atomique du commit après contrôle du patch inverse ;
+- après réversion, redémarrer le backend et repasser test Python, health, gate et smoke.

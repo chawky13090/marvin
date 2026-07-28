@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.373 — exécution Python extraite; garanties honnêtes, environnement et sorties bornés
 # v2.372 — graphiques extraits; 11 types validés, rendu sans état global et PNG atomiques
 # v2.371 — moteur Council extrait; cinq familles, budgets, confidentialité et traces testables
 # v2.370 — nettoyage système extrait; âge, parcours, erreurs et suppression désormais bornés

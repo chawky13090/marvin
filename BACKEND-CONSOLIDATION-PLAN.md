@@ -270,6 +270,10 @@ Hyper local/sensibles restent bloqués et aucun repli local silencieux n'est int
 La génération d'infographies rejoint `tool_domains/charts.py`. Les onze types partagent une
 validation stricte des dimensions et valeurs, un rendu `Figure` sans état global et une
 publication PNG atomique. Les séries incohérentes et nombres non finis sont refusés avant I/O.
+L'exécuteur `code_python` rejoint `python_execution.py`. La frontière ne qualifie plus `-I`
+de sandbox : environnement minimal, sorties sur fichiers temporaires bornés, artefacts
+plafonnés, AST et timeout protègent le mode rapide; Test Forge/VM reste la seule frontière
+annoncée comme confinement système et réseau pour du code non fiable.
 
 ## 4. Validation obligatoire par tranche
 

@@ -7,7 +7,6 @@ Chaque outil expose :
 """
 import os
 import sys
-import ast
 import json
 import re
 import shutil
@@ -22,6 +21,7 @@ import psutil
 import database as db
 import cloud_routing as cloud_routing_runtime
 import model_council as model_council_runtime
+import python_execution as python_execution_runtime
 import vector_store as vector_store_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
@@ -3393,159 +3393,13 @@ async def execute_clipboard_append(args: dict) -> dict:
 
 execute_text_join = text_processing_domain.text_join
 
-# ══════════════════════════════════════════════════════════════════════════════
-# SECTION 19 — Exécution de code Python (sandboxée)
-# ══════════════════════════════════════════════════════════════════════════════
-
-# v2.142 — liste de modules/appels sensibles pour l'analyse STRUCTURELLE (AST) du code
-# avant exécution. Remplace l'ancienne liste noire par SOUS-CHAÎNE (v2.36-2.106), trouvée
-# contournable en auditant le code pour la comparaison "meilleur que le payant" (v2.141) :
-# `getattr(os, 'sys'+'tem')(...)` ne contient AUCUNE des chaînes interdites d'origine, et
-# `os` était de toute façon importé SANS CONDITION dans l'espace de noms — le denylist
-# n'aurait jamais empêché grand-chose. L'AST voit la structure réelle (Import/Call), pas
-# le texte brut : impossible à déguiser par concaténation de chaînes ou obfuscation.
-_CODE_FORBIDDEN_MODULES = {
-    "os", "subprocess", "socket", "shutil", "ctypes", "sys",
-    "multiprocessing", "threading", "urllib", "http", "ftplib", "smtplib",
-    "importlib", "pickle", "winreg", "psutil",
-}
-_CODE_FORBIDDEN_CALLS = {"eval", "exec", "compile", "__import__", "open", "input"}
-
-
-def _scan_code_ast(code: str) -> list[str]:
-    """Retourne les motifs sensibles trouvés (imports/appels) par analyse AST, ou
-    ["Erreur de syntaxe : ..."] si le code ne parse pas. Best-effort mais structurel :
-    un `import os` ou `eval(...)` est détecté quelle que soit la façon dont le module
-    est ensuite utilisé — contrairement à un test de sous-chaîne, contourner la
-    DÉTECTION DE L'IMPORT LUI-MÊME ne sert à rien puisque sans l'import, le nom
-    n'existe simplement pas dans l'espace de noms du sous-processus."""
-    try:
-        tree = ast.parse(code)
-    except SyntaxError as e:
-        return [f"Erreur de syntaxe : {e}"]
-    found = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                root = alias.name.split(".")[0]
-                if root in _CODE_FORBIDDEN_MODULES:
-                    found.add(f"import {alias.name}")
-        elif isinstance(node, ast.ImportFrom):
-            root = (node.module or "").split(".")[0]
-            if root in _CODE_FORBIDDEN_MODULES:
-                found.add(f"from {node.module or '?'} import ...")
-        elif isinstance(node, ast.Call):
-            fn = node.func
-            name = fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else None)
-            if name in _CODE_FORBIDDEN_CALLS:
-                found.add(f"appel à {name}(...)")
-    return sorted(found)
-
-
-_CODE_RESULT_MARKER = "___MARVIN_RESULT___"
-
-
-async def execute_code_python(args: dict) -> dict:
-    """
-    Exécute un extrait de code Python dans un SOUS-PROCESSUS isolé (v2.142 — l'ancienne
-    version tournait par exec() DANS le process du backend, avec `os` toujours disponible :
-    un vrai isolement de processus, pas juste un espace de noms restreint). Idéal pour :
-    calculs de données, statistiques, transformations, GRAPHIQUES (matplotlib) — tout
-    fichier écrit dans le dossier de travail (image, CSV...) est automatiquement détecté
-    et renvoyé, cliquable dans le chat (comme un Code Interpreter). Les imports sensibles
-    (os, subprocess, réseau, fichiers via open()...) demandent confirmation explicite.
-    """
-    code = (args.get("code") or "").strip()
-    timeout = max(1, min(int(args.get("timeout", 15)), 60))
-    confirmed = bool(args.get("confirmed", False))
-
-    if not code:
-        return {"error": "Paramètre 'code' requis."}
-
-    risks = _scan_code_ast(code)
-    if risks and not confirmed:
-        return {
-            "requiresConfirmation": True,
-            "message": f"Ce code utilise des fonctionnalités sensibles ({', '.join(risks[:4])}). Exécuter quand même ?",
-            "risks": risks,
-        }
-
-    import uuid as _uuid
-    import glob as _glob
-
-    run_id = _uuid.uuid4().hex[:12]
-    out_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "code_outputs", run_id))
-    os.makedirs(out_dir, exist_ok=True)
-    script_path = os.path.join(out_dir, "_script.py")
-    # Capture best-effort d'une variable `result`/`output` si le code en définit une —
-    # imprimée avec un marqueur unique, extrait du stdout après coup (le sous-processus
-    # ne partage pas de mémoire avec le backend, donc pas d'autre moyen de la récupérer).
-    with open(script_path, "w", encoding="utf-8") as f:
-        f.write(code)
-        f.write(
-            "\ntry:\n"
-            "    _mv_r = locals().get('result', locals().get('output'))\n"
-            "    if _mv_r is not None:\n"
-            f"        print({_CODE_RESULT_MARKER!r} + repr(_mv_r)[:2000])\n"
-            "except Exception:\n"
-            "    pass\n"
-        )
-
-    env = dict(os.environ)
-    env["MPLBACKEND"] = "Agg"  # graphiques sans affichage (sous-processus headless)
-    env["PYTHONIOENCODING"] = "utf-8"
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-I", script_path,
-            cwd=out_dir, env=env,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
-            return {"error": f"Timeout dépassé ({timeout}s). Simplifiez le code ou augmentez le timeout."}
-    except Exception as e:
-        return {"error": f"Échec de lancement du sous-processus : {str(e)[:200]}"}
-
-    stdout = stdout_b.decode("utf-8", errors="replace")
-    stderr = stderr_b.decode("utf-8", errors="replace")
-
-    result_val = None
-    clean_lines = []
-    for line in stdout.splitlines():
-        if line.startswith(_CODE_RESULT_MARKER):
-            result_val = line[len(_CODE_RESULT_MARKER):][:2000]
-        else:
-            clean_lines.append(line)
-    stdout_clean = "\n".join(clean_lines)
-
-    # Fichiers écrits par le code (graphiques, CSV exportés...) — glob du dossier de
-    # travail dédié à cette exécution, en excluant le script lui-même. `path`/`files`
-    # sont détectés côté frontend par EXTENSION (GeneratedFileCard, v2.128/v2.142),
-    # donc rien à câbler côté LLM : un simple plt.savefig("chart.png") suffit.
-    generated = [
-        os.path.abspath(p) for p in sorted(_glob.glob(os.path.join(out_dir, "*")))
-        if os.path.isfile(p) and os.path.basename(p) != "_script.py"
-    ]
-
-    resp = {
-        "success":    proc.returncode == 0,
-        "stdout":     stdout_clean[:4000] or "(aucune sortie)",
-        "stderr":     stderr[:1500] if stderr else "",
-        "result":     result_val,
-        "returncode": proc.returncode,
-    }
-    if generated:
-        resp["files"] = generated
-        if len(generated) == 1:
-            resp["path"] = generated[0]
-            resp["message"] = f"Fichier généré : {os.path.basename(generated[0])}"
-    if proc.returncode != 0 and not resp["stderr"]:
-        resp["error"] = "Le script a échoué (code de retour non nul) sans message d'erreur."
-    return resp
+# SECTION 19 — calcul Python rapide en processus séparé. Le confinement système réel
+# appartient à Test Forge/VM; cette façade annonce explicitement ses limites.
+python_execution_runtime.configure(
+    output_root=Path(__file__).resolve().parent.parent / "data" / "code_outputs",
+    python_executable=sys.executable,
+)
+execute_code_python = python_execution_runtime.execute
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -6152,16 +6006,17 @@ TOOLS_SPEC = [
        ["texts"]),
     # ── Section 19 ──────────────────────────────────────────────────────────
     _t("code_python",
-       "Exécute un extrait de code Python dans un SOUS-PROCESSUS isolé (vrai « Code Interpreter »). "
+       "Exécute un calcul Python rapide dans un processus séparé. Ce n'est PAS une sandbox OS : "
+       "pour du code non fiable ou une validation de production, utiliser Test Forge/VM. "
        "Idéal pour : calculs de données, statistiques, transformations, et GRAPHIQUES — un simple "
        "plt.savefig('nom.png') suffit, l'image est automatiquement détectée et affichée cliquable "
        "dans le chat (pas besoin de chemin spécial). Bibliothèques disponibles : json, math, re, "
        "datetime, collections, statistics, random, numpy/pandas/matplotlib (si installés) — utilise "
        "un simple 'import'. Imprime le résultat avec print() pour le voir, ou définis une variable "
        "'result'/'output' pour qu'elle apparaisse dans le champ 'result'. "
-       "os/subprocess/réseau/fichiers (open) demandent une confirmation explicite.",
-       {"code":      {"type": "string",  "description": "Code Python à exécuter"},
-        "timeout":   {"type": "integer", "description": "Délai max en secondes (1–60, défaut 15)"},
+       "os/subprocess/réseau/fichiers (open/read/save) demandent une confirmation explicite.",
+       {"code":      {"type": "string", "maxLength": 100000, "description": "Code Python à exécuter"},
+        "timeout":   {"type": "integer", "minimum": 1, "maximum": 60, "description": "Délai max en secondes (1–60, défaut 15)"},
         "confirmed": {"type": "boolean", "description": "Requis si le code utilise open(), import os/subprocess/socket, eval/exec, etc."}},
        ["code"]),
 

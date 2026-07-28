@@ -195,6 +195,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Frontier Arena et Evidence Fabric", (python, "scripts/test_frontier_arena.py")),
         Stage("Adaptive Team Runtime", (python, "scripts/test_adaptive_team.py")),
         Stage("Code Forge et qualité des scripts", (python, "scripts/test_code_forge.py")),
+        Stage("Exécution Python bornée", (python, "scripts/test_python_execution.py")),
         Stage("Bundles multi-fichiers reproductibles", (python, "scripts/test_deliverable_bundle.py")),
         Stage("Production Contract Gate", (python, "scripts/test_production_contract.py")),
         Stage("Matrice de langages certifiés", (python, "scripts/test_language_matrix.py")),

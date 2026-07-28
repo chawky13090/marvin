@@ -269,6 +269,10 @@ les dépendances sont injectables et les volumes de contexte/réponse sont plafo
 `infographic_create`. Chaque rendu utilise une `Figure` isolée, valide les dimensions,
 séries, nombres finis et couleurs, quitte la boucle asyncio et publie le PNG par remplacement
 atomique. La façade ne dépend plus de l'état global Matplotlib.
+91. l'exécution Python rapide : `python_execution.py` isole le processus et son environnement,
+borne code, temps, sorties et artefacts, puis termine l'arbre au timeout. Le contrat expose
+explicitement l'absence de sandbox OS/réseau; les capacités hôte demandent confirmation.
+Tout code non fiable ou à certifier doit passer par Test Forge et son conteneur/sa VM.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

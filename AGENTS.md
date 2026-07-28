@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.372.0)
+## 9. État actuel (v2.373.0)
+
+**v2.373 (exécution Python)** : `code_python` rejoint `python_execution.py`. `python -I`
+est désormais présenté correctement comme une isolation de processus/environnement, pas une
+sandbox OS. Le processus enfant reçoit un environnement minimal sans secrets applicatifs;
+code, délai, stdout/stderr et artefacts sont bornés. AST, confirmation et terminaison d'arbre
+au timeout sont renforcés. Le confinement réel reste Test Forge dans Docker/VM.
 
 **v2.372 (graphiques déterministes)** : `infographic_create` rejoint
 `tool_domains/charts.py`. Onze types utilisent des objets `Figure` isolés sans état global
