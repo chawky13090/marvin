@@ -101,6 +101,67 @@ async def _exercise(path: Path) -> None:
         assert interrupted[-1]["turnInterrupted"] is True
         assert starts == 1
 
+        async def failing_producer():
+            yield 'data: {"type":"text","text":"avant"}\n\n'
+            raise RuntimeError("secret-interne C:\\chemin\\prive token=abc")
+
+        with patch.object(chat_turn_runtime.bug_log, "log_bug") as log_bug:
+            failed_events = []
+            async for chunk in chat_turn_runtime.subscribe(
+                request_id="turn-failed",
+                fingerprint="hash-failed",
+                conversation_id="conv-1",
+                producer_factory=failing_producer,
+            ):
+                failed_events.append(_event(chunk))
+        assert [event["type"] for event in failed_events] == ["text", "error"]
+        failure = failed_events[-1]
+        assert len(failure["incident"]) == 32
+        assert failure["incident"] in failure["message"]
+        assert "secret-interne" not in str(failed_events)
+        log_bug.assert_called_once()
+        logged = log_bug.call_args
+        assert logged.args[:2] == (
+            "chat_turn_producer_failure",
+            "Le producteur SSE d'un tour a échoué.",
+        )
+        assert logged.kwargs["context"]["error_type"] == "RuntimeError"
+        assert "secret-interne" not in str(logged)
+        with db(path) as connection:
+            row = connection.execute(
+                "SELECT status,error FROM chat_turns WHERE request_id='turn-failed'"
+            ).fetchone()
+        assert row["status"] == "failed"
+        assert "secret-interne" not in row["error"]
+
+        with patch.object(
+            chat_turn_runtime.bug_log,
+            "log_bug",
+            side_effect=OSError("journal indisponible"),
+        ):
+            degraded_events = []
+            async for chunk in chat_turn_runtime.subscribe(
+                request_id="turn-failed-log",
+                fingerprint="hash-failed-log",
+                conversation_id="conv-1",
+                producer_factory=failing_producer,
+            ):
+                degraded_events.append(_event(chunk))
+        assert [event["type"] for event in degraded_events] == ["text", "error"]
+        with db(path) as connection:
+            degraded_row = connection.execute(
+                "SELECT status,error FROM chat_turns WHERE request_id='turn-failed-log'"
+            ).fetchone()
+        assert degraded_row["status"] == "failed"
+        assert "secret-interne" not in degraded_row["error"]
+
+        try:
+            chat_turn_runtime._finish("turn-1", "running")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Un statut non terminal devait être refusé.")
+
 
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="marvin-chat-turn-") as directory:

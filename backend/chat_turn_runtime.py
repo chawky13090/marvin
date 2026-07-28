@@ -5,14 +5,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from db_connection import db
+import bug_log
 
 
 _PROCESS_TOKEN = uuid.uuid4().hex
+_LOGGER = logging.getLogger(__name__)
 _TASKS: dict[str, asyncio.Task] = {}
 _LOCK = asyncio.Lock()
 _TERMINAL = frozenset({"completed", "failed", "interrupted"})
@@ -124,6 +127,8 @@ def _append_event(request_id: str, event: dict[str, Any]) -> int:
 
 
 def _finish(request_id: str, status: str, error: str | None = None) -> None:
+    if status not in _TERMINAL:
+        raise ValueError("Statut terminal de tour invalide.")
     with db() as connection:
         connection.execute(
             """UPDATE chat_turns
@@ -131,6 +136,47 @@ def _finish(request_id: str, status: str, error: str | None = None) -> None:
                WHERE request_id = ? AND owner_token = ?""",
             (status, error, request_id, _PROCESS_TOKEN),
         )
+
+
+def _record_producer_failure(
+    request_id: str,
+    *,
+    incident: str,
+    error_type: str,
+    message: str,
+) -> None:
+    """Termine le tour même si le journal technique est momentanément indisponible."""
+    try:
+        bug_log.log_bug(
+            "chat_turn_producer_failure",
+            "Le producteur SSE d'un tour a échoué.",
+            context={
+                "error_type": error_type,
+                "incident": incident,
+                "request_hash": hashlib.sha256(
+                    request_id.encode("utf-8")
+                ).hexdigest()[:16],
+            },
+        )
+    except Exception as log_error:
+        # Repli sans message brut : le journal technique ne doit pas bloquer la clôture métier.
+        _LOGGER.warning(
+            "chat_turn_failure_log_unavailable error_type=%s incident=%s",
+            type(log_error).__name__,
+            incident,
+        )
+
+    try:
+        _append_event(
+            request_id,
+            {
+                "type": "error",
+                "message": message,
+                "incident": incident,
+            },
+        )
+    finally:
+        _finish(request_id, "failed", message)
 
 
 async def _produce(request_id: str, producer: AsyncIterator[str]) -> None:
@@ -153,9 +199,17 @@ async def _produce(request_id: str, producer: AsyncIterator[str]) -> None:
         _finish(request_id, "interrupted", message)
         raise
     except Exception as exc:
-        message = f"Tour interrompu par le backend : {str(exc)[:500]}"
-        _append_event(request_id, {"type": "error", "message": message})
-        _finish(request_id, "failed", message)
+        incident = uuid.uuid4().hex
+        message = (
+            "Le tour a été interrompu par une erreur interne. "
+            f"Incident : {incident}."
+        )
+        _record_producer_failure(
+            request_id,
+            incident=incident,
+            error_type=type(exc).__name__,
+            message=message,
+        )
 
 
 def _task_finished(request_id: str, task: asyncio.Task) -> None:

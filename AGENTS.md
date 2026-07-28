@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.426.0)
+## 9. État actuel (v2.427.0)
+
+**v2.427 (terminaison SSE sûre)** : une panne du producteur d'un tour de chat ne projette
+plus le texte brut de l'exception dans le navigateur ni dans SQLite. Le client reçoit un
+incident opaque; le journal technique conserve uniquement le type d'erreur, l'incident et
+un condensat du request ID. Les états terminaux sont fermés par énumération et la clôture
+métier reste effective même si le journal de bugs est indisponible. Le contrat couvre
+reconnexion, rejeu, interruption, panne producteur, panne logger et rejet d'un statut invalide.
 
 **v2.426 (propriétaire SQLite unique)** : Next.js ne charge plus `better-sqlite3`, ne crée
 plus de schéma et ne lit/écrit plus directement `secretary.db`. Le réglage `active_model`

@@ -10008,3 +10008,45 @@ build Next.js 16.2.12 Turbopack avec `sharp` 0.35.3. Smokes live API **28/28** e
 réussissent, la valeur initiale est préservée, `/api/status` projette la même valeur et un nom
 invalide retourne HTTP 400. Backend v2.426.0 et frontend sont relancés; Ollama est disponible,
 344 outils et 15 workers sont actifs.
+
+## 2026-07-28 — v2.427.0 — Terminaison sûre des tours SSE
+
+### Constat et décision
+
+Le runtime durable des conversations conservait le texte brut d'une exception levée par le
+producteur dans l'événement SSE envoyé au navigateur et dans `chat_turns.error`. Cette voie
+contournait l'expurgation du handler HTTP global et pouvait exposer chemin local, détail
+d'infrastructure, donnée personnelle ou secret présent dans une exception. Deux options ont
+été comparées : filtrer les messages d'exception par motifs, fragile et impossible à garantir,
+ou ne jamais faire traverser le message brut et corréler un incident opaque. La seconde est
+retenue, conformément aux recommandations OWASP Logging et OpenTelemetry sur les attributs
+d'exception potentiellement sensibles.
+
+Sources primaires :
+
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- https://opentelemetry.io/docs/specs/semconv/registry/attributes/exception/
+
+### Implémentation, sécurité et journalisation
+
+`backend/chat_turn_runtime.py` génère un identifiant d'incident aléatoire, retourne uniquement
+un message générique et persiste ce même message. Le journal technique reçoit la classe
+d'erreur, l'incident et un SHA-256 tronqué du `request_id`, jamais le message brut. Les états
+finaux sont limités à `completed`, `failed` et `interrupted`. Si `bug_log` est indisponible,
+un repli du logger Python n'écrit que la classe de cette panne et l'incident; la clôture métier
+continue, évitant un tour éternellement `running`. Aucun schéma, secret, permission, accès
+réseau ou donnée existante n'est modifié.
+
+### Validation et rollback
+
+Le contrat SQLite réel couvre le parcours nominal, détachement/reconnexion, rejeu sans
+duplication, producteur en panne contenant un faux secret, absence de ce secret dans SSE,
+SQLite et journal, panne du logger et rejet d'un statut non terminal. Les tests ciblés
+`test_chat_turn_runtime.py`, `test_agent_gateway_api.py`, `test_chat_stream.mjs`, la
+compilation Python et le contrôle d'architecture réussissent. Le gate consolidé réussit
+**191/191**, dont compilation backend, lint sans erreur et build Next.js 16.2.12 Turbopack.
+Après relance, `/api/health` expose v2.427.0, Ollama disponible, 344 outils et 15 workers;
+les smokes live réussissent **28/28 API** et **40/40 pages**.
+
+Rollback exact : `git revert <commit-v2.427>`. Il n'existe ni migration de schéma ni mutation
+de données à inverser; les tours déjà terminés restent compatibles.
