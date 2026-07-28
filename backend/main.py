@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.419 — sauvegardes SQLite intègres, atomiques et compensables
 # v2.418 — connaissances IT extraites vers un repository borné et injectable
 # v2.417 — fiches de révision extraites vers un repository déterministe
 # v2.416 — recherche Web explicite garantie et réponses modèle vides récupérées

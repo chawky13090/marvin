@@ -99,11 +99,20 @@ async def database_backup_worker() -> None:
         try:
             result = backup.create_backup()
             if result.get("success"):
-                print(f"[Marvin] Sauvegarde DB : {result['path']} ({result['size_kb']} Ko)")
+                print(
+                    "[Marvin] Sauvegarde DB valide "
+                    f"({result['size_kb']} Ko)"
+                )
             else:
-                print(f"[Marvin] Sauvegarde DB echouee : {result.get('error')}")
+                print(
+                    "[Marvin] Sauvegarde DB echouee "
+                    f"({result.get('error_code', 'unknown')})"
+                )
         except Exception as exc:
-            print(f"[Marvin] Sauvegarde DB echouee : {exc}")
+            print(
+                "[Marvin] Sauvegarde DB echouee "
+                f"({type(exc).__name__})"
+            )
         await asyncio.sleep(86400)
 
 

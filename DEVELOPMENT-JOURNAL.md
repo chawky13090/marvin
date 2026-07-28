@@ -9606,3 +9606,80 @@ Le schéma et les données sont inchangés; aucune migration descendante n'est n
 Vérifier ensuite via `/api/tools` que `it_kb_search`, `it_kb_list`, `it_kb_recommend` et
 `it_kb_add` restent accessibles. La réversion restaure volontairement le CRUD historique
 moins borné.
+
+## 2026-07-28 — v2.419.0 — Sauvegarde et restauration SQLite compensables
+
+### Contexte, comparaison et décision
+
+Le mécanisme historique utilisait correctement l'Online Backup API, mais publiait directement
+le fichier final, ne vérifiait ni SQLite ni l'empreinte, ignorait l'échec de la sauvegarde
+pré-restauration et ne compensait pas une restauration partielle. Deux approches ont été
+comparées :
+
+- remplacer atomiquement `secretary.db` par une copie de fichier, simple mais dangereuse
+  avec les connexions actives et le WAL ;
+- conserver l'Online Backup API officielle, puis ajouter publication atomique, intégrité,
+  empreinte, sérialisation et compensation.
+
+La seconde est retenue. SQLite documente que l'Online Backup API produit un snapshot cohérent
+pendant que d'autres clients accèdent à la base; Python expose directement
+`Connection.backup`. `quick_check` fournit un contrôle linéaire adapté à chaque sauvegarde,
+alors que `integrity_check` est utilisé avant/après restauration. OWASP recommande de tester
+régulièrement les restaurations et de chiffrer les sauvegardes sensibles :
+
+- https://www.sqlite.org/backup.html
+- https://docs.python.org/3/library/sqlite3.html
+- https://www.sqlite.org/pragma.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
+
+### Implémentation, sécurité et observabilité
+
+- `BackupService` injecte chemins, rétention, horloge et journal d'événements ;
+- verrou réentrant : worker et API ne peuvent plus sauvegarder ou restaurer simultanément
+  dans un même backend ;
+- nom UTC avec microsecondes et suffixe de collision, fichier `.partial`, `fsync`, puis
+  `os.replace` ;
+- `quick_check`, `foreign_key_check`, SHA-256 et sidecar publié atomiquement ;
+- rotation couplée du snapshot et de son sidecar, avec avertissements comptés ;
+- restauration : validation stricte du nom, `integrity_check`, contrôle SHA-256, sauvegarde
+  préalable obligatoire, copie live, contrôle final et compensation automatique ;
+- compatibilité des sauvegardes legacy sans sidecar, explicitement marquées
+  `checksum_verified=false` ;
+- API Pydantic bornée, confirmation strictement booléenne et codes 404/409/500 distincts ;
+- worker et erreurs HTTP n'exposent plus chemin ni message d'exception ;
+- journalisation réutilise `audit.jsonl`, sa rotation et son expurgation; aucun nouveau JSONL
+  ni contenu SQLite n'est journalisé.
+
+Le test réel a découvert 27 événements SSE historiques sans parent dans
+`chat_turn_events`. `quick_check` reste `ok`; bloquer la sauvegarde aurait supprimé le filet
+de reprise. Le nombre est donc exposé dans chaque preuve sans contenu. SEC-014 enregistre la
+migration de réparation requise. SEC-005 reste `OPEN` : cette tranche n'affirme pas chiffrer
+les fichiers. Le format AES-GCM avec clé de données enveloppée par DPAPI, puis la migration
+vérifiée des sauvegardes en clair, constitue la tranche suivante. Références retenues :
+
+- https://cryptography.io/en/stable/hazmat/primitives/aead/
+- https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata
+
+### Validation observée et rollback
+
+- SQLite réel : snapshot, SHA-256, restauration, legacy, empreinte altérée, base corrompue,
+  mutation partielle compensée, huit créations concurrentes, rotation et source absente ;
+- contrat API : chemin hostile, confirmation non booléenne et sauvegarde corrompue HTTP 409 ;
+- test explicite d'une base physiquement saine avec une violation FK historique : sauvegarde
+  acceptée et avertissement `foreign_key_violations=1` ;
+- gate globale : **185/185 étapes**, 344 outils, harness 344/344, 354 routes, 40 pages,
+  compilation de 263 fichiers Python et lint sans erreur bloquante ;
+- build Next.js 16.2.6 sous Turbopack réussi, puis `next dev` relancé ;
+- backend 2.419.0 relancé avec Ollama et 15 workers ;
+- création réelle via `POST /api/backups` : snapshot de 71 024 Ko, intégrité vraie,
+  SHA-256 de 64 caractères et 27 violations historiques déclarées ;
+- `scripts/verify_backup_restore.py` a restauré ce snapshot réel dans une base temporaire :
+  intégrité SQLite, contenu logique exact et base active jamais modifiée.
+- smokes live : **28/28 contrats API**, **40/40 pages**, cinq conversations représentatives
+  et sérialisation vocale stricte réussis.
+
+Rollback après commit : `git revert <commit-v2.419>`, puis redémarrer le backend. Les nouveaux
+fichiers `.sha256` peuvent rester : l'ancienne version les ignore. Les snapshots `.db`
+demeurent compatibles. Aucune donnée ni migration de schéma n'est modifiée par la réversion.
+Vérifier ensuite `GET /api/backups` et créer une sauvegarde manuelle. Ne restaurer la base
+active pendant le rollback qu'en cas d'incident de données indépendant du code.

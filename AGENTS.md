@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.418.0)
+## 9. État actuel (v2.419.0)
+
+**v2.419 (sauvegarde et restauration SQLite)** : les trois façades historiques passent par
+un service injectable et sérialisé. Chaque nouvelle sauvegarde utilise l'Online Backup API,
+un fichier temporaire, des contrôles SQLite, `fsync`, publication atomique et un manifeste
+SHA-256. La restauration valide la source, exige une sauvegarde préalable, contrôle la base
+restaurée et compense automatiquement depuis l'état précédent en cas d'échec. Les sauvegardes
+legacy sans sidecar restent restaurables après contrôle d'intégrité, avec provenance
+`checksum_verified=false`. Les erreurs et événements sont expurgés. SEC-005 reste ouverte :
+le chiffrement authentifié DPAPI des sauvegardes est la prochaine tranche de persistance.
 
 **v2.418 (persistance des connaissances IT)** : le schéma, le catalogue initial et les six
 façades de la base de connaissances IT rejoignent un repository injectable. Le catalogue

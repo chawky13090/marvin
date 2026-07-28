@@ -3,7 +3,7 @@
 import asyncio
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, StrictBool
 
 import backup
 
@@ -25,8 +25,12 @@ async def create_backup_now():
 
 
 class RestoreRequest(BaseModel):
-    filename: str
-    confirmed: bool = False
+    filename: str = Field(
+        min_length=28,
+        max_length=64,
+        pattern=r"^secretary_\d{8}_\d{6}(?:_\d{6})?(?:_\d+)?\.db$",
+    )
+    confirmed: StrictBool = False
 
 
 @router.post("/api/backups/restore")
@@ -36,5 +40,9 @@ async def restore_backup_now(body: RestoreRequest):
         raise HTTPException(status_code=400, detail="Confirmation requise (confirmed=true).")
     result = await asyncio.to_thread(backup.restore_backup, body.filename)
     if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
+        status = {
+            "backup_not_found": 404,
+            "invalid_backup": 409,
+        }.get(result.get("error_code"), 500)
+        raise HTTPException(status_code=status, detail=result["error"])
     return result

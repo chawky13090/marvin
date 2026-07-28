@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.415.0
+Version courante auditée : 2.419.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -406,6 +406,13 @@ injectable : création du score, de ses points et recommandations dans une trans
 valeurs numériques bornées, lecture stable et rollback vérifié. En v2.415.0, les analyses de
 commandes et approbations rejoignent un repository injectable : catalogue historique exact,
 liaison analyse/commande et transition finale idempotente sont désormais déterministes.
+En v2.417.0 et v2.418.0, fiches de révision puis connaissances IT terminent l'extraction
+des agrégats de `database.py`; la façade ne conserve plus que la composition des schémas.
+En v2.419.0, sauvegarde et restauration utilisent l'Online Backup API sous un service
+sérialisé, avec publication atomique, contrôles SQLite, SHA-256, rotation couplée et
+compensation automatique testée. La phase reste `partial` tant que SEC-005 n'a pas livré
+le format chiffré authentifié, la migration des sauvegardes historiques et sa restauration
+réelle sous le compte Windows.
 
 ## 10. Preuves minimales par grande capacité
 
