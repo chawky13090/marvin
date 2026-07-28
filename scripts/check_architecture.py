@@ -186,6 +186,16 @@ def run() -> dict[str, int | str]:
     ):
         if marker not in persistence_inventory:
             raise CheckFailure(f"Inventaire de persistance incomplet : {marker}")
+    evidence_source = (BACKEND / "durable_evidence_store.py").read_text(encoding="utf-8-sig")
+    for marker in (
+        "DurableEvidenceStore",
+        "record_hash",
+        "previous_hash",
+        "_interprocess_lock",
+        "owner_lifecycle",
+    ):
+        if marker not in evidence_source:
+            raise CheckFailure(f"Registre de preuves incomplet : {marker}")
 
     required_scripts = {
         "check:runtime",
@@ -193,6 +203,8 @@ def run() -> dict[str, int | str]:
         "check:structured-logging",
         "check:skill-match-logging",
         "check:persistence-inventory",
+        "check:durable-evidence",
+        "check:forge-evidence",
         "check:architecture",
         "check:frontier-contract",
         "check:telegram",

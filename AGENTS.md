@@ -186,7 +186,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.393.0)
+## 9. État actuel (v2.394.0)
+
+**v2.394 (preuves Forge durables)** : `durable_evidence_store.py` fournit un registre
+append-only sans expiration automatique, avec séquence, version de schéma, chaîne SHA-256,
+verrou interprocessus Windows/Linux, `fsync`, détection d'altération et quarantaine d'une
+écriture partielle après crash. `forge_runs.jsonl` conserve les preuves historiques non
+signées et chaîne toutes les nouvelles; `forge.summary()` expose leur intégrité.
 
 **v2.393 (inventaire de persistance et matcher privé)** : les treize chemins JSONL du
 backend sont classifiés entre logs techniques, flux métier, registres d'évaluation et registre

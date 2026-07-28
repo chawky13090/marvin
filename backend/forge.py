@@ -11,11 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from config import DATA_DIR
+from durable_evidence_store import DurableEvidenceStore
 
 
 SCENARIOS_PATH = Path(DATA_DIR) / "forge_scenarios.json"
 RUNS_PATH = Path(DATA_DIR) / "forge_runs.jsonl"
 _LOCK = threading.RLock()
+_RUNS_STORE = None
+_RUNS_STORE_PATH = None
 
 _DEFAULT_SCENARIOS = [
     {
@@ -81,6 +84,15 @@ _DEFAULT_SCENARIOS = [
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _runs_store() -> DurableEvidenceStore:
+    global _RUNS_STORE, _RUNS_STORE_PATH
+    resolved = str(RUNS_PATH.resolve())
+    if _RUNS_STORE is None or _RUNS_STORE_PATH != resolved:
+        _RUNS_STORE = DurableEvidenceStore(resolved, stream_name="marvin.forge.runs")
+        _RUNS_STORE_PATH = resolved
+    return _RUNS_STORE
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -286,29 +298,20 @@ def record_run(
         **grade,
     }
     with _LOCK:
-        RUNS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with RUNS_PATH.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(run, ensure_ascii=False) + "\n")
-    return run
+        return _runs_store().append(run)
 
 
 def list_runs(*, limit: int = 200, scenario_id: str | None = None) -> list[dict[str, Any]]:
-    if not RUNS_PATH.exists():
-        return []
-    rows: list[dict[str, Any]] = []
+    bounded = max(1, min(int(limit), 2000))
     with _LOCK:
-        for line in RUNS_PATH.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if scenario_id and row.get("scenario_id") != scenario_id:
-                continue
-            rows.append(row)
-    rows.sort(key=lambda item: str(item.get("created_at") or ""), reverse=True)
-    return rows[: max(1, min(int(limit), 2000))]
+        return _runs_store().recent(
+            bounded,
+            predicate=(
+                (lambda row: row.get("scenario_id") == scenario_id)
+                if scenario_id
+                else None
+            ),
+        )
 
 
 def _window_metric(values: list[bool], k: int, *, require_all: bool) -> bool | None:
@@ -347,4 +350,5 @@ def summary() -> dict[str, Any]:
         "runs": len(runs),
         "success_rate": round(total_success / len(runs), 4) if runs else None,
         "by_scenario": by_scenario,
+        "integrity": _runs_store().verify(),
     }

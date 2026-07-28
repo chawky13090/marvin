@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.394 — preuves Forge conservées, séquencées et chaînées par SHA-256
 # v2.393 — persistances JSONL classifiées; matching skills privé et journal quotidien
 # v2.392 — journalisation structurée obligatoire, expurgée, rotative et bornée
 # v2.391 — générations internes extraites; pool, routage et métriques sans contenu

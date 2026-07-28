@@ -8109,3 +8109,46 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Référence : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 - Rollback applicatif : `git revert <commit>`. Les requêtes historiques expurgées ne sont
   intentionnellement pas restaurables; toutes leurs métadonnées de diagnostic restent lisibles.
+
+## 2026-07-28 — v2.394.0 — registre durable des preuves Marvin Forge
+
+### Constat, comparaison et décision
+
+- L'utilisateur confirme que les preuves métier doivent être conservées. Les exécutions Forge
+  étaient append-only mais sans version, séquence, contrôle d'intégrité, verrou interprocessus
+  ni traitement d'une écriture interrompue.
+- Deux approches ont été comparées : déplacer les preuves dans les logs structurés avec
+  rétention, ou créer un registre métier distinct. La seconde est retenue : une preuve ne doit
+  jamais expirer avec la télémétrie et une altération doit être détectable.
+- Une base événementielle externe apporterait requêtes et réplication, mais augmenterait les
+  dépendances d'installation. Le registre JSONL chaîné conserve le mode local-first; une
+  migration SQLite ou objet reste possible derrière la même frontière.
+
+### Solution et impact de journalisation
+
+- Nouveau `durable_evidence_store.py` : append-only, schéma 1.0, séquence monotone,
+  `previous_hash` et `record_hash` SHA-256 sur JSON canonique.
+- Verrou de chemin dans le processus et verrou fichier borné entre processus sur Windows/Linux;
+  écriture UTF-8 vidée puis `fsync`.
+- Une fin de ligne partielle après crash est conservée dans un sidecar `.partial.*`, retirée du
+  flux valide, puis l'ajout reprend. Une ligne corrompue complète bloque tout nouvel append.
+- Les preuves Forge historiques restent lisibles comme `legacy_records`; les nouvelles sont
+  signées et chaînées. Aucune purge, rotation ou suppression automatique n'existe.
+- `forge.summary()` expose validité, volumes signés/historiques, corruptions et dernier hash.
+  Aucun nouveau log technique n'est ajouté : une impossibilité d'écrire la preuve fait échouer
+  explicitement l'enregistrement au lieu de masquer une livraison non prouvée.
+
+### Validation et rollback
+
+- Tests réussis : héritage, 100 écritures concurrentes via instances séparées, chaîne valide,
+  altération détectée, crash partiel mis en quarantaine, corruption complète bloquante,
+  lecture bornée et conservation `owner_lifecycle`.
+- Forge réel simulé : ancien run préservé, nouveau run signé, liste et résumé compatibles;
+  tests Forge et Frontier Arena sans régression.
+- Gate rapide complet : 167/167 étapes. Backend réel 2.394.0 redémarré; une notation
+  déterministe `safe-no-tools` persistée via HTTP a créé la séquence 4 avec hash 64 caractères.
+  Le résumé réel confirme intégrité valide, 3 preuves historiques et 1 preuve chaînée.
+  Smoke API : 28/28 avec frontend Turbopack.
+- Référence : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+- Rollback : `git revert <commit>`. Les champs de preuve supplémentaires sont additifs et
+  ignorables par l'ancien lecteur; aucun fichier historique n'est réécrit.

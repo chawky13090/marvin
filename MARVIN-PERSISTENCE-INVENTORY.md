@@ -43,7 +43,7 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `coding_mission.py` — `events.jsonl` | domain_event_stream | Coding Mission | avec la mission | à consolider |
 | `engineering_radar.py` — `events.jsonl` | domain_event_stream | Radar documentaire | avec l'état Radar | à consolider |
 | `mission_os.py` — `mission_events.jsonl` | domain_event_stream | Mission OS | avec la mission | à consolider |
-| `forge.py` — `forge_runs.jsonl` | evaluation_ledger | Marvin Forge | archivage explicite | à consolider |
+| `forge.py` — `forge_runs.jsonl` | evaluation_ledger | Marvin Forge | avec le corpus Forge | structuré |
 | `frontier_arena.py` — `frontier_arena_submissions.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | à consolider |
 | `frontier_arena.py` — `frontier_arena_matches.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | à consolider |
 | `frontier_arena.py` — `frontier_arena_votes.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | à consolider |
@@ -58,7 +58,7 @@ backend/skills.py|skills_match_log.jsonl|technical_log|30d|structured
 backend/coding_mission.py|events.jsonl|domain_event_stream|owner_lifecycle|pending
 backend/engineering_radar.py|events.jsonl|domain_event_stream|owner_lifecycle|pending
 backend/mission_os.py|mission_events.jsonl|domain_event_stream|owner_lifecycle|pending
-backend/forge.py|forge_runs.jsonl|evaluation_ledger|explicit_archive|pending
+backend/forge.py|forge_runs.jsonl|evaluation_ledger|owner_lifecycle|structured
 backend/frontier_arena.py|frontier_arena_submissions.jsonl|evaluation_ledger|explicit_archive|pending
 backend/frontier_arena.py|frontier_arena_matches.jsonl|evaluation_ledger|explicit_archive|pending
 backend/frontier_arena.py|frontier_arena_votes.jsonl|evaluation_ledger|explicit_archive|pending

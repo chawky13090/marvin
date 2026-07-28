@@ -83,6 +83,14 @@ def run() -> None:
     for module, _filename in structured_logs:
         source = (ROOT / module).read_text(encoding="utf-8-sig")
         assert "StructuredJsonlStore" in source
+    structured_evidence = {
+        key for key, value in declared.items()
+        if value[0] == "evaluation_ledger" and value[2] == "structured"
+    }
+    assert structured_evidence == {("backend/forge.py", "forge_runs.jsonl")}
+    assert "DurableEvidenceStore" in (ROOT / "backend" / "forge.py").read_text(
+        encoding="utf-8-sig"
+    )
     for phrase in (
         "source de données durable",
         "idempotence",
@@ -95,7 +103,8 @@ def run() -> None:
         assert phrase in text
     print(
         "Persistence Inventory OK - "
-        f"{len(declared)} JSONL classifiés, {len(structured_logs)} logs structurés."
+        f"{len(declared)} JSONL classifiés, {len(structured_logs)} logs et "
+        f"{len(structured_evidence)} registre de preuves structurés."
     )
 
 
