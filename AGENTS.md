@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.403.0)
+## 9. État actuel (v2.404.0)
+
+**v2.404 (sources Engineering Radar)** : les pages npm et TypeScript rendues uniquement par
+JavaScript, qui produisaient des erreurs à chaque démarrage, sont remplacées par deux sources
+primaires statiques : le Markdown du dépôt officiel `npm/documentation` et le blog TypeScript
+officiel de Microsoft. Les domaines restent en liste blanche HTTPS, bornés et vérifiés en
+direct; le smoke live accepte désormais une sélection explicite de langages.
 
 **v2.403 (composition FastAPI)** : la sélection dynamique du meilleur modèle Cloud, le
 briefing et les routes proactives rejoignent `api/model_selection.py` et

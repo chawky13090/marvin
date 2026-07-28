@@ -8770,3 +8770,42 @@ processus du test `python_execution`. Le test inchangé a ensuite réussi isolé
 fois consécutivement. Aucune correction spéculative n'a été introduite. Une seconde gate
 globale complète a réussi en un seul passage : **171/171 étapes**, compilation backend,
 architecture **344 outils / 354 routes / 40 pages / harness 344/344** et lint frontend.
+
+## 2026-07-28 — v2.404.0 — Sources statiques fiables pour Engineering Radar
+
+### Diagnostic et alternatives
+
+Le contrôle des logs après redémarrage 2.403 a trouvé deux erreurs
+`engineering_radar_refresh`, pour `npm-cli` et `typescript-releases`. Une reproduction directe
+a montré HTTP 200 mais seulement 58 et 45 octets : ces pages servaient une coquille
+JavaScript, donc l'extracteur déterministe concluait correctement que la documentation était
+vide.
+
+Deux solutions ont été comparées :
+
+1. lancer un navigateur Chromium dans le worker de veille, avec coût mémoire, surface
+   d'attaque, dépendance et pannes supplémentaires ;
+2. consommer des sources primaires statiques compatibles avec le transport HTTPS borné.
+
+La seconde est retenue. npm utilise le Markdown du dépôt officiel `npm/documentation` sur la
+branche principale et TypeScript le blog officiel Microsoft, qui expose les annonces récentes
+en HTML statique. Les hôtes restent en liste blanche, les redirections inter-domaines et ports
+non standards restent bloqués, et la limite de 4 Mio reste inchangée.
+
+### Validation et rollback
+
+Le test déterministe impose désormais les deux URLs officielles et leurs hôtes. Le smoke live
+accepte une liste de langages pour vérifier précisément JavaScript et TypeScript. Résultats
+réellement observés :
+
+- test Radar déterministe réussi ;
+- smoke live JavaScript et TypeScript réussi avec téléchargement, extraction et preuves ;
+- architecture réussie : version 2.404.0, 344 outils, 354 routes, 40 pages, harness 344/344 ;
+- gate globale réussie : **171/171 étapes**, compilation backend et lint frontend inclus ;
+- backend réellement redémarré en 2.404.0 : Ollama disponible, 344 outils et 15 workers ;
+- aucune nouvelle entrée `engineering_radar_refresh` dans `data/bug_log.jsonl` depuis ce
+  redémarrage ;
+- smoke HTTP/Next.js réussi : **28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.404>`. Aucun schéma n'est modifié. L'ancien
+cache reste lisible et sera remplacé seulement après une actualisation réussie et prouvée.

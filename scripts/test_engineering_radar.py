@@ -25,6 +25,20 @@ def _official_body(label: str) -> str:
     )
 
 
+def _check_static_source_contracts() -> None:
+    sources = {item["id"]: item for item in engineering_radar.SOURCES}
+    assert (
+        sources["npm-cli"]["url"]
+        == "https://raw.githubusercontent.com/npm/documentation/main/content/cli/v12/commands/index.mdx"
+    )
+    assert sources["typescript-releases"]["url"] == "https://devblogs.microsoft.com/typescript/"
+    assert "raw.githubusercontent.com" in engineering_radar.ALLOWED_HOSTS
+    assert "devblogs.microsoft.com" in engineering_radar.ALLOWED_HOSTS
+    assert "docs.npmjs.com" not in {
+        source["url"] for source in engineering_radar.SOURCES if source["id"] == "npm-cli"
+    }
+
+
 async def _exercise_refresh_and_evidence() -> None:
     calls: list[tuple[str, dict[str, str]]] = []
 
@@ -155,6 +169,7 @@ async def exercise() -> None:
 
 
 def main() -> int:
+    _check_static_source_contracts()
     with tempfile.TemporaryDirectory() as temporary:
         original = (
             engineering_radar.ROOT,
