@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 import tools as tool_module
+import api_errors
 
 
 router = APIRouter(tags=["multi-agents"])
@@ -55,7 +56,11 @@ async def _run_one(task: AgentTask) -> dict:
             "tool_name": task.tool_name,
             "label": task.label,
             "success": False,
-            "result": {"error": str(error)},
+            "result": api_errors.safe_failure(
+                "multi_agent_tool",
+                error,
+                "Exécution de l'outil impossible.",
+            ),
             "duration_ms": duration,
         }
 

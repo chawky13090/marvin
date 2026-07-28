@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 import database as db
 import tools as tool_module
+import api_errors
 
 
 router = APIRouter(tags=["workflows"])
@@ -191,7 +192,11 @@ async def run_workflow(workflow_id: str):
                 if success:
                     break
             except Exception as error:
-                result = {"error": str(error)}
+                result = api_errors.safe_failure(
+                    "workflow_tool",
+                    error,
+                    "Exécution de l'étape impossible.",
+                )
             if attempt < retries:
                 await asyncio.sleep(min(2 ** attempt, 5))
 

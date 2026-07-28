@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 import database as db
+import api_errors
 import voice_transcription
 
 
@@ -68,7 +69,9 @@ async def voice_transcribe(file: UploadFile = File(...), language: str = Form("f
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(status_code=500, detail=f"Transcription échouée : {error}")
+        raise api_errors.internal_http_error(
+            "voice_transcription", error, "Transcription impossible."
+        ) from error
     finally:
         if temporary_path and os.path.exists(temporary_path):
             try:
@@ -151,4 +154,6 @@ async def voice_speak(request: TTSRequest):
     except ImportError:
         raise HTTPException(status_code=500, detail="edge-tts non installé. pip install edge-tts")
     except Exception as error:
-        raise HTTPException(status_code=500, detail=f"TTS error: {str(error)[:200]}")
+        raise api_errors.internal_http_error(
+            "voice_tts", error, "Synthèse vocale impossible."
+        ) from error

@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.436.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.437.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.436.0)
+## 9. État actuel (v2.437.0)
+
+**v2.437 (erreurs API expurgées)** : les exceptions internes des surfaces e-mail, avatar,
+contenu, compétences, multi-agents, workflows, monitoring, voix et vidéo ne sont plus
+renvoyées telles quelles. `api_errors.py` crée un incident relié au `X-Request-ID`, journalise
+uniquement composant et classe d'exception, et conserve les formes historiques HTTP ou
+payload lorsque l'interface en dépend. Les erreurs métier 4xx restent précises. Un gate
+statique interdit le retour de `str(exc)` dans les erreurs 500 et résultats d'exécution.
 
 **v2.436 (corrélation et métriques HTTP)** : chaque requête HTTP reçoit un identifiant de
 corrélation validé ou généré, renvoyé dans `X-Request-ID`; `Server-Timing` expose uniquement

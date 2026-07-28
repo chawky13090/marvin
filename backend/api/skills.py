@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Body, File, HTTPException, UploadFile
 
 import database as db
+import api_errors
 import skills
 import tools as tool_module
 
@@ -77,10 +78,12 @@ async def generate_skill_endpoint(body: dict = Body(...)):
     try:
         raw = await _generate(prompt)
     except Exception as error:
-        return {
-            "success": False,
-            "error": f"Génération échouée (modèle indisponible) : {str(error)[:160]}",
-        }
+        return api_errors.safe_failure(
+            "skill_generate",
+            error,
+            "Génération de la compétence impossible.",
+            success=False,
+        )
     data = skills.parse_skill_json(raw)
     if not data.get("name"):
         return {
@@ -143,10 +146,12 @@ async def skill_from_conversation(body: dict = Body(...)):
     try:
         raw = await _generate(prompt)
     except Exception as error:
-        return {
-            "success": False,
-            "error": f"Génération échouée (modèle indisponible) : {str(error)[:160]}",
-        }
+        return api_errors.safe_failure(
+            "skill_generate_conversation",
+            error,
+            "Génération de la compétence impossible.",
+            success=False,
+        )
     data = skills.parse_skill_json(raw)
     if not data.get("name"):
         return {

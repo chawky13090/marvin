@@ -97,6 +97,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         ),
         Stage("Journalisation structurée et bornée", (python, "scripts/test_structured_logging.py")),
         Stage("Corrélation et métriques HTTP", (python, "scripts/test_api_observability.py")),
+        Stage("Erreurs API expurgées", (python, "scripts/test_api_errors.py")),
         Stage("Diagnostic privé du matching des skills", (python, "scripts/test_skill_match_logging.py")),
         Stage("Inventaire des persistances JSONL", (python, "scripts/test_persistence_inventory.py")),
         Stage("Registre durable de preuves métier", (python, "scripts/test_durable_evidence_store.py")),

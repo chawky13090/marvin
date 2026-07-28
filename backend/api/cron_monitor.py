@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 
 import psutil
+import api_errors
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -166,7 +167,12 @@ async def monitor_stream():
             try:
                 yield f"data: {json.dumps(_monitor_payload())}\n\n"
             except Exception as error:
-                yield f"data: {json.dumps({'error': str(error)})}\n\n"
+                failure = api_errors.safe_failure(
+                    "monitor_stream",
+                    error,
+                    "Collecte du monitoring impossible.",
+                )
+                yield f"data: {json.dumps(failure)}\n\n"
             await asyncio.sleep(2)
 
     return StreamingResponse(

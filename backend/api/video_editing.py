@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import video_manager
+import api_errors
 
 
 router = APIRouter()
@@ -96,7 +97,9 @@ async def video_slideshow(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "video_edit", exc, "Montage vidéo impossible."
+        ) from exc
     finally:
         for path in temporary_paths:
             try:
@@ -147,7 +150,9 @@ async def video_text_animation(body: VideoTextAnimRequest):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "video_text_animation", exc, "Animation du texte impossible."
+        ) from exc
 
 
 @router.get("/api/video/files")
@@ -338,7 +343,9 @@ async def video_edit(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "video_operation", exc, "Opération vidéo impossible."
+        ) from exc
     finally:
         if temporary_path:
             try:

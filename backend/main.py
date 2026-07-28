@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.437 — erreurs internes API expurgées et reliées aux incidents
 # v2.436 — corrélation HTTP, métriques API bornées et journal des erreurs lentes
 # v2.435 — portefeuille local dynamique et contrat de runtime Forge
 # v2.434 — boucle de réparation prouvée, check-ups chat et manifeste documentaire

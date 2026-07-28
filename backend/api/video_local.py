@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import database as db
+import api_errors
 import local_video
 from config import OLLAMA_URL
 
@@ -172,8 +173,8 @@ async def enhance_video_prompt(body: PromptEnhanceRequest):
             "model": model,
         }
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Échec de l'amélioration : {exc}"
+        raise api_errors.internal_http_error(
+            "video_prompt_enhance", exc, "Amélioration du prompt impossible."
         ) from exc
 
 

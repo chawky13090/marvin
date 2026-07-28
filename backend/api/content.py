@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+
+import api_errors
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -98,7 +100,13 @@ async def file_preview(path: str):
             content = result.get("text") or result.get("content") or result.get("markdown") or ""
             return {**info, "kind": "text", "lang": "markdown", "content": content[:200000]}
         except Exception as error:
-            return {**info, "kind": "binary", "error": str(error)[:120]}
+            return api_errors.safe_failure(
+                "file_preview_docx",
+                error,
+                "Prévisualisation Word impossible.",
+                **info,
+                kind="binary",
+            )
     if extension in (".xlsx", ".xls"):
         try:
             result = await tool_module.TOOLS_REGISTRY["xlsx_read"]({"path": absolute_path})
@@ -111,7 +119,13 @@ async def file_preview(path: str):
                 content = input_file.read(300000)
             return {**info, "kind": "text", "lang": extension.lstrip("."), "content": content}
         except Exception as error:
-            return {**info, "kind": "binary", "error": str(error)[:120]}
+            return api_errors.safe_failure(
+                "file_preview_text",
+                error,
+                "Prévisualisation du texte impossible.",
+                **info,
+                kind="binary",
+            )
     return {**info, "kind": "binary"}
 
 
@@ -164,7 +178,12 @@ async def chat_attach(file: UploadFile = File(...)):
                 "message": "Type non lisible directement — joins un PDF, Word, Excel, PowerPoint ou texte.",
             }
     except Exception as error:
-        return {"success": False, "error": f"Lecture impossible : {str(error)[:160]}"}
+        return api_errors.safe_failure(
+            "chat_attachment",
+            error,
+            "Lecture de la pièce jointe impossible.",
+            success=False,
+        )
 
     full_length = len(content or "")
     excerpt = (content or "")[:12000]
@@ -199,7 +218,9 @@ async def take_screenshot():
         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return {"success": True, "image": f"data:image/png;base64,{encoded}"}
     except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
+        raise api_errors.internal_http_error(
+            "screenshot", error, "Capture d'écran impossible."
+        ) from error
 
 
 @router.post("/api/upload-image")
@@ -225,4 +246,6 @@ async def upload_image(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
+        raise api_errors.internal_http_error(
+            "image_upload", error, "Traitement de l'image impossible."
+        ) from error

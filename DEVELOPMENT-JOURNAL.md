@@ -5,6 +5,26 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.437.0 — Erreurs internes API expurgées
+
+L'audit post-v2.436 a recherché toutes les réponses API construites depuis `str(exc)` ou
+une interpolation d'exception. Deux traitements ont été distingués : les `ValueError` et
+conflits métier 4xx, utiles et attendus, restent explicites; les pannes internes 5xx et
+résultats asynchrones inattendus deviennent des incidents corrélés.
+
+`api_errors.py` fournit une seule frontière pour les erreurs HTTP et les payloads historiques.
+Elle récupère le `X-Request-ID` propagé par contexte ASGI, génère un identifiant d'incident,
+écrit composant et classe d'exception dans le journal expurgé, puis renvoie un message public
+stable. Ni texte d'exception, ni chemin, ni hôte, ni credential n'atteint le client ou le log.
+Les routes e-mail, avatar, contenu, compétences, multi-agents, workflows, monitoring, voix et
+vidéo utilisent cette frontière sans changer leurs succès ni leurs codes métier.
+
+Le test injecte une exception contenant mot de passe et chemin privé, vérifie son absence
+dans réponse et journal, contrôle la corrélation et scanne statiquement toutes les routes
+contre les retours 500 bruts. Les tests de frontières e-mail, avatar, vidéos, workflows,
+transcription et Agent Gateway passent, ainsi que la compilation. Rollback :
+`git revert <commit-v2.437>`; aucune donnée persistante ni configuration n'est migrée.
+
 ## 2026-07-28 — v2.436.0 — Corrélation et métriques HTTP bornées
 
 Marvin créait déjà un incident expurgé pour certaines erreurs, mais aucune corrélation

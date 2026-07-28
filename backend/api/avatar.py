@@ -9,6 +9,7 @@ from pathlib import Path
 import psutil
 from fastapi import APIRouter, HTTPException, Request
 
+import api_errors
 
 router = APIRouter(prefix="/api/avatar", tags=["avatar"])
 ROOT = Path(__file__).resolve().parents[2]
@@ -72,7 +73,9 @@ async def avatar_activate(request: Request):
             creationflags=flags,
         )
     except OSError as exc:
-        raise HTTPException(status_code=500, detail=f"Activation Avatar impossible : {exc}") from exc
+        raise api_errors.internal_http_error(
+            "avatar_activate", exc, "Activation Avatar impossible."
+        ) from exc
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         pids = _running()

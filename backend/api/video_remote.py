@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 import credentials_manager
+import api_errors
 import video_manager
 
 
@@ -52,7 +53,9 @@ async def video_generate_text(body: VideoGenerateTextRequest):
     try:
         data = await video_manager._replicate_start(model["model_id"], params, token)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "video_generate_text", exc, "Démarrage de la génération vidéo impossible."
+        ) from exc
     return {
         "success": True,
         "prediction_id": data["id"],
@@ -106,7 +109,9 @@ async def video_generate_image(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "video_generate_image", exc, "Démarrage de la génération vidéo impossible."
+        ) from exc
     finally:
         if temporary_path:
             try:
@@ -157,4 +162,6 @@ async def video_download_url(request: Request):
             "url": f"/api/video/files/{filename}",
         }
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "video_download", exc, "Téléchargement de la vidéo impossible."
+        ) from exc

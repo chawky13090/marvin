@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from collections import Counter
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,10 @@ _UUID_OR_NUMBER = re.compile(
 _LATENCY_BUCKETS_MS = (25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
 _MAX_ROUTES = 256
 _SLOW_MS = 2000
+_current_request_id: ContextVar[str | None] = ContextVar(
+    "marvin_request_id",
+    default=None,
+)
 
 _lock = threading.Lock()
 _started_at = time.time()
@@ -46,6 +51,10 @@ _store = StructuredJsonlStore.from_environment(
 def normalize_request_id(value: str | None) -> str:
     candidate = str(value or "").strip()
     return candidate if _REQUEST_ID.fullmatch(candidate) else uuid.uuid4().hex
+
+
+def current_request_id() -> str | None:
+    return _current_request_id.get()
 
 
 def normalize_route(path: str) -> str:
@@ -132,6 +141,7 @@ class ApiObservabilityMiddleware:
         }
         request_id = normalize_request_id(headers.get("x-request-id"))
         scope.setdefault("state", {})["request_id"] = request_id
+        context_token = _current_request_id.set(request_id)
         started = time.perf_counter()
         status_code = 500
 
@@ -154,10 +164,13 @@ class ApiObservabilityMiddleware:
         try:
             await self.app(scope, receive, send_with_context)
         finally:
-            _record(
-                str(scope.get("method") or "GET")[:16],
-                normalize_route(str(scope.get("path") or "/")),
-                status_code,
-                (time.perf_counter() - started) * 1000,
-                request_id,
-            )
+            try:
+                _record(
+                    str(scope.get("method") or "GET")[:16],
+                    normalize_route(str(scope.get("path") or "/")),
+                    status_code,
+                    (time.perf_counter() - started) * 1000,
+                    request_id,
+                )
+            finally:
+                _current_request_id.reset(context_token)

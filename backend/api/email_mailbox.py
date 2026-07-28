@@ -12,6 +12,7 @@ from pydantic import BaseModel
 import database as db
 import email_account_service as accounts
 import email_manager
+import api_errors
 
 
 router = APIRouter()
@@ -82,7 +83,9 @@ async def email_inbox(
     try:
         return {"emails": await loop.run_in_executor(None, fetch), "folder": folder}
     except Exception as exc:
-        return {"error": str(exc), "emails": []}
+        return api_errors.safe_failure(
+            "email_list", exc, "Lecture de la boîte impossible.", emails=[]
+        )
 
 
 @router.get("/api/email/read/{uid}")
@@ -99,7 +102,9 @@ async def email_read(uid: str, folder: str = "INBOX", account: str | None = None
             ),
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "email_read", exc, "Lecture du message impossible."
+        ) from exc
 
 
 @router.get("/api/email/search")
@@ -145,7 +150,9 @@ async def email_search(
     try:
         return {"results": await loop.run_in_executor(None, search)}
     except Exception as exc:
-        return {"results": [], "error": str(exc)}
+        return api_errors.safe_failure(
+            "email_search", exc, "Recherche dans la boîte impossible.", results=[]
+        )
 
 
 @router.get("/api/email/folders")
@@ -162,7 +169,9 @@ async def email_folders(account: str | None = None):
         )
         return {"folders": folders}
     except Exception as exc:
-        return {"folders": [], "error": str(exc)}
+        return api_errors.safe_failure(
+            "email_folders", exc, "Lecture des dossiers impossible.", folders=[]
+        )
 
 
 @router.post("/api/email/send")
@@ -182,7 +191,9 @@ async def email_send(body: SendEmailRequest, account: str | None = None):
         db.log_execution("email_send", {"to": body.to, "subject": body.subject}, result, 0)
         return result
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "email_send", exc, "Envoi du message impossible."
+        ) from exc
 
 
 @router.delete("/api/email/{uid}")
@@ -217,7 +228,9 @@ async def email_mark(
         )
         return {"success": True, "seen": seen}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "email_mark", exc, "Modification du message impossible."
+        ) from exc
 
 
 @router.post("/api/email/move")
@@ -237,7 +250,9 @@ async def email_move(
         )
         return {"success": True, "dest": dest}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise api_errors.internal_http_error(
+            "email_move", exc, "Déplacement du message impossible."
+        ) from exc
 
 
 @router.get("/api/email/attachment")
