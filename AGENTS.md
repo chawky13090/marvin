@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.424.0)
+## 9. État actuel (v2.425.0)
+
+**v2.425 (bootstrap SQLite déterministe)** : l'unique fonction active de `database.py`
+rejoint `database_bootstrap.py`. L'ordre des treize repositories, la migration OAuth externe,
+la frontière de commit et les migrations SQL sont explicites et injectables; doublons et
+repositories invalides sont refusés avant ouverture. La façade publique conserve les mêmes
+fonctions et `db`. Ordre, panne, rollback, imports, migrations, 354 routes et 344 harness sont
+testés. Le rollback est la réversion atomique du commit, sans migration de donnée.
 
 **v2.424 (propriétaire OAuth unique)** : FastAPI est désormais l'unique propriétaire des
 flux OAuth Google et Microsoft, et le coffre DPAPI l'unique persistance des jetons. Les

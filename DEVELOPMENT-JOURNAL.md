@@ -9906,3 +9906,45 @@ du frontend, le build Next.js 16.2.6 Turbopack a réussi séparément, ce qui va
 Backend v2.424.0 relancé avec Ollama disponible, 344 outils et 15 workers; frontend
 Turbopack relancé et HTTP 200. Les routes OAuth live répondent 302 vers FastAPI et les
 callbacks historiques 410.
+## 2026-07-28 — v2.425.0 — Bootstrap SQLite déterministe
+
+### Analyse et décision
+
+Après extraction des agrégats, `database.py` ne comptait plus que 235 lignes et une fonction
+active, mais cette fonction composait encore treize repositories, une migration DPAPI et les
+migrations SQL au milieu de la façade publique. Deux options ont été comparées : laisser cette
+composition implicite pour éviter un fichier supplémentaire, ou l'extraire derrière une
+fonction injectée en conservant tous les exports historiques. La seconde réduit le couplage
+et permet de tester les pannes sans réécrire la façade.
+
+La documentation officielle SQLite rappelle que les transactions ne s'imbriquent pas et que
+les erreurs peuvent annuler une instruction ou la transaction entière selon leur classe.
+La documentation Python 3.12+ recommande une gestion explicite de commit/rollback; Marvin
+reste compatible avec son runtime actuel et son context manager existant. DPAPI étant un
+stockage externe, aucune transaction distribuée fictive n'est annoncée : le secret est relu,
+une frontière de commit est créée, puis la migration SQL transactionnelle s'exécute.
+
+Sources primaires :
+
+- https://www.sqlite.org/lang_transaction.html
+- https://sqlite.org/lang_savepoint.html
+- https://docs.python.org/3/library/sqlite3.html
+
+### Implémentation, tests et rollback
+
+`database_bootstrap.py` contient l'ordre immuable des treize repositories et
+`initialize_database`, dont la fabrique de connexion, les repositories et les deux migrations
+sont injectables. Les doublons et contrats invalides sont refusés avant ouverture. Une panne
+de repository interrompt la suite et déclenche le rollback du contexte. `database.py` devient
+une façade sans fonction active et conserve `db` ainsi que toutes ses identités publiques.
+
+Tests observés : ordre exact, injection, commit intermédiaire, panne, rollback, fermeture,
+doublon et repository invalide; migrations SQLite, composition FastAPI et architecture
+réussissent. 344 outils, 344 harness, 354 routes et 40 pages restent inchangés. Aucun schéma
+ni donnée n'est modifié par cette extraction; rollback exact : `git revert <commit-v2.425>`.
+La tranche ne crée ni log, ni secret, ni entrée réseau, ni nouvelle autorisation.
+
+Validation finale observée : gate consolidé **190/190**, dont compilation Python, lint sans
+erreur et build Next.js 16.2.6 Turbopack. Smokes live API **28/28** et pages **40/40**.
+Backend v2.425.0 relancé avec Ollama disponible, 344 outils et 15 workers; frontend
+Turbopack relancé et HTTP 200.

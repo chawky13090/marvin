@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.424.0
+Version courante auditée : 2.425.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -442,6 +442,10 @@ remplace les colonnes secrètes par un tombstone de métadonnées. La base réel
 le rollback exact est testé. La phase Persistance reste `partial` jusqu'à la fermeture ou
 l'acceptation explicite des dettes restantes, notamment compte de service Google, ACL,
 cycle de vie des secrets et portabilité.
+En v2.425.0, le bootstrap SQLite quitte la façade `database.py`. Les treize repositories,
+la migration de secrets externe, la frontière de commit et les migrations SQL forment un
+composition root déterministe, injectable et testé en panne. `database.py` ne contient plus
+de fonction active : il reste une façade de compatibilité, sans changement d'identité publique.
 
 ## 10. Preuves minimales par grande capacité
 

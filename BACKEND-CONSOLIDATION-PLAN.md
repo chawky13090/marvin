@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.415.0
+Version auditée : 2.425.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -58,7 +58,7 @@ travail restant consiste à rendre leurs frontières de code aussi nettes que le
 |---|---:|---|
 | Runner | Terminé en v2.313 : `agent.py` orchestre des frontières nommées | surveiller les régressions via les tests de contrat |
 | Outils | `tools.py` : 20 197 lignes, 398 objets AST | extraire les domaines restants puis séparer catalogue et assemblage du registre |
-| Persistance | `database.py` : 2 508 lignes, 96 objets AST | déplacer les domaines restants vers des repositories injectables |
+| Persistance | `database.py` : façade de 198 lignes, zéro fonction active; bootstrap injecté séparément | auditer les consommateurs directs, schémas historiques et politiques de données restantes |
 | Composition FastAPI | `main.py` : 276 lignes, 47 routeurs, 2 fonctions actives | terminé en v2.403 : composition, imports et lifespan couverts par contrat |
 | Dépendances | nombreux imports directs de `tools` et `database` | remplacer progressivement par services/domaines, sans rupture de façade |
 

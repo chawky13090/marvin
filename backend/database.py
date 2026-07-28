@@ -7,8 +7,7 @@ CLAUDE.md §9 pour le détail de cette consolidation).
 Utilise le module sqlite3 standard de Python (thread-safe avec check_same_thread=False).
 """
 from db_connection import db
-from db_migrations import apply_migrations
-from oauth_legacy_migration import migrate_legacy_tokens
+from database_bootstrap import initialize_database
 from repositories.billing import (
     billing_catalog_create,
     billing_catalog_delete,
@@ -30,7 +29,6 @@ from repositories.billing import (
     billing_quote_get,
     billing_quote_list,
     billing_quote_update,
-    repository as billing_repository,
 )
 from repositories.conversations import (
     create_conversation,
@@ -52,7 +50,6 @@ from repositories.client_health import (
     health_score_get,
     health_score_history,
     health_score_latest,
-    repository as client_health_repository,
 )
 from repositories.command_safety import (
     approval_create,
@@ -61,14 +58,12 @@ from repositories.command_safety import (
     cmd_review_create,
     cmd_review_list,
     cmd_rules_list,
-    repository as command_safety_repository,
 )
 from repositories.cron_jobs import (
     create_cron_job,
     delete_cron_job,
     get_cron_job,
     list_cron_jobs,
-    repository as cron_job_repository,
     update_cron_job,
 )
 from repositories.documentation import (
@@ -86,7 +81,6 @@ from repositories.documentation import (
     doc_template_get,
     doc_template_list,
     doc_template_use,
-    repository as documentation_repository,
 )
 from repositories.events import (
     count_events_by_source,
@@ -97,7 +91,6 @@ from repositories.events import (
     get_event,
     list_events,
     replace_external_events,
-    repository as event_repository,
     update_event,
 )
 from repositories.executions import (
@@ -106,7 +99,6 @@ from repositories.executions import (
     get_tool_reliability,
     list_executions,
     log_execution,
-    repository as execution_repository,
 )
 from repositories.flashcards import (
     answer_flashcard,
@@ -114,7 +106,6 @@ from repositories.flashcards import (
     delete_flashcards_by_topic,
     flashcard_stats,
     get_next_flashcard,
-    repository as flashcard_repository,
 )
 from repositories.it_knowledge import (
     it_kb_categories,
@@ -123,7 +114,6 @@ from repositories.it_knowledge import (
     it_kb_list,
     it_kb_search,
     it_kb_upsert,
-    repository as it_knowledge_repository,
 )
 from repositories.logos import create_logo, list_logos
 from repositories.memories import (
@@ -150,11 +140,9 @@ from repositories.operations import (
     ops_evidence_list,
     ops_item_create,
     ops_result_set,
-    repository as operations_repository,
 )
 from repositories.network_inventory import (
     get_network_devices,
-    repository as network_inventory_repository,
     set_network_device_notes,
     upsert_network_device,
 )
@@ -178,7 +166,6 @@ from repositories.ssh_connections import (
 from repositories.settings import get_setting, set_setting
 from repositories.system_snapshots import (
     get_system_snapshots,
-    repository as system_snapshot_repository,
     save_system_snapshot,
 )
 from repositories.tasks import (
@@ -192,7 +179,6 @@ from repositories.tool_templates import (
     delete_template,
     get_template,
     list_templates,
-    repository as tool_template_repository,
     save_template,
 )
 from repositories.workflows import (
@@ -207,29 +193,4 @@ from repositories.workflows import (
 )
 
 
-def _init_tables():
-    with db() as conn:
-        execution_repository.ensure_schema(conn)
-        system_snapshot_repository.ensure_schema(conn)
-        tool_template_repository.ensure_schema(conn)
-        cron_job_repository.ensure_schema(conn)
-        network_inventory_repository.ensure_schema(conn)
-        billing_repository.ensure_schema(conn)
-        documentation_repository.ensure_schema(conn)
-        operations_repository.ensure_schema(conn)
-        command_safety_repository.ensure_schema(conn)
-        client_health_repository.ensure_schema(conn)
-        it_knowledge_repository.ensure_schema(conn)
-        flashcard_repository.ensure_schema(conn)
-        event_repository.ensure_schema(conn)
-        # La baseline est enregistree seulement apres la reussite de tous les
-        # initialiseurs historiques. Les prochains changements de schema seront
-        # portes par db_migrations.py sans retirer les garde-fous existants.
-        # Le coffre externe est vérifié avant la suppression transactionnelle
-        # des anciens jetons; ce commit sépare volontairement les deux systèmes.
-        migrate_legacy_tokens(conn)
-        conn.commit()
-        apply_migrations(conn)
-
-
-_init_tables()
+initialize_database()
