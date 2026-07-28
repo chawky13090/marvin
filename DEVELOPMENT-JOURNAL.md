@@ -7847,3 +7847,35 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   — https://www.anthropic.com/engineering/building-effective-agents
 - Google ADK, *Why evaluate agents* : évaluer la trajectoire, l'usage des outils et la réponse
   finale — https://adk.dev/evaluate/
+
+## 2026-07-28 — v2.387.0 — contrat de consolidation globale
+
+### Demande et périmètre
+
+- Étendre explicitement la comparaison et la consolidation à tout Marvin, sans perte de
+  fonctionnalité, avec tests et plan de rollback.
+- Ne pas confondre une liste de bonnes pratiques avec une preuve de conformité réelle.
+
+### Décision et solution
+
+- Deux stratégies ont été comparées : réécriture globale sur un framework agentique ou
+  consolidation progressive derrière les contrats existants. La seconde reste retenue pour
+  préserver les 344 outils, les données, les parcours utilisateur et un rollback par commit.
+- `MARVIN-FRONTIER-CONSOLIDATION.md` couvre seize domaines : Runner, sessions, outils,
+  modèles, mémoire, coding, isolation, persistance, API, workers, observabilité, sécurité,
+  frontend, avatar, voix et installateur.
+- Les statuts `verified`, `partial`, `not_audited` et `blocked` empêchent de transformer une
+  intention en certification. Chaque promotion exige une preuve nommée.
+- Les références primaires OpenAI, Anthropic, Google ADK, OWASP, OpenTelemetry, NIST et
+  Microsoft sont fixées dans le contrat.
+- `scripts/test_frontier_consolidation_contract.py` vérifie couverture, statuts, références,
+  comparaison obligatoire et commandes de rollback. `check_architecture.py` protège aussi
+  l'existence du contrat; `check_marvin.py` l'exécute à chaque gate.
+
+### Validation et rollback
+
+- Test contractuel et contrôle d'architecture exécutés avec succès : seize domaines couverts,
+  trois vérifiés et treize volontairement conservés `partial`.
+- Aucun comportement runtime, schéma, donnée utilisateur ou interface publique n'est modifié.
+- Rollback : réversion atomique du commit v2.387 après contrôle du patch inverse; repasser
+  ensuite le test contractuel, l'architecture, le gate rapide, `/api/health` et le smoke test.

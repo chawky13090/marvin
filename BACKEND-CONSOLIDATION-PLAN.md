@@ -1,5 +1,9 @@
 # Plan de consolidation complète du backend Marvin
 
+> Ce plan spécialisé reste applicable au backend. Le contrat transversal
+> `MARVIN-FRONTIER-CONSOLIDATION.md` couvre désormais l'intégralité du produit et prévaut
+> pour les exigences de preuve, de comparaison, de test et de rollback.
+
 Date de référence : 2026-07-26  
 Version auditée : 2.300.0  
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,

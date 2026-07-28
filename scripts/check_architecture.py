@@ -153,6 +153,7 @@ def run() -> dict[str, int | str]:
     required_scripts = {
         "check:runtime",
         "check:architecture",
+        "check:frontier-contract",
         "check:runtime-supervisor",
         "check:runtime-workers",
         "check:communication-workers",
@@ -260,6 +261,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_mission_os.py",
         ROOT / "scripts" / "test_knowledge_mesh.py",
         ROOT / "scripts" / "test_engineering_radar.py",
+        ROOT / "scripts" / "test_frontier_consolidation_contract.py",
         ROOT / "scripts" / "smoke_test_api.py",
     ]
     missing_files = [str(path.relative_to(ROOT)) for path in required_files if not path.exists()]
@@ -281,6 +283,18 @@ def run() -> dict[str, int | str]:
     ):
         raise CheckFailure(
             "Le plan de consolidation doit conserver le gate de rollback vérifiable."
+        )
+
+    frontier_contract = (ROOT / "MARVIN-FRONTIER-CONSOLIDATION.md").read_text(
+        encoding="utf-8-sig"
+    )
+    if (
+        "## 4. Matrice exhaustive" not in frontier_contract
+        or "<!-- frontier-matrix" not in frontier_contract
+        or "git apply --cached --check --reverse" not in frontier_contract
+    ):
+        raise CheckFailure(
+            "Le contrat de consolidation globale doit conserver matrice et rollback."
         )
 
     main_source = (BACKEND / "main.py").read_text(encoding="utf-8-sig")

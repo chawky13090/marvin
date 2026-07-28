@@ -79,6 +79,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Installation Windows portable", (python, "scripts/test_installer_contract.py")),
         Stage("Activation locale de l'avatar", (python, "scripts/test_avatar_api.py")),
         Stage("Invariants d'architecture", (python, "scripts/check_architecture.py")),
+        Stage(
+            "Contrat de consolidation globale",
+            (python, "scripts/test_frontier_consolidation_contract.py"),
+        ),
         Stage("Superviseur idempotent des workers", (python, "scripts/test_runtime_supervisor.py")),
         Stage("Workers de maintenance extraits", (python, "scripts/test_runtime_workers.py")),
         Stage("Workers e-mail et agenda extraits", (python, "scripts/test_communication_workers.py")),

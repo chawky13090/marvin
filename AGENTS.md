@@ -183,7 +183,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.386.0)
+## 9. État actuel (v2.387.0)
+
+**v2.387 (contrat global de consolidation)** : `MARVIN-FRONTIER-CONSOLIDATION.md`
+étend formellement le chantier à tout le produit : Runner, sessions, outils, modèles,
+mémoire, Forge/VM, persistance, API/workers, observabilité, sécurité, frontend, avatar,
+voix et installation Windows. La matrice distingue preuve vérifiée, audit partiel et
+blocage au lieu de revendiquer une supériorité non mesurée. Chaque tranche doit comparer
+au moins deux solutions significatives, préserver ses invariants, exécuter les tests
+applicables et vérifier un rollback exact. Le contrat est contrôlé par un test dédié,
+par `check_architecture.py` et par le gate global.
 
 **v2.386 (briefing proactif)** : construction du briefing quotidien rejoint
 `proactive_briefing.py`. Tâches, événements et boîtes IMAP sont injectés et collectés
