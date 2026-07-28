@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.406.0
+Version auditée : 2.407.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -58,7 +58,7 @@ travail restant consiste à rendre leurs frontières de code aussi nettes que le
 |---|---:|---|
 | Runner | Terminé en v2.313 : `agent.py` orchestre des frontières nommées | surveiller les régressions via les tests de contrat |
 | Outils | `tools.py` : 20 197 lignes, 398 objets AST | extraire les domaines restants puis séparer catalogue et assemblage du registre |
-| Persistance | `database.py` : 2 952 lignes, 124 objets AST | déplacer les domaines restants vers des repositories injectables |
+| Persistance | `database.py` : 2 783 lignes, 113 objets AST | déplacer les domaines restants vers des repositories injectables |
 | Composition FastAPI | `main.py` : 276 lignes, 47 routeurs, 2 fonctions actives | terminé en v2.403 : composition, imports et lifespan couverts par contrat |
 | Dépendances | nombreux imports directs de `tools` et `database` | remplacer progressivement par services/domaines, sans rupture de façade |
 
@@ -205,6 +205,9 @@ paramètres SQL, fermeture et atomicité sont couverts sur une base temporaire r
 Mémoires, tâches et notes rejoignent trois repositories distincts en v2.406.0. Leurs quinze
 identités publiques restent exposées par `database.py`; création, filtres, mises à jour,
 suppression, décodage JSON dégradé et rollback sont exercés sur SQLite réel.
+L'agenda local et les miroirs iCal/Google rejoignent `repositories/events.py` en v2.407.0.
+Les neuf fonctions historiques, la migration défensive des anciennes tables, les rappels et
+le remplacement atomique par source sont conservés et couverts sur SQLite réel.
 
 ### Phase D — Composition et dépendances
 

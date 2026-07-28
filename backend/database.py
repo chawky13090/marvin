@@ -24,6 +24,18 @@ from repositories.conversations import (
     update_conversation_title,
     upgrade_conversation_title_silent,
 )
+from repositories.events import (
+    count_events_by_source,
+    create_event,
+    delete_event,
+    delete_events_by_source,
+    events_needing_reminder,
+    get_event,
+    list_events,
+    replace_external_events,
+    repository as event_repository,
+    update_event,
+)
 from repositories.memories import (
     clear_all_memories,
     create_memory,
@@ -74,187 +86,6 @@ from repositories.workflows import (
 # ── Notes ─────────────────────────────────────────────────────────────────────
 
 # ── Agenda / Événements (store local) ───────────────────────────────────────────
-
-def _ensure_events_tables(conn):
-    """Crée la table events si absente (agenda local + événements externes iCal/Google).
-    Colonne `source` : 'local' pour les RDV créés dans Marvin, 'ics:<id>' ou
-    'google' pour les agendas connectés (synchronisés, lecture seule)."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            start_at TEXT NOT NULL,
-            end_at TEXT,
-            location TEXT DEFAULT '',
-            all_day INTEGER NOT NULL DEFAULT 0,
-            reminder_minutes INTEGER,
-            reminded INTEGER NOT NULL DEFAULT 0,
-            color TEXT DEFAULT '',
-            tags TEXT DEFAULT '[]',
-            source TEXT DEFAULT 'local',
-            external_id TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_events_start ON events(start_at)")
-    # Migration transparente des bases créées avant l'ajout de source/external_id
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()}
-    if "source" not in cols:
-        conn.execute("ALTER TABLE events ADD COLUMN source TEXT DEFAULT 'local'")
-    if "external_id" not in cols:
-        conn.execute("ALTER TABLE events ADD COLUMN external_id TEXT")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)")
-
-
-def _parse_event(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("tags") and isinstance(row["tags"], str):
-        try:
-            row["tags"] = json.loads(row["tags"])
-        except Exception:
-            row["tags"] = []
-    row["all_day"] = bool(row.get("all_day", 0))
-    row["reminded"] = bool(row.get("reminded", 0))
-    return row
-
-
-def create_event(title: str, start_at: str, end_at: str | None = None, description: str = "",
-                 location: str = "", all_day: bool = False, reminder_minutes: int | None = None,
-                 color: str = "", tags: list | None = None) -> dict:
-    eid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_events_tables(conn)
-        conn.execute(
-            """INSERT INTO events (id, title, description, start_at, end_at, location, all_day, reminder_minutes, color, tags)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (eid, title, description, start_at, end_at, location, 1 if all_day else 0,
-             reminder_minutes, color, json.dumps(tags or []))
-        )
-        row = conn.execute("SELECT * FROM events WHERE id = ?", (eid,)).fetchone()
-    return _parse_event(row_to_dict(row))
-
-
-def get_event(eid: str) -> dict | None:
-    with db() as conn:
-        _ensure_events_tables(conn)
-        row = conn.execute("SELECT * FROM events WHERE id = ?", (eid,)).fetchone()
-    return _parse_event(row_to_dict(row))
-
-
-def list_events(start: str | None = None, end: str | None = None, limit: int = 200) -> list[dict]:
-    """Liste les événements, optionnellement bornés à [start, end] (comparaison lexicographique ISO)."""
-    sql = "SELECT * FROM events WHERE 1=1"
-    params: list = []
-    if start:
-        sql += " AND start_at >= ?"
-        params.append(start)
-    if end:
-        sql += " AND start_at <= ?"
-        params.append(end)
-    sql += " ORDER BY start_at ASC LIMIT ?"
-    params.append(limit)
-    with db() as conn:
-        _ensure_events_tables(conn)
-        rows = conn.execute(sql, params).fetchall()
-    return [_parse_event(row_to_dict(r)) for r in rows]
-
-
-def update_event(eid: str, updates: dict) -> dict | None:
-    fields, values = [], []
-    for k in ("title", "description", "start_at", "end_at", "location", "color", "reminder_minutes"):
-        if k in updates:
-            fields.append(f"{k} = ?")
-            values.append(updates[k])
-    if "all_day" in updates:
-        fields.append("all_day = ?")
-        values.append(1 if updates["all_day"] else 0)
-    if "reminded" in updates:
-        fields.append("reminded = ?")
-        values.append(1 if updates["reminded"] else 0)
-    if "tags" in updates:
-        fields.append("tags = ?")
-        values.append(json.dumps(updates["tags"]))
-    if not fields:
-        return get_event(eid)
-    fields.append("updated_at = datetime('now')")
-    values.append(eid)
-    with db() as conn:
-        _ensure_events_tables(conn)
-        conn.execute(f"UPDATE events SET {', '.join(fields)} WHERE id = ?", values)
-    return get_event(eid)
-
-
-def delete_event(eid: str):
-    with db() as conn:
-        _ensure_events_tables(conn)
-        conn.execute("DELETE FROM events WHERE id = ?", (eid,))
-
-
-def events_needing_reminder(now_iso: str) -> list[dict]:
-    """Événements dont l'heure de rappel est atteinte (et pas encore notifiés)."""
-    out = []
-    with db() as conn:
-        _ensure_events_tables(conn)
-        rows = conn.execute(
-            "SELECT * FROM events WHERE reminded = 0 AND reminder_minutes IS NOT NULL AND start_at >= ?",
-            (now_iso[:10],)  # borne large sur la journée, le filtrage fin se fait en Python
-        ).fetchall()
-    from datetime import datetime, timedelta
-    try:
-        now = datetime.fromisoformat(now_iso)
-    except Exception:
-        return out
-    for r in rows:
-        ev = _parse_event(row_to_dict(r))
-        try:
-            start = datetime.fromisoformat((ev["start_at"] or "").replace("T", " "))
-        except Exception:
-            continue
-        trigger = start - timedelta(minutes=int(ev.get("reminder_minutes") or 0))
-        if trigger <= now <= start + timedelta(minutes=1):
-            out.append(ev)
-    return out
-
-
-def replace_external_events(source: str, events: list[dict]) -> int:
-    """Remplace TOUS les événements d'une source externe (ex 'ics:<id>', 'google')
-    par la liste fournie. Atomique : on supprime puis on réinsère → pas de doublons."""
-    n = 0
-    with db() as conn:
-        _ensure_events_tables(conn)
-        conn.execute("DELETE FROM events WHERE source = ?", (source,))
-        for e in events:
-            if not e.get("start_at"):
-                continue
-            conn.execute(
-                """INSERT INTO events (id, title, description, start_at, end_at, location,
-                                       all_day, color, tags, source, external_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)""",
-                (str(uuid.uuid4()), (e.get("title") or "(sans titre)")[:300], (e.get("description") or "")[:2000],
-                 e.get("start_at"), e.get("end_at"), (e.get("location") or "")[:300],
-                 1 if e.get("all_day") else 0, e.get("color") or "", source, e.get("external_id"))
-            )
-            n += 1
-    return n
-
-
-def delete_events_by_source(source: str) -> int:
-    """Supprime tous les événements d'une source (ex : désabonnement d'un agenda)."""
-    with db() as conn:
-        _ensure_events_tables(conn)
-        cur = conn.execute("DELETE FROM events WHERE source = ?", (source,))
-        return cur.rowcount or 0
-
-
-def count_events_by_source(source: str) -> int:
-    with db() as conn:
-        _ensure_events_tables(conn)
-        row = conn.execute("SELECT COUNT(*) AS c FROM events WHERE source = ?", (source,)).fetchone()
-    return (row["c"] if row else 0)
-
 
 # ── Paramètres ────────────────────────────────────────────────────────────────
 
@@ -2478,7 +2309,7 @@ def _init_tables():
         _ensure_cmd_safety_tables(conn)
         _ensure_health_tables(conn)
         _ensure_it_kb_tables(conn)
-        _ensure_events_tables(conn)
+        event_repository.ensure_schema(conn)
         # La baseline est enregistree seulement apres la reussite de tous les
         # initialiseurs historiques. Les prochains changements de schema seront
         # portes par db_migrations.py sans retirer les garde-fous existants.

@@ -8912,3 +8912,49 @@ relu puis supprimé un souvenir temporaire. Statut, tags, contenu, épinglage et
 Rollback après commit : `git revert <commit-v2.406>`. Aucun schéma ni jeu de données n'est
 transformé; la réversion remet les corps dans la façade. Rejouer les tests des trois
 repositories, redémarrer le backend et vérifier les trois API.
+
+## 2026-07-28 — v2.407.0 — Repository de l'agenda local et externe
+
+### Contexte et décision
+
+L'agrégat suivant regroupe les événements locaux et les copies synchronisées iCal/Google.
+Deux options ont été comparées : séparer immédiatement les événements locaux et externes,
+au risque de casser la transaction « supprimer puis remplacer », ou conserver un repository
+unique dont les opérations par source forment une frontière transactionnelle. La seconde est
+retenue. Les appels fournisseurs restent dans leurs domaines; seul le stockage est déplacé.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/events.py` et conservation des neuf alias publics dans
+  `database.py` ;
+- initialisation défensive et migration des anciennes colonnes `source`/`external_id`
+  conservées dans le repository ;
+- mise à jour et relecture d'un événement réunies dans une même transaction ;
+- remplacement des événements d'une source toujours atomique : toute ligne invalide annule
+  aussi la suppression préalable ;
+- champs modifiables en liste blanche et valeurs SQL paramétrées ;
+- parsing des rappels durci : date, durée ou combinaison de fuseaux incompatible est ignorée
+  localement au lieu de faire échouer tout le lot ;
+- aucune requête réseau, permission, confirmation ou politique Google/iCal n'est déplacée.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation du repository, de la façade et du test réussie ;
+- SQLite réel : création, lecture, filtres, mise à jour, suppression, rappel, JSON dégradé,
+  migration d'une ancienne table, remplacement/suppression/comptage par source et rollback
+  d'un lot invalide réussis ;
+- les neuf identités de façade `database.py` sont conservées ;
+- domaines événements, abonnements calendrier et workers de communication réussis.
+
+Composition, architecture et gate globale réussissent ensuite. La gate observe
+**174/174 étapes**, 245 modules backend compilés, le registre 344/344 et le lint frontend.
+Le backend a été réellement redémarré en 2.407.0 avec Ollama et 15 workers. Un événement
+local temporaire a été créé via HTTP, retrouvé dans une fenêtre temporelle puis supprimé;
+la cible est restée explicitement `local`. Le smoke HTTP/Next.js réussit à
+**28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.407>`. Aucun schéma applicatif nouveau n'est
+introduit; la migration défensive existait déjà dans `database.py`. Après réversion, rejouer
+le test repository, redémarrer le backend et vérifier agenda, rappels et synchronisation.

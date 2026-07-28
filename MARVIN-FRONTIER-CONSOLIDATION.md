@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.406.0
+Version courante auditée : 2.407.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -330,7 +330,7 @@ jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases perti
 L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
 traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
 
-| Ordre | Phase | État au 2.406.0 | Livraison et condition de sortie |
+| Ordre | Phase | État au 2.407.0 | Livraison et condition de sortie |
 |---:|---|---|---|
 | 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
 | 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
@@ -363,8 +363,10 @@ La phase active devient **2 — Persistance modulaire**. L'inventaire AST et tra
 frontière, les paramètres globaux, rejoint `repositories/settings.py` en v2.405.0 avec
 injection de connexion, compatibilité JSON et SQL paramétré. En v2.406.0, mémoires, tâches et
 notes rejoignent trois repositories séparés, injectables et testés sans modifier les quinze
-fonctions de façade. Les tranches suivantes continuent par agrégat cohésif et risque réel;
-elles ne sont jamais pilotées par le seul nombre de lignes.
+fonctions de façade. L'agenda local et les miroirs externes rejoignent à leur tour un
+repository injectable en v2.407.0, avec remplacement par source atomique et migration
+défensive. Les tranches suivantes continuent par agrégat cohésif et risque réel; elles ne
+sont jamais pilotées par le seul nombre de lignes.
 
 ## 10. Preuves minimales par grande capacité
 

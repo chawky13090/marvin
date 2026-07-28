@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.407 — agenda local et miroirs externes extraits vers un repository injectable
 # v2.406 — mémoires, tâches et notes extraites vers trois repositories injectables
 # v2.405 — première frontière de persistance extraite : paramètres globaux injectables
 # v2.404 — sources statiques officielles du Radar; erreurs de coquilles JavaScript supprimées

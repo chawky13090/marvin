@@ -196,7 +196,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.406.0)
+## 9. État actuel (v2.407.0)
+
+**v2.407 (persistance agenda)** : événements locaux et miroirs iCal/Google rejoignent
+`repositories/events.py`. Les neuf façades restent identiques. Schéma défensif, migration des
+colonnes historiques, CRUD, rappels, filtres, lots externes atomiques, suppression par source
+et rollback sont testés sur SQLite réel.
 
 **v2.406 (persistance personnelle)** : mémoires, tâches et notes rejoignent respectivement
 `repositories/memories.py`, `repositories/tasks.py` et `repositories/notes.py`. Les quinze

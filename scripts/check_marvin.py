@@ -114,6 +114,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Repositories mémoires, tâches et notes",
             (python, "scripts/test_personal_data_repositories.py"),
         ),
+        Stage("Repository des événements", (python, "scripts/test_event_repository.py")),
         Stage("Fermeture garantie des connexions SQLite", (python, "scripts/test_db_connection_hygiene.py")),
         Stage("Politiques textuelles de l'agent", (python, "scripts/test_agent_policy.py")),
         Stage("Sécurité déterministe de l'agent", (python, "scripts/test_agent_safety.py")),
