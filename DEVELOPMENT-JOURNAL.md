@@ -9465,3 +9465,70 @@ Rollback après commit : `git revert <commit-v2.416>`, puis redémarrer uniqueme
 Aucune restauration de données n'est nécessaire. Vérifier ensuite qu'une conversation
 historique reste lisible. La réversion rétablit volontairement l'ancien routage et doit donc
 être réservée à un incident plus grave que le défaut corrigé.
+
+## 2026-07-28 — v2.417.0 — Repository des fiches de révision
+
+### Contexte et décision
+
+La persistance des fiches de révision était le dernier agrégat placé après l'initialisation de
+`database.py`. Deux approches ont été comparées :
+
+- conserver le CRUD dans la façade et seulement isoler le schéma ;
+- déplacer schéma, projection, sélection, répétition, statistiques et suppression dans un
+  repository injectable, en conservant les cinq objets publics historiques.
+
+La seconde est retenue pour achever cette frontière de persistance sans modifier les outils
+Quiz. Le planificateur moderne FSRS a également été étudié. Il exige un état mémoire et un
+historique de notation plus riches que le booléen historique de Marvin. Une migration
+silencieuse modifierait les échéances existantes et rendrait le rollback ambigu. La tranche
+conserve donc volontairement le contrat compatible à deux niveaux et inscrit FSRS comme
+évolution additive future, après ajout d'un journal de révisions versionné. Références :
+
+- https://github.com/open-spaced-repetition/py-fsrs
+- https://github.com/open-spaced-repetition/fsrs4anki
+- https://arxiv.org/abs/1602.07032
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/flashcards.py` avec connexion et horloge injectables ;
+- conservation par identité de `create_flashcard`, `get_next_flashcard`,
+  `answer_flashcard`, `flashcard_stats` et `delete_flashcards_by_topic` ;
+- remplacement de `ORDER BY RANDOM()` par un ordre stable : cartes dues par ancienneté,
+  sinon carte la moins travaillée puis prochaine échéance ;
+- échéances calculées explicitement depuis l'horloge injectable et intervalle historique
+  borné entre 1 et 60 jours, y compris si une ancienne ligne est incohérente ;
+- sujets limités à 200 caractères, questions à 4 000, réponses à 8 000, vingt choix de
+  2 000 caractères maximum et identifiants à 160 caractères ;
+- refus des chaînes vides, des choix non textuels et du paramètre `correct` non booléen ;
+- JSON historique invalide projeté en liste vide sans casser une session ;
+- suppression des commentaires orphelins laissés par les extractions précédentes ;
+- aucun nouveau log technique : la tranche ne produit pas d'événement d'exploitation.
+  Les résultats métier restent dans SQLite et ne sont ni copiés ni exposés dans les logs.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation Python du repository, de la façade et du test réussie ;
+- SQLite réel : sélection due, repli déterministe, réponse correcte/incorrecte, échéances,
+  compteurs, statistiques, JSON dégradé, intervalle historique hors borne et suppression
+  validés ;
+- limites de chaque entrée, identifiant vide, booléen invalide, collision d'identifiant et
+  rollback transactionnel validés ;
+- domaine Quiz et fermeture garantie des connexions SQLite réussissent ;
+- cinq identités publiques historiques conservées ;
+- `database.py` descend à 487 lignes et 9 fonctions actives de premier niveau.
+
+La gate globale sans build simultané réussit à **183/183 étapes** : 344 outils, harness
+344/344, 354 routes, 40 pages, compilation de 261 fichiers Python et lint frontend sans
+erreur (37 avertissements préexistants). Après arrêt du seul frontend, le build Next.js
+16.2.6/Turbopack réussit, puis `next dev` est relancé sur le port 3000. Le backend redémarre
+en 2.417.0 avec Ollama et 15 workers. L'appel HTTP réel et non mutateur de `quiz_stats`
+relit les 25 fiches existantes réparties sur quatre sujets. Le smoke API réussit à
+**28/28 contrats**, les **40/40 pages**, cinq conversations et la sérialisation vocale
+réussissent.
+
+Rollback après commit : `git revert <commit-v2.417>`, puis redémarrer uniquement le backend.
+Le schéma et les données ne changent pas; aucune migration descendante n'est nécessaire.
+Vérifier après réversion `quiz_next`, `quiz_answer` et `quiz_stats`. Le retour rétablit
+volontairement la sélection aléatoire historique.

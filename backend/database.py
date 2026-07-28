@@ -6,9 +6,7 @@ passent tous par ce module via des proxys /api/*, voir le changelog v2.107-111 d
 CLAUDE.md §9 pour le détail de cette consolidation).
 Utilise le module sqlite3 standard de Python (thread-safe avec check_same_thread=False).
 """
-import json
-import uuid
-from db_connection import db, get_conn, row_to_dict
+from db_connection import db, row_to_dict
 from db_migrations import apply_migrations
 from repositories.billing import (
     billing_catalog_create,
@@ -108,6 +106,14 @@ from repositories.executions import (
     list_executions,
     log_execution,
     repository as execution_repository,
+)
+from repositories.flashcards import (
+    answer_flashcard,
+    create_flashcard,
+    delete_flashcards_by_topic,
+    flashcard_stats,
+    get_next_flashcard,
+    repository as flashcard_repository,
 )
 from repositories.logos import create_logo, list_logos
 from repositories.memories import (
@@ -471,6 +477,7 @@ def _init_tables():
         command_safety_repository.ensure_schema(conn)
         client_health_repository.ensure_schema(conn)
         _ensure_it_kb_tables(conn)
+        flashcard_repository.ensure_schema(conn)
         event_repository.ensure_schema(conn)
         # La baseline est enregistree seulement apres la reussite de tous les
         # initialiseurs historiques. Les prochains changements de schema seront
@@ -478,125 +485,3 @@ def _init_tables():
         apply_migrations(conn)
 
 _init_tables()
-
-
-# ── Inventaire réseau persistant (v2.139 — mini-CMDB) ──────────────────────────
-# Chaque scan (`net_inventory_scan`) était jusqu'ici un instantané jetable — aucune mémoire
-# des appareils déjà vus. Cette table transforme un scan ponctuel en inventaire consultable
-# (nom personnalisé, notes, première/dernière apparition) — pattern des outils pro (Atera...).
-
-# ── Snapshots système (v2.138 — suivi de tendance, pas juste l'instantané) ────────
-
-# ── Templates d'outils ────────────────────────────────────────────────────────
-
-# ── Jobs cron ─────────────────────────────────────────────────────────────────
-
-# ── Fiches de révision / quiz (v2.155) ──────────────────────────────────────────
-# Répétition espacée minimale (façon Leitner à 2 leviers) : bonne réponse → l'intervalle
-# double (plafonné), mauvaise réponse → repasse le lendemain. Pas un moteur SM-2 complet
-# (courbes d'oubli, facteur de facilité par carte) — volontairement simple, cohérent avec
-# le reste de Marvin (pas de sur-ingénierie pour un besoin d'étude personnelle).
-
-def _ensure_flashcards_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS flashcards (
-            id TEXT PRIMARY KEY,
-            topic TEXT NOT NULL,
-            question TEXT NOT NULL,
-            answer TEXT NOT NULL,
-            choices TEXT DEFAULT '[]',
-            interval_days INTEGER NOT NULL DEFAULT 1,
-            due_at TEXT NOT NULL DEFAULT (datetime('now')),
-            correct_count INTEGER NOT NULL DEFAULT 0,
-            wrong_count INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_at)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_flashcards_topic ON flashcards(topic)")
-
-
-def _parse_flashcard(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("choices") and isinstance(row["choices"], str):
-        try:
-            row["choices"] = json.loads(row["choices"])
-        except Exception:
-            row["choices"] = []
-    return row
-
-
-def create_flashcard(topic: str, question: str, answer: str, choices: list | None = None) -> dict:
-    fid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_flashcards_table(conn)
-        conn.execute(
-            "INSERT INTO flashcards (id, topic, question, answer, choices) VALUES (?,?,?,?,?)",
-            (fid, topic, question, answer, json.dumps(choices or []))
-        )
-        row = conn.execute("SELECT * FROM flashcards WHERE id=?", (fid,)).fetchone()
-    return _parse_flashcard(row_to_dict(row))
-
-
-def get_next_flashcard(topic: str | None = None) -> dict | None:
-    """Carte due en priorité (due_at <= maintenant, la plus ancienne d'abord) ; à défaut,
-    une carte au hasard du topic pour continuer à s'entraîner même sans rien "en retard"."""
-    with db() as conn:
-        _ensure_flashcards_table(conn)
-        params: list = []
-        where = "WHERE due_at <= datetime('now')"
-        if topic:
-            where += " AND topic = ?"
-            params.append(topic)
-        row = conn.execute(
-            f"SELECT * FROM flashcards {where} ORDER BY due_at ASC LIMIT 1", params
-        ).fetchone()
-        if not row:
-            where2 = "WHERE topic = ?" if topic else ""
-            params2 = [topic] if topic else []
-            row = conn.execute(
-                f"SELECT * FROM flashcards {where2} ORDER BY RANDOM() LIMIT 1", params2
-            ).fetchone()
-    return _parse_flashcard(row_to_dict(row))
-
-
-def answer_flashcard(fid: str, correct: bool) -> dict | None:
-    with db() as conn:
-        _ensure_flashcards_table(conn)
-        row = conn.execute("SELECT * FROM flashcards WHERE id=?", (fid,)).fetchone()
-        if not row:
-            return None
-        card = row_to_dict(row)
-        if correct:
-            interval = min(card["interval_days"] * 2, 60)
-            conn.execute(
-                "UPDATE flashcards SET interval_days=?, due_at=datetime('now', ?), correct_count=correct_count+1 WHERE id=?",
-                (interval, f"+{interval} days", fid)
-            )
-        else:
-            conn.execute(
-                "UPDATE flashcards SET interval_days=1, due_at=datetime('now', '+1 days'), wrong_count=wrong_count+1 WHERE id=?",
-                (fid,)
-            )
-        updated = conn.execute("SELECT * FROM flashcards WHERE id=?", (fid,)).fetchone()
-    return _parse_flashcard(row_to_dict(updated))
-
-
-def flashcard_stats() -> list[dict]:
-    with db() as conn:
-        _ensure_flashcards_table(conn)
-        rows = conn.execute("""
-            SELECT topic, COUNT(*) as total,
-                   SUM(CASE WHEN due_at <= datetime('now') THEN 1 ELSE 0 END) as due_now,
-                   SUM(correct_count) as correct_total, SUM(wrong_count) as wrong_total
-            FROM flashcards GROUP BY topic ORDER BY topic
-        """).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def delete_flashcards_by_topic(topic: str) -> int:
-    with db() as conn:
-        _ensure_flashcards_table(conn)
-        cur = conn.execute("DELETE FROM flashcards WHERE topic=?", (topic,))
-    return cur.rowcount

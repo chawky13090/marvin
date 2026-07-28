@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.417 — fiches de révision extraites vers un repository déterministe
 # v2.416 — recherche Web explicite garantie et réponses modèle vides récupérées
 # v2.409 — traces d'outils et fiabilité extraites, bornées et expurgées
 # v2.410 — inventaire, snapshots, modèles d'outils et cron extraits par agrégat

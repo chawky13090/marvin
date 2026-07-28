@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.416.0)
+## 9. État actuel (v2.417.0)
+
+**v2.417 (persistance des fiches de révision)** : les cinq façades historiques rejoignent
+`repositories/flashcards.py` derrière un repository injectable. La sélection remplace
+`ORDER BY RANDOM()` par un ordre stable : échéance la plus ancienne, puis carte la moins
+travaillée lorsqu'aucune n'est due. Sujet, question, réponse, choix, identifiant et booléen
+de correction sont bornés ou validés. Les échéances utilisent une horloge injectable,
+l'intervalle historique reste compatible entre 1 et 60 jours et les JSON historiques
+invalides se projettent en liste vide. SQLite réel couvre répétition, statistiques,
+sélection, collision, rollback et les cinq identités de façade.
 
 **v2.416 (recherche Web et fermeture fiable du Runner)** : une demande naturelle explicite
 comme « cherche sur le Web », une actualité ou une source officielle matérialise désormais
