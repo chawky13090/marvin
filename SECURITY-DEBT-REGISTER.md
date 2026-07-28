@@ -29,6 +29,7 @@ persistances, ses privilèges, son exposition réseau, ses secrets, ses logs et 
 | SEC-010 | Moyenne | OPEN | Vérités, mémoire, preuves | Les registres métier peuvent contenir des données personnelles ou sensibles. Ajouter classification, durée de conservation, export et effacement sélectif avec preuve sans invalider silencieusement les chaînes d'intégrité. |
 | SEC-011 | Moyenne | OPEN | Cycle de vie des secrets | Ajouter métadonnées non sensibles, date de création/rotation, révocation, expiration et alertes. Aucun secret ne doit apparaître dans les logs, erreurs, traces ou sorties de tests. |
 | SEC-012 | Moyenne | OPEN | Portabilité | DPAPI utilisateur est volontairement lié au compte Windows et à la machine. L'installateur doit annoncer que les secrets ne migrent pas avec les données et conduire une réauthentification; un export chiffré optionnel exige une conception et une validation distinctes. |
+| SEC-013 | Élevée | VERIFIED | Erreurs HTTP | Le handler global projetait le texte brut des exceptions au client et le persistait avec le traceback complet. La v2.402 retourne un identifiant d'incident opaque et journalise seulement classe, route, méthode et corrélation, sans message ni contenu de requête. |
 
 ## Critère de fermeture
 

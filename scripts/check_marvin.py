@@ -89,6 +89,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Registre durable de preuves métier", (python, "scripts/test_durable_evidence_store.py")),
         Stage("Intégrité des preuves Marvin Forge", (python, "scripts/test_forge_evidence.py")),
         Stage("Coffre DPAPI des identifiants globaux", (python, "scripts/test_credentials_vault.py")),
+        Stage("API Chat, outils et MCP extraite", (python, "scripts/test_agent_gateway_api.py")),
         Stage("Superviseur idempotent des workers", (python, "scripts/test_runtime_supervisor.py")),
         Stage("Workers de maintenance extraits", (python, "scripts/test_runtime_workers.py")),
         Stage("Workers e-mail et agenda extraits", (python, "scripts/test_communication_workers.py")),

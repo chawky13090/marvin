@@ -121,8 +121,10 @@ def main() -> int:
         ROOT / "lib" / "hooks" / "useSecretary.js",
     ):
         assert "requestId: userMsg.id" in source.read_text(encoding="utf-8-sig")
-    main_source = (BACKEND / "main.py").read_text(encoding="utf-8-sig")
-    assert "request_id=req.requestId" in main_source
+    gateway_source = (BACKEND / "api" / "agent_gateway.py").read_text(
+        encoding="utf-8-sig"
+    )
+    assert "request_id=request.requestId" in gateway_source
 
     with tempfile.TemporaryDirectory(prefix="marvin-action-replay-") as directory:
         path = Path(directory) / "receipts.db"

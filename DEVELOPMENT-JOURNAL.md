@@ -8632,3 +8632,51 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   nœud et studio d'exécution lisible. L'article reste une source secondaire promotionnelle;
   chaque affirmation et API devra être vérifiée dans sa documentation primaire avant code.
 - Source examinée : https://www.kimi.com/fr/resources/ai-agents-frameworks
+
+## 2026-07-28 — v2.402.0 — Gateway agentique HTTP extrait de main.py
+
+### Contexte et décision
+
+- Après la tranche de sécurité 2.401, la consolidation globale reprend la phase D du plan :
+  `main.py` contenait encore les routes chat, UI outils et MCP avec leurs modèles et leur
+  logique de dispatch. Une simple réorganisation sans contrat aurait déplacé le couplage;
+  l'extraction retenue garde un routeur unique et la frontière `tool_gateway` existante.
+- Alternative rejetée : adopter immédiatement LangGraph, CrewAI ou un autre framework pour
+  ces routes. Aucune mesure ne prouve un gain sur le runtime Marvin actuel et cela ajouterait
+  migration, dépendance supply-chain et rollback complexe. Le graphe agentique typé ajouté au
+  plan sera construit derrière les contrats existants puis comparé objectivement.
+
+### Implémentation, sécurité et observabilité
+
+- `api/agent_gateway.py` possède désormais `POST /api/chat`, `POST /api/tools`,
+  `GET /api/tools/list`, `POST /api/mcp/execute` et `GET /api/mcp/config`.
+  Le Runner, la reprise SSE, les 344 spécifications/exécuteurs, l'audit et les différences de
+  confirmation UI/MCP restent identiques.
+- Le chat accepte 1 à 200 messages et borne la charge sérialisée à 32 Mio afin de préserver
+  les images multimodales. Identifiants, curseur, nom de modèle et arguments d'outils ont
+  grammaires et tailles fermées; les arguments sont limités à 2 Mio avant le gateway.
+- Un niveau de permission absent, illisible ou hors catalogue revient au niveau configuré par
+  défaut. Il ne peut plus devenir un entier arbitraire transmis au gateway.
+- Une collision de `requestId` SSE retourne un message public fixe et n'expose plus le texte
+  interne de l'exception.
+- Dette SEC-013 fermée : le handler global renvoyait `str(exc)` au navigateur et persistait
+  message et traceback bruts. Il retourne maintenant un identifiant d'incident opaque et
+  journalise seulement classe, route, méthode et corrélation. Les contenus, arguments et
+  secrets ne sont pas copiés dans ce log.
+
+### Validation et rollback
+
+- Test ciblé observé : routeur cinq chemins, stream direct, en-têtes anti-buffering,
+  collision SSE expurgée, dispatch UI inchangé, chemin MCP portable, niveau de permission
+  invalide, historique vide, traversée d'identifiant, nom d'outil hostile et dépassement de
+  charge refusés.
+- Architecture observée avant gate finale : 344 outils, 354 routes uniques, 40 pages,
+  harness 344/344. `main.py` ne conserve plus `ChatRequest` ni `ToolExecuteRequest` et tombe à
+  sept fonctions actives : cycle de vie, handler global, choix Cloud, briefing et proactif.
+- Rollback applicatif : `git revert <commit>`. Aucun schéma ni donnée n'est modifié; le
+  routeur peut revenir dans `main.py` sans migration descendante.
+- Gate rapide finale observée : après correction d'un test qui cherchait encore le câblage
+  `requestId` dans `main.py`, 169/169 étapes passent, avec zéro erreur ESLint et 37
+  avertissements historiques. Backend réel redémarré en 2.402.0, Ollama connecté et 15
+  workers disponibles. Smoke HTTP/Next.js : 28/28. Les routes réelles exposent 344 outils,
+  registre synchronisé, harness 344/344 et MCP 344; un chat sans message retourne HTTP 422.

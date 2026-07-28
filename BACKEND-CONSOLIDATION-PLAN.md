@@ -376,3 +376,7 @@ Le backend n'est déclaré consolidé que si :
 Les améliorations frontend, avatar et UX restent planifiées, mais ne commencent pas avant la
 clôture factuelle des phases A à D. Une correction frontend bloquante peut être faite plus tôt
 uniquement si elle empêche de valider le backend par le smoke test.
+Le gateway agentique HTTP rejoint `api/agent_gateway.py` en v2.402.0 : chat SSE, UI, catalogue
+et MCP utilisent toujours les mêmes objets Runner/gateway, avec charges bornées et contrats
+testables. `main.py` ne conserve plus ces modèles ni ces routes; restent le choix Cloud,
+briefing/proactif et le handler global autour du composition root.

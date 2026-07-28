@@ -3,6 +3,7 @@ Marvin Backend — FastAPI application principale.
 Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 (ne pas utiliser --reload : coupe les streams SSE lors des changements de fichiers)
 """
+# v2.402 — routes chat/outils/MCP extraites; charges bornées et erreurs HTTP expurgées
 # v2.401 — secrets globaux sous DPAPI; migration vérifiée, audit et rollback explicite
 # v2.400 — Truth Ledger chaîné; limites, URLs sûres et échec de preuve visible
 # v2.399 — Model Market et Research Swarm chaînés; transport Cloud borné et erreurs expurgées
@@ -69,26 +70,23 @@ Lance avec : uvicorn main:app --host 0.0.0.0 --port 8005
 # v2.349 — observabilité runtime extraite dans tool_domains/runtime_observability.py.
 # v2.348 — connecteur ITSM extrait dans tool_domains/itsm.py.
 # v2.347 — recherche Windows extraite dans tool_domains/system_search.py.
-import json
 import base64
 import re as _re
 import sys
+import uuid
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, Response
-from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse, Response
 from typing import Any
 
 import database as db
 import tools as tool_module
-import audit
-import engineering_runtime
-import tool_gateway
 import web_runtime
 import generation_runtime
-from agent import run_agent, _refresh_model_cache
+from agent import _refresh_model_cache
 import chat_turn_runtime
+from api.agent_gateway import router as agent_gateway_router
 from api.backups import router as backups_router
 from api.billing import router as billing_router
 from api.calendar import router as calendar_router
@@ -135,11 +133,7 @@ from api.video_local import router as video_local_router
 from api.video_remote import router as video_remote_router
 from api.workflows import router as workflows_router
 from app_version import APP_VERSION
-from config import (
-    FRONTEND_URL, BACKEND_PORT, DANGEROUS_TOOLS,
-    PERMISSION_SECURE, PERMISSION_STANDARD, PERMISSION_EXPERT, DEFAULT_PERMISSION_LEVEL,
-    SECURE_BLOCKED_TOOLS, BACKEND_DIR,
-)
+from config import FRONTEND_URL
 from runtime_supervisor import RuntimeSupervisor
 from runtime_workers import (
     build_tool_index as _build_tool_index,
@@ -3179,6 +3173,7 @@ app.include_router(cron_monitor_router)
 app.include_router(ssh_router)
 app.include_router(storage_router)
 app.include_router(health_router)
+app.include_router(agent_gateway_router)
 
 
 # v2.184 — filet GLOBAL pour toute exception qui s'échapperait d'une route SANS passer par
@@ -3190,225 +3185,37 @@ app.include_router(health_router)
 # intensif sans nouvelle fonctionnalité.
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception):
+    incident_id = uuid.uuid4().hex
     try:
-        import traceback as _tb
         import bug_log as _bug_log
         _bug_log.log_bug(
-            "http_exception", str(exc),
-            context={"path": str(request.url.path), "method": request.method},
-            traceback_str=_tb.format_exc(),
+            "http_exception",
+            type(exc).__name__,
+            context={
+                "path": str(request.url.path)[:500],
+                "method": str(request.method)[:16],
+                "incident_id": incident_id,
+                "exception_type": type(exc).__name__[:160],
+            },
         )
     except Exception:
         pass
-    return JSONResponse(status_code=500, content={"detail": f"Erreur interne : {exc}"})
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Une erreur interne est survenue.",
+            "incident_id": incident_id,
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Chat — SSE Streaming
 # ══════════════════════════════════════════════════════════════════════════════
 
-class ChatRequest(BaseModel):
-    messages: list[dict]
-    conversationId: str | None = None
-    requestId: str | None = Field(default=None, min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$")
-    afterEvent: int = Field(default=0, ge=0)
-    model: str | None = None
-    cortex: dict | None = None
-
-
-@app.post("/api/chat")
-async def chat(req: ChatRequest):
-    if not req.requestId:
-        async def event_stream():
-            async for chunk in run_agent(
-                req.messages, req.conversationId, req.model, req.cortex,
-            ):
-                yield chunk
-    else:
-        fingerprint = chat_turn_runtime.payload_hash({
-            "messages": req.messages,
-            "conversationId": req.conversationId,
-            "model": req.model,
-            "cortex": req.cortex,
-        })
-
-        def producer():
-            return run_agent(
-                req.messages, req.conversationId, req.model, req.cortex,
-                request_id=req.requestId,
-            )
-
-        async def event_stream():
-            try:
-                async for chunk in chat_turn_runtime.subscribe(
-                    request_id=req.requestId,
-                    fingerprint=fingerprint,
-                    conversation_id=req.conversationId,
-                    producer_factory=producer,
-                    after_sequence=req.afterEvent,
-                ):
-                    yield chunk
-            except ValueError as exc:
-                yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Exécution manuelle d'un outil (confirmation utilisateur)
 # ══════════════════════════════════════════════════════════════════════════════
-
-class ToolExecuteRequest(BaseModel):
-    toolName: str
-    args: dict = Field(default_factory=dict)
-    requestId: str | None = Field(default=None, max_length=160)
-    conversationId: str | None = Field(default=None, max_length=160)
-
-
-def _current_permission_level() -> int:
-    try:
-        value = db.get_setting("permission_level")
-        return int(value) if value is not None else DEFAULT_PERMISSION_LEVEL
-    except Exception:
-        # Le niveau par défaut reste autoritaire si le stockage des réglages
-        # est momentanément indisponible; l'exécution garde tous les autres
-        # contrôles du gateway.
-        return DEFAULT_PERMISSION_LEVEL
-
-
-async def _execute_through_gateway(
-    request: ToolExecuteRequest,
-    *,
-    source: str,
-    confirmed_by_ui: bool,
-) -> tool_gateway.ToolGatewayResult:
-    return await tool_gateway.execute_tool(
-        tool_gateway.ToolGatewayRequest(
-            tool_name=request.toolName,
-            arguments=request.args,
-            source=source,
-            permission_level=_current_permission_level(),
-            conversation_id=request.conversationId,
-            request_id=request.requestId,
-            confirmed_by_ui=confirmed_by_ui,
-        ),
-        registry=tool_module.TOOLS_REGISTRY,
-        specifications=tool_module.TOOLS_SPEC,
-        database=db,
-        normalizer=engineering_runtime.normalize_tool_result,
-        audit_logger=audit.log_action,
-    )
-
-
-@app.post("/api/tools")
-async def execute_tool_endpoint(req: ToolExecuteRequest):
-    outcome = await _execute_through_gateway(
-        req,
-        source="ui",
-        confirmed_by_ui=True,
-    )
-    if outcome.status_code == 404:
-        raise HTTPException(status_code=404, detail=outcome.result["error"])
-    return {"result": outcome.result}
-
-
-@app.get("/api/tools/list")
-async def list_tools_endpoint():
-    """Catalogue complet des outils (nom/description/schéma) — audit + découverte
-    externe (ex : le serveur MCP de Marvin, backend/mcp_server.py, lit ce catalogue
-    sans jamais importer tools.py/database.py directement, pour ne pas risquer un
-    conflit de verrou Qdrant mono-process)."""
-    return {
-        "tools": tool_module.TOOLS_SPEC,
-        "count": len(tool_module.TOOLS_SPEC),
-        "registry_synced": len(tool_module.TOOLS_REGISTRY) == len(tool_module.TOOLS_SPEC),
-        "harness": tool_gateway.coverage_report(
-            tool_module.TOOLS_REGISTRY,
-            tool_module.TOOLS_SPEC,
-        ),
-    }
-
-
-@app.post("/api/mcp/execute")
-async def execute_tool_mcp(req: ToolExecuteRequest):
-    """
-    Exécution d'outil pour des appelants EXTERNES (serveur MCP de Marvin →
-    Claude Desktop, Cursor, etc.) — délibérément SÉPARÉE de /api/tools.
-
-    Différence clé de sécurité : /api/tools force `confirmed=true` sur tout outil
-    DANGEREUX, car c'est la page Outils qui a déjà demandé confirmation via son
-    propre bouton/dialogue AVANT d'appeler cet endpoint. Un appelant MCP n'a rien
-    demandé — le forcer aveuglément permettrait à un client MCP externe de
-    déclencher des actions destructrices sans confirmation.
-
-    Ici, seul le niveau de permission ACTUEL de Marvin (Sécurisé/Standard/Expert,
-    réglé dans Paramètres) décide : en Expert, confirmation automatique (comme le
-    reste de Marvin) ; sinon, l'outil renvoie normalement `requiresConfirmation`
-    et c'est au client MCP (donc à l'utilisateur, côté Claude Desktop/Cursor) de
-    rappeler avec confirmed=true s'il approuve. `security.screen_command()` reste
-    de toute façon actif à l'intérieur de chaque outil (défense en profondeur).
-    """
-    outcome = await _execute_through_gateway(
-        req,
-        source="mcp",
-        confirmed_by_ui=False,
-    )
-    if outcome.status_code == 404:
-        raise HTTPException(status_code=404, detail=outcome.result["error"])
-    return {"result": outcome.result}
-
-
-@app.get("/api/mcp/config")
-async def mcp_config():
-    """
-    Config MCP prête à copier, avec les chemins RÉELS de CETTE installation
-    (jamais codés en dur) : `sys.executable` pointe toujours vers le python.exe
-    du venv réellement utilisé par ce backend, où que Marvin soit installé.
-    Sert la page /mcp (guide de connexion) — voir aussi CLAUDE.md §6.
-    """
-    import sys
-    python_exe = sys.executable
-    server_script = str((BACKEND_DIR / "mcp_server.py").resolve())
-
-    try:
-        perm_raw = db.get_setting("permission_level")
-        permission_level = int(perm_raw) if perm_raw is not None else DEFAULT_PERMISSION_LEVEL
-    except Exception:
-        permission_level = DEFAULT_PERMISSION_LEVEL
-
-    perm_labels = {
-        PERMISSION_SECURE:   {"label": "Sécurisé",  "note": "Les outils dangereux sont bloqués pour les appelants MCP."},
-        PERMISSION_STANDARD: {"label": "Standard",  "note": "Les outils dangereux renvoient une demande de confirmation — le client MCP doit rappeler avec confirmed=true si son utilisateur approuve."},
-        PERMISSION_EXPERT:   {"label": "Expert",    "note": "⚠️ Les outils dangereux s'exécutent SANS confirmation, y compris via MCP — comme le reste de Marvin en ce mode."},
-    }
-
-    config_snippet = {
-        "mcpServers": {
-            "marvin": {
-                "command": python_exe,
-                "args": [server_script],
-            }
-        }
-    }
-    import json as _json
-
-    return {
-        "python_executable": python_exe,
-        "server_script": server_script,
-        "permission_level": permission_level,
-        "permission_info": perm_labels.get(permission_level, perm_labels[PERMISSION_STANDARD]),
-        "config_json": _json.dumps(config_snippet, indent=2, ensure_ascii=False),
-        "tools_count": len(tool_module.TOOLS_SPEC),
-    }
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Mémoires

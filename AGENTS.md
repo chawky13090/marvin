@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.401.0)
+## 9. État actuel (v2.402.0)
+
+**v2.402 (gateway agentique HTTP)** : les routes chat SSE, exécution UI, catalogue des
+344 outils, exécution/configuration MCP quittent `main.py` pour `api/agent_gateway.py`.
+Corps chat, historique, identifiants, modèle et arguments d'outils sont désormais bornés et
+validés avant le Runner ou le gateway. Les trois surfaces conservent le même
+`tool_gateway`, les confirmations MCP distinctes et la reprise SSE durable. Un niveau de
+permission SQLite invalide revient au défaut au lieu d'élargir les droits. Le handler global
+ne renvoie ni ne journalise plus le message brut ou le traceback d'une exception : le client
+reçoit un identifiant d'incident, tandis que le journal conserve classe, route et corrélation.
 
 **v2.401 (coffre des identifiants globaux)** : les clés API, secrets clients et jetons
 globaux quittent SQLite pour un coffre DPAPI lié à l'utilisateur Windows. La migration est

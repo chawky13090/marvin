@@ -206,6 +206,7 @@ def run() -> dict[str, int | str]:
         "check:durable-evidence",
         "check:forge-evidence",
         "check:credentials-vault",
+        "check:agent-gateway-api",
         "check:architecture",
         "check:frontier-contract",
         "check:telegram",
@@ -270,6 +271,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_conversation_repository.py",
         ROOT / "scripts" / "test_db_connection_hygiene.py",
         ROOT / "scripts" / "test_credentials_vault.py",
+        ROOT / "scripts" / "test_agent_gateway_api.py",
         ROOT / "scripts" / "rollback-credentials-vault.py",
         ROOT / "scripts" / "test_agent_policy.py",
         ROOT / "scripts" / "test_agent_safety.py",
@@ -393,9 +395,12 @@ def run() -> dict[str, int | str]:
     unknown_guarded = sorted((dangerous | secure_blocked) - set(registry))
     if unknown_guarded:
         raise CheckFailure(f"Permissions visant des outils inexistants : {unknown_guarded}")
+    gateway_source = (BACKEND / "api" / "agent_gateway.py").read_text(
+        encoding="utf-8-sig"
+    )
     if (
-        "tool_gateway.execute_tool(" not in main_source
-        or "tool_gateway.coverage_report(" not in main_source
+        "tool_gateway.execute_tool(" not in gateway_source
+        or "tool_gateway.coverage_report(" not in gateway_source
     ):
         raise CheckFailure(
             "Les surfaces UI/MCP et le catalogue doivent utiliser le gateway commun."
