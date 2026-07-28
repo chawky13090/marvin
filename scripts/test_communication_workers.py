@@ -17,7 +17,6 @@ import communication_workers
 
 
 EXPECTED_ALIASES = {
-    "_bg_scale": "background_scale",
     "_calendar_sync_worker": "calendar_sync_worker",
     "_email_automation_worker": "email_automation_worker",
     "_email_watch_worker": "email_watch_worker",

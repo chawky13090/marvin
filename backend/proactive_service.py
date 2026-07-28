@@ -8,10 +8,12 @@ import re
 import subprocess
 import tempfile
 import time
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import bug_log
 import database as db
 import tools as tool_module
 from api.voice import DEFAULT_TTS_VOICES
@@ -20,6 +22,31 @@ from api.voice import DEFAULT_TTS_VOICES
 _anticipation_seen: dict[str, Any] = {"date": None, "ids": set()}
 _last_briefing_date: dict[str, str | None] = {"date": None}
 _last_recap_date: dict[str, str | None] = {"date": None}
+_last_worker_error: dict[str, Any] = {"signature": None, "at": 0.0}
+_DEFAULT_CONFIG: dict[str, dict[str, Any]] = {
+    "morning_briefing": {
+        "enabled": False,
+        "time": "08:00",
+        "voice": False,
+        "voice_name": "henri",
+    },
+    "evening_recap": {
+        "enabled": False,
+        "time": "18:30",
+        "voice": False,
+        "voice_name": "henri",
+    },
+    "anticipation": {
+        "enabled": False,
+        "interval_min": 30,
+        "overdue_tasks": True,
+        "upcoming_events": True,
+        "upcoming_events_min": 30,
+        "max_notify": 5,
+    },
+    "quiet_hours": {"enabled": False, "start": "22:00", "end": "07:00"},
+}
+_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
 def get_config() -> dict[str, Any]:
@@ -31,35 +58,47 @@ def get_config() -> dict[str, Any]:
             config = json.loads(config)
         except Exception:
             config = {}
-    return config if isinstance(config, dict) else {}
+    return with_defaults(config if isinstance(config, dict) else {})
 
 
 def with_defaults(config: dict[str, Any]) -> dict[str, Any]:
-    config.setdefault(
-        "morning_briefing",
-        {"enabled": False, "time": "08:00", "voice": False, "voice_name": "henri"},
-    )
-    config.setdefault(
-        "evening_recap",
-        {"enabled": False, "time": "18:30", "voice": False, "voice_name": "henri"},
-    )
-    config.setdefault(
-        "anticipation",
-        {
-            "enabled": False,
-            "interval_min": 30,
-            "overdue_tasks": True,
-            "upcoming_events": True,
-            "upcoming_events_min": 30,
-            "max_notify": 5,
-        },
-    )
-    config.setdefault("quiet_hours", {"enabled": False, "start": "22:00", "end": "07:00"})
-    return config
+    """Retourne une configuration complète et sûre, même après une ancienne valeur corrompue."""
+    source = config if isinstance(config, dict) else {}
+    normalized = deepcopy(_DEFAULT_CONFIG)
+    for section, defaults in _DEFAULT_CONFIG.items():
+        incoming = source.get(section)
+        if not isinstance(incoming, dict):
+            continue
+        for key, default in defaults.items():
+            value = incoming.get(key, default)
+            if isinstance(default, bool):
+                normalized[section][key] = value if isinstance(value, bool) else default
+            elif isinstance(default, int):
+                try:
+                    parsed = int(value)
+                except (TypeError, ValueError):
+                    parsed = default
+                if key == "interval_min":
+                    parsed = min(max(parsed, 5), 1440)
+                elif key == "upcoming_events_min":
+                    parsed = min(max(parsed, 1), 1440)
+                elif key == "max_notify":
+                    parsed = min(max(parsed, 1), 50)
+                normalized[section][key] = parsed
+            elif key in {"time", "start", "end"}:
+                normalized[section][key] = value if isinstance(value, str) and _TIME_RE.fullmatch(value) else default
+            elif key == "voice_name":
+                valid = (
+                    isinstance(value, str)
+                    and 1 <= len(value) <= 64
+                    and re.fullmatch(r"[A-Za-z0-9_-]+", value)
+                )
+                normalized[section][key] = value if valid else default
+    return normalized
 
 
 def in_quiet_hours(config: dict[str, Any], current_hm: str) -> bool:
-    quiet = config.get("quiet_hours", {})
+    quiet = with_defaults(config).get("quiet_hours", {})
     if not quiet.get("enabled"):
         return False
     start = quiet.get("start", "22:00")
@@ -308,6 +347,19 @@ async def proactive_worker() -> None:
                 if time.time() - last_anticipation >= interval:
                     last_anticipation = time.time()
                     await run_anticipation(anticipation)
-        except Exception:
-            pass
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            now_monotonic = time.monotonic()
+            signature = type(exc).__name__
+            if (
+                _last_worker_error["signature"] != signature
+                or now_monotonic - float(_last_worker_error["at"]) >= 300
+            ):
+                _last_worker_error.update(signature=signature, at=now_monotonic)
+                bug_log.log_bug(
+                    "proactive_worker",
+                    signature,
+                    context={"exception_type": signature},
+                )
         await asyncio.sleep(30)

@@ -90,6 +90,14 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Intégrité des preuves Marvin Forge", (python, "scripts/test_forge_evidence.py")),
         Stage("Coffre DPAPI des identifiants globaux", (python, "scripts/test_credentials_vault.py")),
         Stage("API Chat, outils et MCP extraite", (python, "scripts/test_agent_gateway_api.py")),
+        Stage(
+            "API modèles et proactive extraite",
+            (python, "scripts/test_model_proactive_api.py"),
+        ),
+        Stage(
+            "Composition FastAPI minimale",
+            (python, "scripts/test_main_composition.py"),
+        ),
         Stage("Superviseur idempotent des workers", (python, "scripts/test_runtime_supervisor.py")),
         Stage("Workers de maintenance extraits", (python, "scripts/test_runtime_workers.py")),
         Stage("Workers e-mail et agenda extraits", (python, "scripts/test_communication_workers.py")),

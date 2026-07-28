@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.346.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.403.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.402.0)
+## 9. État actuel (v2.403.0)
+
+**v2.403 (composition FastAPI)** : la sélection dynamique du meilleur modèle Cloud, le
+briefing et les routes proactives rejoignent `api/model_selection.py` et
+`api/proactive.py`. Les besoins Cloud et les branches manuelles sont fermés par énumération;
+les patches proactifs valident horaires, voix et limites tout en conservant la forme
+historique du briefing matinal. Une configuration persistée mal formée est normalisée et le
+worker ne masque plus indéfiniment ses exceptions. `main.py` ne conserve désormais que le
+lifespan et le handler global comme fonctions actives; son historique redondant est dans Git
+et le journal, ce qui ramène le composition root de 3 391 à 276 lignes. Le contrat
+`test_main_composition.py` vérifie les 47 routeurs, 15 workers, imports, cycles, temps d'import
+et fermeture du lifespan.
 
 **v2.402 (gateway agentique HTTP)** : les routes chat SSE, exécution UI, catalogue des
 344 outils, exécution/configuration MCP quittent `main.py` pour `api/agent_gateway.py`.

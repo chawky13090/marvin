@@ -8680,3 +8680,93 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   avertissements historiques. Backend réel redémarré en 2.402.0, Ollama connecté et 15
   workers disponibles. Smoke HTTP/Next.js : 28/28. Les routes réelles exposent 344 outils,
   registre synchronisé, harness 344/344 et MCP 344; un chat sans message retourne HTTP 422.
+## 2026-07-28 — v2.403.0 — Feuille de route exhaustive et composition FastAPI minimale
+
+### Contexte et révision du plan
+
+L'utilisateur a demandé de réviser la totalité du plan afin qu'aucune demande accumulée ne
+soit oubliée. `MARVIN-FRONTIER-CONSOLIDATION.md` contient désormais les exigences
+non négociables, une feuille de route ordonnée en treize phases, les preuves minimales par
+capacité et une règle formelle de révision. Le plan couvre explicitement le cœur déterministe
+et la liberté des LLM, Ollama Cloud, Ultra Cloud-only, Council cinq familles, missions jusqu'à
+un état terminal, Code Workspace depuis le chat, validation Web/VM Debian/Windows, preuves
+métier, logs, sécurité transversale, UX, avatar Möbius, voix et installateur Windows.
+
+Deux stratégies ont été réévaluées pour la composition HTTP :
+
+1. conserver les dernières routes dans `main.py`, au prix d'un composition root encore
+   couplé à Cloud, aux outils et à la persistance ;
+2. les extraire dans des `APIRouter` cohésifs en conservant leurs chemins et formats valides.
+
+La seconde est retenue conformément au modèle multi-fichiers officiel FastAPI. Elle réduit les
+dépendances et rend les contrats testables sans démarrer le runtime complet.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `backend/api/model_selection.py` pour `/api/cloud/best-model` avec besoin fermé à
+  `general`, `code` ou `vision` ;
+- ajout de `backend/api/proactive.py` pour `/api/briefing`, `/api/proactive` et
+  `/api/proactive/run` ;
+- remplacement du corps libre par des patches Pydantic fermés et bornés : horaires `HH:MM`,
+  voix, intervalles et quantité de notifications ;
+- préservation de la forme historique top-level du briefing matinal et des quatre blocs
+  actuels de l'UI ;
+- rejet d'une branche manuelle inconnue : une faute de frappe ne déclenche plus silencieusement
+  le briefing matinal ;
+- erreurs internes du briefing remplacées par un message public fixe et un identifiant
+  d'incident, avec log expurgé ;
+- normalisation défensive des anciennes configurations persistées mal formées dans
+  `proactive_service.py` ;
+- le worker proactif propage correctement son annulation et journalise ses exceptions avec
+  déduplication temporelle au lieu de toutes les ignorer ;
+- `main.py` ne possède plus que deux fonctions actives : `lifespan` et le handler global.
+
+La revue de sécurité n'a pas fermé artificiellement les dettes globales SEC-001 et suivantes.
+Cette tranche réduit la validation insuffisante et la divulgation d'erreur de cette surface;
+l'authentification globale de l'API reste une tranche dédiée du plan.
+
+### Validation et rollback
+
+Tests ciblés réellement exécutés avant la gate globale :
+
+- compilation Python des quatre modules et des tests ;
+- `scripts/test_proactive_service.py` ;
+- `scripts/test_model_proactive_api.py` : sélection Cloud, compatibilité ancienne/nouvelle,
+  entrées invalides, erreurs expurgées et routage exact ;
+- `scripts/test_frontier_consolidation_contract.py`.
+
+L'architecture ciblée observe **344 outils**, **354 routes uniques**, **40 pages** et un
+harness **344/344**. Les anciennes mentions de 346 routes restent des mesures historiques,
+pas l'état courant.
+
+Le test contractuel du plan rend obligatoires ses nouvelles sections et les demandes
+structurantes. Le nouveau test est ajouté à `package.json`, à la gate d'architecture et à
+`scripts/check_marvin.py`.
+
+Rollback après commit : `git revert <commit-v2.403>`. Aucun schéma ni format de donnée n'est
+modifié; les routes et formes valides restent identiques. Après réversion, exécuter
+`scripts/test_proactive_service.py`, `scripts/check_architecture.py`, redémarrer le backend et
+contrôler `/api/health`.
+
+### Clôture de la composition et gate globale
+
+L'historique commenté redondant de `main.py` a été retiré après comparaison AST avec la
+version précédente. Git et ce journal restent les sources de l'historique. Le fichier passe
+de 3 391 à 276 lignes. La comparaison établit :
+
+- 45/45 anciens routeurs conservés, plus les deux routeurs extraits attendus ;
+- 15/15 workers conservés avec les mêmes identités ;
+- aucune fonction métier ni classe active supprimée ;
+- logs structurés ajoutés aux trois erreurs de démarrage/arrêt auparavant silencieuses ou
+  imprimées avec leur message brut.
+
+`scripts/test_main_composition.py` vérifie les 47 routeurs, l'absence d'import inutilisé,
+l'absence de cycle d'import top-level sur les 240 modules backend, l'import isolé avec timeout
+et l'ordre complet du lifespan. Les anciens tests de façades communication/cron ont été
+alignés sur les seuls imports réellement consommés.
+
+La première gate globale a rencontré un échec non reproductible lors de la création du premier
+processus du test `python_execution`. Le test inchangé a ensuite réussi isolément puis 20/20
+fois consécutivement. Aucune correction spéculative n'a été introduite. Une seconde gate
+globale complète a réussi en un seul passage : **171/171 étapes**, compilation backend,
+architecture **344 outils / 354 routes / 40 pages / harness 344/344** et lint frontend.

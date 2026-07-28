@@ -17,15 +17,7 @@ sys.path.insert(0, str(BACKEND))
 import proactive_service
 
 
-EXPECTED_IMPORTS = {
-    "_get_proactive_cfg": "get_config",
-    "_in_quiet_hours": "in_quiet_hours",
-    "_proactive_worker": "proactive_worker",
-    "run_anticipation": "run_anticipation",
-    "run_evening_recap": "run_evening_recap",
-    "run_morning_briefing": "run_morning_briefing",
-    "_proactive_with_defaults": "with_defaults",
-}
+EXPECTED_IMPORTS = {"_proactive_worker": "proactive_worker"}
 
 
 def _check_main_facade() -> None:
@@ -39,6 +31,15 @@ def _check_main_facade() -> None:
         node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     assert not set(EXPECTED_IMPORTS).intersection(definitions)
+    assert {
+        "daily_briefing",
+        "get_proactive",
+        "set_proactive",
+        "run_proactive_now",
+    }.isdisjoint(definitions)
+    source = (BACKEND / "main.py").read_text(encoding="utf-8-sig")
+    assert "from api.proactive import router as proactive_router" in source
+    assert "app.include_router(proactive_router)" in source
 
 
 def _check_defaults_and_quiet_hours() -> None:
@@ -49,6 +50,27 @@ def _check_defaults_and_quiet_hours() -> None:
     assert proactive_service.in_quiet_hours(overnight, "23:30") is True
     assert proactive_service.in_quiet_hours(overnight, "06:59") is True
     assert proactive_service.in_quiet_hours(overnight, "12:00") is False
+    malformed = proactive_service.with_defaults(
+        {
+            "morning_briefing": "invalid",
+            "evening_recap": {"enabled": "yes", "time": "25:90", "voice_name": "../voice"},
+            "anticipation": {
+                "interval_min": -10,
+                "upcoming_events_min": 100_000,
+                "max_notify": 0,
+            },
+            "quiet_hours": None,
+            "unknown": {"kept": False},
+        }
+    )
+    assert malformed["morning_briefing"]["time"] == "08:00"
+    assert malformed["evening_recap"]["enabled"] is False
+    assert malformed["evening_recap"]["time"] == "18:30"
+    assert malformed["evening_recap"]["voice_name"] == "henri"
+    assert malformed["anticipation"]["interval_min"] == 5
+    assert malformed["anticipation"]["upcoming_events_min"] == 1440
+    assert malformed["anticipation"]["max_notify"] == 1
+    assert "unknown" not in malformed
 
 
 async def _check_tts_voice_contract() -> None:

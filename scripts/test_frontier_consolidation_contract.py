@@ -24,6 +24,10 @@ REQUIRED_SECTIONS = {
     "## 5. Gate obligatoire par tranche",
     "## 6. Rollback standard",
     "## 7. Critère de clôture globale",
+    "## 8. Exigences non négociables consolidées",
+    "## 9. Feuille de route d'exécution révisée",
+    "## 10. Preuves minimales par grande capacité",
+    "## 11. Règle d'évolution du plan",
 }
 REQUIRED_REFERENCES = {
     "openai.github.io/openai-agents-python",
@@ -109,6 +113,22 @@ def run() -> dict[str, int]:
         raise ContractError("Le contrôle de réversibilité du patch doit rester documenté.")
     if "`git revert <commit>`" not in text:
         raise ContractError("Le rollback atomique après commit doit rester documenté.")
+    for requirement in (
+        "Ultra débridé reste strictement Cloud-only",
+        "Council utilise cinq familles de modèles Cloud distinctes",
+        "aucune limite arbitraire de 120 minutes",
+        "demande de code peut être saisie directement dans le chat général ou dans Code",
+        "VM Debian",
+        "VM Windows",
+        "preuves métier utiles sont conservées plus longtemps",
+        "harness",
+        "avatar de bureau",
+        "boucle de Möbius 3D",
+        "voix est sérialisée",
+        "installateur final est Windows-first, en un clic",
+    ):
+        if requirement not in text:
+            raise ContractError(f"Exigence produit consolidée absente : {requirement}")
     if not SECURITY_REGISTER.is_file():
         raise ContractError("Le registre central de dette de sécurité est absent.")
     security_text = SECURITY_REGISTER.read_text(encoding="utf-8-sig")

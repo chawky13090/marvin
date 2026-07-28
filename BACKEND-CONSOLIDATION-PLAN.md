@@ -4,8 +4,8 @@
 > `MARVIN-FRONTIER-CONSOLIDATION.md` couvre désormais l'intégralité du produit et prévaut
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
-Date de référence : 2026-07-26  
-Version auditée : 2.300.0  
+Date de référence : 2026-07-28
+Version auditée : 2.403.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -50,7 +50,7 @@ travail restant consiste à rendre leurs frontières de code aussi nettes que le
 - repositories conversations, connexions SSH et workflows ;
 - frontières API e-mail, vidéo et SSH ;
 - domaines d'outils Productivité, Mémoire, Média, SSH, Quiz et Base IT ;
-- 344 implémentations pour 344 spécifications et 346 routes sans doublon.
+- 344 implémentations pour 344 spécifications et 354 routes sans doublon.
 
 ### Partiel
 
@@ -59,7 +59,7 @@ travail restant consiste à rendre leurs frontières de code aussi nettes que le
 | Runner | Terminé en v2.313 : `agent.py` orchestre des frontières nommées | surveiller les régressions via les tests de contrat |
 | Outils | `tools.py` : 20 197 lignes, 398 objets AST | extraire les domaines restants puis séparer catalogue et assemblage du registre |
 | Persistance | `database.py` : 3 138 lignes, 143 objets AST | déplacer les domaines restants vers des repositories injectables |
-| Composition FastAPI | `main.py` : 3 470 lignes, 44 routeurs, 12 fonctions/classes actives | extraire les derniers endpoints chat/MCP/proactif ; conserver seulement lifespan, assemblage et handlers globaux |
+| Composition FastAPI | `main.py` : 276 lignes, 47 routeurs, 2 fonctions actives | terminé en v2.403 : composition, imports et lifespan couverts par contrat |
 | Dépendances | nombreux imports directs de `tools` et `database` | remplacer progressivement par services/domaines, sans rupture de façade |
 
 ## 3. Ordre d'exécution
@@ -360,7 +360,7 @@ Le backend n'est déclaré consolidé que si :
 - le Runner central est lisible et testé par phases ;
 - `tools.py` et `database.py` sont des façades/assembleurs, pas des domaines monolithiques ;
 - `main.py` est un composition root ;
-- les contrats publics restent à 344 outils et 346 routes, sauf évolution fonctionnelle
+- les contrats publics restent à 344 outils et 354 routes, sauf évolution fonctionnelle
   explicitement décidée ;
 - aucune connexion SQLite directe ne contourne la fabrique ;
 - les modes de confidentialité, Ultra cloud-only et Council cinq modèles restent couverts ;
@@ -380,3 +380,13 @@ Le gateway agentique HTTP rejoint `api/agent_gateway.py` en v2.402.0 : chat SSE,
 et MCP utilisent toujours les mêmes objets Runner/gateway, avec charges bornées et contrats
 testables. `main.py` ne conserve plus ces modèles ni ces routes; restent le choix Cloud,
 briefing/proactif et le handler global autour du composition root.
+La sélection Cloud, le briefing et la configuration/exécution proactive rejoignent
+`api/model_selection.py` et `api/proactive.py` en v2.403.0. Les besoins et branches sont
+fermés, les charges sont typées et bornées, les erreurs de briefing sont corrélées sans
+divulguer le message interne, et la forme top-level historique du briefing matinal reste
+acceptée. Le service normalise aussi les anciennes configurations mal formées et journalise
+les exceptions répétées du worker avec limitation temporelle. `main.py` ne contient plus que
+le lifespan et le handler global comme fonctions actives. Son historique commenté redondant
+est retiré au profit de Git et `DEVELOPMENT-JOURNAL.md`; le contrat
+`scripts/test_main_composition.py` contrôle tous les routeurs, les imports, l'absence de cycle,
+un import borné et le cycle de vie complet. **La phase D est terminée en v2.403.0.**

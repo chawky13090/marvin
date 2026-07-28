@@ -17,11 +17,7 @@ sys.path.insert(0, str(BACKEND))
 import cron_runtime
 
 
-EXPECTED_IMPORTS = {
-    "_cron_worker": "cron_worker",
-    "_drain_run_agent": "drain_run_agent",
-    "_long_task_resume_tick": "long_task_resume_tick",
-}
+EXPECTED_IMPORTS = {"_cron_worker": "cron_worker"}
 
 
 class StopWorker(BaseException):

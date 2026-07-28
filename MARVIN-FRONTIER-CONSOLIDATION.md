@@ -2,6 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
+Version courante auditée : 2.402.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -132,7 +133,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | coding | Code Workspace, Forge et missions longues | partial | tests Code/Test Forge, production contract, Coding Mission et jobs | scénarios E2E Linux/Windows avec artefact et reprise après panne |
 | isolation | Docker, VM Debian et VM Windows | partial | tests VM Lab, Hyper-V runner et Test Forge | preuves natives propres, snapshot/revert et réseau gouverné |
 | persistence | SQLite, migrations et repositories | partial | les 13 JSONL sont classifiés et structurés; preuves métier et Truth Ledger chaînés | tester sauvegarde, restauration et protection globale au repos |
-| api | FastAPI, contrats et compatibilité | partial | 346 routes uniques et `scripts/smoke_test_api.py` | schémas, erreurs, idempotence, autorisation et versionnement par famille |
+| api | FastAPI, contrats et compatibilité | partial | 354 routes uniques et `scripts/smoke_test_api.py` | schémas, erreurs, idempotence, autorisation et versionnement par famille |
 | workers | Workers, cron et missions proactives | verified | tests supervisor, runtime workers, communication, cron et proactif | chaos tests arrêt/redémarrage, doublon et dépendance indisponible |
 | observability | Logs, traces, métriques, coûts et évaluations | partial | audit JSONL, état Runner, Forge et gate reproductible | corrélation bout en bout, redaction, SLO et suites capacité/régression |
 | security | Permissions, confirmations et guardrails | partial | 65 restrictions, gateway commun et tests de sécurité agent | threat model OWASP agentique complet et tests d'abus par surface |
@@ -213,3 +214,181 @@ Le chantier global ne peut être déclaré terminé que lorsque :
 - les traces permettent de relier demande, décision, modèle, outil, effet, preuve et résultat ;
 - une restauration de données et un rollback applicatif ont été exécutés avec succès ;
 - les affirmations de qualité sont accompagnées de mesures, jamais d'un classement marketing.
+
+## 8. Exigences non négociables consolidées
+
+Cette section rassemble les demandes successives afin qu'une amélioration locale ne fasse
+jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases pertinentes.
+
+### 8.1 Architecture et qualité du code
+
+- consolider tout le projet, pas uniquement `main.py`, le backend ou la sécurité ;
+- conserver un monolithe modulaire installable, avec frontières Runner, sessions, outils,
+  guardrails, persistance, observabilité et composition explicites ;
+- garder un cœur logiciel déterministe pour les permissions, validations, budgets, effets de
+  bord, confirmations, idempotence, reprise, preuves et état terminal ;
+- laisser aux LLM la liberté de planifier, rechercher, critiquer et choisir dans l'enveloppe
+  autorisée; le déterminisme ne doit pas remplacer le raisonnement ouvert ;
+- comparer toute décision significative à au moins deux approches et aux sources primaires
+  pertinentes d'OpenAI, Anthropic, Google, Microsoft, Ollama, OWASP, NIST ou de l'écosystème
+  concerné ;
+- améliorer le composant pendant son extraction lorsque la preuve montre un défaut réel,
+  sans réécriture opportuniste ni réduction de fonctionnalité ;
+- préserver les façades, routes, outils, données et parcours existants ou fournir une
+  migration compatible et réversible ;
+- rendre les chemins, dossiers de travail, ISO, VM, documents et artefacts dynamiques et
+  portables entre comptes et machines Windows ;
+- maintenir une arborescence Marvin dédiée et gouvernée pour projets, documents, preuves,
+  caches, modèles, ISO, VM et exports, sans chemins liés à la machine de développement.
+
+### 8.2 Intelligence, modèles et autonomie
+
+- Ollama Cloud est la puissance normale; les modèles locaux sont réservés aux profils de
+  confidentialité et à la continuité hors ligne ;
+- le profil Ultra débridé reste strictement Cloud-only : aucun repli local silencieux ;
+- Council utilise cinq familles de modèles Cloud distinctes avec panel, critique aveugle,
+  arbitrage, provenance et gestion explicite des indisponibilités ;
+- Model Market rend tous les modèles Ollama Cloud compatibles découvrables et sélectionne le
+  meilleur modèle selon la tâche, les mesures, les capacités et la politique de données ;
+- Research Swarm, Cortex Search et les vérificateurs spécialisés doivent améliorer la qualité
+  par recherche, contradiction et synthèse, sans multiplier des appels inutiles ;
+- le mode Auto poursuit une mission jusqu'au succès vérifié ou jusqu'à un état explicite
+  `needs_user`, `policy_blocked`, `dependency_blocked`, `cancelled` ou `failed_terminal`;
+  aucune limite arbitraire de 120 minutes ne constitue à elle seule une réussite ou un échec ;
+- une mission interrompue reprend depuis le dernier checkpoint cohérent, sans perdre le travail
+  déjà validé, avec retries bornés par étape, backoff, budget et diagnostic ;
+- le chat d'origine reste la vue autoritaire de progression : étapes, outils, blocages,
+  reprises, preuves et résultat y sont publiés même si Code Workspace ou Mission Canvas
+  fournit une vue spécialisée.
+
+### 8.3 Code Workspace, Forge et validation de production
+
+- une demande de code peut être saisie directement dans le chat général ou dans Code
+  Workspace; les deux chemins créent le même contrat de Coding Mission ;
+- Marvin inspecte le dépôt, planifie, modifie, exécute, observe l'erreur, corrige et recommence
+  jusqu'à satisfaire les critères objectifs du livrable ;
+- le code Windows et Linux doit être vérifié sur la cible réelle compatible : conteneur
+  jetable quand il suffit, VM Debian pour le noyau Linux ou les services système, VM Windows
+  pour les applications et scripts Windows natifs ;
+- les environnements de test peuvent accéder au Web pour installer et tester des dépendances,
+  mais avec politique réseau déclarée, délais, quotas, provenance et journalisation ;
+- les VM de validation reviennent à un checkpoint propre après le test; une conservation
+  temporaire pour inspection utilisateur est proposée avant le revert ;
+- cross-compilation, analyse statique et exécution native ne sont jamais confondues dans les
+  preuves ;
+- Knowledge Radar suit les versions, documentations officielles, conventions, avis de
+  sécurité et toolchains nécessaires, avec date et provenance ;
+- aucun livrable n'est qualifié « production » sans installation reproductible, lint,
+  compilation/type-check, tests adaptés, analyse de dépendances, SBOM, artefact, preuve
+  d'exécution et limites connues.
+
+### 8.4 Données, preuves, logs et sécurité
+
+- les preuves métier utiles sont conservées plus longtemps que les logs de diagnostic :
+  résultat, approbation, artefact, hash, provenance et décision de conservation sont des
+  enregistrements gouvernés, pas des lignes de log jetables ;
+- logs, traces, métriques et preuves possèdent une classification, un propriétaire, une durée
+  de rétention, une limite disque, une rotation, une purge vérifiable et une procédure
+  d'export/restauration ;
+- toute demande, décision de modèle, appel d'outil, effet, preuve et résultat est corrélable
+  sans journaliser secret, mot de passe, token, contenu sensible inutile ou raisonnement privé ;
+- chaque composant subit une revue de sécurité obligatoire; la sécurité est un gate
+  transversal et non une phase isolée qui remplace la consolidation fonctionnelle ;
+- aucune dette de sécurité découverte n'est ignorée : elle est corrigée dans la tranche ou
+  enregistrée avec sévérité, exposition, mitigation, propriétaire logique, condition de
+  fermeture et test ;
+- secrets, sauvegardes et données sensibles au repos sont protégés selon un mécanisme standard,
+  avec migration idempotente, restauration testée et parcours de réauthentification portable ;
+- les outils sont tous soumis au même harness : schéma fermé, capacité, permission, effet de
+  bord, confirmation, idempotence, isolation, timeout, sortie bornée, preuve, audit et
+  compensation applicables ;
+- aucun adaptateur MCP, UI, worker, cron ou appel interne ne contourne ce gateway.
+
+### 8.5 Expérience utilisateur, avatar, voix et distribution
+
+- le frontend doit rendre les conversations longues lisibles, conserver les messages et
+  événements partiels lors d'un changement de page et restaurer exactement un stream en cours ;
+- les états chargement, réflexion, outil, erreur, blocage, reprise et succès doivent être
+  compréhensibles sans consulter des journaux ou Code Workspace ;
+- Code Forge, Test Forge, Knowledge Radar, Council et les modes utiles sont accessibles et
+  expliqués depuis les surfaces de chat, sans boutons inertes ni vocabulaire ambigu ;
+- l'avatar de bureau offre démarrage/arrêt de Marvin, raccourci bureau et UI, déplacement
+  fiable, fenêtre de chat exploitable, entrée vocale directe et état du runtime ;
+- l'identité visuelle cible associe une boucle de Möbius 3D animée à un robot intelligent et
+  malicieux, tout en respectant performances, accessibilité et préférence de mouvement réduit ;
+- la voix est sérialisée : une seule restitution active par session, interruption explicite,
+  annulation lors d'un changement de contexte et aucune superposition de messages ;
+- l'installateur final est Windows-first, en un clic, idempotent et portable : détection des
+  capacités, élévation minimale, reprise après redémarrage, diagnostic, mise à jour,
+  réparation, rollback et désinstallation propre ;
+- Hyper-V, Docker, Windows Sandbox, GPU, Ollama local et Ollama Cloud restent des capacités
+  optionnelles; leur absence ne bloque pas le socle et produit un état
+  `disponible`, `dégradé` ou `indisponible` avec repli honnête.
+
+## 9. Feuille de route d'exécution révisée
+
+L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
+traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
+
+| Ordre | Phase | État au 2.402.0 | Livraison et condition de sortie |
+|---:|---|---|---|
+| 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
+| 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
+| 2 | Persistance modulaire | partial | `database.py` devient une façade; repositories par agrégat, transactions, concurrence, migrations montantes/descendantes, sauvegarde et restauration réelles |
+| 3 | Graphe agentique déterministe | partial | graphe durable typé, handoffs versionnés, états terminaux, checkpoints, compensations et manifestes de capacités pour Runner/Mission OS |
+| 4 | Harness universel des outils | partial | 344/344 outils et tous leurs consommateurs passent exclusivement par validation, permissions, idempotence, preuve et observabilité communes |
+| 5 | Intelligence Cloud et évaluation | partial | Ultra Cloud-only prouvé, Council cinq familles live, Model Market/Research Swarm mesurés, Cortex et vérificateurs évalués sur qualité, coût et appels inutiles |
+| 6 | Code Workspace et Forge autonome | partial | demande chat/workspace unifiée, boucle corriger-tester, reprise visible, validations natives Debian/Windows, checkpoint propre et livrable de production démontré |
+| 7 | Memory Mesh, Truth Ledger et rétention | partial | séparation Session/State/Memory, provenance, conflits, oubli, chiffrement, preuves métier durables et politiques de rétention/restauration validées |
+| 8 | Observabilité et SRE | partial | corrélation bout en bout, logs structurés expurgés, métriques/SLO, rotation/purge, alertes, chaos tests et tableaux de santé exploitables |
+| 9 | Fermeture de la dette sécurité | partial | threat model agentique complet, API/auth réseau, secrets e-mail/SSH/OAuth, sauvegardes chiffrées, ACL et tests d'abus fermés ou limitations explicitement acceptées |
+| 10 | Frontend et Mission Canvas | partial | UX accessible, conversations/streams robustes, progression lisible, modes et Forges actionnables, tests Playwright des parcours critiques |
+| 11 | Avatar et voix | partial | Electron réel validé pour démarrage/arrêt/déplacement/raccourcis; avatar Möbius; voix sans chevauchement; reprise et accessibilité |
+| 12 | Installateur Windows | partial | installation machine propre, chemins dynamiques, capacités optionnelles, reboot/reprise, réparation, update, rollback et désinstallation réellement exécutés |
+| 13 | Evolution Lab et audit final | not_audited | benchmark capacité/non-régression, optimisation contrôlée, restauration catastrophe, rollback global, documentation opérateur et matrice sans preuve manquante |
+
+### Phase active
+
+La phase **1 — Composition backend** est vérifiée en v2.403.0 :
+
+- les cinq routes historiques restantes sont dans deux `APIRouter` typés ;
+- `main.py` est passé de 3 391 à 276 lignes sans perdre aucun des 45 routeurs antérieurs ni
+  aucun des 15 workers; les deux routeurs supplémentaires sont les extractions attendues ;
+- un contrat contrôle les 47 routeurs, les imports inutilisés, l'absence de cycle top-level,
+  l'import borné à 30 secondes et la fermeture ordonnée du lifespan ;
+- la gate globale a réussi sur 171 étapes.
+
+La phase active devient **2 — Persistance modulaire**. La première tranche doit produire un
+inventaire AST et transactionnel de `database.py`, identifier les agrégats, consommateurs,
+transactions, verrous, données sensibles, migrations et tests réels. L'extraction commencera
+par le domaine présentant le meilleur rapport cohésion/risque; elle ne sera pas pilotée par le
+seul nombre de lignes.
+
+## 10. Preuves minimales par grande capacité
+
+| Capacité | Preuve exigée avant `verified` |
+|---|---|
+| Chat et sessions | reconnexion navigateur pendant génération et outil, événements sans trou ni doublon, reprise après redémarrage |
+| Outils | identité 344/344, schéma/permission/effect testés, erreurs bornées, compensation et audit |
+| Council/Cloud | cinq familles distinctes réellement appelées, provenance, aucune exécution locale en Ultra |
+| Code | dépôt réel, modification réelle, échec observé puis correction, tests natifs et artefact relu |
+| VM/conteneur | état propre initial, réseau annoncé, résultat invité, export de preuve, arrêt et revert vérifiés |
+| E-mail | plusieurs comptes, plusieurs expéditeurs autorisés, simulation, anti-boucle, confirmation et panne partielle |
+| Mémoire | provenance, contradiction, oubli sélectif, rétention et restauration |
+| Frontend | Playwright desktop et viewport réduit, changement de page pendant stream, erreurs et clavier |
+| Avatar/voix | application Electron réelle, raccourci, déplacement, ouverture Marvin, interruption et non-chevauchement |
+| Installateur | VM Windows propre, install/reboot/repair/update/uninstall, aucune dépendance machine cachée |
+| Données | sauvegarde cohérente, restauration isolée, intégrité, migration/rollback et absence de secret logique |
+| Observabilité | identifiant de corrélation traversant Runner, modèle, outil, effet, preuve et réponse sans donnée interdite |
+
+## 11. Règle d'évolution du plan
+
+Une découverte peut modifier l'ordre ou la solution, jamais supprimer silencieusement une
+exigence. Toute révision doit :
+
+1. citer le fait nouveau et la preuve ;
+2. comparer au moins deux options ;
+3. montrer l'impact sur toutes les phases dépendantes ;
+4. conserver ou migrer les critères de réussite ;
+5. mettre à jour ce document, le plan spécialisé concerné et `DEVELOPMENT-JOURNAL.md` ;
+6. rester réversible par commit ou migration documentée.
