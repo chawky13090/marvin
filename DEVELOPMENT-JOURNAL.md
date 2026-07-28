@@ -9532,3 +9532,77 @@ Rollback après commit : `git revert <commit-v2.417>`, puis redémarrer uniqueme
 Le schéma et les données ne changent pas; aucune migration descendante n'est nécessaire.
 Vérifier après réversion `quiz_next`, `quiz_answer` et `quiz_stats`. Le retour rétablit
 volontairement la sélection aléatoire historique.
+
+## 2026-07-28 — v2.418.0 — Repository de connaissances IT
+
+### Contexte, comparaison et décision
+
+Après l'extraction des fiches de révision, `database.py` conservait encore le schéma, le
+catalogue et les six opérations de la base de connaissances IT. Deux approches ont été
+comparées :
+
+- déplacer uniquement les requêtes et conserver le catalogue dans la façade historique,
+  solution courte mais laissant une dépendance métier dans le composition root ;
+- extraire un repository injectable et un catalogue statique versionné, tout en réexportant
+  par identité les six façades existantes.
+
+La seconde est retenue. Elle termine la frontière de persistance de `database.py` sans
+modifier le contrat des outils `it_kb_search`, `it_kb_list`, `it_kb_recommend` et
+`it_kb_add`. Le catalogue historique de 34 produits est conservé intégralement. La conception
+suit les transactions documentées par SQLite et Python, ainsi que la validation serveur en
+liste blanche recommandée par OWASP :
+
+- https://www.sqlite.org/lang_transaction.html
+- https://docs.python.org/3/library/sqlite3.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html
+
+### Implémentation, amélioration, logs et sécurité
+
+- ajout de `repositories/it_knowledge.py`, avec connexion, horloge et fabrique
+  d'identifiants injectables ;
+- ajout de `repositories/it_knowledge_catalog.py`, qui isole les 34 entrées initiales sans
+  changer leur contenu ;
+- conservation par identité de `it_kb_list`, `it_kb_categories`, `it_kb_search`, `it_kb_get`,
+  `it_kb_upsert` et `it_kb_increment_usage` ;
+- listes limitées à 500 lignes, recherches à 100 résultats, requêtes à 1 000 caractères,
+  noms à 300 et textes métier à des bornes explicites ;
+- liste blanche stricte des six modèles tarifaires, note finie entre 0 et 5 et URL officielle
+  HTTP(S) sans identifiants ni port non standard ;
+- SQL paramétré partout; les noms de colonnes dynamiques proviennent exclusivement d'une
+  liste blanche interne ;
+- ordre stable avec `id` comme dernier départage et relecture de l'upsert dans la même
+  transaction ;
+- collision d'identifiant et validation tardive compensées par le rollback du contexte
+  SQLite; aucune migration de schéma ni transformation des lignes historiques ;
+- `database.py` ne contient plus qu'un composition root de 230 lignes et une seule fonction
+  active, `_init_tables`.
+
+La tranche ne crée aucun nouvel événement d'exploitation : les lectures locales ne doivent
+pas gonfler les logs et les contenus de la base IT ne sont pas copiés dans les journaux.
+L'exécution de l'outil continue de produire le reçu agrégé du gateway existant. L'URL est
+seulement stockée et affichée par ce domaine; elle n'est pas téléchargée. Toute future
+consommation réseau devra repasser par `outbound_http` et sa défense anti-SSRF.
+
+### Validation observée et rollback
+
+- test SQLite réel du repository : catalogue exact, initialisation idempotente, lecture par
+  nom et identifiant, ordre, recherche, création, mise à jour partielle, compteur d'usage,
+  limites, notes non finies, URL invalides, collision et rollback ;
+- six identités publiques conservées et test du domaine outil existant réussi ;
+- initialiseur Next.js, hygiène des connexions, architecture et composition FastAPI réussis ;
+- gate globale : **184/184 étapes**, 344 outils, harness 344/344, 354 routes, 40 pages,
+  compilation de 263 fichiers Python et lint frontend sans erreur (37 avertissements
+  préexistants) ;
+- Ruff n'est pas installé dans le `.venv`; la tentative a correctement signalé
+  `No module named ruff` et n'est pas comptée comme un test réussi ni ajoutée aux dépendances ;
+- build Next.js 16.2.6 sous Turbopack réussi, puis `next dev` Turbopack relancé sur 3000 ;
+- backend relancé en 2.418.0 avec Ollama disponible et 15 workers ;
+- appel HTTP réel et non mutateur `it_kb_search("sauvegarde VM")` réussi via le gateway ;
+- smokes live : **28/28 contrats API**, **40/40 pages**, cinq conversations représentatives
+  et sérialisation vocale stricte réussis.
+
+Rollback après commit : `git revert <commit-v2.418>`, puis redémarrer uniquement le backend.
+Le schéma et les données sont inchangés; aucune migration descendante n'est nécessaire.
+Vérifier ensuite via `/api/tools` que `it_kb_search`, `it_kb_list`, `it_kb_recommend` et
+`it_kb_add` restent accessibles. La réversion restaure volontairement le CRUD historique
+moins borné.

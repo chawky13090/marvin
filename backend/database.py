@@ -6,7 +6,7 @@ passent tous par ce module via des proxys /api/*, voir le changelog v2.107-111 d
 CLAUDE.md §9 pour le détail de cette consolidation).
 Utilise le module sqlite3 standard de Python (thread-safe avec check_same_thread=False).
 """
-from db_connection import db, row_to_dict
+from db_connection import db
 from db_migrations import apply_migrations
 from repositories.billing import (
     billing_catalog_create,
@@ -115,6 +115,15 @@ from repositories.flashcards import (
     get_next_flashcard,
     repository as flashcard_repository,
 )
+from repositories.it_knowledge import (
+    it_kb_categories,
+    it_kb_get,
+    it_kb_increment_usage,
+    it_kb_list,
+    it_kb_search,
+    it_kb_upsert,
+    repository as it_knowledge_repository,
+)
 from repositories.logos import create_logo, list_logos
 from repositories.memories import (
     clear_all_memories,
@@ -197,273 +206,6 @@ from repositories.workflows import (
 )
 
 
-# ── Mémoires ──────────────────────────────────────────────────────────────────
-
-# ── Tâches ────────────────────────────────────────────────────────────────────
-
-# ── Notes ─────────────────────────────────────────────────────────────────────
-
-# ── Agenda / Événements (store local) ───────────────────────────────────────────
-
-# ── Paramètres ────────────────────────────────────────────────────────────────
-
-# ── Projets ───────────────────────────────────────────────────────────────────
-# Table normalement créée par lib/database/init.js (Next.js) au premier lancement du
-# frontend — CREATE TABLE IF NOT EXISTS défensif ici aussi pour une install où le
-# backend Python démarrerait avant le frontend (v2.107, même schéma que le JS).
-
-# ── Captures d'écran (v2.175) ───────────────────────────────────────────────
-# Persiste chaque capture attachée au chat (jusqu'ici jetée après un seul tour,
-# cf. mémoire document-identity-toc-v2174) + son analyse (légende + texte relevé)
-# pour permettre plus tard une génération de documentation à partir de plusieurs
-# captures d'une même conversation.
-
-# ── Logos générés (v2.183) ──────────────────────────────────────────────────
-# Registre des logos générés localement (local_image.py) — permet de les RÉUTILISER
-# pour un client/contexte déjà rencontré au lieu de regénérer à chaque document (né d'un
-# vrai échec : Marvin n'avait aucun moyen de créer/retrouver un logo, cf. mémoire session).
-
-# ── Historique d'exécution ────────────────────────────────────────────────────
-
-# ── CRUD pour billing_clients ────────────────────────────────────────────────
-
-# ── CRUD pour billing_quotes ─────────────────────────────────────────────────
-
-# ── Catalogue de services ────────────────────────────────────────────────────
-
-# ── Factures (facturation) ────────────────────────────────────────────────────
-
-# ── Contrats récurrents (MRR/ARR) ─────────────────────────────────────────────
-
-# ── CRUD interventions ──────────────────────────────────────────────────────
-
-# ── CRUD documents générés ──────────────────────────────────────────────────
-
-# ── Templates ───────────────────────────────────────────────────────────────
-
-# ── Assets (CMDB-lite) ──────────────────────────────────────────────────────
-
-# ══════════════════════════════════════════════════════════════════════════════
-# v2.30.0 — Operations Safety : Module 1 — Pre-Check / Post-Check
-# ══════════════════════════════════════════════════════════════════════════════
-
-# ══════════════════════════════════════════════════════════════════════════════
-# v2.30.0 — Operations Safety : Module 2 — Command Safety / Guardrails
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# v2.30.0 — Operations Safety : Module 3 — Client Health Score
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Base de connaissances IT consultable par Marvin (outils/logiciels/produits)
-# Permet des recommandations instantanées sans recherche web → plus rapide & smart.
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _ensure_it_kb_tables(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS it_knowledge (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            vendor TEXT DEFAULT '',
-            description TEXT DEFAULT '',
-            use_cases TEXT DEFAULT '',
-            pros TEXT DEFAULT '',
-            cons TEXT DEFAULT '',
-            pricing_model TEXT DEFAULT 'paid'
-                CHECK(pricing_model IN ('opensource','free','freemium','paid','saas','unknown')),
-            typical_price TEXT DEFAULT '',
-            platforms TEXT DEFAULT '',
-            alternatives TEXT DEFAULT '',
-            official_url TEXT DEFAULT '',
-            tags TEXT DEFAULT '',
-            rating REAL DEFAULT 0,
-            best_for TEXT DEFAULT '',
-            source TEXT DEFAULT 'curated',
-            times_used INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_itkb_cat ON it_knowledge(category, name)")
-    if conn.execute("SELECT COUNT(*) FROM it_knowledge").fetchone()[0] == 0:
-        _seed_it_kb(conn)
-
-
-def _seed_it_kb(conn):
-    import uuid as _u
-    # (name, category, vendor, description, use_cases, pricing_model, typical_price, platforms, best_for, tags)
-    items = [
-        # Sauvegarde
-        ("Veeam Backup & Replication", "Sauvegarde", "Veeam", "Sauvegarde et réplication VM/physique, référence du marché.", "Sauvegarde serveurs, VM, restauration granulaire, PRA", "paid", "~ selon sockets/instances", "Windows,Linux", "Sauvegarde infra virtualisée (VMware/Hyper-V)", "backup,vm,pra,réplication"),
-        ("Acronis Cyber Protect", "Sauvegarde", "Acronis", "Sauvegarde + cybersécurité intégrée (anti-ransomware).", "Image disque, cloud backup, EDR léger", "saas", "~6-12€/poste/mois", "Windows,macOS,Linux,Mobile", "TPE/PME tout-en-un sauvegarde+sécurité", "backup,image,ransomware,cloud"),
-        ("Nakivo Backup & Replication", "Sauvegarde", "Nakivo", "Sauvegarde VM abordable, bon rapport qualité/prix.", "Sauvegarde VMware/Hyper-V/NAS", "paid", "abordable", "Linux,NAS", "PME budget serré, sauvegarde VM", "backup,vm,nas"),
-        ("Duplicati", "Sauvegarde", "Open source", "Sauvegarde chiffrée vers cloud, gratuit.", "Sauvegarde fichiers vers S3/Backblaze/Drive", "opensource", "gratuit", "Windows,macOS,Linux", "Sauvegarde fichiers chiffrée petit budget", "backup,gratuit,cloud,chiffré"),
-        # Antivirus / EDR
-        ("Bitdefender GravityZone", "Cybersécurité", "Bitdefender", "EDR/antivirus pro, excellent taux de détection.", "Protection postes/serveurs, EDR, console centrale", "saas", "~4-8€/poste/mois", "Windows,macOS,Linux", "Protection PME/collectivité, console centralisée", "edr,antivirus,endpoint"),
-        ("ESET PROTECT", "Cybersécurité", "ESET", "Antivirus léger et fiable, console cloud.", "Protection endpoints, faible impact perf", "saas", "~3-6€/poste/mois", "Windows,macOS,Linux,Android", "Parc avec machines anciennes (léger)", "antivirus,endpoint,léger"),
-        ("Microsoft Defender for Business", "Cybersécurité", "Microsoft", "EDR intégré à Microsoft 365 Business Premium.", "Protection endpoints intégrée M365", "saas", "inclus M365 BP", "Windows,macOS", "Clients déjà sur Microsoft 365", "edr,microsoft,m365"),
-        ("Malwarebytes", "Cybersécurité", "Malwarebytes", "Désinfection et anti-malware complémentaire.", "Nettoyage d'infection, second avis", "freemium", "gratuit/~3€", "Windows,macOS", "Désinfection ponctuelle d'un poste", "antimalware,nettoyage"),
-        # Accès distant
-        ("AnyDesk", "Accès distant", "AnyDesk", "Prise en main à distance rapide et fluide.", "Support à distance, télétravail", "freemium", "~15-30€/mois", "Windows,macOS,Linux,Mobile", "Support à distance pro abordable", "remote,support,télétravail"),
-        ("TeamViewer", "Accès distant", "TeamViewer", "Référence de la prise en main à distance.", "Support, réunion, accès non surveillé", "freemium", "~25-50€/mois", "Tous", "Support multi-plateforme établi", "remote,support"),
-        ("RustDesk", "Accès distant", "Open source", "Alternative open source auto-hébergeable à TeamViewer.", "Support à distance auto-hébergé, RGPD-friendly", "opensource", "gratuit", "Windows,macOS,Linux,Mobile", "Accès distant souverain/auto-hébergé", "remote,gratuit,souverain,rgpd"),
-        # Supervision / RMM
-        ("NinjaOne", "Supervision", "NinjaOne", "RMM moderne : supervision + gestion de parc + patch.", "MSP, supervision, déploiement patchs", "saas", "~2-3€/endpoint/mois", "Cloud", "MSP/infogérance moderne", "rmm,supervision,msp,patch"),
-        ("Atera", "Supervision", "Atera", "RMM+PSA tout-en-un, tarif par technicien.", "Supervision, ticketing, facturation MSP", "saas", "~99€/technicien/mois", "Cloud", "Petit MSP (tarif par tech illimité endpoints)", "rmm,psa,msp"),
-        ("Zabbix", "Supervision", "Open source", "Supervision réseau/serveurs open source puissante.", "Monitoring infra, alertes, graphes", "opensource", "gratuit", "Linux", "Supervision auto-hébergée sans licence", "monitoring,gratuit,réseau"),
-        ("PRTG Network Monitor", "Supervision", "Paessler", "Supervision réseau par capteurs, simple.", "Monitoring réseau, bande passante, SNMP", "freemium", "gratuit <100 capteurs", "Windows", "Supervision réseau PME clé en main", "monitoring,réseau,snmp"),
-        # Virtualisation
-        ("Proxmox VE", "Virtualisation", "Proxmox", "Hyperviseur open source (KVM+LXC) avec cluster/HA.", "Virtualisation serveurs, conteneurs, HA", "opensource", "gratuit (support payant)", "Linux", "Virtualisation sans coût de licence", "virtualisation,kvm,gratuit,ha"),
-        ("VMware vSphere/ESXi", "Virtualisation", "Broadcom", "Hyperviseur entreprise de référence.", "Virtualisation critique, vMotion, HA", "paid", "licence élevée", "Bare-metal", "Infra critique avec besoin support éditeur", "virtualisation,vmware,entreprise"),
-        ("Hyper-V", "Virtualisation", "Microsoft", "Hyperviseur intégré à Windows Server.", "Virtualisation en environnement Windows", "free", "inclus Windows Server", "Windows", "Parc 100% Microsoft", "virtualisation,microsoft,windows"),
-        # Pare-feu / réseau
-        ("pfSense", "Réseau & Sécurité", "Netgate", "Pare-feu/routeur open source complet.", "Pare-feu, VPN, filtrage, routeur", "opensource", "gratuit", "x86/Appliance", "Pare-feu robuste petit budget", "firewall,vpn,routeur,gratuit"),
-        ("OPNsense", "Réseau & Sécurité", "Open source", "Fork de pfSense, interface moderne.", "Pare-feu, IDS/IPS, VPN", "opensource", "gratuit", "x86/Appliance", "Pare-feu open source moderne", "firewall,ids,vpn,gratuit"),
-        ("Stormshield", "Réseau & Sécurité", "Stormshield", "UTM/pare-feu français certifié ANSSI.", "Sécurité périmétrique, conformité FR", "paid", "selon modèle", "Appliance", "Collectivité/secteur sensible (souveraineté)", "firewall,utm,anssi,souverain"),
-        ("Fortinet FortiGate", "Réseau & Sécurité", "Fortinet", "NGFW performant, large écosystème.", "Pare-feu nouvelle génération, SD-WAN", "paid", "selon modèle", "Appliance", "PME/ETI besoin NGFW + SD-WAN", "firewall,ngfw,sdwan"),
-        # Diagnostic / utilitaires
-        ("Wireshark", "Diagnostic", "Open source", "Analyseur de paquets réseau de référence.", "Diagnostic réseau, capture trames", "opensource", "gratuit", "Windows,macOS,Linux", "Diagnostic réseau approfondi", "réseau,capture,diagnostic,gratuit"),
-        ("Advanced IP Scanner", "Diagnostic", "Famatech", "Scan réseau local rapide et gratuit.", "Inventaire réseau, découverte d'hôtes", "free", "gratuit", "Windows", "Cartographie rapide d'un LAN", "réseau,scan,inventaire,gratuit"),
-        ("CrystalDiskInfo", "Diagnostic", "Crystal Dew World", "Santé des disques (SMART).", "Diagnostic disque, prévention de panne", "opensource", "gratuit", "Windows", "Vérifier l'état d'un disque avant panne", "disque,smart,diagnostic,gratuit"),
-        ("HWiNFO", "Diagnostic", "HWiNFO", "Infos matériel et capteurs détaillés.", "Diagnostic matériel, monitoring températures", "freemium", "gratuit", "Windows", "Diagnostic matériel complet", "matériel,capteurs,diagnostic"),
-        ("MemTest86", "Diagnostic", "PassMark", "Test de mémoire RAM bootable.", "Détection de RAM défectueuse", "freemium", "gratuit", "Bootable", "Tester une RAM suspecte", "ram,mémoire,test,gratuit"),
-        # Imagerie / déploiement
-        ("Clonezilla", "Déploiement", "Open source", "Clonage/imagerie disque gratuit.", "Image système, déploiement de masse", "opensource", "gratuit", "Bootable", "Cloner/déployer des postes sans coût", "image,clonage,déploiement,gratuit"),
-        ("Macrium Reflect", "Déploiement", "Macrium", "Imagerie disque fiable Windows.", "Image système, restauration, migration SSD", "freemium", "~70€", "Windows", "Migration SSD / image de référence", "image,backup,ssd,windows"),
-        # Mots de passe / identité
-        ("Bitwarden", "Gestion identité", "Bitwarden", "Gestionnaire de mots de passe open source.", "Coffre-fort partagé équipe, auto-hébergeable", "freemium", "gratuit/~3€/mois", "Tous", "Mots de passe d'équipe sécurisés", "motdepasse,coffre,gratuit,rgpd"),
-        ("KeePass", "Gestion identité", "Open source", "Coffre-fort de mots de passe local.", "Stockage local chiffré des secrets", "opensource", "gratuit", "Windows,Mobile", "Secrets en local sans cloud", "motdepasse,local,gratuit"),
-        # Productivité / cloud
-        ("Microsoft 365", "Cloud & Productivité", "Microsoft", "Suite bureautique + mail + Teams + OneDrive.", "Messagerie pro, collaboration, fichiers cloud", "saas", "~6-22€/user/mois", "Cloud", "Bureautique/collaboration standard du marché", "m365,mail,cloud,collaboration"),
-        ("Google Workspace", "Cloud & Productivité", "Google", "Suite collaborative cloud (Gmail, Drive, Meet).", "Mail pro, collaboration temps réel", "saas", "~6-18€/user/mois", "Cloud", "Structures cloud-first / collaboration", "google,mail,cloud"),
-        # Réseau scan
-        ("Nmap", "Diagnostic", "Open source", "Scanner de ports et d'audit réseau.", "Audit réseau, découverte services/ports", "opensource", "gratuit", "Windows,Linux,macOS", "Audit de sécurité réseau", "réseau,ports,audit,gratuit"),
-    ]
-    for it in items:
-        name, cat, vendor, desc, uc, pm, price, plat, best, tags = it
-        conn.execute("""
-            INSERT INTO it_knowledge
-            (id, name, category, vendor, description, use_cases, pricing_model,
-             typical_price, platforms, best_for, tags, source)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'curated')
-        """, (str(_u.uuid4()), name, cat, vendor, desc, uc, pm, price, plat, best, tags))
-
-
-def it_kb_list(category: str | None = None, limit: int = 200) -> list[dict]:
-    with db() as conn:
-        _ensure_it_kb_tables(conn)
-        if category:
-            rows = conn.execute("SELECT * FROM it_knowledge WHERE category = ? ORDER BY name LIMIT ?",
-                                (category, limit)).fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM it_knowledge ORDER BY category, name LIMIT ?", (limit,)).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def it_kb_categories() -> list[str]:
-    with db() as conn:
-        _ensure_it_kb_tables(conn)
-        rows = conn.execute("SELECT DISTINCT category FROM it_knowledge ORDER BY category").fetchall()
-    return [r[0] for r in rows]
-
-
-def it_kb_search(query: str, limit: int = 12) -> list[dict]:
-    """Recherche plein-texte simple sur nom/catégorie/usage/tags/best_for."""
-    q = f"%{(query or '').strip().lower()}%"
-    with db() as conn:
-        _ensure_it_kb_tables(conn)
-        rows = conn.execute("""
-            SELECT * FROM it_knowledge
-            WHERE lower(name) LIKE ? OR lower(category) LIKE ? OR lower(use_cases) LIKE ?
-               OR lower(tags) LIKE ? OR lower(best_for) LIKE ? OR lower(description) LIKE ?
-               OR lower(vendor) LIKE ?
-            ORDER BY times_used DESC, name LIMIT ?
-        """, (q, q, q, q, q, q, q, limit)).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def it_kb_get(name_or_id: str) -> dict | None:
-    with db() as conn:
-        _ensure_it_kb_tables(conn)
-        row = conn.execute("SELECT * FROM it_knowledge WHERE id = ? OR lower(name) = ?",
-                           (name_or_id, (name_or_id or "").strip().lower())).fetchone()
-    return row_to_dict(row) if row else None
-
-
-def it_kb_upsert(data: dict) -> dict:
-    import uuid as _u
-    name = data["name"].strip()
-    with db() as conn:
-        _ensure_it_kb_tables(conn)
-        existing = conn.execute("SELECT id FROM it_knowledge WHERE lower(name) = ?",
-                                (name.lower(),)).fetchone()
-        fields = ("category", "vendor", "description", "use_cases", "pros", "cons",
-                  "pricing_model", "typical_price", "platforms", "alternatives",
-                  "official_url", "tags", "rating", "best_for", "source")
-        if existing:
-            eid = existing[0]
-            cols, vals = [], []
-            for f in fields:
-                if f in data and data[f] not in (None, ""):
-                    cols.append(f"{f} = ?"); vals.append(data[f])
-            if cols:
-                vals.append(eid)
-                conn.execute(f"UPDATE it_knowledge SET {', '.join(cols)}, updated_at = datetime('now') WHERE id = ?", vals)
-            kid = eid
-        else:
-            kid = str(_u.uuid4())
-            conn.execute("""
-                INSERT INTO it_knowledge (id, name, category, vendor, description, use_cases,
-                    pros, cons, pricing_model, typical_price, platforms, alternatives,
-                    official_url, tags, rating, best_for, source)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (kid, name, data.get("category", "Autre"), data.get("vendor", ""),
-                  data.get("description", ""), data.get("use_cases", ""), data.get("pros", ""),
-                  data.get("cons", ""), data.get("pricing_model", "unknown"),
-                  data.get("typical_price", ""), data.get("platforms", ""),
-                  data.get("alternatives", ""), data.get("official_url", ""),
-                  data.get("tags", ""), float(data.get("rating", 0) or 0),
-                  data.get("best_for", ""), data.get("source", "learned")))
-    return it_kb_get(kid)
-
-
-def it_kb_increment_usage(name_or_id: str):
-    with db() as conn:
-        _ensure_it_kb_tables(conn)
-        conn.execute("UPDATE it_knowledge SET times_used = times_used + 1 WHERE id = ? OR lower(name) = ?",
-                     (name_or_id, (name_or_id or "").strip().lower()))
-
-
 def _init_tables():
     with db() as conn:
         execution_repository.ensure_schema(conn)
@@ -476,12 +218,13 @@ def _init_tables():
         operations_repository.ensure_schema(conn)
         command_safety_repository.ensure_schema(conn)
         client_health_repository.ensure_schema(conn)
-        _ensure_it_kb_tables(conn)
+        it_knowledge_repository.ensure_schema(conn)
         flashcard_repository.ensure_schema(conn)
         event_repository.ensure_schema(conn)
         # La baseline est enregistree seulement apres la reussite de tous les
         # initialiseurs historiques. Les prochains changements de schema seront
         # portes par db_migrations.py sans retirer les garde-fous existants.
         apply_migrations(conn)
+
 
 _init_tables()

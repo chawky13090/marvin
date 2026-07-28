@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.417.0)
+## 9. État actuel (v2.418.0)
+
+**v2.418 (persistance des connaissances IT)** : le schéma, le catalogue initial et les six
+façades de la base de connaissances IT rejoignent un repository injectable. Le catalogue
+historique de 34 produits reste identique. Recherches et listes sont bornées et ordonnées de
+façon stable; textes, catégories, tarifs, notes et URL officielles sont validés avant écriture.
+Les mises à jour relisent la ligne sous la même transaction et collisions comme erreurs de
+validation n'altèrent pas SQLite.
 
 **v2.417 (persistance des fiches de révision)** : les cinq façades historiques rejoignent
 `repositories/flashcards.py` derrière un repository injectable. La sélection remplace
