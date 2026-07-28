@@ -115,6 +115,22 @@ def main() -> int:
     args = audit.call_args.args
     assert args[0] == "_long_tool_chain"
     assert args[1]["count"] == 9 and len(args[1]["query"]) == 200
+    with patch.object(observability.bug_log, "log_bug") as log_bug:
+        observability.record_empty_model_response(
+            conversation_id="conversation-1",
+            model="cloud/model",
+            required_tool_count=1,
+            executed_tool_count=1,
+        )
+    log_bug.assert_called_once()
+    call = log_bug.call_args
+    assert call.args[0] == "empty_model_response"
+    assert call.kwargs["context"] == {
+        "model": "cloud/model",
+        "required_tool_count": 1,
+        "executed_tool_count": 1,
+    }
+    assert "query" not in str(call.kwargs)
 
     import agent
     assert callable(agent._record_tool_observation)

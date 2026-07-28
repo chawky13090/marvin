@@ -21,6 +21,7 @@ class RunnerState:
     blocking_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
     long_chain_reported: bool = False
     nudged: bool = False
+    empty_response_nudged: bool = False
 
     @property
     def tool_count(self) -> int:

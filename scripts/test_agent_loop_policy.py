@@ -14,8 +14,11 @@ sys.path.insert(0, str(ROOT / "backend"))
 from agent_budget_completion import synthesize_budget_answer
 import agent
 from agent_loop_policy import (
+    build_empty_response_nudge,
     build_skill_nudge,
     render_blocking_outcomes,
+    should_suppress_model_text,
+    skill_requires_nudge,
     sensitive_tool_model_switch,
 )
 
@@ -51,6 +54,40 @@ async def main() -> int:
     )
     assert nudge[0]["role"] == "assistant"
     assert "email_read" in nudge[-1]["content"]
+    assert skill_requires_nudge(
+        skill={"tools": ["email_read"]},
+        tools_payload=[{"function": {"name": "email_read"}}],
+        executed_tool_names=set(),
+    ) is True
+    assert skill_requires_nudge(
+        skill={"tools": ["email_read"]},
+        tools_payload=[{"function": {"name": "email_read"}}],
+        executed_tool_names={"email_read"},
+    ) is False
+    assert skill_requires_nudge(
+        skill={"tools": ["unknown"]},
+        tools_payload=[{"function": {"name": "email_read"}}],
+        executed_tool_names=set(),
+    ) is False
+    empty_nudge = build_empty_response_nudge(required_tool_names={"web_research"})
+    assert empty_nudge["role"] == "user"
+    assert "web_research" in empty_nudge["content"]
+    assert "ne reste pas silencieux" in empty_nudge["content"]
+    assert should_suppress_model_text(
+        has_blocking_outcomes=False,
+        required_tool_names={"web_research"},
+        executed_tool_names=set(),
+    ) is True
+    assert should_suppress_model_text(
+        has_blocking_outcomes=False,
+        required_tool_names={"web_research"},
+        executed_tool_names={"web_research"},
+    ) is False
+    assert should_suppress_model_text(
+        has_blocking_outcomes=True,
+        required_tool_names=set(),
+        executed_tool_names=set(),
+    ) is True
     refusal = render_blocking_outcomes({
         "code_forge": {"message": "tests échoués", "failed_steps": ["pytest"]}
     })

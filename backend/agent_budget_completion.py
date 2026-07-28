@@ -19,10 +19,16 @@ async def synthesize_budget_answer(
 ) -> AsyncIterator[dict[str, str]]:
     """Effectue un dernier appel sans outil et garantit une réponse utilisateur."""
     messages = list(ollama_messages)
+    empty_response = stop_reason == "empty_model_response"
     messages.append({
         "role": "user",
         "content": (
-            f"⛔ Tu as atteint le budget ({stop_reason}) pour ce tour. Tu ne peux "
+            (
+                "⛔ Le modèle n'a produit aucun contenu exploitable après une relance."
+                if empty_response
+                else f"⛔ Tu as atteint le budget ({stop_reason}) pour ce tour."
+            )
+            + " Tu ne peux "
             "PLUS utiliser aucun outil. Réponds MAINTENANT, en français, avec une "
             "synthèse aussi complète que possible de ce que tu as déjà trouvé pour "
             "répondre à la demande initiale de l'utilisateur. Si des informations "
@@ -48,9 +54,15 @@ async def synthesize_budget_answer(
 
     if not content.strip():
         content = (
-            "Je n'ai pas réussi à conclure cette recherche dans le nombre d'étapes "
-            "autorisées. Les résultats déjà produits restent disponibles ; demande-moi "
-            "de continuer pour reprendre sans annoncer un succès non vérifié."
+            "Je n'ai reçu aucun contenu exploitable du modèle après une relance. "
+            "Je n'annonce donc pas de résultat non vérifié. Relance cette demande ; "
+            "l'incident est signalé comme une réponse modèle vide."
+            if empty_response
+            else (
+                "Je n'ai pas réussi à conclure cette recherche dans le nombre d'étapes "
+                "autorisées. Les résultats déjà produits restent disponibles ; demande-moi "
+                "de continuer pour reprendre sans annoncer un succès non vérifié."
+            )
         )
         yield {"type": "text", "text": content}
     yield {"type": "_budget_answer", "content": content}

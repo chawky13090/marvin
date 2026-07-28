@@ -38,6 +38,25 @@ def main() -> None:
     check(web["resolved"]["output"] == "report", "Livrable rapport")
     check(web["execution_budget"]["evidence_required"] is True, "Preuves requises exposées")
 
+    natural_web = cortex.compile_contract(
+        "quel est l ia derrière Siri de Apple cherche sur le web"
+    )
+    check(
+        natural_web["forced_tools"] == ["web_research"],
+        "Une demande Web naturelle explicite doit exécuter la recherche",
+    )
+    natural_primary = cortex.compile_contract(
+        "Compare cela avec les sources officielles"
+    )
+    check(
+        natural_primary["forced_tools"] == ["web_deep_research"],
+        "Une demande naturelle de sources primaires doit exécuter la recherche",
+    )
+    local_file = cortex.compile_contract("Cherche ce fichier dans mon dossier")
+    check(local_file["forced_tools"] == [], "Une recherche locale ne doit pas ouvrir le Web")
+    latest_file = cortex.compile_contract("Quel est le dernier fichier modifié ?")
+    check(latest_file["forced_tools"] == [], "Le mot dernier seul ne doit pas ouvrir le Web")
+
     council = cortex.compile_contract("Décide entre A et B", {"review": "council5"})
     check(council["forced_tools"] == ["ai_model_council"], "Council explicite obligatoire")
     swarm = cortex.compile_contract("Étudie le marché", {"review": "swarm"})

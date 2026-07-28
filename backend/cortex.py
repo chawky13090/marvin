@@ -36,6 +36,25 @@ _EFFORT_BUDGETS = {
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _RECIPES_PATH = _DATA_DIR / "cortex_recipes.json"
 _LOCK = threading.RLock()
+_PRIMARY_EVIDENCE_RE = re.compile(
+    r"\b(?:sources?\s+(?:officielles?|primaires?)|documentation\s+officielle)\b"
+)
+_EXPLICIT_WEB_RE = re.compile(
+    r"(?:"
+    r"\b(?:cherche|recherche|v[ée]rifie|consulte)\w*\b.{0,60}"
+    r"\b(?:sur\s+)?(?:le\s+)?(?:web|internet|en\s+ligne)\b"
+    r"|"
+    r"\b(?:sur\s+le\s+web|sur\s+internet)\b"
+    r")"
+)
+_FRESHNESS_EVIDENCE_RE = re.compile(
+    r"\b(?:"
+    r"actualit[ée]s?|nouveaut[ée]s?|aujourd['’]hui|en\s+ce\s+moment|"
+    r"mises?\s+[àa]\s+jour|"
+    r"derni[eè]res?\s+(?:nouvelles|versions?|sorties?|annonces?)|"
+    r"(?:prix|tarifs?)\s+actuels?"
+    r")\b"
+)
 
 
 def _clean_text(value: Any, limit: int = 120) -> str:
@@ -63,8 +82,9 @@ def _explicit_axes(contract: dict) -> list[str]:
 def compile_contract(query: str, raw: dict | None = None) -> dict:
     """Compile les choix explicites et infère seulement une prévisualisation sûre.
 
-    Les inférences Auto n'imposent aucune action sortante. Elles servent au prompt,
-    à la provenance et aux seuils de vérification.
+    Une demande textuelle explicite de recherche ou d'information fraîche devient
+    une exigence de preuve en lecture seule. Les autres inférences Auto n'imposent
+    aucune action sortante.
     """
     requested = normalize_contract(raw)
     text = _clean_text(query, 8000).lower()
@@ -76,10 +96,14 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
             resolved["effort"] = "deep"; reasons.append("profondeur demandée")
         else:
             resolved["effort"] = "standard"
+    natural_primary_request = bool(_PRIMARY_EVIDENCE_RE.search(text))
+    natural_web_request = bool(
+        _EXPLICIT_WEB_RE.search(text) or _FRESHNESS_EVIDENCE_RE.search(text)
+    )
     if resolved["evidence"] == "auto":
-        if re.search(r"\b(sources? officielles?|sources? primaires?|documentation officielle)\b", text):
+        if natural_primary_request:
             resolved["evidence"] = "primary"; reasons.append("sources primaires demandées")
-        elif re.search(r"\b(cherche|recherche|sur le web|internet|actuel|derni[eè]r)\w*", text):
+        elif natural_web_request:
             resolved["evidence"] = "web"; reasons.append("information actuelle demandée")
         else:
             resolved["evidence"] = "memory"
@@ -144,7 +168,8 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
             resolved["review"] = "team"
             forced_tools.append("ai_adaptive_team")
             reasons.append("profondeur multi-experts explicitement demandée")
-    if "evidence" in explicit:
+    evidence_is_required = "evidence" in explicit or natural_primary_request or natural_web_request
+    if evidence_is_required:
         if resolved["evidence"] == "web": forced_tools.append("web_research")
         elif resolved["evidence"] == "primary": forced_tools.append("web_deep_research")
     if ("effort" in explicit and resolved["effort"] == "mission") or (

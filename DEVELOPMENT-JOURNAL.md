@@ -9391,3 +9391,77 @@ réussissent.
 
 Rollback après commit : `git revert <commit-v2.415>`. Aucun schéma persistant n'est changé;
 après réversion, redémarrer puis vérifier règles, historique d'analyse et décisions existantes.
+
+## 2026-07-28 — v2.416.0 — Recherche Web explicite et réponses non vides
+
+### Contexte, preuves et cause racine
+
+Les deux derniers tours de la conversation
+`6630bb71-b65e-416e-b914-3d11f8716269` demandaient explicitement une recherche Web. Cortex
+résolvait correctement `evidence=web`, mais n'ajoutait `web_research` aux outils obligatoires
+que lorsque l'axe avait été sélectionné dans l'interface. Aucun outil, texte ou reçu n'était
+donc produit, puis le Runner persistait une réponse vide avec
+`stop_reason=criteria_satisfied`.
+
+Deux approches ont été comparées :
+
+- laisser le LLM décider seul à partir du prompt Cortex, avec risque de nouvelle omission ;
+- transformer uniquement une demande Web textuellement explicite ou une information
+  réellement fraîche en contrainte déterministe de lecture seule.
+
+La seconde est retenue. Elle correspond au mode `required` documenté par OpenAI pour le
+choix d'outil et au cycle officiel Gemini « appel structuré, exécution applicative, résultat
+réinjecté, réponse utilisateur ». Références :
+
+- https://platform.openai.com/docs/api-reference/chat/create
+- https://ai.google.dev/gemini-api/docs/function-calling
+- https://docs.anthropic.com/pt/api/handling-stop-reasons
+
+### Implémentation, sécurité et journalisation
+
+- `cortex.py` distingue maintenant la recherche Web explicite, les sources primaires et les
+  besoins de fraîcheur des recherches de fichiers locales ;
+- `web_research` ou `web_deep_research` devient obligatoire pour ces demandes naturelles,
+  sans élargir les actions modificatrices ni les autorisations ;
+- un brouillon est masqué tant qu'un outil de preuve obligatoire n'a pas été exécuté ;
+- une compétence n'est plus relancée lorsqu'un de ses propres outils a déjà agi, ce qui
+  supprime les réponses répétées et préserve le bon texte final ;
+- une sortie vide reçoit une unique relance bornée, puis passe par une synthèse sans outil au
+  lieu d'être enregistrée comme un succès vide ;
+- `bug_log` enregistre le type d'incident, le modèle et des compteurs uniquement. Le prompt,
+  le résultat Web, les secrets et les données personnelles ne sont pas journalisés. La
+  rotation et la rétention de 30 jours restent celles de la politique existante ;
+- aucune donnée ni schéma persistant n'est migré. Les conversations artificielles créées
+  pour la validation ont été supprimées.
+
+### Validation et rollback
+
+Régressions déterministes ajoutées pour la demande exacte, les sources officielles, la
+recherche locale, « dernier fichier », la relance vide, le masquage avant preuve, la
+relance de compétence et la journalisation expurgée.
+
+Validation réelle observée avant la gate globale :
+
+- la demande exacte déclenche un seul `web_research`, terminé avec `success=true` ;
+- la réponse restaurée contient 1 321 caractères, deux liens cliquables et une couverture de
+  preuve `cited` ;
+- l'interface affiche l'action terminée, quatre sources et la preuve durable, sans erreur ni
+  avertissement console ;
+- le modèle Cloud étant resté vide après l'outil, le nouveau chemin
+  `empty_model_response` a effectivement produit et persisté la synthèse au lieu d'un
+  silence.
+
+La gate statique réussit à **182/182 étapes** : 344 outils, harness 344/344, 354 routes,
+40 pages, compilation Python complète et lint frontend sans erreur (37 avertissements
+préexistants). Son build intégré s'est arrêté conformément au verrou de protection parce que
+Turbopack était actif. Le frontend seul a été arrêté, le build Next.js 16.2.6/Turbopack a
+ensuite compilé les 40 pages avec succès, puis `next dev` a été relancé sur le port 3000.
+Cela valide les **183/183 contrôles** sans exécuter simultanément build et serveur de
+développement. Le backend a été redémarré en 2.416.0 avec Ollama et 15 workers. Le smoke API
+réussit à **28/28 contrats**, les **40/40 pages**, cinq conversations représentatives et la
+sérialisation vocale réussissent.
+
+Rollback après commit : `git revert <commit-v2.416>`, puis redémarrer uniquement le backend.
+Aucune restauration de données n'est nécessaire. Vérifier ensuite qu'une conversation
+historique reste lisible. La réversion rétablit volontairement l'ancien routage et doit donc
+être réservée à un incident plus grave que le défaut corrigé.

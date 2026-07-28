@@ -47,6 +47,7 @@ from agent_planning import compile_turn_plan as _compile_turn_plan
 from agent_model_config import resolve_model_config as _resolve_model_config
 from agent_runner import RunnerState as _RunnerState
 from agent_observability import (
+    record_empty_model_response as _record_empty_model_response,
     record_long_chain as _record_long_chain,
     record_tool_observation as _record_tool_observation,
 )
@@ -88,8 +89,11 @@ from agent_model_step import (
 from agent_tool_batch import execute_tool_batch as _execute_tool_batch
 from agent_turn_completion import complete_turn as _complete_turn
 from agent_loop_policy import (
+    build_empty_response_nudge as _build_empty_response_nudge,
     build_skill_nudge as _build_skill_nudge,
     render_blocking_outcomes as _render_blocking_outcomes,
+    should_suppress_model_text as _should_suppress_model_text,
+    skill_requires_nudge as _skill_requires_nudge,
     sensitive_tool_model_switch as _sensitive_tool_model_switch,
 )
 from agent_budget_completion import synthesize_budget_answer as _synthesize_budget_answer
@@ -378,7 +382,11 @@ async def run_agent(
                 request=_request,
                 stream_chat=_stream_ollama_chat,
                 result=_model_step,
-                suppress_text=bool(_blocking_outcomes),
+                suppress_text=_should_suppress_model_text(
+                    has_blocking_outcomes=bool(_blocking_outcomes),
+                    required_tool_names=_required_tool_names,
+                    executed_tool_names=_executed_tool_names,
+                ),
             ):
                 yield _sse(_event)
         except Exception as exc:
@@ -414,9 +422,6 @@ async def run_agent(
             inject_required_tool_calls=_inject_required_tool_calls,
         )
         tool_calls_found = _prepared_model_step.tool_calls
-        if _prepared_model_step.required_injected and full_content.strip():
-            yield _sse({"type": "text", "text": "\n\n"})
-
         # v2.119 — protection mid-boucle : un outil sensible vient d'être demandé alors
         # qu'on est sur un modèle CLOUD → bascule en local AVANT que son résultat (contenu
         # d'email, sortie SSH…) ne parte vers le cloud au tour suivant. Le modèle cloud a pu
@@ -470,7 +475,36 @@ async def run_agent(
             ):
                 yield _sse(_event)
 
-        elif (_skill and _skill.get("tools") and not _runner_state.nudged and use_tools and tools_payload
+        elif (
+            not full_content.strip()
+            and not _runner_state.empty_response_nudged
+            and step < _max_tool_steps - 1
+        ):
+            # Une réponse vide n'est jamais un succès. On accorde une seule relance
+            # déterministe, puis le chemin terminal sans outils produira une réponse
+            # explicite si le modèle reste silencieux.
+            _runner_state.empty_response_nudged = True
+            _remaining_required = _required_tool_names - _executed_tool_names
+            ollama_msgs.append(_build_empty_response_nudge(
+                required_tool_names=_remaining_required,
+            ))
+            continue
+
+        elif not full_content.strip():
+            _runner_state.stop_reason = "empty_model_response"
+            _record_empty_model_response(
+                conversation_id=conversation_id,
+                model=active_model,
+                required_tool_count=len(_required_tool_names),
+                executed_tool_count=len(_executed_tool_names),
+            )
+            break
+
+        elif (_skill_requires_nudge(
+                  skill=_skill,
+                  tools_payload=tools_payload,
+                  executed_tool_names=_executed_tool_names,
+              ) and not _runner_state.nudged and use_tools and tools_payload
               and step < _max_tool_steps - 1):
             # ── Compétence active mais le modèle a EXPLIQUÉ au lieu d'AGIR ─────
             # (aucun appel natif, rien à récupérer dans le texte). On le corrige

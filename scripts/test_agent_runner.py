@@ -16,6 +16,7 @@ from agent_runner import RunnerState
 
 def main() -> int:
     state = RunnerState(started_at=100.0)
+    assert state.empty_response_nudged is False
     assert state.begin_step(0, 60, now=200.0) is True
     assert state.steps_used == 1
     assert state.begin_step(1, 60, now=159.0) is True

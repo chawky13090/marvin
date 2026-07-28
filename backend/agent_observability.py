@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import audit
+import bug_log
 import database as db
 import mission_os
 import tool_router
@@ -153,3 +154,23 @@ def record_long_chain(user_query: str, tool_count: int) -> None:
         )
     except Exception:
         pass
+
+
+def record_empty_model_response(
+    *,
+    conversation_id: str | None,
+    model: str,
+    required_tool_count: int,
+    executed_tool_count: int,
+) -> None:
+    """Trace l'absence de réponse sans conserver la demande ni les résultats."""
+    bug_log.log_bug(
+        "empty_model_response",
+        "Le modèle n'a produit ni texte ni appel d'outil après une relance bornée.",
+        context={
+            "model": str(model)[:200],
+            "required_tool_count": max(0, int(required_tool_count)),
+            "executed_tool_count": max(0, int(executed_tool_count)),
+        },
+        conversation_id=conversation_id,
+    )

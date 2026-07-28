@@ -77,6 +77,56 @@ def build_skill_nudge(
     return messages
 
 
+def skill_requires_nudge(
+    *,
+    skill: dict[str, Any] | None,
+    tools_payload: list[dict[str, Any]],
+    executed_tool_names: set[str],
+) -> bool:
+    """Relance une compétence uniquement si aucun de ses outils n'a encore agi."""
+    available = {
+        spec.get("function", {}).get("name")
+        for spec in tools_payload
+        if spec.get("function", {}).get("name")
+    }
+    requested = {
+        name for name in (skill or {}).get("tools", [])
+        if name in available
+    }
+    return bool(requested) and not bool(requested & executed_tool_names)
+
+
+def build_empty_response_nudge(*, required_tool_names: set[str]) -> dict[str, str]:
+    """Construit l'unique relance autorisée après une sortie modèle vide."""
+    required = ", ".join(sorted(required_tool_names))
+    requirement = (
+        f" Il reste au moins un outil obligatoire à exécuter : {required}."
+        if required
+        else ""
+    )
+    return {
+        "role": "user",
+        "content": (
+            "Ta réponse précédente ne contient ni texte utile ni appel d'outil."
+            f"{requirement} Réponds maintenant à la demande initiale : émets un appel "
+            "d'outil natif si une preuve est requise, sinon livre directement une "
+            "réponse utile. Ne décris pas une action future et ne reste pas silencieux."
+        ),
+    }
+
+
+def should_suppress_model_text(
+    *,
+    has_blocking_outcomes: bool,
+    required_tool_names: set[str],
+    executed_tool_names: set[str],
+) -> bool:
+    """Masque un brouillon tant qu'une preuve ou un gate obligatoire manque."""
+    return has_blocking_outcomes or bool(
+        required_tool_names - executed_tool_names
+    )
+
+
 def render_blocking_outcomes(outcomes: dict[str, dict[str, Any]]) -> str | None:
     """Produit un refus explicite lorsqu'un reçu Forge reste négatif."""
     if not outcomes:

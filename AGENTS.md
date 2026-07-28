@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.415.0)
+## 9. État actuel (v2.416.0)
+
+**v2.416 (recherche Web et fermeture fiable du Runner)** : une demande naturelle explicite
+comme « cherche sur le Web », une actualité ou une source officielle matérialise désormais
+`web_research` ou `web_deep_research` comme outil obligatoire. Les recherches locales et le
+mot « dernier » isolé ne déclenchent pas Internet. Le Runner masque les brouillons tant que
+la preuve obligatoire manque, ne relance plus une compétence dont un outil a déjà réussi et
+refuse de clôturer une sortie vide comme un succès. Après une relance bornée, une synthèse
+sans outil garantit une réponse utilisateur; l'incident est journalisé sans prompt ni
+résultat brut.
 
 **v2.415 (sécurité des commandes persistante)** : règles, analyses et approbations rejoignent
 `repositories/command_safety.py`; les vingt-cinq règles historiques sont isolées dans
