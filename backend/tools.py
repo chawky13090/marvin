@@ -89,6 +89,7 @@ from tool_domains import email_productivity as email_productivity_domain
 from tool_domains import email_monitoring as email_monitoring_domain
 from tool_domains import email_automation as email_automation_domain
 from tool_domains import telegram as telegram_domain
+from tool_domains import webapp as webapp_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -415,31 +416,10 @@ def _fmt_bytes(n):
 # étendu ici aux .html) : le fichier est juste un fichier de plus, ouvert via os.startfile()
 # (déjà le comportement de pc_open_file — un .html ouvre le navigateur par défaut, zéro code
 # supplémentaire nécessaire côté ouverture).
-async def execute_webapp_create(args: dict) -> dict:
-    """Génère une mini-application web autonome (HTML/CSS/JS auto-contenu, un seul fichier)
-    et l'enregistre localement — pour un dashboard, un prototype, un outil interactif, une
-    page de suivi de projet... Ouvrable directement dans le navigateur (clic sur la carte
-    dans le chat). Le contenu doit être self-contained : CSS/JS inline, pas de dépendance
-    CDN externe (fonctionne même hors-ligne, cohérent avec un usage local)."""
-    content = (args.get("content") or "").strip()
-    title = (args.get("title") or "webapp").strip()
-    if not content:
-        return {"error": "Paramètre 'content' requis (le code HTML complet de la page)."}
-    if "<html" not in content.lower():
-        content = (
-            f'<!DOCTYPE html>\n<html lang="fr"><head><meta charset="utf-8">'
-            f'<title>{title}</title></head><body>\n{content}\n</body></html>'
-        )
-    import re as _re, uuid as _uuid
-    safe_name = _re.sub(r"[^a-zA-Z0-9_-]+", "_", title)[:60].strip("_") or "webapp"
-    out_dir = os.path.abspath(os.path.join(
-        os.path.dirname(__file__), "..", "data", "webapps", f"{safe_name}_{_uuid.uuid4().hex[:8]}"))
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "index.html")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return {"success": True, "path": path,
-            "message": f"Mini-appli « {title} » créée — clique pour l'ouvrir dans ton navigateur."}
+webapp_domain.configure(
+    output_root=Path(__file__).resolve().parent.parent / "data" / "webapps"
+)
+execute_webapp_create = webapp_domain.create
 
 
 

@@ -7915,3 +7915,36 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Aucun message Telegram réel n'a été envoyé et aucune configuration n'a été modifiée.
 - Rollback : réversion atomique du commit v2.388 après contrôle du patch inverse; redémarrer
   le backend puis repasser le test ciblé, `/api/health`, le gate rapide et le smoke test.
+
+## 2026-07-28 — v2.389.0 — mini-applications Web locales et atomiques
+
+### Constat et comparaison
+
+- `webapp_create` écrivait directement un HTML de taille non bornée depuis la boucle asyncio.
+- La page générée s'ouvrait dans le navigateur sans politique de contenu; un script produit
+  par le modèle pouvait donc contacter une destination réseau malgré le contrat « autonome ».
+- Deux options ont été comparées : supprimer JavaScript/sanitariser tout le document, ou
+  conserver l'interactivité locale sous une CSP offline. La seconde préserve la fonctionnalité
+  utile tout en bloquant réseau, formulaires, frames, objets et URL de base.
+
+### Solution
+
+- Nouveau `tool_domains/webapp.py`, racine et générateur d'identifiant injectables.
+- Limite UTF-8 de 2 Mio, caractère nul refusé, titre échappé et segments de chemin normalisés.
+- Une CSP fournie par le contenu est remplacée, pas simplement acceptée; scripts/styles inline
+  et ressources `data:`/`blob:` restent disponibles, `connect-src` reste à `none`.
+- Écriture temporaire, `fsync`, remplacement atomique, nettoyage sur erreur et travail disque
+  hors de la boucle asyncio.
+- Taille, SHA-256 et politique réseau sont retournés; identité publique inchangée.
+
+### Validation et rollback
+
+- Test réel en dossier temporaire : enveloppe HTML, titre hostile, CSP permissive remplacée,
+  limite, empreinte, chemin, absence de résidu, collision et façades.
+- Compilation ciblée, architecture et gate rapide réussis sur 160 étapes. Backend réel
+  redémarré en 2.389.0 avec Ollama, 344 outils et 15 workers; `webapp_create` est unique dans
+  le catalogue HTTP et le smoke test passe sur 28/28 contrats avec Turbopack.
+- Aucun navigateur ni fichier utilisateur n'a été touché; les écritures réelles du test
+  sont restées dans un répertoire temporaire supprimé à la fin.
+- Rollback : réversion atomique du commit v2.389 après contrôle du patch inverse; redémarrer
+  le backend puis repasser test ciblé, `/api/health`, gate rapide et smoke test.

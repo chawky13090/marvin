@@ -183,7 +183,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.388.0)
+## 9. État actuel (v2.389.0)
+
+**v2.389 (mini-applications Web)** : `webapp_create` rejoint
+`tool_domains/webapp.py`. Le HTML reste autonome avec scripts et styles inline, mais toute
+CSP absente ou fournie par le contenu est remplacée par une politique contrôlée interdisant
+réseau, formulaires, objets et frames. Le contenu est limité à 2 Mio, titre et dossier sont
+bornés, l'écriture devient atomique hors de la boucle asyncio et le résultat fournit taille,
+SHA-256 et politique réseau. Le test manipule de vrais fichiers, couvre contenu hostile,
+collision, limite, absence de temporaire et identités de façade.
 
 **v2.388 (notifications Telegram)** : configuration, validation des identifiants, transport
 HTTP et envoi rejoignent `tool_domains/telegram.py`. L'outil sortant conserve la confirmation
