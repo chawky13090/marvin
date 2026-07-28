@@ -176,6 +176,9 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 - Journal partagé Codex/Claude : après toute évolution importante, ajouter une entrée datée dans
   `DEVELOPMENT-JOURNAL.md` avec la demande, les constats, les décisions, les fichiers modifiés et
   les validations réelles. Ne jamais y inscrire de secret ni de contenu d'e-mail confidentiel.
+- Journalisation obligatoire : toute évolution doit analyser les événements, la corrélation,
+  les données interdites, la rotation, la rétention, les pannes et les tests conformément à
+  `MARVIN-LOGGING-POLICY.md`. Une tranche sans impact de logs doit le justifier explicitement.
 - Rollback obligatoire : aucune tranche ne peut être déclarée terminée sans état antérieur
   identifiable, procédure de retour exacte et réversibilité vérifiée. Une réversion Git suffit
   uniquement si la tranche ne modifie ni schéma ni donnée persistante ; sinon fournir et tester
@@ -183,7 +186,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.391.0)
+## 9. État actuel (v2.392.0)
+
+**v2.392 (journalisation structurée)** : `structured_logging.py` fournit un schéma JSONL
+UTC corrélable, une expurgation récursive, une rotation par taille et une purge combinant
+âge, nombre d'archives et budget disque. Audit et bugs conservent leurs API historiques,
+avec 90 et 30 jours de rétention par défaut. `MARVIN-LOGGING-POLICY.md` rend l'analyse et
+les tests de logs obligatoires dans chaque future tranche; le gate d'architecture l'impose.
 
 **v2.391 (runtime de génération partagé)** : le point d'entrée `_ollama_generate`, consommé
 par plus de treize outils et services, rejoint `generation_runtime.py`. Résolution du modèle,

@@ -131,8 +131,15 @@ async def get_audit(limit: int = 100, source: str = ""):
 
 
 @router.post("/api/audit/clear")
-async def clear_audit():
+async def clear_audit(body: dict = Body(default={})):
     import audit
 
+    if body.get("confirmed") is not True:
+        return {
+            "success": False,
+            "requiresConfirmation": True,
+            "message": "Confirmer l'effacement du journal d'audit et de ses archives.",
+        }
     audit.clear()
+    audit.log_action("audit_clear", {}, {"success": True}, source="ui")
     return {"success": True}

@@ -31,6 +31,9 @@ REQUIRED_REFERENCES = {
     "adk.dev/sessions",
     "genai.owasp.org/initiatives/agentic-security-initiative",
     "opentelemetry.io/docs/specs/semconv/gen-ai",
+    "opentelemetry.io/docs/specs/otel/logs/data-model",
+    "cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet",
+    "csrc.nist.gov/pubs/sp/800/92/r1/ipd",
     "nist.gov/itl/ai-risk-management-framework",
     "learn.microsoft.com/windows/apps/package-and-deploy",
 }
@@ -80,6 +83,15 @@ def run() -> dict[str, int]:
         raise ContractError("La comparaison de deux approches doit rester obligatoire.")
     if "amélioration proactive" not in text.lower():
         raise ContractError("L'amélioration proactive doit rester obligatoire par tranche.")
+    for requirement in (
+        "impact de journalisation obligatoire",
+        "rotation",
+        "rétention",
+        "test de non-divulgation",
+        "MARVIN-LOGGING-POLICY.md",
+    ):
+        if requirement not in text:
+            raise ContractError(f"Exigence de journalisation absente : {requirement}")
     if "git apply --cached --check --reverse" not in text:
         raise ContractError("Le contrôle de réversibilité du patch doit rester documenté.")
     if "`git revert <commit>`" not in text:

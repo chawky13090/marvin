@@ -8028,3 +8028,43 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
   https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
 - Rollback : réversion atomique du commit v2.391 après contrôle du patch inverse; redémarrer
   le backend puis repasser tests ciblés, `/api/health`, gate rapide et smoke test.
+
+## 2026-07-28 — v2.392.0 — journalisation structurée obligatoire
+
+### Constat, comparaison et amélioration proactive
+
+- Les journaux d'audit et de bugs tronquaient seulement un fichier devenu volumineux. Ils
+  n'avaient ni rétention temporelle, ni archives rotatives, ni budget disque total, ni schéma
+  commun avec identifiant de corrélation.
+- Deux options ont été comparées : Windows Event Log comme stockage unique, ou JSONL structuré
+  portable avec exporteurs optionnels. La seconde est retenue pour préserver l'installation
+  utilisateur sans privilège et la portabilité Windows; Event Log et OTLP restent intégrables.
+- Les règles suivent OpenTelemetry Logs, OWASP Logging et le cycle de vie NIST SP 800-92.
+  L'amélioration proactive rend cette analyse obligatoire et contrôlée par le gate pour chaque
+  future évolution, même lorsqu'aucun nouvel événement n'est finalement nécessaire.
+
+### Solution
+
+- Nouveau `structured_logging.py` : timestamp UTC, schéma versionné, sévérité, événement,
+  composant, résultat et `trace_id`; expurgation récursive des secrets et empreinte
+  longueur/SHA-256 des prompts, réponses, e-mails, documents, scripts ou code.
+- Rotation avant dépassement de 10 Mio et purge simultanée par âge, nombre d'archives et
+  budget total. Audit : 90 jours; incidents : 30 jours; paramètres bornés par environnement.
+- `audit.py` et `bug_log.py` utilisent la fondation tout en conservant fonctions et champs
+  historiques. Une panne du journal reste best-effort et ne casse pas l'action métier.
+- L'endpoint d'effacement exige maintenant `confirmed=true`; après purge, il écrit une nouvelle
+  entrée attestant l'opération au lieu de laisser un journal silencieusement vide.
+- `MARVIN-LOGGING-POLICY.md` définit le contrat global; architecture, contrat frontier et
+  gate rapide exigent maintenant sa présence et son test.
+
+### Validation et rollback
+
+- Compilation et test ciblé : schéma, UTC, secrets et contenus absents, empreintes,
+  concurrence 100 écritures, rotation, expiration, plafond d'archives, panne d'écriture,
+  compatibilité des façades et effacement.
+- Contrat frontier et architecture validés avec 344 outils, 346 routes et 40 pages.
+- Références : https://opentelemetry.io/docs/specs/otel/logs/data-model/,
+  https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html et
+  https://csrc.nist.gov/pubs/sp/800/92/r1/ipd
+- Rollback : `git revert <commit>`; les lecteurs historiques ignorent les champs enrichis.
+  Redémarrer le backend puis repasser test ciblé, architecture, gate rapide, health et smoke.

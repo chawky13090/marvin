@@ -51,6 +51,12 @@ Windows installable plutôt que copiés mécaniquement :
   multi-étapes — https://genai.owasp.org/initiatives/agentic-security-initiative/
 - OpenTelemetry : conventions et corrélation portable des traces, métriques et journaux —
   https://opentelemetry.io/docs/specs/semconv/gen-ai/
+- OpenTelemetry Logs Data Model : schéma structuré, sévérité et contexte de trace —
+  https://opentelemetry.io/docs/specs/otel/logs/data-model/
+- OWASP Logging Cheat Sheet : événements, données interdites, validation et rétention —
+  https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- NIST SP 800-92 Rev. 1 : cycle de vie complet de la gestion des journaux —
+  https://csrc.nist.gov/pubs/sp/800/92/r1/ipd
 - NIST AI RMF : gouverner, cartographier, mesurer et gérer les risques IA —
   https://www.nist.gov/itl/ai-risk-management-framework
 - Microsoft : cycle de vie, sécurité, packaging et déploiement Windows —
@@ -120,13 +126,16 @@ Une tranche n'est livrable que si les éléments applicables sont présents :
 2. comparaison d'au moins deux approches pour toute décision significative ;
 3. choix motivé selon sécurité, résilience, maintenabilité, performance et dépendance ;
 4. amélioration proactive évaluée face aux meilleures pratiques et innovations pertinentes ;
-5. tests ciblés ajoutés avant ou avec la correction ;
-6. compilation, architecture et gate rapide ;
-7. validation HTTP ou UI réelle, sûre et non destructive ;
-8. smoke test et contrôle des journaux ;
-9. documentation dans `AGENTS.md` et `DEVELOPMENT-JOURNAL.md` ;
-10. `git diff --check`, staging exact et contrôle du patch inverse ;
-11. commit atomique, version alignée et commande de rollback documentée.
+5. impact de journalisation obligatoire : événements, corrélation, données interdites,
+   rotation, rétention, panne du journal et test de non-divulgation selon
+   `MARVIN-LOGGING-POLICY.md` ;
+6. tests ciblés ajoutés avant ou avec la correction ;
+7. compilation, architecture et gate rapide ;
+8. validation HTTP ou UI réelle, sûre et non destructive ;
+9. smoke test et contrôle des journaux ;
+10. documentation dans `AGENTS.md` et `DEVELOPMENT-JOURNAL.md` ;
+11. `git diff --check`, staging exact et contrôle du patch inverse ;
+12. commit atomique, version alignée et commande de rollback documentée.
 
 Les tests déterministes vérifient en priorité le résultat réel et les effets de bord. Les
 évaluations LLM complètent ces tests pour la qualité ouverte, sans remplacer les assertions

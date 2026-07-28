@@ -149,10 +149,35 @@ def run() -> dict[str, int | str]:
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8-sig")
     if f"Version {version}" not in readme or f"(v{version})" not in agents:
         raise CheckFailure("README.md ou AGENTS.md n'annonce pas la version publique courante.")
+    logging_policy_path = ROOT / "MARVIN-LOGGING-POLICY.md"
+    if not logging_policy_path.is_file():
+        raise CheckFailure("La politique obligatoire de journalisation est absente.")
+    logging_policy = logging_policy_path.read_text(encoding="utf-8-sig")
+    for marker in (
+        "OpenTelemetry Logs Data Model",
+        "OWASP Logging Cheat Sheet",
+        "NIST SP 800-92",
+        "Données interdites",
+        "Rotation, rétention et budget disque",
+        "test de non-divulgation",
+    ):
+        if marker not in logging_policy:
+            raise CheckFailure(f"Politique de journalisation incomplète : {marker}")
+    structured_source = (BACKEND / "structured_logging.py").read_text(encoding="utf-8-sig")
+    for marker in (
+        "StructuredJsonlStore",
+        "retention_days",
+        "max_total_bytes",
+        "trace_id",
+        "sanitize",
+    ):
+        if marker not in structured_source:
+            raise CheckFailure(f"Fondation de journalisation incomplète : {marker}")
 
     required_scripts = {
         "check:runtime",
         "check:generation-runtime",
+        "check:structured-logging",
         "check:architecture",
         "check:frontier-contract",
         "check:telegram",
