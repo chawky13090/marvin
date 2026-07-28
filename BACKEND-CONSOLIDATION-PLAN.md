@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.413.0
+Version auditée : 2.414.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -231,6 +231,10 @@ Interventions, documents, actifs et modèles techniques rejoignent
 `repositories/documentation.py` en v2.413.0. Les quatorze façades restent identiques;
 catalogue historique exact, séquence annuelle transactionnelle, concurrence, JSON dégradé,
 cascade et rollback sont testés sur SQLite réel.
+Scores, points et recommandations de santé client rejoignent
+`repositories/client_health.py` en v2.414.0. Les cinq façades restent identiques; agrégat
+atomique, scores finis et bornés, historique stable, limites et rollback sont testés sur
+SQLite réel.
 
 ### Phase D — Composition et dépendances
 

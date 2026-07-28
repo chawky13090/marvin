@@ -47,6 +47,14 @@ from repositories.conversations import (
     update_conversation_title,
     upgrade_conversation_title_silent,
 )
+from repositories.client_health import (
+    health_recommendations_list,
+    health_score_create,
+    health_score_get,
+    health_score_history,
+    health_score_latest,
+    repository as client_health_repository,
+)
 from repositories.cron_jobs import (
     create_cron_job,
     delete_cron_job,
@@ -462,129 +470,16 @@ def approval_decide(aid: str, status: str, approver: str = "", reason: str = "")
 # v2.30.0 — Operations Safety : Module 3 — Client Health Score
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _ensure_health_tables(conn):
-    """Tables pour le score de santé opérationnelle client."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS client_health_scores (
-            id TEXT PRIMARY KEY,
-            client_id TEXT NOT NULL,
-            backup_score REAL NOT NULL DEFAULT 0,
-            security_score REAL NOT NULL DEFAULT 0,
-            documentation_score REAL NOT NULL DEFAULT 0,
-            infrastructure_score REAL NOT NULL DEFAULT 0,
-            incident_score REAL NOT NULL DEFAULT 0,
-            global_score REAL NOT NULL DEFAULT 0,
-            risk_level TEXT NOT NULL DEFAULT 'medium'
-                CHECK(risk_level IN ('low','medium','high','critical')),
-            computed_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS client_health_items (
-            id TEXT PRIMARY KEY,
-            score_id TEXT NOT NULL,
-            client_id TEXT NOT NULL,
-            category TEXT NOT NULL,
-            label TEXT NOT NULL,
-            points REAL NOT NULL DEFAULT 0,
-            max_points REAL NOT NULL DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'ok',
-            detail TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS client_recommendations (
-            id TEXT PRIMARY KEY,
-            client_id TEXT NOT NULL,
-            score_id TEXT,
-            priority TEXT NOT NULL DEFAULT 'medium'
-                CHECK(priority IN ('low','medium','high','critical')),
-            category TEXT DEFAULT 'general',
-            title TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'open'
-                CHECK(status IN ('open','done','dismissed')),
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_health_client ON client_health_scores(client_id, computed_at DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_health_items_score ON client_health_items(score_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_reco_client ON client_recommendations(client_id, status)")
 
 
-def health_score_create(data: dict, items: list = None, recommendations: list = None) -> dict:
-    import uuid as _u
-    sid = str(_u.uuid4())
-    with db() as conn:
-        _ensure_health_tables(conn)
-        conn.execute("""
-            INSERT INTO client_health_scores
-            (id, client_id, backup_score, security_score, documentation_score,
-             infrastructure_score, incident_score, global_score, risk_level)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (sid, data["client_id"], data.get("backup_score", 0), data.get("security_score", 0),
-              data.get("documentation_score", 0), data.get("infrastructure_score", 0),
-              data.get("incident_score", 0), data.get("global_score", 0),
-              data.get("risk_level", "medium")))
-        for it in (items or []):
-            conn.execute("""
-                INSERT INTO client_health_items (id, score_id, client_id, category, label, points, max_points, status, detail)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (str(_u.uuid4()), sid, data["client_id"], it.get("category", "general"),
-                  it.get("label", ""), it.get("points", 0), it.get("max_points", 0),
-                  it.get("status", "ok"), it.get("detail", "")))
-        for rec in (recommendations or []):
-            conn.execute("""
-                INSERT INTO client_recommendations (id, client_id, score_id, priority, category, title, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (str(_u.uuid4()), data["client_id"], sid, rec.get("priority", "medium"),
-                  rec.get("category", "general"), rec.get("title", ""), rec.get("description", "")))
-    return health_score_get(sid)
 
 
-def health_score_get(sid: str) -> dict | None:
-    with db() as conn:
-        _ensure_health_tables(conn)
-        row = conn.execute("SELECT * FROM client_health_scores WHERE id = ?", (sid,)).fetchone()
-        if not row:
-            return None
-        d = row_to_dict(row)
-        items = conn.execute("SELECT * FROM client_health_items WHERE score_id = ?", (sid,)).fetchall()
-        recos = conn.execute("SELECT * FROM client_recommendations WHERE score_id = ?", (sid,)).fetchall()
-    d["items"] = [row_to_dict(r) for r in items]
-    d["recommendations"] = [row_to_dict(r) for r in recos]
-    return d
 
 
-def health_score_latest(client_id: str) -> dict | None:
-    with db() as conn:
-        _ensure_health_tables(conn)
-        row = conn.execute(
-            "SELECT id FROM client_health_scores WHERE client_id = ? ORDER BY computed_at DESC LIMIT 1",
-            (client_id,)).fetchone()
-    return health_score_get(row["id"]) if row else None
 
 
-def health_score_history(client_id: str, limit: int = 12) -> list[dict]:
-    with db() as conn:
-        _ensure_health_tables(conn)
-        rows = conn.execute(
-            "SELECT * FROM client_health_scores WHERE client_id = ? ORDER BY computed_at DESC LIMIT ?",
-            (client_id, limit)).fetchall()
-    return [row_to_dict(r) for r in rows]
 
 
-def health_recommendations_list(client_id: str, status: str | None = None) -> list[dict]:
-    with db() as conn:
-        _ensure_health_tables(conn)
-        sql = "SELECT * FROM client_recommendations WHERE client_id = ?"
-        params = [client_id]
-        if status:
-            sql += " AND status = ?"; params.append(status)
-        sql += " ORDER BY created_at DESC"
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_dict(r) for r in rows]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -779,7 +674,7 @@ def _init_tables():
         documentation_repository.ensure_schema(conn)
         operations_repository.ensure_schema(conn)
         _ensure_cmd_safety_tables(conn)
-        _ensure_health_tables(conn)
+        client_health_repository.ensure_schema(conn)
         _ensure_it_kb_tables(conn)
         event_repository.ensure_schema(conn)
         # La baseline est enregistree seulement apres la reussite de tous les

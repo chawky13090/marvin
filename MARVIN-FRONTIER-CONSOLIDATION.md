@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.413.0
+Version courante auditée : 2.414.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -330,7 +330,7 @@ jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases perti
 L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
 traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
 
-| Ordre | Phase | État au 2.413.0 | Livraison et condition de sortie |
+| Ordre | Phase | État au 2.414.0 | Livraison et condition de sortie |
 |---:|---|---|---|
 | 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
 | 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
@@ -401,7 +401,9 @@ contrôles opérationnels rejoignent un repository injectable qui garantit la co
 checklist, point, résultat et preuve sans tronquer les preuves métier. En v2.413.0, la
 documentation technique rejoint un repository injectable séparé de son catalogue statique :
 quatorze façades restent compatibles et la numérotation annuelle résiste aux collisions,
-rollbacks et créations concurrentes.
+rollbacks et créations concurrentes. En v2.414.0, la santé client rejoint un repository
+injectable : création du score, de ses points et recommandations dans une transaction unique,
+valeurs numériques bornées, lecture stable et rollback vérifié.
 
 ## 10. Preuves minimales par grande capacité
 

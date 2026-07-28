@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.413.0)
+## 9. État actuel (v2.414.0)
+
+**v2.414 (santé client persistante)** : scores, points de contrôle et recommandations
+rejoignent `repositories/client_health.py`. Les cinq façades restent identiques. La création
+et la relecture de l'agrégat sont atomiques; scores non finis ou hors de 0–100, points
+incohérents et client vide sont refusés. Historique borné, ordre stable, collision et rollback
+sont testés sur SQLite réel.
 
 **v2.413 (documentation technique)** : interventions, documents, actifs et modèles
 rejoignent `repositories/documentation.py`; le catalogue Markdown statique est isolé dans

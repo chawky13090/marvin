@@ -9283,3 +9283,55 @@ Rollback après commit : `git revert <commit-v2.413>`. La table additive `doc_se
 rester inutilisée après réversion sans altérer les données historiques; aucune table ni
 preuve métier existante n'est supprimée. Après réversion, redémarrer le backend puis vérifier
 les listes d'interventions, d'actifs, de documents et de modèles.
+
+## 2026-07-28 — v2.414.0 — Repository de santé client
+
+### Contexte et décision
+
+Les scores, leurs points explicatifs et les recommandations forment un agrégat de diagnostic
+persistant. Deux approches ont été comparées : garder trois écritures indépendantes dans
+`database.py`, ou les regrouper derrière un repository injectable avec une transaction
+unique. La seconde est retenue. Elle correspond au cœur déterministe recherché : le LLM peut
+proposer une évaluation, mais les bornes, la cohérence et l'atomicité sont imposées par le
+logiciel.
+
+Les recommandations officielles OpenAI et OWASP consultées convergent sur une défense en
+profondeur : liberté de raisonnement du modèle, validation déterministe des effets et
+supervision humaine pour les actions à fort impact. Cette tranche ne modifie aucune
+autorisation; elle rend uniquement la donnée de santé fiable avant les futures décisions.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/client_health.py` avec connexion injectable ;
+- conservation par identité des cinq fonctions publiques de `database.py` ;
+- déplacement des trois schémas, index et CRUD hors de la façade ;
+- insertion du score, de ses points et recommandations dans une transaction unique, suivie
+  d'une relecture avant commit ;
+- refus d'un client vide, d'un score non fini ou hors de 0–100, d'un point négatif ou
+  supérieur à son maximum, et des collections contenant autre chose que des objets ;
+- historique borné entre 1 et 1 000, ordres déterministes et lecture du dernier agrégat dans
+  une seule connexion ;
+- conservation des contraintes SQLite historiques sur risques, priorités et statuts.
+
+### Validation et rollback
+
+Résultats ciblés observés avant la gate globale :
+
+- compilation Python du repository, de la façade et du test réussie ;
+- SQLite réel : agrégat complet, dernier score, historique, filtre de recommandations,
+  valeurs limites et cinq identités de façade validés ;
+- collision d'identifiant et niveau de risque invalide annulent toute la transaction sans
+  point orphelin ;
+- `database.py` passe de 912 lignes/30 objets AST à 807 lignes/24 objets AST.
+
+L'architecture et la gate globale réussissent ensuite à **181/181 étapes** : 344 outils,
+harness 344/344, 354 routes, 40 pages, compilation Python complète et lint frontend sans
+erreur. Le backend a été réellement redémarré en 2.414.0 avec Ollama et 15 workers, sans
+arrêter Turbopack. Les trois routes santé ont confirmé sur l'instance réelle le score absent,
+l'historique vide et les recommandations filtrées d'un client témoin inexistant. Le smoke
+API réussit à **28/28 contrats**, les **40/40 pages**, cinq conversations représentatives et
+la sérialisation vocale réussissent.
+
+Rollback après commit : `git revert <commit-v2.414>`. Aucun schéma ni format persistant n'est
+changé; après réversion, redémarrer puis vérifier le dernier score, l'historique et les
+recommandations.
