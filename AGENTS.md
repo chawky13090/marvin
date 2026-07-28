@@ -183,7 +183,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.367.0)
+## 9. État actuel (v2.368.0)
+
+**v2.368 (egress HTTP anti-SSRF)** : `outbound_http.py` fournit la frontière commune des
+téléchargements publics. HTTP/HTTPS et ports 80/443 seulement, identifiants URL interdits,
+toutes les adresses DNS doivent être globales, connexion épinglée sur l'IP validée avec SNI
+original, proxy d'environnement désactivé, trois redirections maximum chacune revalidée,
+taille et délai bornés. `web_browse` et `url_analyze` utilisent cette frontière; ce dernier
+rejoint `tool_domains/web.py` et parse désormais les métadonnées HTML avec BeautifulSoup.
 
 **v2.367 (renommage transactionnel)** : `bulk_rename` rejoint
 `tool_domains/filesystem.py`. Le plan refuse noms Windows invalides, collisions et doublons

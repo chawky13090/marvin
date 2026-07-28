@@ -3612,57 +3612,7 @@ async def execute_text_to_speech(args: dict) -> dict:
 execute_csv_to_chart = structured_data_domain.csv_to_chart
 
 
-async def execute_url_analyze(args: dict) -> dict:
-    """Analyse une URL : titre, meta description, statut HTTP, serveur et temps de réponse."""
-    url = args.get("url", "").strip()
-    if not url:
-        return {"error": "Paramètre 'url' requis."}
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-    import re as _re, time as _t2
-    try:
-        def _fetch():
-            import urllib.request as _ureq
-            hdrs = {"User-Agent": "Mozilla/5.0 (compatible; MarvinBot/2.9)"}
-            req = _ureq.Request(url, headers=hdrs, method="GET")
-            t0 = _t2.time()
-            with _ureq.urlopen(req, timeout=10) as resp:
-                elapsed = round((_t2.time() - t0) * 1000)
-                status = resp.status
-                rh = dict(resp.headers)
-                ct = rh.get("Content-Type", "")
-                body = resp.read(60_000).decode("utf-8", errors="replace") if "html" in ct else ""
-                return status, rh, body, elapsed
-        loop = asyncio.get_running_loop()
-        status, rh, body, elapsed = await loop.run_in_executor(None, _fetch)
-        title = ""
-        tm = _re.search(r"<title[^>]*>([^<]{1,200})</title>", body, _re.I)
-        if tm:
-            title = _re.sub(r"\s+", " ", tm.group(1)).strip()
-        desc = ""
-        dm = _re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']{1,500})["\']', body, _re.I)
-        if not dm:
-            dm = _re.search(r'<meta[^>]+content=["\']([^"\']{1,500})["\'][^>]+name=["\']description["\']', body, _re.I)
-        if dm:
-            desc = _re.sub(r"\s+", " ", dm.group(1)).strip()
-        canon = ""
-        cm = _re.search(r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']', body, _re.I)
-        if cm:
-            canon = cm.group(1).strip()
-        return {
-            "success":          True,
-            "url":              url,
-            "status":           status,
-            "response_time_ms": elapsed,
-            "title":            title,
-            "description":      desc,
-            "canonical":        canon,
-            "content_type":     rh.get("Content-Type", ""),
-            "server":           rh.get("Server", ""),
-            "content_length":   rh.get("Content-Length", ""),
-        }
-    except Exception as e:
-        return {"error": str(e)}
+execute_url_analyze = web_domain.execute_url_analyze
 
 
 execute_zip_list = archives_domain.list_contents
@@ -6566,7 +6516,7 @@ TOOLS_SPEC = [
         "max_rows": {"type": "integer", "description": "Nombre max de lignes à retourner (défaut 50)"}},
        ["path"]),
     _t("url_analyze", "Analyse une URL : titre, meta description, statut HTTP, serveur et temps de réponse.",
-       {"url": {"type": "string", "description": "URL à analyser (avec ou sans https://)"}},
+       {"url": {"type": "string", "maxLength": 8192, "description": "URL publique à analyser (HTTP/HTTPS, ports 80/443)"}},
        ["url"]),
     _t("zip_list", "Liste le contenu d'une archive ZIP sans l'extraire.",
        {"path": {"type": "string", "description": "Chemin de l'archive ZIP"}},

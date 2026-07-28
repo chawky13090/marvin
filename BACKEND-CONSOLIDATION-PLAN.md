@@ -254,6 +254,9 @@ contenu complet remplace le MD5 partiel pour éviter les faux doublons.
 Le renommage en lot a rejoint Filesystem dans une transaction à deux phases. Un manifeste
 atomique conserve anciennes, nouvelles et temporaires; le rollback sait restaurer un état
 appliqué ou interrompu. Toute collision est refusée avant le premier renommage.
+Les lectures HTTP publiques disposent d'une frontière anti-SSRF commune : résolution et IP
+publique contrôlées, connexion épinglée, SNI préservé, ports/budgets bornés et redirections
+revalidées. `web_browse` et `url_analyze` ne suivent plus automatiquement une destination.
 
 ## 4. Validation obligatoire par tranche
 

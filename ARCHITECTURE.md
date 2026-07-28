@@ -249,6 +249,10 @@ sans suivi des liens; les lectures sont déportées et les doublons exigent un S
 Validation et collisions précèdent tout effet; une permutation passe par des noms temporaires
 du même dossier. Le manifeste atomique permet un rollback explicite, idempotent et capable
 de reprendre un état intermédiaire après interruption.
+86. l'egress HTTP public : `outbound_http.py` centralise validation de schéma/port,
+résolution DNS publique, épinglage IP/SNI, redirections manuelles revalidées et budgets.
+`web_browse` et `url_analyze` passent par ce guardrail; aucune redirection automatique ne
+peut les faire basculer vers localhost, une adresse privée ou un service de métadonnées.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

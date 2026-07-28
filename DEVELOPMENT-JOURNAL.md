@@ -7024,3 +7024,46 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
 - rollback du changement de code : réversion atomique du commit v2.367 après validation du
   patch inverse indexé. Aucun schéma SQLite n'est modifié.
+## 2026-07-28 — v2.368.0 — Transport HTTP public anti-SSRF
+
+### Constat et décision
+
+- l'extraction prévue de `url_analyze` a révélé un défaut transversal plus prioritaire :
+  `web_browse` suivait automatiquement les redirections d'une URL fournie au modèle ;
+- une validation du seul premier nom DNS reste contournable par redirection ou rebinding.
+  La frontière retenue valide la résolution puis se connecte directement à l'adresse validée
+  tout en conservant `Host` et SNI pour TLS.
+
+### Solution
+
+- nouveau `outbound_http.py` : HTTP/HTTPS, ports 80/443, aucune information d'identification
+  dans l'URL, toutes les adresses résolues obligatoirement globales ;
+- connexion effectuée vers l'IP contrôlée, en-tête `Host` et extension SNI conservant le nom
+  original; `trust_env=false` évite qu'un proxy implicite contourne cette destination ;
+- redirections automatiques désactivées, maximum trois, chacune repassant par résolution et
+  validation; réponse lue en flux avec plafond de 10 Mio et timeout borné ;
+- `web_browse` utilise ce transport avec un budget de 1 Mio ;
+- `url_analyze` rejoint `tool_domains/web.py`, utilise 60 Ko et BeautifulSoup pour que l'ordre
+  des attributs HTML ne casse plus titre, description ou canonical ;
+- nouveau test intégré au gate global.
+
+### Références vérifiées
+
+- OWASP SSRF Prevention Cheat Sheet : désactiver les redirections automatiques, vérifier les
+  résolutions et refuser les adresses non publiques ;
+- documentation HTTPX/AnyIO installée validée en exécution réelle pour l'extension SNI ;
+- la validation live a détecté puis corrigé `sni_hostname` octets versus chaîne ;
+- téléchargement HTTPS réel de `https://example.com/` : HTTP 200, 559 octets.
+
+### Rollback
+
+- gate rapide complet : **140/140** étapes, nouvelle étape anti-SSRF incluse ;
+- redémarrage réel : `/api/health` expose **2.368.0**, Ollama disponible, 344 outils et
+  15 workers ;
+- API réelle : `url_analyze` et `web_browse` lisent `https://example.com/` en HTTP 200,
+  tandis que `http://127.0.0.1/` est refusé avant connexion comme destination non publique ;
+- frontend Turbopack conservé et smoke test réel : **28/28** contrats ;
+- aucun schéma ni donnée persistante n'est modifié ;
+- rollback du changement : réversion atomique du commit v2.368 après contrôle du patch inverse ;
+- le retour à l'ancien transport resterait techniquement possible mais réintroduirait la
+  faiblesse SSRF documentée et ne doit servir qu'à un diagnostic temporaire.

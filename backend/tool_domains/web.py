@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import outbound_http
+
 Generator = Callable[..., Awaitable[str]]
 GetSetting = Callable[[str], Any]
 HttpClientFactory = Callable[[], Any]
@@ -278,26 +280,32 @@ async def execute_web_browse(args: dict) -> dict:
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
     try:
-        import httpx
         from bs4 import BeautifulSoup
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         }
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-            resp = await client.get(url, headers=headers)
-        final_url = str(resp.url)  # URL après redirections
+        response = await outbound_http.fetch_public(
+            url,
+            max_bytes=1_000_000,
+            timeout=20.0,
+            headers=headers,
+        )
+        final_url = response.url
         # Don't raise_for_status — instead report the status in the result
-        if resp.status_code >= 400:
+        if response.status_code >= 400:
             return {
                 "success": False,
                 "url": final_url,
-                "status": resp.status_code,
-                "error": f"HTTP {resp.status_code} pour {final_url}",
+                "status": response.status_code,
+                "error": f"HTTP {response.status_code} pour {final_url}",
                 "content": "",
             }
-        soup = BeautifulSoup(resp.text, "lxml")
+        soup = BeautifulSoup(
+            response.content.decode("utf-8", errors="replace"),
+            "lxml",
+        )
 
         # Extraire le titre et la description
         title = (soup.title.string or "").strip() if soup.title else url
@@ -335,6 +343,76 @@ async def execute_web_browse(args: dict) -> dict:
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+async def execute_url_analyze(args: dict) -> dict:
+    """Analyse les métadonnées d'une URL publique via le transport SSRF partagé."""
+    url = str(args.get("url") or "").strip()
+    if not url:
+        return {"error": "Paramètre 'url' requis."}
+    if len(url) > 8_192:
+        return {"error": "URL limitée à 8 192 caractères."}
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        from bs4 import BeautifulSoup
+
+        response = await outbound_http.fetch_public(
+            url,
+            max_bytes=60_000,
+            timeout=10.0,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; MarvinBot/2.368)"},
+        )
+        content_type = response.headers.get("content-type", "")
+        body = (
+            response.content.decode("utf-8", errors="replace")
+            if "html" in content_type.casefold()
+            else ""
+        )
+        soup = BeautifulSoup(body, "lxml") if body else None
+        title = ""
+        description = ""
+        canonical = ""
+        if soup is not None:
+            if soup.title:
+                title = " ".join(soup.title.get_text(" ", strip=True).split())[:200]
+            meta = soup.find(
+                "meta",
+                attrs={
+                    "name": lambda value: (
+                        isinstance(value, str)
+                        and value.casefold() == "description"
+                    )
+                },
+            )
+            if meta:
+                description = " ".join(
+                    str(meta.get("content") or "").split()
+                )[:500]
+            for link in soup.find_all("link", href=True):
+                relation = link.get("rel") or []
+                relations = (
+                    [str(item).casefold() for item in relation]
+                    if isinstance(relation, list)
+                    else str(relation).casefold().split()
+                )
+                if "canonical" in relations:
+                    canonical = str(link.get("href") or "").strip()[:8_192]
+                    break
+        return {
+            "success": True,
+            "url": response.url,
+            "status": response.status_code,
+            "response_time_ms": response.elapsed_ms,
+            "title": title,
+            "description": description,
+            "canonical": canonical,
+            "content_type": content_type,
+            "server": response.headers.get("server", ""),
+            "content_length": response.headers.get("content-length", ""),
+        }
+    except (OSError, TypeError, ValueError, outbound_http.httpx.HTTPError) as exc:
+        return {"error": str(exc)}
 
 
 async def execute_web_browser_open(args: dict) -> dict:
