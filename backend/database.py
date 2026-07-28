@@ -36,6 +36,7 @@ from repositories.events import (
     repository as event_repository,
     update_event,
 )
+from repositories.logos import create_logo, list_logos
 from repositories.memories import (
     clear_all_memories,
     create_memory,
@@ -50,6 +51,14 @@ from repositories.notes import (
     list_notes,
     update_note,
 )
+from repositories.projects import (
+    create_project,
+    delete_project,
+    get_project,
+    get_projects,
+    update_project,
+)
+from repositories.screenshots import create_screenshot, list_screenshots
 from repositories.ssh_connections import (
     delete_ssh_connection,
     get_ssh_connection,
@@ -94,148 +103,16 @@ from repositories.workflows import (
 # frontend — CREATE TABLE IF NOT EXISTS défensif ici aussi pour une install où le
 # backend Python démarrerait avant le frontend (v2.107, même schéma que le JS).
 
-def _ensure_projects_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    # v2.142 — un projet n'était jusqu'ici qu'un NOM (regroupement de conversations),
-    # contrairement aux "Projects" de Claude/ChatGPT (instructions persistantes injectées
-    # automatiquement dans chaque conversation du projet). Migration transparente, même
-    # motif que le reste du fichier (PRAGMA table_info + ALTER conditionnel).
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
-    if "instructions" not in cols:
-        conn.execute("ALTER TABLE projects ADD COLUMN instructions TEXT")
-
-
-def get_projects() -> list[dict]:
-    with db() as conn:
-        _ensure_projects_table(conn)
-        rows = conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def get_project(pid: str) -> dict | None:
-    with db() as conn:
-        _ensure_projects_table(conn)
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
-    return row_to_dict(row) if row else None
-
-
-def create_project(name: str, instructions: str | None = None) -> dict:
-    pid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_projects_table(conn)
-        conn.execute("INSERT INTO projects (id, name, instructions) VALUES (?, ?, ?)",
-                     (pid, name, instructions))
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
-    return row_to_dict(row)
-
-
-def update_project(pid: str, name: str | None = None, instructions: str | None = None) -> dict | None:
-    with db() as conn:
-        _ensure_projects_table(conn)
-        if name is not None:
-            conn.execute("UPDATE projects SET name = ?, updated_at = datetime('now') WHERE id = ?", (name, pid))
-        if instructions is not None:
-            conn.execute("UPDATE projects SET instructions = ?, updated_at = datetime('now') WHERE id = ?", (instructions, pid))
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
-    return row_to_dict(row) if row else None
-
-
-def delete_project(pid: str):
-    with db() as conn:
-        _ensure_projects_table(conn)
-        conn.execute("DELETE FROM projects WHERE id = ?", (pid,))
-
-
 # ── Captures d'écran (v2.175) ───────────────────────────────────────────────
 # Persiste chaque capture attachée au chat (jusqu'ici jetée après un seul tour,
 # cf. mémoire document-identity-toc-v2174) + son analyse (légende + texte relevé)
 # pour permettre plus tard une génération de documentation à partir de plusieurs
 # captures d'une même conversation.
 
-def _ensure_screenshots_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS screenshots (
-            id TEXT PRIMARY KEY,
-            conversation_id TEXT,
-            path TEXT NOT NULL,
-            caption TEXT,
-            ocr_text TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-
-
-def create_screenshot(conversation_id: str | None, path: str, caption: str = "", ocr_text: str = "") -> dict:
-    sid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_screenshots_table(conn)
-        conn.execute(
-            "INSERT INTO screenshots (id, conversation_id, path, caption, ocr_text) VALUES (?, ?, ?, ?, ?)",
-            (sid, conversation_id, path, caption, ocr_text)
-        )
-        row = conn.execute("SELECT * FROM screenshots WHERE id = ?", (sid,)).fetchone()
-    return row_to_dict(row)
-
-
-def list_screenshots(conversation_id: str | None = None, limit: int = 100) -> list[dict]:
-    with db() as conn:
-        _ensure_screenshots_table(conn)
-        if conversation_id:
-            rows = conn.execute(
-                "SELECT * FROM screenshots WHERE conversation_id = ? ORDER BY created_at ASC LIMIT ?",
-                (conversation_id, limit)
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM screenshots ORDER BY created_at DESC LIMIT ?", (limit,)
-            ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
 # ── Logos générés (v2.183) ──────────────────────────────────────────────────
 # Registre des logos générés localement (local_image.py) — permet de les RÉUTILISER
 # pour un client/contexte déjà rencontré au lieu de regénérer à chaque document (né d'un
 # vrai échec : Marvin n'avait aucun moyen de créer/retrouver un logo, cf. mémoire session).
-
-def _ensure_logos_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS logos (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            prompt TEXT,
-            path TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-
-
-def create_logo(name: str, prompt: str, path: str) -> dict:
-    lid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_logos_table(conn)
-        conn.execute(
-            "INSERT INTO logos (id, name, prompt, path) VALUES (?, ?, ?, ?)",
-            (lid, name, prompt, path)
-        )
-        row = conn.execute("SELECT * FROM logos WHERE id = ?", (lid,)).fetchone()
-    return row_to_dict(row)
-
-
-def list_logos(limit: int = 100) -> list[dict]:
-    with db() as conn:
-        _ensure_logos_table(conn)
-        rows = conn.execute(
-            "SELECT * FROM logos ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
 
 # ── Historique d'exécution ────────────────────────────────────────────────────
 

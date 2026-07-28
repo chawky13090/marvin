@@ -8958,3 +8958,48 @@ la cible est restée explicitement `local`. Le smoke HTTP/Next.js réussit à
 Rollback après commit : `git revert <commit-v2.407>`. Aucun schéma applicatif nouveau n'est
 introduit; la migration défensive existait déjà dans `database.py`. Après réversion, rejouer
 le test repository, redémarrer le backend et vérifier agenda, rappels et synchronisation.
+
+## 2026-07-28 — v2.408.0 — Repositories projets, captures et logos
+
+### Contexte et décision
+
+La tranche « projets et artefacts » contient trois cycles de vie : contexte de projet,
+captures documentaires et catalogue de logos. Deux approches ont été comparées : les réunir
+dans un repository générique d'artefacts, au prix d'interfaces faibles, ou conserver trois
+repositories spécialisés derrière la façade historique. La seconde est retenue. Elle évite
+de coupler les instructions de projet aux chemins de fichiers ou à la génération d'images.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/projects.py`, `repositories/screenshots.py` et
+  `repositories/logos.py` ;
+- conservation par identité des neuf fonctions publiques de `database.py` ;
+- création et relecture réunies dans une même transaction pour chaque agrégat ;
+- mise à jour simultanée du nom et des instructions d'un projet dans une seule instruction
+  SQL, au lieu de deux écritures successives ;
+- migration défensive de la colonne `instructions` préservée ;
+- suppression d'un projet toujours soumise aux clés étrangères SQLite : les conversations
+  associées sont détachées avec `ON DELETE SET NULL`, sans être supprimées ;
+- aucune génération de fichier, analyse d'image ou appel LLM n'est déplacé dans la couche de
+  persistance.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation des trois repositories, de la façade et du test réussie ;
+- SQLite réel : projet, mise à jour, migration d'une ancienne table, collision et rollback,
+  détachement FK de conversation, capture filtrée et catalogue de logo réussis ;
+- les neuf identités de façade sont conservées ;
+- domaines Captures et Logos, contexte agentique et contexte de tour réussis ;
+- `database.py` passe de 2 783 lignes/113 objets AST à 2 660 lignes/101 objets AST.
+
+Composition, architecture et gate globale réussissent ensuite. La gate observe
+**175/175 étapes**, 248 modules backend compilés, le registre 344/344 et le lint frontend.
+Le backend a été réellement redémarré en 2.408.0 avec Ollama et 15 workers. Un projet
+temporaire a été créé via HTTP, son nom et ses instructions ont été modifiés, il a été
+retrouvé dans la liste puis supprimé. Le smoke HTTP/Next.js réussit à **28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.408>`. Aucun format de donnée n'est transformé.
+Après réversion, rejouer le test repository, redémarrer le backend et vérifier projets,
+captures documentaires et logos.
