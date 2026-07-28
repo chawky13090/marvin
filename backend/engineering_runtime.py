@@ -254,6 +254,7 @@ def delivery_pack(
         "workspace": workspace or {},
         "test_report": result.get("test_report") or {},
         "production_contract": result.get("production_contract") or {},
+        "documentation_manifest": result.get("engineering_radar") or {},
         "models_consulted": result.get("models_consulted") or [],
         "known_limitations": [] if done.get("success") else list(done.get("failures") or []),
     })

@@ -43,6 +43,12 @@ def accepted_result() -> dict:
             "isolation": {"backend": "docker"},
         },
         "production_contract": {"success": True, "failures": []},
+        "engineering_radar": {
+            "available": True,
+            "source_count": 1,
+            "languages": ["python"],
+            "sources": [{"id": "python-docs", "url": "https://docs.python.org/3/"}],
+        },
     }
 
 
@@ -64,8 +70,10 @@ async def scenario(repository: Path) -> None:
 
     original_execute = coding_jobs.code_forge.execute
     original_retry_base = coding_jobs.RETRY_BASE_SECONDS
+    original_checkup_interval = coding_jobs.CHECKUP_INTERVAL_SECONDS
     coding_jobs.code_forge.execute = fake_execute
     coding_jobs.RETRY_BASE_SECONDS = 0
+    coding_jobs.CHECKUP_INTERVAL_SECONDS = 0.02
     try:
         mission = coding_mission.create(
             "Ajouter une application Python", target_platforms=["linux"],
@@ -98,7 +106,12 @@ async def scenario(repository: Path) -> None:
         )
         coding_workspace.create(second["id"], str(repository), confirmed=True)
         cancelling = coding_jobs.create_job(second["id"])
-        await asyncio.sleep(0.08)
+        await asyncio.sleep(1.5)
+        checkup_types = [
+            event["type"]
+            for event in coding_mission.stream_events(second["id"])["events"]
+        ]
+        assert "work.checkup" in checkup_types
         coding_jobs.cancel_job(cancelling["id"])
         cancelled = await wait_terminal(cancelling["id"])
         assert cancelled["status"] == "cancelled"
@@ -151,6 +164,17 @@ async def scenario(repository: Path) -> None:
         assert "raise RuntimeError('candidate')" in repair_evidence[1]
         assert retried["validation_cache"]["passed_steps"][0]["name"] == "unittest"
         assert coding_mission.get(third["id"])["completion_policy"] == "until_success"
+        repair_types = [
+            event["type"]
+            for event in coding_mission.stream_events(third["id"])["events"]
+        ]
+        assert "repair.diagnosed" in repair_types
+        assert "repair.started" in repair_types
+        assert "repair.validated" in repair_types
+        assert retried["result"]["documentation_manifest"]["available"] is True
+        assert coding_mission.read_delivery_pack(third["id"])[
+            "documentation_manifest"
+        ]["source_count"] == 1
 
         windows_calls = 0
         windows_candidates = 0
@@ -271,6 +295,7 @@ async def scenario(repository: Path) -> None:
     finally:
         coding_jobs.code_forge.execute = original_execute
         coding_jobs.RETRY_BASE_SECONDS = original_retry_base
+        coding_jobs.CHECKUP_INTERVAL_SECONDS = original_checkup_interval
         await coding_jobs.shutdown()
 
 

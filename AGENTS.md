@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.433.0)
+## 9. État actuel (v2.434.0)
+
+**v2.434 (boucle de réparation observable)** : chaque refus de Code Forge produit désormais
+un diagnostic durable expurgé, une passe de réparation ciblée et une preuve de validation
+finale. Le chat demandeur reçoit un check-up persistant toutes les trente secondes pendant
+les phases longues et reprend le flux après navigation. Code Workspace expose le registre
+des réparations; le Delivery Pack conserve le manifeste des documentations officielles
+consultées avec URL, empreinte et fraîcheur. L’acceptation reste exclusivement déterministe :
+tests isolés/natifs, revue indépendante, sécurité, Production Contract et Definition of Done.
 
 **v2.433 (arbitrage RAM Cloud/VM)** : quand Ollama Cloud est actif hors Hyper local, le
 worker de démarrage ne précharge plus les modèles locaux. Ils restent installés et sont

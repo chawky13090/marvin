@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.433.0
+Version courante auditée : 2.434.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -481,6 +481,12 @@ publient un précheck RAM avant démarrage. Les deux runners ont exécuté réel
 et ses tests dans leurs VM propres avec restauration du checkpoint avant et après; cette
 preuve ferme le défaut d'exécution native simple, mais pas encore l'E2E complet d'une mission
 LLM autonome interrompue puis reprise.
+En v2.434.0, la boucle `diagnostic → réparation ciblée → revalidation` devient un contrat
+observable commun au chat et à Code Workspace. Les événements sont conservés dans le registre
+chaîné de la Coding Mission, les phases longues publient un check-up toutes les trente
+secondes, et chaque Delivery Pack garde les sources officielles réellement injectées au
+raisonnement avec URL, fraîcheur et empreinte. Un heartbeat ne vaut jamais preuve de progrès :
+seuls les checkpoints, rapports d'exécution et gates déterministes permettent l'acceptation.
 
 ## 10. Preuves minimales par grande capacité
 

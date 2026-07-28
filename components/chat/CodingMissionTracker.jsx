@@ -6,7 +6,10 @@ const EVENT_LABELS = {
   'mission.run.started': 'Nouvelle tentative démarrée',
   'code.forge.started': 'Analyse du correctif',
   'repair.started': 'Correction ciblée en cours',
+  'repair.diagnosed': 'Cause analysée et enregistrée',
   'repair.scheduled': 'Nouvelle correction planifiée',
+  'repair.validated': 'Correction validée par les contrôles',
+  'work.checkup': 'Check-up automatique',
   'validation.failed': 'Validation refusée',
   'mission.blocked': 'Mission bloquée',
   'delivery.pack.created': 'Dossier de livraison créé',
@@ -37,6 +40,10 @@ function initialMissionId(result) {
 function eventDetail(event) {
   const payload = event?.payload || {};
   if (event.type === 'mission.run.started' && payload.attempt) return `tentative ${payload.attempt}`;
+  if (event.type === 'work.checkup') {
+    const label = STAGE_LABELS[payload.stage] || String(payload.stage || 'travail en cours').replaceAll('_', ' ');
+    return `${label} · ${payload.percent ?? 0} % · exécution toujours active`;
+  }
   if (event.type === 'checkpoint') {
     const phase = payload.phase || payload.state?.stage;
     const state = payload.state || {};

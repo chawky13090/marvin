@@ -192,12 +192,21 @@ def status(mission_id: str = "") -> dict[str, Any]:
     if mission is None:
         raise CodingServiceError("Coding Mission introuvable.")
     job_store = coding_jobs.store_status()
+    events = coding_mission.list_events(cleaned, limit=500)
+    repair_ledger = [
+        event for event in events
+        if event.get("type") in {
+            "repair.diagnosed", "repair.started", "validation.failed",
+            "repair.scheduled", "repair.validated", "mission.blocked",
+        }
+    ]
     return {
         "success": True,
         "mission_id": cleaned,
         "project": mission,
         "manifest": coding_mission.latest_manifest(cleaned),
-        "events": coding_mission.list_events(cleaned, limit=500),
+        "events": events,
+        "repair_ledger": repair_ledger,
         "evidence_integrity": coding_mission.evidence_integrity(cleaned),
         "workspace": coding_workspace.status(cleaned) if coding_workspace.get(cleaned) else None,
         "auto_job": (

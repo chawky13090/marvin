@@ -52,7 +52,13 @@ async def exercise_pipeline() -> None:
                 "context": "BEGIN_UNTRUSTED_OFFICIAL_DOCUMENTATION [python-whatsnew]\n"
                            "Official Python release notes\n"
                            "END_UNTRUSTED_OFFICIAL_DOCUMENTATION [python-whatsnew]",
-                "sources": [{"id": "python-whatsnew", "content_sha256": "abc123"}],
+                "sources": [{
+                    "id": "python-whatsnew",
+                    "title": "Python release notes",
+                    "url": "https://docs.python.org/3/whatsnew/",
+                    "content_sha256": "abc123",
+                    "freshness": "fresh",
+                }],
                 "source_count": 1, "available": True,
             }),
         ),
@@ -88,6 +94,8 @@ async def exercise_pipeline() -> None:
     assert test_execute.call_args.kwargs["files"]["src/helper.py"].startswith("def value")
     assert len(result["reviews"]) == 2
     assert result["engineering_radar"]["languages"] == ["python"]
+    assert "## Documentation technique consultée" in result["answer"]
+    assert "https://docs.python.org/3/whatsnew/" in result["answer"]
     assert "UNTRUSTED_OFFICIAL_DOCUMENTATION" in call_model.await_args_list[0].args[2]
 
 

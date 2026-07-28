@@ -49,6 +49,10 @@ _PHASE_PROGRESS = {
 async def _mirror_mission_progress(job_id: str, mission_id: str) -> None:
     """Projette les checkpoints Code Forge dans le statut du job affiche par le Chat."""
     last_revision = -1
+    last_checkup = time.monotonic()
+    mirror_started = last_checkup
+    elapsed_before_run = float((get_job(job_id) or {}).get("elapsed_seconds") or 0)
+    checkup_number = 0
     while True:
         mission = coding_mission.get(mission_id) or {}
         revision = int(mission.get("revision") or 0)
@@ -64,6 +68,25 @@ async def _mirror_mission_progress(job_id: str, mission_id: str) -> None:
                     "mission_revision": revision,
                 })
             last_revision = revision
+        now = time.monotonic()
+        if now - last_checkup >= CHECKUP_INTERVAL_SECONDS:
+            current = get_job(job_id) or {}
+            if current.get("status") == "running":
+                checkup_number += 1
+                progress = dict(current.get("progress") or {})
+                _emit(mission_id, "work.checkup", {
+                    "job_id": job_id,
+                    "attempt": int(current.get("attempts") or 0),
+                    "checkup": checkup_number,
+                    "stage": str(progress.get("stage") or "running")[:100],
+                    "percent": max(0, min(100, int(progress.get("percent") or 0))),
+                    "elapsed_seconds": round(
+                        elapsed_before_run + max(0, now - mirror_started),
+                        1,
+                    ),
+                    "mission_revision": revision,
+                })
+            last_checkup = now
         await asyncio.sleep(0.5)
 _TERMINAL = {"completed", "failed", "cancelled", "blocked"}
 _NON_RECOVERABLE_MARKERS = {
@@ -71,6 +94,7 @@ _NON_RECOVERABLE_MARKERS = {
     "familles cloud", "secret manquant", "confirmation", "runner windows",
 }
 RETRY_BASE_SECONDS = 5
+CHECKUP_INTERVAL_SECONDS = 30
 _SECRET_KEYS = {
     "password", "passwd", "token", "secret", "api_key", "apikey",
     "authorization", "cookie", "credential", "private_key",
@@ -301,6 +325,12 @@ def _result_summary(result: dict[str, Any], applied: dict[str, Any] | None,
             "success": bool(production.get("success")),
             "failures": list(production.get("failures") or [])[:100],
         },
+        "documentation_manifest": {
+            "available": bool((result.get("engineering_radar") or {}).get("available")),
+            "languages": list((result.get("engineering_radar") or {}).get("languages") or [])[:50],
+            "sources": list((result.get("engineering_radar") or {}).get("sources") or [])[:100],
+            "refreshed_at": (result.get("engineering_radar") or {}).get("refreshed_at"),
+        },
         "applied": applied,
         "windows_validation": windows_route,
     }
@@ -488,6 +518,11 @@ async def _run(job_id: str) -> None:
                         state={"reason": "candidate_preserved_for_repair", "repair_context": repair_context},
                     )
                 _update(job_id, result=summary, validation_cache=_validation_cache(result))
+                _emit(job["mission_id"], "repair.diagnosed", {
+                    "job_id": job_id,
+                    "attempt": attempts + 1,
+                    "repair_context": repair_context,
+                })
                 _emit(job["mission_id"], "validation.failed", {
                     "error": error, "repair_context": repair_context,
                     "validation_cache": _validation_cache(result),
@@ -568,6 +603,13 @@ async def _run(job_id: str) -> None:
                 _update(job_id, status="completed", progress={"stage": "completed", "percent": 100},
                         result=summary, error=None, consecutive_failures=0, next_retry_at=None,
                         repair_context=None, validation_cache=validation_cache)
+                if attempts:
+                    _emit(job["mission_id"], "repair.validated", {
+                        "job_id": job_id,
+                        "attempt": attempts + 1,
+                        "tests": validation_cache,
+                        "definition_of_done": done,
+                    })
                 _emit(job["mission_id"], "delivery.accepted", {
                     "job_id": job_id, "definition_of_done": done,
                     "delivery_pack": delivery_path,
@@ -585,6 +627,11 @@ async def _run(job_id: str) -> None:
                 synthetic = {**result, "error": reason}
                 repair_context = engineering_runtime.classify_failure(synthetic)
                 _update(job_id, result=summary, validation_cache=validation_cache)
+                _emit(job["mission_id"], "repair.diagnosed", {
+                    "job_id": job_id,
+                    "attempt": attempts + 1,
+                    "repair_context": repair_context,
+                })
                 _emit(job["mission_id"], "validation.failed", {
                     "error": reason, "definition_of_done": done,
                     "repair_context": repair_context,

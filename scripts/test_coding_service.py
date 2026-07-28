@@ -70,7 +70,10 @@ def main() -> int:
     with (
         patch.object(coding_service.coding_mission, "get", return_value={"id": mission_id}),
         patch.object(coding_service.coding_mission, "latest_manifest", return_value=[{"path": "main.sh"}]),
-        patch.object(coding_service.coding_mission, "list_events", return_value=[]),
+        patch.object(coding_service.coding_mission, "list_events", return_value=[
+            {"type": "repair.diagnosed", "payload": {"attempt": 1}},
+            {"type": "work.checkup", "payload": {"stage": "test_forge"}},
+        ]),
         patch.object(coding_service.coding_mission, "latest_files", return_value={"main.sh": "#!/bin/bash\ntrue\n"}),
         patch.object(coding_service.coding_workspace, "get", return_value=None),
         patch.object(coding_service.coding_jobs, "latest_for_mission", return_value={"status": "blocked"}),
@@ -80,6 +83,8 @@ def main() -> int:
     assert detailed["artifacts"]["source"] == "mission_snapshot"
     assert detailed["success"] is True
     assert detailed["mission_id"] == mission_id
+    assert len(detailed["repair_ledger"]) == 1
+    assert detailed["repair_ledger"][0]["type"] == "repair.diagnosed"
     assert detailed["artifacts"]["files"][0]["path"] == "main.sh"
     assert "#!/bin/bash" in detailed["artifacts"]["files"][0]["content"]
     assert detailed["execution_capabilities"]["docker_linux"]["available"] is True

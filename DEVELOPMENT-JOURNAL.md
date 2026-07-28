@@ -10279,3 +10279,51 @@ et les smokes live réussissent **28/28 API** et **40/40 pages**.
 Rollback exact : `git revert <commit-v2.433>`. Aucun schéma ni donnée métier n'est migré.
 Le modèle local n'a pas été supprimé; Ollama peut le recharger à la demande. Les deux VM
 sont revenues à `Marvin-Clean`, arrêtées, sans snapshot temporaire.
+
+## 2026-07-28 — v2.434.0 — Boucle de réparation et suivi durable dans le chat
+
+### Demande et choix
+
+L'utilisateur demande que Marvin reçoive les rapports d'erreur, répare sans perdre le travail,
+réexécute jusqu'à obtenir un code sain, consulte la documentation et le Web, puis rende les
+preuves et un check-up périodique dans le chat d'origine. Deux options ont été comparées :
+créer un second orchestrateur de réparation ou renforcer le superviseur persistant existant.
+La seconde évite deux sources de vérité et conserve les checkpoints, worktrees et gates déjà
+validés.
+
+### Implémentation
+
+`coding_jobs.py` inscrit `repair.diagnosed`, `repair.started`, `repair.scheduled` et
+`repair.validated` dans le registre chaîné de la Coding Mission. Une phase active produit
+`work.checkup` toutes les trente secondes avec étape, tentative, pourcentage, durée et
+révision, mais ce heartbeat ne peut pas valider le travail. Les erreurs prouvées, le candidat
+refusé et les contrôles réussis alimentent la tentative suivante; l'application au worktree
+reste transactionnelle après tous les gates.
+
+`coding_service.py` projette un Repair Ledger dans Code Workspace. Le tracker du chat lit le
+même flux SSE durable et affiche les check-ups, diagnostics et validations après navigation.
+`code_forge.py` rend visibles les documentations techniques consultées. Leur manifeste
+conserve URL, empreinte, date/fraîcheur et statut dans le résultat et le Delivery Pack.
+Le contenu documentaire reste balisé comme donnée non fiable; seuls les transports officiels
+en liste blanche du Engineering Radar sont utilisés.
+
+### Sécurité, logs et rollback
+
+Les payloads passent par l'expurgation récursive existante avant le registre; mots de passe,
+tokens, cookies et clés ne sont pas conservés. Les sorties sont bornées, les preuves métier
+restent append-only et les check-ups ne rejouent aucune action. Aucun schéma SQLite ni donnée
+utilisateur n'est migré. Rollback exact : `git revert <commit-v2.434>`.
+
+### Validations
+
+Les tests ciblés couvrent un échec de test suivi d'une réparation réussie, la conservation du
+candidat refusé hors worktree, le diagnostic transmis au modèle, la preuve finale, le
+manifeste documentaire, un job lent produisant un check-up et la projection chat/workspace.
+`test_coding_jobs.py`, `test_coding_service.py`, `test_code_forge.py`,
+`test_engineering_runtime.py`, la compilation Python et ESLint réussissent. Les 37
+avertissements ESLint préexistants restent inventoriés; aucune nouvelle erreur n'est créée.
+Le gate consolidé réussit **193/193**, y compris le build Next.js/Turbopack. Après relance,
+`/api/health` expose **2.434.0**, `/code` répond HTTP 200, les contrats API réussissent
+**28/28** et les parcours de pages **40/40**. Le contrôle visuel réel de Code Workspace ne
+remonte aucune erreur console et confirme Definition of Done, Delivery Pack, fichiers et
+chronologie sur une mission historique.

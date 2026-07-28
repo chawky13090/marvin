@@ -1513,6 +1513,17 @@ async def execute(
         )
     delivered_files = current_bundle_files()
     rendered_deliverable = render_bundle(delivered_files, language, limit=800_000)
+    documentation_lines = [
+        "- "
+        + str(item.get("title") or item.get("id") or "Source officielle")[:200]
+        + " — "
+        + str(item.get("url") or "")[:500]
+        + " — SHA-256 "
+        + str(item.get("content_sha256") or "indisponible")[:64]
+        + " — fraîcheur "
+        + str(item.get("freshness") or item.get("status") or "inconnue")[:40]
+        for item in list(radar_summary.get("sources") or [])[:30]
+    ]
     answer = (
         f"## Hypothèses et architecture\n\n{architecture['answer'][:10000]}\n\n"
         f"## Livrable\n\n{rendered_deliverable}\n\n"
@@ -1529,6 +1540,9 @@ async def execute(
           f"- SBOM CycloneDX : {len((production_gate.get('sbom') or {}).get('components') or [])} composant(s)\n"
           f"- Étapes exécutées : {', '.join(str(item.get('name')) for item in test_report.get('steps', [])) or 'aucune'}\n"
           f"- {isolation_summary}\n\n"
+          "## Documentation technique consultée\n\n"
+          + ("\n".join(documentation_lines) if documentation_lines else "- Aucune source officielle pertinente n’a pu être chargée; cette limite reste visible dans le Delivery Pack.")
+          + "\n\n"
           "## Déploiement et rollback\n\n"
           "- Tester d'abord dans une VM ou un environnement isolé correspondant aux versions ciblées.\n"
           "- Sauvegarder les fichiers et données modifiés avant exécution.\n"

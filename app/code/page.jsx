@@ -413,6 +413,7 @@ export default function CodeWorkspacePage() {
             <b style={{ color: selected.delivery_pack.status === 'accepted' ? '#34d399' : '#fb7185' }}>{selected.delivery_pack.status}</b>
             <span>{selected.delivery_pack.manifest?.length || 0} fichier(s)</span>
             <span>{(selected.delivery_pack.targets || []).join(', ')}</span>
+            <span>{selected.delivery_pack.documentation_manifest?.source_count || selected.delivery_pack.documentation_manifest?.sources?.length || 0} source(s) documentaire(s)</span>
           </div>
         </section>}
         <div className={styles.split}>
@@ -423,6 +424,19 @@ export default function CodeWorkspacePage() {
           <pre className={styles.code}>{selectedFile?.content || 'Aucun fichier disponible à cette phase.'}</pre>
         </div>
         <div className={styles.timeline}><div className={styles.panelHeader}>Chronologie et preuves</div>{history.slice().reverse().slice(0, 30).map(item => <div className={styles.event} key={item.revision}><span>{shortDate(item.at)}</span><b style={{ color: statusColor(item.phase === 'accepted' ? 'completed' : project.status) }}>{item.phase}</b><span>{item.state?.score != null ? `score ${item.state.score}/10 · ` : ''}{item.state?.test_production_ready != null ? `production ${item.state.test_production_ready ? 'validée' : 'refusée'} · ` : ''}{item.manifest?.length ? `${item.manifest.length} fichier(s)` : 'checkpoint'}</span></div>)}</div>
+        {selected.repair_ledger?.length > 0 && <div className={styles.timeline}>
+          <div className={styles.panelHeader}>Registre des réparations</div>
+          {selected.repair_ledger.slice().reverse().slice(0, 20).map((item, index) => {
+            const payload = item.payload || {};
+            const repair = payload.repair_context || {};
+            const failed = repair.failed_steps || payload.definition_of_done?.failures || [];
+            return <div className={styles.event} key={`${item.sequence || item.at}-${index}`}>
+              <span>{shortDate(item.at)}</span>
+              <b>{item.type}</b>
+              <span>{failed.length ? failed.join(', ') : repair.category || `tentative ${payload.attempt || '-'}`}</span>
+            </div>;
+          })}
+        </div>}
       </div>}</main>
     </div>}
 
