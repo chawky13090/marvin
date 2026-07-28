@@ -87,10 +87,14 @@ def run() -> None:
         key for key, value in declared.items()
         if value[0] == "evaluation_ledger" and value[2] == "structured"
     }
-    assert structured_evidence == {("backend/forge.py", "forge_runs.jsonl")}
-    assert "DurableEvidenceStore" in (ROOT / "backend" / "forge.py").read_text(
-        encoding="utf-8-sig"
-    )
+    assert structured_evidence == {
+        ("backend/forge.py", "forge_runs.jsonl"),
+        ("backend/frontier_arena.py", "frontier_arena_submissions.jsonl"),
+        ("backend/frontier_arena.py", "frontier_arena_matches.jsonl"),
+        ("backend/frontier_arena.py", "frontier_arena_votes.jsonl"),
+    }
+    for module, _filename in structured_evidence:
+        assert "DurableEvidenceStore" in (ROOT / module).read_text(encoding="utf-8-sig")
     structured_domain_streams = {
         key for key, value in declared.items()
         if value[0] == "domain_event_stream" and value[2] == "structured"
@@ -115,7 +119,7 @@ def run() -> None:
     print(
         "Persistence Inventory OK - "
         f"{len(declared)} JSONL classifiés, {len(structured_logs)} logs et "
-        f"{len(structured_evidence)} registre d'évaluation et "
+        f"{len(structured_evidence)} registres d'évaluation et "
         f"{len(structured_domain_streams)} flux métier structurés."
     )
 

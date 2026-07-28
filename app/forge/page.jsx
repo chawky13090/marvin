@@ -74,6 +74,12 @@ export default function ForgePage() {
 
   useEffect(() => { load(); }, [load]);
   const metrics = Object.fromEntries((summary?.by_scenario || []).map(item => [item.id, item]));
+  const arenaIntegrity = Object.values(arena?.evidence_integrity || {});
+  const arenaIntegrityInvalid = arenaIntegrity.some(item => item.integrity_level === 'invalid');
+  const arenaIntegrityVerified = arenaIntegrity.length > 0
+    && arenaIntegrity.every(item => item.integrity_level === 'tamper_evident');
+  const arenaSigned = arenaIntegrity.reduce((sum, item) => sum + item.signed_records, 0);
+  const arenaLegacy = arenaIntegrity.reduce((sum, item) => sum + item.legacy_records, 0);
 
   async function submitArena(event) {
     event.preventDefault();
@@ -211,6 +217,13 @@ export default function ForgePage() {
               <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
                 Comparaison neutre de Marvin et de réponses importées sur le même corpus Forge.
               </div>
+              {arenaIntegrity.length > 0 && <div style={{ color: arenaIntegrityInvalid ? '#fb7185' : arenaIntegrityVerified ? '#34d399' : '#fbbf24', fontSize: 11, marginTop: 6 }}>
+                {arenaIntegrityInvalid
+                  ? 'Intégrité Arena compromise · nouvelles preuves refusées jusqu’à réparation'
+                  : arenaIntegrityVerified
+                    ? `Preuves Arena vérifiables · ${arenaSigned} événement(s) chaîné(s)`
+                    : `Registres Arena mixtes · ${arenaSigned} preuve(s) chaînée(s) · ${arenaLegacy} historique(s) non signé(s)`}
+              </div>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(130px,1.4fr) repeat(4,minmax(70px,1fr))', gap: 8, padding: '9px 13px', color: 'var(--text-muted)', fontSize: 10, borderBottom: '1px solid var(--border)' }}>
               <span>Système</span><span>Réussite</span><span>Qualité</span><span>Preuves</span><span>Dette</span>

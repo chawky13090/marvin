@@ -344,12 +344,17 @@ def forge_evidence_contracts() -> None:
     leaderboard = fetch_json(f"{BACKEND}/api/forge/arena/leaderboard")
     submissions = fetch_json(f"{BACKEND}/api/forge/arena/submissions?limit=1")
     duels = fetch_json(f"{BACKEND}/api/forge/arena/matches/stats")
+    integrity = fetch_json(f"{BACKEND}/api/forge/arena/integrity")
     evidence = fetch_json(f"{BACKEND}/api/knowledge/evidence-summary?limit=1")
     assert isinstance(scenarios.get("scenarios"), list)
     assert isinstance(leaderboard.get("systems"), list)
     assert isinstance(submissions.get("submissions"), list)
     assert isinstance(duels.get("matches"), int)
     assert isinstance(duels.get("pending"), int)
+    assert all(
+        integrity.get(stream, {}).get("valid") is True
+        for stream in ("submissions", "matches", "votes")
+    )
     assert isinstance(evidence.get("records"), int)
     assert "average_epistemic_debt" in evidence
 

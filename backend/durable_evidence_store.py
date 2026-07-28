@@ -20,6 +20,10 @@ _LOCKS_GUARD = threading.Lock()
 _PATH_LOCKS: dict[str, threading.RLock] = {}
 
 
+class DuplicateEvidenceError(ValueError):
+    """Une identité métier existe déjà dans le registre."""
+
+
 def _path_lock(path: Path) -> threading.RLock:
     key = os.path.normcase(str(path.resolve()))
     with _LOCKS_GUARD:
@@ -39,6 +43,55 @@ def _canonical_bytes(record: dict[str, Any]) -> bytes:
 
 def _digest(record: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical_bytes(record)).hexdigest()
+
+
+def _reject_non_finite(value: str) -> None:
+    raise ValueError(f"Constante JSON non finie interdite : {value}")
+
+
+def _integrity_report(
+    stream_name: str,
+    rows: list[dict[str, Any]],
+    corrupt: int,
+) -> dict[str, Any]:
+    previous_hash = None
+    legacy = 0
+    signed = 0
+    errors: list[dict[str, Any]] = []
+    for index, row in enumerate(rows, start=1):
+        actual_hash = _digest(row)
+        declared_hash = row.get("record_hash")
+        if not declared_hash:
+            legacy += 1
+        else:
+            signed += 1
+            if declared_hash != actual_hash:
+                errors.append({"sequence": index, "reason": "record_hash"})
+            if row.get("previous_hash") != previous_hash:
+                errors.append({"sequence": index, "reason": "previous_hash"})
+            if row.get("sequence") != index:
+                errors.append({"sequence": index, "reason": "sequence"})
+        previous_hash = actual_hash
+    valid = corrupt == 0 and not errors
+    integrity_level = (
+        "invalid"
+        if not valid
+        else "mixed_legacy_unsigned"
+        if legacy
+        else "tamper_evident"
+    )
+    return {
+        "stream": stream_name,
+        "valid": valid,
+        "integrity_level": integrity_level,
+        "records": len(rows),
+        "signed_records": signed,
+        "legacy_records": legacy,
+        "corrupt_lines": corrupt,
+        "errors": errors[:50],
+        "last_hash": previous_hash,
+        "retention": "owner_lifecycle",
+    }
 
 
 @contextmanager
@@ -118,7 +171,7 @@ class DurableEvidenceStore:
                 if not line.strip():
                     continue
                 try:
-                    value = json.loads(line)
+                    value = json.loads(line, parse_constant=_reject_non_finite)
                 except (TypeError, ValueError):
                     corrupt += 1
                     continue
@@ -128,47 +181,84 @@ class DurableEvidenceStore:
                     corrupt += 1
         return rows, corrupt
 
-    def append(self, record: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(record, dict):
             raise TypeError("Une preuve doit être un objet.")
         try:
-            normalized = json.loads(
+            return json.loads(
                 json.dumps(record, ensure_ascii=False, allow_nan=False, default=str)
             )
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Preuve non sérialisable : {exc}") from exc
+
+    def _append_unlocked(
+        self,
+        normalized: dict[str, Any],
+        rows: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        previous_hash = _digest(rows[-1]) if rows else None
+        enriched = {
+            **normalized,
+            "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
+            "sequence": len(rows) + 1,
+            "previous_hash": previous_hash,
+        }
+        enriched["record_hash"] = _digest(enriched)
+        encoded = (
+            json.dumps(
+                enriched,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        if len(encoded) > _MAX_RECORD_BYTES:
+            raise ValueError("Une preuve est limitée à 2 Mio.")
+        with self.path.open("ab") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        return enriched
+
+    def append(self, record: dict[str, Any]) -> dict[str, Any]:
+        normalized = self._normalize_record(record)
         with self._thread_lock, _interprocess_lock(self._lock_path):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._repair_partial_tail_unlocked()
             rows, corrupt = self._rows_unlocked()
-            if corrupt:
+            if not _integrity_report(self.stream_name, rows, corrupt)["valid"]:
                 raise RuntimeError(
-                    "Le registre contient une ligne corrompue complète; ajout refusé avant réparation."
+                    "L'intégrité du registre est compromise; ajout refusé avant réparation."
                 )
-            previous_hash = _digest(rows[-1]) if rows else None
-            enriched = {
-                **normalized,
-                "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
-                "sequence": len(rows) + 1,
-                "previous_hash": previous_hash,
-            }
-            enriched["record_hash"] = _digest(enriched)
-            encoded = (
-                json.dumps(
-                    enriched,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    allow_nan=False,
+            return self._append_unlocked(normalized, rows)
+
+    def append_unique(
+        self,
+        record: dict[str, Any],
+        *,
+        unique_fields: tuple[str, ...],
+    ) -> dict[str, Any]:
+        """Ajoute atomiquement une preuve si son identité métier n'existe pas."""
+        normalized = self._normalize_record(record)
+        fields = tuple(str(item).strip() for item in unique_fields if str(item).strip())
+        if not fields or any(field not in normalized for field in fields):
+            raise ValueError("Les champs d'unicité doivent être présents dans la preuve.")
+        with self._thread_lock, _interprocess_lock(self._lock_path):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._repair_partial_tail_unlocked()
+            rows, corrupt = self._rows_unlocked()
+            if not _integrity_report(self.stream_name, rows, corrupt)["valid"]:
+                raise RuntimeError(
+                    "L'intégrité du registre est compromise; ajout refusé avant réparation."
                 )
-                + "\n"
-            ).encode("utf-8")
-            if len(encoded) > _MAX_RECORD_BYTES:
-                raise ValueError("Une preuve est limitée à 2 Mio.")
-            with self.path.open("ab") as stream:
-                stream.write(encoded)
-                stream.flush()
-                os.fsync(stream.fileno())
-            return enriched
+            if any(
+                all(row.get(field) == normalized.get(field) for field in fields)
+                for row in rows
+            ):
+                raise DuplicateEvidenceError("Une preuve avec cette identité existe déjà.")
+            return self._append_unlocked(normalized, rows)
 
     def recent(
         self,
@@ -218,41 +308,4 @@ class DurableEvidenceStore:
     def verify(self) -> dict[str, Any]:
         with self._thread_lock, _interprocess_lock(self._lock_path):
             rows, corrupt = self._rows_unlocked()
-        previous_hash = None
-        legacy = 0
-        signed = 0
-        errors: list[dict[str, Any]] = []
-        for index, row in enumerate(rows, start=1):
-            actual_hash = _digest(row)
-            declared_hash = row.get("record_hash")
-            if not declared_hash:
-                legacy += 1
-            else:
-                signed += 1
-                if declared_hash != actual_hash:
-                    errors.append({"sequence": index, "reason": "record_hash"})
-                if row.get("previous_hash") != previous_hash:
-                    errors.append({"sequence": index, "reason": "previous_hash"})
-                if row.get("sequence") != index:
-                    errors.append({"sequence": index, "reason": "sequence"})
-            previous_hash = actual_hash
-        valid = corrupt == 0 and not errors
-        integrity_level = (
-            "invalid"
-            if not valid
-            else "mixed_legacy_unsigned"
-            if legacy
-            else "tamper_evident"
-        )
-        return {
-            "stream": self.stream_name,
-            "valid": valid,
-            "integrity_level": integrity_level,
-            "records": len(rows),
-            "signed_records": signed,
-            "legacy_records": legacy,
-            "corrupt_lines": corrupt,
-            "errors": errors[:50],
-            "last_hash": previous_hash,
-            "retention": "owner_lifecycle",
-        }
+        return _integrity_report(self.stream_name, rows, corrupt)

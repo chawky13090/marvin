@@ -8338,3 +8338,69 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Rollback : `git revert <commit>`. Le format est additif et les anciens événements restent
   lisibles. La réversion du code ne réécrit ni ne supprime les preuves; l'état matérialisé a
   déjà été restauré par compensation lors de tout échec testé.
+
+## 2026-07-28 — v2.398.0 — Frontier Arena durable, concurrente et fail-closed
+
+### Contexte, alternatives et décision
+
+- Périmètre : soumissions, duels aveugles, votes, classements, API Forge et affichage de
+  l'intégrité. Les formats publics, les réponses complètes nécessaires à la comparaison et les
+  événements historiques sont conservés.
+- Deux approches ont été comparées : conserver trois JSONL avec un verrou de thread, ou les
+  placer derrière le registre de preuves commun avec unicité métier atomique. La seconde est
+  retenue : elle protège aussi contre deux processus Marvin, détecte les altérations et garde
+  le cycle de vie des évaluations sans introduire de base externe.
+- `DurableEvidenceStore.append_unique()` fournit une primitive générique et atomique. Un vote
+  est unique par `match_id`; 30 votes concurrents simulés n'en produisent qu'un.
+- La création automatique de duel ne matérialise plus toutes les paires en O(n²). Elle
+  regroupe en O(n) les soumissions par scénario, choisit un groupe avec deux systèmes puis
+  tire deux candidats distincts. Le classement indexe les soumissions une fois au lieu de
+  relire le registre pour chaque vote.
+
+### Revue de sécurité obligatoire
+
+- Une chaîne signée altérée ne peut plus être prolongée : `append` et `append_unique` vérifient
+  l'historique sous verrou avant écriture et refusent toute corruption complète ou
+  cryptographique. Les constantes JSON non finies (`NaN`, infinis) sont aussi classées comme
+  corruption au lieu de contourner la sérialisation canonique.
+- Classement, duel, vote et création de duel passent en échec fermé si l'un des trois registres
+  est invalide. Les mutations API renvoient HTTP 409; l'UI distingue preuve vérifiable,
+  historique non signé et intégrité compromise.
+- `cost` refuse NaN, infini, négatif et valeurs excessives. Durée, interventions et violations
+  de confidentialité sont bornées. Les sources sont limitées à 200, projetées sur des champs
+  autorisés, leurs extraits et alias sont bornés, et seules les URLs HTTP(S) sans identifiants
+  et sur port standard sont conservées. Les scorecards doivent contenir exactement A et B.
+- Les contenus de source restent des données non fiables analysées par Evidence Fabric et ne
+  reçoivent aucun droit d'outil. React encode les réponses; les liens sortants utilisent déjà
+  `noopener/noreferrer`.
+- Dette de sécurité explicitement bornée : les outputs complets sont volontairement conservés
+  pour permettre les duels et audits. Ils résident dans `DATA_DIR` sous les droits du compte
+  Windows mais ne sont pas chiffrés individuellement par l'application. La tranche de
+  protection globale des données au repos devra comparer ACL renforcées, BitLocker et
+  chiffrement applicatif portable avant promotion du domaine `security`; aucune donnée Arena
+  n'est envoyée à un service externe par cette migration.
+- Dette historique réelle : 2 soumissions, 2 matchs et 1 vote cohérents mais non signés.
+  L'interface les signale comme historiques; aucune signature rétroactive n'est fabriquée.
+
+### Journalisation, validation et rollback
+
+- Ces fichiers sont des registres d'évaluation, pas des logs techniques : conservation par
+  archivage ou suppression explicite. Aucun secret ni contenu Arena n'est copié dans un log
+  technique. Les erreurs API restent génériques et ne retournent ni chemin ni contenu.
+- Tests ciblés observés : héritage, chaîne SHA-256, unicité concurrente, crash partiel,
+  altération et refus d'extension; Arena complète, score, preuve, duel explicite et automatique,
+  vote concurrent, bornes numériques, URL dangereuse, classement bloqué après altération.
+- Inventaire observé : 13 JSONL classifiés, 3 logs structurés, 4 registres d'évaluation
+  structurés et 3 flux métier structurés.
+- Gate rapide réel : 167/167 étapes, 344 outils, 350 routes, 236 fichiers Python compilés et
+  zéro erreur ESLint; les 37 avertissements frontend historiques restent inventoriés pour la
+  tranche UX et ne sont pas confondus avec une validation de sécurité.
+- Backend réel redémarré en 2.398.0 avec Ollama connecté; smoke HTTP/Next.js : 28/28 contrats.
+- Validation navigateur réelle de `/forge` : « Registres Arena mixtes · 0 preuve(s)
+  chaînée(s) · 5 historique(s) non signé(s) »; aucune erreur ni alerte console.
+- Références : https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing,
+  https://learn.microsoft.com/en-us/azure/architecture/patterns/compensating-transaction et
+  https://owasp.org/www-project-top-ten/
+- Rollback applicatif : `git revert <commit>`. Le format enrichi est additif; les lecteurs
+  historiques restent compatibles. La réversion ne supprime aucune preuve ajoutée et les
+  registres existants ne sont jamais réécrits pendant la migration.

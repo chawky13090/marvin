@@ -129,6 +129,8 @@ async def arena_submission_create(payload: ArenaSubmissionPayload):
         )}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/arena/submissions")
@@ -144,6 +146,11 @@ async def arena_leaderboard():
     return frontier_arena.leaderboard()
 
 
+@router.get("/arena/integrity")
+async def arena_integrity():
+    return frontier_arena.evidence_integrity()
+
+
 @router.post("/arena/matches")
 async def arena_match_create(payload: ArenaMatchPayload):
     try:
@@ -153,6 +160,8 @@ async def arena_match_create(payload: ArenaMatchPayload):
         )}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/arena/matches/stats")
@@ -162,7 +171,10 @@ async def arena_match_stats():
 
 @router.get("/arena/matches/{match_id}")
 async def arena_match_detail(match_id: str):
-    match = frontier_arena.get_blind_match(match_id)
+    try:
+        match = frontier_arena.get_blind_match(match_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not match:
         raise HTTPException(status_code=404, detail="Duel Arena introuvable.")
     return {"match": match}
@@ -179,3 +191,5 @@ async def arena_match_vote(match_id: str, payload: ArenaVotePayload):
         )}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

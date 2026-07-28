@@ -1,8 +1,10 @@
 """Régressions déterministes Evidence Fabric et Frontier Arena."""
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
@@ -124,11 +126,106 @@ def main() -> int:
             )
             assert result["voted"] is True
             assert result["candidates"]["A"]["system"] in {"Marvin", "Frontier importé"}
-            assert frontier_arena.blind_stats() == {"matches": 1, "votes": 1, "pending": 0}
+            assert frontier_arena.blind_stats() == {
+                "matches": 1,
+                "votes": 1,
+                "pending": 0,
+                "trusted": True,
+            }
             ranking = frontier_arena.leaderboard()["systems"]
             assert ranking[0]["system"] == "Marvin"
             assert ranking[0]["evidence_score"] == 1.0
             assert sum(item["blind_matches"] for item in ranking) == 2
+            integrity = frontier_arena.evidence_integrity()
+            assert all(item["valid"] for item in integrity.values())
+            assert all(
+                item["integrity_level"] == "tamper_evident"
+                for item in integrity.values()
+            )
+
+            concurrent_match = frontier_arena.create_blind_match(
+                submission_ids=[strong["id"], weak["id"]],
+            )
+
+            def concurrent_vote(_: int) -> bool:
+                try:
+                    frontier_arena.vote_blind_match(
+                        concurrent_match["id"],
+                        winner="TIE",
+                        scores={
+                            "A": {
+                                "correctness": 4,
+                                "completeness": 4,
+                                "evidence": 4,
+                                "usefulness": 4,
+                            },
+                            "B": {
+                                "correctness": 4,
+                                "completeness": 4,
+                                "evidence": 4,
+                                "usefulness": 4,
+                            },
+                        },
+                    )
+                    return True
+                except ValueError:
+                    return False
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                vote_results = list(pool.map(concurrent_vote, range(30)))
+            assert vote_results.count(True) == 1
+            assert frontier_arena.blind_stats() == {
+                "matches": 2,
+                "votes": 2,
+                "pending": 0,
+                "trusted": True,
+            }
+            automatic_match = frontier_arena.create_blind_match(
+                scenario_id="arena-evidence"
+            )
+            assert automatic_match["scenario_id"] == "arena-evidence"
+            assert automatic_match["voted"] is False
+            assert frontier_arena.blind_stats()["pending"] == 1
+
+            for invalid in (
+                {"cost": float("nan")},
+                {"duration_ms": -1},
+                {"sources": [{"url": "javascript:alert(1)"}]},
+                {"sources": [{"url": "https://user:secret@example.test/source"}]},
+            ):
+                try:
+                    frontier_arena.submit(
+                        scenario_id="arena-evidence",
+                        system="Entrée invalide",
+                        answer="Le fait est confirmé.",
+                        **invalid,
+                    )
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError(f"Entrée Arena dangereuse acceptée : {invalid}")
+
+            submission_lines = frontier_arena.SUBMISSIONS_PATH.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            altered = json.loads(submission_lines[0])
+            altered["answer"] = "Réponse altérée après signature."
+            submission_lines[0] = json.dumps(altered, ensure_ascii=False)
+            frontier_arena.SUBMISSIONS_PATH.write_text(
+                "\n".join(submission_lines) + "\n",
+                encoding="utf-8",
+            )
+            blocked = frontier_arena.leaderboard()
+            assert blocked["systems"] == []
+            assert blocked["blocked_reason"] == "arena_evidence_integrity_invalid"
+            try:
+                frontier_arena.create_blind_match(
+                    submission_ids=[strong["id"], weak["id"]],
+                )
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("Une Arena altérée ne doit plus créer de duel.")
         finally:
             forge.SCENARIOS_PATH = old_scenarios
             forge.RUNS_PATH = old_runs

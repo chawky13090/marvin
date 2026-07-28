@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.397.0)
+## 9. État actuel (v2.398.0)
+
+**v2.398 (preuves Frontier Arena)** : soumissions, matchs et votes utilisent trois registres
+append-only chaînés. Le vote est atomiquement unique par duel, y compris entre processus.
+Métriques, sources, URLs et identifiants sont bornés; une chaîne altérée ne peut plus être
+prolongée. Classements, duels et mutations passent en échec fermé si une preuve est compromise,
+et Forge affiche séparément les preuves chaînées et les événements historiques non signés.
 
 **v2.397 (preuves et transport Engineering Radar)** : les changements de sources officielles
 utilisent le registre append-only chaîné et l'interface expose honnêtement son niveau

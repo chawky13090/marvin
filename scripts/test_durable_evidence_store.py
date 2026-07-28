@@ -58,6 +58,26 @@ def run() -> None:
         assert [item["cursor"] for item in second_page["records"]] == list(range(8, 15))
         assert first_page["cursor"] == 7 and second_page["cursor"] == 14
 
+        unique_path = root / "unique.jsonl"
+
+        def append_same_vote(index: int) -> bool:
+            independent = DurableEvidenceStore(unique_path, stream_name="test.unique")
+            try:
+                independent.append_unique(
+                    {"id": f"vote-{index}", "match_id": "match-1"},
+                    unique_fields=("match_id",),
+                )
+                return True
+            except ValueError:
+                return False
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            outcomes = list(pool.map(append_same_vote, range(50)))
+        assert outcomes.count(True) == 1
+        unique = DurableEvidenceStore(unique_path, stream_name="test.unique")
+        assert unique.verify()["integrity_level"] == "tamper_evident"
+        assert unique.verify()["records"] == 1
+
         partial_path = root / "partial.jsonl"
         partial_store = DurableEvidenceStore(partial_path, stream_name="test.partial")
         partial_store.append({"id": "before-crash"})
@@ -81,6 +101,17 @@ def run() -> None:
         else:
             raise AssertionError("Une ligne corrompue complète doit bloquer l'ajout.")
 
+        non_finite_path = root / "non-finite.jsonl"
+        non_finite_path.write_text('{"score":NaN}\n', encoding="utf-8")
+        non_finite = DurableEvidenceStore(non_finite_path, stream_name="test.non-finite")
+        assert non_finite.verify()["valid"] is False
+        try:
+            non_finite.append({"id": "refused"})
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Une constante JSON non finie doit bloquer l'ajout.")
+
         tampered_rows = concurrent_path.read_text(encoding="utf-8").splitlines()
         tampered = json.loads(tampered_rows[10])
         tampered["id"] = "altered"
@@ -89,6 +120,12 @@ def run() -> None:
         detected = concurrent.verify()
         assert detected["valid"] is False
         assert any(error["reason"] == "record_hash" for error in detected["errors"])
+        try:
+            concurrent.append({"id": "must-not-extend-tampered-chain"})
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Une chaîne altérée ne doit jamais être prolongée.")
 
     print(
         "Durable Evidence Store OK - héritage, chaîne SHA-256, concurrence, "

@@ -44,9 +44,9 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `engineering_radar.py` — `events.jsonl` | domain_event_stream | Radar documentaire | avec l'état Radar | structuré |
 | `mission_os.py` — `mission_events.jsonl` | domain_event_stream | Mission OS | avec la mission | structuré |
 | `forge.py` — `forge_runs.jsonl` | evaluation_ledger | Marvin Forge | avec le corpus Forge | structuré |
-| `frontier_arena.py` — `frontier_arena_submissions.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | à consolider |
-| `frontier_arena.py` — `frontier_arena_matches.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | à consolider |
-| `frontier_arena.py` — `frontier_arena_votes.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | à consolider |
+| `frontier_arena.py` — `frontier_arena_submissions.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
+| `frontier_arena.py` — `frontier_arena_matches.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
+| `frontier_arena.py` — `frontier_arena_votes.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
 | `model_market.py` — `model_market_observations.jsonl` | evaluation_ledger | Model Market | archivage explicite | à consolider |
 | `research_swarm.py` — `research_swarm_runs.jsonl` | evaluation_ledger | Research Swarm | archivage explicite | à consolider |
 | `truth_ledger.py` — `truth_ledger.jsonl` | truth_ledger | Memory Mesh | contrat mémoire | à consolider |
@@ -59,9 +59,9 @@ backend/coding_mission.py|events.jsonl|domain_event_stream|owner_lifecycle|struc
 backend/engineering_radar.py|events.jsonl|domain_event_stream|owner_lifecycle|structured
 backend/mission_os.py|mission_events.jsonl|domain_event_stream|owner_lifecycle|structured
 backend/forge.py|forge_runs.jsonl|evaluation_ledger|owner_lifecycle|structured
-backend/frontier_arena.py|frontier_arena_submissions.jsonl|evaluation_ledger|explicit_archive|pending
-backend/frontier_arena.py|frontier_arena_matches.jsonl|evaluation_ledger|explicit_archive|pending
-backend/frontier_arena.py|frontier_arena_votes.jsonl|evaluation_ledger|explicit_archive|pending
+backend/frontier_arena.py|frontier_arena_submissions.jsonl|evaluation_ledger|explicit_archive|structured
+backend/frontier_arena.py|frontier_arena_matches.jsonl|evaluation_ledger|explicit_archive|structured
+backend/frontier_arena.py|frontier_arena_votes.jsonl|evaluation_ledger|explicit_archive|structured
 backend/model_market.py|model_market_observations.jsonl|evaluation_ledger|explicit_archive|pending
 backend/research_swarm.py|research_swarm_runs.jsonl|evaluation_ledger|explicit_archive|pending
 backend/truth_ledger.py|truth_ledger.jsonl|truth_ledger|memory_contract|pending

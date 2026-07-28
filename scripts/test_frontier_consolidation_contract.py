@@ -84,8 +84,8 @@ def run() -> dict[str, int]:
     if "amélioration proactive" not in text.lower():
         raise ContractError("L'amélioration proactive doit rester obligatoire par tranche.")
     if (
-        "inventaire 13 JSONL, preuves Forge, Mission OS, Coding Mission "
-        "et Engineering Radar chaînées"
+        "inventaire 13 JSONL, preuves Forge, Mission OS, Coding Mission, "
+        "Engineering Radar et Frontier Arena chaînées"
     ) not in text:
         raise ContractError("La preuve d'inventaire des persistances JSONL doit rester visible.")
     for requirement in (
