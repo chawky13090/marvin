@@ -175,7 +175,7 @@ echo.
 echo [5/9] Nettoyage des environnements copies de l'autre PC...
 if exist "backend\.venv" ( rmdir /s /q "backend\.venv" & echo   - backend\.venv supprime )
 if exist ".next" ( rmdir /s /q ".next" & echo   - .next supprime )
-:: node_modules contient des binaires NATIFS (better-sqlite3) compiles pour le Node
+:: node_modules peut contenir des binaires natifs compiles pour le Node
 :: de l'AUTRE PC -> on le supprime pour forcer npm a recuperer les bons binaires.
 if exist "node_modules" ( rmdir /s /q "node_modules" & echo   - node_modules supprime )
 echo   [OK] Pret pour une installation propre.
@@ -207,14 +207,14 @@ if errorlevel 1 ( echo   [ERREUR] Installation npm echouee. & popd & pause & exi
 echo   [OK] Frontend pret.
 echo.
 
-:: --- Verification des modules natifs (better-sqlite3, sharp) compiles pour CE PC ---
+:: --- Verification du module natif sharp compile pour CE PC ---
 echo   Verification des modules natifs Node...
-node -e "require('better-sqlite3'); require('sharp');" >nul 2>&1
+node -e "require('sharp');" >nul 2>&1
 if errorlevel 1 (
     echo   [ATTENTION] Un module natif n'a pas pu se charger. Correction automatique...
-    call npm rebuild better-sqlite3 sharp
+    call npm rebuild sharp
 )
-node -e "require('better-sqlite3'); require('sharp'); console.log('   [OK] better-sqlite3 + sharp charges.');" 2>nul || echo   [ERREUR] Modules natifs toujours KO -^> supprimez node_modules puis relancez ce script.
+node -e "require('sharp'); console.log('   [OK] sharp charge.');" 2>nul || echo   [ERREUR] Module natif toujours KO -^> supprimez node_modules puis relancez ce script.
 if not exist "node_modules\electron\dist\electron.exe" (
     echo   [INFO] Preparation du runtime optionnel Marvin Avatar...
     node node_modules\electron\install.js

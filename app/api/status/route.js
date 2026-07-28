@@ -1,13 +1,12 @@
 // API de vérification de l'état des services
 import { listOllamaModels } from '@/lib/ollama';
-import { getSetting } from '@/lib/database/queries';
 import { BACKEND_URL as BACKEND } from '@/lib/backend';
+import { getBackendSetting } from '@/lib/backendSettings';
 
 export async function GET() {
-  const selectedModel = getSetting('active_model') || null;
-
-  // Charger les modèles Ollama et les credentials en parallèle
-  const [models, credGroups] = await Promise.all([
+  // Charger le réglage, les modèles et les credentials en parallèle.
+  const [selectedModel, models, credGroups] = await Promise.all([
+    getBackendSetting('active_model', null).catch(() => null),
     listOllamaModels(),
     fetch(`${BACKEND}/api/credentials`, { signal: AbortSignal.timeout(3000) })
       .then(r => r.json())

@@ -1,7 +1,28 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getSetting, setSetting } from '@/lib/database/queries';
 import { getActiveModel, listOllamaModels } from '@/lib/ollama';
 import { BACKEND_URL as BACKEND } from '@/lib/backend';
+import { getBackendSetting, setBackendSetting } from '@/lib/backendSettings';
+
+
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+
+function validModelName(value) {
+  return typeof value === 'string' && MODEL_NAME.test(value);
+}
+
+function reportFailure(action, error) {
+  const incident = randomUUID();
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: 'error',
+    component: 'next.settings',
+    action,
+    incident,
+    error_type: error?.constructor?.name || 'Error',
+  }));
+  return incident;
+}
 
 // v2.107 — les actions mémoire (get/create/delete/clear) proxient désormais vers le
 // backend Python (voir app/api/conversations/route.js pour le contexte général) : elles
@@ -10,9 +31,11 @@ import { BACKEND_URL as BACKEND } from '@/lib/backend';
 // list/set_model) reste ici : elle n'a pas d'équivalent Python (spawn de processus local).
 export async function GET() {
   try {
-    const activeModel = await getActiveModel();
-    const selectedModel = getSetting('active_model') || null;
-    const models = await listOllamaModels();
+    const [selectedModel, models] = await Promise.all([
+      getBackendSetting('active_model', null),
+      listOllamaModels(),
+    ]);
+    const activeModel = await getActiveModel(selectedModel);
     return NextResponse.json({
       success: true,
       activeModel,
@@ -20,7 +43,11 @@ export async function GET() {
       models
     });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const incident = reportFailure('read', error);
+    return NextResponse.json(
+      { error: 'Réglages temporairement indisponibles.', incident },
+      { status: 503 },
+    );
   }
 }
 
@@ -30,21 +57,18 @@ export async function POST(req) {
     const { action, modelName } = body;
     
     if (action === 'set_model') {
-      if (!modelName) {
-        return NextResponse.json({ error: 'modelName requis' }, { status: 400 });
+      if (!validModelName(modelName)) {
+        return NextResponse.json({ error: 'modelName invalide' }, { status: 400 });
       }
-      setSetting('active_model', modelName);
-      console.log('[API Settings] Nouveau modèle actif défini dans la BD :', modelName);
+      await setBackendSetting('active_model', modelName);
       return NextResponse.json({ success: true, message: `Modèle actif défini sur ${modelName}` });
     }
     
     if (action === 'pull_model') {
-      if (!modelName) {
-        return NextResponse.json({ error: 'modelName requis' }, { status: 400 });
+      if (!validModelName(modelName)) {
+        return NextResponse.json({ error: 'modelName invalide' }, { status: 400 });
       }
       const { spawn } = await import('child_process');
-      console.log(`[API Settings] Téléchargement asynchrone du modèle : ${modelName}`);
-      
       const process = spawn('ollama', ['pull', modelName], {
         detached: true,
         stdio: 'ignore'
@@ -63,8 +87,8 @@ export async function POST(req) {
     }
 
     if (action === 'delete_model') {
-      if (!modelName) {
-        return NextResponse.json({ error: 'modelName requis' }, { status: 400 });
+      if (!validModelName(modelName)) {
+        return NextResponse.json({ error: 'modelName invalide' }, { status: 400 });
       }
       try {
         const ollamaURL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/v1$/, '').replace('localhost', '127.0.0.1');
@@ -77,8 +101,12 @@ export async function POST(req) {
           return NextResponse.json({ success: true, message: `Modèle "${modelName}" supprimé.` });
         }
         return NextResponse.json({ error: 'Échec suppression' }, { status: 500 });
-      } catch (err) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+      } catch (error) {
+        const incident = reportFailure('delete_model', error);
+        return NextResponse.json(
+          { error: 'Suppression impossible.', incident },
+          { status: 503 },
+        );
       }
     }
 
@@ -123,6 +151,10 @@ export async function POST(req) {
     
     return NextResponse.json({ error: 'Action non reconnue' }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const incident = reportFailure('write', error);
+    return NextResponse.json(
+      { error: 'Action de réglage impossible.', incident },
+      { status: 503 },
+    );
   }
 }

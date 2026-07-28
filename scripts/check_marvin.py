@@ -27,6 +27,11 @@ class Stage:
     name: str
     command: tuple[str, ...] | None = None
     action: str | None = None
+    timeout_seconds: int = 180
+
+    def __post_init__(self) -> None:
+        if not 10 <= self.timeout_seconds <= 900:
+            raise ValueError("Le timeout d'une étape doit être compris entre 10 et 900 s.")
 
 
 def npm_command() -> str:
@@ -61,8 +66,15 @@ def run_stage(stage: Stage) -> tuple[bool, float]:
             cwd=ROOT,
             env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
             check=False,
+            timeout=stage.timeout_seconds,
         )
         return completed.returncode == 0, time.perf_counter() - started
+    except subprocess.TimeoutExpired:
+        print(
+            f"ECHEC: étape interrompue après {stage.timeout_seconds} secondes.",
+            file=sys.stderr,
+        )
+        return False, time.perf_counter() - started
     except (OSError, RuntimeError, py_compile.PyCompileError) as exc:
         print(f"ECHEC: {exc}", file=sys.stderr)
         return False, time.perf_counter() - started
@@ -114,11 +126,15 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Moteur cron et reprises longues", (python, "scripts/test_cron_runtime.py")),
         Stage("Migrations SQLite transactionnelles", (python, "scripts/test_db_migrations.py")),
         Stage("Composition déterministe de SQLite", (python, "scripts/test_database_bootstrap.py")),
-        Stage("Initialisation SQLite Next.js", ("node", "--no-warnings", "scripts/test_database_init.mjs")),
+        Stage(
+            "Frontière de persistance unique FastAPI",
+            ("node", "--no-warnings", "scripts/test_frontend_persistence_boundary.mjs"),
+        ),
         Stage("Repository conversations et messages", (python, "scripts/test_conversation_repository.py")),
         Stage("Repository des connexions SSH", (python, "scripts/test_ssh_connection_repository.py")),
         Stage("Repository des workflows", (python, "scripts/test_workflow_repository.py")),
         Stage("Repository des paramètres", (python, "scripts/test_settings_repository.py")),
+        Stage("API bornée des paramètres", (python, "scripts/test_settings_api.py")),
         Stage(
             "Repositories mémoires, tâches et notes",
             (python, "scripts/test_personal_data_repositories.py"),

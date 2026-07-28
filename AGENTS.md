@@ -196,7 +196,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.425.0)
+## 9. État actuel (v2.426.0)
+
+**v2.426 (propriétaire SQLite unique)** : Next.js ne charge plus `better-sqlite3`, ne crée
+plus de schéma et ne lit/écrit plus directement `secretary.db`. Le réglage `active_model`
+passe par FastAPI avec clé, modèle, taille et timeout bornés; les erreurs Next sont expurgées
+et corrélées. Le binaire natif disparaît du runtime, du démarrage, de l'installateur et de
+Turbopack. Next.js passe de 16.2.6 à 16.2.12 et `sharp` à 0.35.3 via override contrôlé pour
+fermer les avis publiés; `npm audit --omit=dev` retourne zéro vulnérabilité. La façade et les
+parcours historiques restent identiques. Le rollback est la réversion atomique du commit.
+Le gate impose aussi un timeout de 180 secondes par étape afin qu'une dépendance suspendue
+ou un PC mis en veille ne bloque plus indéfiniment la validation; l'étape est alors signalée
+en échec avec sa durée au lieu de masquer la progression.
 
 **v2.425 (bootstrap SQLite déterministe)** : l'unique fonction active de `database.py`
 rejoint `database_bootstrap.py`. L'ordre des treize repositories, la migration OAuth externe,

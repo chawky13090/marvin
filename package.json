@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.425.0",
+  "version": "2.426.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -36,9 +36,10 @@
     "check:cron-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_cron_runtime.py",
     "check:db-migrations": "backend\\.venv\\Scripts\\python.exe scripts\\test_db_migrations.py",
     "check:database-bootstrap": "backend\\.venv\\Scripts\\python.exe scripts\\test_database_bootstrap.py",
-    "check:database-init": "node --no-warnings scripts/test_database_init.mjs",
+    "check:frontend-persistence": "node --no-warnings scripts/test_frontend_persistence_boundary.mjs",
     "check:conversation-repository": "backend\\.venv\\Scripts\\python.exe scripts\\test_conversation_repository.py",
     "check:settings-repository": "backend\\.venv\\Scripts\\python.exe scripts\\test_settings_repository.py",
+    "check:settings-api": "backend\\.venv\\Scripts\\python.exe scripts\\test_settings_api.py",
     "check:personal-data-repositories": "backend\\.venv\\Scripts\\python.exe scripts\\test_personal_data_repositories.py",
     "check:event-repository": "backend\\.venv\\Scripts\\python.exe scripts\\test_event_repository.py",
     "check:project-artifact-repositories": "backend\\.venv\\Scripts\\python.exe scripts\\test_project_artifact_repositories.py",
@@ -120,7 +121,6 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "ai": "^6.0.191",
-    "better-sqlite3": "^12.10.0",
     "dompurify": "3.4.12",
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.5",
@@ -128,7 +128,7 @@
     "mammoth": "^1.12.0",
     "marked": "^18.0.4",
     "mime-types": "^3.0.2",
-    "next": "16.2.6",
+    "next": "16.2.12",
     "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -143,6 +143,7 @@
   "overrides": {
     "@babel/core": "7.29.7",
     "js-yaml": "4.3.0",
-    "postcss": "8.5.19"
+    "postcss": "8.5.19",
+    "sharp": "0.35.3"
   }
 }

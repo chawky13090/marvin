@@ -9948,3 +9948,63 @@ Validation finale observée : gate consolidé **190/190**, dont compilation Pyth
 erreur et build Next.js 16.2.6 Turbopack. Smokes live API **28/28** et pages **40/40**.
 Backend v2.425.0 relancé avec Ollama disponible, 344 outils et 15 workers; frontend
 Turbopack relancé et HTTP 200.
+## 2026-07-28 — v2.426.0 — Propriétaire SQLite unique et dépendances frontend corrigées
+
+### Constat et décision
+
+Après extraction du bootstrap Python, l'audit des 62 consommateurs de la façade a révélé une
+seconde autorité cachée : Next.js ouvrait encore `data/secretary.db` avec `better-sqlite3`,
+recréait un schéma historique de près de 300 lignes et utilisait cette connexion uniquement
+pour `active_model`. Deux solutions ont été comparées : conserver une lecture SQLite Node
+en mode restreint, ou faire passer le dernier réglage par l'API FastAPI déjà autoritative.
+La seconde est retenue : un seul propriétaire de schéma et de transaction, moins de divergence,
+moins de verrous multi-runtime et suppression d'un module natif lié à l'ABI Node.
+
+### Implémentation, sécurité et logs
+
+- `backendSettings.js` borne les clés, utilise un timeout de cinq secondes et appelle FastAPI ;
+- les routes Settings et Status conservent leur contrat JSON, mais `active_model` est lu et
+  écrit par `/api/settings/active_model` ;
+- l'API FastAPI borne clé, format et valeur sérialisée à 1 Mio ;
+- les noms de modèles acceptés par les actions Next sont bornés à 128 caractères et à une
+  liste de caractères compatible Ollama ;
+- les erreurs Next ne retournent plus `error.message`; elles exposent un incident UUID et
+  journalisent uniquement date, niveau, composant, action et classe ;
+- `lib/database/*`, `better-sqlite3`, sa configuration Turbopack et ses réparations
+  installateur/démarrage sont retirés ;
+- le test de frontière vérifie statiquement qu'aucun chemin de réintroduction ne subsiste.
+
+L'audit npm a également identifié Next.js 16.2.6 et son `sharp` transitif 0.34.5. Les avis
+GitHub publiés le 21 juillet indiquent que les branches Next 16 antérieures à 16.2.11 sont
+affectées par un contournement d'autorisation Turbopack et un déni de service App Router,
+sans contournement disponible pour ce dernier. Next passe à 16.2.12 et `sharp` est forcé à
+0.35.3, version corrigée compatible avec le build observé.
+
+Sources primaires :
+
+- https://github.com/advisories/GHSA-6gpp-xcg3-4w24
+- https://github.com/advisories/GHSA-m99w-x7hq-7vfj
+- https://github.com/advisories/GHSA-89xv-2m56-2m9x
+- https://github.com/advisories/GHSA-f88m-g3jw-g9cj
+
+### Tests et rollback
+
+Tests ciblés observés : runtime Node avec `sharp` 0.35.3, frontière frontend, validation HTTP
+des réglages, repository, composition FastAPI et architecture 344/344. `npm audit --omit=dev`
+retourne zéro vulnérabilité. Aucun schéma ni contenu utilisateur n'est migré : la valeur
+`active_model` existante reste dans la même table SQLite et change uniquement de propriétaire
+d'accès. Rollback exact : `git revert <commit-v2.426>`, puis `npm ci`; aucune migration
+descendante de donnée n'est nécessaire.
+
+Le premier gate hors ligne a été suspendu pendant la mise en veille du PC puis a expiré au
+réveil sans résultat exploitable. Ce n'était pas une panne de Marvin : Ollama était resté
+actif et backend/frontend avaient été arrêtés volontairement avant le build. Le gate possède
+désormais un timeout explicite de 180 secondes par étape; une commande bloquée produit un
+échec localisé et ne peut plus immobiliser toute la validation.
+
+Validation finale observée : gate consolidé **191/191**, compilation, lint sans erreur et
+build Next.js 16.2.12 Turbopack avec `sharp` 0.35.3. Smokes live API **28/28** et pages
+**40/40**. La lecture puis l'écriture idempotente réelle de `active_model` via Next.js
+réussissent, la valeur initiale est préservée, `/api/status` projette la même valeur et un nom
+invalide retourne HTTP 400. Backend v2.426.0 et frontend sont relancés; Ollama est disponible,
+344 outils et 15 workers sont actifs.

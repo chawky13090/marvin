@@ -27,12 +27,12 @@ if not exist "%~dp0node_modules" (
     pause
     exit /b 1
 )
-node -e "require('better-sqlite3'); require('sharp')" >nul 2>&1
+node -e "require('sharp')" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo       Modules Node natifs incompatibles - reconstruction automatique...
     set "PYTHON=%~dp0backend\.venv\Scripts\python.exe"
     set "npm_config_cache=%~dp0.npm-cache"
-    call npm rebuild better-sqlite3 sharp
+    call npm rebuild sharp
     if errorlevel 1 (
         echo [ERREUR] Reconstruction impossible. Lancez INSTALLER-NOUVEAU-PC.bat.
         pause

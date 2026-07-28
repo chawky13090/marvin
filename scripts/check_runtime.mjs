@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -29,13 +29,11 @@ for (const relativePath of ["package-lock.json", "node_modules", "backend/.venv/
   }
 }
 
-for (const moduleName of ["better-sqlite3", "sharp"]) {
+for (const moduleName of ["sharp"]) {
   try {
-    require(moduleName);
-    const packageJson = JSON.parse(
-      readFileSync(require.resolve(`${moduleName}/package.json`), "utf8"),
-    );
-    ok(`${moduleName} ${packageJson.version} charge correctement`);
+    const loaded = require(moduleName);
+    const version = loaded?.versions?.[moduleName] || "version chargée";
+    ok(`${moduleName} ${version} charge correctement`);
   } catch (error) {
     fail(
       `${moduleName} ne charge pas avec Node ABI ${process.versions.modules}: ${error.message}`,
@@ -45,7 +43,7 @@ for (const moduleName of ["better-sqlite3", "sharp"]) {
 
 if (failures.length) {
   console.error(
-    "\nRuntime invalide. Lancez INSTALLER-NOUVEAU-PC.bat ou npm rebuild better-sqlite3 sharp.",
+    "\nRuntime invalide. Lancez INSTALLER-NOUVEAU-PC.bat ou npm rebuild sharp.",
   );
   process.exit(1);
 }

@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.425.0
+Version courante auditée : 2.426.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -446,6 +446,10 @@ En v2.425.0, le bootstrap SQLite quitte la façade `database.py`. Les treize rep
 la migration de secrets externe, la frontière de commit et les migrations SQL forment un
 composition root déterministe, injectable et testé en panne. `database.py` ne contient plus
 de fonction active : il reste une façade de compatibilité, sans changement d'identité publique.
+En v2.426.0, la dernière écriture SQLite côté Next.js disparaît : FastAPI devient le seul
+propriétaire du fichier, du schéma et du réglage `active_model`. `better-sqlite3` et ses
+contraintes ABI quittent la dépendance, le preflight, l'installateur et Turbopack. Les
+frontières HTTP sont bornées et les erreurs Next corrélées sans contenu interne.
 
 ## 10. Preuves minimales par grande capacité
 

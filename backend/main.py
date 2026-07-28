@@ -27,6 +27,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.421 — événements SSE orphelins archivés et intégrité défensive
 # v2.420 — sauvegardes AES-256-GCM, clé DPAPI et migration réversible
 
+# v2.426 — FastAPI propriétaire SQLite unique, runtime Node natif allégé
 # v2.425 — composition SQLite déterministe extraite de la façade database
 # v2.424 — OAuth unifié dans FastAPI et jetons historiques migrés vers DPAPI
 

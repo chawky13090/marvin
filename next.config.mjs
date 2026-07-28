@@ -5,9 +5,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Autoriser better-sqlite3 (module natif Node.js) côté serveur
-  serverExternalPackages: ['better-sqlite3'],
-
   // Épingle la racine du projet : évite le warning "multiple lockfiles" si un
   // package-lock.json traîne ailleurs (ex. dans C:\Users\<toi>\).
   turbopack: { root: __dirname },

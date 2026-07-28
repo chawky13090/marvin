@@ -1,9 +1,10 @@
 """Routes de lecture et d'écriture des paramètres Marvin."""
 
-from typing import Literal
+import json
+from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Path
+from pydantic import BaseModel, field_validator
 
 import database as db
 import cloud_routing
@@ -14,6 +15,28 @@ router = APIRouter(tags=["settings"])
 
 class PrivacyPresetRequest(BaseModel):
     preset: Literal["normal", "hyper", "cloud_max", "ultra"]
+
+
+class SettingValueRequest(BaseModel):
+    value: Any
+
+    @field_validator("value")
+    @classmethod
+    def validate_size(cls, value: Any) -> Any:
+        try:
+            serialized = value if isinstance(value, str) else json.dumps(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Valeur non sérialisable.") from exc
+        if len(serialized.encode("utf-8")) > 1_048_576:
+            raise ValueError("Valeur de réglage trop volumineuse.")
+        return value
+
+
+SettingKey = Path(
+    min_length=1,
+    max_length=128,
+    pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+)
 
 
 def _privacy_state() -> dict:
@@ -71,12 +94,11 @@ async def set_privacy_preset(payload: PrivacyPresetRequest):
 
 
 @router.get("/api/settings/{key}")
-async def get_setting(key: str):
+async def get_setting(key: str = SettingKey):
     return {"key": key, "value": db.get_setting(key)}
 
 
 @router.put("/api/settings/{key}")
-async def set_setting(key: str, request: Request):
-    body = await request.json()
-    db.set_setting(key, body.get("value"))
+async def set_setting(payload: SettingValueRequest, key: str = SettingKey):
+    db.set_setting(key, payload.value)
     return {"success": True}
