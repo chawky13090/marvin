@@ -24,6 +24,14 @@ from repositories.conversations import (
     update_conversation_title,
     upgrade_conversation_title_silent,
 )
+from repositories.cron_jobs import (
+    create_cron_job,
+    delete_cron_job,
+    get_cron_job,
+    list_cron_jobs,
+    repository as cron_job_repository,
+    update_cron_job,
+)
 from repositories.events import (
     count_events_by_source,
     create_event,
@@ -59,6 +67,12 @@ from repositories.notes import (
     list_notes,
     update_note,
 )
+from repositories.network_inventory import (
+    get_network_devices,
+    repository as network_inventory_repository,
+    set_network_device_notes,
+    upsert_network_device,
+)
 from repositories.projects import (
     create_project,
     delete_project,
@@ -77,12 +91,24 @@ from repositories.ssh_connections import (
     update_ssh_connection,
 )
 from repositories.settings import get_setting, set_setting
+from repositories.system_snapshots import (
+    get_system_snapshots,
+    repository as system_snapshot_repository,
+    save_system_snapshot,
+)
 from repositories.tasks import (
     create_task,
     delete_task,
     get_task,
     list_tasks,
     update_task,
+)
+from repositories.tool_templates import (
+    delete_template,
+    get_template,
+    list_templates,
+    repository as tool_template_repository,
+    save_template,
 )
 from repositories.workflows import (
     create_workflow,
@@ -123,56 +149,6 @@ from repositories.workflows import (
 # vrai échec : Marvin n'avait aucun moyen de créer/retrouver un logo, cf. mémoire session).
 
 # ── Historique d'exécution ────────────────────────────────────────────────────
-
-def _ensure_tool_tables(conn):
-    """Crée les nouvelles tables si elles n'existent pas encore (migration transparente)."""
-    execution_repository.ensure_schema(conn)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS system_snapshots (
-            id TEXT PRIMARY KEY,
-            ram_percent REAL,
-            disk_max_percent REAL,
-            disk_max_percent_drive TEXT,
-            disk_max_wear REAL,
-            recurring_errors_count INTEGER,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_system_snapshots_created
-        ON system_snapshots(created_at DESC)
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS tool_templates (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            tool_name TEXT NOT NULL,
-            args TEXT DEFAULT '{}',
-            description TEXT DEFAULT '',
-            category TEXT DEFAULT 'general',
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS cron_jobs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            tool_name TEXT NOT NULL,
-            args TEXT DEFAULT '{}',
-            schedule TEXT NOT NULL,
-            enabled INTEGER NOT NULL DEFAULT 1,
-            last_run TEXT,
-            next_run TEXT,
-            run_count INTEGER NOT NULL DEFAULT 0,
-            last_result TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    # Performance indexes for cron scheduler
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_cron_enabled_next ON cron_jobs(enabled, next_run)")
-
 
 def _ensure_billing_tables(conn):
     """Tables pour l'assistant devis/facturation IT."""
@@ -2155,7 +2131,11 @@ def it_kb_increment_usage(name_or_id: str):
 
 def _init_tables():
     with db() as conn:
-        _ensure_tool_tables(conn)
+        execution_repository.ensure_schema(conn)
+        system_snapshot_repository.ensure_schema(conn)
+        tool_template_repository.ensure_schema(conn)
+        cron_job_repository.ensure_schema(conn)
+        network_inventory_repository.ensure_schema(conn)
         _ensure_billing_tables(conn)
         _ensure_doc_tables(conn)
         _ensure_ops_tables(conn)
@@ -2176,226 +2156,11 @@ _init_tables()
 # des appareils déjà vus. Cette table transforme un scan ponctuel en inventaire consultable
 # (nom personnalisé, notes, première/dernière apparition) — pattern des outils pro (Atera...).
 
-def _ensure_network_inventory_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS network_devices (
-            id TEXT PRIMARY KEY,
-            ip TEXT NOT NULL,
-            mac TEXT DEFAULT '',
-            hostname TEXT DEFAULT '',
-            custom_name TEXT DEFAULT '',
-            notes TEXT DEFAULT '',
-            first_seen TEXT NOT NULL DEFAULT (datetime('now')),
-            last_seen TEXT NOT NULL DEFAULT (datetime('now')),
-            UNIQUE(mac, ip)
-        )
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_network_devices_last_seen
-        ON network_devices(last_seen DESC)
-    """)
-
-
-def upsert_network_device(ip: str, mac: str = "", hostname: str = "") -> dict:
-    """Insère un nouvel appareil ou met à jour `last_seen`/hostname d'un appareil déjà connu.
-    Identifié par (mac, ip) — une IP seule peut changer (DHCP), la MAC est plus stable quand
-    disponible."""
-    with db() as conn:
-        _ensure_network_inventory_table(conn)
-        existing = conn.execute(
-            "SELECT id, custom_name FROM network_devices WHERE ip = ? AND mac = ?", (ip, mac or "")
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE network_devices SET hostname = ?, last_seen = datetime('now') WHERE id = ?",
-                (hostname or "", existing["id"])
-            )
-            return {"id": existing["id"], "new": False}
-        did = str(uuid.uuid4())
-        conn.execute(
-            "INSERT INTO network_devices (id, ip, mac, hostname) VALUES (?, ?, ?, ?)",
-            (did, ip, mac or "", hostname or "")
-        )
-        return {"id": did, "new": True}
-
-
-def get_network_devices(days: int = 30) -> list[dict]:
-    """Appareils vus dans les N derniers jours, les plus récents en premier."""
-    with db() as conn:
-        _ensure_network_inventory_table(conn)
-        rows = conn.execute(
-            "SELECT * FROM network_devices WHERE last_seen >= datetime('now', ?) ORDER BY last_seen DESC",
-            (f"-{int(days)} days",)
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def set_network_device_notes(device_id: str, custom_name: str | None = None, notes: str | None = None) -> dict:
-    with db() as conn:
-        _ensure_network_inventory_table(conn)
-        if custom_name is not None:
-            conn.execute("UPDATE network_devices SET custom_name = ? WHERE id = ?", (custom_name, device_id))
-        if notes is not None:
-            conn.execute("UPDATE network_devices SET notes = ? WHERE id = ?", (notes, device_id))
-    return {"success": True}
-
-
 # ── Snapshots système (v2.138 — suivi de tendance, pas juste l'instantané) ────────
-
-def save_system_snapshot(ram_percent: float, disk_max_percent: float, disk_max_percent_drive: str,
-                          disk_max_wear: float | None, recurring_errors_count: int) -> dict:
-    sid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute(
-            """INSERT INTO system_snapshots
-               (id, ram_percent, disk_max_percent, disk_max_percent_drive, disk_max_wear, recurring_errors_count)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (sid, ram_percent, disk_max_percent, disk_max_percent_drive, disk_max_wear, recurring_errors_count)
-        )
-    return {"id": sid}
-
-
-def get_system_snapshots(days: int = 30) -> list[dict]:
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        rows = conn.execute(
-            "SELECT * FROM system_snapshots WHERE created_at >= datetime('now', ?) ORDER BY created_at ASC",
-            (f"-{int(days)} days",)
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
 
 # ── Templates d'outils ────────────────────────────────────────────────────────
 
-def save_template(name: str, tool_name: str, args: dict, description: str = "", category: str = "general") -> dict:
-    tid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute(
-            """INSERT INTO tool_templates (id, name, tool_name, args, description, category)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (tid, name, tool_name, json.dumps(args), description, category)
-        )
-        row = conn.execute("SELECT * FROM tool_templates WHERE id = ?", (tid,)).fetchone()
-    return _parse_template(row_to_dict(row))
-
-
-def list_templates(tool_name: str | None = None, category: str | None = None) -> list[dict]:
-    sql = "SELECT * FROM tool_templates WHERE 1=1"
-    params = []
-    if tool_name:
-        sql += " AND tool_name = ?"
-        params.append(tool_name)
-    if category:
-        sql += " AND category = ?"
-        params.append(category)
-    sql += " ORDER BY name ASC"
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        rows = conn.execute(sql, params).fetchall()
-    return [_parse_template(row_to_dict(r)) for r in rows]
-
-
-def get_template(tid: str) -> dict | None:
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        row = conn.execute("SELECT * FROM tool_templates WHERE id = ?", (tid,)).fetchone()
-    return _parse_template(row_to_dict(row))
-
-
-def delete_template(tid: str):
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute("DELETE FROM tool_templates WHERE id = ?", (tid,))
-
-
-def _parse_template(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("args") and isinstance(row["args"], str):
-        try:
-            row["args"] = json.loads(row["args"])
-        except Exception:
-            row["args"] = {}
-    return row
-
-
 # ── Jobs cron ─────────────────────────────────────────────────────────────────
-
-def create_cron_job(name: str, tool_name: str, args: dict, schedule: str) -> dict:
-    jid = str(uuid.uuid4())
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute(
-            """INSERT INTO cron_jobs (id, name, tool_name, args, schedule)
-               VALUES (?, ?, ?, ?, ?)""",
-            (jid, name, tool_name, json.dumps(args), schedule)
-        )
-        row = conn.execute("SELECT * FROM cron_jobs WHERE id = ?", (jid,)).fetchone()
-    return _parse_cron(row_to_dict(row))
-
-
-def list_cron_jobs(enabled_only: bool = False) -> list[dict]:
-    sql = "SELECT * FROM cron_jobs"
-    params = []
-    if enabled_only:
-        sql += " WHERE enabled = 1"
-    sql += " ORDER BY name ASC"
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        rows = conn.execute(sql, params).fetchall()
-    return [_parse_cron(row_to_dict(r)) for r in rows]
-
-
-def update_cron_job(jid: str, updates: dict) -> dict | None:
-    fields, values = [], []
-    for k in ("name", "schedule", "tool_name", "next_run", "last_run", "last_result"):
-        if k in updates:
-            fields.append(f"{k} = ?")
-            values.append(updates[k])
-    if "args" in updates:
-        fields.append("args = ?")
-        values.append(json.dumps(updates["args"]))
-    if "enabled" in updates:
-        fields.append("enabled = ?")
-        values.append(1 if updates["enabled"] else 0)
-    if "run_count" in updates:
-        fields.append("run_count = run_count + 1")
-    if not fields:
-        return get_cron_job(jid)
-    fields.append("updated_at = datetime('now')")
-    values.append(jid)
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute(f"UPDATE cron_jobs SET {', '.join(fields)} WHERE id = ?", values)
-    return get_cron_job(jid)
-
-
-def get_cron_job(jid: str) -> dict | None:
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        row = conn.execute("SELECT * FROM cron_jobs WHERE id = ?", (jid,)).fetchone()
-    return _parse_cron(row_to_dict(row))
-
-
-def delete_cron_job(jid: str):
-    with db() as conn:
-        _ensure_tool_tables(conn)
-        conn.execute("DELETE FROM cron_jobs WHERE id = ?", (jid,))
-
-
-def _parse_cron(row: dict | None) -> dict | None:
-    if row is None:
-        return None
-    if row.get("args") and isinstance(row["args"], str):
-        try:
-            row["args"] = json.loads(row["args"])
-        except Exception:
-            row["args"] = {}
-    row["enabled"] = bool(row.get("enabled", 1))
-    return row
-
 
 # ── Fiches de révision / quiz (v2.155) ──────────────────────────────────────────
 # Répétition espacée minimale (façon Leitner à 2 leviers) : bonne réponse → l'intervalle

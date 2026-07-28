@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.409.0)
+## 9. État actuel (v2.410.0)
+
+**v2.410 (état opérationnel persistant)** : inventaire réseau, snapshots système, modèles
+d'outils et tâches cron rejoignent quatre repositories injectables. Les quatorze façades
+historiques restent identiques. Les écritures sont transactionnelles, les fenêtres de lecture
+sont bornées, les colonnes cron modifiables restent en liste blanche et les anciens JSON
+invalides sont projetés sans casser les workers. Les schémas et index sont composés au
+démarrage sans dépendance inverse vers `database.py`.
 
 **v2.409 (persistance des exécutions)** : traces, historique, statistiques et fiabilité des
 outils rejoignent `repositories/executions.py`. Les cinq façades restent identiques. Les

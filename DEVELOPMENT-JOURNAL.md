@@ -9063,3 +9063,57 @@ par le premier essai. Le smoke HTTP/Next.js réussit à **28/28 contrats**.
 Rollback après commit : `git revert <commit-v2.409>`. Les nouvelles lignes déjà expurgées
 restent lisibles après réversion; aucune donnée brute ne peut être reconstruite depuis une
 empreinte. Rejouer le test repository et l'observabilité, redémarrer puis vérifier l'historique.
+
+## 2026-07-28 — v2.410.0 — Repositories de l'état opérationnel
+
+### Contexte et décision
+
+La tranche suivante regroupait quatre agrégats opérationnels encore mélangés à
+`database.py` : inventaire réseau, snapshots système, modèles d'outils et tâches cron.
+Deux approches ont été comparées : un repository générique d'état, plus court mais couplant
+quatre cycles de vie sans relation transactionnelle, ou quatre repositories spécialisés
+composés par la façade historique. La seconde est retenue pour garder des contrats explicites,
+des tests isolés et des évolutions indépendantes du scheduler, du diagnostic et du réseau.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/network_inventory.py`, `system_snapshots.py`,
+  `tool_templates.py` et `cron_jobs.py`, tous injectables ;
+- conservation par identité des quatorze fonctions publiques de `database.py` ;
+- retrait de leurs schémas et de leur CRUD historique de `database.py`; la composition
+  initialise désormais chaque repository explicitement ;
+- upsert réseau et mise à jour simultanée du nom/notes dans une transaction unique ;
+- fenêtres temporelles bornées entre 1 et 3 650 jours et ordre stable des résultats ;
+- rejet des métriques non finies et des compteurs d'erreurs négatifs avant écriture ;
+- arguments des modèles et jobs limités à des objets JSON, décodage dégradé des anciens JSON
+  invalides et sérialisation Unicode stable ;
+- colonnes cron modifiables conservées dans une liste blanche; `run_count` garde la sémantique
+  historique d'incrément et update/relecture deviennent atomiques ;
+- ajout d'un index de recherche des modèles sans transformation de données existantes.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- compilation et import de `database.py` réussis ;
+- SQLite réel : création, upsert, filtres, notes, snapshots, modèles et cron réussis ;
+- collisions de clés : rollback confirmé sans ligne partielle ;
+- JSON historique corrompu projeté en objet vide sans casser les consommateurs ;
+- bornes, liste blanche cron, filtres `enabled`, suppressions et quatorze identités de façade
+  validés ;
+- runtime cron, tâches longues, domaine Réseau et diagnostic PC réussis ;
+- initialiseur SQLite Next.js, migrations Python et hygiène des connexions réussis ;
+- architecture : 344 outils, harness 344/344, 354 routes et 40 pages ;
+- `database.py` passe de 2 508 lignes/96 objets AST à 2 273 lignes/100 objets AST : le nombre
+  d'imports de façade augmente, mais les implémentations et schémas quittent le module.
+
+La gate globale réussit ensuite à **177/177 étapes** : dépendances natives, 344 outils,
+harness 344/344, 354 routes, 40 pages, compilation backend et lint frontend sans erreur.
+Le backend a été réellement redémarré en 2.410.0 avec Ollama et 15 workers; le frontend
+Turbopack existant répond toujours sur le port 3000. Un modèle d'outil et un job cron
+temporaires ont été créés via HTTP, relus avec leurs arguments et filtres, puis supprimés.
+Le smoke HTTP/Next.js réussit à **28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.410>`. Aucun schéma existant n'est supprimé.
+Après réversion, redémarrer le backend puis vérifier inventaire réseau, tendances PC, modèles
+d'outils et jobs cron.

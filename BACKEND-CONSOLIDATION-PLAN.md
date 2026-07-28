@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.409.0
+Version auditée : 2.410.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -215,6 +215,10 @@ Les traces d'exécution et agrégats de fiabilité rejoignent
 `repositories/executions.py` en v2.409.0. Corrélation, statistiques, fenêtres récentes,
 pagination, migration et cinq façades sont conservées. Les nouvelles traces sont expurgées
 avant persistance; les preuves métier restent dans leurs registres durables dédiés.
+Inventaire réseau, snapshots système, modèles d'outils et tâches cron rejoignent quatre
+repositories injectables en v2.410.0. Leurs quatorze façades restent identiques; transactions,
+index, fenêtres bornées, listes blanches de mise à jour, JSON historique dégradé et rollback
+sont couverts sur SQLite réel. `database.py` ne possède plus leurs schémas ni leur CRUD.
 
 ### Phase D — Composition et dépendances
 
