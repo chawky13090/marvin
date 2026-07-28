@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.412.0)
+## 9. État actuel (v2.413.0)
+
+**v2.413 (documentation technique)** : interventions, documents, actifs et modèles
+rejoignent `repositories/documentation.py`; le catalogue Markdown statique est isolé dans
+`repositories/documentation_templates.py`. Les quatorze façades restent identiques. La
+numérotation annuelle est transactionnelle et reprend le plus haut historique; collisions,
+rollbacks et créations concurrentes sont testés. JSON historique invalide, tailles, versions,
+durées, cascade des documents et catalogue exact des sept modèles sont contrôlés.
 
 **v2.412 (contrôles opérationnels)** : préchecks, postchecks, points, résultats et preuves
 métier rejoignent `repositories/operations.py`. Les neuf façades restent identiques.

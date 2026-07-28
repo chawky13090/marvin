@@ -9224,3 +9224,62 @@ des routes exactes. Le smoke HTTP/Next.js réussit à **28/28 contrats**.
 Rollback après commit : `git revert <commit-v2.412>`. Aucun format de preuve n'est transformé.
 Après réversion, redémarrer puis vérifier checklist, résultat, rapport de validation et
 suppression en cascade.
+
+## 2026-07-28 — v2.413.0 — Repository de documentation technique
+
+### Contexte et décision
+
+Interventions, actifs, documents produits et modèles Markdown constituent un agrégat
+transactionnel distinct des générateurs DOCX/PDF et des preuves de contrôle opérationnel.
+Deux approches ont été comparées : laisser le schéma, les modèles et le CRUD dans
+`database.py`, ou conserver les quatorze façades historiques devant un repository injectable
+et un catalogue statique séparé. La seconde est retenue : elle réduit le couplage sans
+modifier les consommateurs ni les formats persistés.
+
+La demande complémentaire sur les modes est ajoutée sans interrompre cette tranche au contrat
+global : Normal, Hyper sécurisé, Tout cloud et Ultra débridé forment l'axe de confidentialité;
+Sécurisé, Standard et Expert forment un axe d'autorisation orthogonal. Leur matrice de
+routage, provenance, repli, refus et transition durable devra être testée sur tous les
+consommateurs avant clôture de la phase dédiée.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/documentation.py` avec connexion et horloge injectables ;
+- séparation des sept modèles Markdown historiques dans
+  `repositories/documentation_templates.py`, sans changement de leur contenu ;
+- conservation par identité des quatorze fonctions publiques de `database.py` ;
+- déplacement des quatre schémas, index et CRUD hors de la façade ;
+- ajout d'une séquence annuelle SQLite transactionnelle qui reprend le plus haut numéro
+  historique et résiste aux collisions, rollbacks et créations concurrentes ;
+- sérialisation des listes bornée par leur type et lecture dégradée des anciens JSON invalides ;
+- refus des durées et tailles négatives et des versions de document inférieures à un ;
+- suppression transactionnelle d'une intervention et de ses documents associés ;
+- ordre de lecture stable et limite des interventions bornée entre 1 et 1 000.
+
+### Validation et rollback
+
+Résultats ciblés observés avant la gate globale :
+
+- compilation Python des nouveaux modules, de la façade et du test réussie ;
+- sept modèles relus; leurs sept tuples de contenu sont égaux à ceux de v2.412.0
+  (le conteneur du nouveau catalogue est volontairement immuable) ;
+- SQLite réel : actifs, interventions, documents, modèles, JSON dégradé, cascade, rollback,
+  séquence et quatre créations concurrentes réussis ;
+- quatorze identités de façade validées ;
+- domaines Documentation d'intervention, Contrôles opérationnels, Santé client et Profil
+  documentaire réussis ;
+- `database.py` passe de 1 540 lignes/70 objets AST à 912 lignes/30 objets AST.
+
+L'architecture et la gate globale réussissent ensuite à **180/180 étapes** : 344 outils,
+harness 344/344, 354 routes, 40 pages, compilation Python complète et lint frontend sans
+erreur (37 avertissements préexistants). Le backend a été réellement redémarré en 2.413.0
+avec Ollama et 15 workers, sans arrêter le frontend Turbopack. Les routes HTTP ont créé et
+relu une intervention temporaire liée à un actif, confirmé le catalogue de 7 modèles, puis
+supprimé les deux objets; une relecture finale confirme zéro résidu. Le smoke API réussit à
+**28/28 contrats**, les **40/40 pages**, cinq conversations représentatives et la
+sérialisation vocale réussissent.
+
+Rollback après commit : `git revert <commit-v2.413>`. La table additive `doc_sequences` peut
+rester inutilisée après réversion sans altérer les données historiques; aucune table ni
+preuve métier existante n'est supprimée. Après réversion, redémarrer le backend puis vérifier
+les listes d'interventions, d'actifs, de documents et de modèles.

@@ -5,7 +5,7 @@
 > pour les exigences de preuve, de comparaison, de test et de rollback.
 
 Date de référence : 2026-07-28
-Version auditée : 2.412.0
+Version auditée : 2.413.0
 Périmètre : backend Python, contrats FastAPI, Runner agentique, outils, persistance,
 workers, observabilité et validation. Le frontend est explicitement hors périmètre tant que
 les critères de clôture ci-dessous ne sont pas satisfaits.
@@ -227,6 +227,10 @@ Préchecks, postchecks, points, résultats et preuves rejoignent
 `repositories/operations.py` en v2.412.0. Les neuf façades restent compatibles; cohérence
 check/item/résultat, conservation des preuves métier, lecture agrégée, cascade et rollback
 sont testés sur SQLite réel.
+Interventions, documents, actifs et modèles techniques rejoignent
+`repositories/documentation.py` en v2.413.0. Les quatorze façades restent identiques;
+catalogue historique exact, séquence annuelle transactionnelle, concurrence, JSON dégradé,
+cascade et rollback sont testés sur SQLite réel.
 
 ### Phase D — Composition et dépendances
 
@@ -393,7 +397,10 @@ Le backend n'est déclaré consolidé que si :
 - les contrats publics restent à 344 outils et 354 routes, sauf évolution fonctionnelle
   explicitement décidée ;
 - aucune connexion SQLite directe ne contourne la fabrique ;
-- les modes de confidentialité, Ultra cloud-only et Council cinq modèles restent couverts ;
+- les profils Normal, Hyper sécurisé, Tout cloud et Ultra débridé sont distincts des niveaux
+  Sécurisé/Standard/Expert; routage, provenance, transitions, replis et refus sont testés
+  pour chaque combinaison, avec Hyper strictement local et Ultra strictement cloud ;
+- le Council cinq modèles reste couvert sans contourner le profil actif ;
 - les reprises SSE, reçus idempotents et missions longues passent ;
 - tous les tests rapides, le runtime réel et les smoke tests sont verts ;
 - `AGENTS.md`, `ARCHITECTURE.md` et `DEVELOPMENT-JOURNAL.md` reflètent l'état réel ;

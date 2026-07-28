@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.412.0
+Version courante auditée : 2.413.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -330,22 +330,45 @@ jamais oublier l'objectif produit. Elles s'appliquent à toutes les phases perti
 L'ordre ci-dessous est contraignant par dépendance, mais une correction bloquante peut être
 traitée plus tôt. Chaque phase hérite intégralement du gate de la section 5.
 
-| Ordre | Phase | État au 2.412.0 | Livraison et condition de sortie |
+| Ordre | Phase | État au 2.413.0 | Livraison et condition de sortie |
 |---:|---|---|---|
 | 0 | Gouvernance continue | partial | matrice, dette sécurité, politique de logs, inventaire des persistances, journal et rollback restent synchronisés à chaque tranche |
 | 1 | Composition backend | verified | `main.py` contient uniquement composition, lifespan et handler global; 47 routeurs, cycle de vie, imports acycliques et import borné sont testés |
 | 2 | Persistance modulaire | partial | `database.py` devient une façade; repositories par agrégat, transactions, concurrence, migrations montantes/descendantes, sauvegarde et restauration réelles |
 | 3 | Graphe agentique déterministe | partial | graphe durable typé, handoffs versionnés, états terminaux, checkpoints, compensations et manifestes de capacités pour Runner/Mission OS |
 | 4 | Harness universel des outils | partial | 344/344 outils et tous leurs consommateurs passent exclusivement par validation, permissions, idempotence, preuve et observabilité communes |
-| 5 | Intelligence Cloud et évaluation | partial | Ultra Cloud-only prouvé, Council cinq familles live, Model Market/Research Swarm mesurés, Cortex et vérificateurs évalués sur qualité, coût et appels inutiles |
-| 6 | Code Workspace et Forge autonome | partial | demande chat/workspace unifiée, boucle corriger-tester, reprise visible, validations natives Debian/Windows, checkpoint propre et livrable de production démontré |
-| 7 | Memory Mesh, Truth Ledger et rétention | partial | séparation Session/State/Memory, provenance, conflits, oubli, chiffrement, preuves métier durables et politiques de rétention/restauration validées |
-| 8 | Observabilité et SRE | partial | corrélation bout en bout, logs structurés expurgés, métriques/SLO, rotation/purge, alertes, chaos tests et tableaux de santé exploitables |
-| 9 | Fermeture de la dette sécurité | partial | threat model agentique complet, API/auth réseau, secrets e-mail/SSH/OAuth, sauvegardes chiffrées, ACL et tests d'abus fermés ou limitations explicitement acceptées |
-| 10 | Frontend et Mission Canvas | partial | UX accessible, conversations/streams robustes, progression lisible, modes et Forges actionnables, tests Playwright des parcours critiques |
-| 11 | Avatar et voix | partial | Electron réel validé pour démarrage/arrêt/déplacement/raccourcis; avatar Möbius; voix sans chevauchement; reprise et accessibilité |
-| 12 | Installateur Windows | partial | installation machine propre, chemins dynamiques, capacités optionnelles, reboot/reprise, réparation, update, rollback et désinstallation réellement exécutés |
-| 13 | Evolution Lab et audit final | not_audited | benchmark capacité/non-régression, optimisation contrôlée, restauration catastrophe, rollback global, documentation opérateur et matrice sans preuve manquante |
+| 5 | Profils de confidentialité et autorisations | partial | Normal, Hyper sécurisé, Tout cloud et Ultra débridé ont des contrats distincts; niveaux Sécurisé/Standard/Expert orthogonaux; transitions, provenance, replis et refus sont testés |
+| 6 | Intelligence Cloud et évaluation | partial | Ultra Cloud-only prouvé, Council cinq familles live, Model Market/Research Swarm mesurés, Cortex et vérificateurs évalués sur qualité, coût et appels inutiles |
+| 7 | Code Workspace et Forge autonome | partial | demande chat/workspace unifiée, boucle corriger-tester, reprise visible, validations natives Debian/Windows, checkpoint propre et livrable de production démontré |
+| 8 | Memory Mesh, Truth Ledger et rétention | partial | séparation Session/State/Memory, provenance, conflits, oubli, chiffrement, preuves métier durables et politiques de rétention/restauration validées |
+| 9 | Observabilité et SRE | partial | corrélation bout en bout, logs structurés expurgés, métriques/SLO, rotation/purge, alertes, chaos tests et tableaux de santé exploitables |
+| 10 | Fermeture de la dette sécurité | partial | threat model agentique complet, API/auth réseau, secrets e-mail/SSH/OAuth, sauvegardes chiffrées, ACL et tests d'abus fermés ou limitations explicitement acceptées |
+| 11 | Frontend et Mission Canvas | partial | UX accessible, conversations/streams robustes, progression lisible, modes et Forges actionnables, tests Playwright des parcours critiques |
+| 12 | Avatar et voix | partial | Electron réel validé pour démarrage/arrêt/déplacement/raccourcis; avatar Möbius; voix sans chevauchement; reprise et accessibilité |
+| 13 | Installateur Windows | partial | installation machine propre, chemins dynamiques, capacités optionnelles, reboot/reprise, réparation, update, rollback et désinstallation réellement exécutés |
+| 14 | Evolution Lab et audit final | not_audited | benchmark capacité/non-régression, optimisation contrôlée, restauration catastrophe, rollback global, documentation opérateur et matrice sans preuve manquante |
+
+### Brique obligatoire — profils et autorisations
+
+Les profils de confidentialité et les niveaux d'autorisation ne doivent plus être confondus.
+La consolidation doit produire une matrice exécutable et testée :
+
+- **Normal** : Cloud Ollama prioritaire pour la qualité, repli local seulement si la politique
+  de sensibilité l'autorise et avec provenance visible ;
+- **Hyper sécurisé** : traitement local obligatoire, aucune sortie Cloud ni télémétrie de
+  contenu, échec explicite si la capacité locale manque ;
+- **Tout cloud** : modèles Cloud autorisés et prioritaires, mais garde-fous d'actions et
+  confirmations inchangés ;
+- **Ultra débridé** : Cloud-only strict, liberté maximale du LLM dans le périmètre demandé,
+  jamais de repli local silencieux et provenance de chaque modèle vérifiable ;
+- **Sécurisé / Standard / Expert** : axe orthogonal contrôlant uniquement permissions,
+  confirmations et portée des effets; changer ce niveau ne change pas implicitement la
+  destination des données.
+
+Chaque combinaison doit être couverte par tests positifs et négatifs sur chat, Council,
+outils, mémoire, documents, e-mails et Code Workspace. Une transition en cours de mission
+doit créer un événement durable, recalculer les capacités et ne jamais réinterpréter
+rétroactivement une autorisation déjà refusée.
 
 ### Phase active
 
@@ -375,7 +398,10 @@ injectable unique : vingt façades compatibles, numérotation transactionnelle c
 montants finis, paiements bornés, cascade et rollback testés. La progression reste pilotée
 par agrégat cohésif et risque réel, jamais par le seul nombre de lignes. En v2.412.0, les
 contrôles opérationnels rejoignent un repository injectable qui garantit la cohérence entre
-checklist, point, résultat et preuve sans tronquer les preuves métier.
+checklist, point, résultat et preuve sans tronquer les preuves métier. En v2.413.0, la
+documentation technique rejoint un repository injectable séparé de son catalogue statique :
+quatorze façades restent compatibles et la numérotation annuelle résiste aux collisions,
+rollbacks et créations concurrentes.
 
 ## 10. Preuves minimales par grande capacité
 
