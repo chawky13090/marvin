@@ -66,6 +66,7 @@ import tools as tool_module
 import audit
 import engineering_runtime
 import tool_gateway
+import web_runtime
 from agent import run_agent, _refresh_model_cache
 import chat_turn_runtime
 from api.backups import router as backups_router
@@ -465,14 +466,15 @@ async def lifespan(app_instance):
         yield
     finally:
         await chat_turn_runtime.shutdown()
+        if coding_jobs_started:
+            await _coding_jobs.shutdown()
+        await supervisor.shutdown()
         try:
             import web_browser
             await web_browser.close()
         except Exception:
             pass
-        if coding_jobs_started:
-            await _coding_jobs.shutdown()
-        await supervisor.shutdown()
+        await web_runtime.close()
 
 # v2.79.0 — Compétences fiabilisées : (1) nomic-embed-text requis pour le matching
 #   sémantique (sinon dégradé en lexical) ; (2) les compétences EXÉCUTENT vraiment les

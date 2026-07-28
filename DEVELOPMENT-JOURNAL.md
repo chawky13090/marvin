@@ -7456,6 +7456,35 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback : vérifier le patch inverse indexé, réversion atomique du commit v2.379, redémarrage
   du backend, puis test ciblé, gate rapide, health et smoke.
 
+## 2026-07-28 — v2.380.0 — runtime HTTP et cache Web maîtrisés
+
+### Constat
+
+- `tools.py` possédait encore le client HTTP partagé et un dictionnaire de cache mutable ;
+- le client n'était pas fermé par le lifespan FastAPI ;
+- l'éviction supprimait arbitrairement la moitié du cache et pouvait conserver 257 entrées ;
+- un consommateur pouvait modifier par référence une valeur déjà mise en cache.
+
+### Solution
+
+- nouveau `backend/web_runtime.py` avec possession explicite du pool et du cache ;
+- création du client sérialisée et compatible avec les proxys système ;
+- arrêt des workers avant fermeture du pool, fermeture idempotente et recréation possible ;
+- cache monotone TTL de dix minutes, LRU limité à 256 entrées et copies défensives ;
+- façades historiques de `tools.py`, Web et Météo conservées sans changer le registre.
+
+### Validation et rollback
+
+- tests : concurrence de création, fermeture double, recréation, expiration, LRU, isolation
+  des valeurs, erreurs réseau, ordre du shutdown, domaines Web et Météo ;
+- gate rapide : 152/152 étapes; architecture 344/344, 346 routes et compilation de 225 fichiers ;
+- backend redémarré en 2.380.0 : Ollama disponible et 15 workers supervisés ;
+- appel HTTP réel `weather` via le gateway : Open-Meteo répond pour Paris en 375 ms ;
+- frontend Turbopack conservé et smoke réseau réel : 28/28 contrats ;
+- aucun schéma, réglage ou contenu utilisateur modifié ;
+- rollback : contrôle du patch inverse indexé, réversion atomique du commit v2.380, redémarrage
+  backend, puis tests ciblés, gate, health et smoke.
+
 ## 2026-07-28 — v2.378.0 — OCR écran borné et provenance visible
 
 ### Demande et constats

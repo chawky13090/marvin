@@ -27,6 +27,7 @@ import python_execution as python_execution_runtime
 import mission_os as mission_os_runtime
 import vector_store as vector_store_runtime
 import voice_transcription as voice_transcription_runtime
+import web_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -101,62 +102,11 @@ from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 # (rend tous les outils web plus rapides ET plus résistants aux coupures réseau)
 # ══════════════════════════════════════════════════════════════════════════════
 
-_HTTP_CLIENT = None
-
-
-def _get_http_client():
-    """Client httpx PARTAGÉ (pool de connexions réutilisé) → évite le handshake
-    TCP/TLS à chaque appel = bien plus rapide. Recréé s'il a été fermé."""
-    global _HTTP_CLIENT
-    import httpx
-    if _HTTP_CLIENT is None or _HTTP_CLIENT.is_closed:
-        _HTTP_CLIENT = httpx.AsyncClient(
-            timeout=httpx.Timeout(12.0, connect=4.0),
-            follow_redirects=True,
-            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"},
-        )
-    return _HTTP_CLIENT
-
-
-def _is_offline_error(e) -> bool:
-    """Détecte une panne réseau / DNS / connexion (vs une vraie erreur applicative)."""
-    s = str(e).lower()
-    return any(k in s for k in (
-        "getaddrinfo", "name or service", "temporary failure", "connecterror",
-        "connection refused", "network is unreachable", "no address associated",
-        "timed out", "readtimeout", "connecttimeout", "[errno 11001]", "[errno -3]",
-        "failed to establish", "max retries", "nodename nor servname"))
-
-
-def _net_error(e, what="la ressource") -> dict:
-    """Erreur réseau lisible : distingue 'hors-ligne' d'une erreur applicative."""
-    if _is_offline_error(e):
-        return {"error": f"Pas de connexion internet (ou {what} injoignable). "
-                         f"Vérifiez votre réseau puis réessayez.", "offline": True}
-    return {"error": str(e)}
-
-
-# Cache TTL en mémoire pour les résultats web (évite les appels réseau redondants)
-_WEB_CACHE: dict = {}
-_WEB_CACHE_TTL = 600  # 10 minutes
-
-
-def _wcache_get(key):
-    v = _WEB_CACHE.get(key)
-    if v and (time.time() - v[0]) < _WEB_CACHE_TTL:
-        return v[1]
-    if v:
-        _WEB_CACHE.pop(key, None)
-    return None
-
-
-def _wcache_set(key, value):
-    if len(_WEB_CACHE) > 256:        # borne mémoire
-        for k in list(_WEB_CACHE)[:128]:
-            _WEB_CACHE.pop(k, None)
-    _WEB_CACHE[key] = (time.time(), value)
+_get_http_client = web_runtime.get_http_client
+_is_offline_error = web_runtime.is_offline_error
+_net_error = web_runtime.network_error
+_wcache_get = web_runtime.cache_get
+_wcache_set = web_runtime.cache_set
 
 
 # ══════════════════════════════════════════════════════════════════════════════

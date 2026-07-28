@@ -298,6 +298,9 @@ La transcription Whisper rejoint `voice_transcription.py`. L'API vocale et le re
 d'outils ne chargent plus deux copies concurrentes du modèle. Cache LRU, chargement,
 inférences, limites et validation sont mutualisés; le streaming d'upload empêche une allocation
 non bornée et chaque repli de modèle est observable.
+Le pool HTTP et le cache Web rejoignent `web_runtime.py`. `tools.py` ne possède plus ces états
+globaux; Web et Météo reçoivent toujours les mêmes façades. Le runtime garantit création
+unique, fermeture après les workers, recréation, cache TTL/LRU borné et copies défensives.
 
 ## 4. Validation obligatoire par tranche
 

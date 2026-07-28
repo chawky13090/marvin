@@ -297,6 +297,10 @@ conservée est publiée atomiquement avec rollback.
 un cache Whisper LRU commun limité à deux modèles, un verrou de chargement et un verrou
 d'inférence par modèle. Formats, taille, langue, modèle et texte sont bornés; l'upload HTTP
 est écrit par blocs et le repli vers `base` reste explicitement visible.
+98. le runtime Web : `web_runtime.py` possède le pool `httpx.AsyncClient`, sa fermeture et le
+cache TTL/LRU partagé par Web et Météo. La création est sérialisée, la fermeture intervient
+après les workers, les entrées sont bornées et copiées défensivement, et les erreurs hors ligne
+conservent le contrat historique.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`
