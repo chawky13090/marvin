@@ -9117,3 +9117,58 @@ Le smoke HTTP/Next.js réussit à **28/28 contrats**.
 Rollback après commit : `git revert <commit-v2.410>`. Aucun schéma existant n'est supprimé.
 Après réversion, redémarrer le backend puis vérifier inventaire réseau, tendances PC, modèles
 d'outils et jobs cron.
+
+## 2026-07-28 — v2.411.0 — Repository de facturation
+
+### Contexte et décision
+
+Clients, devis, catalogue, factures et contrats partagent des clés étrangères, des calculs et
+une numérotation métier. Deux options ont été comparées : cinq repositories CRUD séparés, au
+risque de disperser les invariants de montant et de séquence, ou un agrégat Facturation
+injectable unique. La seconde est retenue : la frontière reste cohésive et ne dépend pas du
+domaine d'outils qui génère les documents ou envoie les e-mails.
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/billing.py` avec connexion et horloge injectables ;
+- conservation par identité des vingt fonctions publiques de `database.py` ;
+- déplacement complet des cinq schémas, du catalogue initial et des CRUD hors de la façade ;
+- ajout de `billing_sequences` : allocation annuelle DEV/FAC atomique, reprise du plus grand
+  numéro existant, absence de réutilisation après suppression et résistance aux appels
+  concurrents ;
+- création/relecture et update/relecture réunies dans la même transaction ;
+- calcul centralisé des totaux, TVA, coûts, marges et pourcentages avec refus des nombres non
+  finis ;
+- prix, coûts, durées, totaux de facture, paiements et contrats négatifs refusés lorsque
+  métierement invalides; le trop-perçu est refusé au niveau repository, y compris via API ;
+- changement de TVA d'un devis recalculé avec ses lignes existantes au lieu de perdre leur
+  base ou de revenir silencieusement à 20 % ;
+- lignes JSON de devis et facture projetées en listes; données historiques invalides
+  dégradées en liste vide sans exception ;
+- défaut historique corrigé : `billing_contract_create` insérait `NULL` dans `start_date`
+  malgré une contrainte `NOT NULL`; la date injectée est maintenant utilisée.
+
+### Validation et rollback
+
+Résultats ciblés observés :
+
+- SQLite réel : 19 services initiaux, clients, devis, catalogue, factures et contrats ;
+- totaux HT/TTC, TVA, coût, marge, pourcentage, échéance et statut de retard validés ;
+- huit créations concurrentes de devis produisent huit numéros distincts et consécutifs ;
+- collision d'identifiant : transaction et séquence annulées sans trou ;
+- mise à jour en liste blanche, JSON corrompu, trop-perçu, nombre non fini, filtres, cascade
+  et vingt identités de façade validés ;
+- domaines Facturation et Santé client réussis ;
+- `database.py` passe de 2 273 lignes/100 objets AST à 1 741 lignes/79 objets AST.
+
+L'architecture et la gate globale réussissent ensuite à **178/178 étapes** : 344 outils,
+harness 344/344, 354 routes, 40 pages, 254 fichiers Python compilés et lint frontend sans
+erreur. Le backend a été réellement redémarré en 2.411.0 avec Ollama et 15 workers. Un client
+et un devis temporaires ont été créés par HTTP; le devis relu expose 200 EUR HT, 220 EUR TTC,
+150 EUR de marge et sa ligne structurée. La suppression du client laisse zéro devis portant
+le titre temporaire, ce qui confirme la cascade réelle. Le smoke HTTP/Next.js réussit à
+**28/28 contrats**.
+
+Rollback après commit : `git revert <commit-v2.411>`. La table additive
+`billing_sequences` peut rester inutilisée sans affecter l'ancien code; aucun document métier
+n'est supprimé. Après réversion, vérifier clients, devis, facture, contrat et numérotation.

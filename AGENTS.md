@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.410.0)
+## 9. État actuel (v2.411.0)
+
+**v2.411 (persistance de facturation)** : clients, devis, catalogue, factures et contrats
+rejoignent `repositories/billing.py`. Les vingt façades restent identiques. Numéros DEV/FAC
+sont désormais alloués par séquence SQLite transactionnelle et résistent aux suppressions,
+collisions et créations concurrentes. Montants non finis, prix négatifs et trop-perçus sont
+refusés. Devis et factures projettent leurs lignes JSON sans casser les données historiques.
+La création d'un contrat sans date, auparavant impossible malgré le défaut SQL, utilise
+maintenant la date injectée.
 
 **v2.410 (état opérationnel persistant)** : inventaire réseau, snapshots système, modèles
 d'outils et tâches cron rejoignent quatre repositories injectables. Les quatorze façades
