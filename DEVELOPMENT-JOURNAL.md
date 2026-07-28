@@ -7485,6 +7485,41 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - rollback : contrôle du patch inverse indexé, réversion atomique du commit v2.380, redémarrage
   backend, puis tests ciblés, gate, health et smoke.
 
+## 2026-07-28 — v2.381.0 — automatisation e-mail multiboîte isolée
+
+### Constat
+
+- l'orchestrateur et la file différée dépendaient directement de SQLite, IMAP et des fonctions
+  globales de `tools.py` ;
+- deux verrous globaux sans frontière de domaine portaient l'exclusion mutuelle ;
+- les tests historiques prouvaient la simulation, mais pas l'équité, le retry ni la concurrence.
+
+### Solution
+
+- nouveau `tool_domains/email_automation.py` avec dépendances injectées ;
+- configuration/profils normalisés, modes validés et volumes bornés ;
+- round-robin déterministe entre boîtes, anti-réponse automatique et liste blanche obligatoire ;
+- simulation sans lecture marquée, écriture SQLite ni envoi ;
+- file différée bornée, retry à cinq minutes et verrous séparés pour passage et flush ;
+- façades publiques et registre `email_automation_run` conservés.
+
+### Validation observée
+
+- tests déterministes : quatre messages répartis exactement `A1, B1, A2, B2` ;
+- simulation : aucune écriture, aucun envoi et `mark_seen=false` ;
+- file différée, succès, échec SMTP, conservation et retry à cinq minutes validés ;
+- second passage concurrent refusé pendant le premier ;
+- gate rapide : 153/153; architecture 344/344, 346 routes, compilation de 226 fichiers ;
+- backend réel 2.381.0 : Ollama disponible et 15 workers ;
+- simulation HTTP réelle : 20 messages inspectés, 0 envoyé, 0 brouillon, 0 file, tous filtrés ;
+- frontend Turbopack conservé et smoke réseau réel : 28/28 contrats.
+
+### Rollback
+
+- aucun schéma ni contenu utilisateur migré ;
+- vérifier le patch inverse indexé, réverter atomiquement le commit v2.381, redémarrer le
+  backend et repasser les tests e-mail, le gate, health et smoke.
+
 ## 2026-07-28 — v2.378.0 — OCR écran borné et provenance visible
 
 ### Demande et constats

@@ -301,6 +301,10 @@ non bornée et chaque repli de modèle est observable.
 Le pool HTTP et le cache Web rejoignent `web_runtime.py`. `tools.py` ne possède plus ces états
 globaux; Web et Météo reçoivent toujours les mêmes façades. Le runtime garantit création
 unique, fermeture après les workers, recréation, cache TTL/LRU borné et copies défensives.
+L'orchestrateur e-mail multiboîte et la file différée rejoignent
+`tool_domains/email_automation.py`. Les dépendances IMAP, rédaction, envoi et persistance sont
+injectées; simulation, équité, anti-boucle, retries et exclusion mutuelle partagent désormais
+un contrat déterministe.
 
 ## 4. Validation obligatoire par tranche
 

@@ -301,6 +301,10 @@ est écrit par blocs et le repli vers `base` reste explicitement visible.
 cache TTL/LRU partagé par Web et Météo. La création est sérialisée, la fermeture intervient
 après les workers, les entrées sont bornées et copiées défensivement, et les erreurs hors ligne
 conservent le contrat historique.
+99. l'automatisation e-mail : `tool_domains/email_automation.py` possède le traitement
+multiboîte et la file d'envoi différé. Les transports, réglages et actions de rédaction/envoi
+sont injectés; round-robin, idempotence, simulation sans écriture, anti-boucle, plafonds,
+retries et exclusion mutuelle sont testables sans réseau.
 
 Toute lecture ou écriture SQLite applicative doit utiliser `with database.db()` ou un
 repository. `scripts/test_db_connection_hygiene.py` refuse les appels directs à `get_conn()`

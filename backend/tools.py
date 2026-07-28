@@ -19,6 +19,7 @@ from typing import Any
 
 import psutil
 import database as db
+import email_manager as email_manager_runtime
 import cloud_routing as cloud_routing_runtime
 import learning
 import model_council as model_council_runtime
@@ -82,6 +83,7 @@ from tool_domains import long_tasks as long_tasks_domain
 from tool_domains import system_self_test as system_self_test_domain
 from tool_domains import unified_search as unified_search_domain
 from tool_domains import screen_ocr as screen_ocr_domain
+from tool_domains import email_automation as email_automation_domain
 import ssh_transport
 from document_formatting import (
     markdown_inline_to_reportlab as _md_inline_to_rl,
@@ -1783,6 +1785,21 @@ async def execute_email_outbox_flush() -> dict:
                              "send_after": (now + _timedelta(minutes=5)).isoformat(timespec="seconds")})
         db.set_setting("email_scheduled_outbox", kept[-200:])
         return {"success": failed == 0, "sent": sent, "failed": failed, "pending": len(kept)}
+
+
+email_automation_domain.configure(
+    get_setting=lambda key: db.get_setting(key),
+    set_setting=lambda key, value: db.set_setting(key, value),
+    list_accounts=lambda: _all_email_cfgs(),
+    fetch_inbox=lambda *args, **kwargs: email_manager_runtime.fetch_inbox(*args, **kwargs),
+    fetch_email=lambda *args, **kwargs: email_manager_runtime.fetch_email(*args, **kwargs),
+    draft_reply=lambda args: execute_email_draft_reply(args),
+    send_email=lambda args: execute_email_send(args),
+)
+_email_automation_cfg = email_automation_domain.get_config
+_email_effective_profile = email_automation_domain.effective_profile
+execute_email_orchestrator_run = email_automation_domain.run
+execute_email_outbox_flush = email_automation_domain.flush_outbox
 
 
 async def execute_email_to_task(args: dict) -> dict:

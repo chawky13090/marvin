@@ -183,7 +183,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.380.0)
+## 9. État actuel (v2.381.0)
+
+**v2.381 (automatisation e-mail)** : l'orchestrateur multiboîte et la file différée rejoignent
+`tool_domains/email_automation.py`. Configuration, profils, round-robin, anti-boucle,
+simulation, persistance, retries et verrous sont centralisés derrière des dépendances
+injectées. Le mode autonome reste bloqué sans liste d'expéditeurs autorisés et tout envoi
+réel conserve `confirmed=true`.
 
 **v2.380 (runtime HTTP/Web)** : le pool HTTP partagé et le cache Web quittent `tools.py`
 pour `web_runtime.py`. Le client est créé de manière sûre, fermé après l'arrêt des workers et
