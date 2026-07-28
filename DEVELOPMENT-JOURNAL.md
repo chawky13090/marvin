@@ -9335,3 +9335,59 @@ la sérialisation vocale réussissent.
 Rollback après commit : `git revert <commit-v2.414>`. Aucun schéma ni format persistant n'est
 changé; après réversion, redémarrer puis vérifier le dernier score, l'historique et les
 recommandations.
+
+## 2026-07-28 — v2.415.0 — Repository de sécurité des commandes
+
+### Contexte et décision
+
+Le LLM doit conserver sa liberté d'analyse, mais une commande à fort impact ne doit jamais
+transformer sa propre recommandation en autorisation. Deux approches ont été comparées :
+persister de simples statuts modifiables, ou imposer un automate déterministe
+`pending -> approved|rejected` avec preuve durable. La seconde est retenue. Elle respecte la
+défense en profondeur et l'intervention humaine recommandées par OpenAI, ainsi que la
+réduction de l'« excessive agency » décrite par OWASP.
+
+Références consultées :
+
+- https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+- https://genai.owasp.org/llmrisk/llm062025-excessive-agency/
+- https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html
+- https://www.nist.gov/itl/ai-risk-management-framework
+
+### Implémentation, amélioration et sécurité
+
+- ajout de `repositories/command_safety.py` avec connexion injectable ;
+- séparation du catalogue immuable dans `repositories/command_safety_rules.py` ;
+- conservation exacte des vingt-cinq règles historiques et des six façades publiques ;
+- commande vide, plateforme et niveau de risque inconnus refusés avant écriture ;
+- historique borné entre 1 et 1 000 et ordres de lecture stables ;
+- une demande liée reprend obligatoirement la commande de son analyse et refuse une référence
+  absente ou une commande contradictoire ;
+- le statut fourni à la création ne peut plus pré-approuver une action : toute demande naît
+  en `pending` ;
+- une même décision est idempotente et conserve sa première preuve; une décision finale
+  contradictoire est refusée ;
+- aucune commande n'est exécutée par ce repository.
+
+### Validation et rollback
+
+Résultats ciblés observés avant la gate globale :
+
+- compilation Python des deux modules, de la façade et du test réussie ;
+- empreinte SHA-256 du catalogue exact des vingt-cinq règles verrouillée ;
+- SQLite réel : analyse, filtres, approbation liée, décision, répétition idempotente, décision
+  contradictoire, entrées invalides, collision et rollback validés ;
+- domaine Sécurité des commandes réussi et six identités de façade conservées ;
+- `database.py` passe de 807 lignes/24 objets AST à 602 lignes/16 objets AST.
+
+L'architecture et la gate globale réussissent ensuite à **182/182 étapes** : 344 outils,
+harness 344/344, 354 routes, 40 pages, compilation Python complète et lint frontend sans
+erreur. Le backend a été réellement redémarré en 2.415.0 avec Ollama et 15 workers, sans
+arrêter Turbopack. Une analyse et une demande temporaires ont été créées, la demande a été
+rejetée par la vraie route HTTP, relue avec sa date de décision puis entièrement supprimée;
+les 25 règles ont été exposées et aucune commande n'a été exécutée. Le smoke API réussit à
+**28/28 contrats**, les **40/40 pages**, cinq conversations et la sérialisation vocale
+réussissent.
+
+Rollback après commit : `git revert <commit-v2.415>`. Aucun schéma persistant n'est changé;
+après réversion, redémarrer puis vérifier règles, historique d'analyse et décisions existantes.

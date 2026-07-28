@@ -55,6 +55,15 @@ from repositories.client_health import (
     health_score_latest,
     repository as client_health_repository,
 )
+from repositories.command_safety import (
+    approval_create,
+    approval_decide,
+    approval_list,
+    cmd_review_create,
+    cmd_review_list,
+    cmd_rules_list,
+    repository as command_safety_repository,
+)
 from repositories.cron_jobs import (
     create_cron_job,
     delete_cron_job,
@@ -236,234 +245,20 @@ from repositories.workflows import (
 # v2.30.0 — Operations Safety : Module 2 — Command Safety / Guardrails
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _ensure_cmd_safety_tables(conn):
-    """Tables pour l'analyse de risque des commandes."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS command_reviews (
-            id TEXT PRIMARY KEY,
-            intervention_id TEXT,
-            command TEXT NOT NULL,
-            platform TEXT NOT NULL DEFAULT 'unknown'
-                CHECK(platform IN ('powershell','cmd','bash','linux','proxmox','cisco','firewall','unknown')),
-            risk_level TEXT NOT NULL DEFAULT 'safe'
-                CHECK(risk_level IN ('safe','medium','high','critical','blocked')),
-            risk_explanation TEXT DEFAULT '',
-            safer_alternative TEXT DEFAULT '',
-            requires_approval INTEGER NOT NULL DEFAULT 0,
-            matched_rule TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS command_risk_rules (
-            id TEXT PRIMARY KEY,
-            pattern TEXT NOT NULL,
-            platform TEXT NOT NULL DEFAULT 'unknown',
-            risk_level TEXT NOT NULL DEFAULT 'medium',
-            explanation TEXT DEFAULT '',
-            safer_alternative TEXT DEFAULT '',
-            is_builtin INTEGER NOT NULL DEFAULT 0,
-            active INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS approval_requests (
-            id TEXT PRIMARY KEY,
-            command_review_id TEXT,
-            command TEXT NOT NULL,
-            requested_by TEXT DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'pending'
-                CHECK(status IN ('pending','approved','rejected')),
-            approver TEXT DEFAULT '',
-            reason TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            decided_at TEXT
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_reviews_interv ON command_reviews(intervention_id, created_at DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_reviews_risk ON command_reviews(risk_level)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_approval_status ON approval_requests(status)")
-
-    count = conn.execute("SELECT COUNT(*) FROM command_risk_rules").fetchone()[0]
-    if count == 0:
-        _seed_command_rules(conn)
 
 
-def _seed_command_rules(conn):
-    """Règles de risque par défaut (destructives = blocked/critical)."""
-    import uuid as _u
-    # (pattern_regex, platform, risk_level, explanation, safer_alternative)
-    rules = [
-        # ── BLOCKED (destructif irréversible) ──
-        (r"rm\s+-rf\s+/\s*$|rm\s+-rf\s+/\s", "linux", "blocked",
-         "Suppression récursive de la racine du système — destruction totale irréversible.",
-         "Ciblez un sous-dossier précis : rm -rf /chemin/precis/. Vérifiez toujours le chemin avant."),
-        (r"remove-item\s+.*-recurse\s+.*-force\s+.*c:\\?\s*$|remove-item\s+-recurse\s+-force\s+c:\\", "powershell", "blocked",
-         "Suppression récursive forcée de C:\\ — destruction du système Windows.",
-         "Ciblez un sous-dossier précis et retirez -Force tant que vous n'avez pas vérifié."),
-        (r"diskpart.*\bclean\b", "cmd", "blocked",
-         "diskpart clean efface la table de partition d'un disque — perte totale des données.",
-         "Vérifiez le numéro de disque (list disk) et sauvegardez avant toute opération diskpart."),
-        (r"^\s*format\b", "cmd", "blocked",
-         "Formatage de volume — efface toutes les données du volume ciblé.",
-         "Confirmez la lettre de lecteur et faites une sauvegarde complète au préalable."),
-        (r"del\s+/s\s+/q\s+c:\\?|del\s+/s\s+/q\s+c:", "cmd", "blocked",
-         "Suppression silencieuse récursive de C:\\ — destruction massive de fichiers système.",
-         "Ciblez un dossier précis et retirez /q pour confirmer chaque suppression."),
-        (r"pveceph\s+purge", "proxmox", "blocked",
-         "pveceph purge détruit toute la configuration Ceph du cluster Proxmox.",
-         "Sauvegardez la config et vérifiez l'impact sur le stockage avant. Opération de dernier recours."),
-        (r"\bqm\s+destroy\b", "proxmox", "critical",
-         "qm destroy supprime définitivement une VM et ses disques.",
-         "Faites un snapshot/backup (vzdump) de la VM avant. Vérifiez le VMID."),
-        (r"iptables\s+-F", "linux", "critical",
-         "iptables -F vide toutes les règles de pare-feu — expose le système.",
-         "Sauvegardez d'abord : iptables-save > rules.bak. Travaillez chaîne par chaîne."),
-        (r"netsh\s+advfirewall\s+set\s+allprofiles\s+state\s+off", "powershell", "critical",
-         "Désactive complètement le pare-feu Windows sur tous les profils — risque sécurité majeur.",
-         "Ajoutez une règle ciblée plutôt que de désactiver le pare-feu entier."),
-
-        # ── CRITICAL (destructif ciblé) ──
-        (r"\bdd\s+if=.*of=/dev/", "linux", "critical",
-         "dd vers un périphérique bloc peut écraser un disque entier.",
-         "Vérifiez of= (lsblk) et ajoutez status=progress. Double-vérifiez la cible."),
-        (r"mkfs\.\w+\s+/dev/", "linux", "critical",
-         "mkfs formate une partition — perte des données existantes.",
-         "Vérifiez la partition cible avec lsblk et sauvegardez avant."),
-        (r"drop\s+(database|table)\b", "linux", "critical",
-         "DROP DATABASE/TABLE supprime définitivement des données.",
-         "Faites un dump SQL avant : mysqldump/pg_dump. Utilisez une transaction si possible."),
-        (r"shutdown\s+(-h|/s|now)|halt\b|poweroff\b", "linux", "high",
-         "Arrêt du système — coupe les services en production.",
-         "Prévenez les utilisateurs et planifiez une fenêtre de maintenance."),
-        (r"reboot\b|shutdown\s+/r|restart-computer", "powershell", "high",
-         "Redémarrage du système — interruption de service.",
-         "Vérifiez qu'aucune tâche critique ne tourne et prévenez les utilisateurs."),
-        (r"copy-item\s+.*c:\\windows|move-item\s+.*c:\\windows", "powershell", "high",
-         "Modification de fichiers système Windows.",
-         "Sauvegardez le fichier original et testez en environnement de test."),
-        (r"reg\s+delete|remove-itemproperty.*hklm", "powershell", "high",
-         "Suppression de clés de registre — peut casser des fonctionnalités Windows.",
-         "Exportez la clé avant : reg export. Créez un point de restauration."),
-        (r"set-executionpolicy\s+unrestricted|set-executionpolicy\s+bypass", "powershell", "high",
-         "Désactive la protection d'exécution de scripts PowerShell.",
-         "Préférez -Scope Process et RemoteSigned plutôt que Unrestricted global."),
-        (r"chmod\s+777", "linux", "high",
-         "chmod 777 donne tous les droits à tout le monde — faille de sécurité.",
-         "Utilisez des permissions minimales : 644 (fichiers) / 755 (dossiers)."),
-        (r"\bkill\s+-9\b|stop-process\s+.*-force", "linux", "medium",
-         "Arrêt forcé d'un processus — risque de corruption de données non sauvegardées.",
-         "Essayez d'abord un arrêt propre (kill -15 / Stop-Process sans -Force)."),
-        (r"net\s+user\s+\w+\s+/delete|remove-localuser", "powershell", "high",
-         "Suppression d'un compte utilisateur.",
-         "Désactivez le compte plutôt que de le supprimer : net user X /active:no."),
-
-        # ── CISCO / FIREWALL ──
-        (r"\bno\s+shutdown\b|\bshutdown\b", "cisco", "medium",
-         "Active/désactive une interface réseau Cisco — impact connectivité.",
-         "Vérifiez l'interface (show ip int brief) et planifiez le changement."),
-        (r"erase\s+startup-config|write\s+erase", "cisco", "critical",
-         "Efface la configuration de démarrage de l'équipement Cisco.",
-         "Sauvegardez : copy running-config tftp. Confirmez avant."),
-        (r"clear\s+configure\s+all", "firewall", "critical",
-         "Efface toute la configuration du firewall.",
-         "Exportez la config et planifiez une fenêtre de maintenance."),
-
-        # ── MEDIUM (à surveiller) ──
-        (r"\bgpupdate\s+/force", "powershell", "medium",
-         "Force la mise à jour des stratégies de groupe — peut appliquer des changements immédiats.",
-         "Vérifiez les GPO modifiées avant d'appliquer en masse."),
-        (r"restart-service|stop-service", "powershell", "medium",
-         "Arrêt/redémarrage d'un service — interruption temporaire.",
-         "Vérifiez les dépendances du service et l'impact métier."),
-    ]
-    for pat, plat, risk, expl, alt in rules:
-        conn.execute("""
-            INSERT INTO command_risk_rules (id, pattern, platform, risk_level, explanation, safer_alternative, is_builtin)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
-        """, (str(_u.uuid4()), pat, plat, risk, expl, alt))
 
 
-def cmd_rules_list(active_only: bool = True) -> list[dict]:
-    with db() as conn:
-        _ensure_cmd_safety_tables(conn)
-        if active_only:
-            rows = conn.execute("SELECT * FROM command_risk_rules WHERE active = 1").fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM command_risk_rules").fetchall()
-    return [row_to_dict(r) for r in rows]
 
 
-def cmd_review_create(data: dict) -> dict:
-    import uuid as _u
-    rid = str(_u.uuid4())
-    with db() as conn:
-        _ensure_cmd_safety_tables(conn)
-        conn.execute("""
-            INSERT INTO command_reviews
-            (id, intervention_id, command, platform, risk_level, risk_explanation,
-             safer_alternative, requires_approval, matched_rule)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (rid, data.get("intervention_id"), data.get("command", ""),
-              data.get("platform", "unknown"), data.get("risk_level", "safe"),
-              data.get("risk_explanation", ""), data.get("safer_alternative", ""),
-              1 if data.get("requires_approval") else 0, data.get("matched_rule", "")))
-        row = conn.execute("SELECT * FROM command_reviews WHERE id = ?", (rid,)).fetchone()
-    return row_to_dict(row)
 
 
-def cmd_review_list(intervention_id: str | None = None, risk_level: str | None = None,
-                     limit: int = 100) -> list[dict]:
-    with db() as conn:
-        _ensure_cmd_safety_tables(conn)
-        sql = "SELECT * FROM command_reviews WHERE 1=1"
-        params = []
-        if intervention_id:
-            sql += " AND intervention_id = ?"; params.append(intervention_id)
-        if risk_level:
-            sql += " AND risk_level = ?"; params.append(risk_level)
-        sql += " ORDER BY created_at DESC LIMIT ?"; params.append(limit)
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_dict(r) for r in rows]
 
 
-def approval_create(data: dict) -> dict:
-    import uuid as _u
-    aid = str(_u.uuid4())
-    with db() as conn:
-        _ensure_cmd_safety_tables(conn)
-        conn.execute("""
-            INSERT INTO approval_requests (id, command_review_id, command, requested_by, status, reason)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (aid, data.get("command_review_id"), data.get("command", ""),
-              data.get("requested_by", ""), data.get("status", "pending"),
-              data.get("reason", "")))
-        row = conn.execute("SELECT * FROM approval_requests WHERE id = ?", (aid,)).fetchone()
-    return row_to_dict(row)
 
 
-def approval_list(status: str | None = None) -> list[dict]:
-    with db() as conn:
-        _ensure_cmd_safety_tables(conn)
-        if status:
-            rows = conn.execute(
-                "SELECT * FROM approval_requests WHERE status = ? ORDER BY created_at DESC",
-                (status,)).fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM approval_requests ORDER BY created_at DESC").fetchall()
-    return [row_to_dict(r) for r in rows]
 
 
-def approval_decide(aid: str, status: str, approver: str = "", reason: str = "") -> dict | None:
-    with db() as conn:
-        _ensure_cmd_safety_tables(conn)
-        conn.execute("""
-            UPDATE approval_requests SET status = ?, approver = ?, reason = ?, decided_at = datetime('now')
-            WHERE id = ?
-        """, (status, approver, reason, aid))
-        row = conn.execute("SELECT * FROM approval_requests WHERE id = ?", (aid,)).fetchone()
-    return row_to_dict(row) if row else None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -673,7 +468,7 @@ def _init_tables():
         billing_repository.ensure_schema(conn)
         documentation_repository.ensure_schema(conn)
         operations_repository.ensure_schema(conn)
-        _ensure_cmd_safety_tables(conn)
+        command_safety_repository.ensure_schema(conn)
         client_health_repository.ensure_schema(conn)
         _ensure_it_kb_tables(conn)
         event_repository.ensure_schema(conn)

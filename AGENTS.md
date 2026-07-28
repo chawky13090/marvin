@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.414.0)
+## 9. État actuel (v2.415.0)
+
+**v2.415 (sécurité des commandes persistante)** : règles, analyses et approbations rejoignent
+`repositories/command_safety.py`; les vingt-cinq règles historiques sont isolées dans
+`repositories/command_safety_rules.py`. Les six façades restent identiques. Une approbation
+est toujours créée en attente, doit correspondre à son analyse, puis accepte une décision
+finale idempotente; une décision contradictoire est refusée. Enums, limites, collisions et
+rollback sont testés sur SQLite réel.
 
 **v2.414 (santé client persistante)** : scores, points de contrôle et recommandations
 rejoignent `repositories/client_health.py`. Les cinq façades restent identiques. La création

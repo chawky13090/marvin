@@ -10,7 +10,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.409 — traces d'outils et fiabilité extraites, bornées et expurgées
 # v2.410 — inventaire, snapshots, modèles d'outils et cron extraits par agrégat
 # v2.411 — facturation extraite, numérotation atomique et montants validés
-# v2.414 — santé client extraite avec agrégats atomiques et scores bornés
+# v2.415 — sécurité des commandes extraite avec approbations idempotentes
 # v2.408 — projets, captures et logos extraits vers trois repositories injectables
 # v2.407 — agenda local et miroirs externes extraits vers un repository injectable
 # v2.406 — mémoires, tâches et notes extraites vers trois repositories injectables
