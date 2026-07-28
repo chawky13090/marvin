@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.437.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.438.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.437.0)
+## 9. État actuel (v2.438.0)
+
+**v2.438 (continuité visuelle du chat)** : le dernier identifiant de conversation actif est
+conservé côté navigateur avec validation stricte, puis son contenu est rechargé depuis le
+backend après un rechargement complet. Un identifiant absent, invalide ou supprimé est purgé
+sans exposer ni dupliquer les messages. Les lignes de conversation restent cliquables à la
+souris, deviennent ouvrables au clavier et leurs commandes projet, épinglage, renommage et
+suppression possèdent un nom accessible contextualisé.
 
 **v2.437 (erreurs API expurgées)** : les exceptions internes des surfaces e-mail, avatar,
 contenu, compétences, multi-agents, workflows, monitoring, voix et vidéo ne sont plus

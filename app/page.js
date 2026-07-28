@@ -5,7 +5,12 @@ import LivingAvatar from '@/components/avatar/LivingAvatar';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
-import { canSwitchConversation, initialChatSelection } from '@/lib/chatNavigation.mjs';
+import {
+  canSwitchConversation,
+  initialChatSelection,
+  persistLastConversationId,
+  readLastConversationId,
+} from '@/lib/chatNavigation.mjs';
 
 async function fetchWithBackendFallback(path, options) {
   try {
@@ -25,6 +30,7 @@ export default function ChatPage() {
   const [projects, setProjects] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(initialSelection.conversationId);
   const [chatKey, setChatKey] = useState(initialSelection.chatKey);
+  const [selectionHydrated, setSelectionHydrated] = useState(false);
   const [pendingActiveId, setPendingActiveId] = useState(null);
   const pendingIdRef = useRef(null);
   const [initialMessages, setInitialMessages] = useState([]);
@@ -114,6 +120,51 @@ export default function ChatPage() {
     const statusInterval = setInterval(fetchStatus, 15000);
     return () => { clearInterval(interval); clearInterval(statusInterval); };
   }, [fetchData, fetchStatus]);
+
+  // Restaurer le dernier fil après un rechargement complet. Seul son identifiant
+  // opaque est conservé localement ; le contenu reste la source de vérité backend.
+  useEffect(() => {
+    if (activeConversationId || chatStatus.conversationId) {
+      setSelectionHydrated(true);
+      return;
+    }
+
+    const savedId = readLastConversationId(window.localStorage);
+    if (!savedId) {
+      setSelectionHydrated(true);
+      return;
+    }
+
+    let cancelled = false;
+    const restore = async () => {
+      try {
+        const path = `/api/conversations/${savedId}?t=${Date.now()}`;
+        const response = await fetchWithBackendFallback(path);
+        if (!response.ok) {
+          persistLastConversationId(window.localStorage, null);
+          return;
+        }
+        const data = await response.json();
+        if (cancelled) return;
+        setInitialMessages(Array.isArray(data.messages) ? data.messages : []);
+        setActiveConversationId(savedId);
+        setChatKey(savedId);
+      } catch (error) {
+        console.error('Erreur restauration conversation:', error);
+      } finally {
+        if (!cancelled) setSelectionHydrated(true);
+      }
+    };
+    restore();
+    return () => { cancelled = true; };
+    // L'initialisation doit être exécutée une seule fois, y compris en Strict Mode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!selectionHydrated) return;
+    persistLastConversationId(window.localStorage, activeConversationId);
+  }, [activeConversationId, selectionHydrated]);
 
   const loadConversation = async (id) => {
     setShowConv(false);   // referme le tiroir (mobile)
@@ -743,6 +794,8 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
   const commit = () => { setEditing(false); const t = (draft || '').trim(); if (t && t !== conv.title) onRename?.(conv.id, t); };
   return (
     <div
+      role="listitem"
+      aria-current={isActive ? 'true' : undefined}
       onClick={() => !editing && onSelect(conv.id)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
@@ -765,22 +818,40 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
           onBlur={commit}
           style={{ flex: 1, minWidth: 0, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-focus)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 12.5 }} />
       ) : (
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{conv.title || 'Sans titre'}</span>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`Ouvrir la conversation ${conv.title || 'Sans titre'}`}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              event.stopPropagation();
+              onSelect(conv.id);
+            }
+          }}
+          style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}
+        >
+          {conv.title || 'Sans titre'}
+        </span>
       )}
       {!editing && (
         <div style={{ display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0, opacity: hover || isActive || conv.pinned ? 1 : 0, transition: 'opacity 0.15s' }}>
           {projects.length > 0 && (
             <select value={conv.project_id || 'none'} onChange={(e) => onAssign(conv.id, e.target.value)} onClick={(e) => e.stopPropagation()} title="Ranger dans un projet"
+              aria-label={`Ranger ${conv.title || 'cette conversation'} dans un projet`}
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text-muted)', fontSize: '10px', cursor: 'pointer', maxWidth: 54 }}>
               <option value="none">📁</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           )}
-          <button onClick={(e) => onTogglePin?.(e, conv.id, conv.pinned)} title={conv.pinned ? 'Désépingler' : 'Épingler'}
+          <button type="button" onClick={(e) => onTogglePin?.(e, conv.id, conv.pinned)} title={conv.pinned ? 'Désépingler' : 'Épingler'}
+            aria-label={`${conv.pinned ? 'Désépingler' : 'Épingler'} ${conv.title || 'cette conversation'}`}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: conv.pinned ? 'var(--accent-primary)' : 'var(--text-muted)', padding: '2px' }}>{conv.pinned ? '📌' : '📍'}</button>
-          <button onClick={(e) => { e.stopPropagation(); setDraft(conv.title || ''); setEditing(true); }} title="Renommer"
+          <button type="button" onClick={(e) => { e.stopPropagation(); setDraft(conv.title || ''); setEditing(true); }} title="Renommer"
+            aria-label={`Renommer ${conv.title || 'cette conversation'}`}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)', padding: '2px' }}>✏️</button>
-          <button onClick={(e) => onDelete(e, conv.id)} title="Supprimer"
+          <button type="button" onClick={(e) => onDelete(e, conv.id)} title="Supprimer"
+            aria-label={`Supprimer ${conv.title || 'cette conversation'}`}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--danger)', padding: '2px' }}>×</button>
         </div>
       )}

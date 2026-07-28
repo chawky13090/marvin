@@ -5,6 +5,30 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.438.0 — Continuité du fil actif et accessibilité des conversations
+
+La validation navigateur a reproduit la perte de contexte signalée : le fil « TEST PROVENANCE
+OK » était complet avant navigation, mais un rechargement du chat revenait à l'accueil. Le
+provider global protège déjà un flux SSE pendant une transition App Router; il ne pouvait pas
+survivre à un rechargement complet. Deux options ont été comparées : encoder le fil dans chaque
+URL, utile au partage mais plus intrusive, ou conserver uniquement son identifiant opaque dans
+le stockage navigateur et relire le contenu autoritatif au backend. La seconde corrige le
+défaut sans dupliquer de donnée métier et reste compatible avec les routes existantes.
+
+`chatNavigation.mjs` valide, lit et persiste cet identifiant de façon bornée et tolérante aux
+stockages indisponibles. `app/page.js` restaure le fil une fois côté client, purge une référence
+obsolète et n'enregistre aucun contenu de message. Les commandes auparavant nommées seulement
+par leurs symboles reçoivent des noms accessibles contextualisés; l'ouverture du titre répond
+à Entrée et Espace. Ce choix suit les recommandations officielles Next.js pour les API
+navigateur dans un Client Component et WCAG 2.2 pour le clavier et le nom des contrôles.
+
+Validations réelles : 8 assertions de navigation, ESLint sans avertissement, puis navigateur
+réel avec sélection, passage par `/jour`, rechargement de `/`, restauration du prompt et de la
+réponse, et présence des noms accessibles épingler/renommer/supprimer. Aucun log supplémentaire
+n'est créé : l'identifiant reste une préférence locale et les erreurs réseau utilisent le
+canal console existant sans contenu métier. Aucun schéma ni donnée persistante n'est migré.
+Rollback exact : `git revert <commit-v2.438>`.
+
 ## 2026-07-29 — v2.437.0 — Erreurs internes API expurgées
 
 L'audit post-v2.436 a recherché toutes les réponses API construites depuis `str(exc)` ou
