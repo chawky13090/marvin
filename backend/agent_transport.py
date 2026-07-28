@@ -9,10 +9,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 import json
-import traceback
+import logging
 from typing import Any, Literal
+import uuid
 
 import httpx
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,48 +115,34 @@ async def stream_chat(
 
 
 def error_event(exc: Exception, *, model: str, base_url: str, read_timeout: int) -> dict[str, Any]:
-    """Projette une erreur transport en événement public compatible avec le chat historique."""
+    """Projette une erreur transport publique sans détail interne ni contenu distant."""
+    incident = uuid.uuid4().hex
+    context = {
+        "error_type": type(exc).__name__,
+        "incident": incident,
+    }
     if isinstance(exc, OllamaHTTPError):
-        return {"type": "error", "message": str(exc)}
-    if isinstance(exc, httpx.ConnectError):
-        return {
-            "type": "error",
-            "message": (
-                f"ConnectError: Impossible de contacter Ollama sur {base_url}. "
-                "Relancez Marvin avec start.bat."
-            ),
-        }
-    if isinstance(exc, httpx.ReadTimeout):
-        return {
-            "type": "error",
-            "message": (
-                f"Délai d'attente dépassé ({read_timeout}s). Le modèle '{model}' est "
-                "peut-être en train de charger en RAM (~30-60s la 1ère fois). "
-                "Réessayez dans quelques secondes."
-            ),
-        }
-    if isinstance(exc, httpx.RemoteProtocolError):
-        return {
-            "type": "error",
-            "message": (
-                f"RemoteProtocolError: La connexion au modèle '{model}' a été coupée. "
-                "Le modèle a probablement manqué de mémoire. Essayez un modèle plus léger "
-                "(qwen2.5:3b) ou augmentez le swap Windows."
-            ),
-        }
-
-    message = str(exc).strip()
-    error_type = type(exc).__name__
-    if not message:
-        message = (
-            f"Exception {error_type} sans message (le modèle {model} a peut-être planté "
-            "ou Ollama a coupé la connexion)"
-        )
+        context["status_code"] = exc.status_code
+        message = f"Ollama a refusé la requête (HTTP {exc.status_code})."
+    elif isinstance(exc, httpx.ConnectError):
+        message = "Impossible de contacter Ollama. Vérifiez son état puis relancez Marvin."
+    elif isinstance(exc, httpx.ReadTimeout):
+        timeout = max(1, min(int(read_timeout), 3600))
+        context["read_timeout"] = timeout
+        message = f"Ollama n'a pas répondu avant le délai de {timeout} secondes."
+    elif isinstance(exc, httpx.RemoteProtocolError):
+        message = "La connexion avec Ollama a été interrompue avant la fin de la réponse."
     else:
-        message = f"{error_type}: {message}"
+        message = "Le transport Ollama a rencontré une erreur interne."
+
+    _LOGGER.warning(
+        "ollama_transport_failure error_type=%s incident=%s status_code=%s",
+        context["error_type"],
+        incident,
+        context.get("status_code", "-"),
+    )
     return {
         "type": "error",
-        "message": message,
-        "detail": traceback.format_exc()[-500:],
-        "model": model,
+        "message": f"{message} Incident : {incident}.",
+        "incident": incident,
     }

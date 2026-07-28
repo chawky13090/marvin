@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.427.0)
+## 9. État actuel (v2.428.0)
+
+**v2.428 (transport Ollama expurgé)** : les erreurs HTTP, connexion, timeout, protocole et
+exceptions inconnues sont catégorisées avant création d'un événement SSE. Corps HTTP,
+message d'exception, traceback, URL interne et nom de modèle ne traversent plus le chat.
+L'interface conserve une explication actionnable, le statut HTTP lorsqu'il est sûr et un
+incident opaque; la signature historique du transport reste compatible.
 
 **v2.427 (terminaison SSE sûre)** : une panne du producteur d'un tour de chat ne projette
 plus le texte brut de l'exception dans le navigateur ni dans SQLite. Le client reçoit un

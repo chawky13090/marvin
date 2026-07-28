@@ -86,13 +86,40 @@ def main() -> int:
     assert transport.decode_stream_line("pas du JSON") == ()
 
     connect = transport.error_event(
-        httpx.ConnectError("refus"), model="m", base_url="http://ollama", read_timeout=300
+        httpx.ConnectError("secret-connect token=abc"),
+        model="modele-prive",
+        base_url="http://user:secret@ollama",
+        read_timeout=300,
     )
-    assert connect["type"] == "error" and "start.bat" in connect["message"]
+    assert connect["type"] == "error" and "contacter Ollama" in connect["message"]
+    assert len(connect["incident"]) == 32
     timeout = transport.error_event(
-        httpx.ReadTimeout("lent"), model="m", base_url="http://ollama", read_timeout=120
+        httpx.ReadTimeout("secret-timeout"),
+        model="modele-prive",
+        base_url="http://user:secret@ollama",
+        read_timeout=120,
     )
-    assert "120s" in timeout["message"] and "'m'" in timeout["message"]
+    assert "120 secondes" in timeout["message"]
+
+    http_error = transport.error_event(
+        transport.OllamaHTTPError(503, "prompt secret token=abc"),
+        model="modele-prive",
+        base_url="http://user:secret@ollama",
+        read_timeout=120,
+    )
+    assert "HTTP 503" in http_error["message"]
+    unknown = transport.error_event(
+        RuntimeError("C:\\chemin\\prive token=abc"),
+        model="modele-prive",
+        base_url="http://user:secret@ollama",
+        read_timeout=120,
+    )
+    for event in (connect, timeout, http_error, unknown):
+        serialized = json.dumps(event)
+        assert "secret" not in serialized
+        assert "modele-prive" not in serialized
+        assert "detail" not in event
+        assert "model" not in event
 
     import agent
     assert callable(agent._stream_ollama_chat)

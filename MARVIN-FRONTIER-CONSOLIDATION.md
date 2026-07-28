@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.427.0
+Version courante auditée : 2.428.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -454,6 +454,9 @@ En v2.427.0, le runtime durable des tours ferme ses états terminaux par énumé
 expurge les erreurs du producteur avant toute sortie SSE ou persistance SQLite. Un incident
 opaque relie l'interface au journal technique, qui ne conserve que la classe d'erreur et un
 condensat du request ID. La panne du logger ne peut plus laisser le tour en cours indéfiniment.
+En v2.428.0, la même règle s'applique aux événements déjà formés par le transport Ollama :
+corps HTTP distant, exception, traceback, endpoint et modèle ne sont jamais projetés dans le
+chat. Catégorie opérationnelle, code HTTP sûr et incident opaque préservent le diagnostic.
 
 ## 10. Preuves minimales par grande capacité
 

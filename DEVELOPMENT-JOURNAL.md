@@ -10050,3 +10050,29 @@ les smokes live réussissent **28/28 API** et **40/40 pages**.
 
 Rollback exact : `git revert <commit-v2.427>`. Il n'existe ni migration de schéma ni mutation
 de données à inverser; les tours déjà terminés restent compatibles.
+
+## 2026-07-28 — v2.428.0 — Erreurs du transport Ollama expurgées
+
+### Constat et décision
+
+L'audit suivant a identifié une seconde voie : `agent_transport.error_event()` transformait
+une exception en événement SSE valide contenant selon le cas le corps HTTP Ollama, le message
+brut, un traceback, l'URL ou le modèle. Cette voie ne levait plus d'exception et contournait
+donc la protection v2.427. Conserver une liste de motifs à masquer resterait incomplet; Marvin
+adopte une projection publique fermée par catégorie, conforme aux mêmes recommandations OWASP
+Logging et OpenTelemetry citées en v2.427.
+
+### Implémentation et validation
+
+Les erreurs HTTP, connexion, timeout, protocole et inconnues produisent maintenant un message
+opérationnel borné et un incident opaque. Le code HTTP reste visible sans corps distant.
+Le logger standard conserve uniquement classe, incident et éventuel statut HTTP. La signature
+de `error_event` reste inchangée pour ne casser aucun appelant. Les tests injectent faux token,
+URL avec identifiants, chemin privé, modèle privé et corps HTTP sensible, puis prouvent leur
+absence de toutes les projections. Les contrats transport, Model Step, runtime SSE et la
+compilation Python réussissent. Le gate consolidé réussit **191/191**, dont compilation,
+lint sans erreur et build Next.js 16.2.12 Turbopack. Après relance, les smokes live réussissent
+**28/28 API** et **40/40 pages**.
+
+Rollback exact : `git revert <commit-v2.428>`. Aucun schéma, donnée persistante, dépendance,
+permission ou accès réseau n'est modifié.
