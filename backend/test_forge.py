@@ -349,6 +349,44 @@ def _validate_integration_shape(integration_test_code: str) -> str | None:
     return None
 
 
+def _validate_integration_runtime_contract(
+    language: str,
+    integration_test_code: str,
+) -> str | None:
+    """Refuse les installations de runtime incompatibles avec l'image spécialisée."""
+    code = str(integration_test_code or "")
+    normalized_language = str(language or "").casefold()
+    if normalized_language == "python" and re.search(
+        r"(?im)^\s*(?:[A-Z_][A-Z0-9_]*=\S+\s+)*(?:sudo\s+)?"
+        r"(?:apt(?:-get)?|dnf|yum|apk)\s+(?:install|add)\b[^\n]*\bpython3(?:\.\d+)?\b",
+        code,
+    ):
+        return (
+            "Le runner Python fournit déjà la version Python certifiée. "
+            "Le harness ne doit pas installer python3/python3.X depuis la distribution. "
+            "Utiliser python/python3 déjà présent et n'installer que les dépendances requises."
+        )
+    if normalized_language == "javascript" and re.search(
+        r"(?im)^\s*(?:[A-Z_][A-Z0-9_]*=\S+\s+)*(?:sudo\s+)?"
+        r"(?:apt(?:-get)?|dnf|yum|apk)\s+(?:install|add)\b[^\n]*\b(?:nodejs|npm)\b",
+        code,
+    ):
+        return (
+            "Le runner Node fournit déjà Node.js et npm. "
+            "Le harness ne doit pas réinstaller le runtime depuis la distribution."
+        )
+    if normalized_language == "go" and re.search(
+        r"(?im)^\s*(?:[A-Z_][A-Z0-9_]*=\S+\s+)*(?:sudo\s+)?"
+        r"(?:apt(?:-get)?|dnf|yum|apk)\s+(?:install|add)\b[^\n]*\b(?:golang|go)\b",
+        code,
+    ):
+        return (
+            "Le runner Go fournit déjà la toolchain certifiée. "
+            "Le harness ne doit pas réinstaller Go depuis la distribution."
+        )
+    return None
+
+
 def _powershell_static(
     code: str,
     test_code: str,
@@ -551,6 +589,11 @@ def execute(
         }
     shape_error = _validate_test_shape(language, test_code)
     integration_shape_error = _validate_integration_shape(integration_test_code) if require_online else None
+    if require_online and not integration_shape_error:
+        integration_shape_error = _validate_integration_runtime_contract(
+            language,
+            integration_test_code,
+        )
     main_name, test_name = FILE_NAMES[language]
     steps: list[dict[str, Any]] = []
     native_isolation: dict[str, Any] | None = None

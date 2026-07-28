@@ -98,11 +98,42 @@ export default function JourPage() {
   // Auto-configuration + modes de performance selon le matériel
   const [ac, setAc] = useState(null);
   const [modeBusy, setModeBusy] = useState(false);
+  const [modelDownload, setModelDownload] = useState(null);
   useEffect(() => { fetch(`${BACKEND}/api/auto-config`).then(r => r.json()).then(setAc).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!['queued', 'running', 'started'].includes(modelDownload?.status)) return undefined;
+    const timer = window.setInterval(async () => {
+      try {
+        const state = await fetch(`${BACKEND}/api/auto-config/models/download`, { cache: 'no-store' }).then(response => response.json());
+        setModelDownload(state);
+        if (state.status === 'completed' || state.status === 'degraded') {
+          const refreshed = await fetch(`${BACKEND}/api/auto-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(response => response.json());
+          setAc(refreshed);
+        }
+      } catch {}
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [modelDownload?.status]);
   async function reanalyze() { try { const r = await fetch(`${BACKEND}/api/auto-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json()); setAc(r); } catch {} }
   async function setMode(m) {
     setModeBusy(true);
     try { const r = await fetch(`${BACKEND}/api/auto-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: m }) }).then(r => r.json()); setAc(r); } catch {}
+    setModeBusy(false);
+  }
+  async function installRecommendedModels() {
+    const models = (ac?.recommended_to_install || []).slice(0, 10);
+    if (!models.length) return;
+    setModeBusy(true);
+    try {
+      const result = await fetch(`${BACKEND}/api/auto-config/models/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ models, confirmed: true }),
+      }).then(response => response.json());
+      setModelDownload(result.download || result);
+    } catch {
+      setModelDownload({ status: 'failed', message: 'Démarrage du téléchargement impossible.' });
+    }
     setModeBusy(false);
   }
 
@@ -279,8 +310,27 @@ export default function JourPage() {
             </div>
             <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>
               Modèles choisis : agent <b style={{ color: 'var(--text-secondary)' }}>{ac.applied?.agent}</b> · chat <b style={{ color: 'var(--text-secondary)' }}>{ac.applied?.chat}</b> · analyse <b style={{ color: 'var(--text-secondary)' }}>{ac.applied?.analysis}</b>
-              {ac.recommended_to_install?.length > 0 && <span style={{ color: '#eab308' }}> · 💡 pour mieux : {ac.recommended_to_install.join(', ')}</span>}
+              <span> · budget sûr {ac.model_memory_budget_gb ?? '—'} Go</span>
             </div>
+            {ac.rejected_overrides?.length > 0 && (
+              <div style={{ marginTop: 7, color: '#f59e0b' }}>
+                Un ancien choix manuel a été ignoré car il ne convient pas à cette machine : {ac.rejected_overrides.map(item => `${item.profile}=${item.model}`).join(', ')}.
+              </div>
+            )}
+            {ac.recommended_to_install?.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ color: '#eab308' }}>Portefeuille optimal proposé : {ac.recommended_to_install.join(', ')}</span>
+                <button onClick={installRecommendedModels} disabled={modeBusy}
+                  style={{ fontSize: 11, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(234,179,8,0.45)', background: 'rgba(234,179,8,0.1)', color: '#eab308', cursor: 'pointer' }}>
+                  Télécharger les modèles adaptés
+                </button>
+              </div>
+            )}
+            {modelDownload?.status && (
+              <div style={{ marginTop: 7, color: modelDownload.status === 'degraded' || modelDownload.status === 'failed' ? '#f87171' : '#34d399' }}>
+                Téléchargement local : {modelDownload.status}{modelDownload.current ? ` · ${modelDownload.current}` : ''}
+              </div>
+            )}
 
             {/* Modes de performance */}
             {ac.modes?.length > 0 && (

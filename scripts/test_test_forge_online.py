@@ -26,8 +26,8 @@ def main() -> int:
         "#!/usr/bin/env bash\n"
         "set -Eeuo pipefail\n"
         "apt-get update\n"
-        "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3\n"
-        "python3 -c \"import sys; assert sys.version_info >= (3, 11)\"\n"
+        "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates\n"
+        "python3 -c \"import sys; assert sys.version_info >= (3, 12)\"\n"
         "echo MARVIN_INTEGRATION_COMPLETE=full\n"
     )
     result = test_forge.execute(

@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.435 — portefeuille local dynamique et contrat de runtime Forge
 # v2.434 — boucle de réparation prouvée, check-ups chat et manifeste documentaire
 # v2.419 — sauvegardes SQLite intègres, atomiques et compensables
 # v2.418 — connaissances IT extraites vers un repository borné et injectable
@@ -202,6 +203,16 @@ async def lifespan(app_instance: FastAPI):
         await chat_turn_runtime.shutdown()
         if coding_jobs_started:
             await coding_jobs.shutdown()
+        try:
+            import local_model_installer
+
+            await local_model_installer.shutdown()
+        except Exception as exc:
+            bug_log.log_bug(
+                "shutdown_local_model_installer",
+                type(exc).__name__,
+                context={"exception_type": type(exc).__name__},
+            )
         await supervisor.shutdown()
         try:
             import web_browser

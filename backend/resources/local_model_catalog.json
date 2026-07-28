@@ -1,0 +1,94 @@
+{
+  "schema": "marvin.local-model-catalog/1.0",
+  "updated_at": "2026-07-28",
+  "entries": [
+    {
+      "name": "qwen3:1.7b",
+      "size_bytes": 1400000000,
+      "context_tokens": 40000,
+      "roles": {"chat": 72, "agent": 66, "analysis": 62},
+      "capabilities": ["text", "tools", "thinking", "multilingual"],
+      "source_url": "https://ollama.com/library/qwen3/tags"
+    },
+    {
+      "name": "qwen3:4b",
+      "size_bytes": 2600000000,
+      "context_tokens": 40000,
+      "roles": {"chat": 88, "agent": 86, "analysis": 85},
+      "capabilities": ["text", "tools", "thinking", "multilingual"],
+      "source_url": "https://ollama.com/library/qwen3/tags"
+    },
+    {
+      "name": "qwen3:8b",
+      "size_bytes": 5200000000,
+      "context_tokens": 40000,
+      "roles": {"chat": 91, "agent": 92, "analysis": 91},
+      "capabilities": ["text", "tools", "thinking", "multilingual"],
+      "source_url": "https://ollama.com/library/qwen3/tags"
+    },
+    {
+      "name": "qwen3.5:0.8b",
+      "size_bytes": 1000000000,
+      "context_tokens": 256000,
+      "roles": {"chat": 65, "agent": 58, "analysis": 56, "vision": 58},
+      "capabilities": ["text", "vision", "tools", "thinking", "multilingual"],
+      "source_url": "https://ollama.com/library/qwen3.5/tags"
+    },
+    {
+      "name": "qwen3.5:2b",
+      "size_bytes": 2700000000,
+      "context_tokens": 256000,
+      "roles": {"chat": 84, "agent": 81, "analysis": 80, "vision": 84},
+      "capabilities": ["text", "vision", "tools", "thinking", "multilingual"],
+      "source_url": "https://ollama.com/library/qwen3.5/tags"
+    },
+    {
+      "name": "qwen3.5:4b",
+      "size_bytes": 3400000000,
+      "context_tokens": 256000,
+      "roles": {"chat": 92, "agent": 91, "analysis": 90, "vision": 91},
+      "capabilities": ["text", "vision", "tools", "thinking", "multilingual"],
+      "source_url": "https://ollama.com/library/qwen3.5/tags"
+    },
+    {
+      "name": "qwen2.5-coder:1.5b",
+      "size_bytes": 986000000,
+      "context_tokens": 32000,
+      "roles": {"coding": 72},
+      "capabilities": ["text", "tools", "code"],
+      "source_url": "https://ollama.com/library/qwen2.5-coder"
+    },
+    {
+      "name": "qwen2.5-coder:3b",
+      "size_bytes": 1900000000,
+      "context_tokens": 32000,
+      "roles": {"coding": 84},
+      "capabilities": ["text", "tools", "code"],
+      "source_url": "https://ollama.com/library/qwen2.5-coder"
+    },
+    {
+      "name": "qwen2.5-coder:7b",
+      "size_bytes": 4700000000,
+      "context_tokens": 32000,
+      "roles": {"coding": 91},
+      "capabilities": ["text", "tools", "code"],
+      "source_url": "https://ollama.com/library/qwen2.5-coder"
+    },
+    {
+      "name": "gemma3:4b",
+      "size_bytes": 3300000000,
+      "context_tokens": 128000,
+      "roles": {"chat": 84, "analysis": 82, "vision": 88},
+      "capabilities": ["text", "vision", "multilingual"],
+      "source_url": "https://ollama.com/library/gemma3"
+    },
+    {
+      "name": "llava-phi3",
+      "size_bytes": 2926568956,
+      "context_tokens": 4096,
+      "roles": {"vision": 62},
+      "capabilities": ["text", "vision"],
+      "source_url": "https://ollama.com/library/llava-phi3"
+    }
+  ]
+}

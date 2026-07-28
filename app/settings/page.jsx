@@ -92,10 +92,11 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('permissions');
   const [status, setStatus] = useState(null);
+  const [autoConfig, setAutoConfig] = useState(null);
   const [ollamaUrl, setOllamaUrl] = useState('http://127.0.0.1:11434');
   const [savedMsg, setSavedMsg] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
-  const [pullModelName, setPullModelName] = useState('llama3.2:3b');
+  const [pullModelName, setPullModelName] = useState('');
   const [isPulling, setIsPulling] = useState(false);
 
   // Ollama Cloud (v2.119) — routage local/cloud par sensibilité, jamais par profil entier
@@ -159,6 +160,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchStatus();
+    fetchAutoConfig();
     fetchMemories();
     fetchPermissionLevel();
     fetchCredentials();
@@ -325,6 +327,16 @@ export default function SettingsPage() {
     } catch { }
   }
 
+  async function fetchAutoConfig() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/auto-config`, { cache: 'no-store' });
+      const data = await res.json();
+      setAutoConfig(data);
+      const first = (data?.recommended_to_install || [])[0];
+      if (first) setPullModelName(current => current || first);
+    } catch { }
+  }
+
   // ── Ollama Cloud ──────────────────────────────────────────────────────────
   async function fetchCloudConfig() {
     try {
@@ -450,13 +462,17 @@ export default function SettingsPage() {
   }
 
   const models = status?.ollama?.models || [];
-  const recommendedModels = [
-    { name: 'llama3.2:3b', size: '~2.0 Go', speed: '⚡ Ultra rapide', note: 'Idéal CPU', gpu: '2 Go VRAM' },
-    { name: 'qwen2.5:3b', size: '~1.9 Go', speed: '⚡ Ultra rapide', note: 'Très bon en français', gpu: '2 Go VRAM' },
-    { name: 'qwen3:4b', size: '~2.6 Go', speed: '🚀 Rapide', note: 'Excellent raisonnement', gpu: '3 Go VRAM' },
-    { name: 'llama3.2:1b', size: '~1.3 Go', speed: '⚡⚡ Instantané', note: 'Le plus léger', gpu: '1 Go VRAM' },
-    { name: 'qwen3:8b', size: '~4.9 Go', speed: '🐌 Lent sur CPU', note: 'Meilleure qualité', gpu: '5 Go VRAM' },
-  ];
+  const recommendedModels = Object.values(autoConfig?.portfolio || {}).reduce((items, item) => {
+    if (!item?.recommended || items.some(existing => existing.name === item.recommended)) return items;
+    const plan = (autoConfig?.download_plan || []).find(entry => entry.model === item.recommended);
+    items.push({
+      name: item.recommended,
+      size: plan?.size_bytes ? `${(plan.size_bytes / (1024 ** 3)).toFixed(1)} Go` : 'taille mesurée après installation',
+      speed: 'Adapté au matériel détecté',
+      note: `Rôle : ${item.role || 'général'}`,
+    });
+    return items;
+  }, []);
 
   const currentPerm = PERMISSION_LEVELS[permissionLevel] || PERMISSION_LEVELS[2];
 
@@ -713,7 +729,7 @@ export default function SettingsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {models.map(m => {
                       const isActive = m === selectedModel || m === status?.ollama?.model;
-                      const recInfo = recommendedModels.find(r => m.startsWith(r.name.split(':')[0]));
+                      const recInfo = recommendedModels.find(r => m === r.name);
                       return (
                         <button key={m} onClick={() => handleSetModel(m)} style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -756,6 +772,22 @@ export default function SettingsPage() {
                 background: 'var(--bg-tertiary)', padding: '16px',
                 borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
               }}>
+                {autoConfig && (
+                  <div style={{
+                    marginBottom: 14, padding: 12, borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+                    fontSize: 'var(--font-xs)', lineHeight: 1.6,
+                  }}>
+                    Budget local sûr : <strong>{autoConfig.model_memory_budget_gb} Go</strong>
+                    {' '}— {autoConfig.hardware?.gpu || 'CPU détecté'}.
+                    {(autoConfig.rejected_overrides || []).length > 0 && (
+                      <div style={{ color: 'var(--warning)', marginTop: 4 }}>
+                        {(autoConfig.rejected_overrides || []).length} préférence obsolète ignorée
+                        pour éviter un modèle trop lourd ou incompatible.
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div style={{ fontWeight: 700, fontSize: 'var(--font-sm)', marginBottom: '12px', color: 'var(--text-primary)' }}>
                   📥 Télécharger un nouveau modèle
                 </div>
@@ -880,7 +912,7 @@ export default function SettingsPage() {
                 </label>
               </div>
 
-              <div style={{
+              {activePreset !== 'ultra' && <div style={{
                 padding: '12px 16px', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.25)',
                 borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: 'var(--font-xs)', color: 'var(--text-secondary)', lineHeight: 1.6,
               }}>
@@ -888,7 +920,7 @@ export default function SettingsPage() {
                 (emails, SSH, mots de passe/identifiants, clés API, factures/devis clients) reste <strong>toujours en local</strong>,
                 même si le cloud est activé ci-dessus — Marvin bascule automatiquement, y compris en cours de conversation
                 si un outil sensible est appelé de façon inattendue.
-              </div>
+              </div>}
 
               {cloudEnabled && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

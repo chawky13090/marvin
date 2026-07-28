@@ -1067,6 +1067,27 @@ async def execute(
                     f"bash ./{primary_path}\n"
                     "printf '%s\\n' 'MARVIN_INTEGRATION_COMPLETE=full'\n"
                 )
+            if language == "python" and "pyproject.toml" in artifact_files:
+                return (
+                    "#!/usr/bin/env bash\n"
+                    "set -Eeuo pipefail\n"
+                    "python3 -m pip install --disable-pip-version-check .\n"
+                    "printf '%s\\n' 'MARVIN_INTEGRATION_COMPLETE=full'\n"
+                )
+            if language == "javascript" and "package.json" in artifact_files:
+                return (
+                    "#!/usr/bin/env bash\n"
+                    "set -Eeuo pipefail\n"
+                    "npm install --ignore-scripts\n"
+                    "printf '%s\\n' 'MARVIN_INTEGRATION_COMPLETE=full'\n"
+                )
+            if language == "go" and "go.mod" in artifact_files:
+                return (
+                    "#!/usr/bin/env bash\n"
+                    "set -Eeuo pipefail\n"
+                    "go mod download\n"
+                    "printf '%s\\n' 'MARVIN_INTEGRATION_COMPLETE=full'\n"
+                )
             return ""
         test_instructions = {
             "bash": (
@@ -1123,6 +1144,9 @@ async def execute(
                         reviewer_models[1],
                         "Tu es ingénieur d'intégration. Écris un harness Bash complet exécuté comme root "
                     "dans un environnement Debian 13 jetable avec Internet, sans secret ni montage hôte. "
+                    f"L'image spécialisée `{test_forge.IMAGES.get(language, test_forge.IMAGES['debian13'])}` "
+                    "fournit déjà le runtime certifié : ne réinstalle jamais Python, Node.js ou Go avec "
+                    "apt, dnf ou apk ; utilise directement le runtime présent. "
                     "Si le livrable exige systemd, Test Forge utilisera la VM Debian native. Le répertoire "
                     f"courant contient `{test_forge.FILE_NAMES[language][0]}`. Le harness doit utiliser un "
                     "chemin relatif comme `./main.sh`, jamais `/workspace` ni `/work/src`, puis installer réellement "
@@ -1137,6 +1161,8 @@ async def execute(
                     )
                     if integration_generation.get("ok"):
                         integration_test_code, _ = extract_code(integration_generation.get("answer", ""))
+                if test_forge._validate_integration_shape(integration_test_code):
+                    integration_test_code = bundled_integration_fallback()
             test_report = await asyncio.to_thread(
                 test_forge.execute,
                 code,
@@ -1313,7 +1339,9 @@ async def execute(
                     client,
                     reviewer_models[1],
                     "Régénère un harness Bash d'intégration Debian 13 avec Internet pour le code "
-                    "corrigé présent dans le répertoire courant. Utilise des chemins relatifs comme `./main.sh`, "
+                    f"corrigé dans l'image spécialisée `{test_forge.IMAGES.get(language, test_forge.IMAGES['debian13'])}`. "
+                    "Cette image fournit déjà le runtime certifié : ne réinstalle jamais Python, Node.js "
+                    "ou Go avec apt, dnf ou apk. Utilise des chemins relatifs comme `./main.sh`, "
                     "jamais `/workspace` ni `/work/src`. Il doit installer les dépendances nécessaires et exécuter "
                     "le parcours fonctionnel principal ; Test Forge exécutera lui-même les tests ensuite. "
                     "Il doit vérifier les résultats et n'afficher "
@@ -1329,6 +1357,8 @@ async def execute(
                         integration_test_code, _ = extract_code(
                             integration_generation.get("answer", "")
                         )
+                if test_forge._validate_integration_shape(integration_test_code):
+                    integration_test_code = bundled_integration_fallback()
             if active_mission_id:
                 coding_mission.checkpoint(
                     active_mission_id, "testing", files=current_bundle_files(),

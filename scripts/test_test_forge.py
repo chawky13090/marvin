@@ -26,6 +26,16 @@ def _passed_step(name: str) -> dict:
 
 
 def main() -> int:
+    assert test_forge._validate_integration_runtime_contract(
+        "python",
+        "DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12 python3.12-venv\n"
+        "echo MARVIN_INTEGRATION_COMPLETE=full\n",
+    )
+    assert test_forge._validate_integration_runtime_contract(
+        "python",
+        "python3 -m unittest discover -s tests\n"
+        "echo MARVIN_INTEGRATION_COMPLETE=full\n",
+    ) is None
     assert test_forge.requires_native_linux_runtime(
         "    systemctl restart nginx", "bash"
     ), "Une commande systemctl indentée doit être routée vers la VM Debian native."

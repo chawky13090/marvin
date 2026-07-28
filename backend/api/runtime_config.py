@@ -1,7 +1,7 @@
 """Routes d'apprentissage, configuration matérielle, Telegram et audit."""
 
-from fastapi import APIRouter, Body
-from pydantic import BaseModel
+from fastapi import APIRouter, Body, HTTPException
+from pydantic import BaseModel, Field
 
 import database as db
 import tools as tool_module
@@ -69,6 +69,11 @@ class TeachBody(BaseModel):
     text: str
 
 
+class LocalModelInstallBody(BaseModel):
+    models: list[str] = Field(min_length=1, max_length=10)
+    confirmed: bool = False
+
+
 @router.post("/api/learning/fact")
 async def learning_add_fact(body: TeachBody):
     import learning
@@ -95,6 +100,23 @@ async def run_auto_config(body: dict = Body(default={})):
         mode = body.get("mode") or "auto"
         db.set_setting("perf_mode", mode if mode in auto_config._MODES else "auto")
     return await auto_config.apply_auto_config(force=True)
+
+
+@router.get("/api/auto-config/models/download")
+async def local_model_download_status():
+    import local_model_installer
+
+    return local_model_installer.status()
+
+
+@router.post("/api/auto-config/models/download")
+async def local_model_download(body: LocalModelInstallBody):
+    import local_model_installer
+
+    try:
+        return local_model_installer.start(body.models, confirmed=body.confirmed)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/api/perf-modes")

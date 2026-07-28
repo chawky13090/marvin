@@ -5,6 +5,70 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-28 — v2.435.0 — Portefeuille local dynamique et runtime Forge
+
+### Demande, faits et décision
+
+L'utilisateur demande que chaque future installation détecte une machine plus ou moins
+puissante, propose et télécharge les modèles locaux réellement adaptés, sans figer la qualité
+normale Cloud. La machine observée possède une GTX 1650 de 4 Go; plusieurs modèles installés
+de 4,7 à 9,6 Go dépassent son budget GPU sûr. Trois overrides historiques forçaient encore
+`qwen2.5:14b` malgré cette contrainte. Ils sont désormais conservés comme préférences mais
+refusés à l'exécution, au lieu de contourner le détecteur.
+
+Deux approches ont été comparées : conserver des paliers codés dans `auto_config.py`, simple
+mais rapidement obsolète, ou séparer un moteur déterministe d'un catalogue versionné et
+auditable. La seconde est retenue. Le catalogue porte les noms et métadonnées vérifiables;
+l'algorithme reste générique et croise GPU/VRAM, RAM disponible, disque, capacités, rôle et
+taille Ollama réellement installée. Le Cloud reste prioritaire hors profils protégés.
+
+### Implémentation, sécurité et observabilité
+
+`local_model_policy.py` calcule un budget mémoire conservateur, sélectionne par rôle et
+produit un plan disque. `local_model_installer.py` exige une confirmation explicite, applique
+une allowlist issue du catalogue, sérialise les pulls et persiste uniquement modèle, état,
+progression et classe d'erreur. Les réponses Ollama brutes, prompts et secrets ne sont jamais
+journalisés. L'arrêt du lifespan annule proprement le worker. Jour et Paramètres consomment
+le même contrat dynamique; la saisie libre historique reste disponible pour préserver
+l'accès au catalogue Ollama complet.
+
+Une mission E2E a également révélé une boucle de réparation réelle : l'image Python 3.12
+tentait d'installer `python3.12` depuis Debian Bookworm. Test Forge refuse désormais la
+réinstallation d'un runtime déjà fourni par son image spécialisée, et les prompts de création
+et de réparation décrivent explicitement ce contrat.
+
+### Validation et rollback
+
+Les tests ciblés de politique, installateur, Test Forge, composition FastAPI, architecture,
+compilation Python et ESLint réussissent. Le smoke connecté Test Forge télécharge réellement
+`ca-certificates`, vérifie Python 3.12 et exécute `unittest` dans l'image épinglée. La mission
+persistante initialement interrompue a repris le même worktree et le même historique jusqu'au
+statut `completed / accepted`. Son registre contient 167 preuves chaînées valides; le
+Delivery Pack contient exactement les trois fichiers demandés, 16 tests réussissent,
+Test Forge est `production_ready=true`, le Production Contract réussit, et les défauts
+critiques/élevés restants sont à zéro. Une seconde exécution indépendante des 16 tests
+réussit aussi depuis le worktree.
+
+Sur la machine réelle, `qwen2.5-coder:3b`, `qwen3:4b` et `qwen3.5:2b` sont téléchargés
+séquentiellement sans échec. Les trois répondent à une inférence locale bornée, puis sont
+déchargés pour préserver le fonctionnement Cloud-first. Le moteur applique `qwen3:4b` aux
+profils texte et `qwen3.5:2b` à la vision; les trois overrides 14b trop lourds restent
+visibles mais sont refusés. La page Paramètres est contrôlée dans un vrai navigateur :
+budget, suggestions et avertissements sont lisibles. Une contradiction historique du mode
+Ultra, qui affichait encore « toujours en local », est supprimée; l'interface expose désormais
+uniquement le contrat cloud strict réellement appliqué.
+
+Le gate consolidé réussit toutes ses étapes sauf le build tant que le serveur Turbopack de
+développement tient volontairement son verrou. Après arrêt du seul frontend, le build de
+production Next.js 16.2.12/Turbopack compile, type-checke et génère toutes les routes. Le
+frontend est ensuite relancé en mode Turbopack et répond HTTP 200; le backend 2.435.0 reste
+disponible.
+
+Rollback logiciel : `git revert <commit-v2.435>`. Aucun modèle existant, override, schéma ou
+donnée métier n'est supprimé. Les nouveaux modèles éventuellement téléchargés restent des
+artefacts Ollama réutilisables; leur suppression est volontairement exclue du rollback
+automatique afin d'éviter une opération destructive non demandée.
+
 ## 2026-07-15 — Consolidation, e-mails multiboîtes et Council v2
 
 ### Fil de la conversation

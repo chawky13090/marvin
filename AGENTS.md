@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.403.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.435.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,23 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.434.0)
+## 9. État actuel (v2.435.0)
+
+**v2.435 (portefeuille local dynamique et Forge cohérent)** : la sélection locale ne repose
+plus sur des tailles ou modèles enfouis dans l'algorithme. Un catalogue versionné décrit
+taille, rôles, capacités, contexte et source officielle; le moteur croise cet inventaire avec
+GPU, VRAM, RAM disponible, espace disque et tailles réellement installées. Une préférence
+persistée reste une préférence : elle est refusée si elle dépasse le budget mémoire sûr ou
+ne possède pas la capacité attendue. Les suggestions des pages Jour et Paramètres proviennent
+du même contrat. Le téléchargement est explicite, séquentiel, idempotent, annulable au
+shutdown, limité au catalogue et ne conserve aucune réponse brute.
+
+Test Forge refuse maintenant un harness qui tente de réinstaller Python, Node.js ou Go depuis
+la distribution alors que son image spécialisée fournit déjà le runtime certifié. Les prompts
+de création et de réparation reçoivent le même contrat d'environnement. Cela supprime la
+boucle observée où une image Python 3.12 tentait d'installer `python3.12` depuis Debian
+Bookworm. Le smoke en ligne télécharge une vraie dépendance système puis compile et exécute
+les tests dans l'image épinglée.
 
 **v2.434 (boucle de réparation observable)** : chaque refus de Code Forge produit désormais
 un diagnostic durable expurgé, une passe de réparation ciblée et une preuve de validation
