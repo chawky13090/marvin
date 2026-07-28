@@ -79,6 +79,7 @@ def run() -> None:
         ("backend/audit.py", "audit.jsonl"),
         ("backend/bug_log.py", "bug_log.jsonl"),
         ("backend/skills.py", "skills_match_log.jsonl"),
+        ("backend/api_observability.py", "api_requests.jsonl"),
     }
     for module, _filename in structured_logs:
         source = (ROOT / module).read_text(encoding="utf-8-sig")

@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.435.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.436.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.435.0)
+## 9. État actuel (v2.436.0)
+
+**v2.436 (corrélation et métriques HTTP)** : chaque requête HTTP reçoit un identifiant de
+corrélation validé ou généré, renvoyé dans `X-Request-ID`; `Server-Timing` expose uniquement
+la durée applicative. Les compteurs en mémoire agrègent classes de statut, latences,
+requêtes lentes et routes normalisées avec cardinalité bornée, sans query string, corps,
+identifiant métier ni donnée personnelle. `/api/health` expose ce snapshot. Seules les
+erreurs 5xx et requêtes de plus de deux secondes rejoignent un journal structuré expurgé,
+tournant et conservé trente jours. Le handler 500 relie incident et requête sans exposer
+l'exception.
 
 **v2.435 (portefeuille local dynamique et Forge cohérent)** : la sélection locale ne repose
 plus sur des tailles ou modèles enfouis dans l'algorithme. Un catalogue versionné décrit

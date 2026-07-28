@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.436 — corrélation HTTP, métriques API bornées et journal des erreurs lentes
 # v2.435 — portefeuille local dynamique et contrat de runtime Forge
 # v2.434 — boucle de réparation prouvée, check-ups chat et manifeste documentaire
 # v2.419 — sauvegardes SQLite intègres, atomiques et compensables
@@ -51,6 +52,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import bug_log
+from api_observability import ApiObservabilityMiddleware
 import chat_turn_runtime
 import generation_runtime
 import web_runtime
@@ -252,6 +254,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ApiObservabilityMiddleware)
 
 app.include_router(doctor_router)
 app.include_router(cortex_router)
@@ -305,6 +308,7 @@ app.include_router(proactive_router)
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     incident_id = uuid.uuid4().hex
+    request_id = str(getattr(request.state, "request_id", "") or uuid.uuid4().hex)
     bug_log.log_bug(
         "http_exception",
         type(exc).__name__,
@@ -312,6 +316,7 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
             "path": str(request.url.path)[:500],
             "method": str(request.method)[:16],
             "incident_id": incident_id,
+            "request_id": request_id,
             "exception_type": type(exc).__name__[:160],
         },
     )
@@ -320,5 +325,7 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
         content={
             "detail": "Une erreur interne est survenue.",
             "incident_id": incident_id,
+            "request_id": request_id,
         },
+        headers={"X-Request-ID": request_id},
     )

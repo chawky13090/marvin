@@ -40,6 +40,7 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `audit.py` — `audit.jsonl` | technical_log | sécurité/opérations | 90 jours | structuré |
 | `bug_log.py` — `bug_log.jsonl` | technical_log | incidents | 30 jours | structuré |
 | `skills.py` — `skills_match_log.jsonl` | technical_log | matcher de compétences | 30 jours | structuré |
+| `api_observability.py` — `api_requests.jsonl` | technical_log | erreurs et latences HTTP | 30 jours | structuré |
 | `coding_mission.py` — `events.jsonl` | domain_event_stream | Coding Mission | avec la mission | structuré |
 | `engineering_radar.py` — `events.jsonl` | domain_event_stream | Radar documentaire | avec l'état Radar | structuré |
 | `mission_os.py` — `mission_events.jsonl` | domain_event_stream | Mission OS | avec la mission | structuré |
@@ -55,6 +56,7 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 backend/audit.py|audit.jsonl|technical_log|90d|structured
 backend/bug_log.py|bug_log.jsonl|technical_log|30d|structured
 backend/skills.py|skills_match_log.jsonl|technical_log|30d|structured
+backend/api_observability.py|api_requests.jsonl|technical_log|30d|structured
 backend/coding_mission.py|events.jsonl|domain_event_stream|owner_lifecycle|structured
 backend/engineering_radar.py|events.jsonl|domain_event_stream|owner_lifecycle|structured
 backend/mission_os.py|mission_events.jsonl|domain_event_stream|owner_lifecycle|structured

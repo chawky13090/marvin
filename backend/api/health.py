@@ -11,6 +11,7 @@ from app_version import APP_VERSION
 from config import OLLAMA_URL
 import tools
 import generation_runtime
+import api_observability
 
 router = APIRouter()
 _cache: dict = {}
@@ -21,7 +22,11 @@ _CACHE_TTL = 15.0
 def _with_runtime(result: dict, request: Request) -> dict:
     supervisor = getattr(request.app.state, "runtime_supervisor", None)
     if supervisor is None:
-        return {**result, "workers": {"available": False, "total": 0, "statuses": {}}}
+        return {
+            **result,
+            "api": api_observability.snapshot(),
+            "workers": {"available": False, "total": 0, "statuses": {}},
+        }
     snapshot = supervisor.snapshot()
     statuses: dict[str, int] = {}
     for task in snapshot["tasks"]:
@@ -29,6 +34,7 @@ def _with_runtime(result: dict, request: Request) -> dict:
         statuses[status] = statuses.get(status, 0) + 1
     return {
         **result,
+        "api": api_observability.snapshot(),
         "workers": {
             "available": True,
             "closed": snapshot["closed"],

@@ -5,6 +5,29 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-28 — v2.436.0 — Corrélation et métriques HTTP bornées
+
+Marvin créait déjà un incident expurgé pour certaines erreurs, mais aucune corrélation
+systématique ne reliait requête, réponse, durée et incident. Deux approches ont été comparées :
+ajouter immédiatement une pile OpenTelemetry externe, plus complète mais lourde pour une
+application Windows locale, ou poser d'abord un middleware ASGI sans dépendance avec contrat
+compatible. La seconde est retenue; elle pourra alimenter OpenTelemetry plus tard sans
+modifier les routes.
+
+`api_observability.py` valide un éventuel `X-Request-ID` client ou génère un identifiant
+aléatoire, le place dans l'état de requête et le renvoie dans chaque réponse. Il mesure la
+durée sans corps ni query string, normalise UUID/nombres en `{id}`, limite la cardinalité à
+256 routes et expose compteurs, classes HTTP, histogramme, moyenne, maximum et top 20 via
+`/api/health`. `Server-Timing` expose uniquement la durée. Les requêtes normales ne sont pas
+écrites sur disque : seules les 5xx et durées supérieures à deux secondes rejoignent
+`data/logs/api_requests.jsonl`, expurgé, rotatif et conservé trente jours. Ce quatorzième
+JSONL est ajouté à l'inventaire autoritaire.
+
+Les tests couvrent identifiant accepté/refusé, en-têtes, 503, route normalisée, compteurs et
+absence d'écriture réelle pendant le test. Composition FastAPI, inventaire, architecture et
+compilation réussissent. Rollback exact : `git revert <commit-v2.436>`; aucun schéma ni donnée
+métier n'est modifié. La suppression du journal technique reste gouvernée par sa rétention.
+
 ## 2026-07-28 — v2.435.0 — Portefeuille local dynamique et runtime Forge
 
 ### Demande, faits et décision
