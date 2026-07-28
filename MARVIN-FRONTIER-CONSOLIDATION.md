@@ -89,7 +89,7 @@ de validation de livrables, pas une fragmentation obligatoire du produit.
 | memory | Mémoire, RAG et vérité durable | partial | `scripts/test_knowledge_mesh.py`, tests des domaines mémoire/documentaire | audit rétention, provenance, oubli, conflits et dérive factuelle |
 | coding | Code Workspace, Forge et missions longues | partial | tests Code/Test Forge, production contract, Coding Mission et jobs | scénarios E2E Linux/Windows avec artefact et reprise après panne |
 | isolation | Docker, VM Debian et VM Windows | partial | tests VM Lab, Hyper-V runner et Test Forge | preuves natives propres, snapshot/revert et réseau gouverné |
-| persistence | SQLite, migrations et repositories | partial | inventaire 13 JSONL, preuves Forge, Mission OS, Coding Mission, Engineering Radar et Frontier Arena chaînées | consolider les flux métier restants, sauvegarde et restauration |
+| persistence | SQLite, migrations et repositories | partial | inventaire 13 JSONL, preuves Forge, Mission OS, Coding Mission, Engineering Radar, Frontier Arena, Model Market et Research Swarm chaînées | consolider Truth Ledger, sauvegarde et restauration |
 | api | FastAPI, contrats et compatibilité | partial | 346 routes uniques et `scripts/smoke_test_api.py` | schémas, erreurs, idempotence, autorisation et versionnement par famille |
 | workers | Workers, cron et missions proactives | verified | tests supervisor, runtime workers, communication, cron et proactif | chaos tests arrêt/redémarrage, doublon et dépendance indisponible |
 | observability | Logs, traces, métriques, coûts et évaluations | partial | audit JSONL, état Runner, Forge et gate reproductible | corrélation bout en bout, redaction, SLO et suites capacité/régression |
@@ -129,7 +129,8 @@ Une tranche n'est livrable que si les éléments applicables sont présents :
 5. revue de sécurité obligatoire : surface d'attaque, validation des entrées, autorisation,
    secrets et données personnelles, concurrence, intégrité, dépendances, abus et test de
    non-régression. Toute dette restante doit être inventoriée, bornée, justifiée et planifiée;
-   elle ne peut pas être masquée par un statut `verified` ;
+   aucune dette de sécurité ne peut être ignorée et elle ne peut pas être masquée par un
+   statut `verified` ;
 6. impact de journalisation obligatoire : événements, corrélation, données interdites,
    rotation, rétention, panne du journal et test de non-divulgation selon
    `MARVIN-LOGGING-POLICY.md` ;

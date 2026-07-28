@@ -2,9 +2,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
+import tempfile
+import uuid
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+import httpx
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,6 +129,175 @@ def main() -> int:
     with patch.object(research_swarm.cloud_routing, "get_cloud_config", return_value=(False, {})):
         error, _ = research_swarm.validate_runtime("Question publique")
         assert "cloud" in error.lower()
+    oversized, _ = research_swarm.validate_runtime("x" * 12_001)
+    assert "12000" in oversized
+
+    with tempfile.TemporaryDirectory() as temporary:
+        old_observations = model_market.OBSERVATIONS_PATH
+        old_runs = research_swarm.RUNS_PATH
+        model_market.OBSERVATIONS_PATH = Path(temporary) / "observations.jsonl"
+        research_swarm.RUNS_PATH = Path(temporary) / "runs.jsonl"
+        try:
+            receipt = model_market.record_observation(
+                "deepseek-v4-pro:cloud",
+                "research",
+                True,
+                1234,
+                phase="research stage with spaces",
+            )
+            assert receipt and receipt["sequence"] == 1
+            assert receipt["phase"] == "research_stage_with_spaces"
+            assert model_market.evidence_integrity()["integrity_level"] == "tamper_evident"
+
+            run = research_swarm._record_run({
+                "id": "swarm-" + uuid.uuid4().hex[:12],
+                "created_at": "2026-07-28T00:00:00+00:00",
+                "question": "Question publique",
+                "answer": "Réponse sourcée.",
+                "success": True,
+            })
+            assert run["evidence_persisted"] is True
+            assert run["sequence"] == 1 and len(run["record_hash"]) == 64
+            assert research_swarm.list_runs(10)[0]["id"] == run["id"]
+
+            observation_rows = model_market.OBSERVATIONS_PATH.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            altered_observation = json.loads(observation_rows[0])
+            altered_observation["success"] = False
+            observation_rows[0] = json.dumps(altered_observation)
+            model_market.OBSERVATIONS_PATH.write_text(
+                "\n".join(observation_rows) + "\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(
+                    model_market.cloud_routing,
+                    "list_installed_cloud_models",
+                    return_value=role_models,
+                ),
+                patch.object(
+                    model_market.cloud_routing,
+                    "get_model_capabilities",
+                    return_value={},
+                ),
+            ):
+                fallback_catalog = model_market.catalog("research")
+            assert fallback_catalog["telemetry_trusted"] is False
+            assert fallback_catalog["observation_count"] == 0
+            assert all(
+                item["observations"]["calls"] == 0
+                for item in fallback_catalog["models"]
+            )
+
+            run_rows = research_swarm.RUNS_PATH.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            altered_run = json.loads(run_rows[0])
+            altered_run["answer"] = "Réponse falsifiée."
+            run_rows[0] = json.dumps(altered_run, ensure_ascii=False)
+            research_swarm.RUNS_PATH.write_text(
+                "\n".join(run_rows) + "\n",
+                encoding="utf-8",
+            )
+            with patch.object(research_swarm.bug_log, "log_bug"):
+                unpersisted = research_swarm._record_run({
+                    "id": "swarm-" + uuid.uuid4().hex[:12],
+                    "created_at": "2026-07-28T00:01:00+00:00",
+                    "question": "Autre question publique",
+                    "answer": "Résultat utile malgré la panne de preuve.",
+                    "success": True,
+                })
+            assert unpersisted["evidence_persisted"] is False
+            assert unpersisted["evidence_error"] == "RuntimeError"
+
+            async def exercise_model_transport() -> None:
+                public_page = SimpleNamespace(
+                    status_code=200,
+                    headers={"content-type": "text/html; charset=utf-8"},
+                    content=(
+                        b"<html><head><title>Official</title></head>"
+                        b"<body><script>ignore()</script><main>Useful text</main></body></html>"
+                    ),
+                    url="https://docs.example.org/guide",
+                )
+                with patch.object(
+                    research_swarm.outbound_http,
+                    "fetch_public",
+                    new=AsyncMock(return_value=public_page),
+                ) as fetch_public:
+                    source = await research_swarm._fetch_public_source(
+                        "https://docs.example.org/guide"
+                    )
+                assert source == {
+                    "title": "Official",
+                    "url": "https://docs.example.org/guide",
+                    "text": "Useful text",
+                }
+                assert fetch_public.await_args.kwargs["max_bytes"] == 1_000_000
+
+                binary_page = SimpleNamespace(
+                    status_code=200,
+                    headers={"content-type": "application/octet-stream"},
+                    content=b"binary",
+                    url="https://docs.example.org/archive",
+                )
+                with patch.object(
+                    research_swarm.outbound_http,
+                    "fetch_public",
+                    new=AsyncMock(return_value=binary_page),
+                ):
+                    try:
+                        await research_swarm._fetch_public_source(
+                            "https://docs.example.org/archive"
+                        )
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError("Une source non textuelle doit être refusée.")
+
+                success_transport = httpx.MockTransport(
+                    lambda request: httpx.Response(
+                        200,
+                        json={"response": "Réponse bornée."},
+                    )
+                )
+                with patch.object(model_market, "record_observation"):
+                    async with httpx.AsyncClient(transport=success_transport) as client:
+                        success = await research_swarm._model_call(
+                            client,
+                            "deepseek-v4-pro:cloud",
+                            "Question",
+                            "test",
+                            "research",
+                        )
+                assert success["ok"] is True and success["answer"] == "Réponse bornée."
+
+                oversized_transport = httpx.MockTransport(
+                    lambda request: httpx.Response(
+                        200,
+                        content=b"x" * (research_swarm.MAX_MODEL_RESPONSE_BYTES + 1),
+                    )
+                )
+                with (
+                    patch.object(model_market, "record_observation"),
+                    patch.object(research_swarm.bug_log, "log_bug"),
+                ):
+                    async with httpx.AsyncClient(transport=oversized_transport) as client:
+                        oversized_result = await research_swarm._model_call(
+                            client,
+                            "deepseek-v4-pro:cloud",
+                            "Question",
+                            "test",
+                            "research",
+                        )
+                assert oversized_result["ok"] is False
+                assert oversized_result["error"] == "ValueError"
+
+            asyncio.run(exercise_model_transport())
+        finally:
+            model_market.OBSERVATIONS_PATH = old_observations
+            research_swarm.RUNS_PATH = old_runs
 
     swarm = cortex.compile_contract("Recherche cette technologie", {"review": "swarm"})
     assert swarm["forced_tools"] == ["ai_research_swarm"]

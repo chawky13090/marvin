@@ -92,6 +92,8 @@ def run() -> None:
         ("backend/frontier_arena.py", "frontier_arena_submissions.jsonl"),
         ("backend/frontier_arena.py", "frontier_arena_matches.jsonl"),
         ("backend/frontier_arena.py", "frontier_arena_votes.jsonl"),
+        ("backend/model_market.py", "model_market_observations.jsonl"),
+        ("backend/research_swarm.py", "research_swarm_runs.jsonl"),
     }
     for module, _filename in structured_evidence:
         assert "DurableEvidenceStore" in (ROOT / module).read_text(encoding="utf-8-sig")

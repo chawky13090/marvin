@@ -23,17 +23,24 @@ export default function ModelMarketPage() {
   const [job, setJob] = useState(null);
   const [error, setError] = useState('');
   const [fleet, setFleet] = useState(null);
+  const [swarmIntegrity, setSwarmIntegrity] = useState(null);
   const [fleetBusy, setFleetBusy] = useState(false);
   const [modelToPull, setModelToPull] = useState('');
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const response = await fetch(`${BACKEND_URL}/api/model-market/catalog?need=${encodeURIComponent(need)}`);
+      const [response, fleetResponse, swarmResponse] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/model-market/catalog?need=${encodeURIComponent(need)}`),
+        fetch(`${BACKEND_URL}/api/model-market/fleet`),
+        fetch(`${BACKEND_URL}/api/model-market/swarm/runs?limit=1`),
+      ]);
       if (!response.ok) throw new Error(`Model Market HTTP ${response.status}`);
       setCatalog(await response.json());
-      const fleetResponse = await fetch(`${BACKEND_URL}/api/model-market/fleet`);
       if (fleetResponse.ok) setFleet(await fleetResponse.json());
+      if (swarmResponse.ok) {
+        setSwarmIntegrity((await swarmResponse.json()).evidence_integrity || null);
+      }
     } catch (err) {
       setError(err.message || 'Model Market indisponible');
     }
@@ -179,6 +186,13 @@ export default function ModelMarketPage() {
               <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>
                 {catalog?.installed_count ?? 0} modèles cloud · {catalog?.observation_count ?? 0} observations · {catalog?.need_label || need}
               </div>
+              {catalog?.evidence_integrity && <div style={{ color: catalog.evidence_integrity.valid ? catalog.evidence_integrity.legacy_records ? '#fbbf24' : '#34d399' : '#fb7185', fontSize: 10, marginTop: 5 }}>
+                {catalog.evidence_integrity.valid
+                  ? catalog.evidence_integrity.legacy_records
+                    ? `Télémétrie cohérente · ${catalog.evidence_integrity.legacy_records} observation(s) historique(s) non signée(s)`
+                    : `Télémétrie vérifiable · ${catalog.evidence_integrity.signed_records} observation(s) chaînée(s)`
+                  : 'Télémétrie compromise · scores appris ignorés, priorités officielles actives'}
+              </div>}
             </div>
             <select value={need} onChange={event => setNeed(event.target.value)}
               style={{ padding: '8px 10px', borderRadius: 9, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
@@ -207,6 +221,13 @@ export default function ModelMarketPage() {
           <div style={{ color: 'var(--text-muted)', fontSize: 12, margin: '5px 0 11px' }}>
             Cinq familles cloud distinctes recherchent en parallèle : sources primaires, état de l’art, contradiction, exécution et vérification.
           </div>
+          {swarmIntegrity && <div style={{ color: swarmIntegrity.valid ? swarmIntegrity.legacy_records ? '#fbbf24' : '#34d399' : '#fb7185', fontSize: 10, marginBottom: 9 }}>
+            {swarmIntegrity.valid
+              ? swarmIntegrity.legacy_records
+                ? `Runs cohérents · ${swarmIntegrity.legacy_records} recherche(s) historique(s) non signée(s)`
+                : `Preuves Swarm vérifiables · ${swarmIntegrity.signed_records} run(s) chaîné(s)`
+              : 'Intégrité des runs compromise · tout nouveau résultat sera signalé non persisté'}
+          </div>}
           <textarea value={question} onChange={event => setQuestion(event.target.value)}
             placeholder="Question de recherche complexe et non sensible"
             style={{ width: '100%', minHeight: 90, resize: 'vertical', boxSizing: 'border-box', borderRadius: 10, padding: 11, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
@@ -225,6 +246,13 @@ export default function ModelMarketPage() {
             <div style={{ fontWeight: 750, marginBottom: 8 }}>Rapport final</div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 12 }}>
               {result.cells?.length || 0} cellules · {result.sources?.length || 0} sources · {(result.models_consulted || []).length} modèles
+            </div>
+            <div style={{ color: result.evidence_persisted === true ? '#34d399' : result.evidence_persisted === false ? '#fb7185' : '#fbbf24', fontSize: 11, marginBottom: 12 }}>
+              {result.evidence_persisted === true
+                ? `Preuve persistée · séquence ${result.sequence || 'N/D'} · ${result.record_hash?.slice(0, 14) || 'empreinte indisponible'}`
+                : result.evidence_persisted === false
+                  ? `Rapport livré mais preuve non persistée · ${result.evidence_error || 'erreur inconnue'}`
+                  : 'Rapport historique · aucun reçu de preuve disponible'}
             </div>
             <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', lineHeight: 1.55, fontSize: 13 }}>{result.answer}</pre>
             <div style={{ marginTop: 14, display: 'grid', gap: 6 }}>

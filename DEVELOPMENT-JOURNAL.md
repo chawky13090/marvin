@@ -8404,3 +8404,74 @@ commit; le backend doit ensuite être redémarré et validé par `/api/health` e
 - Rollback applicatif : `git revert <commit>`. Le format enrichi est additif; les lecteurs
   historiques restent compatibles. La réversion ne supprime aucune preuve ajoutée et les
   registres existants ne sont jamais réécrits pendant la migration.
+
+## 2026-07-28 — v2.399.0 — preuves Model Market et Research Swarm
+
+### Contexte, alternatives et décision
+
+- Périmètre : observations passives qui influencent le routage Model Market, résultats
+  Research Swarm, API et interface `/market`. Les modèles, les cinq rôles, les contrats
+  publics et les historiques existants sont conservés.
+- Deux approches ont été comparées : déplacer immédiatement la télémétrie dans une base
+  analytique séparée, ou consolider les deux JSONL derrière le registre local commun. Le
+  registre local est retenu pour cette tranche : moins de dépendances et de surface réseau,
+  fonctionnement hors service externe, preuve chaînée et rollback atomique. Une base indexée
+  reste préférable lorsque le volume rendra la vérification linéaire mesurable; la fenêtre de
+  décision est déjà limitée aux 100 observations les plus récentes par modèle et besoin.
+- Model Market n'utilise plus une télémétrie dont l'intégrité est invalide. Il revient aux
+  priors officiels et expose `telemetry_trusted=false`, au lieu de permettre à un fichier
+  altéré d'empoisonner silencieusement la sélection des modèles.
+- Research Swarm conserve un résultat utile même si son écriture probante échoue. Il expose
+  `evidence_persisted=false` et ne rejoue jamais automatiquement les cinq appels Cloud, afin
+  d'éviter doubles coûts et effets indéterministes.
+
+### Revue de sécurité et journalisation obligatoires
+
+- Questions bornées à 12 000 caractères; nombres d'agents, sources, concurrence et durée
+  restent bornés par les contrats existants. Identifiants et champs de télémétrie sont
+  normalisés avant persistance.
+- Les réponses Ollama sont désormais lues en flux avec une limite de 2 Mio sur le corps
+  décompressé. Une réponse vide, invalide ou trop volumineuse produit une erreur typée et ne
+  peut pas épuiser silencieusement la mémoire du processus.
+- Les pages candidates ne sont plus ouvertes par un navigateur qui pourrait suivre une
+  destination interne. Elles passent par `outbound_http.fetch_public` : HTTP(S) seulement,
+  ports 80/443, DNS public épinglé, redirections revalidées avant requête, réponse limitée à
+  1 Mio et types textuels seulement. Le HTML est extrait sans exécuter son JavaScript; une
+  source refusée n'est ni transmise au modèle, ni persistée, ni rendue comme lien.
+- Les erreurs publiques et techniques ne contiennent ni prompt, ni réponse, ni source, ni
+  exception brute. Le journal technique ne reçoit que composant, phase bornée, identifiant de
+  run et classe d'erreur; sa rétention reste celle de `bug_log.jsonl`, soit 30 jours.
+- Les deux registres sont vérifiés avant extension et utilisent verrou interprocessus, écriture
+  vidée par `fsync`, remplacement/quarantaine de fin partielle, séquence et chaîne SHA-256.
+- Dette de sécurité non ignorée : les 1 249 observations Model Market et quatre runs Research
+  Swarm actuellement présents sont cohérents mais historiques et non signés. Leur niveau
+  `mixed_legacy_unsigned` est exposé; aucune signature rétroactive trompeuse n'est créée.
+- Dette de confidentialité non ignorée : les résultats complets de recherche sont nécessaires
+  à l'audit et restent dans `DATA_DIR` sous les droits Windows, sans chiffrement applicatif par
+  enregistrement. Le chantier de protection au repos doit comparer ACL Windows renforcées,
+  BitLocker et chiffrement applicatif portable, avec migration, rotation de clés, sauvegarde
+  et récupération. Le domaine global `security` reste donc `partial`.
+- Aucune nouvelle dépendance n'est ajoutée. Le transport HTTP existant reste dirigé vers
+  l'endpoint Ollama configuré; cette tranche ne modifie ni les profils de confidentialité ni
+  l'interdiction de repli local silencieux en mode Ultra.
+
+### Validation et rollback
+
+- Test ciblé déterministe : recommandation multi-familles, validation de modèles, cinq rôles,
+  question excessive refusée, preuves chaînées, altération et repli aux priors, panne de
+  preuve visible, extraction HTML via le transport anti-SSRF, type binaire refusé, réponse
+  Cloud nominale simulée et dépassement de 2 Mio refusé.
+- Les endpoints `/api/model-market/integrity` et `/api/model-market/swarm/integrity` ainsi que
+  les listes exposent l'état de preuve. `/market` distingue registre vérifiable, historique
+  non signé, intégrité compromise et résultat non persisté.
+- Inventaire attendu après cette tranche : 13 JSONL classifiés, trois logs techniques, six
+  registres d'évaluation et trois flux métier structurés.
+- Gate rapide observée : 167/167 étapes, 344 outils, 352 routes, 236 fichiers Python compilés
+  et zéro erreur ESLint. Les 37 avertissements frontend historiques restent inventoriés.
+- Backend réel redémarré en 2.399.0 avec Ollama connecté; smoke HTTP/Next.js : 28/28 contrats.
+  Lecture réelle : 1 249 observations Model Market et quatre runs Research Swarm cohérents,
+  tous historiques non signés, sans corruption et sans modification de leur contenu.
+- Validation navigateur réelle de `/market` : les deux avertissements historiques sont
+  lisibles, les neuf modèles Cloud accessibles et aucune erreur ni alerte console n'est émise.
+- Rollback applicatif : `git revert <commit>`. Les enveloppes de preuve sont additives; les
+  lecteurs historiques restent compatibles et aucun enregistrement existant n'est réécrit.

@@ -47,8 +47,8 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `frontier_arena.py` — `frontier_arena_submissions.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
 | `frontier_arena.py` — `frontier_arena_matches.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
 | `frontier_arena.py` — `frontier_arena_votes.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
-| `model_market.py` — `model_market_observations.jsonl` | evaluation_ledger | Model Market | archivage explicite | à consolider |
-| `research_swarm.py` — `research_swarm_runs.jsonl` | evaluation_ledger | Research Swarm | archivage explicite | à consolider |
+| `model_market.py` — `model_market_observations.jsonl` | evaluation_ledger | Model Market | archivage explicite | structuré |
+| `research_swarm.py` — `research_swarm_runs.jsonl` | evaluation_ledger | Research Swarm | archivage explicite | structuré |
 | `truth_ledger.py` — `truth_ledger.jsonl` | truth_ledger | Memory Mesh | contrat mémoire | à consolider |
 
 <!-- persistence-inventory
@@ -62,8 +62,8 @@ backend/forge.py|forge_runs.jsonl|evaluation_ledger|owner_lifecycle|structured
 backend/frontier_arena.py|frontier_arena_submissions.jsonl|evaluation_ledger|explicit_archive|structured
 backend/frontier_arena.py|frontier_arena_matches.jsonl|evaluation_ledger|explicit_archive|structured
 backend/frontier_arena.py|frontier_arena_votes.jsonl|evaluation_ledger|explicit_archive|structured
-backend/model_market.py|model_market_observations.jsonl|evaluation_ledger|explicit_archive|pending
-backend/research_swarm.py|research_swarm_runs.jsonl|evaluation_ledger|explicit_archive|pending
+backend/model_market.py|model_market_observations.jsonl|evaluation_ledger|explicit_archive|structured
+backend/research_swarm.py|research_swarm_runs.jsonl|evaluation_ledger|explicit_archive|structured
 backend/truth_ledger.py|truth_ledger.jsonl|truth_ledger|memory_contract|pending
 -->
 

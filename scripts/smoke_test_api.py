@@ -324,6 +324,8 @@ def model_market_contracts() -> None:
         f"{BACKEND}/api/model-market/recommend?need=research&count=5&distinct_families=true"
     )
     runs = fetch_json(f"{BACKEND}/api/model-market/swarm/runs?limit=1")
+    market_integrity = fetch_json(f"{BACKEND}/api/model-market/integrity")
+    swarm_integrity = fetch_json(f"{BACKEND}/api/model-market/swarm/integrity")
     jobs = fetch_json(f"{BACKEND}/api/model-market/swarm/jobs?limit=1")
     evolution = fetch_json(f"{BACKEND}/api/evolution/experiments?limit=1")
     missions = fetch_json(f"{BACKEND}/api/missions?limit=1")
@@ -331,6 +333,9 @@ def model_market_contracts() -> None:
     assert isinstance(catalog.get("models"), list)
     assert isinstance(recommendations.get("recommendations"), list)
     assert isinstance(runs.get("runs"), list)
+    assert runs.get("evidence_integrity", {}).get("valid") is True
+    assert market_integrity.get("valid") is True
+    assert swarm_integrity.get("valid") is True
     assert isinstance(jobs.get("jobs"), list)
     assert isinstance(evolution.get("experiments"), list)
     assert isinstance(evolution.get("allowed_targets"), dict)

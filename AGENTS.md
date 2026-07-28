@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.398.0)
+## 9. État actuel (v2.399.0)
+
+**v2.399 (preuves Model Market et Research Swarm)** : observations de routage et runs de
+recherche utilisent `DurableEvidenceStore`, avec séquences et chaîne SHA-256. Une télémétrie
+altérée est ignorée au profit des priors officiels; elle ne peut pas empoisonner silencieusement
+le routage. Les réponses Cloud Research Swarm sont lues en flux et bornées à 2 Mio, les
+questions à 12 000 caractères, et les erreurs techniques n'exposent que leur classe. Un
+résultat de recherche dont la preuve ne peut être écrite reste livré sans rejeu coûteux, avec
+`evidence_persisted=false` visible dans l'API et l'interface. Les pages de recherche passent
+par `outbound_http.fetch_public` : résolution publique épinglée, redirections revalidées,
+ports standards, réponse limitée à 1 Mio et aucun JavaScript de la page exécuté.
 
 **v2.398 (preuves Frontier Arena)** : soumissions, matchs et votes utilisent trois registres
 append-only chaînés. Le vote est atomiquement unique par duel, y compris entre processus.

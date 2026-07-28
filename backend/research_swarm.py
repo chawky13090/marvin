@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import re
-import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -18,14 +16,19 @@ import httpx
 import cloud_routing
 import database as db
 import evidence_fabric
+import bug_log
 import model_market
+import outbound_http
 import semantic_evidence
 import web_browser
 from config import DATA_DIR, OLLAMA_URL
+from durable_evidence_store import DurableEvidenceStore
 
 
 RUNS_PATH = Path(DATA_DIR) / "research_swarm_runs.jsonl"
-_LOCK = threading.RLock()
+_RUN_ID = re.compile(r"^swarm-[0-9a-f]{12}$")
+MAX_MODEL_RESPONSE_BYTES = 2 * 1024 * 1024
+MAX_SOURCE_RESPONSE_BYTES = 1_000_000
 ROLES = (
     ("sources_primaires", "Trouve en priorité documentation officielle, normes, publications et données de première main."),
     ("état_de_l_art", "Cartographie les solutions actuelles, leurs capacités et les pratiques reconnues."),
@@ -64,6 +67,44 @@ def _search_query(question: str, role: str) -> str:
     return f"{subject} {_QUERY_SUFFIXES.get(role, 'documentation')}".strip()
 
 
+def _run_store() -> DurableEvidenceStore:
+    return DurableEvidenceStore(
+        RUNS_PATH,
+        stream_name="marvin.research_swarm.runs",
+    )
+
+
+def evidence_integrity() -> dict[str, Any]:
+    return _run_store().verify()
+
+
+def _persist_run(run: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(run, dict) or not _RUN_ID.fullmatch(str(run.get("id") or "")):
+        raise ValueError("Identité de run Research Swarm invalide.")
+    return _run_store().append(run)
+
+
+def _record_run(run: dict[str, Any]) -> dict[str, Any]:
+    candidate = {**run, "evidence_persisted": True}
+    try:
+        return _persist_run(candidate)
+    except Exception as exc:
+        error_type = type(exc).__name__
+        bug_log.log_bug(
+            "research_swarm_evidence",
+            "Persistance de la preuve Research Swarm impossible.",
+            context={
+                "run_id": str(run.get("id") or "")[:80],
+                "error_type": error_type,
+            },
+        )
+        return {
+            **run,
+            "evidence_persisted": False,
+            "evidence_error": error_type,
+        }
+
+
 def _source_priority(hit: dict[str, Any], question: str) -> int:
     url = str(hit.get("url") or "").casefold()
     title = str(hit.get("title") or "").casefold()
@@ -84,10 +125,60 @@ def _source_priority(hit: dict[str, Any], question: str) -> int:
     return score
 
 
+async def _fetch_public_source(url: str, *, max_chars: int = 3500) -> dict[str, str]:
+    """Lit une source publique via le transport anti-SSRF commun, sans exécuter son JavaScript."""
+    from bs4 import BeautifulSoup
+
+    normalized_limit = max(500, min(int(max_chars), 10_000))
+    response = await outbound_http.fetch_public(
+        str(url or "").strip(),
+        max_bytes=MAX_SOURCE_RESPONSE_BYTES,
+        timeout=20.0,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; MarvinResearchSwarm/2.399)",
+            "Accept": "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.1",
+            "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.7",
+        },
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"HTTP_{response.status_code}")
+    content_type = str(response.headers.get("content-type") or "").casefold()
+    if content_type and not any(
+        allowed in content_type
+        for allowed in ("text/html", "text/plain", "application/xhtml+xml")
+    ):
+        raise ValueError("Type de contenu Web non textuel.")
+    decoded = response.content.decode("utf-8", errors="replace")
+    if "html" in content_type or "<html" in decoded[:1000].casefold():
+        soup = BeautifulSoup(decoded, "lxml")
+        title = (
+            " ".join(soup.title.get_text(" ", strip=True).split())[:300]
+            if soup.title
+            else ""
+        )
+        for tag in soup(
+            ["script", "style", "nav", "footer", "header", "aside", "form", "iframe", "noscript", "svg"]
+        ):
+            tag.decompose()
+        root = soup.find("article") or soup.find("main") or soup.find("body") or soup
+        text = root.get_text(separator="\n", strip=True)
+    else:
+        title = ""
+        text = decoded
+    cleaned = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    return {
+        "title": title,
+        "url": response.url,
+        "text": cleaned[:normalized_limit],
+    }
+
+
 def validate_runtime(question: str) -> tuple[str | None, list[dict[str, Any]]]:
-    question = (question or "").strip()
+    question = str(question or "").strip()
     if not question:
         return "Paramètre 'question' requis.", []
+    if len(question) > 12_000:
+        return "La question Research Swarm est limitée à 12000 caractères.", []
     enabled, _ = cloud_routing.get_cloud_config()
     if not enabled:
         return "Research Swarm exige Ollama Cloud activé.", []
@@ -123,12 +214,24 @@ def build_plan(question: str, agent_count: int = 5) -> dict[str, Any]:
 async def _model_call(client: httpx.AsyncClient, model: str, prompt: str, phase: str, need: str) -> dict[str, Any]:
     started = time.perf_counter()
     try:
-        response = await client.post(
+        async with client.stream(
+            "POST",
             f"{OLLAMA_URL}/api/generate",
-            json={"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.2}},
-        )
-        response.raise_for_status()
-        answer = str(response.json().get("response") or "").strip()
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.2},
+            },
+        ) as response:
+            response.raise_for_status()
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > MAX_MODEL_RESPONSE_BYTES:
+                    raise ValueError("Réponse Ollama Research Swarm trop volumineuse.")
+        payload = json.loads(bytes(body))
+        answer = str(payload.get("response") or "").strip() if isinstance(payload, dict) else ""
         if not answer:
             raise RuntimeError("réponse vide")
         duration = int((time.perf_counter() - started) * 1000)
@@ -137,12 +240,18 @@ async def _model_call(client: httpx.AsyncClient, model: str, prompt: str, phase:
                 "phase": phase, "answer": answer, "duration_ms": duration}
     except Exception as exc:
         duration = int((time.perf_counter() - started) * 1000)
+        error_type = type(exc).__name__
         model_market.record_observation(
-            model, need, False, duration, phase=phase, error_type=type(exc).__name__,
+            model, need, False, duration, phase=phase, error_type=error_type,
+        )
+        bug_log.log_bug(
+            "research_swarm_model_call",
+            "Appel d'une cellule Research Swarm impossible.",
+            context={"phase": str(phase)[:80], "error_type": error_type},
         )
         return {"ok": False, "model": model, "family": cloud_routing.model_family(model),
                 "phase": phase, "duration_ms": duration,
-                "error": f"{type(exc).__name__}: {str(exc)[:180]}"}
+                "error": error_type}
 
 
 async def execute(
@@ -175,7 +284,18 @@ async def execute(
             try:
                 hits = await web_browser.search(cell["query"], n=max(4, sources_per_agent + 1))
             except Exception as exc:
-                return {**cell, "ok": False, "error": f"Recherche web : {str(exc)[:160]}", "sources": []}
+                error_type = type(exc).__name__
+                bug_log.log_bug(
+                    "research_swarm_web_search",
+                    "Recherche Web d'une cellule Research Swarm impossible.",
+                    context={"cell_id": cell["id"], "error_type": error_type},
+                )
+                return {
+                    **cell,
+                    "ok": False,
+                    "error": f"Recherche web : {error_type}",
+                    "sources": [],
+                }
             sources = []
             ranked_hits = sorted(
                 hits,
@@ -187,12 +307,16 @@ async def execute(
                 if not url:
                     continue
                 try:
-                    page = await web_browser.fetch_text(url, max_chars=3500)
+                    page = await _fetch_public_source(url, max_chars=3500)
                     text = str(page.get("text") or hit.get("snippet") or "").strip()
                 except Exception:
-                    text = str(hit.get("snippet") or "").strip()
+                    continue
                 if text:
-                    sources.append({"title": str(hit.get("title") or "")[:300], "url": url, "text": text[:3500]})
+                    sources.append({
+                        "title": str(page.get("title") or hit.get("title") or "")[:300],
+                        "url": str(page.get("url") or ""),
+                        "text": text[:3500],
+                    })
             if not sources:
                 return {**cell, "ok": False, "error": "Aucune source exploitable.", "sources": []}
             for index, source in enumerate(sources, start=1):
@@ -360,24 +484,10 @@ async def execute(
         "evidence_fabric": evidence_bundle,
         "semantic_judges": semantic_judges,
     }
-    with _LOCK:
-        RUNS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with RUNS_PATH.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(run, ensure_ascii=False) + "\n")
+    run = _record_run(run)
     await notify("completed", len(cells), len(cells))
     return run
 
 
 def list_runs(limit: int = 30) -> list[dict[str, Any]]:
-    if not RUNS_PATH.exists():
-        return []
-    rows = []
-    with _LOCK:
-        for line in RUNS_PATH.read_text(encoding="utf-8").splitlines():
-            try:
-                row = json.loads(line)
-            except ValueError:
-                continue
-            if isinstance(row, dict):
-                rows.append(row)
-    return rows[-max(1, min(int(limit), 200)) :][::-1]
+    return _run_store().recent(max(1, min(int(limit), 200)))

@@ -84,14 +84,15 @@ def run() -> dict[str, int]:
     if "amélioration proactive" not in text.lower():
         raise ContractError("L'amélioration proactive doit rester obligatoire par tranche.")
     if (
-        "inventaire 13 JSONL, preuves Forge, Mission OS, Coding Mission, "
-        "Engineering Radar et Frontier Arena chaînées"
+        "inventaire 13 JSONL, preuves Forge, Mission OS, Coding Mission, Engineering Radar, "
+        "Frontier Arena, Model Market et Research Swarm chaînées"
     ) not in text:
         raise ContractError("La preuve d'inventaire des persistances JSONL doit rester visible.")
     for requirement in (
         "revue de sécurité obligatoire",
         "Toute dette restante doit être inventoriée, bornée, justifiée et planifiée",
-        "elle ne peut pas être masquée par un statut `verified`",
+        "aucune dette de sécurité ne peut être ignorée",
+        "elle ne peut pas être masquée par un",
     ):
         if requirement not in text:
             raise ContractError(f"Exigence de sécurité globale absente : {requirement}")

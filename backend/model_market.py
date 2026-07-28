@@ -1,7 +1,6 @@
 """Model Market : catalogue et classement déterministe des modèles Ollama Cloud."""
 from __future__ import annotations
 
-import json
 import os
 import re
 import threading
@@ -11,11 +10,12 @@ from pathlib import Path
 from typing import Any
 
 import cloud_routing
+import bug_log
 from config import DATA_DIR, OLLAMA_URL
+from durable_evidence_store import DurableEvidenceStore
 
 
 OBSERVATIONS_PATH = Path(DATA_DIR) / "model_market_observations.jsonl"
-_LOCK = threading.RLock()
 _NEEDS = {
     "general",
     "reasoning",
@@ -99,6 +99,17 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _observation_store() -> DurableEvidenceStore:
+    return DurableEvidenceStore(
+        OBSERVATIONS_PATH,
+        stream_name="marvin.model_market.observations",
+    )
+
+
+def evidence_integrity() -> dict[str, Any]:
+    return _observation_store().verify()
+
+
 def _need(value: str) -> str:
     value = str(value or "general").strip().lower()
     return value if value in _NEEDS else "general"
@@ -112,39 +123,44 @@ def record_observation(
     *,
     phase: str = "",
     error_type: str | None = None,
-) -> None:
+) -> dict[str, Any] | None:
     """Enregistre uniquement la télémétrie technique d'un appel réel, jamais son contenu."""
     if not model or not cloud_routing.is_cloud_model(model):
-        return
+        return None
+    normalized_model = str(model).strip()
+    if not _MODEL_NAME_RE.fullmatch(normalized_model):
+        return None
+    try:
+        normalized_duration = max(0, min(int(duration_ms or 0), 3_600_000))
+    except (TypeError, ValueError, OverflowError):
+        normalized_duration = 0
     row = {
         "at": _utc_now(),
-        "model": model,
-        "family": cloud_routing.model_family(model),
+        "model": normalized_model,
+        "family": cloud_routing.model_family(normalized_model),
         "need": _need(need),
         "success": bool(success),
-        "duration_ms": max(0, min(int(duration_ms or 0), 3_600_000)),
-        "phase": str(phase or "")[:80],
-        "error_type": str(error_type or "")[:80] or None,
+        "duration_ms": normalized_duration,
+        "phase": re.sub(r"[^A-Za-z0-9_.:-]+", "_", str(phase or ""))[:80],
+        "error_type": re.sub(
+            r"[^A-Za-z0-9_.:-]+",
+            "_",
+            str(error_type or ""),
+        )[:80] or None,
     }
-    with _LOCK:
-        OBSERVATIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with OBSERVATIONS_PATH.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    try:
+        return _observation_store().append(row)
+    except Exception as exc:
+        bug_log.log_bug(
+            "model_market_observation",
+            "Persistance d'une observation de modèle impossible.",
+            context={"error_type": type(exc).__name__},
+        )
+        return None
 
 
 def list_observations(limit: int = 500) -> list[dict[str, Any]]:
-    if not OBSERVATIONS_PATH.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    with _LOCK:
-        for line in OBSERVATIONS_PATH.read_text(encoding="utf-8").splitlines():
-            try:
-                row = json.loads(line)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(row, dict):
-                rows.append(row)
-    return rows[-max(1, min(int(limit), 5000)) :][::-1]
+    return _observation_store().recent(max(1, min(int(limit), 5000)))
 
 
 def _stats() -> dict[tuple[str, str], dict[str, Any]]:
@@ -166,6 +182,7 @@ def _stats() -> dict[tuple[str, str], dict[str, Any]]:
             grouped[(model, derived_need)].append(row)
     result: dict[tuple[str, str], dict[str, Any]] = {}
     for key, rows in grouped.items():
+        rows = rows[:100]
         successes = [row for row in rows if row.get("success")]
         durations = [int(row.get("duration_ms") or 0) for row in successes if row.get("duration_ms")]
         result[key] = {
@@ -273,7 +290,8 @@ def _score(model: str, need: str, stats: dict[str, Any] | None) -> tuple[float, 
 
 def catalog(need: str = "general") -> dict[str, Any]:
     need = _need(need)
-    observations = _stats()
+    integrity = evidence_integrity()
+    observations = _stats() if integrity["valid"] else {}
     models = []
     for model in cloud_routing.list_installed_cloud_models():
         model_stats = observations.get((model, need))
@@ -295,8 +313,12 @@ def catalog(need: str = "general") -> dict[str, Any]:
         "need_label": _NEED_LABELS[need],
         "models": models,
         "installed_count": len(models),
-        "observation_count": len(list_observations(5000)),
+        "observation_count": len(list_observations(5000)) if integrity["valid"] else 0,
         "policy": "passive_real_calls_only",
+        "observation_window_per_model_need": 100,
+        "telemetry_trusted": integrity["valid"],
+        "evidence_integrity": integrity,
+        "fallback_reason": None if integrity["valid"] else "observation_integrity_invalid",
         "generated_at": _utc_now(),
     }
 

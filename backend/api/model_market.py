@@ -45,7 +45,15 @@ async def market_recommend(
 
 @router.get("/observations")
 async def market_observations(limit: int = Query(default=200, ge=1, le=2000)):
-    return {"observations": model_market.list_observations(limit)}
+    return {
+        "observations": model_market.list_observations(limit),
+        "evidence_integrity": model_market.evidence_integrity(),
+    }
+
+
+@router.get("/integrity")
+async def market_integrity():
+    return model_market.evidence_integrity()
 
 
 @router.get("/fleet")
@@ -71,7 +79,15 @@ async def cloud_fleet_pull(payload: CloudModelPullRequest):
 
 @router.get("/swarm/runs")
 async def swarm_runs(limit: int = Query(default=30, ge=1, le=200)):
-    return {"runs": research_swarm.list_runs(limit)}
+    return {
+        "runs": research_swarm.list_runs(limit),
+        "evidence_integrity": research_swarm.evidence_integrity(),
+    }
+
+
+@router.get("/swarm/integrity")
+async def swarm_integrity():
+    return research_swarm.evidence_integrity()
 
 
 @router.post("/swarm/run")
