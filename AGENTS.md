@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.482.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.483.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.482.0)
+## 9. État actuel (v2.483.0)
+
+**v2.483 (navigation adaptative)** : le composition root frontend partage un contrôleur de
+disposition déterministe. Le mode Automatique choisit Focus pour le chat et la recherche,
+Rail pour Code Workspace, Missions, Forge et les espaces d'automatisation, puis Complet pour
+les écrans de gestion. Le choix global ou propre à une section reste prioritaire; les petits
+écrans utilisent Focus et ouvrent la navigation complète en panneau modal. Le mode Classique
+conserve la sidebar historique comme rollback immédiat. `Ctrl+K` recherche aussi les
+conversations récentes et permet de changer de disposition. Les préférences locales sont
+validées, bornées et ne contiennent aucun contenu utilisateur.
 
 **v2.482 (recherche Web et palette de commandes)** : les demandes portant sur l'état d'un événement
 dynamique imposent désormais une preuve Web, y compris sans le mot `web`. Les fautes fréquentes

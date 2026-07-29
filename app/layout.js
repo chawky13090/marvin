@@ -5,6 +5,7 @@ import TopLoadingBar from '@/components/ui/TopLoadingBar';
 import CommandPalette from '@/components/ui/CommandPalette';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ChatProvider } from '@/lib/contexts/ChatContext';
+import { NavigationProvider } from '@/lib/contexts/NavigationContext';
 import LanAccessGate from '@/components/security/LanAccessGate';
 
 // Forcer le rendu dynamique pour éviter les erreurs SSR avec les composants client
@@ -40,9 +41,11 @@ export default function RootLayout({ children }) {
             stream keeps running in the background. */}
         <ToastProvider>
           <ChatProvider>
-            <TopLoadingBar />
-            <CommandPalette />
-            <AppFrame>{children}</AppFrame>
+            <NavigationProvider>
+              <TopLoadingBar />
+              <CommandPalette />
+              <AppFrame>{children}</AppFrame>
+            </NavigationProvider>
           </ChatProvider>
         </ToastProvider>
         </LanAccessGate>

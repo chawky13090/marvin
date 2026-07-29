@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.483 — navigation adaptative Focus, Rail, Complet et rollback Classique
 # v2.482 — recherche Web cohérente et palette de commandes React fiabilisée
 # v2.481 — fermeture des listeners HTTP LAN derrière la passerelle HTTPS
 # v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique

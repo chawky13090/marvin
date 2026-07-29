@@ -12136,3 +12136,74 @@ données déjà affichées, réessaie au cycle suivant et ne journalise que la c
 forme d'avertissement, sans URL sensible ni contenu utilisateur. Le build Turbopack, les
 services HTTP et une nouvelle ouverture de la palette ont ensuite été validés avec zéro erreur
 console.
+
+## 2026-07-29 — v2.483.0 — Navigation adaptative et centre de commandes
+
+### Demande
+
+Gagner en lisibilité en masquant la sidebar quand elle n'est pas nécessaire, sans perdre
+l'accès aux nombreuses fonctions de Marvin, avec un comportement intelligent, prévisible,
+personnalisable et réversible.
+
+### Décision
+
+La sélection de disposition reste logicielle et déterministe; aucun LLM ne réorganise
+silencieusement l'interface. `lib/navigationLayout.mjs` définit les politiques :
+
+- Focus : chat, recherche et rédaction ;
+- Rail : Code Workspace, Mission Canvas, Forge, Agents, Workflows, Evolution et Market ;
+- Complet : e-mails, calendrier, fichiers, paramètres et autres écrans de gestion ;
+- écran compact ou tactile : Focus, avec navigation complète en panneau modal ;
+- Classique : composant Sidebar historique conservé sans suppression.
+
+Les priorités sont : contrainte responsive, préférence de section, préférence globale, puis
+politique automatique. L'utilisateur choisit « Partout » ou « Cette section » et peut revenir
+immédiatement à Automatique ou Classique. `Ctrl+Maj+B` bascule Focus; `Ctrl+K` propose les cinq
+dispositions, les pages, outils, actions et vingt conversations récentes.
+
+### Fichiers et contrats
+
+- `lib/navigationLayout.mjs` : fonctions pures de résolution et clés de section ;
+- `lib/contexts/NavigationContext.jsx` : état partagé, préférences locales bornées, événements
+  et panneau temporaire ;
+- `components/layout/NavigationModeControl.jsx` : sélecteur accessible et portée du réglage ;
+- `components/layout/AppFrame.jsx` : composition Focus/Rail/Complet/Classique ;
+- `components/sidebar/Sidebar.jsx` : nouvelle branche adaptative; branche historique intacte ;
+- `components/ui/CommandPalette.jsx` : dispositions et conversations récentes ;
+- `app/page.js` : ouverture bornée d'une conversation depuis le centre de commandes ;
+- `scripts/test_navigation_layout.mjs` : politiques, priorités, responsive et rollback.
+
+### Cas limites corrigés pendant la validation
+
+Le premier bouton « Plus » du Rail était placé sous le bouton Next.js de développement en bas
+à gauche. Il a été déplacé dans la liste principale. Le premier sélecteur flottant recouvrait
+les commandes de la page Emails; il est maintenant intégré à l'en-tête du Rail et du panneau
+Complet, et ne flotte qu'en Focus, où aucune sidebar n'existe. Les popovers intégrés restent
+visibles hors de la largeur de la sidebar.
+
+### Sécurité, données et logs
+
+Seuls le mode (`auto`, `focus`, `rail`, `full`, `classic`) et jusqu'à 64 clés de section
+validées sont stockés dans `localStorage`. Aucun prompt, message, identifiant de compte,
+secret, e-mail ou résultat d'outil n'est persisté. Les identifiants de conversation issus du
+centre de commandes sont limités à 128 caractères alphanumériques, tiret ou underscore avant
+usage. Aucun endpoint d'écriture, droit, appel cloud ou nouveau journal n'est ajouté. Les
+échecs de lecture du catalogue restent best-effort et n'empêchent pas la navigation.
+
+### Validation réelle
+
+- contrat pur `test_navigation_layout.mjs` : succès ;
+- ESLint ciblé : succès ;
+- navigateur connecté : Focus sur `/`, Rail sur `/code`, Complet sur `/emails` ;
+- panneau complet depuis le Rail et depuis un viewport 390×844 : succès ;
+- `Ctrl+K` : dispositions et conversations « feux de forêt » visibles ;
+- retour Classique puis retour Automatique : succès ;
+- journal navigateur sur tous ces parcours : zéro erreur ;
+- contrôle visuel bureau et mobile effectué après correction des deux collisions spatiales.
+
+### Rollback
+
+Aucune migration de schéma ni donnée métier. Le rollback fonctionnel immédiat consiste à
+choisir « Classique — Ancienne sidebar ». Le rollback code est la réversion atomique du commit
+v2.483, puis redémarrage du frontend. Les deux clés locales peuvent être supprimées sans perte
+métier : `marvin:navigation-mode:v1` et `marvin:navigation-route-modes:v1`.

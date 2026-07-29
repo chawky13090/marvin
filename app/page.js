@@ -231,6 +231,15 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    const openConversation = event => {
+      const id = String(event.detail?.conversationId || '');
+      if (/^[a-zA-Z0-9_-]{1,128}$/.test(id)) loadConversation(id);
+    };
+    window.addEventListener('marvin:open-conversation', openConversation);
+    return () => window.removeEventListener('marvin:open-conversation', openConversation);
+  });
+
+  useEffect(() => {
     const requestedId = new URLSearchParams(window.location.search).get('conversation');
     if (!requestedId) return;
     window.history.replaceState({}, '', '/');

@@ -13,6 +13,13 @@ const QUICK_ACTIONS = [
   { id: 'council', icon: '◉', label: 'Council de modèles', href: '/agents' },
   { id: 'history', icon: '↶', label: 'Historique des discussions', href: '/historique' },
 ];
+const LAYOUT_ACTIONS = [
+  { id: 'layout:auto', icon: '✦', label: 'Navigation automatique', layoutMode: 'auto' },
+  { id: 'layout:focus', icon: '◫', label: 'Mode Focus', layoutMode: 'focus' },
+  { id: 'layout:rail', icon: '▥', label: 'Navigation compacte', layoutMode: 'rail' },
+  { id: 'layout:full', icon: '☰', label: 'Navigation complète', layoutMode: 'full' },
+  { id: 'layout:classic', icon: '↩', label: 'Navigation classique', layoutMode: 'classic' },
+];
 
 function buildIndex() {
   const navItems = NAV_SECTIONS.flatMap(s => s.items.map(i => ({
@@ -20,7 +27,11 @@ function buildIndex() {
     id: `nav:${i.href}`,
     section: s.title,
   })));
-  return [...QUICK_ACTIONS.map(a => ({ ...a, section: 'Actions' })), ...navItems];
+  return [
+    ...QUICK_ACTIONS.map(a => ({ ...a, section: 'Actions' })),
+    ...LAYOUT_ACTIONS.map(a => ({ ...a, section: 'Disposition' })),
+    ...navItems,
+  ];
 }
 
 function CommandIcon({ icon }) {
@@ -40,6 +51,7 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [tools, setTools] = useState(null);   // chargé à la demande (294 outils, pas au montage)
+  const [conversations, setConversations] = useState(null);
   const inputRef = useRef(null);
   const router = useRouter();
   const items = useMemo(() => buildIndex(), []);
@@ -64,6 +76,23 @@ export default function CommandPalette() {
       .catch(() => setTools([]));
   }, [open, tools]);
 
+  useEffect(() => {
+    if (!open || conversations !== null) return;
+    fetch('/api/conversations?limit=20')
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('ConversationIndexUnavailable')))
+      .then(data => {
+        setConversations((data.conversations || []).slice(0, 20).map(conversation => ({
+          id: `conversation:${conversation.id}`,
+          icon: '◌',
+          label: conversation.title || 'Conversation sans titre',
+          description: conversation.preview || '',
+          section: 'Conversation',
+          conversationId: String(conversation.id),
+        })));
+      })
+      .catch(() => setConversations([]));
+  }, [conversations, open]);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;   // requête vide : uniquement pages/actions (pas les 294 outils)
@@ -73,8 +102,11 @@ export default function CommandPalette() {
     const toolMatches = (tools || []).filter(t =>
       t.label.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)
     ).slice(0, 20);   // plafond pour ne pas noyer les résultats de pages
-    return [...navMatches, ...toolMatches];
-  }, [items, tools, query]);
+    const conversationMatches = (conversations || []).filter(item =>
+      item.label.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q)
+    ).slice(0, 10);
+    return [...navMatches, ...conversationMatches, ...toolMatches];
+  }, [items, tools, conversations, query]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -95,6 +127,19 @@ export default function CommandPalette() {
   const go = useCallback((item) => {
     if (!item) return;
     if (item.id === 'new-conv') startNewConversation();
+    else if (item.layoutMode) {
+      window.dispatchEvent(new CustomEvent('marvin:set-navigation-mode', {
+        detail: { mode: item.layoutMode, scope: 'global' },
+      }));
+    } else if (item.conversationId) {
+      if (window.location.pathname === '/') {
+        window.dispatchEvent(new CustomEvent('marvin:open-conversation', {
+          detail: { conversationId: item.conversationId },
+        }));
+      } else {
+        router.push(`/?conversation=${encodeURIComponent(item.conversationId)}`);
+      }
+    }
     else if (item.isTool) router.push(`/outils?q=${encodeURIComponent(item.label)}`);
     else router.push(item.href);
     close();

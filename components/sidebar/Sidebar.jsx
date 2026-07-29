@@ -1,9 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
+import NavigationModeControl from '@/components/layout/NavigationModeControl';
 import { BACKEND_URL } from '@/lib/backend';
 import {
   Activity,
@@ -21,6 +22,7 @@ import {
   ListChecks,
   Mail,
   MessageSquare,
+  MoreHorizontal,
   MonitorCog,
   NotebookPen,
   PanelsTopLeft,
@@ -38,6 +40,7 @@ import {
   Terminal,
   Workflow,
   Wrench,
+  X,
 } from 'lucide-react';
 
 export const NAV_SECTIONS = [
@@ -85,9 +88,10 @@ export const NAV_SECTIONS = [
   ]},
 ];
 const NAV_ITEMS = NAV_SECTIONS.flatMap(s => s.items);
+const CORE_NAV_HREFS = new Set(['/', '/recherche', '/code', '/fichiers', '/missions']);
 const OLLAMA_PORT = process.env.NEXT_PUBLIC_OLLAMA_PORT || '11434';
 
-export default function Sidebar() {
+export default function Sidebar({ displayMode = 'classic', onRequestClose, onRequestFull }) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -95,6 +99,7 @@ export default function Sidebar() {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarStatus, setAvatarStatus] = useState('checking');
+  const previousPathRef = useRef(pathname);
   // v2.146 — indicateur ambiant de tâche(s) longue(s) en cours (long_task_start, v2.145) :
   // demandé explicitement (« que l'on sache que Marvin travaille d'une certaine manière »).
   // Jusqu'ici totalement invisible tant qu'on ne demandait pas explicitement long_task_status
@@ -125,6 +130,10 @@ export default function Sidebar() {
 
   // Ferme le tiroir quand on change de page (mobile)
   useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (previousPathRef.current !== pathname && displayMode === 'overlay') onRequestClose?.();
+    previousPathRef.current = pathname;
+  }, [displayMode, onRequestClose, pathname]);
 
   useEffect(() => {
     checkOllama();
@@ -189,6 +198,121 @@ export default function Sidebar() {
 
   // Sur mobile : barre déployée (240px) en tiroir, masquée hors écran sauf si ouverte.
   const open = isMobile ? mobileOpen : (expanded || pinned);
+
+  if (displayMode !== 'classic') {
+    const expandedAdaptive = displayMode === 'full' || displayMode === 'overlay';
+    const adaptiveSections = expandedAdaptive
+      ? NAV_SECTIONS
+      : [{
+          title: 'Essentiel',
+          items: NAV_ITEMS.filter(item => CORE_NAV_HREFS.has(item.href)),
+        }];
+    return (
+      <>
+        {displayMode === 'overlay' && (
+          <button
+            type="button"
+            className="adaptive-nav-backdrop"
+            aria-label="Fermer la navigation"
+            onClick={onRequestClose}
+          />
+        )}
+        <aside
+          className={`adaptive-nav adaptive-nav--${displayMode}`}
+          aria-label={expandedAdaptive ? 'Navigation complète' : 'Navigation essentielle'}
+        >
+          <div className="adaptive-nav__brand">
+            {!expandedAdaptive ? (
+              <NavigationModeControl embedded />
+            ) : (
+              <button
+                type="button"
+                className="adaptive-nav__icon-button"
+                onClick={activateAvatar}
+                aria-label="Activer ou afficher l’avatar Marvin"
+                title="Avatar Marvin"
+              >
+                <LivingAvatar size={36} thinking={chatStatus.isLoading} />
+              </button>
+            )}
+            {expandedAdaptive && (
+              <div className="adaptive-nav__brand-copy">
+                <strong>MARVIN</strong>
+                <small>{chatStatus.isLoading ? 'Travail en cours' : 'Prêt à travailler'}</small>
+              </div>
+            )}
+            {expandedAdaptive && <NavigationModeControl embedded />}
+            {displayMode === 'overlay' && (
+              <button
+                type="button"
+                className="adaptive-nav__icon-button"
+                onClick={onRequestClose}
+                aria-label="Fermer la navigation"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+
+          <nav className="adaptive-nav__list">
+            {adaptiveSections.map(section => (
+              <div key={section.title}>
+                {expandedAdaptive && <div className="adaptive-nav__section-label">{section.title}</div>}
+                {section.items.map(item => {
+                  const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      className="adaptive-nav__link"
+                      key={item.href}
+                      href={item.href}
+                      aria-label={item.label}
+                      aria-current={active ? 'page' : undefined}
+                      title={expandedAdaptive ? undefined : item.label}
+                    >
+                      <Icon size={20} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
+                      {expandedAdaptive && <span>{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+            {!expandedAdaptive && (
+              <button
+                type="button"
+                className="adaptive-nav__link adaptive-nav__more"
+                aria-label="Afficher toute la navigation"
+                title="Plus"
+                onClick={onRequestFull}
+              >
+                <MoreHorizontal size={20} aria-hidden="true" />
+              </button>
+            )}
+          </nav>
+
+          <div className="adaptive-nav__footer">
+            <button
+              type="button"
+              className="adaptive-nav__icon-button"
+              aria-label="Ouvrir le centre de commandes"
+              title="Centre de commandes (Ctrl+K)"
+              onClick={() => window.dispatchEvent(new Event('marvin:open-command-palette'))}
+            >
+              <Search size={19} aria-hidden="true" />
+            </button>
+            {expandedAdaptive && (
+              <>
+                <span style={{ flex: 1, color: 'var(--text-muted)', fontSize: 10 }}>
+                  {longTaskCount > 0 ? `${longTaskCount} tâche(s) de fond` : 'Navigation complète'}
+                </span>
+                <span className={`badge-dot ${ollamaStatus}`} title={`Ollama : ${ollamaStatus}`} />
+              </>
+            )}
+          </div>
+        </aside>
+      </>
+    );
+  }
 
   return (
     <>
