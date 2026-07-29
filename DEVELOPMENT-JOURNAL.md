@@ -5,6 +5,48 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.445.0 — Orchestrateurs sous harness commun
+
+### Analyse et décision
+
+Multi-agents, workflows et cron résolvaient encore les outils avec `.get`, en dehors de la
+validation, des permissions, des reçus et de l'audit communs. Deux options ont été comparées :
+un orchestrateur générique unique, qui aurait mélangé streaming parallèle, historique de
+workflow et planification; ou la conservation des trois moteurs avec une frontière
+d'exécution partagée. La seconde préserve leurs responsabilités et leurs formats publics.
+Elle suit le principe Anthropic de workflows déterministes pour les chemins connus, les
+approbations fail-closed et reprenables d'OpenAI, ainsi que les callbacks/contextes explicites
+de Google ADK sans importer un framework externe.
+
+### Implémentation
+
+Les tâches multi-agents sont limitées à 32 et leurs identités, noms d'outil et libellés sont
+bornés. Les workflows acceptent au plus 50 étapes et trois retries; le runtime borne aussi
+les anciennes valeurs persistées. Chaque tentative porte `workflow:<run>:<step>:<attempt>`.
+Cron compose `cron:<job>:<horaire>:<phase>`, ce qui rend le rejeu d'un même cycle
+idempotent. Son ancien `log_execution` local est supprimé car le gateway produit déjà cette
+preuve.
+
+### Sécurité, concurrence, logs et rollback
+
+Une confirmation stockée dans les arguments d'un workflow ne peut pas auto-approuver une
+action dangereuse. Les erreurs cron ne conservent plus le message brut d'une exception. Le
+parallélisme et les retries sont bornés contre l'épuisement de ressources. Aucun schéma ni
+donnée n'est migré; les réponses SSE, historiques de runs et calendriers cron restent
+compatibles. Rollback exact : `git revert <commit-v2.445>`, redémarrage backend, tests
+orchestration/cron/inventaire/architecture et smoke API.
+
+### Validation
+
+Les tests ciblés couvrent succès et outil inconnu multi-agents, plafond de parallélisme,
+retry workflow avec identités distinctes, bornes des anciens workflows, cycle cron standard,
+notification de fin et inventaire exhaustif. Le premier smoke live a détecté une incompatibilité
+422 sur la liste multi-agents vide; la borne minimale, sans bénéfice de sécurité, a été retirée
+avant livraison tandis que le plafond de 32 reste actif. Après correction, le calcul parallèle
+réel retourne 42, le smoke API réussit **28/28** et `/api/health` expose **2.445.0**. Le gate
+consolidé réussit **205/205 étapes**, dont compilation Python, lint sans erreur et build
+Turbopack; les 37 avertissements frontend préexistants restent visibles.
+
 ## 2026-07-29 — v2.444.0 — Harness proactif et correction du gate d'inventaire
 
 ### Constat et correction de preuve

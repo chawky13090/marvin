@@ -103,6 +103,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Inventaire des consommateurs d'outils", (python, "scripts/test_tool_consumer_inventory.py")),
         Stage("Runtime commun des outils", (python, "scripts/test_tool_runtime.py")),
         Stage("Gateway des routes agenda", (python, "scripts/test_calendar_gateway_api.py")),
+        Stage("Gateway des orchestrateurs", (python, "scripts/test_orchestration_tool_gateway.py")),
         Stage("Erreurs API expurgées", (python, "scripts/test_api_errors.py")),
         Stage("Diagnostic privé du matching des skills", (python, "scripts/test_skill_match_logging.py")),
         Stage("Inventaire des persistances JSONL", (python, "scripts/test_persistence_inventory.py")),

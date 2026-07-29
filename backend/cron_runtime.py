@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 from datetime import datetime
 from typing import Any
 
 import database as db
-import tools as tool_module
+import tool_runtime
 from agent import run_agent
 from scheduling import next_run_datetime
 
@@ -19,6 +18,24 @@ async def drain_run_agent(message: str, conversation_id: str) -> None:
         [{"role": "user", "content": message}], conversation_id, None
     ):
         pass
+
+
+async def _run_cron_tool(
+    job: dict[str, Any],
+    tool_name: str,
+    arguments: dict[str, Any],
+    now_string: str,
+    *,
+    phase: str,
+) -> Any:
+    outcome = await tool_runtime.execute(
+        tool_name,
+        arguments,
+        source="cron_worker",
+        conversation_id=f"cron:{job['id']}",
+        request_id=f"cron:{job['id']}:{now_string}:{phase}",
+    )
+    return outcome.result
 
 
 async def long_task_resume_tick(job: dict[str, Any], now_string: str) -> None:
@@ -55,14 +72,16 @@ async def long_task_resume_tick(job: dict[str, Any], now_string: str) -> None:
             },
         )
         try:
-            notifier = tool_module.TOOLS_REGISTRY.get("pc_notify")
-            if notifier:
-                await notifier(
-                    {
-                        "title": "Marvin — Tâche longue terminée",
-                        "message": goal[:200] or "Toutes les étapes sont faites.",
-                    }
-                )
+            await _run_cron_tool(
+                job,
+                "pc_notify",
+                {
+                    "title": "Marvin — Tâche longue terminée",
+                    "message": goal[:200] or "Toutes les étapes sont faites.",
+                },
+                now_string,
+                phase="completed",
+            )
         except Exception:
             pass
         return
@@ -107,18 +126,20 @@ async def long_task_resume_tick(job: dict[str, Any], now_string: str) -> None:
             },
         )
         try:
-            notifier = tool_module.TOOLS_REGISTRY.get("pc_notify")
-            if notifier:
-                await notifier(
-                    {
-                        "title": "Marvin — Tâche longue en attente",
-                        "message": (
-                            f"« {goal[:120]} » ne progresse plus (probablement en attente d'une "
-                            "confirmation) — reprise automatique mise en pause. Ouvre la "
-                            "conversation pour valider l'étape bloquante, puis relance-la."
-                        ),
-                    }
-                )
+            await _run_cron_tool(
+                job,
+                "pc_notify",
+                {
+                    "title": "Marvin — Tâche longue en attente",
+                    "message": (
+                        f"« {goal[:120]} » ne progresse plus (probablement en attente d'une "
+                        "confirmation) — reprise automatique mise en pause. Ouvre la "
+                        "conversation pour valider l'étape bloquante, puis relance-la."
+                    ),
+                },
+                now_string,
+                phase="paused",
+            )
         except Exception:
             pass
         return
@@ -146,24 +167,19 @@ async def cron_worker() -> None:
                 if job["tool_name"] == "_long_task_resume":
                     await long_task_resume_tick(job, now_string)
                     continue
-                executor = tool_module.TOOLS_REGISTRY.get(job["tool_name"])
                 result: dict[str, Any] = {
                     "error": f"Outil '{job['tool_name']}' introuvable"
                 }
-                duration_ms = 0
-                if executor:
-                    started = time.monotonic()
-                    try:
-                        result = await executor(dict(job.get("args") or {}))
-                    except Exception as exc:
-                        result = {"error": str(exc)}
-                    duration_ms = int((time.monotonic() - started) * 1000)
-                    try:
-                        db.log_execution(
-                            job["tool_name"], job.get("args", {}), result, duration_ms
-                        )
-                    except Exception:
-                        pass
+                try:
+                    result = await _run_cron_tool(
+                        job,
+                        job["tool_name"],
+                        dict(job.get("args") or {}),
+                        now_string,
+                        phase="scheduled",
+                    )
+                except Exception as exc:
+                    result = {"error": type(exc).__name__}
                 db.update_cron_job(
                     job["id"],
                     {

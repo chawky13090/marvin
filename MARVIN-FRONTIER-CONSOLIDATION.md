@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.444.0
+Version courante auditée : 2.445.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -127,7 +127,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 |---|---|---|---|---|
 | runner | Runner et boucle agentique | verified | `scripts/test_agent_loop_policy.py`, `scripts/test_agent_execution.py`, `scripts/test_agent_turn_completion.py` | maintenir les contrats de budget, arrêt, reprise et événements |
 | sessions | Sessions, SSE et reprise | verified | `scripts/test_chat_turn_runtime.py`, `scripts/test_chat_stream.mjs`, `scripts/test_agent_session.py` | test navigateur de reconnexion pendant un tour long |
-| tools | Catalogue, harness et appels d'outils | partial | registre 344/344, runtime commun, Agenda/proactif migrés et 55 accès directs exhaustivement bornés par `scripts/test_tool_consumer_inventory.py` | migrer les consommateurs restants puis mesurer sélection, erreurs, approbations et résultat |
+| tools | Catalogue, harness et appels d'outils | partial | registre 344/344, runtime commun, Agenda/proactif/orchestrateurs migrés et 50 accès directs bornés par `scripts/test_tool_consumer_inventory.py` | migrer les consommateurs restants puis mesurer sélection, erreurs, approbations et résultat |
 | models | Routage modèles, Council et confidentialité | partial | `scripts/test_agent_routing.py`, `scripts/test_agent_model_config.py`, `scripts/test_council.py` | matrice Cloud/local complète, provenance live et absence de repli interdit |
 | memory | Mémoire, RAG et vérité durable | partial | `scripts/test_knowledge_mesh.py`, tests des domaines mémoire/documentaire | audit rétention, provenance, oubli, conflits et dérive factuelle |
 | coding | Code Workspace, Forge et missions longues | partial | tests Code/Test Forge, production contract, Coding Mission et jobs | scénarios E2E Linux/Windows avec artefact et reprise après panne |

@@ -8,35 +8,39 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 import database as db
-import tools as tool_module
 import api_errors
+import tool_runtime
 
 
 router = APIRouter(tags=["workflows"])
 
 
 class WorkflowStep(BaseModel):
-    id: str
-    tool_name: str
+    id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    tool_name: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_]+$")
     args: dict = Field(default_factory=dict)
-    label: str = ""
+    label: str = Field(default="", max_length=300)
     enabled: bool = True
-    when: str | None = None
-    retries: int = 0
+    when: str | None = Field(default=None, max_length=1_000)
+    retries: int = Field(default=0, ge=0, le=3)
     continue_on_error: bool = False
-    save_as: str | None = None
+    save_as: str | None = Field(
+        default=None,
+        max_length=128,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*$",
+    )
 
 
 class WorkflowCreate(BaseModel):
-    name: str
-    description: str = ""
-    steps: list[WorkflowStep] = Field(default_factory=list)
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2_000)
+    steps: list[WorkflowStep] = Field(default_factory=list, max_length=50)
 
 
 class WorkflowUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    steps: list[WorkflowStep] | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2_000)
+    steps: list[WorkflowStep] | None = Field(default=None, max_length=50)
 
 
 @router.get("/api/workflows")
@@ -176,7 +180,7 @@ async def run_workflow(workflow_id: str):
 
         tool_name = step["tool_name"]
         args = _resolve(dict(step.get("args", {})), context)
-        retries = int(step.get("retries", 0) or 0)
+        retries = min(max(int(step.get("retries", 0) or 0), 0), 3)
         continue_on_error = bool(step.get("continue_on_error", False))
         step_started = datetime.now()
         result = None
@@ -184,11 +188,17 @@ async def run_workflow(workflow_id: str):
 
         for attempt in range(retries + 1):
             try:
-                function = tool_module.TOOLS_REGISTRY.get(tool_name)
-                if function is None:
-                    raise ValueError(f"Outil inconnu : {tool_name}")
-                result = await function(args)
-                success = not (isinstance(result, dict) and result.get("error"))
+                outcome = await tool_runtime.execute(
+                    tool_name,
+                    args,
+                    source="workflow",
+                    conversation_id=f"workflow:{run_id}",
+                    request_id=f"workflow:{run_id}:{step['id']}:{attempt + 1}",
+                )
+                result = outcome.result
+                success = outcome.executed and not (
+                    isinstance(result, dict) and result.get("error")
+                )
                 if success:
                     break
             except Exception as error:

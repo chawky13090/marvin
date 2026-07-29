@@ -60,16 +60,17 @@ async def _check_completed_long_task() -> None:
     with (
         patch.object(cron_runtime.db, "list_tasks", return_value=[]),
         patch.object(cron_runtime.db, "update_cron_job", update),
-        patch.dict(cron_runtime.tool_module.TOOLS_REGISTRY, {"pc_notify": notify}),
+        patch.object(cron_runtime, "_run_cron_tool", notify),
     ):
         await cron_runtime.long_task_resume_tick(job, "2026-07-22 10:00:00")
     assert update.call_args.args[1]["enabled"] is False
     notify.assert_awaited_once()
+    assert notify.call_args.args[1] == "pc_notify"
+    assert notify.call_args.kwargs["phase"] == "completed"
 
 
 async def _check_regular_job_once() -> None:
     executor = AsyncMock(return_value={"success": True})
-    log_execution = Mock()
     update = Mock()
     job = {
         "id": "cron-3",
@@ -84,11 +85,10 @@ async def _check_regular_job_once() -> None:
 
     with (
         patch.object(cron_runtime.db, "list_cron_jobs", return_value=[job]),
-        patch.object(cron_runtime.db, "log_execution", log_execution),
         patch.object(cron_runtime.db, "update_cron_job", update),
         patch.object(cron_runtime, "next_run_datetime", return_value="2026-07-22 10:05:00"),
         patch.object(cron_runtime.asyncio, "sleep", stop_after_pass),
-        patch.dict(cron_runtime.tool_module.TOOLS_REGISTRY, {"safe_test_tool": executor}),
+        patch.object(cron_runtime, "_run_cron_tool", executor),
     ):
         try:
             await cron_runtime.cron_worker()
@@ -96,8 +96,9 @@ async def _check_regular_job_once() -> None:
             pass
         else:
             raise AssertionError("Le worker de test devait etre arrete apres un cycle.")
-    executor.assert_awaited_once_with({"value": 7})
-    log_execution.assert_called_once()
+    executor.assert_awaited_once()
+    assert executor.call_args.args[1:3] == ("safe_test_tool", {"value": 7})
+    assert executor.call_args.kwargs["phase"] == "scheduled"
     payload = update.call_args.args[1]
     assert payload["next_run"] == "2026-07-22 10:05:00"
     assert payload["run_count"] is True

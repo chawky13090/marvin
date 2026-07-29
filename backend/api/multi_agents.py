@@ -8,44 +8,41 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-import tools as tool_module
 import api_errors
+import tool_runtime
 
 
 router = APIRouter(tags=["multi-agents"])
 
 
 class AgentTask(BaseModel):
-    id: str
-    tool_name: str
+    id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    tool_name: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_]+$")
     args: dict = Field(default_factory=dict)
-    label: str = ""
+    label: str = Field(default="", max_length=300)
 
 
 class AgentRunRequest(BaseModel):
-    tasks: list[AgentTask]
+    tasks: list[AgentTask] = Field(default_factory=list, max_length=32)
 
 
 async def _run_one(task: AgentTask) -> dict:
     started = datetime.now()
     try:
-        function = tool_module.TOOLS_REGISTRY.get(task.tool_name)
-        if function is None:
-            return {
-                "id": task.id,
-                "tool_name": task.tool_name,
-                "label": task.label,
-                "success": False,
-                "result": {"error": f"Outil inconnu : {task.tool_name}"},
-                "duration_ms": 0,
-            }
-        result = await function(task.args)
+        outcome = await tool_runtime.execute(
+            task.tool_name,
+            task.args,
+            source="multi_agent",
+            conversation_id=f"multi-agent:{task.id}",
+        )
+        result = outcome.result
         duration = int((datetime.now() - started).total_seconds() * 1000)
         return {
             "id": task.id,
             "tool_name": task.tool_name,
             "label": task.label,
-            "success": "error" not in result,
+            "success": outcome.executed
+            and not (isinstance(result, dict) and result.get("error")),
             "result": result,
             "duration_ms": duration,
         }

@@ -13,11 +13,8 @@ EXPECTED_DIRECT_CONSUMERS = {
     "api/documents.py": 7,
     "api/email_automation.py": 1,
     "api/email_preferences.py": 2,
-    "api/multi_agents.py": 1,
     "api/system_tools.py": 25,
-    "api/workflows.py": 1,
     "communication_workers.py": 5,
-    "cron_runtime.py": 3,
 }
 
 
@@ -88,8 +85,11 @@ def main() -> int:
     assert "api/calendar.py" not in observed
     assert "api/proactive.py" not in observed
     assert "proactive_service.py" not in observed
-    assert sum(observed.values()) == 55
-    print("Tool Consumer Inventory OK - agenda et proactif migrés, dette bornée à 55 accès.")
+    assert "api/multi_agents.py" not in observed
+    assert "api/workflows.py" not in observed
+    assert "cron_runtime.py" not in observed
+    assert sum(observed.values()) == 50
+    print("Tool Consumer Inventory OK - orchestration migrée, dette bornée à 50 accès.")
     return 0
 
 
