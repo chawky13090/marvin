@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.459.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.460.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.459.0)
+## 9. État actuel (v2.460.0)
+
+**v2.460 (fraîcheur et récupération mémoire)** : les faits et habitudes ont une échéance
+de révision déterministe et une rétention de 730 jours; profils et préférences sont revus
+annuellement sans suppression automatique. Un souvenir à revoir, expiré ou contradictoire
+reste visible mais quitte le prompt jusqu'à confirmation explicite. La restauration d'une
+sauvegarde SQLite réexécute les migrations puis réconcilie Mesh et Qdrant. Une panne de
+projection restaure automatiquement le snapshot préalable et ses projections, avec un
+événement d'audit sans contenu. La migration réelle a régénéré dix métadonnées historiques,
+retiré un index orphelin et fini sur SQLite=10, Mesh=10, Qdrant=10 cohérents.
 
 **v2.459 (chiffrement actif des souvenirs)** : le contenu autoritatif SQLite et le payload
 texte Qdrant utilisent une enveloppe DPAPI utilisateur versionnée et découpée. Les API, le

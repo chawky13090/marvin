@@ -42,8 +42,27 @@ async def _exercise(mesh_path: Path) -> None:
         assert result["consistency"] == "complete"
         assert memory_mesh.list_metadata()[0]["memory_id"] == "memory-1"
         assert memory_mesh.list_metadata()[0]["source"] == "test"
+        assert memory_mesh.list_metadata()[0]["category"] == "preference"
+        assert memory_mesh.list_metadata()[0]["review_after"]
         original_valid_from = memory_mesh.list_metadata()[0]["valid_from"]
         assert len(memory_mesh.list_metadata()[0]["content_sha256"]) == 64
+
+        memory_mesh.register(
+            "freshness-fact",
+            "Version courante du produit",
+            "fact",
+            source="test",
+        )
+        in_100_days = datetime.now(timezone.utc) + timedelta(days=100)
+        in_731_days = datetime.now(timezone.utc) + timedelta(days=731)
+        assert "freshness-fact" in memory_mesh.stale_ids(now=in_100_days)
+        assert "freshness-fact" not in memory_mesh.expired_ids(now=in_100_days)
+        assert "freshness-fact" in memory_mesh.expired_ids(now=in_731_days)
+        assert memory_mesh.filter_active(
+            [{"id": "freshness-fact"}],
+            now=in_100_days,
+        ) == []
+        memory_mesh.remove("freshness-fact")
         try:
             await memory_lifecycle.create("test", "working", source="test")
         except ValueError:
@@ -310,6 +329,30 @@ async def _exercise(mesh_path: Path) -> None:
             )
         assert api_memory["id"] == "api-1"
         api_create.assert_awaited_once_with("Souvenir API", "fact", source="api")
+
+        try:
+            await memories_api.confirm_memory("api-1", confirmed=False)
+        except HTTPException as exc:
+            assert exc.status_code == 409
+        else:
+            raise AssertionError("La revalidation devait exiger une confirmation.")
+        with patch.object(
+            memories_api.memory_lifecycle,
+            "confirm",
+            AsyncMock(return_value={
+                "success": True,
+                "confirmed": True,
+                "id": "api-1",
+                "consistency": "complete",
+                "warnings": [],
+            }),
+        ) as confirm:
+            confirmed = await memories_api.confirm_memory(
+                "api-1",
+                confirmed=True,
+            )
+        assert confirmed["confirmed"] is True
+        confirm.assert_awaited_once_with("api-1", source="api_confirmation")
 
         try:
             await memories_api.clear_memories(confirmed=False)

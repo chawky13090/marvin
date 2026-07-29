@@ -92,6 +92,26 @@ async def refresh(memory: dict[str, Any], *, source: str = "user") -> dict[str, 
     }
 
 
+async def confirm(memory_id: str, *, source: str = "user_confirmation") -> dict[str, Any]:
+    """Revalide explicitement la fraîcheur d'un souvenir existant."""
+    memory = next(
+        (
+            item for item in db.get_memories()
+            if str(item.get("id") or "") == str(memory_id)
+        ),
+        None,
+    )
+    if memory is None:
+        return {"success": False, "confirmed": False, "error": "not_found"}
+    projection = await refresh(memory, source=source)
+    return {
+        "success": projection["consistency"] == "complete",
+        "confirmed": projection["consistency"] == "complete",
+        "id": str(memory_id),
+        **projection,
+    }
+
+
 async def forget(memory_id: str) -> dict[str, Any]:
     """Oublie d'abord les projections, puis la source SQLite autoritative.
 
@@ -200,10 +220,12 @@ def audit_consistency() -> dict[str, Any]:
             datetime.fromisoformat(str(item.get("valid_from") or ""))
             if item.get("expires_at"):
                 datetime.fromisoformat(str(item["expires_at"]))
+            datetime.fromisoformat(str(item.get("review_after") or ""))
         except (TypeError, ValueError):
             return False
         return (
             item.get("kind") in {"working", "episodic", "semantic", "procedural"}
+            and item.get("category") in MEMORY_CATEGORIES
             and bool(str(item.get("source") or "").strip())
             and math.isfinite(confidence)
             and 0.0 <= confidence <= 1.0
@@ -246,6 +268,7 @@ def audit_consistency() -> dict[str, Any]:
         "invalid_metadata": invalid,
         "expired": sorted(memory_mesh.expired_ids()),
         "conflicted": sorted(memory_mesh.conflicted_ids()),
+        "stale_review": sorted(memory_mesh.stale_ids()),
         "index": index,
     }
 

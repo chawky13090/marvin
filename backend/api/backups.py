@@ -6,9 +6,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, StrictBool
 
 import backup
+from database_bootstrap import initialize_database
+import memory_lifecycle
+import memory_recovery
 
 
 router = APIRouter(tags=["backups"])
+_restore_lock = asyncio.Lock()
 
 
 @router.get("/api/backups")
@@ -38,7 +42,13 @@ async def restore_backup_now(body: RestoreRequest):
     # Cette route reste hors du registre d'outils : le LLM ne peut pas la piloter.
     if not body.confirmed:
         raise HTTPException(status_code=400, detail="Confirmation requise (confirmed=true).")
-    result = await asyncio.to_thread(backup.restore_backup, body.filename)
+    async with _restore_lock:
+        result = await memory_recovery.restore_and_reconcile(
+            body.filename,
+            restore=backup.restore_backup,
+            initialize=initialize_database,
+            repair=memory_lifecycle.repair_consistency,
+        )
     if result.get("error"):
         status = {
             "backup_not_found": 404,

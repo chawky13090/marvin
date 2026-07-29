@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.460 — fraîcheur factuelle et restauration mémoire compensée
 # v2.459 — chiffrement DPAPI actif des souvenirs SQLite et Qdrant
 # v2.458 — politique de données modèles exhaustive et privée par défaut
 # v2.457 — Code Workspace E2E natif, réparation ciblée et artefact préservé

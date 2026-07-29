@@ -54,6 +54,24 @@ async def delete_memory(mid: str = Path(min_length=1, max_length=128)):
     return result
 
 
+@router.post("/api/memories/{mid}/confirm")
+async def confirm_memory(
+    mid: str = Path(min_length=1, max_length=128),
+    confirmed: bool = Query(default=False),
+):
+    if not confirmed:
+        raise HTTPException(
+            status_code=409,
+            detail="Confirmation explicite requise pour revalider ce souvenir.",
+        )
+    result = await memory_lifecycle.confirm(mid, source="api_confirmation")
+    if result.get("error") == "not_found":
+        raise HTTPException(status_code=404, detail="Souvenir introuvable.")
+    if not result["success"]:
+        raise HTTPException(status_code=503, detail=result)
+    return result
+
+
 @router.get("/api/memories/consolidate/preview")
 async def preview_memory_consolidation():
     """Aperçu des fusions proposées, sans suppression."""

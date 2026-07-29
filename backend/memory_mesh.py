@@ -15,6 +15,12 @@ from config import DATA_DIR
 
 MESH_PATH = Path(DATA_DIR) / "memory_mesh.json"
 _LOCK = threading.RLock()
+_FRESHNESS_POLICY = {
+    "fact": {"review_days": 90, "retention_days": 730},
+    "habit": {"review_days": 180, "retention_days": 730},
+    "preference": {"review_days": 365, "retention_days": None},
+    "user_profile": {"review_days": 365, "retention_days": None},
+}
 
 
 class MemoryMeshError(RuntimeError):
@@ -73,20 +79,34 @@ def register(
 ) -> dict[str, Any]:
     kind = classify(content, category)
     now = _now()
+    normalized_category = str(category or "fact").strip().lower()
+    policy = _FRESHNESS_POLICY.get(
+        normalized_category,
+        {"review_days": 90, "retention_days": 365},
+    )
+    review_after = (
+        now + timedelta(days=int(policy["review_days"]))
+    ).isoformat()
     expires_at = None
     if kind == "working":
         expires_at = (now + timedelta(days=7)).isoformat()
     elif kind == "episodic":
         expires_at = (now + timedelta(days=365)).isoformat()
+    elif policy["retention_days"] is not None:
+        expires_at = (
+            now + timedelta(days=int(policy["retention_days"]))
+        ).isoformat()
     record = {
         "memory_id": str(memory_id),
         "kind": kind,
+        "category": normalized_category,
         "source": source[:120],
         "source_history": [],
         "content_sha256": content_sha256(content),
         "confidence": max(0.0, min(float(confidence), 1.0)),
         "sensitive": bool(re.search(r"\b(mail|ssh|client|facture|mot de passe|token|secret)\b", content.lower())),
         "valid_from": now.isoformat(),
+        "review_after": review_after,
         "expires_at": expires_at,
         "last_used_at": None,
         "use_count": 0,
@@ -240,13 +260,36 @@ def expired_ids(*, now: datetime | None = None) -> set[str]:
     return expired
 
 
+def stale_ids(*, now: datetime | None = None) -> set[str]:
+    """Quarantaine les souvenirs dont la validité doit être reconfirmée."""
+    current = now or _now()
+    stale: set[str] = set()
+    with _LOCK:
+        records = _load()
+    for memory_id, record in records.items():
+        raw_review = record.get("review_after")
+        if not raw_review:
+            stale.add(str(memory_id))
+            continue
+        try:
+            review = datetime.fromisoformat(str(raw_review))
+            if review.tzinfo is None:
+                review = review.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            stale.add(str(memory_id))
+            continue
+        if review <= current:
+            stale.add(str(memory_id))
+    return stale
+
+
 def filter_active(
     memories: list[dict[str, Any]],
     *,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Exclut du prompt les souvenirs expirés, sans masquer les entrées legacy sans Mesh."""
-    excluded = expired_ids(now=now) | conflicted_ids()
+    excluded = expired_ids(now=now) | conflicted_ids() | stale_ids(now=now)
     return [
         memory
         for memory in memories
@@ -273,4 +316,5 @@ def stats() -> dict[str, Any]:
         "sensitive": sum(1 for item in records if item.get("sensitive")),
         "used": sum(1 for item in records if int(item.get("use_count") or 0) > 0),
         "conflicted": sum(1 for item in records if item.get("contradictions")),
+        "stale": len(stale_ids()),
     }

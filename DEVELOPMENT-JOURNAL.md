@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.460.0 — Fraîcheur et récupération mémoire
+
+### Constat et décisions
+
+Le worker appelait bien `prune_expired`, mais les catégories autorisées étaient toutes
+projetées en mémoire `semantic` sans échéance : la rétention était donc déclarée mais
+inopérante. De plus, la restauration remplaçait SQLite sans reconstruire Memory Mesh ni
+Qdrant. Deux choix de dérive ont été comparés : laisser un LLM réécrire périodiquement les
+faits, ou appliquer une quarantaine temporelle déterministe avec confirmation humaine. La
+seconde évite les corrections inventées.
+
+Les faits sont revus après 90 jours, les habitudes après 180 jours, puis tous deux expirent
+après 730 jours. Profils et préférences sont revus après 365 jours sans suppression
+automatique. Les éléments à revoir, expirés ou contradictoires restent consultables mais
+sont exclus du prompt. `POST /api/memories/{id}/confirm?confirmed=true` les revalide en
+réécrivant les projections depuis l'autorité SQLite.
+
+`memory_recovery.restore_and_reconcile` restaure SQLite, réapplique les migrations, puis
+réconcilie Mesh et Qdrant. Si cette dernière étape échoue, le snapshot préalable et ses
+projections sont restaurés; l'échec global ne devient jamais un faux succès. Un verrou
+asyncio sérialise les restaurations. Références : NIST AI RMF recommande une évaluation
+continue, contextuelle et documentée de la validité
+(`https://airc.nist.gov/airmf-resources/airmf/5-sec-core/`); le Playbook demande d'évaluer
+si les données restent représentatives lorsque les conditions changent
+(`https://airc.nist.gov/docs/AI_RMF_Playbook.pdf`).
+
+### Sécurité, logs, validation et rollback
+
+Aucun contenu n'entre dans le nouvel événement `memory_restore_reconcile`; seuls succès,
+compensation, nombre d'actions et code d'erreur fermé sont audités selon la rétention
+existante de 90 jours. Les délais sont calculés en UTC et les dates invalides échouent en
+quarantaine. Les suppressions passent toujours par l'ordre Qdrant, Mesh, SQLite et exposent
+toute panne partielle.
+
+`test_memory_lifecycle.py` couvre révision, expiration, exclusion du prompt et confirmation.
+`test_memory_recovery.py` couvre succès, échec de la base, panne de projection et compensation
+complète. Aucun schéma SQLite n'est modifié. Rollback du code : `git revert <commit-v2.460>`;
+les champs Mesh supplémentaires sont ignorés par v2.459 et les contenus restent intacts.
+
+Sur le runtime réel, l'audit initial a correctement classé les 10 métadonnées historiques
+comme invalides et à revoir, au lieu de les accepter implicitement. La réconciliation a
+effectué 11 actions sans échec : dix projections régénérées et un index orphelin retiré.
+L'état final est SQLite=10, Mesh=10, Qdrant=10, zéro métadonnée invalide, zéro échéance de
+révision déjà dépassée et `consistent=true`.
+
 ## 2026-07-29 — v2.459.0 — Chiffrement actif des souvenirs
 
 ### Constat et décision
