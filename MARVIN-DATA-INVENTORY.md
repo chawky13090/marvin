@@ -36,6 +36,13 @@ Le bundle est protégé au repos mais lié au compte Windows courant. Il ne cons
 une copie hors machine ou immuable. Une exportation portable devra utiliser une clé dérivée
 d'une phrase secrète, un KDF standard audité et une procédure de récupération distincte.
 
+La commande
+`scripts/replicate-full-backup.py <bundle> <destination> --confirm-external-copy` copie le
+bundle chiffré vers une racine existante hors de `data/`, relit son SHA-256 après publication,
+écrit un sidecar JSON et conserve trois générations. Le résultat `same_volume` distingue une
+simple copie logique d'une protection contre la panne physique. Cette réplication ne rend pas
+portable le coffre DPAPI interne : elle protège le support, pas la perte du profil Windows.
+
 ## Exclusions justifiées
 
 Qdrant et Memory Mesh sont des projections : les sauvegarder en parallèle de SQLite créerait

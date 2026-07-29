@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.462.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.463.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.462.0)
+## 9. État actuel (v2.463.0)
+
+**v2.463 (réplication de sauvegarde)** : `backup_replication.py` copie un bundle global déjà
+chiffré vers une racine explicitement choisie, refuse `data/` et ses parents/enfants, publie
+par remplacement atomique puis relit le SHA-256 final. Une copie homonyme identique est
+idempotente; une copie différente est refusée. Un sidecar versionné permet le contrôle hors
+Marvin et trois générations sont conservées. `scripts/replicate-full-backup.py` exige une
+confirmation de transfert. La preuve réelle a copié 191 325 600 octets deux fois (création
+puis idempotence), mais sur le même volume : aucune prétention de copie hors machine.
 
 **v2.462 (restauration globale compensée)** : `full_backup_recovery.py` applique un bundle
 uniquement hors ligne, crée d'abord un point de retour, remplace les seules autorités du

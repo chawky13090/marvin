@@ -5,6 +5,41 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.463.0 — Réplication chiffrée hors stockage
+
+### Décision
+
+Une copie locale sur le même disque ne protège pas contre sa perte. Une synchronisation
+automatique vers `G:` aurait toutefois constitué un transfert externe non explicitement
+choisi. La tranche ajoute donc une commande de réplication volontaire, sans API agentique ni
+destination codée en dur. Elle copie uniquement le bundle global déjà chiffré.
+
+`backup_replication.py` refuse la source mal nommée, les destinations inexistantes, liens,
+`data/`, ses descendants et ses parents. La copie passe par un fichier partiel sur la cible,
+est contrôlée SHA-256 avant et après publication atomique, puis reçoit un sidecar versionné.
+Un même nom avec la même empreinte est idempotent et répare le sidecar s'il manque; une
+empreinte différente échoue fermée. Trois générations sont conservées.
+
+Le script `replicate-full-backup.py` exige `--confirm-external-copy`. Les logs techniques ne
+conservent ni chemin, ni hash, ni contenu : seulement succès, idempotence, taille et classe
+d'erreur. Le résultat indique `same_volume`, afin de ne jamais présenter une copie logique
+comme une protection physique. La documentation Python `os.replace` et `shutil` a servi de
+contrat pour atomicité, copie et traitement des liens.
+
+### Validations, limite et rollback
+
+Les tests couvrent copie, relecture SHA-256, sidecar recréé, idempotence, altération homonyme
+et refus des cibles locales. Une preuve réelle de 191 325 600 octets a réussi puis a été
+rejouée idempotemment, avec l'empreinte
+`ab793ed33f9e4389561f6b78cec1d672576e2c791576fd4368e8d4d0ae660947`. Elle a volontairement
+utilisé un dossier isolé du même volume (`same_volume=true`) et ne ferme donc pas SEC-024.
+
+Le bundle contient encore des enveloppes DPAPI internes : le rechiffrer extérieurement avec
+une phrase secrète ne suffirait pas à le rendre lisible sur un autre profil Windows. La suite
+doit inventorier et réenvelopper chaque secret avant de déclarer un export portable.
+Rollback : réversion atomique du commit v2.463; les copies déjà publiées restent valides et
+doivent être supprimées explicitement par leur propriétaire.
+
 ## 2026-07-29 — v2.462.0 — Restauration globale hors ligne compensée
 
 ### Décision et sécurité
