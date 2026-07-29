@@ -12528,3 +12528,54 @@ intégré n’a pas rendu localhost et cette validation n’est donc pas revendi
 compilation, tests DOM/Research et smoke HTTP restent obligatoires. Aucune migration de
 données. Rollback complet : réversion atomique du commit v2.489 puis redémarrage backend;
 le frontend Turbopack recharge automatiquement les sources antérieures.
+## 2026-07-29 — v2.491 — Fondations réversibles de l'orchestrateur LLM natif
+
+### Demande et cause racine
+
+L'utilisateur refuse que le cœur déterministe choisisse à la place des modèles : les
+classifications lexicales, outils imposés et arguments matérialisés ont produit des appels
+inutiles et des routages fragiles. La modularisation du backend reste conservée; seule la
+frontière de décision doit évoluer. La cible validée donne au LLM la stratégie et réserve au
+code l'identité, l'autorisation, la portée, les effets, l'exécution et les preuves.
+
+### Livraison
+
+- le commit `817a501` est figé par le tag `marvin-deterministic-2026-07-29`;
+- la branche de migration est `chaouki-dev/llm-native-orchestrator`;
+- `agent_orchestration.py` fournit quatre modes explicites et un repli fermé;
+- le mode shadow est isolé du flux SSE visible et ne peut casser la production;
+- `policy_engine.py` calcule le risque par appel et lie toute approbation aux arguments,
+  à la cible, à l'identité et à l'environnement;
+- `capability_catalog.py` dérive sa source de vérité de `TOOLS_SPEC`;
+- `tool_search` est la 345e capacité, consultative et sans effet;
+- `native_agent_runtime.py` implémente la boucle indépendante du fournisseur;
+- `repositories/agent_runs.py` persiste les checkpoints de manière atomique avec contrôle
+  de concurrence optimiste.
+
+### Validations réelles
+
+- compilation Python des nouveaux modules : réussie;
+- façade : déterministe, shadow isolé, natif et repli fermé : réussie;
+- Policy Engine : lecture, isolation, refus fermé, approbation liée, expiration : réussie;
+- catalogue : 345 schémas et 345 exécuteurs, recherche bornée, déduplication : réussie;
+- boucle native : découverte, exécution simulée, vérification, approbation suspendue : réussie;
+- checkpoints SQLite : création, reprise, collision et suppression : réussis;
+- Agent Gateway, composition FastAPI, architecture et Tool Runtime : réussis.
+
+### Sécurité, logs et limites
+
+Le runtime natif n'est pas encore relié à Ollama ni activé. Aucun outil réel, réseau,
+destructeur ou sortant n'a été exécuté. Le Policy Engine ne journalise ni arguments ni
+secrets; la persistance de run est bornée à 2 Mio et refuse NaN, états non sérialisables et
+écritures concurrentes obsolètes. Les politiques des 345 outils doivent encore être
+qualifiées avant le mode `enforce`; une capacité inconnue ou non vérifiée est refusée.
+
+### Rollback
+
+Aucune donnée métier existante n'a été migrée. Le schéma `agent_runs` n'est créé que lors
+de l'initialisation explicite du repository. Rollback complet : remettre
+`MARVIN_ORCHESTRATOR=deterministic`, réverter le commit v2.491 et redémarrer le backend.
+Le tag `marvin-deterministic-2026-07-29` reste le point de restauration autoritaire. Si la
+table expérimentale a été créée, l'arrêter puis exécuter
+`DROP TABLE IF EXISTS agent_runs; DROP INDEX IF EXISTS idx_agent_runs_conversation;`
+sur une sauvegarde vérifiée de `secretary.db`.

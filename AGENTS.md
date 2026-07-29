@@ -6,7 +6,7 @@
 
 ## 1. Qu'est-ce que Marvin
 
-Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **344 outils**.
+Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **345 outils**.
 
 L'utilisateur veut un Marvin **complet, puissant, qui ne fait pas de compromis**. Travailler de façon **autonome** : décider, innover, vérifier et améliorer les outils, ne pas s'arrêter pour demander à chaque étape.
 
@@ -35,14 +35,14 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.490.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.491.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
 ### Fichiers backend clés (`backend/`)
 - `main.py` — cycle de vie et majorité des endpoints FastAPI historiques (gros fichier ; historique versionné en commentaires `# vX.Y`).
 - `api/` — routeurs FastAPI extraits progressivement : Doctor, conversations, projets, tâches et notes ont leurs modules dédiés.
-- `tools.py` — les **344 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
+- `tools.py` — les **345 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
 - `auto_config.py` — détecte le matériel, choisit le **mode** (eco/balanced/performance/max) et applique les leviers + choisit les modèles Ollama selon la VRAM.
 - `skills.py` — système de **compétences** (fichiers Markdown, voir §5).
@@ -196,7 +196,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.490.0)
+## 9. État actuel (v2.491.0)
+
+**v2.491 (fondations de l'orchestrateur LLM natif)** : `agent_orchestration.py`
+introduit une façade commutable (`deterministic`, `llm_native_shadow`,
+`llm_native_canary`, `llm_native`) avec repli fermé vers le chemin certifié tant que le
+runtime natif n'est pas branché. Le shadow ne peut produire aucun événement utilisateur.
+`policy_engine.py` sépare la décision d'autorisation de la sélection métier : effets,
+portées, sensibilité, environnement, réversibilité et approbations expirables liées au
+digest exact de l'appel sont évalués sans faire confiance au LLM. `tool_search` porte le
+catalogue à 345 capacités et consulte une vue dérivée de `TOOLS_SPEC`; son classement
+n'exécute rien et le chargement différé conserve les schémas exacts. La boucle indépendante
+`native_agent_runtime.py` couvre Discover, Decide, Authorize, Execute, Observe, Verify et
+checkpoint; `repositories/agent_runs.py` ajoute une persistance SQLite optimiste et bornée.
+Ces fondations restent inactives par défaut jusqu'au canary comparatif.
 
 **v2.490 (routage agentique vérifié en conditions réelles)** : les demandes locales explicites
 imposent désormais leur lecture déterministe sans polluer chaque tour avec la recherche Web.

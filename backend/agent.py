@@ -12,6 +12,7 @@ import cortex as _cortex
 import database as db
 import memory_mesh
 import tool_runtime
+from agent_orchestration import dispatch_agent as _dispatch_agent_runtime
 from intent_guard import skill_match_text
 from agent_prompt import build_system_prompt as _build_system_prompt
 from agent_protocol import encode_sse as _sse, to_ollama_messages as _to_ollama_messages
@@ -125,7 +126,7 @@ _BG_LEARN_TASKS: set = set()
 
 # ── Agent de streaming principal ──────────────────────────────────────────────
 
-async def run_agent(
+async def _run_deterministic_agent(
     messages: list[dict],
     conversation_id: str | None,
     model: str | None,
@@ -734,3 +735,28 @@ async def run_agent(
     )
     for _event in _completion.events:
         yield _event
+
+
+async def run_agent(
+    messages: list[dict],
+    conversation_id: str | None,
+    model: str | None,
+    cortex_contract: dict | None = None,
+    request_id: str | None = None,
+) -> AsyncIterator[str]:
+    """Point d'entrée stable, commutable sans modifier les routes HTTP."""
+
+    def deterministic_factory() -> AsyncIterator[str]:
+        return _run_deterministic_agent(
+            messages,
+            conversation_id,
+            model,
+            cortex_contract,
+            request_id,
+        )
+
+    async for event in _dispatch_agent_runtime(
+        deterministic_factory=deterministic_factory,
+        encode_event=_sse,
+    ):
+        yield event

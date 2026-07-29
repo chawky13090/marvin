@@ -2109,6 +2109,16 @@ system_self_test_domain.configure(registry_provider=lambda: TOOLS_REGISTRY)
 execute_system_self_test = system_self_test_domain.run
 
 
+async def execute_tool_search(
+    query: str,
+    limit: int = 10,
+) -> dict[str, Any]:
+    """Recherche le catalogue réel sans transformer le résultat en appel d'outil."""
+    from capability_catalog import CapabilityCatalog
+
+    return CapabilityCatalog(TOOLS_SPEC).search(query, limit=limit)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Fiches de révision / quiz (v2.155) — répétition espacée minimale (voir database.py)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2364,6 +2374,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "quiz_answer":   execute_quiz_answer,
     "quiz_stats":    execute_quiz_stats,
     "system_self_test": execute_system_self_test,
+    "tool_search": execute_tool_search,
     "file_list": execute_file_list,
     "file_info": execute_file_info,
     "file_read": execute_file_read,
@@ -2764,6 +2775,25 @@ def _t(name: str, description: str, properties: dict, required: list = None) -> 
 
 
 TOOLS_SPEC = [
+    _t(
+       "tool_search",
+       "Découvre les outils Marvin pertinents pour atteindre un objectif. Retourne des "
+       "candidats et leurs paramètres, mais n'exécute rien. À utiliser quand les outils "
+       "actuellement visibles ne suffisent pas ou sont ambigus.",
+       {
+           "query": {
+               "type": "string",
+               "description": "Capacité recherchée, formulée comme un objectif précis",
+           },
+           "limit": {
+               "type": "integer",
+               "description": "Nombre de candidats, de 1 à 20",
+               "minimum": 1,
+               "maximum": 20,
+           },
+       },
+       ["query"],
+    ),
     _t("system_self_test",
        "Auto-diagnostic : Marvin teste un échantillon de ses propres outils et rapporte ceux qui fonctionnent ou non (+ latence). include_web=true teste aussi les outils réseau. Pour répondre à 'est-ce que tout fonctionne ?'.",
        {"category":    {"type": "string", "description": "Filtrer par catégorie/outil (optionnel)"},
