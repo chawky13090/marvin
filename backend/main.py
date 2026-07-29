@@ -7,7 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
-# v2.495 — résolution SearXNG obligatoire des sites nommés avant aspiration
+# v2.496 — canary LLM natif activé automatiquement en mode Ultra débridé
 # v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
 # v2.485 — vocalisation fiable des réponses Cloud answer_final
 # v2.484 — barre contextuelle stable et accueil orienté travail

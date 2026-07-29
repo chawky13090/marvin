@@ -12781,3 +12781,48 @@ standards et aux limites du crawler. La requête SQLite reste paramétrée et la
 bornée. Aucun schéma ni donnée persistante n'est modifié.
 Rollback sans migration : réverter le commit v2.495; aucun artefact existant ni schéma
 SQLite n'est modifié.
+
+## 2026-07-29 — v2.496 — Canary LLM natif en mode Ultra débridé
+
+### Décision
+
+Deux options ont été comparées :
+
+1. conserver le routeur métier déterministe, stable mais responsable des mauvais choix
+   d'outils observés;
+2. laisser le LLM Cloud découvrir et sélectionner les outils, tout en gardant les règles
+   déterministes uniquement aux frontières d'effets.
+
+L'option 2 est retenue progressivement. En l'absence d'override opérateur, le profil Ultra
+active `llm_native_canary`; Normal, Hyper local et Tout cloud restent sur le chemin historique
+pendant la phase de mesure. `MARVIN_ORCHESTRATOR=deterministic` reste prioritaire pour un
+rollback immédiat sans modification de code ni de donnée.
+
+### Fonctionnement
+
+Le Runner SSE durable existant reste le point d'entrée. En canary natif, la compilation du
+tour n'impose aucun outil, aucune requête Web et aucune route Workspace. Le modèle voit
+initialement uniquement `tool_search`, recherche les capacités selon son propre raisonnement,
+puis reçoit les schémas exacts des candidats. Chaque exécution passe toujours par
+`tool_runtime`, `tool_gateway` et `PolicyEngine`; la liberté de décision n'élargit donc ni
+les privilèges ni les effets autorisés.
+
+### Validation, sécurité, logs et rollback
+
+Les tests de façade, chemin natif, Runner et compilation réussissent. Un smoke réel en mode
+Ultra a émis `requested=effective=llm_native_canary`; Kimi Cloud a appelé `tool_search`,
+découvert `datetime_info`, exécuté les deux outils et terminé par `done` en 15,8 secondes.
+La conversation de test a été supprimée après validation.
+
+Le premier gate global a détecté que l'ajout d'une ligne d'historique portait `main.py` à
+351 lignes pour une limite contractuelle de 350. L'ancienne ligne v2.495, déjà conservée
+dans Git et ce journal, a été retirée; le test de composition a ensuite réussi. Le gate
+consolidé final a réussi 213 étapes sur 213 en 468,4 secondes, dont les profils de
+confidentialité, Ultra Cloud-only, reconnexion SSE, gateway 346/346, compilation Python et
+lint frontend sans erreur.
+
+Les événements `orchestration_mode`, `capability_context`, outils et provenance restent dans
+le journal durable du tour sans nouveau secret. Les actions dangereuses restent soumises aux
+approbations liées au digest exact des arguments. Aucun schéma ni donnée n'est migré.
+Rollback opérationnel : définir `MARVIN_ORCHESTRATOR=deterministic` puis redémarrer le
+backend. Rollback code : réverter le commit v2.496.

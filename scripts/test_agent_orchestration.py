@@ -15,6 +15,7 @@ from agent_orchestration import (  # noqa: E402
     OrchestratorMode,
     configured_mode,
     dispatch_agent,
+    request_mode,
     resolve_mode,
 )
 
@@ -58,6 +59,18 @@ async def main() -> None:
     assert configured_mode(
         {"MARVIN_ORCHESTRATOR": "llm_native_shadow"}
     ) is OrchestratorMode.LLM_NATIVE_SHADOW
+    assert request_mode(
+        ultra_unrestricted=False,
+        environ={},
+    ) is OrchestratorMode.DETERMINISTIC
+    assert request_mode(
+        ultra_unrestricted=True,
+        environ={},
+    ) is OrchestratorMode.LLM_NATIVE_CANARY
+    assert request_mode(
+        ultra_unrestricted=True,
+        environ={"MARVIN_ORCHESTRATOR": "deterministic"},
+    ) is OrchestratorMode.DETERMINISTIC
 
     unavailable = resolve_mode(
         OrchestratorMode.LLM_NATIVE,

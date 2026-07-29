@@ -52,6 +52,20 @@ def configured_mode(environ: dict[str, str] | None = None) -> OrchestratorMode:
         return OrchestratorMode.DETERMINISTIC
 
 
+def request_mode(
+    *,
+    ultra_unrestricted: bool,
+    environ: dict[str, str] | None = None,
+) -> OrchestratorMode:
+    """Choisit le canary natif en Ultra, sauf configuration opérateur explicite."""
+    source = os.environ if environ is None else environ
+    if str(source.get("MARVIN_ORCHESTRATOR") or "").strip():
+        return configured_mode(source)
+    if ultra_unrestricted:
+        return OrchestratorMode.LLM_NATIVE_CANARY
+    return OrchestratorMode.DETERMINISTIC
+
+
 def resolve_mode(
     requested: OrchestratorMode,
     *,
@@ -132,4 +146,3 @@ async def dispatch_agent(
 
     async for event in deterministic_factory():
         yield event
-

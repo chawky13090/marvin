@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.495.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.496.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.495.0)
+## 9. État actuel (v2.496.0)
+
+**v2.496 (canary LLM natif en Ultra)** : sans override opérateur, le profil de confidentialité
+Ultra débridé utilise `llm_native_canary`. Le modèle démarre avec le seul schéma
+`tool_search`, découvre les capacités utiles puis charge leurs schémas exacts. Aucun routeur
+métier ne lui impose l'outil. Tous les appels continuent de traverser le gateway, le
+`PolicyEngine`, les limites, l'idempotence, les preuves et les approbations. Les trois autres
+profils restent temporairement déterministes pendant le canary. La variable
+`MARVIN_ORCHESTRATOR` conserve la priorité et permet un rollback immédiat vers
+`deterministic`.
 
 **v2.495 (résolution SearXNG avant crawl nommé)** : une demande explicite d'aspiration
 matérialise `web_site_crawl` dans le mode déterministe au lieu de laisser le modèle enchaîner

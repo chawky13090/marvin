@@ -12,7 +12,10 @@ import cortex as _cortex
 import database as db
 import memory_mesh
 import tool_runtime
-from agent_orchestration import dispatch_agent as _dispatch_agent_runtime
+from agent_orchestration import (
+    dispatch_agent as _dispatch_agent_runtime,
+    request_mode as _request_orchestrator_mode,
+)
 from intent_guard import skill_match_text
 from agent_prompt import build_system_prompt as _build_system_prompt
 from agent_protocol import encode_sse as _sse, to_ollama_messages as _to_ollama_messages
@@ -934,5 +937,8 @@ async def run_agent(
         deterministic_factory=deterministic_factory,
         native_factory=native_factory,
         encode_event=_sse,
+        requested=_request_orchestrator_mode(
+            ultra_unrestricted=_is_ultra_unrestricted(),
+        ),
     ):
         yield event
