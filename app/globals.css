@@ -3,8 +3,6 @@
    Console IA professionnelle · Graphite neutre + bleu électrique
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 /* ── CSS Custom Properties ──────────────────────────────── */
 :root {
   /* Backgrounds — graphite neutre (pas de teinte chaude) */
@@ -26,7 +24,7 @@
   /* Text */
   --text-primary:   #e4e4e7;
   --text-secondary: #a1a1aa;
-  --text-muted:     #5f606a;
+  --text-muted:     #858792;
 
   /* Borders — neutres */
   --border:       rgba(228, 228, 231, 0.08);
@@ -43,24 +41,36 @@
   --info:       hsl(210, 70%, 55%);
   --info-bg:    hsla(210, 70%, 55%, 0.1);
 
-  /* Spacing */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --space-2xl: 48px;
+  /* Spacing — échelle Fibonacci */
+  --fib-1: 3px;
+  --fib-2: 5px;
+  --fib-3: 8px;
+  --fib-4: 13px;
+  --fib-5: 21px;
+  --fib-6: 34px;
+  --fib-7: 55px;
+  --fib-8: 89px;
+  --space-xs: var(--fib-2);
+  --space-sm: var(--fib-3);
+  --space-md: var(--fib-4);
+  --space-lg: var(--fib-5);
+  --space-xl: var(--fib-6);
+  --space-2xl: var(--fib-7);
+  --space-3xl: var(--fib-8);
 
   /* Radius — plus contenu, look outil pro (pas de pilule partout) */
   --radius-sm: 5px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-lg: 13px;
+  --radius-xl: 21px;
   --radius-full: 9999px;
 
   /* Sidebar */
-  --sidebar-collapsed: 72px;
-  --sidebar-expanded: 240px;
+  --sidebar-collapsed: 55px;
+  --sidebar-expanded: 233px;
+  --conversation-pane: clamp(233px, 23vw, 377px);
+  --golden-major: 61.8%;
+  --golden-minor: 38.2%;
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
@@ -69,7 +79,7 @@
   --shadow-glow: 0 0 26px rgba(79, 140, 255, 0.14);
 
   /* Typography */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
   --font-xs: 0.7rem;
   --font-sm: 0.8rem;
@@ -104,6 +114,12 @@ a { color: var(--accent-secondary); text-decoration: none; transition: color 0.2
 a:hover { color: var(--accent-primary-hover); }
 
 img { max-width: 100%; display: block; }
+
+:where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-primary-hover);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(79, 140, 255, 0.18);
+}
 
 /* ── Scrollbar ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -617,7 +633,7 @@ img { max-width: 100%; display: block; }
 @media (max-width: 1024px), (hover: none) and (pointer: coarse) {
   :root {
     --sidebar-collapsed: 0px;
-    --sidebar-expanded: 240px;
+    --sidebar-expanded: 233px;
   }
 
   /* La liste des conversations (page Chat) devient un tiroir coulissant
@@ -746,7 +762,13 @@ body { background: var(--bg-primary); position: relative; }
 
 /* Respecte « réduire les animations » (accessibilité + perf sur petites machines) */
 @media (prefers-reduced-motion: reduce) {
-  .breathe, .float-y { animation: none !important; }
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .lan-access-shell {

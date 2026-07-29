@@ -37,12 +37,12 @@
 
 /* Logo */
 .logoSection {
-  padding: var(--space-lg) var(--space-md);
+  padding: var(--space-md) var(--space-sm);
   display: flex;
   align-items: center;
   gap: var(--space-md);
   border-bottom: 1px solid var(--border);
-  min-height: 70px;
+  min-height: 55px;
 }
 
 .logoMonogram {
@@ -69,14 +69,14 @@
 }
 
 .logoTitle {
-  font-size: var(--font-size-md);
+  font-size: var(--font-md);
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
 }
 
 .logoSubtitle {
-  font-size: var(--font-size-xs);
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 
@@ -98,9 +98,9 @@
   padding: 12px 14px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-sm);
   font-weight: 500;
-  transition: all var(--transition-base);
+  transition: color 0.2s ease, background 0.2s ease;
   position: relative;
   text-decoration: none;
   cursor: pointer;
@@ -168,7 +168,7 @@
   transform: translateX(-8px);
   transition: all 0.2s ease 0.05s;
   white-space: nowrap;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 

@@ -427,15 +427,15 @@ export default function ChatPage() {
 
       {/* ═══ Sidebar des conversations ═══ (tiroir sur mobile, repliable sur desktop) */}
       <div className={`conv-sidebar ${showConv ? 'open' : ''}`} style={{
-        width: collapsed ? '0px' : '280px',
-        minWidth: collapsed ? '0px' : '280px',
+        width: collapsed ? '0px' : 'var(--conversation-pane)',
+        minWidth: collapsed ? '0px' : 'var(--conversation-pane)',
         borderRight: collapsed ? 'none' : '1px solid rgba(228, 228, 231,0.06)',
         overflow: 'hidden',
         transition: 'width 0.2s cubic-bezier(0.4,0,0.2,1), min-width 0.2s cubic-bezier(0.4,0,0.2,1)',
         display: 'flex',
         flexShrink: 0,
       }}>
-      <div style={{ width: '280px', minWidth: '280px', display: 'flex', flexDirection: 'column', background: '#0d0d0d', height: '100%' }}>
+      <div style={{ width: 'var(--conversation-pane)', minWidth: 'var(--conversation-pane)', display: 'flex', flexDirection: 'column', background: '#0d0d0d', height: '100%' }}>
         <div style={{ padding: '16px' }}>
           <button
             onClick={() => {

@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.470.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.471.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.470.0)
+## 9. État actuel (v2.471.0)
+
+**v2.471 (système UX adaptatif)** : les espacements globaux suivent une échelle Fibonacci
+explicite et les proportions principales utilisent le nombre d'or comme guide borné par le
+contenu et le viewport. Le panneau de conversations devient adaptatif avec `clamp()`, le focus
+clavier est visible sur toutes les surfaces interactives et la réduction des animations couvre
+désormais transitions, défilement et animations. Le texte atténué est plus lisible et les
+polices système remplacent Google Fonts pour conserver un démarrage local, privé et disponible
+hors ligne. `MARVIN-UX-DESIGN-SYSTEM.md` documente hiérarchie, accessibilité, validation et
+rollback; un gate statique protège ces invariants.
 
 **v2.470 (comparatif de persistance mesuré)** : la base réelle est inspectée en lecture seule
 et les écritures concurrentes utilisent une base synthétique temporaire, sans contenu métier.

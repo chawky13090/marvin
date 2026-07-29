@@ -5,6 +5,35 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.471.0 — Système UX Fibonacci adaptatif
+
+**Demande.** Rechercher les meilleures pratiques UX des assistants IA et rendre Marvin plus
+calme, lisible et précurseur, avec une composition inspirée de Fibonacci et du nombre d'or,
+sans retirer d'option.
+
+**Décision.** Le nombre d'or strict a été écarté car il dégrade les petits viewports et les
+contenus longs. L'approche retenue utilise une échelle Fibonacci globale, un panneau de
+conversations `clamp(233px, 23vw, 377px)`, une hiérarchie à trois niveaux et le dévoilement
+progressif existant. Le focus clavier, la réduction globale des animations et le contraste du
+texte atténué sont renforcés. Google Fonts est supprimé au profit des polices système afin
+d'éviter une dépendance réseau et une fuite de métadonnées au démarrage.
+
+**Fichiers.** `app/globals.css`, `app/page.js`, `components/sidebar/Sidebar.module.css`,
+`scripts/test_ux_design_system.mjs`, `MARVIN-UX-DESIGN-SYSTEM.md`, métadonnées de version et
+documentation portable.
+
+**Journalisation et sécurité.** Aucun événement, stockage, cookie, appel réseau ni donnée
+personnelle n'est ajouté. La suppression de la police distante réduit la surface réseau. Le
+gate UX ne lit que les sources du dépôt. Le rollback est une réversion atomique du commit,
+car aucun schéma ni état persistant n'est modifié.
+
+**Validation réelle.** Gate UX 20 assertions, présentation chat 14, voix 10 et avatar 33 :
+réussis. Build Next.js 16.2.12 Turbopack : réussi. Après relance, `/api/health` expose
+2.471.0; smoke API 28/28 et pages 40/40 : réussis. Inspection visuelle réelle à 1280 × 720 :
+chat, Code Workspace et réglages chargés sans débordement ni disparition de fonction. Le
+comportement mobile et la réduction d'animations sont couverts par les media queries et le
+gate statique; une émulation tactile automatisée reste une amélioration de banc de test.
+
 ## 2026-07-29 — v2.470.0 — Comparatif mesuré de la persistance
 
 Le terme « MARVA » est résolu comme **Mastra** à partir de l'article Kimi fourni. LangGraph

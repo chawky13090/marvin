@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.470.0",
+  "version": "2.471.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -30,6 +30,7 @@
     "check:mcp-server-boundary": "backend\\.venv\\Scripts\\python.exe scripts\\test_mcp_server_boundary.py",
     "check:model-proactive-api": "backend\\.venv\\Scripts\\python.exe scripts\\test_model_proactive_api.py",
     "check:main-composition": "backend\\.venv\\Scripts\\python.exe scripts\\test_main_composition.py",
+    "check:ux": "node scripts/test_ux_design_system.mjs",
     "check:chat-presentation": "node scripts/test_chat_presentation.mjs",
     "check:voice": "node scripts/test_voice_frontend.mjs",
     "check:avatar": "node scripts/test_desktop_avatar.mjs",
