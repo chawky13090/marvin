@@ -18,6 +18,7 @@ class RunnerState:
     failed_tools: int = 0
     trace: list[str] = field(default_factory=list)
     successful_calls: list[dict[str, str]] = field(default_factory=list)
+    successful_results: list[dict[str, Any]] = field(default_factory=list)
     blocking_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
     long_chain_reported: bool = False
     nudged: bool = False
@@ -72,6 +73,19 @@ class RunnerState:
                 "tool": tool_name,
                 "args": json.dumps(compact, ensure_ascii=False)[:90] if compact else "",
             })
+            if isinstance(result, dict):
+                self.successful_results.append({
+                    "tool": tool_name,
+                    "answer": str(result.get("answer") or "")[:16_000],
+                    "sources": [
+                        {
+                            "title": str(source.get("title") or "")[:300],
+                            "url": str(source.get("url") or "")[:2_000],
+                        }
+                        for source in (result.get("sources") or [])[:50]
+                        if isinstance(source, dict)
+                    ],
+                })
         if not self.long_chain_reported and self.tool_count > 8:
             self.long_chain_reported = True
             return True

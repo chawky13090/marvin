@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.482 — recherche Web cohérente et palette de commandes React fiabilisée
 # v2.481 — fermeture des listeners HTTP LAN derrière la passerelle HTTPS
 # v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique
 # v2.479 — activation vocale explicite, dock inférieur et retry TTS borné
@@ -47,12 +48,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.439 — installateur unique portable et portefeuille local adapté au matériel
 # v2.438 — restauration durable du fil actif et commandes de conversation accessibles
 # v2.437 — erreurs internes API expurgées et reliées aux incidents
-# v2.436 — corrélation HTTP, métriques API bornées et journal des erreurs lentes
-# v2.435 — portefeuille local dynamique et contrat de runtime Forge
-# v2.434 — boucle de réparation prouvée, check-ups chat et manifeste documentaire
-# v2.419 — sauvegardes SQLite intègres, atomiques et compensables
-# v2.418 — connaissances IT extraites vers un repository borné et injectable
-# v2.417 — fiches de révision extraites vers un repository déterministe
+# Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations
 

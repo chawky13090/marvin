@@ -60,6 +60,31 @@ _FRESHNESS_EVIDENCE_RE = re.compile(
     r"(?:prix|tarifs?)\s+actuels?"
     r")\b"
 )
+_DYNAMIC_STATUS_RE = re.compile(
+    r"\b(?:[ée]tat|statut|situation|bilan|point\s+de\s+situation)\b"
+    r".{0,80}\b(?:"
+    r"feux?|incendies?|inondations?|s[ée]ismes?|temp[êe]tes?|cyclones?|"
+    r"m[ée]t[ée]o|trafic|circulation|gr[èe]ves?|pannes?|coupures?|"
+    r"[ée]lections?|conflits?|alertes?|vigilance"
+    r")\b"
+    r"|"
+    r"\b(?:"
+    r"feux?|incendies?|inondations?|s[ée]ismes?|temp[êe]tes?|cyclones?|"
+    r"m[ée]t[ée]o|trafic|circulation|gr[èe]ves?|pannes?|coupures?|"
+    r"[ée]lections?|conflits?|alertes?|vigilance"
+    r")\b.{0,80}\b(?:[ée]tat|statut|situation|bilan)\b"
+)
+
+
+def _normalize_intent_text(value: str) -> str:
+    """Corrige uniquement des fautes fréquentes autour de l'intention Web.
+
+    Cette normalisation bornée ne modifie jamais la requête envoyée au moteur.
+    """
+    text = value.lower()
+    for typo in ("recherhe", "recheche", "recherce"):
+        text = re.sub(rf"\b{typo}\b", "recherche", text)
+    return text
 
 
 def _clean_text(value: Any, limit: int = 120) -> str:
@@ -92,7 +117,7 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
     aucune action sortante.
     """
     requested = normalize_contract(raw)
-    text = _clean_text(query, 8000).lower()
+    text = _normalize_intent_text(_clean_text(query, 8000))
     resolved = {axis: requested[axis] for axis in AXES}
     reasons: list[str] = []
 
@@ -103,7 +128,9 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
             resolved["effort"] = "standard"
     natural_primary_request = bool(_PRIMARY_EVIDENCE_RE.search(text))
     natural_web_request = bool(
-        _EXPLICIT_WEB_RE.search(text) or _FRESHNESS_EVIDENCE_RE.search(text)
+        _EXPLICIT_WEB_RE.search(text)
+        or _FRESHNESS_EVIDENCE_RE.search(text)
+        or _DYNAMIC_STATUS_RE.search(text)
     )
     if resolved["evidence"] == "auto":
         if natural_primary_request:

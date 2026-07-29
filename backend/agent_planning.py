@@ -39,6 +39,17 @@ _WEB_HISTORY_RE = re.compile(
     r"\b(?:web\s+search|recherche\s+(?:web|internet|en\s+ligne)|"
     r"cherche\w*\s+sur\s+(?:le\s+)?web|visite\w*\s+(?:le\s+)?site)\b"
 )
+_WEB_DEICTIC_RE = re.compile(
+    r"\b(?:ce\s+sujet|ce\s+point|[àa]\s+ce\s+propos|l[àa]\s+dessus|"
+    r"cela|[çc]a|dessus|sur\s+ceci)\b"
+)
+_GENERIC_WEB_REQUEST_RE = re.compile(
+    r"^\s*(?:je\s+te\s+demande\s+)?(?:de\s+)?"
+    r"(?:faire|lancer|effectuer)?\s*(?:une\s+)?"
+    r"recherche\s+(?:sur\s+le\s+)?(?:web|internet)"
+    r"(?:\s+(?:maintenant|simple|s['’]il\s+te\s+pla[îi]t|stp|svp))*"
+    r"[\s!?.]*$"
+)
 
 
 def _message_text(message: dict[str, Any]) -> str:
@@ -58,8 +69,16 @@ def _contextual_web_requirement(
     messages: list[dict[str, Any]],
     user_query: str,
 ) -> tuple[str, str] | None:
-    current = cloud_routing.strip_accents((user_query or "").casefold())
-    if not _WEB_FOLLOWUP_RE.search(current):
+    current = cortex._normalize_intent_text(
+        cloud_routing.strip_accents((user_query or "").casefold())
+    )
+    is_explicit_web = bool(cortex._EXPLICIT_WEB_RE.search(current))
+    is_contextual = bool(
+        _WEB_FOLLOWUP_RE.search(current)
+        or (is_explicit_web and _WEB_DEICTIC_RE.search(current))
+        or (is_explicit_web and _GENERIC_WEB_REQUEST_RE.fullmatch(current))
+    )
+    if not is_contextual:
         return None
     prior = messages[:-1] if messages and messages[-1].get("role") == "user" else messages
     previous_users = [
@@ -70,10 +89,22 @@ def _contextual_web_requirement(
         for item in prior
         if item.get("role") == "user"
     ][-4:]
-    matched_query = next(
-        (raw for raw, normalized in reversed(previous_users) if _WEB_HISTORY_RE.search(normalized)),
-        "",
-    )
+    matched_query = next((
+        raw
+        for raw, normalized in reversed(previous_users)
+        if raw
+        and not _GENERIC_WEB_REQUEST_RE.fullmatch(normalized)
+        and not (
+            cortex._EXPLICIT_WEB_RE.search(normalized)
+            and _WEB_DEICTIC_RE.search(normalized)
+        )
+        and len(normalized.split()) >= 4
+    ), "")
+    if not matched_query:
+        matched_query = next(
+            (raw for raw, normalized in reversed(previous_users) if _WEB_HISTORY_RE.search(normalized)),
+            "",
+        )
     if not matched_query:
         return None
     return (

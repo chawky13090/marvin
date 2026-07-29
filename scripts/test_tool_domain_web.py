@@ -56,7 +56,7 @@ async def _run() -> None:
             return {
                 "results": [
                     {
-                        "title": f"Source {index}",
+                        "title": f"Marvin Source {index}",
                         "url": f"https://example{index}.com/page",
                         "content": f"Fait vérifié {index}",
                     }
@@ -83,6 +83,24 @@ async def _run() -> None:
     assert priority["provider_attempts"] == [
         {"provider": "SearXNG", "status": "succeeded"}
     ]
+    assert web._prepare_searxng_query(
+        "Quel est le statut des feux de foret en France ?"
+    ) == "feux de foret en France aujourd'hui en cours actualités"
+    assert web._prepare_searxng_query(
+        "recher sur le web les derniers infos sur les feux de foret en france"
+    ) == "derniers infos sur les feux de foret en france"
+    filtered = web._filter_relevant_results(
+        "feux de foret France",
+        [
+            {
+                "title": "Statut, statue ou status : règle de français",
+                "url": "https://grammar.example/statut",
+                "snippet": "Définition et exemples de la langue française.",
+            },
+            {"title": "Incendies en France", "url": "https://fire.example", "snippet": ""},
+        ],
+    )
+    assert [item["url"] for item in filtered] == ["https://fire.example"]
 
     async def priority_search(query: str, max_results: int) -> dict:
         query_id = sum(map(ord, query))
@@ -116,7 +134,7 @@ async def _run() -> None:
             "min_rounds": 3,
         })
     assert normal["provider"] == "SearXNG"
-    assert len(normal["sources"]) == 10
+    assert len(normal["sources"]) == 20
     assert deep["provider_priority"] == "SearXNG"
     assert deep["fallback_used"] is False
     assert deep["rounds"] == 3

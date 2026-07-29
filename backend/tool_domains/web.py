@@ -2,7 +2,9 @@
 from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
+import re
 from typing import Any
+import unicodedata
 
 import outbound_http
 import tool_activity
@@ -34,6 +36,42 @@ _wcache_get: CacheGet = _missing_cache_get
 _wcache_set: CacheSet = _missing_cache_set
 _net_error: NetError = _default_net_error
 
+_SEARCH_PREFIX_RE = re.compile(
+    r"^\s*(?:"
+    r"(?:peux[- ]tu\s+|merci\s+de\s+)?"
+    r"(?:effectue|effectuer|fais|faire|lance|lancer)?\s*"
+    r"(?:une\s+)?(?:recherche|recherhe|recheche|recher)\w*"
+    r"(?:\s+(?:approfondie|approfondi|exhaustive|v[ée]rifiable|compl[èe]te))*"
+    r"(?:\s+(?:sur\s+)?(?:le\s+)?(?:web|internet|en\s+ligne))?"
+    r"(?:\s+(?:sur|concernant|[àa]\s+propos\s+de))?"
+    r"|"
+    r"(?:quel(?:le)?\s+est|quels?\s+sont|donne[- ]moi|indique[- ]moi)"
+    r")\s+",
+    re.IGNORECASE,
+)
+_FRESH_STATUS_RE = re.compile(
+    r"\b(?:statut|[ée]tat|situation|bilan)\b",
+    re.IGNORECASE,
+)
+_DYNAMIC_EVENT_RE = re.compile(
+    r"\b(?:feux?|for[êe]ts?|incendies?|inondations?|s[ée]ismes?|temp[êe]tes?|"
+    r"cyclones?|m[ée]t[ée]o|trafic|circulation|gr[èe]ves?|pannes?|coupures?|"
+    r"[ée]lections?|conflits?|alertes?|vigilance)\b",
+    re.IGNORECASE,
+)
+_FRESH_HINT_RE = re.compile(
+    r"\b(?:aujourd['’]hui|actuel|actuellement|en\s+cours|derni[eè]res?|r[ée]cent)\w*\b",
+    re.IGNORECASE,
+)
+_SEARCH_TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
+_SEARCH_STOP_WORDS = {
+    "actualite", "actualites", "actuel", "actuelle", "actuellement", "aujourd",
+    "aux", "avec", "ces", "cours", "dans", "de", "dernier", "derniers", "derniere",
+    "dernieres", "des", "donne", "du", "en", "et", "etat", "est", "faire", "hui",
+    "info", "infos", "la", "le", "les", "leur", "mais", "ou", "pour", "que", "qui",
+    "recherche", "son", "sont", "statut", "sur", "un", "une", "verifiable", "web",
+}
+
 def configure(*, generate: Generator, get_setting: GetSetting,
               get_http_client: HttpClientFactory, cache_get: CacheGet,
               cache_set: CacheSet, net_error: NetError) -> None:
@@ -44,6 +82,69 @@ def configure(*, generate: Generator, get_setting: GetSetting,
     _wcache_get = cache_get
     _wcache_set = cache_set
     _net_error = net_error
+
+
+def _normalize_search_text(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "").casefold())
+    return "".join(char for char in text if not unicodedata.combining(char))
+
+
+def _prepare_searxng_query(value: str) -> str:
+    """Transforme une consigne en requête moteur sans perdre son sujet métier."""
+    original = " ".join(str(value or "").replace('"', " ").split()).strip()
+    cleaned = _SEARCH_PREFIX_RE.sub("", original, count=1).strip(" ?!.,:;")
+    cleaned = re.sub(
+        r"^(?:le|la|les|des|du|de\s+l['’])\s+",
+        "",
+        cleaned,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    if not cleaned:
+        cleaned = original.strip(" ?!.,:;")
+    if _FRESH_STATUS_RE.search(cleaned) and _DYNAMIC_EVENT_RE.search(cleaned):
+        cleaned = _FRESH_STATUS_RE.sub(" ", cleaned)
+        cleaned = " ".join(cleaned.split())
+        cleaned = re.sub(
+            r"^(?:le|la|les|des|du|de\s+l['’])\s+",
+            "",
+            cleaned,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        if not _FRESH_HINT_RE.search(cleaned):
+            cleaned = f"{cleaned} aujourd'hui en cours actualités"
+    return " ".join(cleaned.split())[:300]
+
+
+def _topic_tokens(value: str) -> set[str]:
+    tokens = {
+        token
+        for token in _SEARCH_TOKEN_RE.findall(_normalize_search_text(value))
+        if token not in _SEARCH_STOP_WORDS
+    }
+    if {"feu", "feux", "foret"} & tokens:
+        tokens.update({"incendie", "incendies"})
+    if {"incendie", "incendies"} & tokens:
+        tokens.update({"feu", "feux"})
+    return tokens
+
+
+def _filter_relevant_results(query: str, results: list[dict]) -> list[dict]:
+    """Écarte les résultats sans aucun recouvrement avec le sujet recherché."""
+    topic = _topic_tokens(query)
+    if not topic:
+        return results
+    ranked: list[tuple[int, int, dict]] = []
+    for index, item in enumerate(results):
+        haystack = _topic_tokens(
+            f"{item.get('title', '')} {item.get('snippet', '')} {item.get('url', '')}"
+        )
+        score = len(topic & haystack)
+        if score:
+            ranked.append((score, -index, item))
+    ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [item for _score, _index, item in ranked]
 
 
 async def _execute_web_search_legacy(args: dict) -> dict:
@@ -302,7 +403,8 @@ async def execute_web_search(args: dict) -> dict:
             "error": "Paramètre 'max_results' invalide : entier attendu entre 1 et 20.",
         }
 
-    cache_key = ("ws-searxng-only", query.lower(), max_results)
+    search_query = _prepare_searxng_query(query)
+    cache_key = ("ws-searxng-only", search_query.lower(), max_results)
     cached = _wcache_get(cache_key)
     if cached is not None:
         return {**cached, "cached": True}
@@ -325,11 +427,11 @@ async def execute_web_search(args: dict) -> dict:
         client = _get_http_client()
         response = await client.get(
             str(base).rstrip("/") + "/search",
-            params={"q": query, "format": "json"},
+            params={"q": search_query, "format": "json", "language": "fr-FR"},
         )
         response.raise_for_status()
         payload = response.json()
-        results = [
+        raw_results = [
             {
                 "title": str(item.get("title") or ""),
                 "url": str(item.get("url") or ""),
@@ -338,10 +440,12 @@ async def execute_web_search(args: dict) -> dict:
             for item in list(payload.get("results") or [])[:max_results]
             if item.get("url")
         ]
+        results = _filter_relevant_results(search_query, raw_results)
         receipt = {
             "success": bool(results),
             "provider": "SearXNG",
             "query": query,
+            "search_query": search_query,
             "count": len(results),
             "results": results,
             "provider_attempts": [{
@@ -582,7 +686,7 @@ async def execute_web_research(args: dict) -> dict:
     )
     try:
         import web_browser as wb
-        search_receipt = await _priority_search(query, 10)
+        search_receipt = await _priority_search(query, 20)
         results = list(search_receipt.get("results") or [])
     except Exception as e:
         return {"error": f"Recherche navigateur échouée : {str(e)[:160]}"}
@@ -635,7 +739,7 @@ async def execute_web_research(args: dict) -> dict:
     await tool_activity.emit(
         "synthesizing",
         "Synthèse de la réponse",
-        metrics={"sources": len(results[:10]), "pages_lues": len(pages)},
+        metrics={"sources": len(results[:20]), "pages_lues": len(pages)},
     )
     answer = (await _generate(prompt, model=args.get("model"), timeout=180) or "").strip()
     # Enrichir la base de connaissances (apprentissage)
@@ -650,15 +754,17 @@ async def execute_web_research(args: dict) -> dict:
         "answer": answer,
         "sources": [
             {"title": r.get("title", ""), "url": r["url"]}
-            for r in results[:10]
+            for r in results[:20]
         ],
         "provider": search_receipt.get("provider"),
         "provider_attempts": search_receipt.get("provider_attempts", []),
         "fallback_used": bool(search_receipt.get("fallback_used", False)),
         "message": (
             f"Réponse trouvée via {search_receipt.get('provider') or 'le Web'} "
-            f"avec {len(results[:10])} source(s) et mémorisée."
+            f"avec {len(results[:20])} source(s) et mémorisée."
         ),
+        "query": query,
+        "search_query": search_receipt.get("search_query") or query,
     }
 
 

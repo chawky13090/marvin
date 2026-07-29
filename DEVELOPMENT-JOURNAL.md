@@ -12041,3 +12041,98 @@ health FastAPI répondent via HTTPS.
 Rollback exact : `git revert <commit-v2.481>`, puis redémarrage de Marvin. Aucun schéma,
 secret ou donnée métier n'est migré. Le journal d'accès Caddy reste désactivé; les décisions
 d'autorisation continuent dans le logger backend expurgé.
+
+## 2026-07-29 — v2.482.0 — Recherche Web contextuelle et reçus cohérents
+
+Les conversations récentes sur les feux de forêt ont établi quatre défauts indépendants :
+les sujets dynamiques n'imposaient pas toujours de preuve Web, une relance « à ce sujet »
+perdait le thème précédent, plusieurs fautes simples empêchaient le routage et le modèle
+pouvait annoncer un échec malgré un reçu `success=true`. SearXNG répondait simultanément en
+HTTP 200; le moteur n'était donc pas la cause.
+
+La comparaison avec les versions antérieures à v2.475–v2.476 confirme la régression :
+`web_search` appartenait auparavant au repli polyvalent exposé au LLM, qui pouvait décider
+librement de l'appeler. Les nouveaux contrats ont fiabilisé les demandes explicites mais leur
+classification trop étroite laissait certains sujets dynamiques sans outil obligatoire. La
+correction conserve le catalogue borné et SearXNG-only tout en restaurant l'activation
+automatique.
+
+Le compilateur Cortex reconnaît maintenant une liste bornée de couples état/statut et
+événements intrinsèquement dynamiques. La normalisation des fautes ne sert qu'à classifier
+l'intention et ne réécrit pas la requête métier. Le planificateur résout les relances
+déictiques et les commandes Web génériques depuis la dernière demande utilisateur
+substantielle. Le Runner conserve en mémoire volatile une projection bornée des résultats
+réussis. La finalisation remplace uniquement une affirmation explicite et contradictoire
+d'indisponibilité par le dernier résultat Web réussi; seules les sources HTTP(S) sont rendues.
+
+Le smoke réel a ensuite révélé que SearXNG interprétait la question naturelle « Quel est le
+statut… ? » comme une recherche grammaticale sur « quel ». Le domaine Web retire désormais
+uniquement les préfixes conversationnels, conserve les mots métier, ajoute un marqueur de
+fraîcheur aux demandes de statut, puis expose séparément la consigne initiale et la requête
+réellement envoyée. Un filtre lexical accent-insensible rejette les résultats sans aucun
+recouvrement avec le sujet et comprend les synonymes feu/incendie. La recherche normale demande
+jusqu'à 20 résultats pertinents et la finalisation ajoute systématiquement la liste complète
+des sources HTTP(S), même si le modèle n'en cite qu'une partie dans son résumé.
+
+Sécurité : aucune permission, confirmation, donnée persistante, priorité réseau ou fournisseur
+de recherche n'est modifié. Les réponses et prompts ne rejoignent aucun nouveau journal. Une
+contradiction produit dans `bug_log.jsonl` l'événement existant
+`bug.tool_result_contradiction`, limité au nom d'outil et à l'identifiant de conversation;
+rotation et rétention de 30 jours restent celles de `bug_log`. Une panne du journal reste
+best-effort et ne masque pas le résultat utilisateur.
+
+Validation exécutée : `test_cortex.py`, `test_agent_planning.py`, `test_agent_runner.py`,
+`test_agent_turn_completion.py`, compilation Python et `check_architecture.py`. Les quatre
+phrases réellement observées produisent maintenant `web_research` ou `web_deep_research`;
+« recherche web à ce sujet » reprend exactement la demande sur les feux de forêt.
+Un smoke SearXNG réel sur la formulation fautive de l'utilisateur a envoyé
+`derniers infos sur les feux de foret en france`, retenu 19 sources pertinentes et produit un
+résumé sur les foyers, le bilan et les cartes de suivi; aucun résultat grammatical ou Facebook
+n'a survécu au filtre.
+Le gate global a aussi révélé une assertion documentaire périmée qui exigeait encore
+« 13 JSONL » alors que l'inventaire autoritaire et son test en comptent 14 depuis v2.461;
+l'assertion vérifie désormais la preuve actuelle sans modifier l'inventaire.
+Le gate de composition dépassait sa limite de cinq lignes uniquement à cause de commentaires
+de versions historiques dans `main.py`; ces doublons ont été retirés du composition root,
+leurs informations restant intégralement disponibles dans Git et ce journal. Aucun symbole,
+routeur, worker ou comportement n'a été supprimé.
+La suite complète a enfin détecté une assertion e-mail antérieure qui ne tenait pas compte du
+nouveau champ de corrélation `request_id=None`; le test a été aligné sur le contrat déjà actif,
+sans modifier l'envoi, les destinataires ni les données e-mail.
+
+Rollback exact : réversion atomique du commit v2.482 puis redémarrage du backend. Aucun schéma,
+secret, certificat ou enregistrement métier n'est migré; les conversations existantes restent
+inchangées.
+
+### Correctif complémentaire — sept erreurs à l'ouverture de la palette
+
+Reproduction réelle sous Next.js 16.2.12 avec Turbopack : six collisions de clés React
+(`/recherche`, `/code` et `/agents`, chacune dupliquée) et une exception
+`Objects are not valid as a React child`. Dans `components/ui/CommandPalette.jsx`, les actions
+rapides et les pages utilisaient le même `href` comme clé, tandis que les icônes Lucide
+importées depuis la sidebar étaient injectées comme des valeurs au lieu d'être instanciées.
+
+Correction : les pages reçoivent une identité stable `nav:<href>`, toutes les lignes utilisent
+leur identifiant comme clé, et `CommandIcon` rend séparément les pictogrammes texte et les
+composants Lucide.
+
+Validation réelle :
+
+- `npx eslint components/ui/CommandPalette.jsx` : succès sans erreur ni avertissement ;
+- `npm run lint` : succès, zéro erreur et 35 avertissements historiques hors tranche ;
+- navigateur connecté : palette complète et exploitable, zéro erreur dans le journal après
+  ouverture.
+
+Sécurité et logs : aucune entrée, requête réseau, autorisation, persistance ou donnée sensible
+supplémentaire. Rollback : réversion atomique de `components/ui/CommandPalette.jsx`; aucun
+schéma ni donnée persistante n'est concerné.
+
+Pendant le build final, l'arrêt volontaire de Next.js a aussi reproduit un `Failed to fetch`
+dans `ChatPage.fetchData`. Ce cas transitoire utilisait directement le proxy Next pour les
+conversations et projets, contrairement aux autres lectures déjà protégées. Ces deux lectures
+passent maintenant par `fetchWithBackendFallback` : si le proxy redémarre, le backend FastAPI
+est interrogé directement; si les deux chemins sont indisponibles, l'interface conserve les
+données déjà affichées, réessaie au cycle suivant et ne journalise que la classe d'erreur sous
+forme d'avertissement, sans URL sensible ni contenu utilisateur. Le build Turbopack, les
+services HTTP et une nouvelle ouverture de la palette ont ensuite été validés avec zéro erreur
+console.

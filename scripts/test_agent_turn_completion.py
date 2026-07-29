@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ class SkillOutcomes:
 
 class Runner:
     succeeded = True
+    successful_results = []
 
     def budget_usage(self, reason):
         return {"reason": reason}
@@ -124,6 +126,61 @@ async def main() -> int:
         encode_sse=json.dumps,
     )
     assert no_learning == []
+
+    reconciled_messages: list[tuple] = []
+    successful_web_runner = Runner()
+    successful_web_runner.successful_results = [{
+        "tool": "web_research",
+        "answer": "Deux incendies sont suivis par les autorités.",
+        "sources": [{
+            "title": "Source officielle",
+            "url": "https://example.org/status",
+        }],
+    }]
+    with patch("agent_turn_completion.bug_log.log_bug") as log_bug:
+        reconciled = await complete_turn(
+            user_query="statut actuel",
+            content="brouillon",
+            active_model="model",
+            conversation_id="conv-web",
+            cortex_plan={"requested": {}},
+            runner_state=successful_web_runner,
+            executed_tool_names={"web_research"},
+            stop_reason="criteria_satisfied",
+            force_review=False,
+            skill=None,
+            skill_outcomes=SkillOutcomes(),
+            tools_spec=[],
+            background_tasks=set(),
+            schedule_learning=False,
+            finalize_answer=lambda **_kwargs: asyncio.sleep(
+                0,
+                result=SimpleNamespace(
+                    content="Je n'ai pas pu effectuer la recherche web demandée.",
+                    critique=None,
+                    council_executed=False,
+                    events=[],
+                ),
+            ),
+            script_scanner=lambda *_args, **_kwargs: [],
+            critique_pass=lambda *_args, **_kwargs: None,
+            council_escalation=lambda *_args, **_kwargs: None,
+            create_message=lambda *args, **kwargs: reconciled_messages.append((args, kwargs)),
+            schedule_exchange_learning=lambda **_kwargs: None,
+            get_setting=lambda _key: "resident",
+            record_recipe_outcome=lambda *_args: None,
+            build_provenance=lambda *_args, **_kwargs: {},
+            encode_sse=json.dumps,
+        )
+        log_bug.assert_called_once()
+    assert reconciled.content.startswith("Deux incendies")
+    assert "Source officielle" in reconciled.content
+    assert "Sources Web consultées (1)" in reconciled.content
+    assert reconciled_messages[0][0][2] == reconciled.content
+    assert json.loads(reconciled.events[0]) == {
+        "type": "answer_final",
+        "text": reconciled.content,
+    }
     print("Agent Turn Completion OK - ordre, Council, apprentissage, skill et provenance.")
     return 0
 

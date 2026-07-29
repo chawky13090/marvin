@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.481.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.482.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.481.0)
+## 9. État actuel (v2.482.0)
+
+**v2.482 (recherche Web et palette de commandes)** : les demandes portant sur l'état d'un événement
+dynamique imposent désormais une preuve Web, y compris sans le mot `web`. Les fautes fréquentes
+sur `recherche` sont normalisées uniquement pour le routage. Les relances déictiques telles que
+« recherche web à ce sujet » reprennent la dernière demande métier pertinente au lieu d'envoyer
+la phrase vague à SearXNG. Si un modèle contredit un reçu Web réussi, la finalisation restitue
+le résultat et ses URLs HTTP(S) validées, puis journalise l'anomalie sans contenu utilisateur.
+Les formulations conversationnelles sont converties en mots-clés SearXNG sans perdre le sujet,
+les résultats sans recouvrement métier sont écartés et toutes les sources pertinentes sont
+ajoutées à la réponse finale.
+Les contrats publics, données persistantes et priorités SearXNG restent inchangés.
+La palette de commandes attribue une identité distincte à chaque action et page, puis rend
+les icônes Lucide comme des composants React. Son ouverture ne produit plus les six collisions
+de clés ni l'exception de rendu auparavant visibles dans les outils Next.js.
 
 **v2.481 (fermeture HTTP LAN)** : Next.js `3000` et FastAPI `8005` écoutent uniquement sur
 `127.0.0.1`. La passerelle HTTPS `8443` est désormais la seule entrée réseau distante.

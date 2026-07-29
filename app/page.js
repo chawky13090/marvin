@@ -109,8 +109,8 @@ export default function ChatPage() {
   const fetchData = useCallback(async () => {
     try {
       const [convRes, projRes] = await Promise.all([
-        fetch('/api/conversations?t=' + Date.now()),
-        fetch('/api/projects?t=' + Date.now())
+        fetchWithBackendFallback('/api/conversations?t=' + Date.now()),
+        fetchWithBackendFallback('/api/projects?t=' + Date.now())
       ]);
       if (convRes.ok) {
         const data = await convRes.json();
@@ -121,7 +121,11 @@ export default function ChatPage() {
         setProjects(data || []);
       }
     } catch (err) {
-      console.error('Erreur chargement données:', err);
+      // Une brève indisponibilité du proxy Next pendant un redémarrage est récupérable :
+      // conserver l'état affiché et laisser le prochain rafraîchissement réessayer.
+      console.warn('[ChatPage] Données temporairement indisponibles', {
+        error_type: err?.name || 'FetchUnavailable',
+      });
     } finally {
       setLoading(false);
     }

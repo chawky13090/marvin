@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Awaitable, Callable
+
+import bug_log
 
 
 @dataclass(frozen=True)
@@ -11,6 +14,59 @@ class TurnCompletion:
     content: str
     critique: str | None
     events: tuple[str, ...]
+
+
+_FALSE_WEB_FAILURE_RE = re.compile(
+    r"\b(?:"
+    r"n['’]ai\s+pas\s+pu\s+(?:effectuer|lancer|faire|interroger)|"
+    r"outil\s+(?:de\s+)?recherche\s+web\s+n['’]est\s+pas\s+disponible|"
+    r"outil\s+n['’]a\s+pas\s+[ée]t[ée]\s+ex[ée]cut[ée]|"
+    r"recherche\s+web\s+n['’]a\s+pas\s+[ée]t[ée]\s+(?:lanc[ée]e|ex[ée]cut[ée])"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _reconcile_successful_web_result(
+    content: str,
+    runner_state: Any,
+    conversation_id: str,
+) -> str:
+    """Aligne le texte sur le reçu Web et restitue toutes ses sources."""
+    successful = [
+        item
+        for item in getattr(runner_state, "successful_results", [])
+        if item.get("tool") in {"web_search", "web_research", "web_deep_research"}
+        and item.get("answer")
+    ]
+    if not successful:
+        return content
+    latest = successful[-1]
+    contradicted = bool(_FALSE_WEB_FAILURE_RE.search(str(content or "")))
+    rendered = str(latest["answer"] if contradicted else content).strip()
+    if contradicted:
+        bug_log.log_bug(
+            "tool_result_contradiction",
+            "La réponse du modèle contredisait un reçu Web réussi; synthèse déterministe appliquée.",
+            context={"tool": str(latest.get("tool") or "")[:80]},
+            conversation_id=conversation_id,
+            tool_name=str(latest.get("tool") or "")[:80],
+        )
+    sources = [
+        source
+        for source in (latest.get("sources") or [])
+        if re.match(r"^https?://", str(source.get("url") or ""), re.IGNORECASE)
+    ]
+    if sources:
+        rendered += (
+            f"\n\n### Sources Web consultées ({len(sources)})\n\n"
+            + "\n".join(
+            f"- [{source['title'] or source['url']}]({source['url']})"
+            for source in sources
+            if source.get("url")
+        )
+        )
+    return rendered
 
 
 async def complete_turn(
@@ -50,8 +106,17 @@ async def complete_turn(
         critique_pass=critique_pass,
         council_escalation=council_escalation,
     )
-    final_content = finalized.content
+    final_content = _reconcile_successful_web_result(
+        finalized.content,
+        runner_state,
+        conversation_id,
+    )
     events = [encode_sse(event) for event in finalized.events]
+    if final_content != finalized.content:
+        events.append(encode_sse({
+            "type": "answer_final",
+            "text": final_content,
+        }))
     if finalized.council_executed:
         executed_tool_names.add("ai_model_council")
 

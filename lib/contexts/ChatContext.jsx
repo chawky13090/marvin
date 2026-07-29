@@ -268,6 +268,24 @@ export function ChatProvider({ children }) {
               }
               break;
 
+            case 'answer_final':
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const finalText = event.text || '';
+                const keptParts = m.parts.filter(
+                  p => p.type === 'tool-invocation' || p.type === 'reasoning'
+                );
+                return {
+                  ...m,
+                  content: finalText,
+                  parts: [
+                    { type: 'text', text: finalText },
+                    ...keptParts,
+                  ],
+                };
+              }));
+              break;
+
             case 'tool_start': {
               // v2.148 — horodatage de départ, utilisé par ToolCallInline pour afficher un
               // chrono en direct sur les outils lents (recherche approfondie, panel

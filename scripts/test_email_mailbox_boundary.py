@@ -50,7 +50,11 @@ async def _run() -> None:
     assert result["success"] is True
     assert send.call_args.kwargs["to"] == "a@example.test"
     log.assert_called_once_with(
-        "email_send", {"to": "a@example.test", "subject": "Sujet"}, {"success": True}, 0
+        "email_send",
+        {"to": "a@example.test", "subject": "Sujet"},
+        {"success": True},
+        0,
+        request_id=None,
     )
 
     with (

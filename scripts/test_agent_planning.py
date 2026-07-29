@@ -101,6 +101,28 @@ def main() -> int:
     assert "web_deep_research" in reinforced.required_tool_names
     assert "web_research" not in reinforced.required_tool_names
 
+    for dynamic_query in (
+        "statut des feux de foret en France",
+        "Effectue une recherche approfondie et vérifiable sur le statut des feux de foret en France",
+        "quel est l'état du trafic en Île-de-France",
+    ):
+        dynamic = planning.compile_turn_plan(
+            [{"role": "user", "content": dynamic_query}],
+            dynamic_query,
+        )
+        expected = (
+            "web_deep_research"
+            if "approfondie" in dynamic_query
+            else "web_research"
+        )
+        assert expected in dynamic.required_tool_names, dynamic_query
+
+    typo_web = planning.compile_turn_plan(
+        [{"role": "user", "content": "recherhe web sur kes feux de foret en france"}],
+        "recherhe web sur kes feux de foret en france",
+    )
+    assert "web_research" in typo_web.required_tool_names
+
     followup_messages = [
         {
             "role": "user",
@@ -118,6 +140,21 @@ def main() -> int:
     )
     assert "web_deep_research" in followup.required_tool_names
     assert followup.contextual_web_query == followup_messages[0]["content"]
+
+    deictic_messages = [
+        {
+            "role": "user",
+            "content": "salut, quel est l'etat des feux de foret en France ?",
+        },
+        {"role": "assistant", "content": "Une recherche actuelle est nécessaire."},
+        {"role": "user", "content": "recherche web a ce sujet"},
+    ]
+    deictic = planning.compile_turn_plan(
+        deictic_messages,
+        deictic_messages[-1]["content"],
+    )
+    assert "web_research" in deictic.required_tool_names
+    assert deictic.contextual_web_query == deictic_messages[0]["content"]
 
     unrelated = planning.compile_turn_plan(
         [

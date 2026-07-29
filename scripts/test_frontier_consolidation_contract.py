@@ -88,9 +88,10 @@ def run() -> dict[str, int]:
         raise ContractError("La comparaison de deux approches doit rester obligatoire.")
     if "amélioration proactive" not in text.lower():
         raise ContractError("L'amélioration proactive doit rester obligatoire par tranche.")
-    if (
-        "les 13 JSONL sont classifiés et structurés; preuves métier et Truth Ledger chaînés"
-    ) not in text:
+    if not all(
+        marker in text
+        for marker in ("14 JSONL classifiés", "preuves chaînées")
+    ):
         raise ContractError("La preuve d'inventaire des persistances JSONL doit rester visible.")
     for requirement in (
         "revue de sécurité obligatoire",

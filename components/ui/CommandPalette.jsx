@@ -15,8 +15,19 @@ const QUICK_ACTIONS = [
 ];
 
 function buildIndex() {
-  const navItems = NAV_SECTIONS.flatMap(s => s.items.map(i => ({ ...i, section: s.title })));
+  const navItems = NAV_SECTIONS.flatMap(s => s.items.map(i => ({
+    ...i,
+    id: `nav:${i.href}`,
+    section: s.title,
+  })));
   return [...QUICK_ACTIONS.map(a => ({ ...a, section: 'Actions' })), ...navItems];
+}
+
+function CommandIcon({ icon }) {
+  if (typeof icon === 'string' || typeof icon === 'number') return icon;
+  if (!icon) return null;
+  const Icon = icon;
+  return <Icon aria-hidden="true" size={16} strokeWidth={1.8} />;
 }
 
 /**
@@ -165,7 +176,7 @@ export default function CommandPalette() {
             </div>
           ) : results.map((item, i) => (
             <div
-              key={item.href || item.id}
+              key={item.id}
               onMouseEnter={() => setActive(i)}
               onClick={() => go(item)}
               style={{
@@ -174,7 +185,9 @@ export default function CommandPalette() {
                 background: active === i ? 'rgba(79, 140, 255,0.12)' : 'transparent',
               }}
             >
-              <span style={{ fontSize: 16, width: 22, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ fontSize: 16, width: 22, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <CommandIcon icon={item.icon} />
+              </span>
               <span style={{ flex: 1, fontSize: 13.5, color: active === i ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.label}</span>
               <span style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{item.section}</span>
             </div>
