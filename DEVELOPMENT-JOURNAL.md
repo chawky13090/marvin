@@ -5,6 +5,56 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.459.0 — Chiffrement actif des souvenirs
+
+### Constat et décision
+
+SQLite était la source autoritative cohérente et les sauvegardes étaient déjà chiffrées, mais
+la colonne `memories.content` et le payload `text` Qdrant restaient en clair au repos.
+Memory Mesh était déjà minimisé à une empreinte et des métadonnées. Deux approches ont été
+comparées : chiffrer tout le fichier de données par une dépendance système, peu portable et
+insuffisamment granulaire, ou protéger les deux copies textuelles au niveau applicatif. La
+seconde est retenue avec DPAPI utilisateur, déjà éprouvé par les coffres Marvin.
+
+`memory_cipher.py` fournit une enveloppe `dpapi:v1`, découpe jusqu'à 128 000 octets en blocs
+bornés et vérifie la relecture. Le repository chiffre avant transaction, déchiffre uniquement
+à la projection API et migre le clair historique de façon idempotente. Qdrant conserve le
+vecteur mais remplace `text` par `text_protected`; recherche vectorielle, BM25 et reranker
+déchiffrent seulement en mémoire. Toute enveloppe corrompue échoue fermée.
+
+### Preuve réelle, sécurité, logs et rollback
+
+Les 10 souvenirs réels sont chiffrés et relisibles. L'initialisation de base étant déclenchée
+par un test d'intégration, la migration SQLite idempotente s'est exécutée avant le redémarrage
+du service prévu. Ce comportement d'import historique n'a pas supprimé de donnée. Une
+sauvegarde `secretary_20260729_044907_384422.mrvbak` a ensuite été créée, chiffrée, relue et
+contrôlée avec zéro violation de clé étrangère; deux sauvegardes antérieures entourent aussi
+la fenêtre.
+
+Le premier audit Qdrant exhaustif a trouvé 11 payloads chiffrés pour 10 sources SQLite :
+l'ancien audit, limité au Mesh, produisait donc un faux `consistent=true`. Le contrat couvre
+maintenant les index manquants, orphelins, obsolètes, non protégés et corrompus. La réparation
+live a retiré l'unique orphelin; l'état final est SQLite=10, Mesh=10, Qdrant=10, zéro clair,
+zéro corruption et `consistent=true`.
+
+Aucun contenu, ciphertext ou chemin n'est ajouté aux logs. Les erreurs restent limitées à
+leur classe dans les couches appelantes; la décision « aucun nouvel événement » évite de
+dupliquer une donnée de sécurité dans le journal technique. La sauvegarde et le rollback
+restent auditables par leurs événements existants.
+
+Rollback de données, Marvin arrêté :
+`backend\.venv\Scripts\python.exe scripts\rollback-memory-encryption.py --confirmed`.
+Le script refuse un backend actif, crée d'abord un snapshot SQLite, déchiffre SQLite et
+Qdrant, puis permet `git revert <commit-v2.459>`. Un `git revert` seul est interdit.
+
+### Validation
+
+`test_memory_encryption.py` couvre découpage, corruption, migration SQLite, CRUD, absence de
+clair, migration Qdrant, idempotence et rollback des deux stockages.
+`test_personal_data_repositories.py`, `test_memory_lifecycle.py` et
+`test_database_bootstrap.py` passent sans régression. La rétention/restauration globale et
+la dérive factuelle restent la prochaine sous-tranche avant promotion du domaine mémoire.
+
 ## 2026-07-29 — v2.458.0 — Contrat de données des modèles
 
 ### Constat, comparaison et décision

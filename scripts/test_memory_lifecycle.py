@@ -358,7 +358,21 @@ async def _exercise(mesh_path: Path) -> None:
 
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="marvin-memory-lifecycle-") as directory:
-        asyncio.run(_exercise(Path(directory) / "mesh.json"))
+        clean_index = {
+            "available": True,
+            "count": 0,
+            "missing": [],
+            "orphan": [],
+            "stale": [],
+            "unprotected": [],
+            "corrupt": [],
+        }
+        with patch.object(
+            memory_lifecycle,
+            "_inspect_index",
+            return_value=clean_index,
+        ):
+            asyncio.run(_exercise(Path(directory) / "mesh.json"))
     print("Memory Lifecycle OK - ordre d'oubli, cohérence et panne partielle.")
     return 0
 

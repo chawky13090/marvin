@@ -9,6 +9,7 @@ import uuid
 import httpx
 from typing import Any
 from config import QDRANT_PATH, OLLAMA_URL, EMBEDDING_MODEL
+import memory_cipher
 
 try:
     from qdrant_client import QdrantClient
@@ -22,14 +23,18 @@ except ImportError:
 # ── Initialisation du client ──────────────────────────────────────────────────
 
 _client: Any = None
+_memory_payloads_migrated = False
 
 def get_client():
-    global _client
+    global _client, _memory_payloads_migrated
     if not _qdrant_available:
         return None
     if _client is None:
         _client = QdrantClient(path=QDRANT_PATH)
         _ensure_collections()
+    if not _memory_payloads_migrated:
+        _migrate_memory_payloads(_client)
+        _memory_payloads_migrated = True
     return _client
 
 
@@ -48,6 +53,139 @@ def _ensure_collections():
                 collection_name=name,
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
             )
+
+
+def _memory_payload_text(payload: dict[str, Any]) -> str:
+    protected = payload.get("text_protected")
+    if protected is not None:
+        return memory_cipher.unprotect_text(str(protected))
+    return str(payload.get("text") or "")
+
+
+def _migrate_memory_payloads(client: Any) -> int:
+    """Retire le texte clair historique de Qdrant après vérification DPAPI."""
+    migrated = 0
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection_name="memories",
+            limit=128,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in points:
+            payload = dict(point.payload or {})
+            if payload.get("text_protected") is not None:
+                memory_cipher.unprotect_text(str(payload["text_protected"]))
+                if "text" not in payload:
+                    continue
+            elif payload.get("text"):
+                payload["text_protected"] = memory_cipher.protect_text(
+                    str(payload["text"])
+                )
+            else:
+                continue
+            payload.pop("text", None)
+            client.overwrite_payload(
+                collection_name="memories",
+                payload=payload,
+                points=[point.id],
+            )
+            migrated += 1
+        if offset is None:
+            break
+    return migrated
+
+
+def rollback_memory_payload_protection(client: Any) -> int:
+    """Restaure les payloads texte attendus par les versions antérieures."""
+    changed = 0
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection_name="memories",
+            limit=128,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in points:
+            payload = dict(point.payload or {})
+            protected = payload.get("text_protected")
+            if protected is None:
+                continue
+            payload["text"] = memory_cipher.unprotect_text(str(protected))
+            payload.pop("text_protected", None)
+            client.overwrite_payload(
+                collection_name="memories",
+                payload=payload,
+                points=[point.id],
+            )
+            changed += 1
+        if offset is None:
+            break
+    return changed
+
+
+def inspect_memory_index(expected_hashes: dict[str, str]) -> dict[str, Any]:
+    """Compare Qdrant à SQLite sans retourner le contenu des souvenirs."""
+    client = get_client()
+    if client is None:
+        return {
+            "available": False,
+            "count": 0,
+            "missing": sorted(expected_hashes),
+            "orphan": [],
+            "stale": [],
+            "unprotected": [],
+            "corrupt": [],
+        }
+    indexed: dict[str, dict[str, Any]] = {}
+    unprotected: list[str] = []
+    corrupt: list[str] = []
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection_name="memories",
+            limit=128,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in points:
+            payload = dict(point.payload or {})
+            memory_id = str(payload.get("original_id") or "")
+            if not memory_id:
+                corrupt.append(str(point.id))
+                continue
+            indexed[memory_id] = payload
+            if payload.get("text_protected") is None:
+                unprotected.append(memory_id)
+            else:
+                try:
+                    memory_cipher.unprotect_text(str(payload["text_protected"]))
+                except memory_cipher.MemoryCipherError:
+                    corrupt.append(memory_id)
+        if offset is None:
+            break
+    expected_ids = set(expected_hashes)
+    indexed_ids = set(indexed)
+    stale = sorted(
+        memory_id
+        for memory_id in expected_ids & indexed_ids
+        if str(indexed[memory_id].get("content_sha256") or "")
+        != expected_hashes[memory_id]
+    )
+    return {
+        "available": True,
+        "count": len(indexed),
+        "missing": sorted(expected_ids - indexed_ids),
+        "orphan": sorted(indexed_ids - expected_ids),
+        "stale": stale,
+        "unprotected": sorted(set(unprotected)),
+        "corrupt": sorted(set(corrupt)),
+    }
 
 
 # ── Embeddings via Ollama ─────────────────────────────────────────────────────
@@ -115,12 +253,19 @@ def _get_bm25_index(collection: str):
                 collection_name=collection, limit=256, offset=offset, with_payload=True,
             )
             for p in points:
-                text = p.payload.get("text", "")
+                text = (
+                    _memory_payload_text(p.payload)
+                    if collection == "memories"
+                    else p.payload.get("text", "")
+                )
                 if text:
                     records.append({
                         "collection": collection,
                         "text": text,
-                        "metadata": {k: v for k, v in p.payload.items() if k not in ("text",)},
+                        "metadata": {
+                            k: v for k, v in p.payload.items()
+                            if k not in ("text", "text_protected")
+                        },
                     })
             if offset is None:
                 break
@@ -245,11 +390,19 @@ async def search(
                 with_payload=True,
             )
             for h in resp.points:
+                text = (
+                    _memory_payload_text(h.payload)
+                    if col == "memories"
+                    else h.payload.get("text", "")
+                )
                 results.append({
                     "collection": col,
                     "score": round(h.score, 4),
-                    "text": h.payload.get("text", ""),
-                    "metadata": {k: v for k, v in h.payload.items() if k not in ("text",)},
+                    "text": text,
+                    "metadata": {
+                        k: v for k, v in h.payload.items()
+                        if k not in ("text", "text_protected")
+                    },
                 })
         except Exception as e:
             print(f"[VectorStore] search error in {col}: {e}")
@@ -276,6 +429,7 @@ async def delete_document(collection: str, doc_id: str):
     if client is None:
         return
     client.delete(collection_name=collection, points_selector=[_safe_id(doc_id)])
+    _BM25_CACHE.pop(collection, None)
 
 
 def _safe_id(raw_id: str) -> str:
@@ -291,16 +445,27 @@ def _safe_id(raw_id: str) -> str:
 async def index_memory(memory_id: str, content: str, category: str):
     import memory_mesh
 
-    await upsert_document(
-        "memories",
-        memory_id,
-        content,
-        {
-            "category": category,
-            "original_id": memory_id,
-            "content_sha256": memory_mesh.content_sha256(content),
-        },
+    client = get_client()
+    if client is None:
+        return False
+    vector = await embed(content)
+    if vector is None:
+        return False
+    client.upsert(
+        collection_name="memories",
+        points=[PointStruct(
+            id=_safe_id(memory_id),
+            vector=vector,
+            payload={
+                "text_protected": memory_cipher.protect_text(content),
+                "category": category,
+                "original_id": memory_id,
+                "content_sha256": memory_mesh.content_sha256(content),
+            },
+        )],
     )
+    _BM25_CACHE.pop("memories", None)
+    return True
 
 
 async def index_note(note_id: str, title: str, content: str, tags: list):

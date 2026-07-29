@@ -14,6 +14,12 @@ import memory_mesh
 MEMORY_CATEGORIES = frozenset({"user_profile", "preference", "fact", "habit"})
 
 
+def _inspect_index(expected_hashes: dict[str, str]) -> dict[str, Any]:
+    from vector_store import inspect_memory_index
+
+    return inspect_memory_index(expected_hashes)
+
+
 def validate_category(category: str) -> str:
     normalized = str(category or "").strip()
     if normalized not in MEMORY_CATEGORIES:
@@ -30,7 +36,8 @@ async def _delete_index(memory_id: str) -> None:
 async def _index(memory_id: str, content: str, category: str) -> None:
     from vector_store import index_memory
 
-    await index_memory(memory_id, content, category)
+    if await index_memory(memory_id, content, category) is not True:
+        raise RuntimeError("Index mémoire indisponible.")
 
 
 async def create(
@@ -170,7 +177,7 @@ async def prune_expired() -> dict[str, Any]:
 
 
 def audit_consistency() -> dict[str, Any]:
-    """Compare SQLite et Memory Mesh sans ouvrir un second client Qdrant."""
+    """Compare la source SQLite à Memory Mesh et au client Qdrant partagé."""
     memories = db.get_memories()
     by_id = {str(item["id"]): item for item in memories}
     metadata = {
@@ -210,12 +217,26 @@ def audit_consistency() -> dict[str, Any]:
         for memory_id, item in metadata.items()
         if not valid_metadata(item)
     )
+    index = _inspect_index({
+        memory_id: memory_mesh.content_sha256(
+            str(memory.get("content") or "")
+        )
+        for memory_id, memory in by_id.items()
+    })
+    index_issues = (
+        not index["available"]
+        or any(
+            index[key]
+            for key in ("missing", "orphan", "stale", "unprotected", "corrupt")
+        )
+    )
     return {
         "consistent": not (
             database_ids - mesh_ids
             or mesh_ids - database_ids
             or stale
             or invalid
+            or index_issues
         ),
         "database_count": len(database_ids),
         "mesh_count": len(mesh_ids),
@@ -225,6 +246,7 @@ def audit_consistency() -> dict[str, Any]:
         "invalid_metadata": invalid,
         "expired": sorted(memory_mesh.expired_ids()),
         "conflicted": sorted(memory_mesh.conflicted_ids()),
+        "index": index,
     }
 
 
@@ -243,6 +265,10 @@ async def repair_consistency(*, dry_run: bool = True) -> dict[str, Any]:
         set(before["missing_mesh"])
         | set(before["stale_content"])
         | set(before["invalid_metadata"])
+        | set(before["index"]["missing"])
+        | set(before["index"]["stale"])
+        | set(before["index"]["unprotected"])
+        | set(before["index"]["corrupt"])
     ):
         memory = memories.get(memory_id)
         if not memory:
@@ -263,6 +289,18 @@ async def repair_consistency(*, dry_run: bool = True) -> dict[str, Any]:
                 {
                     "id": memory_id,
                     "stage": "orphan",
+                    "error_type": type(exc).__name__,
+                }
+            )
+    for memory_id in before["index"]["orphan"]:
+        try:
+            await _delete_index(memory_id)
+            actions.append({"id": memory_id, "action": "remove_index_orphan"})
+        except Exception as exc:
+            failures.append(
+                {
+                    "id": memory_id,
+                    "stage": "index_orphan",
                     "error_type": type(exc).__name__,
                 }
             )

@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.458.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.459.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.458.0)
+## 9. État actuel (v2.459.0)
+
+**v2.459 (chiffrement actif des souvenirs)** : le contenu autoritatif SQLite et le payload
+texte Qdrant utilisent une enveloppe DPAPI utilisateur versionnée et découpée. Les API, le
+RAG hybride et le reranker ne voient le clair qu'en mémoire du processus. La migration
+historique chiffre puis relit avant remplacement, échoue fermée sur corruption et reste
+idempotente. Memory Mesh ne conserve toujours qu'une empreinte et des métadonnées. Le script
+hors ligne `scripts/rollback-memory-encryption.py --confirmed` restaure le format clair
+attendu par une version antérieure après création d'un snapshot SQLite. L'audit compare
+désormais SQLite, Mesh et Qdrant; la preuve réelle finale est 10/10/10, sans payload clair,
+orphelin, empreinte obsolète ni enveloppe corrompue.
 
 **v2.458 (contrat de données des modèles)** : les résultats d'outils ne sont plus classés
 par quatre préfixes historiques. Seuls les outils déterministes ou de recherche publique
