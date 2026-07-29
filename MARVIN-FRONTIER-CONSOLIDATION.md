@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.457.0
+Version courante auditée : 2.458.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -128,7 +128,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | runner | Runner et boucle agentique | verified | `scripts/test_agent_loop_policy.py`, `scripts/test_agent_execution.py`, `scripts/test_agent_turn_completion.py` | maintenir les contrats de budget, arrêt, reprise et événements |
 | sessions | Sessions, SSE et reprise | verified | `scripts/test_chat_turn_runtime.py`, `scripts/test_chat_stream.mjs`, `scripts/test_agent_session.py` | test navigateur de reconnexion pendant un tour long |
 | tools | Catalogue, harness et appels d'outils | verified | registre 344/344, zéro consommateur direct, 78 restrictions, sélection/erreurs/approbations/résultats testés par `test_agent_tool_selection.py`, `test_tool_gateway.py`, `test_system_tools_gateway.py` et `test_engineering_runtime.py` | maintenir le gate et ajouter les nouveaux outils uniquement avec schéma, politique, résultat et preuves |
-| models | Routage modèles, Council et confidentialité | partial | matrice des quatre profils, provenance SSE, Ultra Cloud-only, Council cinq familles, preuves génératives et découverte locale dynamique par capacités Ollama | tester les combinaisons négatives de chaque domaine avant promotion |
+| models | Routage modèles, Council et confidentialité | verified | matrice des quatre profils, provenance SSE, Ultra Cloud-only, Council cinq familles, preuves génératives, découverte locale dynamique et classification privée par défaut des 344 outils; `test_model_data_policy.py` couvre dix familles négatives et les valeurs sensibles structurées | maintenir la liste positive publique, les tests Cloud-only/Council et le défaut privé pour tout nouvel outil |
 | memory | Mémoire, RAG et vérité durable | partial | cycle SQLite autoritatif, empreintes de contenu, audit/réparation des projections, quarantaine des contradictions et apprentissage historique migré vers SQLite (`scripts/test_memory_lifecycle.py`, `scripts/test_knowledge_mesh.py`, `scripts/test_learning_durability.py`) | valider chiffrement, rétention/restauration globale et dérive factuelle |
 | coding | Code Workspace, Forge et missions longues | verified | mission réelle `da59b089bff44e77974d7d35324e88b3`, Delivery Pack accepté, réparation après échecs, artefact préservé, 12 tests Windows et 12 tests Debian + Bats | maintenir les gates E2E, le rejeu ciblé et l'absence de régression d'artefact |
 | isolation | Docker, VM Debian et VM Windows | verified | Docker hors ligne sans socket hôte; Windows 11 non-admin réseau coupé; Debian 13 native; checkpoints restaurés avant/après; smokes live et mission v2.457 | maintenir les images figées, le moindre privilège, la gouvernance réseau et les restaurations |
@@ -146,7 +146,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 runner|verified
 sessions|verified
 tools|verified
-models|partial
+models|verified
 memory|partial
 coding|verified
 isolation|verified

@@ -5,6 +5,47 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.458.0 — Contrat de données des modèles
+
+### Constat, comparaison et décision
+
+Le repli local après outil reposait sur quatre préfixes et exemptait même les adresses de
+comptes e-mail ainsi que les hôtes et utilisateurs SSH. Des outils lisant fichiers, mémoire,
+agenda, stockage Cloud, inventaire du poste ou diagnostics pouvaient donc réinjecter leur
+résultat dans un modèle Cloud en modes Normal et Tout cloud. Deux approches ont été comparées :
+étendre continuellement une liste de préfixes sensibles, ou n'autoriser au Cloud que des
+sorties publiques nommées et classer tout outil nouveau comme privé. La seconde est retenue,
+car elle échoue fermée et reste sûre quand le catalogue évolue.
+
+`cloud_routing.py` introduit `ToolDataClass`, une liste positive limitée aux calculs,
+date/unité, météo et recherches publiques, puis un défaut privé. La détection du texte couvre
+aussi adresses e-mail, Bearer/JWT, clés privées, affectations de secrets, IBAN et chemins de
+profils Windows/Linux. Normal et Tout cloud basculent avant réinjection; Hyper est déjà local;
+Ultra reste Cloud-only par consentement explicite.
+
+Références primaires consultées : les tool guardrails OpenAI exécutés avant et après chaque
+outil (`https://openai.github.io/openai-agents-python/guardrails/`), la défense en profondeur
+et le contrôle utilisateur décrits par Anthropic
+(`https://www.anthropic.com/research/trustworthy-agents`), et la matrice d'abus OWASP couvrant
+exfiltration, outils, mémoire et tests négatifs
+(`https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html`).
+
+### Sécurité, logs et rollback
+
+La surface sortante diminue : aucune donnée ni configuration n'est migrée et aucun secret
+n'est journalisé. Le changement réutilise l'événement SSE `model_info` déjà expurgé; aucun
+nouveau stockage ou log technique n'est nécessaire. Les classes sont déterministes et le
+catalogue futur échoue en privé. Limite connue : ces motifs ne constituent pas un DLP
+statistique complet; les résultats de tous les outils non publics restent donc le filet
+principal. Rollback exact, sans donnée persistante : `git revert <commit-v2.458>`.
+
+### Validation
+
+`test_model_data_policy.py` vérifie les 344 outils, les nouveautés inconnues, dix domaines
+privés, les sorties publiques, les quatre profils, l'historique et huit formes de valeurs
+sensibles. Les suites de confidentialité, Cloud-only, Runner, Council cinq familles, Model
+Market, Adaptive Team et découverte/installation locale passent sans régression.
+
 ## 2026-07-29 — v2.457.0 — Code Workspace natif et réparation ciblée
 
 ### Constat et décisions

@@ -14,7 +14,9 @@ Doctrine (v2.119-121, non-négociable sauf via `ultra_unrestricted`) :
 - Une donnée sensible (email, SSH, mot de passe, facture...) ne part au cloud
   QUE si `ultra_unrestricted` est explicitement activé par l'utilisateur.
 """
+import re
 import unicodedata
+from enum import StrEnum
 
 import database as db
 
@@ -33,35 +35,70 @@ SENSITIVE_KEYWORDS = (
     "cle privee", "clé privée", "private key", "token", "jeton", "secret",
     "facture", "devis", "client",
 )
-SENSITIVE_TOOL_PREFIXES = ("email_", "ssh_", "billing_", "credential_")
 
-# v2.164 — outils "métadonnées uniquement" explicitement exemptés du repli local
-# mid-boucle (agent.py) : leur nom commence par un préfixe sensible mais ils ne
-# renvoient JAMAIS de contenu réel (mot de passe, corps d'email, sortie de commande
-# distante...) — juste une liste de ce qui est configuré. Carve-out volontairement
-# étroit et nommé outil par outil (jamais un préfixe entier) pour ne pas affaiblir
-# la garde ailleurs. Signalé par l'utilisateur : "ssh_list" déclenchait le repli
-# local ("🔒 Repli local (donnée sensible détectée)") sur une simple demande de
-# script, dégradant la qualité de réponse sans aucune raison de confidentialité
-# réelle (has_password/has_key restent des booléens, jamais la valeur).
-SENSITIVE_TOOL_EXEMPTIONS = frozenset({
-    "ssh_list",        # connexions enregistrées : host/port/username, has_password/has_key en booléen
-    "email_accounts",  # comptes configurés : adresse seulement, jamais un contenu de message
+# Signaux structurés usuels qui peuvent être collés sans aucun mot-clé explicite.
+# Les expressions sont volontairement bornées et n'enregistrent jamais la valeur.
+_SENSITIVE_VALUE_PATTERNS = (
+    re.compile(r"(?i)(?<![\w.+-])[\w.+-]{1,64}@[\w.-]{1,253}\.[a-z]{2,24}(?![\w.-])"),
+    re.compile(r"(?i)\b(?:authorization\s*:\s*)?bearer\s+[a-z0-9._~+/=-]{12,4096}\b"),
+    re.compile(r"\beyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\b"),
+    re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"),
+    re.compile(r"(?i)\b(?:password|passwd|pwd|token|api[_ -]?key|secret)\s*[:=]\s*\S{4,}"),
+    re.compile(r"(?i)\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b"),
+    re.compile(r"(?i)(?:[A-Z]:\\Users\\|/home/)[^\\/\s]{1,128}"),
+)
+class ToolDataClass(StrEnum):
+    """Classification du résultat réinjecté au modèle après un appel d'outil."""
+
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+
+# v2.458 — liste positive des seuls résultats autorisés à poursuivre sur le Cloud.
+# Ils ne lisent ni le poste, ni un compte, ni une mémoire utilisateur. Tout nouvel
+# outil reste privé par défaut : étendre le registre ne peut pas ouvrir un flux
+# sortant silencieux.
+PUBLIC_TOOL_NAMES = frozenset({
+    "calculator",
+    "color_tool",
+    "datetime_info",
+    "unit_convert",
+    "weather",
+    "web_search",
+    "web_browse",
+    "web_research",
+    "web_deep_research",
 })
+
+# Export historique conservé pour compatibilité. La décision effective repose sur
+# PUBLIC_TOOL_NAMES et sur le défaut privé, pas sur cette liste de préfixes.
+SENSITIVE_TOOL_PREFIXES = (
+    "email_", "ssh_", "billing_", "credential_", "memory_", "task_", "note_",
+    "calendar_", "event_", "document_", "file_", "google_drive_", "onedrive_",
+)
 
 
 def is_sensitive_text(text: str) -> bool:
     """True si le texte (prompt d'un appel LLM interne, message utilisateur...)
     contient un mot-clé de donnée sensible."""
-    norm = strip_accents((text or "").lower())
-    return any(strip_accents(k) in norm for k in SENSITIVE_KEYWORDS)
+    raw = str(text or "")
+    norm = strip_accents(raw.lower())
+    return (
+        any(strip_accents(k) in norm for k in SENSITIVE_KEYWORDS)
+        or any(pattern.search(raw) for pattern in _SENSITIVE_VALUE_PATTERNS)
+    )
 
 
 def is_sensitive_tool(name: str) -> bool:
-    n = name or ""
-    if n in SENSITIVE_TOOL_EXEMPTIONS:
-        return False
-    return any(n.startswith(p) for p in SENSITIVE_TOOL_PREFIXES)
+    return classify_tool_data(name) is ToolDataClass.PRIVATE
+
+
+def classify_tool_data(name: str) -> ToolDataClass:
+    """Classe une sortie d'outil ; un nom vide ou inconnu échoue en mode privé."""
+    normalized = str(name or "").strip()
+    if normalized in PUBLIC_TOOL_NAMES:
+        return ToolDataClass.PUBLIC
+    return ToolDataClass.PRIVATE
 
 
 def is_cloud_model(name: str) -> bool:
@@ -77,7 +114,7 @@ def is_cloud_model(name: str) -> bool:
     return (
         n.endswith(":cloud")
         or n.endswith("-cloud")
-        or bool(__import__("re").fullmatch(r"gemma4:e\d+b", n))
+        or bool(re.fullmatch(r"gemma4:e\d+b", n))
     )
 
 
