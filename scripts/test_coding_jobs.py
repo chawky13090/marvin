@@ -84,6 +84,9 @@ async def scenario(repository: Path) -> None:
         job = coding_jobs.create_job(mission["id"])
         completed = await wait_terminal(job["id"])
         assert completed["status"] == "completed", completed
+        assert completed["privacy_contract"]["preset"] in {
+            "normal", "hyper", "cloud_max", "ultra"
+        }
         assert Path(workspace["worktree_root"], "app.py").read_text(encoding="utf-8") == "print('auto')\n"
         assert not (repository / "app.py").exists()
         assert coding_mission.get(mission["id"])["status"] == "completed"
@@ -92,6 +95,87 @@ async def scenario(repository: Path) -> None:
         assert delivery["definition_of_done"]["success"] is True
         event_types = [event["type"] for event in coding_mission.stream_events(mission["id"])["events"]]
         assert "delivery.accepted" in event_types and "delivery.pack.created" in event_types
+        assert "privacy.profile.bound" in event_types
+
+        changed_contract = {
+            "preset": "hyper",
+            "cloud_only": False,
+            "local_only": True,
+            "sensitive_cloud_allowed": False,
+        }
+        with patch.object(coding_jobs, "_privacy_contract", return_value=changed_contract):
+            assert coding_jobs._sync_privacy_contract(
+                job["id"], mission["id"], phase="test_transition", attempt=2
+            ) is True
+        transition = [
+            event
+            for event in coding_mission.stream_events(mission["id"])["events"]
+            if event["type"] == "privacy.profile.changed"
+        ][-1]
+        assert transition["payload"]["prior_decisions_preserved"] is True
+        assert transition["payload"]["current"] == changed_contract
+        privacy_mission = coding_mission.create(
+            "Mission avec transition de confidentialité",
+            target_platforms=["linux"],
+            repository={"root": str(repository)},
+            autonomy="autonomous",
+            budget={
+                "max_duration_minutes": 5,
+                "max_iterations": 3,
+                "max_files_changed": 5,
+            },
+        )
+        coding_workspace.create(
+            privacy_mission["id"], str(repository), confirmed=True
+        )
+        initial_contract = {
+            "preset": "ultra",
+            "cloud_only": True,
+            "local_only": False,
+            "sensitive_cloud_allowed": True,
+        }
+        with (
+            patch.object(
+                coding_jobs, "_privacy_contract", return_value=initial_contract
+            ),
+            patch.object(
+                coding_jobs,
+                "_emit",
+                return_value={"proof_recorded": False},
+            ),
+        ):
+            try:
+                coding_jobs._sync_privacy_contract(
+                    job["id"], mission["id"], phase="proof_failure", attempt=3
+                )
+            except RuntimeError as exc:
+                assert "ne peut pas être prouvée" in str(exc)
+            else:
+                raise AssertionError(
+                    "Une transition sans preuve durable devait suspendre la mission."
+                )
+        privacy_calls = 0
+
+        def changing_privacy():
+            nonlocal privacy_calls
+            privacy_calls += 1
+            return initial_contract if privacy_calls <= 2 else changed_contract
+
+        with patch.object(
+            coding_jobs, "_privacy_contract", side_effect=changing_privacy
+        ):
+            privacy_job = coding_jobs.create_job(privacy_mission["id"])
+            privacy_completed = await wait_terminal(privacy_job["id"])
+        assert privacy_completed["status"] == "completed"
+        assert privacy_completed["attempts"] == 2
+        privacy_events = [
+            event["type"]
+            for event in coding_mission.stream_events(
+                privacy_mission["id"]
+            )["events"]
+        ]
+        assert "privacy.profile.changed" in privacy_events
+        assert "repair.scheduled" in privacy_events
 
         gate = asyncio.Event()
 

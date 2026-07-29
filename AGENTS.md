@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.451.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.452.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.451.0)
+## 9. État actuel (v2.452.0)
+
+**v2.452 (confidentialité des missions longues)** : chaque job Code Workspace capture le
+profil effectif au démarrage et avant/après chaque génération. Une transition produit un
+événement durable `privacy.profile.changed` sans contenu métier. Si elle survient pendant
+la génération, le candidat n'est jamais appliqué : la mission repart sous le nouveau contrat,
+alors que les refus et décisions antérieurs restent inchangés dans le registre.
 
 **v2.451 (provenance générative transverse)** : le runtime partagé retourne désormais,
 sur demande, modèle, fournisseur, profil de confidentialité et Cloud-only dans un snapshot

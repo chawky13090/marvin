@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.452 — transitions de confidentialité durables dans Coding Mission
 # v2.451 — provenance générative documents, e-mails et Code Workspace
 # v2.450 — amélioration de prompt vidéo alignée sur le runtime modèles partagé
 # v2.449 — matrice confidentialité/modèles et provenance du profil effectif

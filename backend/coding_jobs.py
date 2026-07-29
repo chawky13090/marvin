@@ -20,6 +20,7 @@ import windows_validation
 import hyperv_test_runner
 import engineering_runtime
 import bug_log
+import cloud_routing
 from structured_logging import sanitize_text
 from config import DATA_DIR
 
@@ -103,6 +104,48 @@ _SECRET_KEYS = {
 
 class CodingJobStoreError(RuntimeError):
     """Le registre des jobs et sa sauvegarde ne peuvent pas être relus sûrement."""
+
+
+def _privacy_contract() -> dict[str, Any]:
+    return {
+        "preset": cloud_routing.get_privacy_preset(),
+        "cloud_only": cloud_routing.is_cloud_only_mode(),
+        "local_only": cloud_routing.is_local_only_lockdown(),
+        "sensitive_cloud_allowed": cloud_routing.is_ultra_unrestricted(),
+    }
+
+
+def _sync_privacy_contract(
+    job_id: str,
+    mission_id: str,
+    *,
+    phase: str,
+    attempt: int,
+) -> bool:
+    job = get_job(job_id) or {}
+    previous = dict(job.get("privacy_contract") or {})
+    current = _privacy_contract()
+    changed = bool(previous) and previous != current
+    if changed:
+        receipt = _emit(
+            mission_id,
+            "privacy.profile.changed",
+            {
+                "job_id": job_id,
+                "attempt": attempt,
+                "phase": str(phase)[:100],
+                "previous": previous,
+                "current": current,
+                "prior_decisions_preserved": True,
+            },
+        )
+        if not receipt.get("proof_recorded"):
+            raise RuntimeError(
+                "La transition de confidentialité ne peut pas être prouvée; "
+                "la mission est suspendue avant application."
+            )
+    _update(job_id, privacy_contract=current)
+    return changed
 
 
 def _safe_state(value: Any, *, key: str = "", depth: int = 0) -> Any:
@@ -312,6 +355,7 @@ def _result_summary(result: dict[str, Any], applied: dict[str, Any] | None,
         "bundle": result.get("bundle"),
         "models_consulted": list(result.get("models_consulted") or []),
         "families": list(result.get("families") or []),
+        "generation": dict(result.get("generation") or {}),
         "critical_issues": int(result.get("critical_issues") or 0),
         "high_issues": int(result.get("high_issues") or 0),
         "test_report": {
@@ -416,6 +460,12 @@ async def _run(job_id: str) -> None:
         started = time.monotonic()
         _update(job_id, status="running", attempts=attempts + 1, started_at=_now(),
                 progress={"stage": "repository_context", "percent": 5}, error=None)
+        _sync_privacy_contract(
+            job_id,
+            job["mission_id"],
+            phase="before_run",
+            attempt=attempts + 1,
+        )
         _emit(job["mission_id"], "mission.run.started", {"job_id": job_id, "attempt": attempts + 1})
         try:
             worktree_root = workspace["worktree_root"]
@@ -495,6 +545,26 @@ async def _run(job_id: str) -> None:
             finally:
                 progress_task.cancel()
                 await asyncio.gather(progress_task, return_exceptions=True)
+            if _sync_privacy_contract(
+                job_id,
+                job["mission_id"],
+                phase="after_generation",
+                attempt=attempts + 1,
+            ):
+                _retry_or_block(
+                    job_id,
+                    job["mission_id"],
+                    "Le profil de confidentialité a changé pendant la génération; "
+                    "le candidat n'est pas appliqué et sera recalculé.",
+                    max_failures=max_failures,
+                    repair_context={
+                        "category": "privacy_transition",
+                        "retryable": True,
+                        "error": "Profil modifié pendant la génération.",
+                        "signature": "privacy-transition",
+                    },
+                )
+                return
             if get_job(job_id).get("cancel_requested"):
                 raise asyncio.CancelledError
             if not result.get("success"):
@@ -694,6 +764,7 @@ def create_job(mission_id: str) -> dict[str, Any]:
         "attempts": 0, "elapsed_seconds": 0.0, "cancel_requested": False,
         "consecutive_failures": 0, "next_retry_at": None,
         "repair_context": None, "validation_cache": {},
+        "privacy_contract": _privacy_contract(),
         "last_failure_signature": "", "same_failure_count": 0,
         "result": None, "error": None, "created_at": _now(), "updated_at": _now(),
     }
@@ -701,6 +772,15 @@ def create_job(mission_id: str) -> dict[str, Any]:
         rows = _load()
         rows.append(job)
         _write(rows[-500:])
+    _emit(
+        mission_id,
+        "privacy.profile.bound",
+        {
+            "job_id": job["id"],
+            "current": job["privacy_contract"],
+            "prior_decisions_preserved": True,
+        },
+    )
     _TASKS[job["id"]] = asyncio.create_task(_run(job["id"]))
     return job
 

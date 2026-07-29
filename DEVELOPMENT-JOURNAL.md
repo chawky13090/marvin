@@ -5,6 +5,41 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.452.0 — Confidentialité durable des Coding Missions
+
+### Constat et décision
+
+Le profil de confidentialité était évalué par Code Forge au moment de chaque appel, mais une
+mission longue ne conservait pas son contrat initial et ne détectait pas un changement pendant
+une génération. Deux approches ont été comparées : figer le profil pour toute la mission, ce
+qui ignorerait une décision ultérieure de l'utilisateur, ou capturer un snapshot à chaque
+frontière et invalider uniquement le candidat traversant une transition. La seconde respecte
+le choix actuel sans réinterpréter rétroactivement les décisions déjà prises.
+
+### Implémentation
+
+Chaque job persiste un contrat borné : profil, Cloud-only, local-only et autorisation du
+sensible. `privacy.profile.bound` inscrit l'état initial dans le registre chaîné. Avant chaque
+tentative et après chaque génération, le superviseur compare le profil effectif. Toute
+différence produit `privacy.profile.changed` avec phase et numéro de tentative. Si le profil
+change pendant la génération, les fichiers candidats ne rejoignent jamais le worktree; une
+nouvelle tentative repart sous le contrat courant. Le résumé du job conserve également la
+provenance de Code Forge. Si la preuve de transition ne peut pas être écrite, la synchronisation
+échoue fermée et la mission est suspendue avant toute application.
+
+### Sécurité, logs, tests et rollback
+
+Les événements ne contiennent ni prompt, ni code, ni document, ni secret. Les décisions
+antérieures restent dans le registre append-only et portent
+`prior_decisions_preserved=true`. Le test `test_coding_jobs.py` simule Ultra vers Hyper au
+milieu d'une génération : le premier candidat est rejeté, `repair.scheduled` est enregistré,
+la seconde tentative réussit et une seule livraison est appliquée. Les tests de reprise,
+annulation, isolation et boucle jusqu'au succès restent verts.
+
+Aucun schéma SQLite n'est modifié; les anciens jobs sans `privacy_contract` sont enrichis à
+leur prochaine exécution. Après relance, `/api/health` expose **2.452.0** et `/code` répond
+HTTP 200. Rollback exact : `git revert <commit-v2.452>`.
+
 ## 2026-07-29 — v2.451.0 — Provenance générative transverse
 
 ### Constat et décision
