@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.464.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.465.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.464.0)
+## 9. État actuel (v2.465.0)
+
+**v2.465 (identité et garde LAN)** : `lan_access.py` protège HTTP, SSE et WebSocket hors
+boucle locale par une session HMAC liée au client, expirant en douze heures et signée avec
+une clé DPAPI. Le jumelage utilise un code temporaire de forte entropie, cinq essais par dix
+minutes, un cookie HttpOnly et un jeton CSRF double-submit. Origine et client sont contrôlés;
+logout et expiration ferment la session. Le frontend ajoute les credentials/CSRF à tous les
+fetch FastAPI, les EventSource utilisent `withCredentials`, et un écran de jumelage bloque
+l'interface distante. `proxy.js` contrôle aussi les routes API Next par introspection de la
+signature FastAPI; les origines Turbopack sont découvertes dynamiquement. Le code n'est pas
+journalisé : il est visible seulement dans Paramètres > Connexions depuis la boucle locale.
+OpenAPI expose la session et 401/403 sur 362 opérations; santé, état, jumelage et
+introspection restent publics. HTTP LAN sans TLS et les scopes par capacité empêchent encore
+le statut VERIFIED.
 
 **v2.464 (inventaire contractuel API)** : `api_contract_inventory.py` analyse le schéma
 OpenAPI sans démarrer le lifespan. Le gate couvre 300 chemins, 362 opérations et 63 familles,

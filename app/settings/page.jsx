@@ -123,6 +123,7 @@ export default function SettingsPage() {
   const [credValues, setCredValues] = useState({});    // champs en cours d'édition
   const [credSaving, setCredSaving] = useState({});    // loading par clé
   const [credVisible, setCredVisible] = useState({});  // afficher/masquer
+  const [lanAccess, setLanAccess] = useState(null);
 
   // v2.174 — Identité document par défaut (auteur/organisation/en-tête/pied de page),
   // réutilisée automatiquement par Marvin pour tout document généré (PDF/Word) sans avoir
@@ -167,6 +168,10 @@ export default function SettingsPage() {
     fetchCredentials();
     fetchCloudConfig();
     fetchDocIdentity();
+    fetch(`${BACKEND_URL}/api/auth/lan/status`, { cache: 'no-store' })
+      .then(response => response.json())
+      .then(setLanAccess)
+      .catch(() => {});
     // Lire tab depuis l'URL (callback OAuth)
     const tab = searchParams?.get('tab');
     if (tab) setActiveTab(tab);
@@ -174,6 +179,8 @@ export default function SettingsPage() {
     const microsoft = searchParams?.get('microsoft');
     if (google === 'connected') showNotification('✅ Google connecté avec succès !');
     if (microsoft === 'connected') showNotification('✅ Microsoft connecté avec succès !');
+    // Chargement initial uniquement; les callbacks OAuth mettent à jour l'URL via navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Permission Level ────────────────────────────────────────────────────────
@@ -1052,6 +1059,26 @@ export default function SettingsPage() {
               ═══════════════════════════════════════════════════════════════════ */}
           {activeTab === 'connections' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+              {lanAccess?.pairing_code && (
+                <div style={{
+                  padding: '16px', background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                }}>
+                  <div style={{ fontWeight: 650, marginBottom: 6 }}>Accès réseau protégé</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-xs)', lineHeight: 1.5 }}>
+                    Saisis ce code temporaire sur le téléphone ou le PC à jumeler. Il change au redémarrage
+                    et n&apos;est jamais écrit dans les journaux.
+                  </div>
+                  <code style={{
+                    display: 'inline-block', marginTop: 10, padding: '9px 12px',
+                    borderRadius: 8, background: 'var(--bg-primary)', userSelect: 'all',
+                    letterSpacing: '0.06em',
+                  }}>
+                    {lanAccess.pairing_code}
+                  </code>
+                </div>
+              )}
 
               {/* Info générale */}
               <div style={{

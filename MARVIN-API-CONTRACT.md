@@ -4,24 +4,26 @@ Date de référence : 2026-07-29
 
 ## État mesuré
 
-Le schéma OpenAPI expose 300 chemins et 362 opérations HTTP, répartis dans 63 familles.
-Les 362 opérations ont un identifiant unique. 273 ont un schéma de réponse non vide; 89
-restent génériques et 71 opérations ne possèdent aucun tag. Ces lacunes devront être
-résorbées famille par famille.
+Le schéma OpenAPI expose désormais 304 chemins et 366 opérations HTTP, répartis dans
+64 familles. Les 366 opérations ont un identifiant unique. La garde LAN documente 362
+opérations protégées et leurs erreurs 401/403; les quatre surfaces publiques sont santé,
+état de jumelage, jumelage et introspection cryptographique interne. Grâce aux erreurs
+communes, 363 opérations ont maintenant un
+schéma non vide. Les réponses métier génériques et 71 opérations sans tag restent à
+résorber famille par famille.
 
 Le constat critique est objectif :
 
-- 189 mutations ;
-- 127 mutations avec corps de requête ;
-- 0 réponse d'erreur 4xx/5xx documentée hors validation automatique 422 ;
-- 0 opération avec sécurité OpenAPI ;
+- 192 mutations ;
+- 128 mutations avec corps de requête ;
+- 363 opérations avec une erreur 4xx documentée ;
+- 362 opérations protégées par le contrat de session LAN ;
 - 0 mutation déclarant une clé d'idempotence.
 
-Ces zéros ne signifient pas que toutes les implémentations sont dépourvues de validation ou
-de contrôles internes. Ils signifient que le contrat public ne les garantit pas et confirme
-la dette SEC-001. La promotion suivra l'ordre : identité/session locale, autorisation par
-capacité, erreurs communes expurgées, idempotence des mutations à effet, puis modèles de
-réponse explicites. Chaque famille garde ses routes pendant la migration.
+La garde globale fournit l'identité réseau, mais pas encore l'autorisation fine par capacité.
+La promotion suivra donc l'ordre : transport HTTPS LAN, autorisation par capacité,
+idempotence des mutations à effet, puis modèles de réponse métier explicites. Chaque famille
+garde ses routes pendant la migration.
 
 ## Gate
 
@@ -31,14 +33,14 @@ non taguée et dérive de la baseline. Toute évolution modifie le contrat et sa
 même commit.
 
 <!-- api-contract-baseline
-paths|300
-operations|362
-mutations|189
-typed_responses|273
-documented_errors|0
-secured|0
+paths|304
+operations|366
+mutations|192
+typed_responses|363
+documented_errors|363
+secured|362
 idempotent_mutations|0
-request_bodies|127
+request_bodies|128
 untagged|71
 missing_operation_ids|0
 -->

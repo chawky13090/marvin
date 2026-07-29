@@ -166,7 +166,7 @@ export default function MonitoringPage() {
 
   // ── SSE monitoring ────────────────────────────────────────────────────────
   useEffect(() => {
-    const es = new EventSource(`${BACKEND}/api/monitor`);
+    const es = new EventSource(`${BACKEND}/api/monitor`, { withCredentials: true });
     evtRef.current = es;
 
     es.onopen = () => setConnected(true);

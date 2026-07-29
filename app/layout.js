@@ -5,6 +5,7 @@ import TopLoadingBar from '@/components/ui/TopLoadingBar';
 import CommandPalette from '@/components/ui/CommandPalette';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ChatProvider } from '@/lib/contexts/ChatContext';
+import LanAccessGate from '@/components/security/LanAccessGate';
 
 // Forcer le rendu dynamique pour éviter les erreurs SSR avec les composants client
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="fr" className={inter.variable}>
       <body>
+        <LanAccessGate>
         {/* ChatProvider lives at the layout level → chat state survives page navigation.
             User can start a conversation, navigate to /outils or /files, and the
             stream keeps running in the background. */}
@@ -43,6 +45,7 @@ export default function RootLayout({ children }) {
             <AppFrame>{children}</AppFrame>
           </ChatProvider>
         </ToastProvider>
+        </LanAccessGate>
       </body>
     </html>
   );

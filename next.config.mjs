@@ -1,7 +1,16 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { networkInterfaces } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const allowedDevOrigins = new Set(['127.0.0.1', 'localhost']);
+for (const addresses of Object.values(networkInterfaces())) {
+  for (const address of addresses || []) {
+    if (address.family === 'IPv4' && !address.internal) {
+      allowedDevOrigins.add(address.address);
+    }
+  }
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -12,21 +21,8 @@ const nextConfig = {
   // L'avatar de bureau Electron charge http://127.0.0.1:3000 (pas localhost). Sans cette
   // entrée, le serveur de dev bloque le websocket HMR comme "cross-origin" → la page ne finit
   // jamais son hydratation et boucle en rechargement complet (aucun bouton ne répond).
-  allowedDevOrigins: ['127.0.0.1'],
+  allowedDevOrigins: [...allowedDevOrigins],
 
-  // Configuration des en-têtes pour la sécurité
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,PATCH,DELETE,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
-        ],
-      },
-    ];
-  },
 };
 
 export default nextConfig;

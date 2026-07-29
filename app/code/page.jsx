@@ -126,7 +126,10 @@ export default function CodeWorkspacePage() {
       clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => loadDetail(id, selectedFile?.path).catch(() => {}), 200);
     };
-    const source = new EventSource(`${CODING_API}/projects/${id}/events/stream`);
+    const source = new EventSource(
+      `${CODING_API}/projects/${id}/events/stream`,
+      { withCredentials: true },
+    );
     source.addEventListener('mission', refresh);
     source.addEventListener('terminal', () => { refresh(); source.close(); });
     source.onerror = () => {

@@ -5,6 +5,67 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.465.0 — Identité et garde LAN
+
+### Menace et choix
+
+SEC-001 était critique : FastAPI écoutait toutes les interfaces avec CORS LAN mais sans
+identité globale. Deux solutions ont été comparées. Lier uniquement la boucle locale est
+simple et sûr mais retire téléphone/mobile. Conserver le LAN avec un token dans
+`localStorage` maintient la fonction mais expose le secret au moindre XSS. La solution
+retenue conserve le LAN avec jumelage, cookie HttpOnly signé et défense CSRF distincte.
+
+Les références officielles utilisées sont le middleware ASGI pur de Starlette, applicable
+aussi aux WebSocket, les cookies HttpOnly/SameSite de son middleware de session, et les
+cheat sheets OWASP Session Management/CSRF. OWASP déconseille les jetons de session dans
+localStorage et recommande cookie HttpOnly, contrôle d'origine, Fetch Metadata et défense
+CSRF dédiée.
+
+### Implémentation
+
+`lan_access.py` signe HMAC-SHA-256 une session versionnée, liée par empreinte au client,
+expirant en douze heures. La clé 256 bits est générée une fois, relue et mise en cache depuis
+DPAPI. Le code de jumelage temporaire possède environ 96 bits d'entropie; cinq erreurs sur
+dix minutes bloquent le client. HTTP, SSE et WebSocket non locaux exigent la session.
+Les mutations navigateur exigent en plus même hôte/ports 3000–8005 et double-submit CSRF.
+La boucle locale reçoit elle aussi une session signée au premier contrôle afin que les routes
+serveur Next.js puissent appliquer exactement la même frontière.
+
+Le cookie de session est non persistant, HttpOnly et Lax pour préserver les callbacks OAuth;
+le CSRF est Strict. Logout, expiration, changement de client, signature altérée, origine
+hostile et absence de CSRF échouent fermés. Santé, état, jumelage et introspection interne
+sont les quatre surfaces publiques. Cette dernière ne révèle qu'un booléen et valide la
+signature sans exposer le jeton. OpenAPI documente `MarvinLanSession`, 401/403 et 362
+opérations protégées.
+
+Le frontend installe le transport dans `lib/backend.js` avant les appels : credentials
+inclus, header CSRF seulement vers `/api/*` du backend réel. `LanAccessGate` empêche de monter
+l'application distante avant jumelage; Code Workspace et Monitoring ajoutent les credentials
+aux EventSource. Le proxy officiel Next.js 16 protège toutes les routes `/api/*`, sauf la
+sonde de compatibilité `/api/status`, par introspection auprès de FastAPI; une panne du
+backend échoue fermée. Les anciens en-têtes CORS `*` de Next ont été supprimés. Les origines
+Turbopack autorisées sont calculées depuis les IPv4 réellement présentes au démarrage, sans
+adresse de machine codée en dur. Le code temporaire reste hors logs et s'affiche localement
+dans Paramètres.
+
+### Tests, logs et rollback
+
+Les tests couvrent signature, expiration, liaison client, cinq essais, loopback, LAN,
+origine, CSRF local/distant, WebSocket 4401, cookies, pairing, introspection, logout et
+projection OpenAPI. ESLint ciblé passe. Le build Next.js 16.2.12 avec Turbopack réussit.
+Après redémarrage réel, Playwright ouvre l'interface locale, confirme le pont CSRF, refuse
+les routes FastAPI et Next anonymes en 401 depuis `192.168.1.105`, effectue le jumelage,
+hydrate l'interface distante et obtient HTTP 200 via le proxy Next authentifié.
+Le smoke API initialise désormais sa propre session locale signée avant de vérifier les
+proxies : **28/28 contrats** réussissent. Le parcours HTTP couvre également **40/40 pages**.
+La composition, l'inventaire OpenAPI, l'architecture, la compilation Python et le lint ciblé
+réussissent; le backend 2.465.0 et Turbopack répondent tous deux HTTP 200.
+
+Les audits `lan_pair`/`lan_logout` ne contiennent ni IP, code, token, cookie, CSRF ou contenu.
+Limite résiduelle explicite : le LAN reste en HTTP et l'autorisation ne possède pas encore
+de scopes par capacité; SEC-001 passe seulement à MITIGATED. Rollback : réversion atomique
+du commit v2.465, sans migration de donnée.
+
 ## 2026-07-29 — v2.464.0 — Inventaire contractuel FastAPI
 
 ### Constat et décision

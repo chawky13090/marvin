@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.465 — identité LAN signée, jumelage, CSRF et WebSocket protégés
 # v2.464 — inventaire OpenAPI exhaustif et gate contractuel par famille
 # v2.463 — réplication chiffrée hors stockage, idempotente et vérifiée
 # v2.462 — restauration globale hors ligne compensée et projections réconciliées
@@ -42,16 +43,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.418 — connaissances IT extraites vers un repository borné et injectable
 # v2.417 — fiches de révision extraites vers un repository déterministe
 # v2.416 — recherche Web explicite garantie et réponses modèle vides récupérées
-# v2.409 — traces d'outils et fiabilité extraites, bornées et expurgées
-# v2.410 — inventaire, snapshots, modèles d'outils et cron extraits par agrégat
-# v2.411 — facturation extraite, numérotation atomique et montants validés
 # v2.415 — sécurité des commandes extraite avec approbations idempotentes
-# v2.408 — projets, captures et logos extraits vers trois repositories injectables
-# v2.407 — agenda local et miroirs externes extraits vers un repository injectable
-# v2.406 — mémoires, tâches et notes extraites vers trois repositories injectables
-# v2.405 — première frontière de persistance extraite : paramètres globaux injectables
-# v2.404 — sources statiques officielles du Radar; erreurs de coquilles JavaScript supprimées
-# v2.403 — composition FastAPI finalisée; routes modèles et proactives extraites et typées
 
 from __future__ import annotations
 
@@ -65,6 +57,7 @@ from fastapi.responses import JSONResponse
 
 import bug_log
 from api_observability import ApiObservabilityMiddleware
+from api_contract_schema import install_access_contract
 import chat_turn_runtime
 import generation_runtime
 import web_runtime
@@ -92,6 +85,7 @@ from api.forge import router as forge_router
 from api.health import router as health_router
 from api.history import router as history_router
 from api.knowledge import router as knowledge_router
+from api.lan_access import router as lan_access_router
 from api.memories import router as memories_router
 from api.missions import router as missions_router
 from api.model_market import router as model_market_router
@@ -136,6 +130,7 @@ from runtime_workers import (
     prewarm_default_models as _prewarm_default_model,
     skill_night_learning_worker as _skill_night_learning_worker,
 )
+from lan_access import LanAccessMiddleware
 
 
 for _stream in (sys.stdout, sys.stderr):
@@ -148,6 +143,10 @@ for _stream in (sys.stdout, sys.stderr):
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """Initialise les dépendances partagées et supervise les workers de Marvin."""
+    print(
+        "[Marvin] Accès LAN protégé. Code visible dans "
+        "Paramètres > Connexions sur le PC principal."
+    )
     chat_turn_runtime.recover_orphaned_turns()
     chat_turn_runtime.prune()
     try:
@@ -248,6 +247,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(LanAccessMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -275,6 +275,7 @@ app.include_router(evolution_router)
 app.include_router(missions_router)
 app.include_router(model_market_router)
 app.include_router(knowledge_router)
+app.include_router(lan_access_router)
 app.include_router(conversations_router)
 app.include_router(projects_router)
 app.include_router(tasks_router)
@@ -315,6 +316,7 @@ app.include_router(health_router)
 app.include_router(agent_gateway_router)
 app.include_router(model_selection_router)
 app.include_router(proactive_router)
+install_access_contract(app)
 
 
 @app.exception_handler(Exception)

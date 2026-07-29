@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import http.cookiejar
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -14,18 +15,21 @@ from typing import Any
 BACKEND = os.getenv("MARVIN_BACKEND_URL", "http://127.0.0.1:8005").rstrip("/")
 FRONTEND = os.getenv("MARVIN_FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/")
 OLLAMA = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+HTTP = urllib.request.build_opener(
+    urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
+)
 
 
 def fetch_json(url: str) -> Any:
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=20) as response:
+    with HTTP.open(request, timeout=20) as response:
         if response.status != 200:
             raise AssertionError(f"HTTP {response.status} pour {url}")
         return json.loads(response.read().decode("utf-8"))
 
 
 def fetch_ok(url: str) -> None:
-    with urllib.request.urlopen(url, timeout=20) as response:
+    with HTTP.open(url, timeout=20) as response:
         if response.status != 200:
             raise AssertionError(f"HTTP {response.status} pour {url}")
 
@@ -37,7 +41,7 @@ def post_json(url: str, payload: dict) -> Any:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
+    with HTTP.open(request, timeout=20) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -432,6 +436,9 @@ TESTS: list[tuple[str, Callable[[], None]]] = [
 
 def main() -> int:
     print("\nSMOKE TEST API MARVIN")
+    # La boucle locale reçoit une session signée, partagée entre les ports 8005 et 3000.
+    # Le smoke valide ainsi les proxies Next sous la même frontière que le navigateur.
+    fetch_json(f"{BACKEND}/api/auth/lan/status")
     failures = 0
     for name, test in TESTS:
         try:

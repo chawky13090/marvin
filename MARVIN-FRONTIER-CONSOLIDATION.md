@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.464.0
+Version courante auditée : 2.465.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -133,10 +133,10 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | coding | Code Workspace, Forge et missions longues | verified | mission réelle `da59b089bff44e77974d7d35324e88b3`, Delivery Pack accepté, réparation après échecs, artefact préservé, 12 tests Windows et 12 tests Debian + Bats | maintenir les gates E2E, le rejeu ciblé et l'absence de régression d'artefact |
 | isolation | Docker, VM Debian et VM Windows | verified | Docker hors ligne sans socket hôte; Windows 11 non-admin réseau coupé; Debian 13 native; checkpoints restaurés avant/après; smokes live et mission v2.457 | maintenir les images figées, le moindre privilège, la gouvernance réseau et les restaurations |
 | persistence | SQLite, migrations et repositories | partial | 14 JSONL classifiés, preuves chaînées, bundle global AES-256-GCM/DPAPI, application compensée et réplication vérifiée/idempotente; exercice réel sur 1 067 fichiers | exécuter une copie sur stockage physiquement distinct/immuable et concevoir l'export réellement portable avant promotion |
-| api | FastAPI, contrats et compatibilité | partial | 362 opérations/300 chemins inventoriés, operationId uniques, 273 réponses typées et baseline fermée (`test_api_contract_inventory.py`); smoke 28/28 | corriger 71 tags, 89 réponses génériques, erreurs, idempotence et autorisation famille par famille |
+| api | FastAPI, contrats et compatibilité | partial | 365 opérations/303 chemins inventoriés, operationId uniques, 362 protégées par session LAN et 363 erreurs contractuelles; smoke 28/28 | corriger 71 tags, réponses métier génériques, idempotence et autorisation par capacité |
 | workers | Workers, cron et missions proactives | verified | tests supervisor, runtime workers, communication, cron et proactif | chaos tests arrêt/redémarrage, doublon et dépendance indisponible |
 | observability | Logs, traces, métriques, coûts et évaluations | partial | audit JSONL, état Runner, SLO HTTP roulant, Forge, corrélation HTTP→Runner→outils→SQLite/audit et gate reproductible | alertes et suites capacité/régression |
-| security | Permissions, confirmations et guardrails | partial | 65 restrictions, gateway commun et tests de sécurité agent | threat model OWASP agentique complet et tests d'abus par surface |
+| security | Permissions, confirmations et guardrails | partial | 78 restrictions, gateway commun, session LAN HMAC/DPAPI, jumelage borné, CSRF/origine, HTTP/SSE/WebSocket protégés | ajouter TLS LAN, autorisation par capacité et threat model OWASP agentique complet |
 | frontend | Frontend, accessibilité et expérience chat | partial | compilation/lint ciblés, 40 pages recensées et smoke Playwright | audit WCAG, états erreur/chargement/reprise et E2E des parcours critiques |
 | avatar | Avatar de bureau et démarrage | partial | `scripts/test_avatar_api.py` et contrat installateur | test Electron réel démarrage/arrêt, déplacement, raccourcis et reprise |
 | voice | Entrée/sortie vocale | verified | test frontend statique et smoke navigateur de sérialisation, navigation et interruption | maintenir le parcours dans le gate de non-régression |
