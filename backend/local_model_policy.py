@@ -77,6 +77,69 @@ def _installed_map(models: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _supports_dynamic_role(item: dict[str, Any], role: str) -> bool:
+    name = str(item.get("name") or "").casefold()
+    capabilities = {
+        str(capability).casefold()
+        for capability in item.get("capabilities") or []
+    }
+    if "embedding" in capabilities or "embed" in name:
+        return False
+    if role == "vision":
+        return "vision" in capabilities or any(
+            marker in name
+            for marker in ("vision", "llava", "minicpm", "bakllava", "glm-ocr")
+        )
+    if "vision" in capabilities or any(
+        marker in name
+        for marker in ("vision", "llava", "minicpm", "bakllava", "glm-ocr")
+    ):
+        return False
+    if role == "coding":
+        return any(
+            marker in name
+            for marker in ("coder", "code", "codestral", "devstral", "starcoder")
+        )
+    if role == "agent" and capabilities:
+        return "tools" in capabilities
+    return not capabilities or "completion" in capabilities
+
+
+def _dynamic_candidate(
+    installed: dict[str, dict[str, Any]],
+    role: str,
+    budget: int,
+) -> dict[str, Any] | None:
+    candidates = [
+        item
+        for item in installed.values()
+        if 0 < int(item.get("size_bytes") or 0) <= budget
+        and _supports_dynamic_role(item, role)
+    ]
+    candidates.sort(
+        key=lambda item: (
+            "tools" in set(item.get("capabilities") or []),
+            "thinking" in set(item.get("capabilities") or []),
+            int(item.get("context_tokens") or 0),
+            int(item.get("size_bytes") or 0),
+            item["name"],
+        ),
+        reverse=True,
+    )
+    if not candidates:
+        return None
+    selected = candidates[0]
+    return {
+        "name": selected["name"],
+        "size_bytes": selected["size_bytes"],
+        "context_tokens": int(selected.get("context_tokens") or 0),
+        "roles": {role: 0},
+        "capabilities": list(selected.get("capabilities") or ["unknown_legacy"]),
+        "source_url": None,
+        "selection_source": "ollama_runtime_metadata",
+    }
+
+
 def recommend(
     hardware: dict[str, Any],
     installed_models: list[dict[str, Any]],
@@ -111,34 +174,8 @@ def recommend(
             entry for entry in candidates if canonical_name(entry["name"]) in installed
         ]
         selected = installed_candidates[0] if installed_candidates else None
-        if selected is None and role in RUNTIME_ROLES:
-            legacy = [
-                item for item in installed.values()
-                if 0 < int(item.get("size_bytes") or 0) <= budget
-                and "embed" not in item["name"].casefold()
-                and (
-                    role != "vision"
-                    or any(marker in item["name"].casefold() for marker in (
-                        "vision", "llava", "minicpm", "bakllava", "glm-ocr",
-                    ))
-                )
-                and (
-                    role == "vision"
-                    or not any(marker in item["name"].casefold() for marker in (
-                        "vision", "llava", "minicpm", "bakllava", "glm-ocr",
-                    ))
-                )
-            ]
-            legacy.sort(key=lambda item: int(item.get("size_bytes") or 0), reverse=True)
-            if legacy:
-                selected = {
-                    "name": legacy[0]["name"],
-                    "size_bytes": legacy[0]["size_bytes"],
-                    "context_tokens": 0,
-                    "roles": {role: 0},
-                    "capabilities": ["unknown_legacy"],
-                    "source_url": None,
-                }
+        if selected is None:
+            selected = _dynamic_candidate(installed, role, budget)
         portfolio[role] = {
             "recommended": desired["name"] if desired else None,
             "selected": selected["name"] if selected else None,
@@ -147,6 +184,12 @@ def recommend(
             "size_bytes": int((desired or {}).get("size_bytes") or 0),
             "context_tokens": int((desired or {}).get("context_tokens") or 0),
             "capabilities": list((desired or {}).get("capabilities") or []),
+            "selected_capabilities": list((selected or {}).get("capabilities") or []),
+            "selected_source": (
+                "curated_catalog"
+                if selected and not selected.get("selection_source")
+                else (selected or {}).get("selection_source")
+            ),
         }
         if selected and role in RUNTIME_ROLES:
             chosen[role] = selected["name"]

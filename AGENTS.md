@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.454.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.455.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.454.0)
+## 9. État actuel (v2.455.0)
+
+**v2.455 (modèles locaux dynamiques)** : l'inventaire Ollama enrichit jusqu'à trente-deux
+modèles locaux par `/api/show`, avec concurrence bornée, afin de lire capacités, famille et
+contexte directement depuis le runtime. Le catalogue versionné reste la préférence vérifiée
+pour les téléchargements, mais tout futur modèle déjà installé peut désormais être sélectionné
+pour chat, agent, analyse, vision ou coding selon ses capacités réelles et le budget matériel.
+Les modèles d'embedding, Cloud et ceux qui dépassent le budget restent exclus.
 
 **v2.454 (apprentissage durable)** : les faits et réponses réutilisables extraits des
 conversations ne dépendent plus de Qdrant comme source unique. Le repository

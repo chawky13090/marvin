@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.455.0 — Découverte dynamique des modèles locaux
+
+### Constat et décision
+
+Le choix local respectait déjà VRAM, RAM, disque et catalogue versionné, mais un futur modèle
+installé hors catalogue n'était classé que par son nom et sa taille. Deux approches ont été
+comparées : télécharger automatiquement tout modèle récent trouvé sur Internet, non
+déterministe et exposé aux changements de registre, ou interroger les métadonnées officielles
+du runtime local puis conserver un catalogue approuvé uniquement pour les téléchargements.
+La seconde offre de la liberté sans transformer une source distante en autorité d'exécution.
+
+### Implémentation
+
+`auto_config._installed_models()` appelle l'endpoint Ollama officiel `/api/show` pour au plus
+32 modèles, avec quatre requêtes concurrentes maximum et les timeouts existants. Capacités,
+famille et longueur de contexte enrichissent l'inventaire. `local_model_policy.py` sait
+désormais classifier tout modèle futur installé pour chat, agent, analyse, vision ou coding.
+Les capacités déclarées priment sur les heuristiques de nom; les modèles d'embedding, Cloud,
+vision hors rôle ou trop volumineux sont exclus. Le catalogue approuvé reste prioritaire
+lorsqu'un de ses modèles est installé et demeure la seule origine des recommandations de
+téléchargement.
+
+Références primaires consultées :
+`https://docs.ollama.com/api/tags` et
+`https://docs.ollama.com/api-reference/show-model-details`.
+
+### Sécurité, logs, tests et rollback
+
+Les noms proviennent du daemon local mais passent tout de même par la grammaire stricte avant
+`/api/show`. Aucun Modelfile, template, licence, prompt ou secret n'est conservé; seules les
+capacités bornées et métriques nécessaires sont projetées. Un échec d'introspection ne bloque
+pas Marvin et revient à l'inventaire `/api/tags`. Les tests couvrent une machine 4 Go, 24 Go,
+CPU faible, les overrides trop lourds, le disque insuffisant et trois modèles futurs absents
+du catalogue. Rollback : `git revert <commit-v2.455>`; aucun schéma ni donnée n'est modifié.
+La validation live sur la **NVIDIA GeForce GTX 1650 4 Go** calcule un budget sûr de 3 Go et
+conserve `qwen3:4b` pour chat/agent/analyse, `qwen3.5:2b` pour vision et
+`qwen2.5-coder:3b` pour coding. Les trois anciens overrides 14b sont refusés sans élargir le
+budget. `/api/health` expose **2.455.0** et le contrat Ultra Cloud-only reste vert.
+
 ## 2026-07-29 — v2.454.0 — Apprentissage durable autoritatif
 
 ### Constat et décision

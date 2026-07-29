@@ -66,6 +66,34 @@ def main() -> int:
     assert large["chosen"]["agent"] == "qwen3:8b"
     assert large["chosen"]["vision"] == "qwen3.5:4b"
 
+    dynamic = local_model_policy.recommend(
+        small_gpu,
+        [
+            {
+                **installed("future-agent:2b", 2.4),
+                "capabilities": ["completion", "tools", "thinking"],
+                "context_tokens": 131_072,
+            },
+            {
+                **installed("future-vision:2b", 2.3),
+                "capabilities": ["completion", "vision"],
+                "context_tokens": 65_536,
+            },
+            {
+                **installed("future-coder:2b", 2.2),
+                "capabilities": ["completion", "tools"],
+                "context_tokens": 98_304,
+            },
+        ],
+    )
+    assert dynamic["chosen"]["agent"] == "future-agent:2b"
+    assert dynamic["chosen"]["vision"] == "future-vision:2b"
+    assert dynamic["portfolio"]["coding"]["selected"] == "future-coder:2b"
+    assert (
+        dynamic["portfolio"]["agent"]["selected_source"]
+        == "ollama_runtime_metadata"
+    )
+
     cpu = {
         "vendor": "cpu", "vram_gb": 0.0, "ram_gb": 8.0,
         "ram_available_gb": 3.0, "disk_free_bytes": 8 * local_model_policy.GIB,

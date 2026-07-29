@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.455 — découverte dynamique des capacités des modèles locaux
 # v2.454 — apprentissage durable avec SQLite autoritatif
 # v2.453 — cohérence, provenance et conflits du Memory Mesh
 # v2.452 — transitions de confidentialité durables dans Coding Mission

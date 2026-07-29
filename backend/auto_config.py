@@ -8,6 +8,7 @@ modèle pour chaque profil (chat / agent / analysis / vision). S'exécute au dé
 Stratégie : on APPLIQUE le meilleur modèle DÉJÀ installé qui tient dans la VRAM,
 et on RECOMMANDE de télécharger l'idéal s'il manque (jamais de download surprise).
 """
+import asyncio
 import shutil
 import subprocess
 
@@ -133,6 +134,53 @@ async def _installed_models() -> list[dict]:
                     "quantization": str((m.get("details") or {}).get("quantization_level") or ""),
                     "modified_at": str(m.get("modified_at") or ""),
                 })
+            semaphore = asyncio.Semaphore(4)
+
+            async def enrich(item: dict) -> None:
+                name = item["name"]
+                if (
+                    not local_model_policy.MODEL_NAME_RE.fullmatch(name)
+                    or name.endswith(":cloud")
+                    or name.endswith("-cloud")
+                ):
+                    return
+                try:
+                    async with semaphore:
+                        response = await c.post(
+                            f"{OLLAMA_URL}/api/show",
+                            json={"model": name, "verbose": False},
+                        )
+                    response.raise_for_status()
+                    payload = response.json()
+                except Exception:
+                    return
+                capabilities = payload.get("capabilities")
+                item["capabilities"] = (
+                    sorted(
+                        {
+                            str(capability).strip().casefold()
+                            for capability in capabilities
+                            if str(capability).strip()
+                        }
+                    )
+                    if isinstance(capabilities, list)
+                    else []
+                )
+                details = payload.get("details")
+                if isinstance(details, dict):
+                    item["family"] = str(details.get("family") or "")
+                model_info = payload.get("model_info")
+                if isinstance(model_info, dict):
+                    contexts = [
+                        int(value)
+                        for key, value in model_info.items()
+                        if str(key).endswith(".context_length")
+                        and isinstance(value, (int, float))
+                        and 0 < int(value) <= 10_000_000
+                    ]
+                    item["context_tokens"] = max(contexts, default=0)
+
+            await asyncio.gather(*(enrich(item) for item in models[:32]))
             return models
     except Exception:
         return []
