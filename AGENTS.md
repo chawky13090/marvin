@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.463.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.464.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.463.0)
+## 9. État actuel (v2.464.0)
+
+**v2.464 (inventaire contractuel API)** : `api_contract_inventory.py` analyse le schéma
+OpenAPI sans démarrer le lifespan. Le gate couvre 300 chemins, 362 opérations et 63 familles,
+refuse les doublons méthode/chemin et `operationId`, puis fige les métriques dans
+`MARVIN-API-CONTRACT.md`. Le diagnostic établit 273 réponses typées, 89 génériques,
+71 opérations non taguées, 189 mutations, zéro erreur 4xx/5xx explicite, zéro sécurité
+OpenAPI et zéro clé d'idempotence. Il ne masque donc pas SEC-001 et définit l'ordre de
+migration compatible.
 
 **v2.463 (réplication de sauvegarde)** : `backup_replication.py` copie un bundle global déjà
 chiffré vers une racine explicitement choisie, refuse `data/` et ses parents/enfants, publie

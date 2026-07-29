@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.464.0 — Inventaire contractuel FastAPI
+
+### Constat et décision
+
+Le smoke 28/28 prouve les parcours principaux, mais ne mesure pas la qualité contractuelle
+des 363 routes FastAPI/WebSocket. Une réécriture globale aurait créé une régression massive.
+La méthode retenue commence par une baseline OpenAPI automatique et migrera ensuite chaque
+famille sans renommer ses routes.
+
+Les recommandations officielles FastAPI utilisées sont : modèles Pydantic pour valider et
+documenter les corps, `responses` pour décrire les erreurs/status alternatifs, et dépendances
+`Security`/scopes pour rendre l'autorisation vérifiable dans OpenAPI. L'inventaire observe
+300 chemins, 362 opérations HTTP et 63 familles. Les identifiants d'opération sont uniques.
+273 réponses possèdent un schéma non vide; 89 sont génériques et 71 opérations n'ont pas de
+tag. Sur 189 mutations, 127 ont un corps, zéro publie une clé d'idempotence. Zéro opération
+déclare une sécurité et aucune erreur 4xx/5xx hors 422 n'est contractuellement documentée.
+
+`api_contract_inventory.py` calcule ces métriques sans lancer le lifespan.
+`test_api_contract_inventory.py` refuse doublons, identifiants absents/dupliqués et dérive
+non documentée de la baseline dans `MARVIN-API-CONTRACT.md`. Cette tranche ne prétend pas
+corriger SEC-001 : elle empêche désormais de le masquer et fournit un ordre mesurable.
+
+Validations : import/inspection OpenAPI réel, 362 opérations agrégées exactement dans les
+63 familles, version alignée et gate reproductible. Aucun runtime, route, donnée, log ou
+permission n'est modifié. Rollback : réversion atomique du commit v2.464.
+
 ## 2026-07-29 — v2.463.0 — Réplication chiffrée hors stockage
 
 ### Décision
