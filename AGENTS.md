@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.483.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.484.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.483.0)
+## 9. État actuel (v2.484.0)
+
+**v2.484 (contexte de travail stable)** : la capsule flottante de disposition est supprimée
+des modes Focus et Classique. Une barre contextuelle de 48 px, intégrée au flux de chaque
+page, ouvre la navigation complète, indique la section active et rend visible l’état de
+travail global sans recouvrir les conversations ni les commandes des pages. Le choix de
+disposition reste dans la navigation complète et `Ctrl+K`. L’accueil demande désormais
+« Sur quoi travaillons-nous aujourd’hui ? » et conserve ses six raccourcis métier.
 
 **v2.483 (navigation adaptative)** : le composition root frontend partage un contrôleur de
 disposition déterministe. Le mode Automatique choisit Focus pour le chat et la recherche,

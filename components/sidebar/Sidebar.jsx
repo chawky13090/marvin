@@ -21,6 +21,7 @@ import {
   Hammer,
   ListChecks,
   Mail,
+  Menu,
   MessageSquare,
   MoreHorizontal,
   MonitorCog,
@@ -223,7 +224,15 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
         >
           <div className="adaptive-nav__brand">
             {!expandedAdaptive ? (
-              <NavigationModeControl embedded />
+              <button
+                type="button"
+                className="adaptive-nav__icon-button"
+                onClick={onRequestFull}
+                aria-label="Ouvrir toute la navigation"
+                title="Navigation complète"
+              >
+                <Menu size={18} aria-hidden="true" />
+              </button>
             ) : (
               <button
                 type="button"

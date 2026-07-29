@@ -17,6 +17,15 @@
 
 .avatar { margin-bottom: 8px; filter: saturate(.88); }
 
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent-primary);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
 .title {
   margin: 0;
   color: var(--text-primary);
@@ -26,9 +35,9 @@
 }
 
 .subtitle {
-  margin: 5px 0 21px;
+  margin: 8px 0 21px;
   color: var(--text-secondary);
-  font-size: .92rem;
+  font-size: clamp(.92rem, 1.6vw, 1rem);
 }
 
 .composer { width: 100%; }

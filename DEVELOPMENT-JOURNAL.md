@@ -12207,3 +12207,52 @@ Aucune migration de schéma ni donnée métier. Le rollback fonctionnel immédia
 choisir « Classique — Ancienne sidebar ». Le rollback code est la réversion atomique du commit
 v2.483, puis redémarrage du frontend. Les deux clés locales peuvent être supprimées sans perte
 métier : `marvin:navigation-mode:v1` et `marvin:navigation-route-modes:v1`.
+
+## 2026-07-29 — v2.484.0 — Barre contextuelle et accueil orienté travail
+
+### Demande et décision
+
+Le contrôle flottant de navigation pouvait se placer au-dessus de la liste des conversations,
+du titre Marvin ou des commandes propres à une page. Il est remplacé par une barre
+contextuelle intégrée au flux du `main`, donc comptabilisée dans la mise en page plutôt que
+superposée. Elle sépare l’action fréquente « ouvrir la navigation » du réglage occasionnel de
+disposition, qui reste disponible dans le panneau complet et dans `Ctrl+K`.
+
+L’accueil emploie désormais la formulation sobre « Sur quoi travaillons-nous aujourd’hui ? ».
+Les six raccourcis validés par l’utilisateur sont conservés et leur cardinalité est protégée
+par le test UX.
+
+### Fichiers et contrats
+
+- `components/layout/ContextBar.jsx` : contexte de route, état global et commandes ;
+- `components/layout/AppFrame.jsx` : barre placée avant une zone de page flexible bornée ;
+- `components/sidebar/Sidebar.jsx` : le Rail ouvre la navigation complète sans exposer un
+  second sélecteur ;
+- `components/chat/QuietWelcome.jsx` et son CSS : accueil reformulé, six intentions intactes ;
+- `app/globals.css` : mise en page bureau/mobile sans position flottante ;
+- `scripts/test_ux_design_system.mjs` : 53 assertions, dont six intentions obligatoires.
+
+### Sécurité, logs et données
+
+Aucun endpoint, appel réseau, permission, secret, donnée personnelle ou stockage persistant
+n’est ajouté. Les libellés de route proviennent d’une table locale ou d’un segment de chemin
+déjà affiché par l’application. Aucun nouvel événement de journalisation n’est nécessaire :
+les actions sont purement visuelles, sans effet métier, et l’état de travail provient du
+contexte chat existant. Les erreurs React restent visibles dans les journaux frontend
+existants. La surface d’attaque et la rétention des logs sont donc inchangées.
+
+### Validation réelle
+
+- ESLint ciblé : succès après correction d’un import `Menu` manquant ;
+- `npm run check:ux` : 53 assertions réussies ;
+- build Next.js 16.2.12 avec Turbopack : succès, 12 pages statiques préparées ;
+- frontend et backend relancés : HTTP 200, backend `status=ok` ;
+- navigateur réel : accueil, six raccourcis, ouverture du panneau et cinq dispositions ;
+- navigateur réel sur `/code` : contexte `Code Workspace` et état `Prêt` ;
+- viewport 390×844 : barre lisible, aucune superposition observée.
+
+### Rollback
+
+Aucune migration ni donnée métier. Le rollback est la réversion atomique du commit v2.484,
+suivie du redémarrage frontend. En urgence, le mode Classique reste disponible depuis
+`Ctrl+K`; il ne dépend d’aucune nouvelle clé de stockage.

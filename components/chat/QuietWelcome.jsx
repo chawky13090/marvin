@@ -35,8 +35,9 @@ export default function QuietWelcome(props) {
         <div className={styles.avatar}>
           <LivingAvatar size={108} thinking={props.isLoading} />
         </div>
+        <p className={styles.eyebrow}>Votre espace de travail</p>
         <h2 className={styles.title}>{props.greeting}.</h2>
-        <p className={styles.subtitle}>Que souhaitez-vous accomplir&nbsp;?</p>
+        <p className={styles.subtitle}>Sur quoi travaillons-nous aujourd’hui&nbsp;?</p>
         <div className={styles.composer} data-marvin-composer>
           <ChatInput variant="welcome" {...props} />
         </div>

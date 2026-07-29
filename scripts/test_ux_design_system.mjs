@@ -9,6 +9,8 @@ const conversationRow = fs.readFileSync('components/chat/sidebar/ConversationRow
 const chatInput = fs.readFileSync('components/chat/ChatInput.jsx', 'utf8');
 const quietWelcome = fs.readFileSync('components/chat/QuietWelcome.jsx', 'utf8');
 const quietWelcomeCss = fs.readFileSync('components/chat/QuietWelcome.module.css', 'utf8');
+const contextBar = fs.readFileSync('components/layout/ContextBar.jsx', 'utf8');
+const appFrame = fs.readFileSync('components/layout/AppFrame.jsx', 'utf8');
 const historyPage = fs.readFileSync('app/historique/page.jsx', 'utf8');
 
 for (const [token, value] of [
@@ -58,8 +60,15 @@ assert.match(chatInput, /variant === 'welcome'/);
 assert.match(quietWelcome, /Modes de travail suggérés/);
 assert.match(quietWelcome, /Recherche approfondie/);
 assert.match(quietWelcome, /Council/);
+assert.equal((quietWelcome.match(/id:\s*'/g) || []).length, 6);
+assert.match(quietWelcome, /Sur quoi travaillons-nous aujourd’hui/);
 assert.match(quietWelcomeCss, /prefers-reduced-motion/);
+assert.match(contextBar, /Ouvrir la navigation Marvin/);
+assert.match(contextBar, /marvin:open-command-palette/);
+assert.match(contextBar, /Travail en cours/);
+assert.match(appFrame, /<ContextBar \/>/);
+assert.doesNotMatch(appFrame, /<NavigationModeControl/);
 assert.match(historyPage, /Historique des discussions/);
 assert.match(historyPage, /toLocaleDateString\('fr-FR'/);
 
-console.log('UX design system: 46 assertions passed.');
+console.log('UX design system: 53 assertions passed.');

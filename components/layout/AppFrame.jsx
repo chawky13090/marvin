@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/sidebar/Sidebar';
-import NavigationModeControl from '@/components/layout/NavigationModeControl';
+import ContextBar from '@/components/layout/ContextBar';
 import { useNavigationLayout } from '@/lib/contexts/NavigationContext';
 
 export default function AppFrame({ children }) {
@@ -26,8 +26,10 @@ export default function AppFrame({ children }) {
           onRequestClose={navigation.closeOverlay}
         />
       )}
-      {(navigation.mode === 'focus' || navigation.mode === 'classic') && <NavigationModeControl />}
-      <main className={`main-content main-content--nav-${navigation.mode}`}>{children}</main>
+      <main className={`main-content main-content--nav-${navigation.mode}`}>
+        <ContextBar />
+        <div className="main-content__page">{children}</div>
+      </main>
     </div>
   );
 }
