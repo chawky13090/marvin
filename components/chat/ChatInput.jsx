@@ -184,6 +184,11 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
     }
   }, []);
 
+  // Quitter le mode mains libres ferme immédiatement un micro encore ouvert.
+  useEffect(() => {
+    if (!voiceMode && voiceState === 'recording') stopRecording();
+  }, [voiceMode, voiceState, stopRecording]);
+
   const toggleVoice = useCallback(() => {
     if (voiceState === 'idle') startRecording();
     else if (voiceState === 'recording') stopRecording();
@@ -419,6 +424,46 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
               >×</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {(voiceMode || isSpeaking || voiceCtx?.voiceError) && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, minHeight: 34,
+            marginBottom: 8, padding: '5px 8px 5px 10px',
+            border: '1px solid rgba(79,140,255,.22)', borderRadius: 10,
+            background: 'rgba(79,140,255,.055)', color: 'var(--text-secondary)',
+            fontSize: 11,
+          }}
+        >
+          <span aria-hidden="true" style={{
+            width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+            background: voiceCtx?.voiceError ? 'var(--warning)' : 'var(--accent-primary)',
+            boxShadow: voiceMode ? '0 0 8px rgba(79,140,255,.7)' : 'none',
+          }} />
+          <strong style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+            {isSpeaking ? 'Marvin parle' : voiceState === 'recording' ? 'Écoute en cours' : voiceCtx?.voiceError ? 'Voix indisponible' : 'Conversation vocale'}
+          </strong>
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {voiceCtx?.voiceError || (voiceMode ? 'Mains libres actives pour cette session' : 'Lecture en cours')}
+          </span>
+          {isSpeaking && (
+            <button type="button" onClick={voiceCtx.stopSpeaking} style={{
+              marginLeft: 'auto', border: 0, background: 'transparent',
+              color: 'var(--warning)', cursor: 'pointer', fontSize: 11,
+            }}>Couper</button>
+          )}
+          {voiceMode && (
+            <button type="button" onClick={voiceCtx.toggleVoiceMode} style={{
+              marginLeft: isSpeaking ? 0 : 'auto', padding: '4px 8px',
+              border: '1px solid var(--border)', borderRadius: 7,
+              background: 'rgba(255,255,255,.025)', color: 'var(--text-primary)',
+              cursor: 'pointer', fontSize: 11,
+            }}>Quitter</button>
+          )}
         </div>
       )}
 

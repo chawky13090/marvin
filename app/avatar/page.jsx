@@ -133,7 +133,6 @@ export default function DesktopAvatarPage() {
       voice.stopListening();
       return;
     }
-    if (!voice.voiceMode) voice.toggleVoiceMode();
     await voice.startListening((text) => submit(text));
   };
 

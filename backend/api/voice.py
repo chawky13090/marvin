@@ -1,5 +1,6 @@
 """Transcription Whisper locale et synthèse vocale Edge-TTS."""
 
+import asyncio
 import os
 import re
 import tempfile
@@ -98,6 +99,27 @@ class TTSRequest(BaseModel):
     pitch: str = "+0Hz"
 
 
+async def _synthesize_edge_audio(edge_tts_module, text: str, voice_id: str, rate: str, pitch: str) -> bytes:
+    """Effectue une unique relance bornée sur les pannes transitoires Edge-TTS."""
+    last_error = None
+    for attempt in range(2):
+        try:
+            communication = edge_tts_module.Communicate(text, voice_id, rate=rate, pitch=pitch)
+            chunks = []
+            async for chunk in communication.stream():
+                if chunk.get("type") == "audio" and chunk.get("data"):
+                    chunks.append(chunk["data"])
+            audio = b"".join(chunks)
+            if audio:
+                return audio
+            last_error = RuntimeError("NoAudioReceived")
+        except Exception as error:
+            last_error = error
+        if attempt == 0:
+            await asyncio.sleep(0.2)
+    raise last_error or RuntimeError("NoAudioReceived")
+
+
 @router.get("/api/voice/voices")
 async def voice_list_voices():
     return {
@@ -128,19 +150,13 @@ async def voice_speak(request: TTSRequest):
     try:
         import edge_tts
 
-        communication = edge_tts.Communicate(
+        audio = await _synthesize_edge_audio(
+            edge_tts,
             text,
             voice_id,
-            rate=request.rate,
-            pitch=request.pitch,
+            request.rate,
+            request.pitch,
         )
-        chunks = []
-        async for chunk in communication.stream():
-            if chunk["type"] == "audio":
-                chunks.append(chunk["data"])
-        audio = b"".join(chunks)
-        if not audio:
-            raise HTTPException(status_code=500, detail="Aucun audio généré")
         return Response(
             content=audio,
             media_type="audio/mpeg",

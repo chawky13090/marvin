@@ -3,6 +3,8 @@ import fs from 'node:fs';
 
 const hook = fs.readFileSync(new URL('../lib/hooks/useVoice.js', import.meta.url), 'utf8');
 const context = fs.readFileSync(new URL('../lib/contexts/ChatContext.jsx', import.meta.url), 'utf8');
+const input = fs.readFileSync(new URL('../components/chat/ChatInput.jsx', import.meta.url), 'utf8');
+const avatar = fs.readFileSync(new URL('../app/avatar/page.jsx', import.meta.url), 'utf8');
 
 assert.match(hook, /speakSeqRef\.current \+= 1/, 'arrêter doit invalider la génération active');
 assert.match(hook, /mySeq !== speakSeqRef\.current/, 'une ancienne boucle doit refuser la nouvelle file');
@@ -14,5 +16,11 @@ assert.match(hook, /controller\.abort\(\)/, 'arrêter doit annuler les requêtes
 assert.match(context, /liveVoice\.beginSpeechStream\(\)/, 'le chat doit ouvrir une génération vocale par réponse');
 assert.match(context, /enqueueSpeech\(m\[0\], voiceStream\.sequence\)/, 'chaque phrase doit porter le jeton du flux');
 assert.match(context, /enqueueSpeech\(tail, voiceStream\.sequence\)/, 'le fragment final doit porter le même jeton');
+assert.doesNotMatch(hook, /if \(m === 'true'\) setVoiceMode\(true\)/, 'le mode mains libres ne doit jamais être restauré');
+assert.match(hook, /localStorage\.removeItem\(VOICE_MODE_KEY\)/, 'la préférence active historique doit être purgée');
+assert.doesNotMatch(hook, /localStorage\.setItem\(VOICE_MODE_KEY/, 'un état actif ne doit pas survivre à la session');
+assert.doesNotMatch(avatar, /if \(!voice\.voiceMode\) voice\.toggleVoiceMode\(\)/, 'une dictée avatar ne doit pas activer les mains libres');
+assert.match(input, /Mains libres actives pour cette session/, 'le statut vocal doit annoncer sa portée');
+assert.match(input, /Quitter/, 'le contrôle vocal inférieur doit permettre une sortie explicite');
 
-console.log('Voice frontend: 10 assertions réussies.');
+console.log('Voice frontend: 16 assertions réussies.');

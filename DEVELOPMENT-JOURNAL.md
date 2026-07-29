@@ -5,6 +5,52 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.479.0 — Mode vocal explicitement consenti
+
+### Incident et cause racine
+
+La dernière conversation contient plusieurs messages transcrits depuis l'environnement alors
+que l'utilisateur n'avait pas activé la voix pendant cette session. `useVoice` restaurait
+`marvin:voice_mode=true` depuis `localStorage`; après chaque réponse parlée, `ChatInput`
+rouvrait donc automatiquement le micro. Deux erreurs `NoAudioReceived` sont corrélées dans le
+journal TTS. Aucun outil ni modèle conversationnel n'a activé la voix.
+
+### Correction
+
+Le mode mains libres démarre désormais toujours à `false`, purge la préférence active
+historique et ne persiste plus son état. La voix et la vitesse choisies restent mémorisées.
+La dictée ponctuelle de l'avatar ne bascule plus en mains libres. Quitter ce mode ferme
+immédiatement un enregistrement encore actif.
+
+L'ancien bandeau supérieur est supprimé. Un dock compact apparaît uniquement près du
+composeur lorsque la voix est active, parle ou signale une erreur; il affiche l'état réel,
+sa portée de session, `Couper` et `Quitter`. Edge-TTS reconstruit une communication et
+effectue une seule relance après 200 ms avant de produire l'incident final expurgé.
+
+### Sécurité, logs et rollback
+
+L'accès microphone exige toujours la permission du navigateur et une action utilisateur.
+Le contenu audio n'est ni ajouté aux logs ni persisté par ce changement. Les erreurs TTS
+conservent la politique structurée existante; seule l'exception finale rejoint le journal,
+ce qui évite de compter une panne transitoire réparée. Aucun schéma ni donnée métier ne
+change. Rollback exact : `git revert <commit-v2.479>`.
+
+### Validation
+
+Les tests frontend imposent l'absence de restauration/persistance, la séparation dictée et
+mains libres, ainsi que le dock inférieur. Le test backend simule un premier
+`NoAudioReceived`, vérifie la réussite au second essai et confirme l'échec après exactement
+deux tentatives vides. Dans Chrome, recharger Marvin conserve la voix désactivée; un clic
+explicite fait apparaître le dock inférieur, `Quitter` le retire, puis un second rechargement
+confirme qu'il ne revient pas.
+Le build Next.js/Turbopack réussit. Après redémarrage, le frontend répond HTTP 200, le
+backend expose 2.479.0 et une synthèse Henri réelle retourne HTTP 200 avec 15 696 octets
+audio. `npm audit --omit=dev` confirme zéro vulnérabilité de production; les neuf alertes
+du scan complet concernent uniquement la chaîne ESLint/minimatch de développement et leur
+correctif annoncé impose actuellement une montée majeure à valider séparément.
+Le smoke vocal réel confirme aussi une concurrence maximale de 1 pendant navigation,
+interruption et lectures successives : aucune voix ne se superpose.
+
 ## 2026-07-29 — v2.478.0 — Quiet Workbench inspiré des principes de Kimi
 
 ### Demande et décision

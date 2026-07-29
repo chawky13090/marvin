@@ -196,7 +196,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.478.0)
+## 9. État actuel (v2.479.0)
+
+**v2.479 (contrat vocal explicite)** : le mode mains libres ne persiste plus dans le
+navigateur et démarre toujours désactivé. Une dictée ponctuelle depuis l'avatar ne l'active
+pas. Son état apparaît près du composeur avec une sortie explicite; l'ancien bandeau supérieur
+est supprimé. Edge-TTS effectue une unique relance bornée sur `NoAudioReceived`.
 
 **v2.478 (Quiet Workbench)** : l'accueil vide utilise un composeur central et des intentions
 explicites; le composeur retourne en bas après le premier message. `/` ouvre la palette

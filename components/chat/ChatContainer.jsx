@@ -272,68 +272,6 @@ export default function ChatContainer({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Voice mode banner */}
-      {voice?.voiceMode && (
-        <div style={{
-          padding: '8px 24px',
-          background: 'linear-gradient(90deg, rgba(79, 140, 255,0.12), rgba(79, 140, 255,0.04))',
-          borderBottom: '1px solid rgba(79, 140, 255,0.25)',
-          display: 'flex', alignItems: 'center', gap: '10px',
-          fontSize: '12px', color: '#4f8cff',
-          flexShrink: 0,
-        }}>
-          <span style={{
-            display: 'inline-block', width: '8px', height: '8px',
-            background: '#4f8cff', borderRadius: '50%',
-            boxShadow: '0 0 8px #4f8cff',
-            animation: voice.isSpeaking ? 'pulse 0.8s ease-in-out infinite' : 'pulse 2s ease-in-out infinite',
-          }} />
-          <span><strong>Mode vocal actif</strong> — mains libres · {voice.isSpeaking ? '🔊 parle…' : '🎙️ en attente'}</span>
-
-          {/* Voix */}
-          {voice.voiceList?.length > 0 && (
-            <select value={voice.currentVoice} onChange={e => voice.setVoice(e.target.value)}
-              title="Voix de Marvin"
-              style={{ background: 'rgba(0,0,0,0.25)', color: '#4f8cff', border: '1px solid rgba(79, 140, 255,0.3)',
-                       borderRadius: '6px', fontSize: '11px', padding: '2px 6px', cursor: 'pointer', maxWidth: 160 }}>
-              {voice.voiceList.map(v => <option key={v.key} value={v.key} style={{ color: '#000' }}>{v.label?.split('(')[0]?.trim() || v.key}</option>)}
-            </select>
-          )}
-
-          {/* Vitesse */}
-          <select value={voice.rate} onChange={e => voice.setSpeechRate(e.target.value)}
-            title="Vitesse de la voix"
-            style={{ background: 'rgba(0,0,0,0.25)', color: '#4f8cff', border: '1px solid rgba(79, 140, 255,0.3)',
-                     borderRadius: '6px', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}>
-            <option value="-15%" style={{ color: '#000' }}>🐢 Lent</option>
-            <option value="+0%"  style={{ color: '#000' }}>Normal</option>
-            <option value="+20%" style={{ color: '#000' }}>⚡ Rapide</option>
-            <option value="+40%" style={{ color: '#000' }}>🚀 Très rapide</option>
-          </select>
-
-          {/* Interruption (barge-in) */}
-          {voice.isSpeaking && (
-            <button onClick={voice.stopSpeaking} title="Couper la voix"
-              style={{ padding: '3px 10px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
-                       borderRadius: '6px', color: '#f87171', fontSize: '11px', cursor: 'pointer' }}>
-              ⏹ Stop
-            </button>
-          )}
-
-          <button
-            onClick={voice.toggleVoiceMode}
-            style={{
-              marginLeft: voice.isSpeaking ? '0' : 'auto', padding: '3px 10px',
-              background: 'transparent', border: '1px solid rgba(79, 140, 255,0.3)',
-              borderRadius: '6px', color: '#4f8cff', fontSize: '11px',
-              cursor: 'pointer',
-            }}
-          >
-            Désactiver
-          </button>
-        </div>
-      )}
-
       {messages.length > 0 && (
         <ConversationViewToolbar
           mode={viewMode}

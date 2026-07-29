@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.478.0",
+  "version": "2.479.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -33,6 +33,7 @@
     "check:ux": "node scripts/test_ux_design_system.mjs",
     "check:chat-presentation": "node scripts/test_chat_presentation.mjs",
     "check:voice": "node scripts/test_voice_frontend.mjs",
+    "check:voice-api": "backend\\.venv\\Scripts\\python.exe scripts\\test_voice_api.py",
     "check:avatar": "node scripts/test_desktop_avatar.mjs",
     "check:architecture": "backend\\.venv\\Scripts\\python.exe scripts\\check_architecture.py",
     "check:frontier-contract": "backend\\.venv\\Scripts\\python.exe scripts\\test_frontier_consolidation_contract.py",
