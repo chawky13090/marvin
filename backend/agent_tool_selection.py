@@ -10,6 +10,9 @@ _ALWAYS_INCLUDE = {
     "pc_get_real_paths",
     "memory_save", "memory_list",
     "datetime_info",
+    # Façade Research universelle : le LLM peut vérifier spontanément un fait
+    # sans dépendre d'un mot-clé fragile.
+    "web_research",
 }
 
 # Repli BORNÉ quand aucun mot-clé métier ne matche : un petit jeu d'outils

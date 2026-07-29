@@ -159,6 +159,45 @@ def main() -> int:
     assert "Julie Solé Boussayri" in person_followup.contextual_web_query
     assert "réseaux sociaux" in person_followup.contextual_web_query
 
+    kimi_messages = [
+        {
+            "role": "user",
+            "content": "recherche sur le web des informations sur kimi 3 l ai",
+        },
+        {"role": "assistant", "content": "Première recherche partielle."},
+        {"role": "user", "content": "recherche plus profondements"},
+    ]
+    kimi_deep = planning.compile_turn_plan(
+        kimi_messages,
+        kimi_messages[-1]["content"],
+    )
+    assert "web_deep_research" in kimi_deep.required_tool_names
+    assert "kimi 3" in kimi_deep.contextual_web_query
+
+    kimi_points = [
+        *kimi_messages,
+        {
+            "role": "assistant",
+            "content": (
+                "## Ce qui manque encore\n"
+                "1. Benchmarks chiffrés précis\n"
+                "2. Texte exact de la licence\n"
+                "3. Coût API précis\n"
+                "4. Tests indépendants de codage\n"
+                "5. Matériel nécessaire\n"
+            ),
+        },
+        {"role": "user", "content": "cible tout les point que tu a cité"},
+    ]
+    kimi_all_points = planning.compile_turn_plan(
+        kimi_points,
+        kimi_points[-1]["content"],
+    )
+    assert "web_deep_research" in kimi_all_points.required_tool_names
+    assert "kimi 3" in kimi_all_points.contextual_web_query
+    assert "Benchmarks chiffrés précis" in kimi_all_points.contextual_web_query
+    assert "Matériel nécessaire" in kimi_all_points.contextual_web_query
+
     deictic_messages = [
         {
             "role": "user",

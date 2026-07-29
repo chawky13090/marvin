@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.487.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.488.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.487.0)
+## 9. État actuel (v2.488.0)
+
+**v2.488 (Research universel pour les LLM)** : `web_research` reste visible dans le catalogue
+borné à chaque tour afin que le modèle puisse vérifier spontanément une information sans
+dépendre d’un mot-clé. Les formulations référentielles (« recherche plus profondément »,
+« cible tout/tous les points cités », « traite les lacunes ») reprennent le sujet Web initial,
+extraient au plus dix sous-questions énumérées dans la section de lacunes du dernier message
+assistant et imposent `web_deep_research`. Le texte assistant ne devient jamais une instruction
+exécutable : seules les lignes énumérées bornées deviennent des questions de recherche. Les
+politiques de confidentialité, autorisation, transport anti-SSRF et preuves restent inchangées.
 
 **v2.487 (recherche profonde consolidée)** : `web_deep_research` conserve sa façade publique
 mais délègue au Research Engine v3. Le profil profond exige 24 requêtes et 50 pages uniques;

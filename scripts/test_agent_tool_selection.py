@@ -58,6 +58,12 @@ def main() -> int:
         ))))
         assert "weather" in portable
 
+        spontaneous_research = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "explique-moi cette technologie"}],
+            "agent",
+        ))))
+        assert "web_research" in spontaneous_research
+
     sample = [_spec(name) for name in ("a", "b", "c", "d", "z")]
     with (
         patch.dict(sys.modules, {"tool_router": empty_router}),

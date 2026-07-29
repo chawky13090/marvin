@@ -29,11 +29,14 @@ _TOOL_NAMES = {
 }
 _WEB_FOLLOWUP_RE = re.compile(
     r"\b(?:refai[st]?|reprends?|continue|poursuis|approfondis?|renforce|"
+    r"recherche\s+plus\s+profond\w*|creuse\s+(?:davantage|plus)|"
     r"plus\s+de\s+(?:sources?|r[ée]sultats?)|maximum\s+de\s+r[ée]sultats?|"
     r"un\s+maximum\s+de\s+r[ée]sultats?)\b"
 )
 _DEEP_WEB_FOLLOWUP_RE = re.compile(
-    r"\b(?:approfondis?|renforce|maximum|max|exhaustif|plus\s+de\s+(?:sources?|r[ée]sultats?))\b"
+    r"\b(?:approfondis?|renforce|recherche\s+plus\s+profond\w*|"
+    r"creuse\s+(?:davantage|plus)|maximum|max|exhaustif|"
+    r"plus\s+de\s+(?:sources?|r[ée]sultats?))\b"
 )
 _WEB_HISTORY_RE = re.compile(
     r"\b(?:web\s+search|recherche\s+(?:web|internet|en\s+ligne)|"
@@ -61,6 +64,20 @@ _DYNAMIC_RESEARCH_RE = re.compile(
     r"actualit[ée]s?|en\s+ce\s+moment|aujourd['’]hui|"
     r"statut\s+(?:actuel|des)|situation\s+actuelle)\b"
 )
+_REFERENTIAL_RESEARCH_RE = re.compile(
+    r"\b(?:cible|traite|v[ée]rifie|recherche|approfondis?|creuse)\w*"
+    r".{0,40}\b(?:(?:tout|tous|toutes)\s+les?\s+points?|"
+    r"points?\s+(?:cit[ée]s?|manquants?)|"
+    r"lacunes?|[ée]l[ée]ments?\s+manquants?)\b"
+)
+_GAP_SECTION_RE = re.compile(
+    r"(?:ce\s+qui\s+manque|points?\s+manquants?|lacunes?)",
+    re.IGNORECASE,
+)
+_ENUMERATED_LINE_RE = re.compile(
+    r"^\s*(?:[-*]|\d{1,2}[.)])\s+(.{3,240})$",
+    re.MULTILINE,
+)
 
 
 def _message_text(message: dict[str, Any]) -> str:
@@ -76,6 +93,28 @@ def _message_text(message: dict[str, Any]) -> str:
     return str(content or "")
 
 
+def _assistant_research_gaps(messages: list[dict[str, Any]]) -> tuple[str, ...]:
+    """Extrait des sous-questions bornées, jamais des instructions exécutables."""
+    prior = messages[:-1] if messages and messages[-1].get("role") == "user" else messages
+    assistant_text = next((
+        _message_text(item)
+        for item in reversed(prior)
+        if item.get("role") == "assistant" and _message_text(item).strip()
+    ), "")
+    marker = _GAP_SECTION_RE.search(assistant_text)
+    if not marker:
+        return ()
+    section = assistant_text[marker.end(): marker.end() + 6_000]
+    values: list[str] = []
+    for match in _ENUMERATED_LINE_RE.finditer(section):
+        value = " ".join(match.group(1).split()).strip("* ")[:180]
+        if value and value not in values:
+            values.append(value)
+        if len(values) >= 10:
+            break
+    return tuple(values)
+
+
 def _contextual_web_requirement(
     messages: list[dict[str, Any]],
     user_query: str,
@@ -86,6 +125,7 @@ def _contextual_web_requirement(
     is_explicit_web = bool(cortex._EXPLICIT_WEB_RE.search(current))
     is_contextual = bool(
         _WEB_FOLLOWUP_RE.search(current)
+        or _REFERENTIAL_RESEARCH_RE.search(current)
         or (is_explicit_web and _WEB_DEICTIC_RE.search(current))
         or (is_explicit_web and _GENERIC_WEB_REQUEST_RE.fullmatch(current))
     )
@@ -128,9 +168,15 @@ def _contextual_web_requirement(
     contextual_query = matched_query
     if modifiers:
         contextual_query += "\nContraintes complémentaires : " + " ; ".join(modifiers)
+    gaps = _assistant_research_gaps(messages)
+    if gaps and _REFERENTIAL_RESEARCH_RE.search(current):
+        contextual_query += "\nSous-questions à vérifier : " + " ; ".join(gaps)
     return (
         "web_deep_research"
-        if _DEEP_WEB_FOLLOWUP_RE.search(current)
+        if (
+            _DEEP_WEB_FOLLOWUP_RE.search(current)
+            or _REFERENTIAL_RESEARCH_RE.search(current)
+        )
         else "web_research",
         contextual_query,
     )

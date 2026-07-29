@@ -12399,3 +12399,33 @@ recherche existant; aucune nouvelle classe de rétention n’est créée.
 Aucune migration de schéma ni mutation de données. Rollback fonctionnel immédiat :
 `research_engine_v3_enabled=false`. Rollback complet : réversion atomique du commit v2.487,
 redémarrage du backend, puis exécution des tests Web, Agent Planning et Research v3.
+
+## 2026-07-29 — v2.488 — Research universel et suivis référentiels
+
+### Incident reproduit
+
+Dans la conversation « Recherche Kimi IA », la première demande a exécuté `web_research`.
+Les suivis « recherche plus profondements » et « cible tout les point que tu a cité » ont
+ensuite produit un plan sans outil obligatoire et sans contexte Web. Le modèle a donc rédigé
+une analyse supplémentaire sans nouvelle preuve, puis annoncé à tort que les outils Web
+n’étaient pas disponibles.
+
+### Correction
+
+- `web_research` rejoint les outils universels visibles dans le catalogue borné;
+- les demandes d’approfondissement, y compris leurs variantes grammaticales, imposent
+  `web_deep_research`;
+- les références à tous les points, aux lacunes ou aux éléments manquants reprennent la
+  recherche utilisateur initiale;
+- au plus dix lignes énumérées suivant une section explicite de lacunes sont transformées en
+  sous-questions bornées;
+- les formulations exactes de la conversation Kimi sont des tests de non-régression.
+
+### Sécurité, logs et rollback
+
+La visibilité d’un outil n’autorise pas son exécution : permissions, politique de
+confidentialité et gateway restent appliqués lors de l’appel. Le contenu assistant n’est pas
+exécuté et seules des sous-questions textuelles bornées sont extraites. Aucun nouveau log,
+secret, contenu de page ou stockage n’est ajouté. Il n’existe aucune migration de données.
+Rollback : réversion atomique du commit v2.488 puis redémarrage du backend; le comportement
+antérieur peut aussi être restauré en retirant `web_research` de `_ALWAYS_INCLUDE`.
