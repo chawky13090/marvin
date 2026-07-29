@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.471.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.472.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.471.0)
+## 9. État actuel (v2.472.0)
+
+**v2.472 (navigation latérale non comprimée)** : le rail compact passe à 72 px et centre
+chaque icône dans une cible de 44 px, sans padding latéral masqué. Le panneau déployé utilise
+258 px pour éviter la troncature des intitulés. Les deux états conservent les mêmes routes et
+outils; le gate UX protège désormais leurs dimensions.
 
 **v2.471 (système UX adaptatif)** : les espacements globaux suivent une échelle Fibonacci
 explicite et les proportions principales utilisent le nombre d'or comme guide borné par le

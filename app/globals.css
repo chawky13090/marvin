@@ -66,8 +66,8 @@
   --radius-full: 9999px;
 
   /* Sidebar */
-  --sidebar-collapsed: 55px;
-  --sidebar-expanded: 233px;
+  --sidebar-collapsed: 72px;
+  --sidebar-expanded: 258px;
   --conversation-pane: clamp(233px, 23vw, 377px);
   --golden-major: 61.8%;
   --golden-minor: 38.2%;
@@ -633,7 +633,7 @@ img { max-width: 100%; display: block; }
 @media (max-width: 1024px), (hover: none) and (pointer: coarse) {
   :root {
     --sidebar-collapsed: 0px;
-    --sidebar-expanded: 233px;
+    --sidebar-expanded: 258px;
   }
 
   /* La liste des conversations (page Chat) devient un tiroir coulissant

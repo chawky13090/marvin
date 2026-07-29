@@ -22,6 +22,11 @@ Les espacements utilisent des jetons Fibonacci. Les largeurs structurantes utili
 secondaires deviennent des tiroirs. Cette solution préserve la lisibilité, les cibles
 tactiles et les 344 outils.
 
+Le rail d'outils constitue une exception d'accessibilité volontaire à l'échelle stricte :
+72 px en mode compact permettent de centrer une cible de 44 px sans écraser les icônes. Son
+état déployé mesure 258 px afin de préserver les intitulés. L'accessibilité et la lisibilité
+priment sur la conformité mathématique décorative.
+
 ## Principes
 
 1. **Contrôle humain visible** : état, progression, annulation, reprise et résultat doivent

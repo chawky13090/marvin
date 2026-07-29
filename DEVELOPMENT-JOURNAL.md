@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.472.0 — Rail d'outils non comprimé
+
+**Demande et constat.** L'utilisateur signale que la barre latérale des outils est trop
+écrasée. L'inspection confirme qu'une largeur de 55 px contenait des lignes avec marges,
+padding et icônes dépassant cette largeur, ce qui comprimait et rognait visuellement les
+contrôles.
+
+**Correction.** Rail compact à 72 px, panneau déployé à 258 px, cible minimale de 44 px,
+centrage explicite en mode compact et espacements distincts selon l'état. Aucune route, aucun
+outil et aucune autorisation ne changent. Aucun log ni état persistant n'est ajouté. Le
+rollback reste la réversion atomique du commit.
+
+**Validation réelle.** Gate UX 22 assertions et lint ciblé : réussis. Build Next.js 16.2.12
+Turbopack : réussi. Après relance, `/api/health` expose 2.472.0, le frontend répond HTTP 200
+et le smoke couvre 40/40 pages. Inspection visuelle réelle du chat à 1280 × 720 : rail
+compact de 72 px, icônes centrées, cible active non rognée et contenu principal intact.
+
+**Rollback vérifié par conception.** Aucun schéma, fichier de données ou paramètre persistant
+n'est modifié. Arrêter Marvin, exécuter `git revert <commit-v2.472>`, reconstruire avec
+`npm run build`, puis redémarrer avec `start.bat`. Le gate `npm run check:ux` et le smoke des
+pages constituent les contrôles post-rollback.
+
 ## 2026-07-29 — v2.471.0 — Système UX Fibonacci adaptatif
 
 **Demande.** Rechercher les meilleures pratiques UX des assistants IA et rendre Marvin plus

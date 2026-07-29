@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.472 — navigation latérale lisible, centrée et non comprimée
 # v2.471 — système UX Fibonacci adaptatif, accessibilité et ressources local-first
 # v2.470 — comparatif mesuré de persistance et critères de promotion
 # v2.469 — idempotence HTTP des effets critiques directs et issue inconnue fermée

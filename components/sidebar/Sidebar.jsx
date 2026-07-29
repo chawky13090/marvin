@@ -189,7 +189,7 @@ export default function Sidebar() {
       >
       {/* ── Logo / Brand ───────────────────────────────────────── */}
       <div style={{
-        padding: '14px 16px',
+        padding: open ? '14px 16px' : '13px 14px',
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
@@ -239,7 +239,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── Palette de commandes (Ctrl+K) ──────────────────────── */}
-      <div style={{ padding: open ? '10px 12px 4px' : '10px 8px 4px' }}>
+      <div style={{ padding: open ? '10px 12px 4px' : '10px 13px 4px' }}>
         <button
           onClick={() => window.dispatchEvent(new Event('marvin:open-command-palette'))}
           title="Rechercher (Ctrl+K)"
@@ -283,9 +283,11 @@ export default function Sidebar() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px',
-                  padding: '9px 20px',
-                  margin: '0 8px',
+                  gap: open ? '13px' : 0,
+                  padding: open ? '9px 13px' : '9px 0',
+                  margin: open ? '0 8px' : '0 9px',
+                  minHeight: '44px',
+                  justifyContent: open ? 'flex-start' : 'center',
                   borderRadius: 'var(--radius-md)',
                   color: isActive ? '#4f8cff' : 'var(--text-muted)',
                   background: isActive ? 'rgba(79, 140, 255,0.07)' : 'transparent',

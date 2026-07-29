@@ -20,6 +20,8 @@ for (const [token, value] of [
 
 assert.match(globalCss, /--golden-major:\s*61\.8%/);
 assert.match(globalCss, /--golden-minor:\s*38\.2%/);
+assert.match(globalCss, /--sidebar-collapsed:\s*72px/);
+assert.match(globalCss, /--sidebar-expanded:\s*258px/);
 assert.match(globalCss, /:focus-visible\s*\{/);
 assert.match(globalCss, /outline:\s*2px solid var\(--accent-primary-hover\)/);
 assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\)/);
@@ -29,4 +31,4 @@ assert.match(home, /var\(--conversation-pane\)/);
 assert.match(sidebar, /font-size:\s*var\(--font-md\)/);
 assert.doesNotMatch(sidebar, /--font-size-/);
 
-console.log('UX design system: 20 assertions passed.');
+console.log('UX design system: 22 assertions passed.');
