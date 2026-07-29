@@ -8,6 +8,7 @@ from pydantic import BaseModel, field_validator
 
 import database as db
 import cloud_routing
+import audit
 
 
 router = APIRouter(tags=["settings"])
@@ -47,6 +48,7 @@ def _privacy_state() -> dict:
         "local_only_lockdown": cloud_routing.is_local_only_lockdown(),
         "ultra_unrestricted": cloud_routing.is_ultra_unrestricted(),
         "cloud_only": cloud_routing.is_cloud_only_mode(),
+        "privacy_preset": cloud_routing.get_privacy_preset(),
     }
 
 
@@ -77,7 +79,14 @@ async def set_privacy_preset(payload: PrivacyPresetRequest):
             ultra_unrestricted=payload.preset == "ultra",
         )
 
-    keys = ("cloud_overrides", "cloud_enabled", "ultra_unrestricted", "local_only_lockdown")
+    next_state["privacy_preset"] = payload.preset
+    keys = (
+        "cloud_overrides",
+        "cloud_enabled",
+        "ultra_unrestricted",
+        "local_only_lockdown",
+        "privacy_preset",
+    )
     try:
         # Ultra est écrit après la configuration cloud. Hyper est écrit en dernier afin
         # que le coupe-circuit gagne même si un ancien état était incohérent.
@@ -90,7 +99,20 @@ async def set_privacy_preset(payload: PrivacyPresetRequest):
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail="Application du preset annulée et restaurée.") from exc
-    return {"success": True, "preset": payload.preset, **_privacy_state()}
+    current = _privacy_state()
+    audit.log_action(
+        "privacy_preset_change",
+        {
+            "previous": previous["privacy_preset"],
+            "requested": payload.preset,
+        },
+        {
+            "success": True,
+            "effective": current["privacy_preset"],
+        },
+        source="ui",
+    )
+    return {"success": True, "preset": payload.preset, **current}
 
 
 @router.get("/api/settings/{key}")

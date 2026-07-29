@@ -5,6 +5,59 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.449.0 — Matrice modèles et confidentialité
+
+### Constat et décision
+
+L'audit a confirmé deux protections solides : Hyper local domine tout état contradictoire et
+Ultra débridé exige un modèle Ollama Cloud sans repli local. Il a aussi révélé que l'interface
+déduisait « Tout cloud » de la présence de trois overrides; après passage par Normal, le bouton
+pouvait donc rester visuellement sur le mauvais profil. Deux approches ont été comparées :
+créer un second moteur de politiques ou conserver `cloud_routing.py` comme source unique et
+persister seulement l'identité du profil. La seconde réduit couplage et risque de divergence.
+
+### Implémentation
+
+`cloud_routing.get_privacy_preset()` normalise les quatre profils sans codage en dur des noms
+de modèles. Les coupe-circuits Hyper et Ultra restent prioritaires. La route atomique de
+changement persiste `privacy_preset`, restaure également cette valeur en cas d'échec et écrit
+un audit limité aux anciens/nouveaux noms de profils. Les événements `model_info` du chat et
+le résultat Council exposent le profil effectif; les deux stores frontend le conservent.
+L'écran Réglages relit cette source au lieu d'inférer le profil depuis les modèles sélectionnés.
+
+La matrice exécutable couvre Normal, Hyper sécurisé, Tout cloud et Ultra débridé : destination
+publique, donnée sensible, priorité du verrou local, Cloud-only Ultra, transition atomique et
+provenance. Normal et Tout cloud gardent le filtrage sensible actuel; seul Ultra autorise
+explicitement les contenus sensibles vers le Cloud. L'axe Sécurisé/Standard/Expert n'est pas
+modifié.
+
+### Référentiel, sécurité, logs et rollback
+
+Les choix suivent les frontières explicites modèle/provider/run et les traces sans données
+sensibles documentées par l'OpenAI Agents SDK, ainsi que la séparation workflow/agent
+préconisée par Anthropic. Aucun prompt, réponse, modèle de contenu, secret ou donnée
+personnelle n'est ajouté aux logs. L'audit technique conserve uniquement le nom du profil et
+bénéficie de la rotation/rétention existante. Aucun schéma SQLite n'est migré : le réglage est
+compatible avec le magasin clé/valeur existant. Rollback exact : `git revert <commit-v2.449>`;
+une valeur `privacy_preset` restante est ignorée par l'ancienne version.
+
+### Validation
+
+Tests ciblés exécutés : `test_privacy_model_matrix.py`, `test_agent_model_config.py`,
+`test_cloud_only_routing.py` et `test_model_council.py`. La matrice modèles reste `partial`
+jusqu'aux scénarios transversaux documents, e-mails et Coding Mission et à une preuve Cloud
+live reproductible. Cette preuve live a ensuite sélectionné `deepseek-v4-pro:cloud` et émis
+`provider=ollama_cloud`, `privacyPreset=ultra` et `cloudOnly=true` avant une réponse `OK`,
+sans appel d'outil.
+
+Le gate consolidé a validé ses 207 étapes fonctionnelles, compilation Python et ESLint sans
+erreur; les 37 avertissements historiques restent inchangés. Son build a été bloqué, comme
+prévu, par le frontend actif. Après arrêt contrôlé du seul frontend, le build Next.js 16.2.12
+Turbopack a réussi, puis Turbopack a été relancé. Les smokes live réussissent **28/28 API** et
+**40/40 pages**; `/api/health` expose **2.449.0**. Le test visuel via le navigateur intégré a
+retourné une surface vide connue de cet environnement; aucune réussite visuelle n'est donc
+revendiquée pour cette tranche.
+
 ## 2026-07-29 — v2.448.0 — Harness universel et politique système conditionnelle
 
 ### Analyse et architecture

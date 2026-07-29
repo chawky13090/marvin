@@ -113,7 +113,7 @@ def main() -> int:
         ROOT / "lib" / "hooks" / "useSecretary.js",
     ):
         source = frontend.read_text(encoding="utf-8-sig")
-        for field in ("provider", "privacyMode", "cloudOnly", "sensitive"):
+        for field in ("provider", "privacyMode", "privacyPreset", "cloudOnly", "sensitive"):
             assert field in source
     import agent
     assert callable(agent._resolve_model_config)

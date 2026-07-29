@@ -40,6 +40,9 @@ class FakeRouting:
     def is_ultra_unrestricted(self):
         return self.ultra
 
+    def get_privacy_preset(self):
+        return "ultra" if self.ultra else "normal"
+
     def detect_task(self, _question):
         return "general"
 

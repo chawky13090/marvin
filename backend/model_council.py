@@ -316,6 +316,7 @@ async def run(args: dict) -> dict:
             if routing.is_ultra_unrestricted()
             else "cloud_non_sensitive"
         ),
+        "privacy_preset": routing.get_privacy_preset(),
         "message": (
             "Council terminé : 5 familles cloud, critique croisée et "
             "arbitrage traçable."

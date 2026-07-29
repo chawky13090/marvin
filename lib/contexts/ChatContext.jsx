@@ -202,6 +202,7 @@ export function ChatProvider({ children }) {
                     label: event.label,
                     provider: event.provider,
                     privacyMode: event.privacyMode,
+                    privacyPreset: event.privacyPreset,
                     cloudOnly: Boolean(event.cloudOnly),
                     sensitive: Boolean(event.sensitive),
                   },

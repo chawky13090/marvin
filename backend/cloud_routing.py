@@ -355,6 +355,28 @@ def is_cloud_only_mode() -> bool:
     return is_ultra_unrestricted() and not is_local_only_lockdown()
 
 
+def get_privacy_preset() -> str:
+    """Retourne le profil effectif sans confondre confidentialité et permissions.
+
+    Les deux coupe-circuits restent autoritatifs pour récupérer proprement un ancien
+    état ou une écriture partielle. ``privacy_preset`` distingue ensuite Normal de
+    Tout cloud, qui utilisent tous deux le Cloud en priorité mais pas le même réglage
+    explicite dans l'interface.
+    """
+    if is_local_only_lockdown():
+        return "hyper"
+    if is_cloud_only_mode():
+        return "ultra"
+    try:
+        persisted = str(db.get_setting("privacy_preset") or "").strip()
+    except Exception:
+        persisted = ""
+    if persisted == "cloud_max":
+        enabled, _ = get_cloud_config()
+        return "cloud_max" if enabled else "normal"
+    return persisted if persisted == "normal" else "normal"
+
+
 def require_cloud_model(
     need: str = "general",
     *,

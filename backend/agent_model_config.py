@@ -58,6 +58,7 @@ class ModelConfig:
             "label": label or self.label,
             "provider": "ollama_cloud" if is_cloud_model(selected_model) else "ollama_local",
             "privacyMode": privacy_mode,
+            "privacyPreset": cloud_routing.get_privacy_preset(),
             "cloudOnly": self.ultra_cloud_only,
             "sensitive": self.sensitive,
         }

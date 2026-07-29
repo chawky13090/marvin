@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.448.0",
+  "version": "2.449.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -97,6 +97,7 @@
     "check:hyperv-test-forge": "backend\\.venv\\Scripts\\python.exe scripts\\test_hyperv_test_runner.py",
     "check:linux-test-forge": "backend\\.venv\\Scripts\\python.exe scripts\\test_linux_test_runner.py",
     "check:cloud-only": "backend\\.venv\\Scripts\\python.exe scripts\\test_cloud_only_routing.py",
+    "check:privacy-model-matrix": "backend\\.venv\\Scripts\\python.exe scripts\\test_privacy_model_matrix.py",
     "check:platform-paths": "backend\\.venv\\Scripts\\python.exe scripts\\test_platform_paths.py",
     "check:storage-layout": "backend\\.venv\\Scripts\\python.exe scripts\\test_storage_layout.py",
     "check:vm-lab": "backend\\.venv\\Scripts\\python.exe scripts\\test_vm_lab.py",

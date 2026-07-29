@@ -321,6 +321,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_tool_domain_translation.py",
         ROOT / "scripts" / "test_agent_protocol.py",
         ROOT / "scripts" / "test_generation_runtime.py",
+        ROOT / "scripts" / "test_privacy_model_matrix.py",
         ROOT / "scripts" / "test_agent_routing.py",
         ROOT / "scripts" / "test_agent_prompt.py",
         ROOT / "scripts" / "test_agent_tool_selection.py",

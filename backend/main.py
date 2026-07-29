@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.449 — matrice confidentialité/modèles et provenance du profil effectif
 # v2.448 — zéro consommateur direct, outils système conditionnels et Council sous harness
 # v2.447 — contenu et documents sous harness, téléchargement confiné
 # v2.446 — API et workers e-mail sous harness, erreurs bornées et rejeu stable

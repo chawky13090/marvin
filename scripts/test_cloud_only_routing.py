@@ -101,6 +101,7 @@ def test_atomic_presets() -> None:
         "cloud_overrides": {},
         "local_only_lockdown": False,
         "ultra_unrestricted": False,
+        "privacy_preset": "normal",
     }
 
     def get_setting(key: str):
@@ -118,12 +119,14 @@ def test_atomic_presets() -> None:
         assert ultra["cloud_only"] is True
         assert store["cloud_enabled"] is True
         assert store["ultra_unrestricted"] is True
+        assert store["privacy_preset"] == "ultra"
         assert all(cloud_routing.is_cloud_model(model) for model in store["cloud_overrides"].values())
 
         hyper = asyncio.run(settings_api.set_privacy_preset(settings_api.PrivacyPresetRequest(preset="hyper")))
         assert hyper["local_only_lockdown"] is True
         assert hyper["ultra_unrestricted"] is False
         assert hyper["cloud_enabled"] is False
+        assert store["privacy_preset"] == "hyper"
 
 
 def main() -> int:

@@ -105,6 +105,7 @@ export default function SettingsPage() {
   const [cloudSaving, setCloudSaving] = useState(false);
   const [localOnlyLockdown, setLocalOnlyLockdown] = useState(false);   // v2.120 — Hyper sécurisé
   const [ultraUnrestricted, setUltraUnrestricted] = useState(false);   // v2.121 — Ultra débridé
+  const [privacyPreset, setPrivacyPreset] = useState('normal');
   const [presetApplying, setPresetApplying] = useState(false);
 
   // Permission
@@ -340,17 +341,19 @@ export default function SettingsPage() {
   // ── Ollama Cloud ──────────────────────────────────────────────────────────
   async function fetchCloudConfig() {
     try {
-      const [r1, r2, r3, r4] = await Promise.all([
+      const [r1, r2, r3, r4, r5] = await Promise.all([
         fetch(`${BACKEND_URL}/api/settings/cloud_enabled`),
         fetch(`${BACKEND_URL}/api/settings/cloud_overrides`),
         fetch(`${BACKEND_URL}/api/settings/local_only_lockdown`),
         fetch(`${BACKEND_URL}/api/settings/ultra_unrestricted`),
+        fetch(`${BACKEND_URL}/api/settings/privacy_preset`),
       ]);
-      const d1 = await r1.json(), d2 = await r2.json(), d3 = await r3.json(), d4 = await r4.json();
+      const d1 = await r1.json(), d2 = await r2.json(), d3 = await r3.json(), d4 = await r4.json(), d5 = await r5.json();
       setCloudEnabled(!!d1.value);
       setCloudOverrides((d2.value && typeof d2.value === 'object') ? d2.value : {});
       setLocalOnlyLockdown(!!d3.value);
       setUltraUnrestricted(!!d4.value);
+      setPrivacyPreset(['normal', 'hyper', 'cloud_max', 'ultra'].includes(d5.value) ? d5.value : 'normal');
     } catch { }
   }
 
@@ -402,6 +405,7 @@ export default function SettingsPage() {
       setCloudEnabled(Boolean(presetState.cloud_enabled));
       setCloudOverrides(presetState.cloud_overrides || {});
       setUltraUnrestricted(Boolean(presetState.ultra_unrestricted));
+      setPrivacyPreset(presetState.privacy_preset || preset);
       showNotification(
         preset === 'normal' ? '🛡️ Mode Normal appliqué' :
         preset === 'hyper' ? '🔒 Mode Hyper sécurisé appliqué — cloud totalement verrouillé' :
@@ -836,8 +840,7 @@ export default function SettingsPage() {
           {activeTab === 'model' && (() => {
             const activePreset = localOnlyLockdown ? 'hyper'
               : (ultraUnrestricted && cloudEnabled) ? 'ultra'
-              : (cloudEnabled && ['agent', 'chat', 'analysis'].every(p => cloudOverrides[p])) ? 'cloud_max'
-              : 'normal';
+              : privacyPreset;
             const PRESETS = [
               { id: 'normal', icon: '🛡️', label: 'Normal', tagline: 'Sécurisé — vous choisissez', color: '#f59e0b' },
               { id: 'hyper', icon: '🔒', label: 'Hyper sécurisé', tagline: '100% local, verrouillé', color: '#10b981' },
