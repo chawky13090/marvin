@@ -38,6 +38,15 @@ def get_client():
     return _client
 
 
+def close_client() -> None:
+    """Ferme explicitement le stockage local lors d'un runtime court/hors ligne."""
+    global _client, _memory_payloads_migrated
+    client, _client = _client, None
+    _memory_payloads_migrated = False
+    if client is not None:
+        client.close()
+
+
 COLLECTIONS = {
     "memories": 768,    # nomic-embed-text = 768 dims
     "notes": 768,

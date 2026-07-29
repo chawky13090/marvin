@@ -44,9 +44,18 @@ la réconciliation mémoire régénère ces projections. Les logs techniques ne 
 preuves métier et suivent leur rétention. Les modèles Ollama, ISO et caches se retéléchargent
 ou se redétectent.
 
-## Rollback
+## Application hors ligne et rollback
 
-Cette tranche ne remplace aucun fichier de production. La restauration reste isolée dans une
-destination vide. Rollback du code : `git revert <commit-v2.461>`. Les bundles `.mrvfull`
-créés restent des artefacts chiffrés indépendants et peuvent être supprimés explicitement
-après conservation d'un autre point de récupération vérifié.
+`scripts/restore-full-backup.py <bundle> --confirm-offline-restore` refuse de fonctionner
+tant que le frontend ou le backend écoute. Il extrait et contrôle d'abord le bundle, crée un
+nouveau point de retour global, remplace uniquement les autorités déclarées, conserve les
+états machine et projections, puis réconcilie SQLite, Memory Mesh et Qdrant. Une erreur
+restaure les anciennes autorités et réexécute la réconciliation. Un répertoire de rollback
+n'est supprimé qu'après réussite ou compensation confirmée.
+
+La création et la vérification restent isolées. Seule la commande hors ligne confirmée
+remplace les données; son champ `pre_restore_filename` identifie le retour métier exact.
+Rollback du code : réversion atomique du commit v2.462 puis du commit `20fcefe` si le format
+global doit aussi disparaître. Les bundles `.mrvfull` restent des artefacts chiffrés
+indépendants et peuvent être supprimés explicitement après conservation d'un autre point
+vérifié.

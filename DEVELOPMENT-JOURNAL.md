@@ -5,6 +5,42 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.462.0 — Restauration globale hors ligne compensée
+
+### Décision et sécurité
+
+Une extraction vérifiée ne suffisait pas à garantir la reprise du produit. Deux stratégies
+ont été comparées : remplacer tout `data/`, ce qui écraserait Qdrant, les états Hyper-V et
+les capacités propres à la machine, ou remplacer uniquement les autorités du manifeste puis
+reconstruire les projections. La seconde réduit la surface de panne et préserve la
+portabilité. La documentation Python confirme que `os.replace` est atomique sur un même
+système de fichiers; elle avertit aussi des risques de liens et suppressions récursives.
+
+`full_backup_recovery.py` extrait et vérifie d'abord le bundle, contrôle SQLite, crée un
+nouveau bundle de l'état courant, déplace les autorités dans un répertoire de compensation
+sur le même volume, installe la capture puis réconcilie SQLite, Memory Mesh et Qdrant. Une
+erreur remet les anciennes autorités et réexécute la réconciliation. Les répertoires de
+retour restent présents si la compensation elle-même ne peut pas être prouvée.
+
+Le script `restore-full-backup.py` accepte uniquement un nom local borné, exige
+`--confirm-offline-restore` et refuse si 8005 ou 3000 écoute. Il n'affiche ni contenu métier
+ni secret. L'audit conserve succès, compensation, nombre de fichiers et classe d'erreur.
+
+### Validations et preuve réelle
+
+Les tests couvrent remplacement exact, suppression des artefacts postérieurs, préservation
+de Qdrant, destination sûre, échec de réconciliation et compensation complète. Le garde a
+refusé Marvin actif avec les ports `[8005, 3000]`. Après création du snapshot
+`marvin_full_20260729_051600_388224.mrvfull`, Marvin a été arrêté et la restauration réelle
+a appliqué 1 067 fichiers / 272 627 615 octets, réconcilié la mémoire et créé
+`marvin_full_20260729_051743_819802.mrvfull` comme point préalable. Le client Qdrant est
+désormais fermé explicitement; un second exercice réel est sorti sans traceback.
+
+Rollback des données : arrêter Marvin et appliquer le `pre_restore_filename` indiqué par la
+commande. Rollback du code : réversion atomique du commit v2.462. Dette restante : les
+bundles demeurent liés au compte DPAPI et sur le même disque; l'export portable et la copie
+hors machine/immuable restent nécessaires.
+
 ## 2026-07-29 — v2.461.0 — Point de récupération global chiffré
 
 ### Constat et conception

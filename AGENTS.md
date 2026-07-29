@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.461.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.462.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.461.0)
+## 9. État actuel (v2.462.0)
+
+**v2.462 (restauration globale compensée)** : `full_backup_recovery.py` applique un bundle
+uniquement hors ligne, crée d'abord un point de retour, remplace les seules autorités du
+manifeste tout en conservant projections et états propres à la machine, puis réconcilie
+SQLite, Memory Mesh et Qdrant. Toute panne remet les anciens fichiers et réexécute la
+réconciliation. `scripts/restore-full-backup.py` exige une confirmation explicite et refuse
+les ports 8005/3000 actifs. L'exercice réel a restauré 1 067 fichiers et 272 627 615 octets,
+créé un rollback préalable et redémarré sans résidu ni erreur Qdrant.
 
 **v2.461 (point de récupération global)** : `full_backup.py` classe explicitement les
 persistances, capture SQLite par son API de snapshot, archive registres, compétences,
