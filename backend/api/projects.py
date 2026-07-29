@@ -1,7 +1,7 @@
 """Routes des projets et de leurs instructions persistantes."""
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 import database as db
 
@@ -15,8 +15,16 @@ async def list_projects():
 
 
 class ProjectCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=120)
     instructions: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Le nom du projet est requis")
+        return normalized
 
 
 @router.post("/api/projects")
@@ -28,8 +36,18 @@ async def create_project(body: ProjectCreate):
 
 
 class ProjectUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=120)
     instructions: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Le nom du projet est requis")
+        return normalized
 
 
 @router.put("/api/projects/{pid}")

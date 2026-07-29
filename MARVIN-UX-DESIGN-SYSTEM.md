@@ -27,6 +27,11 @@ Le rail d'outils constitue une exception d'accessibilité volontaire à l'échel
 état déployé mesure 258 px afin de préserver les intitulés. L'accessibilité et la lisibilité
 priment sur la conformité mathématique décorative.
 
+Les outils utilisent des SVG Lucide locaux de 22 px dans une cellule de 48 × 44 px. Le SVG
+hérite de `currentColor`, chaque lien couvre toute la largeur et l'état courant est exposé par
+`aria-current="page"`. Les groupes de projets suivent le pattern WAI-ARIA disclosure avec un
+bouton portant `aria-expanded` et `aria-controls`; un treeview complexe n'est pas utilisé.
+
 ## Principes
 
 1. **Contrôle humain visible** : état, progression, annulation, reprise et résultat doivent

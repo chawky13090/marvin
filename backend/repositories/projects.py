@@ -17,6 +17,15 @@ class ProjectRepository:
         self._connection_scope = connection_scope
 
     @staticmethod
+    def _normalize_name(name: str) -> str:
+        normalized = str(name).strip()
+        if not normalized:
+            raise ValueError("Le nom du projet est requis.")
+        if len(normalized) > 120:
+            raise ValueError("Le nom du projet ne peut pas dépasser 120 caractères.")
+        return normalized
+
+    @staticmethod
     def ensure_schema(connection) -> None:
         connection.execute(
             """CREATE TABLE IF NOT EXISTS projects (
@@ -51,6 +60,7 @@ class ProjectRepository:
         return row_to_dict(row)
 
     def create(self, name: str, instructions: str | None = None) -> dict:
+        name = self._normalize_name(name)
         project_id = str(uuid.uuid4())
         with self._connection_scope() as connection:
             self.ensure_schema(connection)
@@ -77,7 +87,7 @@ class ProjectRepository:
         values: list[object] = []
         if name is not None:
             assignments.append("name = ?")
-            values.append(name)
+            values.append(self._normalize_name(name))
         if instructions is not None:
             assignments.append("instructions = ?")
             values.append(instructions)

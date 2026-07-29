@@ -41,6 +41,12 @@ export default function ChatPage() {
   // v2.142 — instructions persistantes de projet (équivalent Claude/ChatGPT Projects)
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [projectInstructionsDraft, setProjectInstructionsDraft] = useState('');
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState(() => new Set());
+  const [projectCollapseHydrated, setProjectCollapseHydrated] = useState(false);
+  const [renamingProjectId, setRenamingProjectId] = useState(null);
+  const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [projectNameError, setProjectNameError] = useState('');
+  const [projectNameSaving, setProjectNameSaving] = useState(false);
 
   // Repli persistant (revient au prochain chargement tel qu'on l'a laissé)
   useEffect(() => {
@@ -49,6 +55,27 @@ export default function ChatPage() {
   useEffect(() => {
     try { localStorage.setItem('marvin:conv_sidebar_collapsed', collapsed ? '1' : '0'); } catch {}
   }, [collapsed]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('marvin:collapsed_projects:v1') || '[]');
+      if (Array.isArray(saved)) setCollapsedProjectIds(new Set(saved.map(String).slice(0, 500)));
+    } catch {
+      setCollapsedProjectIds(new Set());
+    } finally {
+      setProjectCollapseHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!projectCollapseHydrated) return;
+    try {
+      localStorage.setItem(
+        'marvin:collapsed_projects:v1',
+        JSON.stringify([...collapsedProjectIds].slice(0, 500)),
+      );
+    } catch {}
+  }, [collapsedProjectIds, projectCollapseHydrated]);
 
   // Raccourci global Ctrl+N / palette de commandes : démarre une nouvelle conversation
   // même si on est déjà sur "/" (un simple router.push('/') serait un no-op ici).
@@ -317,6 +344,61 @@ export default function ChatPage() {
     }
   };
 
+  const toggleProjectCollapsed = (projectId) => {
+    setCollapsedProjectIds((current) => {
+      const next = new Set(current);
+      if (next.has(String(projectId))) next.delete(String(projectId));
+      else next.add(String(projectId));
+      return next;
+    });
+  };
+
+  const beginProjectRename = (e, project) => {
+    e.stopPropagation();
+    setRenamingProjectId(project.id);
+    setProjectNameDraft(project.name || '');
+    setProjectNameError('');
+  };
+
+  const cancelProjectRename = () => {
+    setRenamingProjectId(null);
+    setProjectNameDraft('');
+    setProjectNameError('');
+  };
+
+  const saveProjectName = async (e, projectId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const name = projectNameDraft.trim();
+    if (!name) {
+      setProjectNameError('Le nom est requis.');
+      return;
+    }
+    if (name.length > 120) {
+      setProjectNameError('Maximum 120 caractères.');
+      return;
+    }
+    setProjectNameSaving(true);
+    setProjectNameError('');
+    try {
+      const response = await fetchWithBackendFallback(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.detail || payload?.error || `HTTP ${response.status}`);
+      }
+      cancelProjectRename();
+      await fetchData();
+    } catch {
+      setProjectNameError('Renommage impossible. Le nom précédent est conservé.');
+    } finally {
+      setProjectNameSaving(false);
+    }
+  };
+
   const assignProject = async (convId, projectId) => {
     try {
       const response = await fetchWithBackendFallback(`/api/conversations/${convId}`, {
@@ -412,6 +494,20 @@ export default function ChatPage() {
       byProject[c.project_id].push(c);
     }
   });
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const active = conversations.find((conversation) => conversation.id === activeConversationId);
+    if (!active?.project_id) return;
+    setCollapsedProjectIds((current) => {
+      const projectId = String(active.project_id);
+      if (!current.has(projectId)) return current;
+      const next = new Set(current);
+      next.delete(projectId);
+      return next;
+    });
+  }, [activeConversationId, conversations]);
+
   const unassignedF = unassigned.filter(matchesQ);
   const buckets = {};
   unassignedF.forEach(c => { const b = dateBucket(c); (buckets[b] = buckets[b] || []).push(c); });
@@ -517,15 +613,49 @@ export default function ChatPage() {
 
             {projects.map(proj => (
               <div key={proj.id} style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'var(--bg-glass)', borderRadius: '4px', marginBottom: '4px' }}>
-                  <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }} title={proj.instructions ? 'Instructions actives' : ''}>
-                    📁 {proj.name}{proj.instructions ? ' 📋' : ''}
-                  </strong>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button onClick={(e) => openProjectInstructions(e, proj)} title="Instructions du projet" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: 0.5 }}>⚙️</button>
-                    <button onClick={(e) => deleteProject(e, proj.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: 0.5 }}>🗑️</button>
+                {renamingProjectId === proj.id ? (
+                  <form
+                    onSubmit={(e) => saveProjectName(e, proj.id)}
+                    style={{ padding: '6px', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', marginBottom: '4px' }}
+                  >
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <input
+                        value={projectNameDraft}
+                        onChange={(e) => { setProjectNameDraft(e.target.value); setProjectNameError(''); }}
+                        onKeyDown={(e) => { if (e.key === 'Escape') cancelProjectRename(); }}
+                        maxLength={120}
+                        autoFocus
+                        aria-label="Nouveau nom du projet"
+                        aria-invalid={Boolean(projectNameError)}
+                        style={{ flex: 1, minWidth: 0, padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-focus)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '12px' }}
+                      />
+                      <button type="submit" disabled={projectNameSaving} title="Enregistrer le nom" aria-label="Enregistrer le nom" style={{ width: 30, borderRadius: 'var(--radius-sm)', border: 0, background: 'var(--accent-primary)', color: 'white', cursor: 'pointer' }}>✓</button>
+                      <button type="button" onClick={cancelProjectRename} title="Annuler le renommage" aria-label="Annuler le renommage" style={{ width: 30, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>×</button>
+                    </div>
+                    {projectNameError && <div role="alert" style={{ color: 'var(--danger)', fontSize: 10.5, marginTop: 4 }}>{projectNameError}</div>}
+                  </form>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '4px 5px', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', marginBottom: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleProjectCollapsed(proj.id)}
+                      aria-expanded={!collapsedProjectIds.has(String(proj.id))}
+                      aria-controls={`project-conversations-${proj.id}`}
+                      title={collapsedProjectIds.has(String(proj.id)) ? 'Déplier le projet' : 'Replier le projet'}
+                      style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 3px', border: 0, background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <span aria-hidden="true" style={{ width: 12, color: 'var(--text-muted)', transform: collapsedProjectIds.has(String(proj.id)) ? 'rotate(-90deg)' : 'rotate(0)', transition: 'transform .15s' }}>⌄</span>
+                      <span aria-hidden="true">📁</span>
+                      <strong style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px' }}>{proj.name}</strong>
+                      <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 10 }}>{(byProject[proj.id] || []).length}</span>
+                    </button>
+                    <div style={{ display: 'flex', gap: '2px', marginLeft: 3 }}>
+                      <button onClick={(e) => beginProjectRename(e, proj)} title="Renommer le projet" aria-label={`Renommer ${proj.name}`} style={{ width: 27, height: 27, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}>✎</button>
+                      <button onClick={(e) => openProjectInstructions(e, proj)} title="Instructions du projet" aria-label={`Instructions de ${proj.name}`} style={{ width: 27, height: 27, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}>⚙</button>
+                      <button onClick={(e) => deleteProject(e, proj.id)} title="Supprimer le projet" aria-label={`Supprimer ${proj.name}`} style={{ width: 27, height: 27, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}>⌫</button>
+                    </div>
                   </div>
-                </div>
+                )}
                 {editingProjectId === proj.id && (
                   <div style={{ padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '6px', border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
@@ -545,7 +675,11 @@ export default function ChatPage() {
                     </div>
                   </div>
                 )}
-                <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div
+                  id={`project-conversations-${proj.id}`}
+                  hidden={collapsedProjectIds.has(String(proj.id))}
+                  style={{ paddingLeft: '12px', display: collapsedProjectIds.has(String(proj.id)) ? 'none' : 'flex', flexDirection: 'column', gap: '2px' }}
+                >
                   {(byProject[proj.id] || []).length === 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vide</span>}
                   {(byProject[proj.id] || []).map(conv => (
                     <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />

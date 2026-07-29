@@ -40,6 +40,14 @@ def main() -> int:
         assert updated["name"] == "Migration validée"
         assert updated["instructions"] == "Tester et documenter."
         assert projects.update("missing", name="absent") is None
+        assert projects.update("project-1", name="  Projet lisible  ")["name"] == "Projet lisible"
+        for invalid_name in ("", "   ", "x" * 121):
+            try:
+                projects.update("project-1", name=invalid_name)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("Un nom de projet invalide doit être refusé.")
 
         with db(path) as connection:
             connection.execute(
@@ -80,7 +88,7 @@ def main() -> int:
                 pass
             else:
                 raise AssertionError("Une clé projet dupliquée doit annuler la transaction.")
-        assert projects.get("project-1")["name"] == "Migration validée"
+        assert projects.get("project-1")["name"] == "Projet lisible"
 
         projects.delete("project-1")
         assert projects.get("project-1") is None

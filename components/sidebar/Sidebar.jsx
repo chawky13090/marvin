@@ -5,49 +5,81 @@ import { usePathname } from 'next/navigation';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
 import { BACKEND_URL } from '@/lib/backend';
+import {
+  Activity,
+  BookMarked,
+  BookOpen,
+  Bot,
+  Brain,
+  CalendarDays,
+  Clapperboard,
+  Clock3,
+  Code2,
+  FlaskConical,
+  FolderOpen,
+  Hammer,
+  ListChecks,
+  Mail,
+  MessageSquare,
+  MonitorCog,
+  NotebookPen,
+  PanelsTopLeft,
+  PenLine,
+  Plug,
+  Puzzle,
+  ReceiptText,
+  Search,
+  Settings,
+  Smartphone,
+  Store,
+  Sun,
+  Terminal,
+  Workflow,
+  Wrench,
+} from 'lucide-react';
 
 export const NAV_SECTIONS = [
   { title: 'Assistant', items: [
-    { href: '/',           icon: '💬', label: 'Chat' },
-    { href: '/jour',       icon: '🌅', label: 'Mon jour' },
-    { href: '/recherche',  icon: '🔍', label: 'Recherche' },
+    { href: '/',           icon: MessageSquare, label: 'Chat' },
+    { href: '/jour',       icon: Sun, label: 'Mon jour' },
+    { href: '/recherche',  icon: Search, label: 'Recherche' },
   ]},
   { title: 'PC & Système', items: [
-    { href: '/outils',     icon: '🔧', label: 'Outils' },
-    { href: '/systeme',    icon: '🖥️', label: 'PC & Système' },
-    { href: '/ssh',        icon: '🔗', label: 'SSH' },
-    { href: '/monitoring', icon: '📊', label: 'Monitoring' },
+    { href: '/outils',     icon: Wrench, label: 'Outils' },
+    { href: '/systeme',    icon: MonitorCog, label: 'PC & Système' },
+    { href: '/ssh',        icon: Terminal, label: 'SSH' },
+    { href: '/monitoring', icon: Activity, label: 'Monitoring' },
   ]},
   { title: 'Organisation', items: [
-    { href: '/tasks',      icon: '✅', label: 'Tâches' },
-    { href: '/notes',      icon: '📝', label: 'Notes' },
-    { href: '/emails',     icon: '📧', label: 'Emails' },
-    { href: '/calendar',   icon: '📅', label: 'Calendrier' },
-    { href: '/devis',      icon: '📋', label: 'Devis & Factu' },
-    { href: '/fichiers',   icon: '📁', label: 'Fichiers' },
+    { href: '/tasks',      icon: ListChecks, label: 'Tâches' },
+    { href: '/notes',      icon: NotebookPen, label: 'Notes' },
+    { href: '/emails',     icon: Mail, label: 'Emails' },
+    { href: '/calendar',   icon: CalendarDays, label: 'Calendrier' },
+    { href: '/devis',      icon: ReceiptText, label: 'Devis & Factu' },
+    { href: '/fichiers',   icon: FolderOpen, label: 'Fichiers' },
   ]},
   { title: 'IA & Contenu', items: [
-    { href: '/skills',     icon: '🧩', label: 'Compétences' },
-    { href: '/redaction',  icon: '✍️', label: 'Rédaction IA' },
-    { href: '/video',      icon: '🎬', label: 'Vidéo IA' },
-    { href: '/docs',       icon: '📚', label: 'Doc Tech IA' },
-    { href: '/memoire',    icon: '🧠', label: 'Mémoire' },
+    { href: '/skills',     icon: Puzzle, label: 'Compétences' },
+    { href: '/redaction',  icon: PenLine, label: 'Rédaction IA' },
+    { href: '/video',      icon: Clapperboard, label: 'Vidéo IA' },
+    { href: '/docs',       icon: BookOpen, label: 'Doc Tech IA' },
+    { href: '/memoire',    icon: Brain, label: 'Mémoire' },
   ]},
   { title: 'Automatisation', items: [
-    { href: '/code',       icon: '</>', label: 'Code Workspace' },
-    { href: '/workflows',  icon: '⚡', label: 'Workflows' },
-    { href: '/agents',     icon: '🤖', label: 'Multi-Agents' },
-    { href: '/market',     icon: 'M', label: 'Model Market' },
-    { href: '/evolution',  icon: 'E', label: 'Evolution Lab' },
-    { href: '/missions',   icon: 'C', label: 'Mission Canvas' },
-    { href: '/forge',      icon: 'F', label: 'Forge' },
-    { href: '/cron',       icon: '⏰', label: 'Planificateur' },
+    { href: '/code',       icon: Code2, label: 'Code Workspace' },
+    { href: '/workflows',  icon: Workflow, label: 'Workflows' },
+    { href: '/agents',     icon: Bot, label: 'Multi-Agents' },
+    { href: '/market',     icon: Store, label: 'Model Market' },
+    { href: '/evolution',  icon: FlaskConical, label: 'Evolution Lab' },
+    { href: '/missions',   icon: PanelsTopLeft, label: 'Mission Canvas' },
+    { href: '/forge',      icon: Hammer, label: 'Forge' },
+    { href: '/cron',       icon: Clock3, label: 'Planificateur' },
   ]},
   { title: 'Réglages', items: [
-    { href: '/technique',  icon: '📖', label: 'Guide Technique' },
-    { href: '/mobile',     icon: '📱', label: 'Accès mobile' },
-    { href: '/mcp',        icon: '🔌', label: 'MCP' },
-    { href: '/settings',   icon: '⚙️', label: 'Paramètres' },
+    { href: '/technique',  icon: BookMarked, label: 'Guide Technique' },
+    { href: '/mobile',     icon: Smartphone, label: 'Accès mobile' },
+    { href: '/mcp',        icon: Plug, label: 'MCP' },
+    { href: '/settings',   icon: Settings, label: 'Paramètres' },
   ]},
 ];
 const NAV_ITEMS = NAV_SECTIONS.flatMap(s => s.items);
@@ -277,15 +309,23 @@ export default function Sidebar() {
           <div style={{ height: open ? 'auto' : 6, overflow: 'hidden', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-primary)', opacity: open ? 0.6 : 0, padding: open ? '10px 20px 3px' : '0', transition: 'opacity .2s' }}>{section.title}</div>
           {section.items.map((item) => {
           const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+          const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
+              title={open ? undefined : item.label}
+              style={{ display: 'block', width: '100%', textDecoration: 'none' }}
+            >
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: open ? '13px' : 0,
                   padding: open ? '9px 13px' : '9px 0',
-                  margin: open ? '0 8px' : '0 9px',
+                  margin: open ? '0 8px' : '0 3px 0 14px',
                   minHeight: '44px',
                   justifyContent: open ? 'flex-start' : 'center',
                   borderRadius: 'var(--radius-md)',
@@ -324,14 +364,14 @@ export default function Sidebar() {
                   }} />
                 )}
                 <span style={{
-                  fontSize: '1.15rem',
                   flexShrink: 0,
-                  width: '26px',
-                  textAlign: 'center',
-                  filter: isActive ? 'none' : 'grayscale(0.4)',
+                  width: open ? '26px' : '48px',
+                  height: open ? '26px' : '44px',
+                  display: 'grid',
+                  placeItems: 'center',
                   position: 'relative',
                 }}>
-                  {item.icon}
+                  <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} aria-hidden="true" />
                   {/* Pulse indicator on the Chat nav item when Marvin is processing */}
                   {item.href === '/' && chatStatus.isLoading && (
                     <span
@@ -357,7 +397,7 @@ export default function Sidebar() {
                   whiteSpace: 'nowrap',
                   opacity: expanded ? 1 : 0,
                   transition: 'opacity 0.2s ease',
-                  display: 'flex',
+                  display: open ? 'flex' : 'none',
                   alignItems: 'center',
                   gap: '8px',
                 }}>

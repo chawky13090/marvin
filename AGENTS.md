@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.472.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.473.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.472.0)
+## 9. État actuel (v2.473.0)
+
+**v2.473 (rail SVG et projets structurés)** : les emojis variables du rail principal sont
+remplacés par Lucide React 1.27.0 épinglé. Chaque lien occupe toute la largeur et chaque SVG
+est mesuré au centre exact du rail compact (`x=36` pour 72 px), avec nom accessible et
+`aria-current`. Les projets du chat utilisent le pattern disclosure : repli individuel
+persisté localement, nombre de conversations, ouverture du projet actif et renommage inline
+annulable. Les noms sont normalisés et bornés à 120 caractères dans l'API comme dans le
+repository. Aucune conversation ni instruction n'est modifiée par ces préférences visuelles.
 
 **v2.472 (navigation latérale non comprimée)** : le rail compact passe à 72 px et centre
 chaque icône dans une cible de 44 px, sans padding latéral masqué. Le panneau déployé utilise

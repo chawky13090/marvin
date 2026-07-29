@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 const globalCss = fs.readFileSync('app/globals.css', 'utf8');
 const home = fs.readFileSync('app/page.js', 'utf8');
 const sidebar = fs.readFileSync('components/sidebar/Sidebar.module.css', 'utf8');
+const sidebarComponent = fs.readFileSync('components/sidebar/Sidebar.jsx', 'utf8');
 
 for (const [token, value] of [
   ['--fib-1', '3px'],
@@ -28,7 +29,15 @@ assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(globalCss, /animation-duration:\s*0\.01ms !important/);
 assert.doesNotMatch(globalCss, /fonts\.googleapis\.com/);
 assert.match(home, /var\(--conversation-pane\)/);
+assert.match(home, /marvin:collapsed_projects:v1/);
+assert.match(home, /aria-expanded=\{!collapsedProjectIds\.has/);
+assert.match(home, /aria-label="Nouveau nom du projet"/);
+assert.match(home, /Maximum 120 caractères/);
 assert.match(sidebar, /font-size:\s*var\(--font-md\)/);
 assert.doesNotMatch(sidebar, /--font-size-/);
+assert.match(sidebarComponent, /from 'lucide-react'/);
+assert.match(sidebarComponent, /aria-current=\{isActive \? 'page'/);
+assert.match(sidebarComponent, /width: open \? '26px' : '48px'/);
+assert.match(sidebarComponent, /display: 'block', width: '100%'/);
 
-console.log('UX design system: 22 assertions passed.');
+console.log('UX design system: 30 assertions passed.');

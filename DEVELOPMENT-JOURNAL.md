@@ -5,6 +5,48 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.473.0 — Rail SVG et projets repliables
+
+**Demande.** Corriger définitivement les icônes du rail encore décalées, puis permettre de
+replier les projets du chat et de changer leur titre selon les conventions des assistants IA
+et les pratiques accessibles.
+
+**Constat mesuré et décision.** Les emojis dépendaient de la police Windows. Surtout, le
+libellé rendu invisible conservait sa largeur et déplaçait le SVG; la scrollbar réduisait
+également la zone utile. La mesure navigateur donnait un centre d'icône à 17,14 px dans un
+rail centré à 36 px. Le rail utilise maintenant Lucide React 1.27.0 épinglé, un lien bloc,
+une cellule 48 × 44 px et une marge compensant la scrollbar. Après correction, rail, ligne
+et SVG ont tous exactement le centre `x=36`.
+
+**Projets.** Chaque projet possède un disclosure sémantique, un compteur, un état replié
+persisté sous `marvin:collapsed_projects:v1`, une ouverture automatique lorsqu'une
+conversation active lui appartient et un renommage inline avec Entrée, Échap, annulation,
+erreur visible et conservation de l'ancien nom en cas d'échec. Les noms sont normalisés et
+bornés à 120 caractères dans FastAPI et le repository SQLite.
+
+**Sécurité, données et logs.** La préférence de repli est locale, bornée à 500 identifiants
+et ne contient aucun contenu métier. Aucun nouveau log, secret, cookie ou appel sortant n'est
+ajouté. `npm audit --omit=dev` retourne zéro vulnérabilité runtime. L'audit complet signale
+encore la chaîne de développement ESLint/minimatch; elle préexistait, n'est pas embarquée en
+production et sa correction automatique exige ESLint 10, donc une tranche de migration
+séparée plutôt qu'un override incompatible. Le test a démontré qu'imposer
+`brace-expansion@5` casse ESLint, et cet essai a été entièrement retiré.
+
+**Validation réelle.** Lint ciblé, gate UX 30 assertions, repository projets, composition
+FastAPI et architecture 344/344 : réussis. Build Next.js 16.2.12 Turbopack : réussi. Après
+relance, `/api/health` expose 2.473.0, smoke API 28/28 et pages 40/40 : réussis. Les tests
+interactifs navigateur couvrent repli, persistance après rechargement, affichage/annulation
+du renommage et réouverture du projet actif sans modifier les données. La mesure finale
+confirme `aside.center=36`, `row.center=36` et `svg.center=36`; l'inspection visuelle montre
+les SVG nets et entièrement visibles.
+Un projet temporaire a enfin été créé via l'API réelle, renommé, relu avec le nouveau nom,
+puis supprimé avec contrôle d'absence résiduelle; un nom composé uniquement d'espaces est
+refusé avec HTTP 422.
+
+**Rollback.** Aucun schéma ni contenu existant n'est migré. Arrêter Marvin, exécuter
+`git revert <commit-v2.473>`, `npm install`, `npm run build`, puis `start.bat`. La clé locale
+de repli devient simplement inutilisée; les noms et conversations restent inchangés.
+
 ## 2026-07-29 — v2.472.0 — Rail d'outils non comprimé
 
 **Demande et constat.** L'utilisateur signale que la barre latérale des outils est trop
