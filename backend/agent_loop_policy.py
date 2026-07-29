@@ -2,8 +2,21 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
+
+_UNEXECUTED_ACTION_RE = re.compile(
+    r"\b(?:je\s+(?:vais|peux|dois)\s+|je\s+)"
+    r"(?:lance(?:r)?|effectue(?:r)?|ex[ée]cute(?:r)?|d[ée]marre(?:r)?|"
+    r"consulte(?:r)?|recherche(?:r)?|visite(?:r)?)\b",
+    re.IGNORECASE,
+)
+_TOOL_ACTION_RE = re.compile(
+    r"\b(?:recherches?|web|internet|site|page|outil|analyse|scan|test|"
+    r"commande|script|fichier|document|mission)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -113,6 +126,37 @@ def build_empty_response_nudge(*, required_tool_names: set[str]) -> dict[str, st
             "réponse utile. Ne décris pas une action future et ne reste pas silencieux."
         ),
     }
+
+
+def promises_unexecuted_action(
+    content: str,
+    *,
+    executed_tool_names: set[str],
+    tools_available: bool,
+) -> bool:
+    """Détecte une promesse d'action présentée à tort comme résultat terminal."""
+    text = str(content or "")
+    return (
+        tools_available
+        and not executed_tool_names
+        and bool(_UNEXECUTED_ACTION_RE.search(text))
+        and bool(_TOOL_ACTION_RE.search(text))
+    )
+
+
+def build_action_execution_nudge(*, available_tool_names: set[str]) -> list[dict[str, str]]:
+    """Relance une seule fois le modèle lorsqu'il promet d'agir sans reçu d'outil."""
+    names = ", ".join(sorted(available_tool_names)[:20])
+    suffix = f" Outils disponibles pertinents : {names}." if names else ""
+    return [{
+        "role": "user",
+        "content": (
+            "Tu viens d'annoncer une action future sans l'avoir exécutée. "
+            "Une promesse n'est pas un résultat. Émets maintenant un véritable appel "
+            "d'outil natif, ou explique immédiatement le blocage concret sans prétendre "
+            f"que l'action est lancée.{suffix}"
+        ),
+    }]
 
 
 def should_suppress_model_text(

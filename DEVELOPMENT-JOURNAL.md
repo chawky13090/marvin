@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.475.0 — Recherche Web réellement exécutée
+
+**Incident observé.** Dans la conversation `Salutation simple`, la demande « web search
+renforcer sur le sujet de koios aix-en-provence » a reçu « Je lance plusieurs recherches en
+parallèle » sans aucun `tool_calls`, `tool_results`, reçu d'audit ou événement Research Swarm.
+Le tour HTTP a duré 13,1 secondes. La demande précédente avait produit
+`bug.empty_model_response` sur `deepseek-v4-pro:cloud`.
+
+**Cause racine et décision.** Le filtre d'outils exposait `web_search`, mais Cortex ne
+classait comme preuves obligatoires que des formulations telles que « recherche web » ou
+« cherche sur le web ». `web search`, `derniers infos` et `visiter leur site` restaient en
+mémoire seule. Deux protections sont retenues : compléter le classificateur déterministe et
+refuser une réponse terminale au futur lorsqu'elle promet une action outillée sans reçu.
+
+**Sécurité, logs et rollback.** Seuls des outils Web en lecture sont imposés; permissions,
+timeouts, filtrage SSRF et expurgation existants restent inchangés. Aucun prompt, résultat ou
+contenu de site supplémentaire n'est ajouté aux logs. Aucun schéma ni donnée persistante ne
+change. Rollback exact : `git revert <commit-v2.475>`.
+
+**Validation.** Les tests de planification reproduisent les trois formulations réelles et
+exigent `web_research`. Les tests de politique distinguent une promesse non exécutée d'un
+résultat déjà prouvé et d'une simple explication. Après redémarrage en 2.475.0, un tour
+temporaire réel reprenant exactement « web search renforcer sur le sujet de koios
+aix-en-provence » produit un `tool_start web_research`, un `tool_end web_research`, une
+réponse et `done` en 47 secondes. La conversation et la capture temporaires sont supprimées.
+
 ## 2026-07-29 — v2.474.0 — Sidebar Conversations v2 et exports
 
 **Demande.** Reconcevoir la sidebar du chat selon les conventions de ChatGPT, Claude, Gemini

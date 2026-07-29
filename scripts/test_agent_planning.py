@@ -85,6 +85,17 @@ def main() -> int:
     )
     assert "net_ping" in explicit.explicit_tool_names
 
+    for web_query in (
+        "web search renforcer sur le sujet de koios aix-en-provence",
+        "donne les derniers infos sur koios.fr en visitant leur site",
+        "recherche web sur koios",
+    ):
+        web_plan = planning.compile_turn_plan(
+            [{"role": "user", "content": web_query}],
+            web_query,
+        )
+        assert "web_research" in web_plan.required_tool_names, web_query
+
     import agent
 
     assert callable(agent._compile_turn_plan)

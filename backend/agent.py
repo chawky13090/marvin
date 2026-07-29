@@ -91,8 +91,10 @@ from agent_model_step import (
 from agent_tool_batch import execute_tool_batch as _execute_tool_batch
 from agent_turn_completion import complete_turn as _complete_turn
 from agent_loop_policy import (
+    build_action_execution_nudge as _build_action_execution_nudge,
     build_empty_response_nudge as _build_empty_response_nudge,
     build_skill_nudge as _build_skill_nudge,
+    promises_unexecuted_action as _promises_unexecuted_action,
     render_blocking_outcomes as _render_blocking_outcomes,
     should_suppress_model_text as _should_suppress_model_text,
     skill_requires_nudge as _skill_requires_nudge,
@@ -519,6 +521,28 @@ async def run_agent(
                 executed_tool_count=len(_executed_tool_names),
             )
             break
+
+        elif (
+            _promises_unexecuted_action(
+                full_content,
+                executed_tool_names=_executed_tool_names,
+                tools_available=bool(tools_payload),
+            )
+            and not _runner_state.nudged
+            and step < _max_tool_steps - 1
+        ):
+            _runner_state.nudged = True
+            _available_names = {
+                str(spec.get("function", {}).get("name") or "")
+                for spec in tools_payload
+                if spec.get("function", {}).get("name")
+            }
+            ollama_msgs.append({"role": "assistant", "content": full_content})
+            ollama_msgs.extend(_build_action_execution_nudge(
+                available_tool_names=_available_names,
+            ))
+            yield _sse({"type": "text", "text": "\n\n"})
+            continue
 
         elif (_skill_requires_nudge(
                   skill=_skill,

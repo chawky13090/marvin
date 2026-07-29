@@ -41,8 +41,12 @@ _PRIMARY_EVIDENCE_RE = re.compile(
 )
 _EXPLICIT_WEB_RE = re.compile(
     r"(?:"
+    r"\b(?:web\s+search|recherche\s+(?:web|internet|en\s+ligne))\b"
+    r"|"
     r"\b(?:cherche|recherche|v[ée]rifie|consulte)\w*\b.{0,60}"
     r"\b(?:sur\s+)?(?:le\s+)?(?:web|internet|en\s+ligne)\b"
+    r"|"
+    r"\bvisit(?:e|er|ant|ez)?\b.{0,40}\b(?:site|page)\b"
     r"|"
     r"\b(?:sur\s+le\s+web|sur\s+internet)\b"
     r")"
@@ -51,6 +55,7 @@ _FRESHNESS_EVIDENCE_RE = re.compile(
     r"\b(?:"
     r"actualit[ée]s?|nouveaut[ée]s?|aujourd['’]hui|en\s+ce\s+moment|"
     r"mises?\s+[àa]\s+jour|"
+    r"derni[eè]res?\s+infos?|"
     r"derni[eè]res?\s+(?:nouvelles|versions?|sorties?|annonces?)|"
     r"(?:prix|tarifs?)\s+actuels?"
     r")\b"

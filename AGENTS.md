@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.474.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.475.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.474.0)
+## 9. État actuel (v2.475.0)
+
+**v2.475 (exécution Web prouvée)** : les formulations naturelles `web search`, `recherche
+internet`, `derniers infos` et `visiter le site` imposent désormais un outil Web en lecture
+seule au lieu de seulement l'exposer au modèle. Une réponse terminale qui annonce « je
+lance/effectue/exécute » une action sans aucun reçu d'outil est rejetée une fois et relancée
+avec l'obligation d'agir réellement ou d'exposer immédiatement le blocage. Les événements
+`tool_start`/`tool_end` restent la preuve visible dans le chat.
 
 **v2.474 (sidebar Conversations v2)** : chaque conversation utilise une ligne native extraite
 avec une action principale et un menu contextuel unique, visible au survol comme au focus.

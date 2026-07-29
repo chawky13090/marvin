@@ -14,8 +14,10 @@ sys.path.insert(0, str(ROOT / "backend"))
 from agent_budget_completion import synthesize_budget_answer
 import agent
 from agent_loop_policy import (
+    build_action_execution_nudge,
     build_empty_response_nudge,
     build_skill_nudge,
+    promises_unexecuted_action,
     render_blocking_outcomes,
     should_suppress_model_text,
     skill_requires_nudge,
@@ -73,6 +75,26 @@ async def main() -> int:
     assert empty_nudge["role"] == "user"
     assert "web_research" in empty_nudge["content"]
     assert "ne reste pas silencieux" in empty_nudge["content"]
+    assert promises_unexecuted_action(
+        "Je lance plusieurs recherches en parallèle.",
+        executed_tool_names=set(),
+        tools_available=True,
+    ) is True
+    assert promises_unexecuted_action(
+        "J'ai lancé les recherches et voici les sources.",
+        executed_tool_names={"web_search"},
+        tools_available=True,
+    ) is False
+    assert promises_unexecuted_action(
+        "Je pense que cette recherche est pertinente.",
+        executed_tool_names=set(),
+        tools_available=True,
+    ) is False
+    action_nudge = build_action_execution_nudge(
+        available_tool_names={"web_search", "web_research"},
+    )
+    assert "promesse n'est pas un résultat" in action_nudge[0]["content"]
+    assert "web_search" in action_nudge[0]["content"]
     assert should_suppress_model_text(
         has_blocking_outcomes=False,
         required_tool_names={"web_research"},
