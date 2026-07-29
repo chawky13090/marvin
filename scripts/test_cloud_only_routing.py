@@ -90,6 +90,9 @@ def test_internal_cloud_fallback() -> None:
     assert result == {
         "text": "réponse cloud secondaire",
         "model": "glm-5.2:cloud",
+        "provider": "ollama_cloud",
+        "privacy_preset": "ultra",
+        "cloud_only": True,
     }
     assert calls == ["deepseek-v4-pro:cloud", "glm-5.2:cloud"]
     assert all(cloud_routing.is_cloud_model(model) for model in calls)

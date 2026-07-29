@@ -89,14 +89,16 @@ async def _run_tool(name: str, arguments: dict):
 
 
 def _message_args(body: SummarizeRequest) -> dict:
-    return {
+    arguments = {
         "uid": body.uid,
         "body": body.body,
         "subject": body.subject,
         "from": body.from_,
         "folder": body.folder,
-        "account": body.account or None,
     }
+    if body.account:
+        arguments["account"] = body.account
+    return arguments
 
 
 @router.post("/api/email/draft-reply")

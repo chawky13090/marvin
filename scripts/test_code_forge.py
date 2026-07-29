@@ -81,6 +81,8 @@ async def exercise_pipeline() -> None:
     ):
         result = await code_forge.execute("Crée un script Python complet qui affiche ok.")
     assert result["success"] is True
+    assert result["generation"]["provider"] == "ollama_cloud"
+    assert result["generation"]["workflow_cloud_only"] is True
     assert result["language"] == "python"
     assert result["validation"]["syntax_valid"] is True
     assert result["critical_issues"] == 0

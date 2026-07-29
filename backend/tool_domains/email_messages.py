@@ -10,7 +10,7 @@ from typing import Any
 
 GetAccount = Callable[[str | None], dict[str, Any] | None]
 ListAccounts = Callable[[], list[dict[str, Any]]]
-Generate = Callable[..., Awaitable[str]]
+Generate = Callable[..., Awaitable[Any]]
 NetworkError = Callable[[Exception, str], dict[str, Any]]
 
 _get_account: GetAccount | None = None
@@ -59,6 +59,24 @@ def _require_dependencies() -> None:
         )
     ):
         raise RuntimeError("Le domaine des messages e-mail n'est pas configuré.")
+
+
+async def _generate_with_provenance(prompt: str, **kwargs) -> tuple[str, dict[str, Any]]:
+    assert _generate is not None
+    generated = await _generate(prompt, return_metadata=True, **kwargs)
+    if isinstance(generated, dict):
+        provenance = {
+            key: generated[key]
+            for key in (
+                "model",
+                "provider",
+                "privacy_preset",
+                "cloud_only",
+            )
+            if key in generated
+        }
+        return _text(generated.get("text"), 100_000), provenance
+    return _text(generated, 100_000), {}
 
 
 def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
@@ -291,7 +309,9 @@ async def draft_reply(args: dict[str, Any]) -> dict[str, Any]:
         prompt += f"Termine par cette signature :\n{signature}\n\n"
     prompt += "=== TA RÉPONSE (corps de l'email uniquement) ==="
     try:
-        draft = _text(await _generate(prompt, model=args.get("model"), timeout=180), 100_000)
+        draft, provenance = await _generate_with_provenance(
+            prompt, model=args.get("model"), timeout=180
+        )
         if not draft:
             return {"error": "L'IA n'a pas produit de réponse. Réessayez."}
         reply_subject = subject if subject.lower().startswith("re:") else (f"Re: {subject}" if subject else "Re:")
@@ -302,6 +322,7 @@ async def draft_reply(args: dict[str, Any]) -> dict[str, Any]:
             "subject": reply_subject,
             "account": args.get("account"),
             "message": "Brouillon de réponse généré.",
+            "generation": provenance,
         }
     except Exception as error:
         return _network_error(error, "rédaction IA")
@@ -324,13 +345,16 @@ async def summarize(args: dict[str, Any]) -> dict[str, Any]:
         f"De : {sender or '(inconnu)'}\nObjet : {subject or '(sans objet)'}\n\n{original[:6_000]}"
     )
     try:
-        summary = _text(await _generate(prompt, model=args.get("model"), timeout=180), 100_000)
+        summary, provenance = await _generate_with_provenance(
+            prompt, model=args.get("model"), timeout=180
+        )
         return {
             "success": True,
             "summary": summary,
             "subject": subject,
             "from": sender,
             "message": "Résumé généré.",
+            "generation": provenance,
         }
     except Exception as error:
         return _network_error(error, "résumé IA")
@@ -395,12 +419,15 @@ async def digest(args: dict[str, Any]) -> dict[str, Any]:
             "- Termine par : « 👉 À TRAITER EN PRIORITÉ : … ».\n"
             "Sois synthétique et concret.\n\n=== EMAILS ===\n" + "\n".join(lines)
         )
-        result = _text(await _generate(prompt, model=args.get("model"), timeout=180), 100_000)
+        result, provenance = await _generate_with_provenance(
+            prompt, model=args.get("model"), timeout=180
+        )
         return {
             "success": True,
             "digest": result,
             "count": len(messages),
             "message": f"Briefing de {len(messages)} email(s) généré.",
+            "generation": provenance,
         }
     except Exception as error:
         return _network_error(error, "briefing IA")

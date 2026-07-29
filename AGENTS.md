@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.450.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.451.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.450.0)
+## 9. État actuel (v2.451.0)
+
+**v2.451 (provenance générative transverse)** : le runtime partagé retourne désormais,
+sur demande, modèle, fournisseur, profil de confidentialité et Cloud-only dans un snapshot
+unique de génération. Documents et e-mails conservent ces preuves dans leurs résultats;
+le sidecar documentaire conserve aussi les modèles employés. Code Forge déclare son
+workflow Cloud obligatoire, le profil effectif et si le contenu sensible était autorisé.
+Les champs historiques restent inchangés.
 
 **v2.450 (frontière générative vidéo)** : l'amélioration de prompt vidéo ne sélectionne
 plus directement un modèle local. Elle utilise `generation_runtime` via sa façade historique,

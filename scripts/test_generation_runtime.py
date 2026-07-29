@@ -30,6 +30,12 @@ class FakeRouting:
     def is_cloud_only_mode(self):
         return self.cloud_only
 
+    def is_cloud_model(self, model):
+        return model.endswith(":cloud")
+
+    def get_privacy_preset(self):
+        return "ultra" if self.cloud_only else "normal"
+
     def detect_task(self, _text):
         return "reasoning"
 
@@ -78,7 +84,13 @@ async def main() -> None:
     with patch("httpx.AsyncClient", Client):
         responses[:] = [" première réponse "]
         first = await generation_runtime.generate("bonjour", return_metadata=True)
-        assert first == {"text": "première réponse", "model": "primary:local"}
+        assert first == {
+            "text": "première réponse",
+            "model": "primary:local",
+            "provider": "ollama_local",
+            "privacy_preset": "normal",
+            "cloud_only": False,
+        }
 
         responses[:] = [
             httpx.ConnectError("temporary"),

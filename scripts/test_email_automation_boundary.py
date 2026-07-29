@@ -62,18 +62,23 @@ async def _run() -> None:
     )
     with patch.object(email_automation.tool_runtime, "execute", side_effect=execute):
         await email_automation.email_draft_reply(request)
+        await email_automation.email_summarize(
+            email_automation.SummarizeRequest(body="Contenu fourni")
+        )
         await email_automation.run_email_automation(dry_run=True, mode="autonome")
     assert gateway_calls[0][1]["from"] == "sender@example.test"
     assert gateway_calls[0][2] == {
         "source": "email_ui",
         "confirmed_by_ui": False,
     }
-    assert gateway_calls[1][1] == {
+    assert "account" not in gateway_calls[1][1]
+    assert gateway_calls[1][1]["body"] == "Contenu fourni"
+    assert gateway_calls[2][1] == {
         "dry_run": True,
         "mode": "autonome",
         "source": "manual",
     }
-    assert gateway_calls[1][2]["confirmed_by_ui"] is False
+    assert gateway_calls[2][2]["confirmed_by_ui"] is False
 
     outbox = [{"id": "keep"}, {"id": "cancel"}]
     with (

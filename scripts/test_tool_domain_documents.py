@@ -71,8 +71,15 @@ async def main() -> int:
         })
         assert "pdf" in invalid_target["error"] and "docx" in invalid_target["error"]
 
-        async def generate_text(_prompt, **_kwargs):
-            return "# Document\n\n## Introduction\n\nContenu vérifié."
+        async def generate_text(_prompt, **kwargs):
+            assert kwargs["return_metadata"] is True
+            return {
+                "text": "# Document\n\n## Introduction\n\nContenu vérifié.",
+                "model": "writer:cloud",
+                "provider": "ollama_cloud",
+                "privacy_preset": "ultra",
+                "cloud_only": True,
+            }
 
         documents.configure_generation(
             text_generator=generate_text,
@@ -91,6 +98,13 @@ async def main() -> int:
         assert generated_result["success"] is True
         assert Path(generated_result["file"]).parent == base / "generated"
         assert Path(generated_result["file"]).exists()
+        assert generated_result["generation"] == {
+            "model": "writer:cloud",
+            "provider": "ollama_cloud",
+            "privacy_preset": "ultra",
+            "cloud_only": True,
+            "models": ["writer:cloud"],
+        }
 
     documents.configure(resolve_path=tools._resolve_path)
     assert tools.execute_file_create_docx is documents.create_docx

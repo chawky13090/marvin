@@ -1623,5 +1623,11 @@ async def execute(
             if item.get("model")
         }),
         "families": sorted({cloud_routing.model_family(item) for item in models}),
+        "generation": {
+            "provider": "ollama_cloud",
+            "privacy_preset": cloud_routing.get_privacy_preset(),
+            "workflow_cloud_only": True,
+            "sensitive_allowed": cloud_routing.is_ultra_unrestricted(),
+        },
         "message": "Code Forge terminé : architecture, implémentation, double revue, réparation et validation syntaxique.",
     }

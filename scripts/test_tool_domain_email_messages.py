@@ -79,9 +79,16 @@ async def main() -> None:
         send_calls.append({"username": username, **kwargs})
         return {"message_id": "<sent@example.com>"}
 
-    async def generate(prompt, **_kwargs):
+    async def generate(prompt, **kwargs):
         prompts.append(prompt)
-        return "Résultat IA"
+        assert kwargs["return_metadata"] is True
+        return {
+            "text": "Résultat IA",
+            "model": "email:cloud",
+            "provider": "ollama_cloud",
+            "privacy_preset": "ultra",
+            "cloud_only": True,
+        }
 
     def network_error(error, resource):
         return {"error": f"{resource}: {error}"}
@@ -152,15 +159,18 @@ async def main() -> None:
         {"uid": "42", "instruction": "Accepter", "signature": "Chaouki"}
     )
     assert draft["success"] and draft["subject"] == "Re: Demande"
+    assert draft["generation"]["provider"] == "ollama_cloud"
     assert "Accepter" in prompts[-1] and "Chaouki" in prompts[-1]
     direct_summary = await email_messages.summarize(
         {"body": "Information importante.", "subject": "Info", "from": "Client"}
     )
     assert direct_summary["success"] and direct_summary["summary"] == "Résultat IA"
+    assert direct_summary["generation"]["privacy_preset"] == "ultra"
     assert (await email_messages.summarize({}))["error"].startswith("Aucun contenu")
 
     digest = await email_messages.digest({"account": "__all__", "limit": 25})
     assert digest["success"] and digest["count"] == 2
+    assert digest["generation"]["cloud_only"] is True
     assert "a@example.com" in prompts[-1] and "b@example.com" in prompts[-1]
     assert "🔴" in prompts[-1] and "👉 À TRAITER EN PRIORITÉ" in prompts[-1]
 

@@ -23,6 +23,10 @@ class Routing(Protocol):
 
     def is_cloud_only_mode(self) -> bool: ...
 
+    def is_cloud_model(self, model: str) -> bool: ...
+
+    def get_privacy_preset(self) -> str: ...
+
     def detect_task(self, text: str) -> str | None: ...
 
     def require_cloud_model(
@@ -179,6 +183,19 @@ def _record(
         _stats["last_error_type"] = None if error is None else type(error).__name__[:80]
 
 
+def _metadata(text: str, model: str) -> dict[str, Any]:
+    assert _routing is not None
+    return {
+        "text": text,
+        "model": model,
+        "provider": (
+            "ollama_cloud" if _routing.is_cloud_model(model) else "ollama_local"
+        ),
+        "privacy_preset": _routing.get_privacy_preset(),
+        "cloud_only": _routing.is_cloud_only_mode(),
+    }
+
+
 async def _call(
     *,
     model: str,
@@ -216,7 +233,7 @@ async def generate(
     images: list[Any] | None = None,
     timeout: int = 180,
     return_metadata: bool = False,
-) -> str | dict[str, str]:
+) -> str | dict[str, Any]:
     """Génère avec un retry non-timeout et un seul repli conforme à la confidentialité."""
     _require_dependencies()
     if not isinstance(prompt, str) or not prompt:
@@ -266,7 +283,7 @@ async def generate(
             images=images,
             timeout=timeout_value,
         )
-        result = {"text": text, "model": primary} if return_metadata else text
+        result = _metadata(text, primary) if return_metadata else text
         _record(
             success=True,
             model=primary,
@@ -290,7 +307,7 @@ async def generate(
                     images=images,
                     timeout=timeout_value,
                 )
-                result = {"text": text, "model": primary} if return_metadata else text
+                result = _metadata(text, primary) if return_metadata else text
                 _record(
                     success=True,
                     model=primary,
@@ -315,7 +332,7 @@ async def generate(
                 images=images,
                 timeout=light_timeout,
             )
-            result = {"text": text, "model": light} if return_metadata else text
+            result = _metadata(text, light) if return_metadata else text
             _record(
                 success=True,
                 model=light,

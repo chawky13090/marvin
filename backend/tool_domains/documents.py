@@ -21,7 +21,7 @@ from platform_paths import PATHS as _SYSTEM_PATHS
 
 
 _resolver: Callable[[str], str] | None = None
-_text_generator: Callable[..., Awaitable[str]] | None = None
+_text_generator: Callable[..., Awaitable[object]] | None = None
 _generated_dir: Path | None = None
 
 
@@ -32,7 +32,7 @@ def configure(*, resolve_path: Callable[[str], str]) -> None:
 
 def configure_generation(
     *,
-    text_generator: Callable[..., Awaitable[str]],
+    text_generator: Callable[..., Awaitable[object]],
     generated_dir: Path,
 ) -> None:
     global _text_generator, _generated_dir
@@ -44,6 +44,24 @@ async def _generate_text(*args, **kwargs) -> str:
     if _text_generator is None:
         raise RuntimeError("Le générateur documentaire n'est pas configuré")
     return await _text_generator(*args, **kwargs)
+
+
+async def _generate_with_provenance(*args, **kwargs) -> tuple[str, dict]:
+    generated = await _generate_text(*args, return_metadata=True, **kwargs)
+    if isinstance(generated, dict):
+        text = str(generated.get("text") or "")
+        provenance = {
+            key: generated[key]
+            for key in (
+                "model",
+                "provider",
+                "privacy_preset",
+                "cloud_only",
+            )
+            if key in generated
+        }
+        return text, provenance
+    return str(generated or ""), {}
 
 
 def _documents_output_dir() -> Path:
@@ -525,6 +543,8 @@ async def generate(args: dict) -> dict:
     # Mode par défaut piloté par le MODE de performance (rapide sur petite machine, detaille sur puissante)
     mode = (args.get("mode") or db.get_setting("doc_default_mode") or "rapide").lower()
     src_block = (f"\nCONTEXTE (extraits de documents) :\n{sources_ctx}\n" if sources_ctx else "")
+    generation_models: set[str] = set()
+    generation_provenance: dict = {}
 
     if mode == "detaille":
         # Section par section : plus complet/profond, mais plusieurs appels LLM (lent sur petit GPU).
@@ -538,7 +558,13 @@ async def generate(args: dict) -> dict:
                 f"NOTES :\n{raw or '(peu d éléments — propose un contenu plausible)'}\n" + src_block + "\nRÉDACTION :"
             )
             try:
-                part = (await _generate_text(prompt, model=args.get("model"), timeout=180) or "").strip()
+                generated, provenance = await _generate_with_provenance(
+                    prompt, model=args.get("model"), timeout=180
+                )
+                part = generated.strip()
+                if provenance.get("model"):
+                    generation_models.add(str(provenance["model"]))
+                    generation_provenance = provenance
             except Exception as e:
                 part = f"## {section}\n\n(génération échouée : {str(e)[:80]})"
             if "##" not in part[:60]:
@@ -558,7 +584,12 @@ async def generate(args: dict) -> dict:
             + src_block + "\nDOCUMENT COMPLET (markdown) :"
         )
         try:
-            body = (await _generate_text(prompt, model=args.get("model"), timeout=240) or "").strip()
+            generated, generation_provenance = await _generate_with_provenance(
+                prompt, model=args.get("model"), timeout=240
+            )
+            body = generated.strip()
+            if generation_provenance.get("model"):
+                generation_models.add(str(generation_provenance["model"]))
         except Exception as e:
             return {"error": f"Génération échouée : {str(e)[:120]}"}
         content = body if body.lstrip().startswith("#") else f"# {title}\n\n{body}"
@@ -594,7 +625,8 @@ async def generate(args: dict) -> dict:
         import json as _json
         meta = {"title": title, "subtitle": tpl["name"], "template": tpl_key, "author": author,
                 "letterhead": letterhead, "references": references, "signature": signature,
-                "sections": sections, "markdown": content}
+                "sections": sections, "markdown": content,
+                "generation": {**generation_provenance, "models": sorted(generation_models)}}
         with open(docx_path + ".meta.json", "w", encoding="utf-8") as _mf:
             _json.dump(meta, _mf, ensure_ascii=False)
     except Exception:
@@ -602,6 +634,11 @@ async def generate(args: dict) -> dict:
     result = {"success": True, "file": docx_path, "title": title, "template": tpl["name"],
               "author": author, "sections": sections, "markdown": content[:4000],
               "message": f"📄 Document « {title} » généré ({len(sections)} sections) → {os.path.basename(docx_path)}"}
+    if generation_provenance:
+        result["generation"] = {
+            **generation_provenance,
+            "models": sorted(generation_models),
+        }
     if args.get("pdf"):
         try:
             pr = await convert_docx_to_pdf({"path": docx_path})

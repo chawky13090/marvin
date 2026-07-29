@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.451.0 — Provenance générative transverse
+
+### Constat et décision
+
+Documents et e-mails utilisaient déjà `generation_runtime`, mais demandaient une chaîne nue :
+le modèle et la route de confidentialité disparaissaient du résultat métier. Code Forge
+conservait ses modèles consultés sans déclarer explicitement le profil actif. Deux options ont
+été comparées : recalculer la provenance après chaque appel, avec un risque de course si le
+profil change, ou la capturer dans le runtime au moment où le modèle final réussit. La seconde
+fournit la preuve la plus exacte et évite toute duplication.
+
+### Implémentation
+
+Le mode `return_metadata` de `generation_runtime` ajoute fournisseur, profil effectif et
+Cloud-only au modèle déjà retourné. Les trois chemins de génération documentaire et les trois
+assistances e-mail demandent ces métadonnées. Le document restitue la dernière route et la
+liste dédupliquée des modèles; son sidecar conserve la même preuve. Brouillon, résumé et digest
+e-mail ajoutent un objet `generation`. Code Forge ajoute fournisseur Cloud, profil,
+`workflow_cloud_only=true` et autorisation éventuelle du sensible. Tous les champs publics
+antérieurs restent compatibles.
+
+### Sécurité, logs et rollback
+
+La provenance ne contient ni prompt, ni réponse, ni contenu de document/e-mail, ni secret.
+Aucun nouveau log technique n'est créé; les preuves suivent la rétention métier du résultat
+concerné. Les échecs continuent d'être expurgés par les frontières existantes. Aucun schéma de
+base n'est modifié. Rollback exact : `git revert <commit-v2.451>`; les champs additifs seront
+simplement absents avec l'ancienne version.
+
+### Validation
+
+Les tests `test_generation_runtime.py`, `test_cloud_only_routing.py`,
+`test_tool_domain_documents.py`, `test_tool_domain_email_messages.py` et
+`test_code_forge.py` réussissent. Ils couvrent provenance locale/Cloud, repli Cloud Ultra,
+document DOCX réel, brouillon/résumé/digest multi-comptes et pipeline Code Forge.
+
+La validation live a aussi découvert puis corrigé un défaut de frontière : l'API e-mail
+envoyait `account=None` au harness quand le contenu était fourni directement, alors que le
+schéma exige une chaîne. Le champ absent est désormais omis et
+`test_email_automation_boundary.py` empêche la régression. Après relance, un résumé synthétique
+réel a utilisé `minimax-m3:cloud`, avec `privacy_preset=ultra` et `cloud_only=true`. Une
+génération DOCX réelle via le harness a produit la même provenance Cloud. Les deux artefacts
+temporaires se trouvent dans `data/documents_generes`; leur suppression automatisée a été
+refusée par la politique locale, ils ne sont ni suivis par Git ni utilisés par Marvin.
+
 ## 2026-07-29 — v2.450.0 — Frontière générative de la vidéo locale
 
 ### Constat, décision et implémentation

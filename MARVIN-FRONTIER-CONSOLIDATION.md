@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.450.0
+Version courante auditée : 2.451.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -128,7 +128,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | runner | Runner et boucle agentique | verified | `scripts/test_agent_loop_policy.py`, `scripts/test_agent_execution.py`, `scripts/test_agent_turn_completion.py` | maintenir les contrats de budget, arrêt, reprise et événements |
 | sessions | Sessions, SSE et reprise | verified | `scripts/test_chat_turn_runtime.py`, `scripts/test_chat_stream.mjs`, `scripts/test_agent_session.py` | test navigateur de reconnexion pendant un tour long |
 | tools | Catalogue, harness et appels d'outils | verified | registre 344/344, zéro consommateur direct, 78 restrictions, sélection/erreurs/approbations/résultats testés par `test_agent_tool_selection.py`, `test_tool_gateway.py`, `test_system_tools_gateway.py` et `test_engineering_runtime.py` | maintenir le gate et ajouter les nouveaux outils uniquement avec schéma, politique, résultat et preuves |
-| models | Routage modèles, Council et confidentialité | partial | matrice des quatre profils dans `scripts/test_privacy_model_matrix.py`, provenance SSE, Ultra Cloud-only et Council cinq familles | étendre la matrice aux documents, e-mails et Coding Mission, puis conserver une preuve Cloud live reproductible |
+| models | Routage modèles, Council et confidentialité | partial | matrice des quatre profils, provenance SSE, Ultra Cloud-only, Council cinq familles et preuves documents/e-mails/Code Forge | tester les transitions en mission et les combinaisons négatives de chaque domaine avant promotion |
 | memory | Mémoire, RAG et vérité durable | partial | `scripts/test_knowledge_mesh.py`, tests des domaines mémoire/documentaire | audit rétention, provenance, oubli, conflits et dérive factuelle |
 | coding | Code Workspace, Forge et missions longues | partial | tests Code/Test Forge, production contract, Coding Mission et jobs | scénarios E2E Linux/Windows avec artefact et reprise après panne |
 | isolation | Docker, VM Debian et VM Windows | partial | tests VM Lab, Hyper-V runner et Test Forge | preuves natives propres, snapshot/revert et réseau gouverné |
