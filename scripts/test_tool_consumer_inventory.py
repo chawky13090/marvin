@@ -13,10 +13,11 @@ EXPECTED_DIRECT_CONSUMERS = {
     "api/documents.py": 7,
     "api/email_automation.py": 1,
     "api/email_preferences.py": 2,
-    "api/proactive.py": 1,
-    "api/system_tools.py": 20,
+    "api/multi_agents.py": 1,
+    "api/system_tools.py": 25,
+    "api/workflows.py": 1,
     "communication_workers.py": 5,
-    "proactive_service.py": 2,
+    "cron_runtime.py": 3,
 }
 
 
@@ -26,14 +27,52 @@ def is_registry(value: ast.expr) -> bool:
     return isinstance(value, ast.Attribute) and value.attr == "TOOLS_REGISTRY"
 
 
+def registry_aliases(tree: ast.AST) -> set[str]:
+    aliases = {"TOOLS_REGISTRY"}
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            value = node.value
+            if value is None or not (
+                is_registry(value)
+                or isinstance(value, ast.Name) and value.id in aliases
+            ):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id not in aliases:
+                    aliases.add(target.id)
+                    changed = True
+    return aliases
+
+
+def is_registry_access(value: ast.expr, aliases: set[str]) -> bool:
+    return is_registry(value) or isinstance(value, ast.Name) and value.id in aliases
+
+
 def inventory() -> dict[str, int]:
     result = {}
     for path in BACKEND.rglob("*.py"):
+        if any(part in {".venv", "__pycache__"} for part in path.parts):
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        aliases = registry_aliases(tree)
         count = sum(
             1
             for node in ast.walk(tree)
-            if isinstance(node, ast.Subscript) and is_registry(node.value)
+            if (
+                isinstance(node, ast.Subscript)
+                and is_registry_access(node.value, aliases)
+            )
+            or (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "get"
+                and is_registry_access(node.func.value, aliases)
+            )
         )
         if count:
             result[path.relative_to(BACKEND).as_posix()] = count
@@ -47,8 +86,10 @@ def main() -> int:
         f"documentez explicitement le nouvel état : {observed}"
     )
     assert "api/calendar.py" not in observed
-    assert sum(observed.values()) == 48
-    print("Tool Consumer Inventory OK - agenda migré, dette restante bornée à 48 appels.")
+    assert "api/proactive.py" not in observed
+    assert "proactive_service.py" not in observed
+    assert sum(observed.values()) == 55
+    print("Tool Consumer Inventory OK - agenda et proactif migrés, dette bornée à 55 accès.")
     return 0
 
 

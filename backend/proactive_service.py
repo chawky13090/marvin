@@ -15,6 +15,7 @@ from typing import Any
 
 import bug_log
 import database as db
+import tool_runtime
 import tools as tool_module
 from api.voice import DEFAULT_TTS_VOICES
 
@@ -168,8 +169,13 @@ async def speak_backend(text: str, voice: str = "henri") -> None:
         pass
 
 
+async def _run_tool(name: str, arguments: dict[str, Any], *, source: str) -> Any:
+    outcome = await tool_runtime.execute(name, arguments, source=source)
+    return outcome.result
+
+
 async def run_morning_briefing(config: dict[str, Any]) -> dict[str, Any]:
-    result = await tool_module.TOOLS_REGISTRY["daily_briefing"]({})
+    result = await _run_tool("daily_briefing", {}, source="proactive_morning")
     if not result.get("success"):
         return {"error": result.get("error", "briefing indisponible")}
     events = result.get("events_today") or []
@@ -182,8 +188,10 @@ async def run_morning_briefing(config: dict[str, Any]) -> dict[str, Any]:
         parts.append(f"{result['unread']} mail(s) non lus")
     summary = "Aujourd'hui : " + ", ".join(parts) + "."
     try:
-        await tool_module.TOOLS_REGISTRY["pc_notify"](
-            {"title": "🌅 Votre briefing du jour", "message": summary}
+        await _run_tool(
+            "pc_notify",
+            {"title": "🌅 Votre briefing du jour", "message": summary},
+            source="proactive_morning",
         )
     except Exception:
         pass
@@ -200,10 +208,13 @@ async def run_morning_briefing(config: dict[str, Any]) -> dict[str, Any]:
 
 
 async def run_evening_recap(config: dict[str, Any]) -> dict[str, Any]:
-    registry = tool_module.TOOLS_REGISTRY
-    result = await registry["daily_briefing"]({})
+    result = await _run_tool("daily_briefing", {}, source="proactive_evening")
     try:
-        tomorrow = await registry["event_list"]({"period": "tomorrow"})
+        tomorrow = await _run_tool(
+            "event_list",
+            {"period": "tomorrow"},
+            source="proactive_evening",
+        )
         tomorrow_events = tomorrow.get("events") or []
     except Exception:
         tomorrow_events = []
@@ -217,7 +228,11 @@ async def run_evening_recap(config: dict[str, Any]) -> dict[str, Any]:
         parts.append(f"{result['unread']} mail(s) non lus")
     summary = "Bilan du soir — " + ", ".join(parts) + "."
     try:
-        await registry["pc_notify"]({"title": "🌙 Bilan du soir", "message": summary})
+        await _run_tool(
+            "pc_notify",
+            {"title": "🌙 Bilan du soir", "message": summary},
+            source="proactive_evening",
+        )
     except Exception:
         pass
     try:
@@ -230,7 +245,6 @@ async def run_evening_recap(config: dict[str, Any]) -> dict[str, Any]:
 
 
 async def run_anticipation(config: dict[str, Any], *, force: bool = False) -> dict[str, Any]:
-    registry = tool_module.TOOLS_REGISTRY
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
     if _anticipation_seen["date"] != today:
@@ -241,7 +255,7 @@ async def run_anticipation(config: dict[str, Any], *, force: bool = False) -> di
 
     if config.get("overdue_tasks", True):
         try:
-            tasks = await registry["task_list"]({})
+            tasks = await _run_tool("task_list", {}, source="proactive_anticipation")
             for task in tasks.get("tasks") or []:
                 due = (task.get("due_date") or "")[:10]
                 if due and due < today and task.get("status") not in {"done", "completed", "cancelled"}:
@@ -261,7 +275,11 @@ async def run_anticipation(config: dict[str, Any], *, force: bool = False) -> di
     if config.get("upcoming_events", True):
         lead = int(config.get("upcoming_events_min", 30))
         try:
-            events = await registry["event_list"]({"period": "today"})
+            events = await _run_tool(
+                "event_list",
+                {"period": "today"},
+                source="proactive_anticipation",
+            )
             for event in events.get("events") or []:
                 raw = event.get("start_at") or event.get("start") or ""
                 try:
@@ -291,7 +309,11 @@ async def run_anticipation(config: dict[str, Any], *, force: bool = False) -> di
     selected = alerts[:maximum]
     for alert in selected:
         try:
-            await registry["pc_notify"]({"title": "🔔 Marvin anticipe", "message": alert["text"]})
+            await _run_tool(
+                "pc_notify",
+                {"title": "🔔 Marvin anticipe", "message": alert["text"]},
+                source="proactive_anticipation",
+            )
         except Exception:
             pass
         try:

@@ -5,6 +5,42 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.444.0 — Harness proactif et correction du gate d'inventaire
+
+### Constat et correction de preuve
+
+La poursuite de l'audit a montré que le gate v2.443 comptait uniquement les indexations
+écrites directement `TOOLS_REGISTRY[...]`. Il ignorait les alias locaux `registry[...]` et
+les résolutions `.get(...)`. Le total de 48 n'était donc pas exhaustif. Le parseur AST suit
+maintenant les alias simples, compte les deux formes et exclut explicitement l'environnement
+virtuel. Le plafond réel après migration du domaine proactif est **55 accès** dans dix
+composants. La documentation antérieure est rectifiée au lieu de conserver une métrique
+favorable mais fausse.
+
+### Implémentation et compromis
+
+Le briefing manuel et les branches matin, soir et anticipation passent par `tool_runtime`.
+Chaque branche fournit une source stable (`proactive_ui`, `proactive_morning`,
+`proactive_evening`, `proactive_anticipation`) afin de préserver la corrélation et l'audit.
+Une réécriture du service n'était pas justifiée : les contrats de résumé, voix, Telegram,
+heures calmes et déduplication restent inchangés.
+
+### Sécurité, logs et rollback
+
+Les notifications et lectures proactives reçoivent désormais validation, permission,
+capture d'exception, normalisation et audit communs. Aucun payload supplémentaire, secret,
+schéma ou donnée persistante n'est introduit. Les pannes de notification restent sans rejeu
+automatique afin d'éviter les doublons. Rollback exact : `git revert <commit-v2.444>`, puis
+redémarrage backend et exécution des tests proactifs, inventaire, architecture et smoke API.
+
+### Validation
+
+Les tests dédiés couvrent la configuration, les heures calmes, la voix, le briefing, les
+erreurs expurgées, le routage des trois branches et l'inventaire AST exhaustif. Le gate
+consolidé réussit **204/204 étapes**, dont compilation Python, qualité frontend et build
+Turbopack. Après relance, `/api/health` expose **2.444.0**, le briefing réel répond
+`success=true` avec un contrat `succeeded`, et le smoke API réussit **28/28**.
+
 ## 2026-07-29 — v2.443.0 — Harness universel et migration Agenda
 
 ### Contexte et décision

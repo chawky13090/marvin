@@ -12,7 +12,7 @@ import audit
 import bug_log
 import database as db
 import proactive_service
-import tools as tool_module
+import tool_runtime
 
 
 router = APIRouter(prefix="/api", tags=["proactive"])
@@ -63,7 +63,12 @@ def _patch_values(value: BaseModel) -> dict[str, object]:
 async def daily_briefing() -> dict:
     """Produit le briefing du jour depuis l'outil public partagé."""
     try:
-        result = await tool_module.TOOLS_REGISTRY["daily_briefing"]({})
+        outcome = await tool_runtime.execute(
+            "daily_briefing",
+            {},
+            source="proactive_ui",
+        )
+        result = outcome.result
     except Exception as exc:
         incident_id = uuid.uuid4().hex
         bug_log.log_bug(

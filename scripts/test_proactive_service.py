@@ -93,23 +93,26 @@ async def _check_tts_voice_contract() -> None:
 
 
 async def _check_morning_briefing() -> None:
-    briefing = AsyncMock(
-        return_value={
+    async def run_tool(name, _arguments, *, source):
+        assert source == "proactive_morning"
+        if name == "daily_briefing":
+            return {
             "success": True,
             "events_today": [{"id": "evt"}],
             "tasks_urgent": 2,
             "unread": 3,
             "briefing": "Votre journee est chargee.",
-        }
-    )
+            }
+        if name == "pc_notify":
+            await notify()
+            return {"success": True}
+        raise AssertionError(name)
+
     notify = AsyncMock(return_value={"success": True})
     telegram = AsyncMock(return_value={"success": True})
     speak = AsyncMock()
     with (
-        patch.dict(
-            proactive_service.tool_module.TOOLS_REGISTRY,
-            {"daily_briefing": briefing, "pc_notify": notify},
-        ),
+        patch.object(proactive_service, "_run_tool", side_effect=run_tool),
         patch.object(proactive_service.tool_module, "_telegram_notify", telegram),
         patch.object(proactive_service, "speak_backend", speak),
     ):

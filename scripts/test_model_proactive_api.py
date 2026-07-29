@@ -138,14 +138,16 @@ async def _check_config_compatibility() -> None:
 
 
 async def _check_briefing_errors_are_redacted() -> None:
-    success = AsyncMock(return_value={"success": True, "briefing": "ok"})
-    with patch.dict(proactive.tool_module.TOOLS_REGISTRY, {"daily_briefing": success}):
+    success = AsyncMock()
+    success.return_value.result = {"success": True, "briefing": "ok"}
+    with patch.object(proactive.tool_runtime, "execute", success):
         assert await proactive.daily_briefing() == {"success": True, "briefing": "ok"}
 
     leaked = "secret-provider-message"
-    failure = AsyncMock(return_value={"error": leaked})
+    failure = AsyncMock()
+    failure.return_value.result = {"error": leaked}
     with (
-        patch.dict(proactive.tool_module.TOOLS_REGISTRY, {"daily_briefing": failure}),
+        patch.object(proactive.tool_runtime, "execute", failure),
         patch.object(proactive.bug_log, "log_bug") as log_bug,
     ):
         try:
