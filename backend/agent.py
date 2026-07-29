@@ -112,6 +112,8 @@ from agent_transport import (
     stream_chat as _stream_ollama_chat,
 )
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
+from capability_catalog import CapabilityCatalog as _CapabilityCatalog
+from native_agent_prompt import build_native_system_prompt as _build_native_system_prompt
 from config import (
     OLLAMA_URL, MAX_CONTEXT_MESSAGES,
     DEFAULT_PERMISSION_LEVEL, DANGEROUS_TOOLS,
@@ -132,6 +134,8 @@ async def _run_deterministic_agent(
     model: str | None,
     cortex_contract: dict | None = None,
     request_id: str | None = None,
+    *,
+    native_decision_mode: bool = False,
 ) -> AsyncIterator[str]:
     """
     Générateur SSE. Yielde des événements de type :
@@ -152,7 +156,12 @@ async def _run_deterministic_agent(
     _user_query = _prepared_turn.user_query
     for _turn_event in _prepared_turn.events:
         yield _sse(_turn_event)
-    _turn_plan = _compile_turn_plan(messages, _user_query, cortex_contract)
+    _turn_plan = _compile_turn_plan(
+        messages,
+        _user_query,
+        cortex_contract,
+        llm_native=native_decision_mode,
+    )
     _explicit_tool_names = _turn_plan.explicit_tool_names
     _command_text_only = _turn_plan.command_text_only
     _tool_suppression = _turn_plan.tool_suppression
@@ -201,23 +210,60 @@ async def _run_deterministic_agent(
         get_conversation=db.get_conversation,
         get_project=db.get_project,
         to_ollama_messages=_to_ollama_messages,
-        build_system_prompt=_build_system_prompt,
-        cortex_prompt_block=_cortex.prompt_block,
-        get_real_paths=execute_pc_get_real_paths,
+        build_system_prompt=(
+            _build_native_system_prompt
+            if native_decision_mode
+            else _build_system_prompt
+        ),
+        # Le contrat Cortex reste utilisé pour les budgets et la confidentialité,
+        # mais son ancien mode métier « advise/act » ne doit pas reprendre le contrôle
+        # de la décision d'outil dans l'orchestrateur natif.
+        cortex_prompt_block=(
+            (lambda _plan: "")
+            if native_decision_mode
+            else _cortex.prompt_block
+        ),
+        get_real_paths=(
+            None if native_decision_mode else execute_pc_get_real_paths
+        ),
         filter_memories=memory_mesh.filter_active,
         contextual_web_query=_contextual_web_query,
+        include_document_identity=not native_decision_mode,
     )
     _overflow = _base_context.overflow
     ollama_msgs = _base_context.ollama_messages
     system_prompt = _base_context.system_prompt
     permission_level = _base_context.permission_level
     use_tools = _base_context.use_tools
+    if native_decision_mode and not _tool_suppression:
+        # Le mode historique « advise » désactivait entièrement les schémas d'outils.
+        # Dans la boucle native, le LLM doit au minimum pouvoir découvrir les
+        # capacités; le gateway reste seul autoritaire pour leur exécution.
+        use_tools = bool(MODEL_PROFILES.get(profile_name, {}).get("tools", True))
 
     # Connaissances apprises : rappel SÉMANTIQUE → injecté EN TÊTE (priorité absolue,
     # sinon noyé dans le long prompt de capacités et ignoré par le modèle).
     # Rappel mémoire (embed) + filtrage des outils (embed) = 2 opérations INDÉPENDANTES.
     # On les lance EN PARALLÈLE (gain de latence, résultat identique) et on construit le
     # prompt système pendant ce temps.
+    async def _native_bootstrap_tools(
+        _messages: list[dict],
+        _profile_name: str,
+    ) -> list[dict]:
+        return [
+            specification
+            for specification in TOOLS_SPEC
+            if specification.get("function", {}).get("name") == "tool_search"
+        ]
+
+    async def _native_no_skill(_text: str) -> None:
+        return None
+
+    async def _native_no_recall(_text: str) -> list[dict]:
+        # La boucle native récupère les connaissances à la demande via des outils.
+        # Un rappel implicite ne doit pas contaminer sa décision d'agir.
+        return []
+
     _enrichments = _start_enrichments(
         messages=messages,
         user_query=_user_query,
@@ -225,7 +271,20 @@ async def _run_deterministic_agent(
         use_tools=use_tools,
         tool_suppression=_tool_suppression,
         skill_matcher_text=skill_match_text,
-        filter_tools=_filter_relevant_tools,
+        filter_tools=(
+            _native_bootstrap_tools
+            if native_decision_mode
+            else _filter_relevant_tools
+        ),
+        match_skill=(
+            _native_no_skill if native_decision_mode else None
+        ),
+        recall=(
+            _native_no_recall if native_decision_mode else None
+        ),
+        recall_block=(
+            (lambda _items: "") if native_decision_mode else None
+        ),
     )
 
     # SKILL : si une compétence (fichier Markdown) correspond à la demande, on injecte sa
@@ -294,6 +353,25 @@ async def _run_deterministic_agent(
         skill=_skill,
         use_tools=use_tools,
     )
+    if native_decision_mode:
+        yield _sse({
+            "type": "capability_context",
+            "enabled": bool(use_tools),
+            "count": len(tools_payload),
+            "system_chars": len(system_prompt),
+            "message_roles": [
+                str(message.get("role") or "")
+                for message in ollama_msgs
+            ],
+            "message_chars": [
+                len(str(message.get("content") or ""))
+                for message in ollama_msgs
+            ],
+            "names": [
+                str(spec.get("function", {}).get("name") or "")
+                for spec in tools_payload
+            ],
+        })
 
     # ── Boucle d'appel d'outils ───────────────────────────────────────────────
     _runner_state = _RunnerState()
@@ -500,10 +578,31 @@ async def _run_deterministic_agent(
                 messages=messages,
                 successful_results=_runner_state.successful_results,
             ),
-            salvage_text_tool_calls=_salvage_text_tool_calls,
+            salvage_text_tool_calls=(
+                (lambda _content, _allowed: [])
+                if native_decision_mode
+                else _salvage_text_tool_calls
+            ),
             inject_required_tool_calls=_inject_required_tool_calls,
         )
         tool_calls_found = _prepared_model_step.tool_calls
+        if native_decision_mode and tool_calls_found and _is_cloud_model(active_model):
+            # Un appel natif réellement décodé constitue une preuve de compatibilité
+            # agentique. Il corrige notamment les anciennes observations faussement
+            # négatives produites par le bug tuple/list du collecteur.
+            try:
+                import model_market as _model_market
+
+                _cr.record_model_capability(active_model, "agentic", True)
+                _model_market.record_observation(
+                    active_model,
+                    "agentic",
+                    True,
+                    int((time.monotonic() - _runner_state.started_at) * 1000),
+                    phase="native_tool_call",
+                )
+            except Exception:
+                pass
         # v2.119 — protection mid-boucle : un outil sensible vient d'être demandé alors
         # qu'on est sur un modèle CLOUD → bascule en local AVANT que son résultat (contenu
         # d'email, sortie SSH…) ne parte vers le cloud au tour suivant. Le modèle cloud a pu
@@ -569,6 +668,36 @@ async def _run_deterministic_agent(
                 ),
             ):
                 yield _sse(_event)
+            if native_decision_mode:
+                # `tool_search` reste consultatif. Après son observation, seuls les
+                # schémas exacts des candidats sont ajoutés pour le prochain tour.
+                latest_discovery = next(
+                    (
+                        item
+                        for item in reversed(_runner_state.successful_results)
+                        if item.get("tool") == "tool_search"
+                        and item.get("candidates")
+                    ),
+                    None,
+                )
+                if latest_discovery:
+                    catalog = _CapabilityCatalog(TOOLS_SPEC)
+                    names = [
+                        str(item.get("name") or "")
+                        for item in latest_discovery["candidates"]
+                        if isinstance(item, dict)
+                    ]
+                    present = {
+                        str(item.get("function", {}).get("name") or "")
+                        for item in tools_payload
+                    }
+                    for specification in catalog.exact_specifications(names):
+                        name = str(
+                            specification.get("function", {}).get("name") or ""
+                        )
+                        if name and name not in present:
+                            tools_payload.append(specification)
+                            present.add(name)
 
         elif (
             not full_content.strip()
@@ -582,12 +711,16 @@ async def _run_deterministic_agent(
             _remaining_required = _required_tool_names - _executed_tool_names
             if _is_cloud_model(active_model):
                 _empty_need = (
-                    _cr.detect_task(_user_query)
-                    or {
-                        "analysis": "reasoning",
-                        "agent": "agentic",
-                        "vision": "vision",
-                    }.get(profile_name, "general")
+                    "agentic"
+                    if native_decision_mode and tools_payload
+                    else (
+                        _cr.detect_task(_user_query)
+                        or {
+                            "analysis": "reasoning",
+                            "agent": "agentic",
+                            "vision": "vision",
+                        }.get(profile_name, "general")
+                    )
                 )
                 try:
                     import model_market as _model_market
@@ -755,8 +888,19 @@ async def run_agent(
             request_id,
         )
 
+    def native_factory() -> AsyncIterator[str]:
+        return _run_deterministic_agent(
+            messages,
+            conversation_id,
+            model,
+            cortex_contract,
+            request_id,
+            native_decision_mode=True,
+        )
+
     async for event in _dispatch_agent_runtime(
         deterministic_factory=deterministic_factory,
+        native_factory=native_factory,
         encode_event=_sse,
     ):
         yield event

@@ -39,6 +39,17 @@ def main() -> None:
 
     result = asyncio.run(execute_tool_search("recherche web publique", 8))
     assert result["catalog_size"] == len(TOOLS_SPEC)
+    registered_result = asyncio.run(execute_tool_search({
+        "query": "date et heure",
+        "limit": 5,
+        "confirmed": True,
+    }))
+    assert registered_result["query"] == "date et heure"
+    assert registered_result["count"] <= 5
+    assert any(
+        item["name"] == "datetime_info"
+        for item in registered_result["candidates"]
+    )
     assert result["count"] <= 8
 
     print(

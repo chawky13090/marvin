@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.491.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.492.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.491.0)
+## 9. État actuel (v2.492.0)
+
+**v2.492 (canary LLM natif réel)** : `agent.py` branche désormais réellement le chemin
+`llm_native_canary` sur Ollama tout en gardant le mode déterministe par défaut et comme
+rollback immédiat. Le LLM ne reçoit initialement que `tool_search`, puis les schémas exacts
+des capacités découvertes sont ajoutés au tour suivant. Le défaut causal qui supprimait tous
+les appels natifs est corrigé dans `agent_model_step.py` : le transport produit un tuple
+immuable, désormais accepté au lieu d'être remplacé silencieusement par une liste vide.
+Les mémoires et l'identité documentaire ne sont plus injectées comme instructions
+privilégiées dans ce chemin. Les quatre profils de confidentialité restent autoritaires :
+Normal, Hyper local, Tout cloud et Ultra cloud strict sans repli local silencieux. Les
+smokes réels ont validé réponse directe sans outil et découverte puis exécution de
+`datetime_info`; la recherche Web reste en canary car un parcours multi-passes a dépassé
+180 secondes et SearXNG a signalé des moteurs suspendus.
 
 **v2.491 (fondations de l'orchestrateur LLM natif)** : `agent_orchestration.py`
 introduit une façade commutable (`deterministic`, `llm_native_shadow`,

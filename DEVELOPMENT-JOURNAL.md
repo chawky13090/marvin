@@ -12579,3 +12579,63 @@ Le tag `marvin-deterministic-2026-07-29` reste le point de restauration autorita
 table expérimentale a été créée, l'arrêter puis exécuter
 `DROP TABLE IF EXISTS agent_runs; DROP INDEX IF EXISTS idx_agent_runs_conversation;`
 sur une sauvegarde vérifiée de `secretary.db`.
+
+## 2026-07-29 — v2.492 — Canary LLM natif et réparation du tool-calling Ollama
+
+### Demande et décision
+
+L'utilisateur a validé le pivot : le LLM choisit librement sa stratégie et ses outils,
+tandis que le logiciel conserve les politiques, les autorisations, les budgets, l'exécution
+et les preuves. Les quatre profils de confidentialité doivent rester intacts, notamment le
+profil Ultra actuellement actif, qui impose Ollama Cloud sans repli local silencieux.
+
+### Cause racine établie
+
+Une sonde directe sur `/api/chat` d'Ollama a prouvé que GLM 5.2, DeepSeek V4 Pro,
+Qwen 3.5 397B, Kimi K2.7 Code et Mistral Large 3 émettent bien des appels d'outils natifs.
+Dans Marvin, `agent_transport.decode_stream_line` les normalisait en tuple immuable, mais
+`agent_model_step.stream_model_step` n'acceptait que `list` et remplaçait donc chaque appel
+par `[]`. Cette suppression silencieuse causait les réponses « aucun outil disponible »,
+les replis injustifiés et les promesses d'action non exécutées.
+
+### Livraison
+
+- le chemin `llm_native_canary` appelle réellement Ollama via la façade réversible;
+- le tour commence avec le seul schéma `tool_search`, puis charge les schémas exacts des
+  candidats observés;
+- le collecteur accepte les tuples et listes de tool calls;
+- les mémoires implicites et l'identité documentaire ne sont plus injectées dans le
+  contexte privilégié du chemin natif;
+- une capacité agentique observée est enregistrée dans Model Market; GLM 5.2 a remplacé
+  Nemotron en Auto après preuve réelle;
+- `tool_search` respecte désormais le contrat dictionnaire du registre et n'interprète plus
+  tout le dictionnaire d'arguments comme une chaîne de recherche;
+- les descriptions Web distinguent découverte SearXNG, lecture de page, recherche sourcée
+  et recherche profonde;
+- les tests couvrent explicitement Normal, Hyper local, Tout cloud et Ultra.
+
+### Validations réelles
+
+- réponse directe DNS avec interdiction d'outil : aucun outil, réponse correcte;
+- demande d'heure à Paris en Auto : `tool_search`, puis `datetime_info`, réponse horodatée
+  et sourcée par le reçu d'outil;
+- sélection Auto agentique après observation : `glm-5.2:cloud`;
+- 9 contrôles ciblés Python, composition FastAPI et architecture : réussis;
+- architecture : 345 schémas, 345 exécuteurs et 78 restrictions renforcées.
+
+La recherche Next.js n'est pas validée : le premier canary a bouclé sur des recherches
+SearXNG hors sujet; le second a démarré `web_deep_research` mais le client smoke a coupé le
+flux après 180 secondes. La requête directe SearXNG a confirmé que Google CSE était suspendu
+pour trafic excessif, Startpage pour CAPTCHA et Qwant pour refus d'accès; Bing répond mais
+exige une désambiguïsation correcte de « Next.js ». Cette dette reste ouverte et interdit
+l'activation globale du chemin natif.
+
+### Sécurité, logs et rollback
+
+Aucune action destructive ou sortante n'a été exécutée. Les tests réels ont uniquement lu
+l'heure, interrogé SearXNG et lu des pages publiques. Les observations Model Market et les
+preuves d'outils sont append-only; aucun prompt ni secret n'est ajouté aux métriques.
+Le backend doit rester en mode déterministe après la campagne. Rollback de code : réverter
+le commit v2.492. Rollback fonctionnel immédiat : supprimer `MARVIN_ORCHESTRATOR` ou définir
+`MARVIN_ORCHESTRATOR=deterministic`, puis redémarrer le backend. Le tag
+`marvin-deterministic-2026-07-29` demeure la restauration complète antérieure au pivot.

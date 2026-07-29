@@ -131,6 +131,27 @@ def test_atomic_presets() -> None:
         assert hyper["cloud_enabled"] is False
         assert store["privacy_preset"] == "hyper"
 
+        cloud_max = asyncio.run(
+            settings_api.set_privacy_preset(
+                settings_api.PrivacyPresetRequest(preset="cloud_max")
+            )
+        )
+        assert cloud_max["cloud_only"] is False
+        assert store["cloud_enabled"] is True
+        assert store["local_only_lockdown"] is False
+        assert store["ultra_unrestricted"] is False
+        assert store["privacy_preset"] == "cloud_max"
+
+        normal = asyncio.run(
+            settings_api.set_privacy_preset(
+                settings_api.PrivacyPresetRequest(preset="normal")
+            )
+        )
+        assert normal["cloud_only"] is False
+        assert store["local_only_lockdown"] is False
+        assert store["ultra_unrestricted"] is False
+        assert store["privacy_preset"] == "normal"
+
 
 def main() -> int:
     test_resolution()

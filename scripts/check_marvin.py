@@ -219,6 +219,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Policy Engine contextuel", (python, "scripts/test_policy_engine.py")),
         Stage("Catalogue dynamique des capacités", (python, "scripts/test_capability_catalog.py")),
         Stage("Boucle agentique LLM native", (python, "scripts/test_native_agent_runtime.py")),
+        Stage("Chemin natif du Runner", (python, "scripts/test_native_agent_path.py")),
         Stage("Execution deterministe des outils LLM", (python, "scripts/test_agent_execution.py")),
         Stage("Préparation des étapes d'outils", (python, "scripts/test_agent_tool_step.py")),
         Stage("Politique de dispatch des outils", (python, "scripts/test_agent_tool_dispatch.py")),

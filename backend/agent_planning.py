@@ -268,6 +268,8 @@ def compile_turn_plan(
     messages: list[dict[str, Any]],
     user_query: str,
     cortex_contract: dict[str, Any] | None = None,
+    *,
+    llm_native: bool = False,
 ) -> TurnPlan:
     """Compile les contraintes du tour sans appel réseau, stockage ou modèle."""
     explicit_tool_names = exact_tool_mentions_from_text(
@@ -276,6 +278,27 @@ def compile_turn_plan(
     )
     command_text_only = wants_command_text_only(user_query)
     tool_suppression = tool_suppression_reason(messages, user_query)
+    if llm_native:
+        # Le modèle choisit la stratégie. Le code conserve uniquement les contraintes
+        # explicites négatives, la confidentialité et les budgets de sûreté.
+        cortex_plan = cortex.compile_contract(user_query, cortex_contract)
+        execution_budget = cortex_plan["execution_budget"]
+        return TurnPlan(
+            explicit_tool_names=set(),
+            command_text_only=command_text_only,
+            tool_suppression=tool_suppression,
+            required_tool_names=set(),
+            workspace_norm=cloud_routing.strip_accents(
+                (user_query or "").casefold()
+            ),
+            workspace_route=None,
+            workspace_mission_id="",
+            workspace_action="",
+            cortex_plan=cortex_plan,
+            max_tool_steps=int(execution_budget["max_tool_steps"]),
+            max_wall_seconds=int(execution_budget["max_wall_seconds"]),
+            contextual_web_query="",
+        )
     required_tool_names = (
         {"ai_model_council"}
         if not tool_suppression and wants_model_council(user_query)

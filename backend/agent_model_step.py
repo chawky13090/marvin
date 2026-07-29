@@ -31,7 +31,14 @@ async def stream_model_step(
                 yield {"type": "text", "text": event.text}
         elif event.kind == "tool_calls":
             calls = event.tool_calls
-            result.tool_calls = list(calls) if isinstance(calls, list) else []
+            # Le transport normalise volontairement les appels en tuple immuable.
+            # Accepter les deux formes évite de supprimer silencieusement tous les
+            # tool calls natifs reçus d'Ollama.
+            result.tool_calls = (
+                list(calls)
+                if isinstance(calls, (list, tuple))
+                else []
+            )
 
 
 @dataclass(frozen=True)

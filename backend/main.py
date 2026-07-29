@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.492 — boucle LLM native réelle, tool-calling Ollama réparé et quatre profils préservés
 # v2.490 — routage outils réel, reprise Cloud, Kimi K3 et recherche SearXNG pertinente
 # v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
 # v2.485 — vocalisation fiable des réponses Cloud answer_final

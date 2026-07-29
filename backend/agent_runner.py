@@ -92,6 +92,20 @@ class RunnerState:
                         for source in (result.get("sources") or [])[:50]
                         if isinstance(source, dict)
                     ],
+                    "candidates": (
+                        [
+                            {
+                                "name": str(candidate.get("name") or "")[:128],
+                                "namespace": str(
+                                    candidate.get("namespace") or ""
+                                )[:80],
+                            }
+                            for candidate in (result.get("candidates") or [])[:20]
+                            if isinstance(candidate, dict) and candidate.get("name")
+                        ]
+                        if tool_name == "tool_search"
+                        else []
+                    ),
                 })
         if not self.long_chain_reported and self.tool_count > 8:
             self.long_chain_reported = True

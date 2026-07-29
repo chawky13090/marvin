@@ -37,6 +37,7 @@ async def prepare_agent_context(
     get_real_paths: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
     filter_memories: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None,
     contextual_web_query: str = "",
+    include_document_identity: bool = True,
 ) -> PreparedAgentContext:
     """Construit messages, permissions et prompt de base avec replis non bloquants."""
     try:
@@ -156,22 +157,23 @@ async def prepare_agent_context(
     except Exception:
         pass
 
-    try:
-        document_identity = get_setting("document_identity")
-        if isinstance(document_identity, dict) and any(document_identity.values()):
-            identity_lines = "\n".join(
-                f"- {key} : {value}"
-                for key, value in document_identity.items()
-                if value
-            )
-            system_prompt += (
-                "\n\n=== IDENTITÉ DOCUMENT DÉJÀ CONNUE (ne redemande PAS ces infos) ===\n"
-                f"{identity_lines}\n"
-                "(file_create_pdf/file_create_docx l'appliquent déjà automatiquement en repli — "
-                "inutile de la repasser en argument sauf pour LA remplacer pour ce document précis.)"
-            )
-    except Exception:
-        pass
+    if include_document_identity:
+        try:
+            document_identity = get_setting("document_identity")
+            if isinstance(document_identity, dict) and any(document_identity.values()):
+                identity_lines = "\n".join(
+                    f"- {key} : {value}"
+                    for key, value in document_identity.items()
+                    if value
+                )
+                system_prompt += (
+                    "\n\n=== IDENTITÉ DOCUMENT DÉJÀ CONNUE (ne redemande PAS ces infos) ===\n"
+                    f"{identity_lines}\n"
+                    "(file_create_pdf/file_create_docx l'appliquent déjà automatiquement en repli — "
+                    "inutile de la repasser en argument sauf pour LA remplacer pour ce document précis.)"
+                )
+        except Exception:
+            pass
 
     return PreparedAgentContext(
         overflow=overflow,

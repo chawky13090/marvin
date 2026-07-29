@@ -2110,12 +2110,21 @@ execute_system_self_test = system_self_test_domain.run
 
 
 async def execute_tool_search(
-    query: str,
+    query: str | dict[str, Any],
     limit: int = 10,
 ) -> dict[str, Any]:
     """Recherche le catalogue réel sans transformer le résultat en appel d'outil."""
     from capability_catalog import CapabilityCatalog
 
+    # Le registre historique appelle chaque exécuteur avec un dictionnaire unique.
+    # Conserver aussi l'appel positionnel facilite les tests et les usages internes.
+    if isinstance(query, dict):
+        arguments = query
+        query = str(arguments.get("query") or "")
+        try:
+            limit = int(arguments.get("limit", limit))
+        except (TypeError, ValueError, OverflowError):
+            limit = 10
     return CapabilityCatalog(TOOLS_SPEC).search(query, limit=limit)
 
 
@@ -3234,7 +3243,10 @@ TOOLS_SPEC = [
         "limit": {"type": "integer", "description": "Nombre de résultats (défaut 5)"}},
        ["query"]),
 
-    _t("web_search", "Effectue une recherche Web exclusivement via l'instance SearXNG locale configurée.",
+    _t("web_search",
+       "Découverte Web rapide exclusivement via SearXNG. Retourne titres, URL et extraits, "
+       "sans lire les pages ni produire une synthèse vérifiée. Pour une réponse actuelle "
+       "sourcée, utiliser ensuite web_browse/web_browser_open ou directement web_research.",
        {"query": {"type": "string", "description": "Requête de recherche"},
         "provider": {"type": "string", "enum": ["auto", "searxng"], "description": "Les deux valeurs utilisent exclusivement SearXNG"},
         "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"},
@@ -3242,7 +3254,9 @@ TOOLS_SPEC = [
         "time_range": {"type": "string", "enum": ["day", "week", "month", "year"], "description": "Fenêtre temporelle optionnelle"}},
        ["query"]),
 
-    _t("web_browse", "Récupère et extrait le texte principal d'une page web depuis une URL. Retourne titre, description et contenu texte.",
+    _t("web_browse",
+       "Lit une page Web précise trouvée via SearXNG et extrait son contenu principal. "
+       "À utiliser pour vérifier une source primaire avant de la citer.",
        {"url": {"type": "string", "description": "URL de la page à visiter"},
         "max_chars": {"type": "integer", "description": "Limite de caractères à retourner (défaut 25000, max 60000)"}},
        ["url"]),
@@ -3762,7 +3776,11 @@ TOOLS_SPEC = [
        ["text"]),
 
     # ── Web par vrai navigateur ────────────────────────────────────────────────
-    _t("web_research", "Cherche la réponse sur INTERNET avec un vrai navigateur (contourne les blocages anti-bot), lit les meilleurs résultats et mémorise la réponse. Pour « cherche sur le web », « trouve en ligne », quand une info manque.",
+    _t("web_research",
+       "Recherche Web normale et sourcée : planifie plusieurs requêtes via SearXNG, "
+       "déduplique les résultats, lit les meilleures pages avec un vrai navigateur et "
+       "produit une synthèse avec liens directs. À préférer à web_search lorsque "
+       "l'utilisateur demande une information actuelle, un résumé ou des sources.",
        {"query": {"type": "string", "description": "La question / les mots-clés à rechercher"}},
        ["query"]),
     _t("ai_model_council",
@@ -3916,9 +3934,9 @@ TOOLS_SPEC = [
     _t("web_deep_research",
        "Recherche APPROFONDIE multi-passes sur le web (équivalent Deep Research de ChatGPT/Claude/"
        "Gemini/Perplexity) : plusieurs cycles recherche→analyse des trous→recherche complémentaire, "
-       "rapport structuré avec citations numérotées. PREND PLUSIEURS MINUTES — à utiliser UNIQUEMENT "
-       "quand l'utilisateur demande explicitement une recherche approfondie/exhaustive/un rapport "
-       "détaillé (« fais une recherche approfondie sur... », « fais-moi un rapport complet sur... »), "
+       "rapport structuré avec citations numérotées. PREND PLUSIEURS MINUTES — à utiliser quand "
+       "l'utilisateur demande explicitement une recherche approfondie/exhaustive, un rapport "
+       "détaillé ou impose une couverture multi-source importante, "
        "jamais pour une question simple (utiliser web_research à la place, bien plus rapide).",
        {"query": {"type": "string", "description": "Le sujet à rechercher en profondeur"},
         "depth": {"type": "string", "enum": ["deep", "exhaustive"],
