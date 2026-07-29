@@ -11990,3 +11990,38 @@ Le gate consolidé réussit **193/193**, y compris le build Next.js/Turbopack. A
 **28/28** et les parcours de pages **40/40**. Le contrôle visuel réel de Code Workspace ne
 remonte aucune erreur console et confirme Definition of Done, Delivery Pack, fichiers et
 chronologie sur une mission historique.
+## 2026-07-29 — v2.480.0 — HTTPS LAN et jumelage éphémère
+
+### Demande et décision
+
+L'utilisateur valide le centre de jumelage puis demande le chiffrement des flux LAN. Deux
+approches ont été comparées : TLS séparé dans Next/Uvicorn, ou une passerelle unique. La
+passerelle Caddy 2.11.4 est retenue afin de conserver SSE/WebSocket, centraliser TLS et éviter
+deux cycles de certificats. Le binaire Windows x64 est téléchargé depuis la release officielle
+et accepté uniquement si son SHA-512 épinglé correspond.
+
+### Implémentation et sécurité
+
+`https://hôte:8443` transmet `/marvin-api/*` à FastAPI et le reste à Next.js. Les routes API
+Next ne sont pas interceptées. FastAPI n'accorde la confiance à `X-Forwarded-For` que si la
+connexion TCP vient réellement de la boucle locale; le smoke LAN prouve qu'un client proxifié
+n'est pas confondu avec le propriétaire. Les cookies deviennent `Secure` sous HTTPS.
+
+Le code de jumelage expire après cinq minutes, est remplacé après une réussite et utilise
+`standard` par défaut. La régénération et le téléchargement du certificat public sont
+disponibles depuis Paramètres > Connexions; seul le propriétaire local reçoit le code. La clé
+privée de l'autorité reste dans le runtime ignoré par Git. Aucun journal d'accès Caddy n'est
+persisté afin d'éviter une seconde copie de métadonnées sensibles; les décisions restent dans
+le logger backend expurgé.
+
+### Validation et rollback
+
+Les tests `test_lan_access.py`, `test_lan_access_api.py` et `test_https_gateway.py` réussissent.
+Le smoke réel obtient HTTP 200 via TLS avec HSTS. Une requête HTTPS par `127.0.0.1` reçoit le
+code propriétaire; la même requête par `192.168.1.105` exige un jumelage et ne reçoit aucun
+code. La configuration Caddy est validée avant démarrage.
+
+Rollback : `git revert <commit-v2.480>` pour le code, puis
+`scripts\rollback-marvin-https.ps1 -Confirm:$false` pour le runtime. Aucun schéma ni donnée
+métier n'est migré. La dette restante est conservée dans SEC-001 jusqu'à fermeture des ports
+HTTP LAN, service Windows/port 443 et révocation multiplateforme.

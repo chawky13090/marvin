@@ -1,0 +1,27 @@
+{
+	admin 127.0.0.1:2019
+	storage file_system {$MARVIN_CADDY_DATA}
+}
+
+{$MARVIN_HTTPS_ORIGINS} {
+	tls internal
+	encode zstd gzip
+
+	@marvin_backend path /marvin-api/*
+	handle @marvin_backend {
+		uri strip_prefix /marvin-api
+		reverse_proxy 127.0.0.1:8005
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+		Strict-Transport-Security "max-age=86400"
+	}
+}

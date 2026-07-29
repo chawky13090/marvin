@@ -59,6 +59,7 @@ backend/generated_videos/
 # Logs Marvin
 *.log
 /artifacts/
+/runtime/
 
 # Cache local d'upload Drive (fichiers temporaires, pas du code)
 .tmp.driveupload/

@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import ipaddress
 import secrets
 import threading
 import time
@@ -30,6 +31,7 @@ PUBLIC_PATHS = {
 }
 MAX_PAIR_ATTEMPTS = 5
 PAIR_WINDOW_SECONDS = 10 * 60
+PAIR_CODE_SECONDS = 5 * 60
 ACCESS_PROFILES = {
     "read_only": frozenset({"read"}),
     "standard": frozenset({"read", "operate"}),
@@ -71,6 +73,20 @@ def is_loopback(host: str | None) -> bool:
     return str(host or "").split("%", 1)[0] in {"127.0.0.1", "::1"}
 
 
+def effective_client(host: str | None, headers: dict[str, str]) -> str:
+    """Résout le client transmis uniquement par la passerelle locale de confiance."""
+    direct = str(host or "")
+    if not is_loopback(direct):
+        return direct
+    forwarded = str(headers.get("x-forwarded-for") or "").split(",", 1)[0].strip()
+    if not forwarded:
+        return direct
+    try:
+        return str(ipaddress.ip_address(forwarded))
+    except ValueError:
+        return direct
+
+
 def _headers(scope: dict[str, Any]) -> dict[str, str]:
     return {
         key.decode("latin-1").casefold(): value.decode("latin-1")
@@ -94,10 +110,13 @@ def _origin_allowed(origin: str, host_header: str) -> bool:
         target_host = str(target.hostname or "").casefold()
     except (TypeError, ValueError):
         return False
+    source_port = source.port or (443 if source.scheme == "https" else 80)
+    target_port = target.port or (443 if source.scheme == "https" else 80)
     return (
         source.scheme in {"http", "https"}
         and str(source.hostname or "").casefold() == target_host
-        and source.port in {3000, 8005}
+        and (source_port, target_port)
+        in {(3000, 8005), (8005, 8005), (443, 443), (8443, 8443)}
     )
 
 
@@ -121,12 +140,26 @@ class LanAccessManager:
         clock=time.time,
         secret_loader=None,
     ) -> None:
-        self.pairing_code = pairing_code or secrets.token_urlsafe(12)
         self._clock = clock
+        self._pairing_code = pairing_code or secrets.token_urlsafe(12)
+        self._pairing_code_created_at = self._clock()
         self._secret_loader = secret_loader or self._load_secret
         self._secret_cache: bytes | None = None
         self._attempts: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.RLock()
+
+    @property
+    def pairing_code(self) -> str:
+        with self._lock:
+            if self._clock() - self._pairing_code_created_at > PAIR_CODE_SECONDS:
+                return ""
+            return self._pairing_code
+
+    def regenerate_pairing_code(self) -> str:
+        with self._lock:
+            self._pairing_code = secrets.token_urlsafe(12)
+            self._pairing_code_created_at = self._clock()
+            return self._pairing_code
 
     def _secret(self) -> bytes:
         with self._lock:
@@ -173,10 +206,12 @@ class LanAccessManager:
             attempts = self._prune_attempts(client)
             if len(attempts) >= MAX_PAIR_ATTEMPTS:
                 raise LanAccessError("Trop de tentatives de jumelage.")
-            if not hmac.compare_digest(str(code or ""), self.pairing_code):
+            active_code = self.pairing_code
+            if not active_code or not hmac.compare_digest(str(code or ""), active_code):
                 attempts.append(self._clock())
                 raise LanAccessError("Code de jumelage invalide.")
             attempts.clear()
+            self.regenerate_pairing_code()
         return self.issue(client, profile=profile)
 
     def issue(self, client: str, *, profile: str = "full") -> tuple[str, str]:
@@ -301,7 +336,10 @@ class LanAccessMiddleware:
             await self.app(scope, receive, send)
             return
         headers = _headers(scope)
-        client = (scope.get("client") or ("", 0))[0]
+        client = effective_client(
+            (scope.get("client") or ("", 0))[0],
+            headers,
+        )
         session = self.manager.authenticated(headers, client=client)
         if not is_loopback(client) and session is None:
             await self._reject(scope, receive, send, 401, "lan_authentication_required")

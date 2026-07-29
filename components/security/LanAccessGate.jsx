@@ -7,7 +7,7 @@ import { BACKEND_URL } from '@/lib/backend';
 export default function LanAccessGate({ children }) {
   const [state, setState] = useState({ loading: true, required: false, authenticated: false });
   const [code, setCode] = useState('');
-  const [accessProfile, setAccessProfile] = useState('full');
+  const [accessProfile, setAccessProfile] = useState('standard');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -68,7 +68,7 @@ export default function LanAccessGate({ children }) {
           <h1>Jumeler cet appareil</h1>
           <p>
             Pour protéger les outils, fichiers et e-mails de Marvin sur le réseau local,
-            saisis le code temporaire affiché dans la fenêtre Backend du PC principal.
+            saisis le code temporaire affiché dans Paramètres → Connexions sur le PC principal.
           </p>
           <label htmlFor="marvin-pair-code">Code de jumelage</label>
           <input
@@ -86,15 +86,19 @@ export default function LanAccessGate({ children }) {
             value={accessProfile}
             onChange={(event) => setAccessProfile(event.target.value)}
           >
-            <option value="full">Complet — toutes les fonctions</option>
             <option value="standard">Standard — sans administration sensible</option>
             <option value="read_only">Lecture seule</option>
+            <option value="full">Complet — toutes les fonctions sensibles</option>
           </select>
           {error && <div className="lan-access-error">{error}</div>}
           <button type="submit" disabled={busy || code.trim().length < 12}>
             {busy ? 'Vérification…' : 'Autoriser cet appareil'}
           </button>
-          <small>Le code change à chaque redémarrage. La session reste dans un cookie HttpOnly.</small>
+          <small>
+            {state.transport_secure
+              ? 'Connexion HTTPS chiffrée. La session reste dans un cookie Secure et HttpOnly.'
+              : 'Connexion HTTP non chiffrée. Utilise l’adresse HTTPS proposée par le PC principal.'}
+          </small>
         </form>
       </div>
     );

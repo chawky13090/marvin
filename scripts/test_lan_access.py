@@ -17,6 +17,7 @@ from lan_access import (
     LanAccessError,
     LanAccessManager,
     LanAccessMiddleware,
+    PAIR_CODE_SECONDS,
 )
 
 
@@ -75,6 +76,7 @@ def main() -> int:
     assert _status(asyncio.run(_request(middleware, client="192.168.1.50"))) == 401
 
     token, csrf = manager.pair("192.168.1.50", "verified-pair-code")
+    assert manager.pairing_code != "verified-pair-code", "Le code doit être à usage unique."
     cookie = f"{SESSION_COOKIE}={token}; {CSRF_COOKIE}={csrf}"
     assert _status(asyncio.run(_request(
         middleware,
@@ -137,6 +139,31 @@ def main() -> int:
         method="DELETE",
         headers=wrong_origin,
     ))) == 403
+    tls_browser = {
+        **browser,
+        "origin": "https://192.168.1.10:8443",
+        "host": "192.168.1.10:8443",
+    }
+    assert _status(asyncio.run(_request(
+        middleware,
+        client="192.168.1.50",
+        method="POST",
+        headers=tls_browser,
+    ))) == 200
+
+    expiring = LanAccessManager(
+        pairing_code="temporary-code-value",
+        clock=lambda: now[0],
+        secret_loader=lambda: b"E" * 32,
+    )
+    now[0] += PAIR_CODE_SECONDS + 1
+    assert expiring.pairing_code == ""
+    try:
+        expiring.pair("192.168.1.80", "temporary-code-value")
+    except LanAccessError:
+        pass
+    else:
+        raise AssertionError("Un code de jumelage expiré doit être refusé.")
 
     local_csrf = "local-csrf-token-with-enough-entropy"
     assert _status(asyncio.run(_request(

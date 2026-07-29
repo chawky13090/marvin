@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$Ports = @(3000, 8005)
+$Ports = @(3000, 8005, 8443)
 $Stopped = @()
 
 function Test-MarvinProcess {

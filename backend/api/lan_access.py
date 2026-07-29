@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 from lan_access import (
@@ -12,18 +16,20 @@ from lan_access import (
     CSRF_COOKIE,
     SESSION_COOKIE,
     LanAccessError,
+    effective_client,
     is_loopback,
     required_capability,
 )
 
 
 router = APIRouter(prefix="/api/auth/lan", tags=["access"])
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class PairRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     code: StrictStr = Field(min_length=12, max_length=128)
-    access_profile: Literal["read_only", "standard", "full"] = "full"
+    access_profile: Literal["read_only", "standard", "full"] = "standard"
 
 
 class IntrospectRequest(BaseModel):
@@ -71,10 +77,38 @@ def _audit_pair(success: bool, *, error_code: str | None = None) -> None:
         pass
 
 
+def _https_status() -> dict:
+    state_path = _PROJECT_ROOT / "runtime" / "https" / "state.json"
+    root_path = (
+        _PROJECT_ROOT
+        / "runtime"
+        / "https"
+        / "data"
+        / "pki"
+        / "authorities"
+        / "local"
+        / "root.crt"
+    )
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        state = {}
+    result = {
+        "configured": bool(state.get("enabled")),
+        "port": state.get("port"),
+        "origins": state.get("origins") if isinstance(state.get("origins"), list) else [],
+    }
+    try:
+        result["root_sha256"] = hashlib.sha256(root_path.read_bytes()).hexdigest()
+    except OSError:
+        result["root_sha256"] = None
+    return result
+
+
 @router.get("/status")
 async def lan_status(request: Request, response: Response):
-    client = request.client.host if request.client else ""
     headers = {key.casefold(): value for key, value in request.headers.items()}
+    client = effective_client(request.client.host if request.client else "", headers)
     session = ACCESS.authenticated(headers, client=client)
     authenticated = is_loopback(client) or session is not None
     if is_loopback(client) and session is None:
@@ -94,7 +128,43 @@ async def lan_status(request: Request, response: Response):
         result["access_profile"] = session["profile"]
     if is_loopback(client):
         result["pairing_code"] = ACCESS.pairing_code
+        result["pairing_expires_in_seconds"] = 300 if ACCESS.pairing_code else 0
+    if is_loopback(client) or session is not None:
+        result["https"] = _https_status()
     return result
+
+
+@router.post("/pairing-code")
+async def regenerate_pairing_code(request: Request):
+    headers = {key.casefold(): value for key, value in request.headers.items()}
+    client = effective_client(request.client.host if request.client else "", headers)
+    if not is_loopback(client):
+        raise HTTPException(status_code=403, detail="Action réservée au PC principal.")
+    code = ACCESS.regenerate_pairing_code()
+    _audit_pair(True, error_code="pairing_code_regenerated")
+    return {"pairing_code": code, "expires_in_seconds": 300}
+
+
+@router.get("/ca-certificate")
+async def download_ca_certificate():
+    certificate = (
+        _PROJECT_ROOT
+        / "runtime"
+        / "https"
+        / "data"
+        / "pki"
+        / "authorities"
+        / "local"
+        / "root.crt"
+    )
+    if not certificate.is_file():
+        raise HTTPException(status_code=404, detail="Autorité HTTPS non configurée.")
+    return FileResponse(
+        certificate,
+        media_type="application/x-x509-ca-cert",
+        filename="marvin-local-authority.crt",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/introspect")
@@ -119,7 +189,8 @@ async def lan_introspect(
 
 @router.post("/pair")
 async def lan_pair(payload: PairRequest, request: Request, response: Response):
-    client = request.client.host if request.client else ""
+    headers = {key.casefold(): value for key, value in request.headers.items()}
+    client = effective_client(request.client.host if request.client else "", headers)
     try:
         token, csrf = ACCESS.pair(
             client,

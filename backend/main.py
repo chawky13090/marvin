@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique
 # v2.479 — activation vocale explicite, dock inférieur et retry TTS borné
 # v2.478 — Quiet Workbench, accueil contextuel et historique unifié
 # v2.477 — Activity Beacon persistant et progression réelle des outils longs

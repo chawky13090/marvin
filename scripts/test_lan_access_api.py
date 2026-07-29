@@ -55,6 +55,7 @@ async def _run() -> None:
             headers={"Origin": "http://marvin.local:3000"},
         )
         assert paired.status_code == 200
+        assert paired.json()["access_profile"] == "standard"
         cookies = paired.headers.get_list("set-cookie")
         assert any("marvin_session=" in item and "HttpOnly" in item for item in cookies)
         assert any(

@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.476.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.480.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.479.0)
+## 9. État actuel (v2.480.0)
+
+**v2.480 (HTTPS LAN progressif)** : Caddy 2.11.4, téléchargé depuis la release officielle et
+contrôlé par SHA-512 épinglé, fournit `https://hôte:8443`. `/marvin-api/*` rejoint FastAPI et
+les autres chemins Next.js, sans collision avec les routes `/api` du frontend. L'autorité
+locale est propre à l'installation et sa clé privée reste dans `runtime/` ignoré par Git.
+FastAPI n'honore `X-Forwarded-For` que depuis la passerelle en boucle locale. Les cookies
+deviennent Secure sous TLS; le code de jumelage expire après cinq minutes, est à usage unique
+et le profil par défaut est Standard. `MARVIN-HTTPS.md` documente installation, confiance,
+tests, limites et rollback. HTTP LAN reste temporairement ouvert; SEC-001 demeure MITIGATED.
 
 **v2.479 (contrat vocal explicite)** : le mode mains libres ne persiste plus dans le
 navigateur et démarre toujours désactivé. Une dictée ponctuelle depuis l'avatar ne l'active

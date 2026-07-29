@@ -160,6 +160,24 @@ export default function SettingsPage() {
     }
   }
 
+  async function regenerateLanPairingCode() {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/auth/lan/pairing-code`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('pairing_code_refused');
+      const generated = await response.json();
+      setLanAccess(current => ({
+        ...(current || {}),
+        pairing_code: generated.pairing_code,
+        pairing_expires_in_seconds: generated.expires_in_seconds,
+      }));
+      showNotification('Code de jumelage renouvelé pour cinq minutes');
+    } catch {
+      showNotification('Impossible de renouveler le code depuis cet appareil');
+    }
+  }
+
   useEffect(() => {
     fetchStatus();
     fetchAutoConfig();
@@ -1060,23 +1078,52 @@ export default function SettingsPage() {
           {activeTab === 'connections' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-              {lanAccess?.pairing_code && (
+              {lanAccess && (
                 <div style={{
                   padding: '16px', background: 'var(--bg-secondary)',
                   border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
                 }}>
                   <div style={{ fontWeight: 650, marginBottom: 6 }}>Accès réseau protégé</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-xs)', lineHeight: 1.5 }}>
-                    Saisis ce code temporaire sur le téléphone ou le PC à jumeler. Il change au redémarrage
-                    et n&apos;est jamais écrit dans les journaux.
+                    Le code est à usage unique, valable cinq minutes et n&apos;est jamais écrit dans les journaux.
                   </div>
-                  <code style={{
-                    display: 'inline-block', marginTop: 10, padding: '9px 12px',
-                    borderRadius: 8, background: 'var(--bg-primary)', userSelect: 'all',
-                    letterSpacing: '0.06em',
-                  }}>
-                    {lanAccess.pairing_code}
-                  </code>
+                  {lanAccess.pairing_code ? (
+                    <code style={{
+                      display: 'inline-block', marginTop: 10, padding: '9px 12px',
+                      borderRadius: 8, background: 'var(--bg-primary)', userSelect: 'all',
+                      letterSpacing: '0.06em',
+                    }}>
+                      {lanAccess.pairing_code}
+                    </code>
+                  ) : (
+                    <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 'var(--font-xs)' }}>
+                      Aucun code actif.
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-ghost" onClick={regenerateLanPairingCode}>
+                      Générer un nouveau code
+                    </button>
+                    {lanAccess.https?.origins?.map(origin => (
+                      <a key={origin} className="btn btn-ghost" href={origin} target="_blank" rel="noreferrer">
+                        Ouvrir {origin}
+                      </a>
+                    ))}
+                  </div>
+                  {lanAccess.https?.root_sha256 && (
+                    <>
+                      <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 11, wordBreak: 'break-all' }}>
+                        Empreinte SHA-256 de l&apos;autorité Marvin : {lanAccess.https.root_sha256}
+                      </div>
+                      <a
+                        href={`${BACKEND_URL}/api/auth/lan/ca-certificate`}
+                        className="btn btn-ghost"
+                        style={{ display: 'inline-flex', marginTop: 8 }}
+                      >
+                        Télécharger l&apos;autorité HTTPS
+                      </a>
+                    </>
+                  )}
                 </div>
               )}
 
