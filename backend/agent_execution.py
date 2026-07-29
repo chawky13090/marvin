@@ -69,6 +69,7 @@ async def execute_registered_tool(
     request_id: str | None,
     *,
     registry: Mapping[str, Any] | None = None,
+    client_idempotency_key: str | None = None,
 ) -> Any:
     """Execute un outil derriere le recu idempotent des actions a effet de bord.
 
@@ -93,6 +94,7 @@ async def execute_registered_tool(
         arguments=tool_args,
         operation=operation,
         guarded=tool_name in DANGEROUS_TOOLS or should_guard(tool_name),
+        client_key=client_idempotency_key,
     )
 
 

@@ -32,6 +32,10 @@ _SECRET_MARKERS = (
 )
 
 
+class IdempotencyMismatchError(RuntimeError):
+    """Une clé client a été réutilisée pour une opération différente."""
+
+
 def should_guard(tool_name: str) -> bool:
     """Vrai pour une action susceptible de produire un effet ou un objet externe."""
     normalized = str(tool_name or "").strip().lower()
@@ -45,11 +49,22 @@ def _canonical_args(arguments: dict[str, Any]) -> str:
 
 
 def idempotency_key(
-    request_id: str, conversation_id: str, tool_name: str, arguments: dict[str, Any]
+    request_id: str,
+    conversation_id: str,
+    tool_name: str,
+    arguments: dict[str, Any],
+    *,
+    client_key: str | None = None,
 ) -> tuple[str, str]:
     canonical = _canonical_args(arguments)
     args_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    payload = "\0".join((request_id, conversation_id, tool_name, args_hash)).encode("utf-8")
+    payload = (
+        f"http\0{client_key}".encode("utf-8")
+        if client_key
+        else "\0".join(
+            (request_id, conversation_id, tool_name, args_hash)
+        ).encode("utf-8")
+    )
     return hashlib.sha256(payload).hexdigest(), args_hash
 
 
@@ -76,10 +91,21 @@ def _with_replay(result: Any, **metadata: Any) -> Any:
 
 
 def claim(
-    *, request_id: str, conversation_id: str, tool_name: str, arguments: dict[str, Any]
+    *,
+    request_id: str,
+    conversation_id: str,
+    tool_name: str,
+    arguments: dict[str, Any],
+    client_key: str | None = None,
 ) -> dict[str, Any]:
     """Reserve atomiquement une action ou retourne son etat durable existant."""
-    key, args_hash = idempotency_key(request_id, conversation_id, tool_name, arguments)
+    key, args_hash = idempotency_key(
+        request_id,
+        conversation_id,
+        tool_name,
+        arguments,
+        client_key=client_key,
+    )
     with db() as connection:
         cursor = connection.execute(
             """INSERT OR IGNORE INTO action_receipts
@@ -95,6 +121,20 @@ def claim(
         ).fetchone()
         if row is None:
             raise RuntimeError("Le recu d'action est introuvable apres reservation.")
+        if client_key:
+            identity = connection.execute(
+                """SELECT conversation_id, tool_name, args_hash
+                   FROM action_receipts WHERE idempotency_key = ?""",
+                (key,),
+            ).fetchone()
+            if identity is None or (
+                str(identity["conversation_id"]) != conversation_id
+                or str(identity["tool_name"]) != tool_name
+                or str(identity["args_hash"]) != args_hash
+            ):
+                raise IdempotencyMismatchError(
+                    "Cette clé d'idempotence appartient à une autre opération."
+                )
         status = str(row["status"])
         if status == "completed":
             try:
@@ -134,9 +174,11 @@ async def execute_once(
     arguments: dict[str, Any],
     operation: Callable[[], Awaitable[Any]],
     guarded: bool | None = None,
+    client_key: str | None = None,
 ) -> Any:
     """Execute une action une fois; rejoue son recu sans reproduire l'effet externe."""
-    if not request_id or not (should_guard(tool_name) if guarded is None else guarded):
+    guarded_action = should_guard(tool_name) if guarded is None else guarded
+    if not request_id or (not client_key and not guarded_action):
         return await operation()
 
     receipt = claim(
@@ -144,6 +186,7 @@ async def execute_once(
         conversation_id=conversation_id,
         tool_name=tool_name,
         arguments=arguments,
+        client_key=client_key,
     )
     state = receipt["state"]
     key = receipt["key"]

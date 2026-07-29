@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from typing import Annotated, Any
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 import chat_turn_runtime
 import database as db
+from action_replay import IdempotencyMismatchError
 import tool_gateway
 import tool_runtime
 import tools as tool_module
@@ -28,6 +30,23 @@ from config import (
 router = APIRouter(tags=["agent-gateway"])
 MAX_CHAT_PAYLOAD_BYTES = 32 * 1024 * 1024
 MAX_TOOL_ARGUMENT_BYTES = 2 * 1024 * 1024
+IDEMPOTENCY_RESPONSES = {
+    200: {
+        "description": "Résultat exécuté ou relu depuis le reçu.",
+        "headers": {
+            "Idempotency-Replayed": {
+                "description": "true si le résultat provient d'un reçu terminé.",
+                "schema": {"type": "string", "enum": ["true", "false"]},
+            }
+        },
+    },
+    409: {
+        "description": "La même action est active ou son effet précédent est inconnu."
+    },
+    422: {
+        "description": "Clé UUID invalide ou réutilisée avec un autre payload."
+    },
+}
 
 
 def _json_size(value: Any) -> int:
@@ -174,6 +193,7 @@ async def _execute_through_gateway(
     *,
     source: str,
     confirmed_by_ui: bool,
+    idempotency_key: str | None = None,
 ) -> tool_gateway.ToolGatewayResult:
     return await tool_runtime.execute(
         request.toolName,
@@ -183,6 +203,7 @@ async def _execute_through_gateway(
         conversation_id=request.conversationId,
         request_id=request.requestId,
         confirmed_by_ui=confirmed_by_ui,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -194,18 +215,45 @@ def _tool_outcome_response(outcome: tool_gateway.ToolGatewayResult):
             "status": "degraded",
             "errors": list(observation_errors),
         }
+    headers: dict[str, str] = {}
+    replay = outcome.result.get("_replay") if isinstance(outcome.result, dict) else None
+    if isinstance(replay, dict):
+        headers["Idempotency-Replayed"] = (
+            "true" if replay.get("reused") is True else "false"
+        )
+        if replay.get("state") in {"in_progress", "unknown"}:
+            return JSONResponse(status_code=409, content=payload, headers=headers)
     if outcome.status_code != 200:
-        return JSONResponse(status_code=outcome.status_code, content=payload)
+        return JSONResponse(
+            status_code=outcome.status_code,
+            content=payload,
+            headers=headers,
+        )
+    if headers:
+        return JSONResponse(content=payload, headers=headers)
     return payload
 
 
-@router.post("/api/tools")
-async def execute_tool_endpoint(request: ToolExecuteRequest):
-    outcome = await _execute_through_gateway(
-        request,
-        source="ui",
-        confirmed_by_ui=True,
-    )
+@router.post("/api/tools", responses=IDEMPOTENCY_RESPONSES)
+async def execute_tool_endpoint(
+    request: ToolExecuteRequest,
+    idempotency_key: Annotated[
+        UUID | None,
+        Header(alias="Idempotency-Key"),
+    ] = None,
+):
+    try:
+        outcome = await _execute_through_gateway(
+            request,
+            source="ui",
+            confirmed_by_ui=True,
+            idempotency_key=str(idempotency_key) if idempotency_key else None,
+        )
+    except IdempotencyMismatchError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Cette clé d'idempotence appartient à une autre opération.",
+        ) from exc
     return _tool_outcome_response(outcome)
 
 
@@ -223,13 +271,26 @@ async def list_tools_endpoint():
     }
 
 
-@router.post("/api/mcp/execute")
-async def execute_tool_mcp(request: ToolExecuteRequest):
-    outcome = await _execute_through_gateway(
-        request,
-        source="mcp",
-        confirmed_by_ui=False,
-    )
+@router.post("/api/mcp/execute", responses=IDEMPOTENCY_RESPONSES)
+async def execute_tool_mcp(
+    request: ToolExecuteRequest,
+    idempotency_key: Annotated[
+        UUID | None,
+        Header(alias="Idempotency-Key"),
+    ] = None,
+):
+    try:
+        outcome = await _execute_through_gateway(
+            request,
+            source="mcp",
+            confirmed_by_ui=False,
+            idempotency_key=str(idempotency_key) if idempotency_key else None,
+        )
+    except IdempotencyMismatchError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Cette clé d'idempotence appartient à une autre opération.",
+        ) from exc
     return _tool_outcome_response(outcome)
 
 

@@ -41,6 +41,7 @@ async def execute(
     confirmed_by_ui: bool = False,
     conversation_id: str | None = None,
     request_id: str | None = None,
+    idempotency_key: str | None = None,
     permission_level: int | None = None,
     registry: Mapping[str, Any] | None = None,
     specifications: Sequence[dict[str, Any]] | None = None,
@@ -69,6 +70,7 @@ async def execute(
             conversation_id=conversation_id,
             request_id=request_id or api_observability.current_request_id(),
             confirmed_by_ui=bool(confirmed_by_ui),
+            idempotency_key=idempotency_key,
         ),
         registry=registry if registry is not None else tool_module.TOOLS_REGISTRY,
         specifications=(

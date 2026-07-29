@@ -36,6 +36,7 @@ class ToolGatewayRequest:
     conversation_id: str | None = None
     request_id: str | None = None
     confirmed_by_ui: bool = False
+    idempotency_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +150,7 @@ async def execute_tool(
         request.conversation_id or f"{request.source}:direct",
         request.request_id,
         registry=registry,
+        client_idempotency_key=request.idempotency_key,
     )
     duration_ms = max(0, int((time.monotonic() - started) * 1000))
     observation_errors: list[str] = []

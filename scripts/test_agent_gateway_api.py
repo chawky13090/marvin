@@ -75,6 +75,7 @@ async def _exercise_routes() -> None:
     assert execute.await_args.kwargs == {
         "source": "ui",
         "confirmed_by_ui": True,
+        "idempotency_key": None,
     }
 
     degraded = SimpleNamespace(
@@ -110,6 +111,62 @@ async def _exercise_routes() -> None:
         )
     assert response.status_code == 403
     assert json.loads(response.body)["result"]["permission_denied"] is True
+
+    replayed = SimpleNamespace(
+        status_code=200,
+        result={
+            "success": True,
+            "_replay": {"state": "completed", "reused": True},
+        },
+        observation_errors=(),
+    )
+    key = agent_gateway.UUID("d48cccf9-2c8b-4be9-94a8-6d6fcb930f10")
+    with patch.object(
+        agent_gateway,
+        "_execute_through_gateway",
+        AsyncMock(return_value=replayed),
+    ) as execute:
+        response = await agent_gateway.execute_tool_endpoint(
+            agent_gateway.ToolExecuteRequest(toolName="task_create"),
+            idempotency_key=key,
+        )
+    assert response.headers["idempotency-replayed"] == "true"
+    assert execute.await_args.kwargs["idempotency_key"] == str(key)
+
+    concurrent = SimpleNamespace(
+        status_code=200,
+        result={
+            "success": False,
+            "_replay": {"state": "in_progress", "reused": False},
+        },
+        observation_errors=(),
+    )
+    with patch.object(
+        agent_gateway,
+        "_execute_through_gateway",
+        AsyncMock(return_value=concurrent),
+    ):
+        response = await agent_gateway.execute_tool_endpoint(
+            agent_gateway.ToolExecuteRequest(toolName="task_create"),
+            idempotency_key=key,
+        )
+    assert response.status_code == 409
+
+    with patch.object(
+        agent_gateway,
+        "_execute_through_gateway",
+        AsyncMock(side_effect=agent_gateway.IdempotencyMismatchError("mismatch")),
+    ):
+        try:
+            await agent_gateway.execute_tool_endpoint(
+                agent_gateway.ToolExecuteRequest(toolName="task_create"),
+                idempotency_key=key,
+            )
+        except agent_gateway.HTTPException as exc:
+            assert exc.status_code == 422
+            assert "mismatch" not in str(exc.detail)
+        else:
+            raise AssertionError("Le conflit de fingerprint doit produire HTTP 422.")
 
 
 def _expect_invalid(factory) -> None:

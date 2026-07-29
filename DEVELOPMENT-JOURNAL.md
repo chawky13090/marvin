@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.467.0 — Idempotence HTTP des gateways d'outils
+
+### Constat et comparaison
+
+Le Runner protégeait déjà les actions d'un tour par `action_receipts`, mais un client HTTP
+qui répétait `/api/tools` après une coupure recevait une nouvelle corrélation et pouvait
+reproduire l'effet. Un cache HTTP séparé aurait corrigé le symptôme en ajoutant une seconde
+source de vérité. L'extension du reçu transactionnel existant est retenue. Google AIP-155,
+AWS et le projet IETF HTTPAPI convergent sur clé client, replay du résultat, fingerprint et
+refus d'une même clé avec d'autres paramètres.
+
+### Implémentation, sécurité et observabilité
+
+Les gateways UI et MCP acceptent un `Idempotency-Key` UUID optionnel. Sa présence force le
+passage par le reçu, même pour un outil classé lecture. La clé brute n'est jamais persistée :
+son SHA-256 identifie le reçu. Conversation, outil et arguments canoniques forment le
+fingerprint. Un résultat terminé est relu avec `Idempotency-Replayed: true`; une concurrence
+ou un effet interrompu inconnu retourne 409; un payload différent retourne 422. Le frontend
+génère une clé pour chaque appel direct et laisse un client de retry fournir sa clé stable.
+
+La corrélation technique reste distincte. Arguments bruts, clé client et secrets ne rejoignent
+ni SQLite ni les logs; le résultat du reçu reste expurgé récursivement. Aucun nouveau store,
+journal ou worker n'est ajouté. La rétention actuelle suit la base : sa future compaction sera
+décidée avec le comparatif LangGraph/MARVA/autres stores, car supprimer un reçu réautorise
+potentiellement un ancien effet.
+
+### Validation et rollback
+
+Les tests ciblés couvrent première exécution, replay avec une autre corrélation, outil
+normalement non gardé, concurrence, interruption, résultat expurgé, panne de persistance,
+conflit de fingerprint, réponses 409/422 et header de replay. OpenAPI mesure désormais deux
+mutations idempotentes. Le build Next.js 16.2.12 Turbopack, composition, architecture,
+gateway, runtime, inventaire OpenAPI et lint ciblé réussissent. Sur le backend réel 2.467.0,
+un calcul `40+2` avec le même UUID répond successivement `200/false`, puis `200/true`; le
+même UUID avec `41+2` répond 422. SQLite contient un unique reçu `completed`, identifié
+uniquement par SHA-256, sans UUID brut. Les smokes réussissent **28/28 API** et
+**40/40 pages**. Rollback exact : `git revert <commit-v2.467>`; aucun schéma ni donnée
+n'est migré.
+
 ## 2026-07-29 — v2.466.0 — Autorisation LAN par capacités
 
 ### Constat et décision

@@ -109,6 +109,59 @@ async def _exercise(path: Path) -> None:
         assert len(receipt_failure["_replay"]["incident"]) == 32
         assert "disque plein" not in str(receipt_failure)
 
+        http_calls = 0
+
+        async def create_from_http():
+            nonlocal http_calls
+            http_calls += 1
+            return {"success": True, "id": "task-http"}
+
+        client_key = "d48cccf9-2c8b-4be9-94a8-6d6fcb930f10"
+        first_http = await action_replay.execute_once(
+            request_id="correlation-a",
+            conversation_id="http:direct",
+            tool_name="task_create",
+            arguments={"title": "Stable"},
+            operation=create_from_http,
+            client_key=client_key,
+        )
+        replayed_http = await action_replay.execute_once(
+            request_id="correlation-b",
+            conversation_id="http:direct",
+            tool_name="task_create",
+            arguments={"title": "Stable"},
+            operation=create_from_http,
+            client_key=client_key,
+        )
+        assert http_calls == 1
+        for correlation in ("read-correlation-a", "read-correlation-b"):
+            await action_replay.execute_once(
+                request_id=correlation,
+                conversation_id="http:direct",
+                tool_name="task_list",
+                arguments={},
+                operation=create_from_http,
+                guarded=False,
+                client_key="6d00e470-3820-4f99-85f8-99f39c0e4ed9",
+            )
+        assert http_calls == 2
+        assert first_http["_replay"]["reused"] is False
+        assert replayed_http["_replay"]["reused"] is True
+        try:
+            await action_replay.execute_once(
+                request_id="correlation-c",
+                conversation_id="http:direct",
+                tool_name="task_create",
+                arguments={"title": "Different"},
+                operation=create_from_http,
+                client_key=client_key,
+            )
+        except action_replay.IdempotencyMismatchError:
+            pass
+        else:
+            raise AssertionError("Une clé HTTP réutilisée avec un autre payload doit échouer.")
+        assert http_calls == 2
+
 
 def main() -> int:
     assert action_replay.should_guard("email_send")

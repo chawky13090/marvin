@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.466.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.467.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.466.0)
+## 9. État actuel (v2.467.0)
+
+**v2.467 (idempotence HTTP des outils)** : les gateways UI et MCP acceptent
+`Idempotency-Key` UUID. Le registre `action_receipts` reste l'unique autorité : clé client
+hachée, fingerprint canonique, réservation atomique, replay sans nouvel effet, concurrence
+et résultat inconnu en 409, réutilisation avec un autre payload en 422. Le frontend fournit
+une clé aux appels directs. Aucun argument ni clé brute n'est persisté ou journalisé.
 
 **v2.466 (autorisation LAN par capacités)** : chaque session jumelée signe un profil
 `read_only`, `standard` ou `full`; `full` reste le défaut compatible. La garde recalcule à

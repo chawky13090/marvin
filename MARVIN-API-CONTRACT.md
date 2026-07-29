@@ -19,11 +19,12 @@ Le constat critique est objectif :
 - 363 opérations avec une erreur 4xx documentée ;
 - 362 opérations protégées par le contrat de session LAN ;
 - 362 opérations déclarant une capacité serveur contrôlée à chaque requête ;
-- 0 mutation déclarant une clé d'idempotence.
+- 2 mutations de gateway déclarant une clé d'idempotence UUID optionnelle.
 
 La garde globale fournit l'identité réseau et l'autorisation par capacité.
 La promotion suivra donc l'ordre : transport HTTPS LAN,
-idempotence des mutations à effet, puis modèles de réponse métier explicites. Chaque famille
+extension progressive de l'idempotence au-delà des deux gateways, puis modèles de réponse
+métier explicites. Chaque famille
 garde ses routes pendant la migration.
 
 ## Gate
@@ -41,7 +42,7 @@ typed_responses|364
 documented_errors|363
 secured|362
 capability_declared|362
-idempotent_mutations|0
+idempotent_mutations|2
 request_bodies|129
 untagged|71
 missing_operation_ids|0
