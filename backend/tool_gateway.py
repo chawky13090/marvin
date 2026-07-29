@@ -9,6 +9,7 @@ from typing import Any, Awaitable, Callable, Mapping, Sequence
 from agent_safety import validator_for
 from agent_execution import execute_registered_tool
 from config import (
+    CONDITIONAL_TOOL_SAFE_ACTIONS,
     DANGEROUS_TOOLS,
     PERMISSION_EXPERT,
     PERMISSION_SECURE,
@@ -16,6 +17,14 @@ from config import (
 )
 
 Executor = Callable[[dict[str, Any]], Awaitable[Any]]
+
+
+def _conditional_mutation(tool_name: str, arguments: Mapping[str, Any]) -> bool:
+    safe_actions = CONDITIONAL_TOOL_SAFE_ACTIONS.get(tool_name)
+    if safe_actions is None:
+        return False
+    action = str(arguments.get("action") or "").strip().lower()
+    return action not in safe_actions
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +63,14 @@ def coverage_report(
         "complete": registry_names == spec_names,
         "missing_schema": sorted(registry_names - spec_names),
         "missing_executor": sorted(spec_names - registry_names),
-        "restricted": len((DANGEROUS_TOOLS | SECURE_BLOCKED_TOOLS) & registry_names),
+        "restricted": len(
+            (
+                DANGEROUS_TOOLS
+                | SECURE_BLOCKED_TOOLS
+                | set(CONDITIONAL_TOOL_SAFE_ACTIONS)
+            )
+            & registry_names
+        ),
         "layers": [
             "schema_validation",
             "permission_policy",
@@ -102,12 +118,17 @@ async def execute_tool(
             False,
             422,
         )
+    conditional_mutation = _conditional_mutation(request.tool_name, arguments)
     if (
         request.permission_level == PERMISSION_SECURE
-        and request.tool_name in SECURE_BLOCKED_TOOLS
+        and (
+            request.tool_name in SECURE_BLOCKED_TOOLS
+            or conditional_mutation
+        )
     ):
         return ToolGatewayResult(_permission_denied(request.tool_name), False, 403)
-    if request.tool_name in DANGEROUS_TOOLS and not (
+    dangerous_call = request.tool_name in DANGEROUS_TOOLS or conditional_mutation
+    if dangerous_call and not (
         request.confirmed_by_ui or request.permission_level == PERMISSION_EXPERT
     ):
         # Une confirmation déclarée dans les arguments appartient à la zone non fiable :
@@ -117,7 +138,7 @@ async def execute_tool(
         arguments.pop("__confirmed", None)
     elif (
         request.confirmed_by_ui
-        and request.tool_name in DANGEROUS_TOOLS
+        and dangerous_call
     ) or request.permission_level == PERMISSION_EXPERT:
         arguments["confirmed"] = True
 

@@ -1,7 +1,7 @@
 # Migration des consommateurs vers le harness universel
 
 Date de référence : 2026-07-29
-Version : 2.447.0
+Version : 2.448.0
 Source de vérité exécutable : `scripts/test_tool_consumer_inventory.py`
 
 ## Contrat cible
@@ -24,21 +24,20 @@ le Council comme dépendance et n'exécute pas directement un choix du modèle.
 
 ## État mesuré
 
-L'agenda, le proactif, les orchestrateurs, l'e-mail et les surfaces contenu/documents sont
-migrés.
+Tous les consommateurs sont migrés, y compris les 25 appels système et l'escalade Council
+interne.
 Les appels parallèles sont bornés, chaque étape de workflow possède une identité de tentative,
 un cycle cron possède une clé de rejeu stable et une automatisation e-mail planifiée possède
 une clé par minute. L'inventaire détecte les indexations directes, les alias locaux et les
 appels `.get`; il a corrigé le précédent comptage incomplet de 48.
-Les accès directs historiques restants sont temporairement bornés :
+Le gate AST échoue désormais dès qu'un accès direct réapparaît : la dette mesurée est zéro.
+Le registre reste la table de composition des 344 exécuteurs, mais aucun consommateur HTTP,
+worker, workflow, cron ou branche interne ne l'indexe pour exécuter un outil hors harness.
 
-| Composant | Appels directs | Traitement prévu |
-|---|---:|---|
-| `api/system_tools.py` | 25 | migrer par groupes lecture/mutation avec confirmations UI |
-| `agent.py` | 1 | injection Council, pas un contournement d'exécution |
-
-Le gate AST échoue si un fichier ou un accès direct apparaît sans mise à jour explicite. La
-valeur 26 est un plafond transitoire, jamais une cible : chaque tranche doit la réduire.
+Les outils Windows mixtes utilisent une politique par action. `status`, `get` et `list`
+restent des lectures disponibles en mode Sécurisé. Toute autre action échoue fermée dans ce
+mode et exige en Standard une confirmation provenant du canal UI, jamais des arguments du
+modèle ou d'un client.
 
 ## Sécurité, logs et rollback
 

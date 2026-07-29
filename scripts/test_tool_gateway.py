@@ -47,12 +47,22 @@ async def main() -> None:
             "requiresConfirmation": not arguments.get("confirmed"),
         }
 
+    async def os_firewall(arguments):
+        calls.append(arguments)
+        if arguments.get("action") == "status":
+            return {"success": True, "status": "enabled"}
+        return {
+            "success": bool(arguments.get("confirmed")),
+            "requiresConfirmation": not arguments.get("confirmed"),
+        }
+
     async def broken(arguments):
         raise RuntimeError("secret-interne token=abc")
 
     registry = {
         "calculator": calculator,
         "file_delete": file_delete,
+        "os_firewall": os_firewall,
         "broken": broken,
     }
     specifications = [
@@ -76,6 +86,19 @@ async def main() -> None:
                         "confirmed": {"type": "boolean"},
                     },
                     "required": ["path"],
+                },
+            }
+        },
+        {
+            "function": {
+                "name": "os_firewall",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string"},
+                        "confirmed": {"type": "boolean"},
+                    },
+                    "required": ["action"],
                 },
             }
         },
@@ -172,6 +195,63 @@ async def main() -> None:
         audit_logger=audit,
     )
     assert expert.result["success"] and calls[-1]["confirmed"] is True
+
+    secure_status = await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            "os_firewall", {"action": "status"}, "ui", PERMISSION_SECURE
+        ),
+        registry=registry,
+        specifications=specifications,
+        database=Database,
+        normalizer=normalize,
+        audit_logger=audit,
+    )
+    assert secure_status.executed and secure_status.result["status"] == "enabled"
+
+    secure_mutation = await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            "os_firewall", {"action": "disable"}, "ui", PERMISSION_SECURE
+        ),
+        registry=registry,
+        specifications=specifications,
+        database=Database,
+        normalizer=normalize,
+        audit_logger=audit,
+    )
+    assert secure_mutation.status_code == 403 and not secure_mutation.executed
+
+    forged_system_confirmation = await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            "os_firewall",
+            {"action": "disable", "confirmed": True},
+            "mcp",
+            PERMISSION_STANDARD,
+        ),
+        registry=registry,
+        specifications=specifications,
+        database=Database,
+        normalizer=normalize,
+        audit_logger=audit,
+    )
+    assert forged_system_confirmation.result["requiresConfirmation"]
+    assert "confirmed" not in calls[-1]
+
+    confirmed_system_mutation = await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            "os_firewall",
+            {"action": "disable"},
+            "ui",
+            PERMISSION_STANDARD,
+            confirmed_by_ui=True,
+        ),
+        registry=registry,
+        specifications=specifications,
+        database=Database,
+        normalizer=normalize,
+        audit_logger=audit,
+    )
+    assert confirmed_system_mutation.result["success"]
+    assert calls[-1]["confirmed"] is True
 
     failure = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest("broken", {}, "mcp", PERMISSION_STANDARD),

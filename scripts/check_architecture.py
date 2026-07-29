@@ -225,6 +225,7 @@ def run() -> dict[str, int | str]:
         "check:calendar-gateway",
         "check:orchestration-gateway",
         "check:content-document-gateway",
+        "check:system-tools-gateway",
         "check:model-proactive-api",
         "check:main-composition",
         "check:architecture",
@@ -308,6 +309,7 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_calendar_gateway_api.py",
         ROOT / "scripts" / "test_orchestration_tool_gateway.py",
         ROOT / "scripts" / "test_content_document_gateway.py",
+        ROOT / "scripts" / "test_system_tools_gateway.py",
         ROOT / "scripts" / "test_model_proactive_api.py",
         ROOT / "scripts" / "test_main_composition.py",
         ROOT / "scripts" / "rollback-credentials-vault.py",
@@ -433,7 +435,15 @@ def run() -> dict[str, int | str]:
 
     dangerous = literal_assignment(BACKEND / "config.py", "DANGEROUS_TOOLS")
     secure_blocked = literal_assignment(BACKEND / "config.py", "SECURE_BLOCKED_TOOLS")
-    unknown_guarded = sorted((dangerous | secure_blocked) - set(registry))
+    conditional_node = assignment(
+        parse(BACKEND / "config.py"), "CONDITIONAL_TOOL_SAFE_ACTIONS"
+    )
+    if not isinstance(conditional_node, ast.Dict):
+        raise CheckFailure("La politique conditionnelle des outils doit rester un dictionnaire.")
+    conditional = {ast.literal_eval(key) for key in conditional_node.keys}
+    unknown_guarded = sorted(
+        (dangerous | secure_blocked | conditional) - set(registry)
+    )
     if unknown_guarded:
         raise CheckFailure(f"Permissions visant des outils inexistants : {unknown_guarded}")
     gateway_source = (BACKEND / "api" / "agent_gateway.py").read_text(
@@ -484,7 +494,7 @@ def run() -> dict[str, int | str]:
         "routes": len(routes),
         "pages": len(expected_pages),
         "harness_tools": len(set(registry) & set(spec)),
-        "restricted_tools": len(dangerous | secure_blocked),
+        "restricted_tools": len(dangerous | secure_blocked | conditional),
     }
 
 

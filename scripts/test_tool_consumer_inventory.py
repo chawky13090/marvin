@@ -7,10 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-EXPECTED_DIRECT_CONSUMERS = {
-    "agent.py": 1,
-    "api/system_tools.py": 25,
-}
+EXPECTED_DIRECT_CONSUMERS: dict[str, int] = {}
 
 
 def is_registry(value: ast.expr) -> bool:
@@ -88,8 +85,10 @@ def main() -> int:
     assert "communication_workers.py" not in observed
     assert "api/content.py" not in observed
     assert "api/documents.py" not in observed
-    assert sum(observed.values()) == 26
-    print("Tool Consumer Inventory OK - contenu/documents migrés, dette bornée à 26 accès.")
+    assert "api/system_tools.py" not in observed
+    assert "agent.py" not in observed
+    assert observed == {}
+    print("Tool Consumer Inventory OK - zéro consommateur direct hors harness.")
     return 0
 
 

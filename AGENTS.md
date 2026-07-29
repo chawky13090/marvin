@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.447.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.448.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.447.0)
+## 9. État actuel (v2.448.0)
+
+**v2.448 (harness universel achevé)** : les 25 appels des pages Winget, Pantheon,
+Catharsis et Codex ainsi que l'escalade Council interne passent par le runtime commun.
+L'inventaire AST prouve zéro consommateur direct. Les outils Windows mixtes conservent leurs
+lectures en mode Sécurisé, tandis que toute mutation est refusée dans ce mode et exige une
+confirmation UI authentifiée en Standard. Six mutations pures rejoignent aussi les listes
+de permission et confirmation. Le catalogue compte 344 outils et 78 restrictions contrôlées.
 
 **v2.447 (contenu et documents sous harness)** : recherche système/contenu/unifiée,
 prévisualisation Office, extraction des pièces jointes et sept actions RAG/documentaires

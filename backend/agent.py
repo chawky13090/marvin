@@ -10,6 +10,7 @@ import cloud_routing as _cr
 import cortex as _cortex
 import database as db
 import memory_mesh
+import tool_runtime
 from intent_guard import skill_match_text
 from agent_prompt import build_system_prompt as _build_system_prompt
 from agent_protocol import encode_sse as _sse, to_ollama_messages as _to_ollama_messages
@@ -290,13 +291,23 @@ async def run_agent(
     _runner_state = _RunnerState()
     _executed_tool_names = _runner_state.executed_tool_names
 
+    async def _run_council_tool(arguments: dict):
+        outcome = await tool_runtime.execute(
+            "ai_model_council",
+            arguments,
+            source="agent_cortex",
+            conversation_id=conversation_id,
+            request_id=request_id,
+        )
+        return outcome.result
+
     async def _cortex_disagreement_escalation(critique_text: str | None, answer: str):
         return await _escalate_council_on_disagreement(
             critique_text,
             answer,
             cortex_plan=_cortex_plan,
             user_query=_user_query,
-            council_tool=TOOLS_REGISTRY["ai_model_council"],
+            council_tool=_run_council_tool,
         )
 
     async def _finish_turn(

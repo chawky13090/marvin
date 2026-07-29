@@ -5,6 +5,46 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.448.0 — Harness universel et politique système conditionnelle
+
+### Analyse et architecture
+
+Les 25 derniers accès exécutables appartenaient aux pages Windows. Sept outils regroupaient
+lecture et mutation sous un même nom; les placer globalement en blocage Sécurisé aurait cassé
+les pages de statut, tandis que les laisser hors politique permettait à un argument
+`confirmed=true` non fiable de contourner l'approbation. Le gateway distingue maintenant les
+actions sûres (`status`, `get`, `list`) des autres actions. Cette décision suit les règles
+fail-closed et par appel de l'OpenAI Agents SDK sans sacrifier l'observabilité locale.
+
+### Implémentation
+
+Les 25 appels Winget, Pantheon, Catharsis et Codex passent par `system_ui`; les treize
+mutations transmettent uniquement le signal de confirmation du canal, pas un booléen forgé
+dans leur payload. Six outils purement mutateurs rejoignent `DANGEROUS_TOOLS` et
+`SECURE_BLOCKED_TOOLS`. Les sept outils mixtes utilisent
+`CONDITIONAL_TOOL_SAFE_ACTIONS`. L'escalade Council après désaccord Cortex passe elle aussi
+par `tool_runtime`, supprimant la dernière indexation directe de `TOOLS_REGISTRY`.
+
+### Sécurité, logs et rollback
+
+En mode Sécurisé, les lectures restent disponibles et les mutations conditionnelles
+retournent 403 sans exécution. En Standard, une confirmation fournie dans les arguments est
+supprimée; seule `confirmed_by_ui` autorise la mutation. Le mode Expert conserve sa politique
+explicite. Toutes les actions réutilisent corrélation, reçu, résultat, audit et rétention
+existants. Aucun schéma ni donnée n'est migré. Rollback exact :
+`git revert <commit-v2.448>`, redémarrage backend, tests gateway/système/inventaire/agent,
+architecture et smoke API.
+
+### Validation
+
+Les tests ciblés couvrent les 25 appels, treize mutations, sept lectures mixtes, lecture
+Sécurisée, mutation Sécurisée refusée, confirmation forgée supprimée, confirmation UI,
+Council et inventaire à zéro. Après relance, `/api/health` expose **2.448.0**; les cinq
+lectures réelles de `/api/codex/status` réussissent avec des contrats `succeeded`, sans
+mutation, et le smoke API réussit **28/28**. Le gate consolidé réussit **207/207 étapes**,
+dont compilation Python, lint sans erreur et build Turbopack. Le domaine `tools` passe donc
+à `verified`; les onze autres domaines partiels restent inchangés.
+
 ## 2026-07-29 — v2.447.0 — Contenu et documents sous harness
 
 ### Analyse et décision

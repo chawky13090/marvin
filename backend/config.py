@@ -120,6 +120,12 @@ SECURE_BLOCKED_TOOLS: set[str] = {
     "ssh_write_and_run",
     "code_workspace_start",
     "code_workspace_control",
+    "winget_install",
+    "winget_upgrade",
+    "winget_uninstall",
+    "tweak_debloat_remove",
+    "system_restore_point",
+    "catharsis_clean",
 }
 
 # ── Outils nécessitant une confirmation manuelle (niveau Standard = 2) ────────
@@ -147,4 +153,23 @@ DANGEROUS_TOOLS: set[str] = {
     "code_workspace_start",  # crée dépôt/worktree et peut lancer un job Auto
     "code_workspace_control",  # reprend ou annule un job Auto persistant
     "long_task_start",   # v2.151 — "Plan mode" : démarrage réel après validation du plan
+    "winget_install",
+    "winget_upgrade",
+    "winget_uninstall",
+    "tweak_debloat_remove",
+    "system_restore_point",
+    "catharsis_clean",
+}
+
+# Outils mixtes lecture/mutation. Les actions listées restent des lectures sûres; toute
+# autre action suit les politiques DANGEROUS + SECURE_BLOCKED sans rendre le statut
+# indisponible en mode Sécurisé.
+CONDITIONAL_TOOL_SAFE_ACTIONS: dict[str, frozenset[str]] = {
+    "tweak_telemetry": frozenset({"status"}),
+    "tweak_network_harden": frozenset({"status"}),
+    "os_power_plan": frozenset({"get", "status"}),
+    "os_dark_mode": frozenset({"get", "status"}),
+    "os_firewall": frozenset({"status"}),
+    "os_hibernation": frozenset({"status"}),
+    "os_network_adapters": frozenset({"list", "status"}),
 }
