@@ -18,17 +18,23 @@ class ConversationRepository:
         self._connection_scope = connection_scope
 
     @staticmethod
-    def _ensure_pinned_column(connection) -> None:
+    def _ensure_columns(connection) -> None:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(conversations)")}
         if "pinned" not in columns:
             connection.execute(
                 "ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0"
             )
+        if "archived_at" not in columns:
+            connection.execute("ALTER TABLE conversations ADD COLUMN archived_at TEXT")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversations_archived_updated "
+            "ON conversations(archived_at, updated_at DESC)"
+        )
 
     def create_conversation(self, title: str = "Nouvelle conversation") -> dict:
         conversation_id = str(uuid.uuid4())
         with self._connection_scope() as connection:
-            self._ensure_pinned_column(connection)
+            self._ensure_columns(connection)
             connection.execute(
                 "INSERT INTO conversations (id, title) VALUES (?, ?)",
                 (conversation_id, title),
@@ -40,17 +46,21 @@ class ConversationRepository:
 
     def get_conversation(self, conversation_id: str) -> dict | None:
         with self._connection_scope() as connection:
-            self._ensure_pinned_column(connection)
+            self._ensure_columns(connection)
             row = connection.execute(
                 "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
             ).fetchone()
         return row_to_dict(row)
 
-    def list_conversations(self, limit: int = 50, offset: int = 0) -> list[dict]:
+    def list_conversations(
+        self, limit: int = 50, offset: int = 0, archived: bool = False
+    ) -> list[dict]:
         with self._connection_scope() as connection:
-            self._ensure_pinned_column(connection)
+            self._ensure_columns(connection)
             rows = connection.execute(
                 """SELECT * FROM conversations
+                   WHERE archived_at IS """ + ("NOT NULL" if archived else "NULL") +
+                """
                    ORDER BY pinned DESC, updated_at DESC LIMIT ? OFFSET ?""",
                 (limit, offset),
             ).fetchall()
@@ -58,16 +68,41 @@ class ConversationRepository:
 
     def set_conversation_pinned(self, conversation_id: str, pinned: bool) -> None:
         with self._connection_scope() as connection:
-            self._ensure_pinned_column(connection)
+            self._ensure_columns(connection)
             connection.execute(
                 "UPDATE conversations SET pinned = ? WHERE id = ?",
                 (1 if pinned else 0, conversation_id),
             )
 
+    def set_conversation_archived(
+        self, conversation_id: str, archived: bool
+    ) -> dict | None:
+        with self._connection_scope() as connection:
+            self._ensure_columns(connection)
+            if archived:
+                connection.execute(
+                    """UPDATE conversations
+                       SET archived_at = datetime('now'), pinned = 0,
+                           updated_at = datetime('now')
+                       WHERE id = ?""",
+                    (conversation_id,),
+                )
+            else:
+                connection.execute(
+                    """UPDATE conversations
+                       SET archived_at = NULL, updated_at = datetime('now')
+                       WHERE id = ?""",
+                    (conversation_id,),
+                )
+            row = connection.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+        return row_to_dict(row)
+
     def search_conversations(self, query: str, limit: int = 50) -> list[dict]:
         pattern = f"%{query.strip()}%"
         with self._connection_scope() as connection:
-            self._ensure_pinned_column(connection)
+            self._ensure_columns(connection)
             rows = connection.execute(
                 """SELECT DISTINCT c.* FROM conversations c
                    LEFT JOIN messages m ON m.conversation_id = c.id
@@ -224,6 +259,7 @@ create_conversation = repository.create_conversation
 get_conversation = repository.get_conversation
 list_conversations = repository.list_conversations
 set_conversation_pinned = repository.set_conversation_pinned
+set_conversation_archived = repository.set_conversation_archived
 search_conversations = repository.search_conversations
 update_conversation_title = repository.update_conversation_title
 upgrade_conversation_title_silent = repository.upgrade_conversation_title_silent

@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import ChatContainer from '@/components/chat/ChatContainer';
+import ConversationRow from '@/components/chat/sidebar/ConversationRow';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
+import { createConversationAudit, conversationAuditToMarkdown } from '@/lib/chatPresentation.mjs';
 import {
   canSwitchConversation,
   initialChatSelection,
@@ -47,6 +49,9 @@ export default function ChatPage() {
   const [projectNameDraft, setProjectNameDraft] = useState('');
   const [projectNameError, setProjectNameError] = useState('');
   const [projectNameSaving, setProjectNameSaving] = useState(false);
+  const [lastArchivedConversation, setLastArchivedConversation] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedConversations, setArchivedConversations] = useState([]);
 
   // Repli persistant (revient au prochain chargement tel qu'on l'a laissé)
   useEffect(() => {
@@ -292,8 +297,7 @@ export default function ChatPage() {
     }
   };
 
-  const deleteConversation = async (e, id) => {
-    e.stopPropagation();
+  const deleteConversation = async (id) => {
     if (!confirm('Supprimer cette conversation définitivement ?')) return;
     try {
       const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'DELETE' });
@@ -303,9 +307,91 @@ export default function ChatPage() {
         setActiveConversationId(null);
         setInitialMessages([]);
       }
-      fetchData();
+      await fetchData();
+      if (showArchived) await loadArchivedConversations();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const archiveConversation = async (id) => {
+    const conversation = conversations.find((item) => item.id === id);
+    try {
+      const response = await fetchWithBackendFallback(`/api/conversations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (!response.ok) throw new Error(`Archivage HTTP ${response.status}`);
+      setLastArchivedConversation(conversation || { id, title: 'Conversation' });
+      if (activeConversationId === id) {
+        setActiveConversationId(null);
+        setInitialMessages([]);
+      }
+      await fetchData();
+    } catch {
+      toast.error('Archivage impossible', 'La conversation est restée active.');
+    }
+  };
+
+  const restoreArchivedConversation = async (conversationId = lastArchivedConversation?.id) => {
+    if (!conversationId) return;
+    try {
+      const response = await fetchWithBackendFallback(
+        `/api/conversations/${conversationId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: false }),
+        },
+      );
+      if (!response.ok) throw new Error(`Restauration HTTP ${response.status}`);
+      setLastArchivedConversation(null);
+      await fetchData();
+      if (showArchived) await loadArchivedConversations();
+    } catch {
+      toast.error('Restauration impossible', 'La conversation reste disponible dans les archives.');
+    }
+  };
+
+  const loadArchivedConversations = async () => {
+    try {
+      const response = await fetch('/api/conversations?archived=true&limit=100');
+      if (!response.ok) throw new Error(`Archives HTTP ${response.status}`);
+      const payload = await response.json();
+      setArchivedConversations(payload.conversations || []);
+    } catch {
+      toast.error('Archives indisponibles', 'Impossible de charger les conversations archivées.');
+    }
+  };
+
+  const toggleArchivedView = async () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next) await loadArchivedConversations();
+  };
+
+  const exportConversation = async (conversation, format) => {
+    try {
+      const response = await fetch(`/api/conversations/${conversation.id}?t=${Date.now()}`);
+      if (!response.ok) throw new Error(`Export HTTP ${response.status}`);
+      const payload = await response.json();
+      const audit = createConversationAudit(payload.messages || []);
+      const json = format === 'json';
+      const content = json
+        ? `${JSON.stringify({ conversation: payload.conversation, ...audit }, null, 2)}\n`
+        : `# ${payload.conversation?.title || 'Conversation Marvin'}\n\n${conversationAuditToMarkdown(audit)}`;
+      const blob = new Blob([content], { type: json ? 'application/json;charset=utf-8' : 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const safeTitle = String(payload.conversation?.title || 'conversation')
+        .normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').slice(0, 80);
+      link.href = url;
+      link.download = `${safeTitle || 'conversation-marvin'}.${json ? 'json' : 'md'}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Export impossible', 'La conversation n’a pas été téléchargée.');
     }
   };
 
@@ -425,8 +511,7 @@ export default function ChatPage() {
 
   // v2.171 — épinglage (pattern Claude/ChatGPT) : garder une conversation en haut de la
   // liste indépendamment de sa date, sans avoir à la ranger dans un projet pour ça.
-  const togglePin = async (e, id, pinned) => {
-    e.stopPropagation();
+  const togglePin = async (id, pinned) => {
     try {
       const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinned: !pinned }) });
       if (!response.ok) throw new Error(`Épinglage HTTP ${response.status}`);
@@ -559,13 +644,37 @@ export default function ChatPage() {
             />
             {convSearch && <button onClick={() => setConvSearch('')} title="Effacer" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14 }}>×</button>}
           </div>
+          <button
+            type="button"
+            onClick={toggleArchivedView}
+            aria-pressed={showArchived}
+            style={{ marginTop: 8, border: 0, background: 'transparent', color: showArchived ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}
+          >
+            {showArchived ? 'Retour aux conversations' : 'Voir les archives'}
+          </button>
         </div>
+
+        {lastArchivedConversation && !showArchived && (
+          <div role="status" style={{ margin: '0 12px 8px', padding: '7px 9px', display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', fontSize: 11 }}>
+            <span style={{ minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Conversation archivée</span>
+            <button type="button" onClick={() => restoreArchivedConversation()} style={{ border: 0, background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: 700 }}>Annuler</button>
+          </div>
+        )}
 
         <div style={{
           flex: 1, overflowY: 'auto', padding: '0 12px',
           display: 'flex', flexDirection: 'column', gap: '12px'
         }}>
-          {isSearching ? (
+          {showArchived ? (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>ARCHIVES</div>
+              {archivedConversations.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: 8 }}>Aucune conversation archivée.</div>
+              ) : archivedConversations.map((conv) => (
+                <ConversationRow key={conv.id} conv={conv} isActive={false} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} onArchive={archiveConversation} onRestore={restoreArchivedConversation} onExport={exportConversation} projects={projects} />
+              ))}
+            </div>
+          ) : isSearching ? (
             /* v2.171 — mode recherche : liste plate des résultats full-text (titre +
                contenu), pas de groupement — pattern Claude/ChatGPT. */
             <div>
@@ -575,7 +684,7 @@ export default function ChatPage() {
                 <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '8px' }}>Aucun résultat.</div>
               ) : (
                 searchList.map(conv => (
-                  <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
+                  <ConversationRow key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} onArchive={archiveConversation} onRestore={restoreArchivedConversation} onExport={exportConversation} projects={projects} />
                 ))
               )}
             </div>
@@ -586,7 +695,7 @@ export default function ChatPage() {
             <div>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', paddingLeft: '4px' }}>📌 ÉPINGLÉES</div>
               {pinnedConvs.map(conv => (
-                <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
+                <ConversationRow key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} onArchive={archiveConversation} onRestore={restoreArchivedConversation} onExport={exportConversation} projects={projects} />
               ))}
             </div>
           )}
@@ -682,7 +791,7 @@ export default function ChatPage() {
                 >
                   {(byProject[proj.id] || []).length === 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vide</span>}
                   {(byProject[proj.id] || []).map(conv => (
-                    <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
+                    <ConversationRow key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} onArchive={archiveConversation} onRestore={restoreArchivedConversation} onExport={exportConversation} projects={projects} />
                   ))}
                 </div>
               </div>
@@ -700,7 +809,7 @@ export default function ChatPage() {
                 <div key={b} style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent-primary)', opacity: 0.55, marginBottom: '5px', paddingLeft: '4px' }}>{b}</div>
                   {buckets[b].map(conv => (
-                    <ConversationItem key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} projects={projects} />
+                    <ConversationRow key={conv.id} conv={conv} isActive={activeConversationId === conv.id} onSelect={loadConversation} onDelete={deleteConversation} onAssign={assignProject} onRename={renameConversation} onTogglePin={togglePin} onArchive={archiveConversation} onRestore={restoreArchivedConversation} onExport={exportConversation} projects={projects} />
                   ))}
                 </div>
               ))
@@ -915,80 +1024,6 @@ export default function ChatPage() {
           onClick={() => setShowModelDropdown(false)}
           style={{ position: 'fixed', inset: 0, zIndex: 9 }}
         />
-      )}
-    </div>
-  );
-}
-
-// ─── Composant conversation dans la sidebar (renommage inline + actions au survol) ───
-function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRename, onTogglePin, projects }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(conv.title || '');
-  const [hover, setHover] = useState(false);
-  const commit = () => { setEditing(false); const t = (draft || '').trim(); if (t && t !== conv.title) onRename?.(conv.id, t); };
-  return (
-    <div
-      role="listitem"
-      data-conversation-id={conv.id}
-      aria-current={isActive ? 'true' : undefined}
-      onClick={() => !editing && onSelect(conv.id)}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{
-        padding: '7px 8px 7px 10px', borderRadius: 'var(--radius-md)',
-        cursor: 'pointer', fontSize: '13px',
-        background: isActive ? 'rgba(79, 140, 255,0.08)' : (hover ? 'rgba(255,255,255,0.03)' : 'transparent'),
-        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-        borderLeft: `2px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}`,
-        display: 'flex', alignItems: 'center', gap: 6,
-        transition: 'background 0.15s ease', marginBottom: '2px',
-      }}
-    >
-      {!editing && !!conv.pinned && (
-        <span title="Épinglée" style={{ fontSize: '11px', flexShrink: 0, opacity: 0.85 }}>📌</span>
-      )}
-      {editing ? (
-        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(conv.title || ''); } }}
-          onBlur={commit}
-          style={{ flex: 1, minWidth: 0, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-focus)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 12.5 }} />
-      ) : (
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label={`Ouvrir la conversation ${conv.title || 'Sans titre'}`}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              event.stopPropagation();
-              onSelect(conv.id);
-            }
-          }}
-          style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}
-        >
-          {conv.title || 'Sans titre'}
-        </span>
-      )}
-      {!editing && (
-        <div style={{ display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0, opacity: hover || isActive || conv.pinned ? 1 : 0, transition: 'opacity 0.15s' }}>
-          {projects.length > 0 && (
-            <select value={conv.project_id || 'none'} onChange={(e) => onAssign(conv.id, e.target.value)} onClick={(e) => e.stopPropagation()} title="Ranger dans un projet"
-              aria-label={`Ranger ${conv.title || 'cette conversation'} dans un projet`}
-              style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text-muted)', fontSize: '10px', cursor: 'pointer', maxWidth: 54 }}>
-              <option value="none">📁</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          )}
-          <button type="button" onClick={(e) => onTogglePin?.(e, conv.id, conv.pinned)} title={conv.pinned ? 'Désépingler' : 'Épingler'}
-            aria-label={`${conv.pinned ? 'Désépingler' : 'Épingler'} ${conv.title || 'cette conversation'}`}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: conv.pinned ? 'var(--accent-primary)' : 'var(--text-muted)', padding: '2px' }}>{conv.pinned ? '📌' : '📍'}</button>
-          <button type="button" onClick={(e) => { e.stopPropagation(); setDraft(conv.title || ''); setEditing(true); }} title="Renommer"
-            aria-label={`Renommer ${conv.title || 'cette conversation'}`}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)', padding: '2px' }}>✏️</button>
-          <button type="button" onClick={(e) => onDelete(e, conv.id)} title="Supprimer"
-            aria-label={`Supprimer ${conv.title || 'cette conversation'}`}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--danger)', padding: '2px' }}>×</button>
-        </div>
       )}
     </div>
   );

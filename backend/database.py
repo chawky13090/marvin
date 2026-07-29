@@ -39,6 +39,7 @@ from repositories.conversations import (
     get_recent_user_messages,
     list_conversations,
     search_conversations,
+    set_conversation_archived,
     set_conversation_pinned,
     update_conversation_project,
     update_conversation_title,

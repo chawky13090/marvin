@@ -115,6 +115,113 @@ a:hover { color: var(--accent-primary-hover); }
 
 img { max-width: 100%; display: block; }
 
+.conversation-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  margin-bottom: 2px;
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+.conversation-row:hover,
+.conversation-row:focus-within { background: rgba(255,255,255,.035); }
+.conversation-row-active {
+  border-left-color: var(--accent-primary);
+  background: rgba(79,140,255,.09);
+  color: var(--text-primary);
+}
+.conversation-row-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 4px 7px 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.conversation-row-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-row-input {
+  min-width: 0;
+  flex: 1;
+  margin: 4px 5px;
+  padding: 5px 7px;
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.conversation-row-menu-shell { position: relative; flex: 0 0 auto; }
+.conversation-row-menu-trigger {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  margin-right: 3px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.conversation-row:hover .conversation-row-menu-trigger,
+.conversation-row:focus-within .conversation-row-menu-trigger,
+.conversation-row-active .conversation-row-menu-trigger {
+  opacity: 1;
+}
+.conversation-row-menu {
+  position: absolute;
+  z-index: 50;
+  top: 34px;
+  right: 2px;
+  width: 210px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #18191f;
+  box-shadow: var(--shadow-md);
+}
+.conversation-row-menu button,
+.conversation-row-project {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.conversation-row-menu button:hover,
+.conversation-row-menu button:focus-visible { background: var(--bg-glass-hover); color: var(--text-primary); }
+.conversation-row-menu button.danger { color: var(--danger); }
+.conversation-row-project { flex-direction: column; align-items: stretch; cursor: default; }
+.conversation-row-project span { display: flex; align-items: center; gap: 8px; }
+.conversation-row-project select {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
 :where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--accent-primary-hover);
   outline-offset: 3px;

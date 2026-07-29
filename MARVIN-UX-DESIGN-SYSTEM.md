@@ -32,6 +32,12 @@ hérite de `currentColor`, chaque lien couvre toute la largeur et l'état couran
 `aria-current="page"`. Les groupes de projets suivent le pattern WAI-ARIA disclosure avec un
 bouton portant `aria-expanded` et `aria-controls`; un treeview complexe n'est pas utilisé.
 
+La sidebar de conversations suit une hiérarchie compacte : épinglées, projets, récentes et
+archives. Une ligne possède une seule cible d'ouverture et un seul bouton d'actions; aucune
+commande invisible ne reste exploitable sans devenir visible au focus. Le menu regroupe les
+mutations secondaires. L'archivage est préféré à la suppression pour désencombrer et reste
+réversible. Les exports Markdown et JSON sont construits localement, sans réinjection LLM.
+
 ## Principes
 
 1. **Contrôle humain visible** : état, progression, annulation, reprise et résultat doivent

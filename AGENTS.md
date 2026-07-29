@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.473.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.474.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.473.0)
+## 9. État actuel (v2.474.0)
+
+**v2.474 (sidebar Conversations v2)** : chaque conversation utilise une ligne native extraite
+avec une action principale et un menu contextuel unique, visible au survol comme au focus.
+Épinglage, renommage, déplacement, export Markdown/JSON, archivage et suppression restent
+accessibles sans comprimer le titre. `archived_at` sépare les conversations actives des
+archives; recherche, restauration, annulation immédiate et index SQLite sont couverts.
+Le rollback hors ligne restaure toutes les conversations, sauvegarde SQLite puis retire
+l'index et la colonne. Les exports sont générés localement depuis la conversation complète,
+avec nom de fichier normalisé et sans appel LLM.
 
 **v2.473 (rail SVG et projets structurés)** : les emojis variables du rail principal sont
 remplacés par Lucide React 1.27.0 épinglé. Chaque lien occupe toute la largeur et chaque SVG

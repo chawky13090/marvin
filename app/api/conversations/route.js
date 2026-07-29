@@ -9,9 +9,16 @@ import { fetchBackendRead } from '@/lib/backendRead.mjs';
 // projet, corrigé côté Python plutôt que de garder deux logiques à maintenir).
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const r = await fetchBackendRead(`${BACKEND}/api/conversations`);
+    const search = request?.nextUrl?.searchParams;
+    const params = new URLSearchParams();
+    for (const key of ['limit', 'offset', 'archived']) {
+      const value = search?.get(key);
+      if (value !== null && value !== undefined) params.set(key, value);
+    }
+    const suffix = params.size ? `?${params.toString()}` : '';
+    const r = await fetchBackendRead(`${BACKEND}/api/conversations${suffix}`);
     if (!r.ok) throw new Error(`Backend ${r.status}`);
     const conversations = await r.json();
     return NextResponse.json({ conversations });

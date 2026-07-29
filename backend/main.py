@@ -7,7 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
-# v2.473 — rail SVG mesuré et projets repliables/renommables
+# v2.474 — sidebar conversations accessible, archivage réversible et exports
 # v2.469 — idempotence HTTP des effets critiques directs et issue inconnue fermée
 # v2.468 — métriques bornées des décisions d'accès et d'idempotence
 # v2.467 — clés d'idempotence HTTP sur les gateways d'outils UI et MCP

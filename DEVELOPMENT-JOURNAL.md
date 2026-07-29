@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.474.0 — Sidebar Conversations v2 et exports
+
+**Demande.** Reconcevoir la sidebar du chat selon les conventions de ChatGPT, Claude, Gemini
+et du W3C, puis étudier et intégrer l'export des conversations.
+
+**Décision.** La ligne historique imbriquait faux bouton, select et trois commandes dont
+l'opacité n'empêchait pas le focus. `ConversationRow.jsx` sépare désormais la cible native
+d'ouverture du bouton `Actions`. Le menu rassemble épinglage, renommage, déplacement,
+Markdown, JSON, archivage et suppression définitive. `:focus-within` garantit la visibilité
+au clavier. Les listes restent compactes; la recherche plein texte existante conserve
+l'accès aux conversations anciennes.
+
+**Données et rollback.** Le repository ajoute idempotemment `archived_at` et son index.
+L'archivage retire l'épingle, la restauration remet la conversation active et la recherche
+continue à retrouver les archives. `rollback_conversation_archiving.py --confirm` exige
+Marvin arrêté, copie la base, restaure toutes les lignes, contrôle `quick_check`, puis retire
+index et colonne. La réversion Git seule ne suffit donc pas pour cette tranche de schéma.
+
+**Export.** Markdown et JSON utilisent la conversation relue depuis l'API, les outils de
+présentation déjà testés et un nom borné/nettoyé. Aucun LLM, réseau externe ou fichier serveur
+n'est nécessaire. Le JSON conserve les métadonnées de conversation et l'audit; le Markdown
+reste lisible par un humain.
+
+**Sécurité et logs.** Les contenus exportés ne rejoignent aucun log. Les exports sont produits
+par action explicite dans le navigateur. Les titres sont neutralisés pour le nom de fichier.
+La suppression reste séparée et confirmée; l'archivage est réversible. Aucun secret nouveau
+n'est persisté.
+
+**Validation réelle.** `check:conversation-repository` valide façade, migration, listes
+active/archivée, restauration, sauvegarde et rollback SQLite réel. `check:ux` réussit
+38 assertions; ESLint ciblé, `check:main-composition` et `git diff --check` réussissent.
+Le build Next.js 16.2.12 avec Turbopack compile toutes les routes. Après redémarrage,
+les smokes réussissent 28/28 contrats API et 40/40 pages; `npm audit --omit=dev` ne trouve
+aucune vulnérabilité de production. Le test dans la session Marvin authentifiée confirme
+les cibles d'ouverture, le menu clavier, Markdown, JSON et Archivage; un export JSON réel
+se déclenche sans erreur. La validation visuelle a détecté puis fait corriger l'affichage
+parasite de `pinned=0`. Un cycle API réel archive, masque, relit, restaure et supprime une
+conversation temporaire sans résidu.
+
 ## 2026-07-29 — v2.473.0 — Rail SVG et projets repliables
 
 **Demande.** Corriger définitivement les icônes du rail encore décalées, puis permettre de

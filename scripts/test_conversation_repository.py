@@ -12,10 +12,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 from db_connection import db, get_conn
 from db_migrations import MIGRATIONS, apply_migrations
 from repositories.conversations import ConversationRepository
+from rollback_conversation_archiving import rollback_database
 
 
 EXPORTED = {
@@ -27,6 +29,7 @@ EXPORTED = {
     "get_recent_user_messages",
     "list_conversations",
     "search_conversations",
+    "set_conversation_archived",
     "set_conversation_pinned",
     "update_conversation_project",
     "update_conversation_title",
@@ -56,6 +59,14 @@ def _check_repository(path: Path) -> None:
     second = repository.create_conversation("Seconde")
     repository.set_conversation_pinned(first["id"], True)
     assert repository.list_conversations()[0]["id"] == first["id"]
+    archived = repository.set_conversation_archived(second["id"], True)
+    assert archived and archived["archived_at"]
+    assert {item["id"] for item in repository.list_conversations()} == {first["id"]}
+    assert {item["id"] for item in repository.list_conversations(archived=True)} == {
+        second["id"]
+    }
+    restored = repository.set_conversation_archived(second["id"], False)
+    assert restored and restored["archived_at"] is None
 
     message = repository.create_message(
         first["id"],
@@ -117,6 +128,16 @@ def _check_repository(path: Path) -> None:
         assert connection.execute(
             "SELECT count(*) FROM messages WHERE conversation_id = ?", (first["id"],)
         ).fetchone()[0] == 0
+
+    backup = rollback_database(path)
+    assert backup.is_file()
+    with db(path) as connection:
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(conversations)").fetchall()
+        }
+        assert "archived_at" not in columns
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
 
 
 def _check_transaction_rollback(path: Path) -> None:

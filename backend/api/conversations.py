@@ -14,8 +14,8 @@ router = APIRouter(tags=["conversations"])
 
 
 @router.get("/api/conversations")
-async def list_conversations(limit: int = 50, offset: int = 0):
-    return db.list_conversations(limit, offset)
+async def list_conversations(limit: int = 50, offset: int = 0, archived: bool = False):
+    return db.list_conversations(limit, offset, archived)
 
 
 @router.get("/api/conversations/search")
@@ -103,6 +103,7 @@ class ConversationUpdate(BaseModel):
     title: str | None = None
     projectId: str | None = None
     pinned: bool | None = None
+    archived: bool | None = None
 
 
 @router.put("/api/conversations/{cid}")
@@ -114,4 +115,8 @@ async def update_conversation(cid: str, body: ConversationUpdate):
         db.update_conversation_project(cid, fields["projectId"])
     if "pinned" in fields and fields["pinned"] is not None:
         db.set_conversation_pinned(cid, fields["pinned"])
+    if "archived" in fields and fields["archived"] is not None:
+        updated = db.set_conversation_archived(cid, fields["archived"])
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Conversation introuvable")
     return {"success": True}

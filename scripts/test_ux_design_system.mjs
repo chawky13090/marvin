@@ -5,6 +5,7 @@ const globalCss = fs.readFileSync('app/globals.css', 'utf8');
 const home = fs.readFileSync('app/page.js', 'utf8');
 const sidebar = fs.readFileSync('components/sidebar/Sidebar.module.css', 'utf8');
 const sidebarComponent = fs.readFileSync('components/sidebar/Sidebar.jsx', 'utf8');
+const conversationRow = fs.readFileSync('components/chat/sidebar/ConversationRow.jsx', 'utf8');
 
 for (const [token, value] of [
   ['--fib-1', '3px'],
@@ -39,5 +40,13 @@ assert.match(sidebarComponent, /from 'lucide-react'/);
 assert.match(sidebarComponent, /aria-current=\{isActive \? 'page'/);
 assert.match(sidebarComponent, /width: open \? '26px' : '48px'/);
 assert.match(sidebarComponent, /display: 'block', width: '100%'/);
+assert.match(conversationRow, /aria-expanded=\{menuOpen\}/);
+assert.match(conversationRow, /Exporter en Markdown/);
+assert.match(conversationRow, /Exporter en JSON/);
+assert.match(conversationRow, /Archiver/);
+assert.match(conversationRow, /Restaurer/);
+assert.doesNotMatch(conversationRow, /opacity:\s*0/);
+assert.match(home, /archived:\s*true/);
+assert.match(home, /Conversation archivée/);
 
-console.log('UX design system: 30 assertions passed.');
+console.log('UX design system: 38 assertions passed.');
