@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import database as db
+import tool_runtime
 import tools as tool_module
 
 
@@ -14,9 +15,20 @@ router = APIRouter(tags=["documents"])
 _DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(tool_module.__file__), "..", "data"))
 
 
+async def _document_tool(name: str, arguments: dict, *, confirmed_by_ui: bool = False):
+    return (
+        await tool_runtime.execute(
+            name,
+            arguments,
+            source="documents_ui",
+            confirmed_by_ui=confirmed_by_ui,
+        )
+    ).result
+
+
 @router.get("/api/documents")
 async def list_documents():
-    return await tool_module.TOOLS_REGISTRY["document_list"]({})
+    return await _document_tool("document_list", {})
 
 
 @router.get("/api/documents/templates")
@@ -26,7 +38,7 @@ async def document_templates():
 
 @router.post("/api/documents/generate")
 async def generate_document(body: dict = Body(...)):
-    result = await tool_module.TOOLS_REGISTRY["document_generate"](body)
+    result = await _document_tool("document_generate", body)
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -36,7 +48,11 @@ async def generate_document(body: dict = Body(...)):
 async def download_document(path: str):
     base = os.path.join(_DATA_DIR, "documents_generes")
     target = os.path.abspath(path)
-    if not target.startswith(base) or not os.path.exists(target):
+    try:
+        contained = os.path.commonpath((base, target)) == os.path.abspath(base)
+    except ValueError:
+        contained = False
+    if not contained or not os.path.isfile(target):
         raise HTTPException(status_code=404, detail="Fichier introuvable")
     return FileResponse(
         target,
@@ -78,7 +94,7 @@ class DocIndexBody(BaseModel):
 
 @router.post("/api/documents/index")
 async def index_document(body: DocIndexBody):
-    result = await tool_module.TOOLS_REGISTRY["document_index"]({"path": body.path})
+    result = await _document_tool("document_index", {"path": body.path})
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -91,7 +107,8 @@ class DocAskBody(BaseModel):
 
 @router.post("/api/documents/ask")
 async def ask_documents(body: DocAskBody):
-    result = await tool_module.TOOLS_REGISTRY["document_ask"](
+    result = await _document_tool(
+        "document_ask",
         {"question": body.question, "k": body.k}
     )
     if result.get("error"):
@@ -108,7 +125,7 @@ class DocRefineBody(BaseModel):
 
 @router.post("/api/documents/refine")
 async def refine_document(body: DocRefineBody):
-    result = await tool_module.TOOLS_REGISTRY["document_refine_section"](body.model_dump())
+    result = await _document_tool("document_refine_section", body.model_dump())
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -116,7 +133,11 @@ async def refine_document(body: DocRefineBody):
 
 @router.delete("/api/documents/{doc_id}")
 async def forget_document(doc_id: str):
-    return await tool_module.TOOLS_REGISTRY["document_forget"]({"id": doc_id})
+    return await _document_tool(
+        "document_forget",
+        {"id": doc_id},
+        confirmed_by_ui=True,
+    )
 
 
 @router.post("/api/documents/upload")
@@ -126,7 +147,7 @@ async def upload_document(file: UploadFile = File(...)):
     destination = os.path.join(documents_dir, os.path.basename(file.filename or "document"))
     with open(destination, "wb") as output:
         output.write(await file.read())
-    result = await tool_module.TOOLS_REGISTRY["document_index"]({"path": destination})
+    result = await _document_tool("document_index", {"path": destination})
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result

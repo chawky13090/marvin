@@ -5,6 +5,40 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.447.0 — Contenu et documents sous harness
+
+### Analyse et décision
+
+Seize accès directs contournaient encore le contrat commun dans la recherche locale, les
+aperçus Office, les pièces jointes du chat et les opérations RAG/documentaires. La migration
+par deux helpers de domaine conserve les transformations spécifiques de PDF, Word, Excel et
+PowerPoint tout en centralisant validation, permissions, erreurs, résultat et audit. Une
+réécriture des lecteurs n'était pas justifiée.
+
+### Amélioration de sécurité
+
+Le téléchargement documentaire vérifiait `target.startswith(base)`. Un répertoire frère tel
+que `documents_generes_evil` partage le préfixe et pouvait franchir ce contrôle. La route
+utilise désormais `os.path.commonpath`, gère les lecteurs Windows différents et exige
+`isfile`. Le test crée un vrai fichier autorisé et un voisin au préfixe trompeur : seul le
+premier reçoit un `FileResponse`.
+
+### Logs, données et rollback
+
+Les extractions continuent à être bornées par les outils et les limites d'aperçu existantes.
+Le gateway réutilise l'expurgation et la rétention existantes; aucun contenu documentaire
+supplémentaire n'est journalisé. Aucun schéma ni donnée n'est migré. Rollback exact :
+`git revert <commit-v2.447>`, redémarrage backend, tests contenu/documents, inventaire,
+architecture et smoke API.
+
+### Validation
+
+Les tests ciblés couvrent recherches, scopes, liste, génération, indexation, question,
+raffinement, oubli et confinement de téléchargement. Après relance, `/api/health` expose
+**2.447.0**; la liste réelle retourne 205 documents avec un contrat `succeeded`, sans
+mutation, et le smoke API réussit **28/28**. Le gate consolidé réussit **206/206 étapes**,
+dont compilation Python, lint sans erreur et build Turbopack.
+
 ## 2026-07-29 — v2.446.0 — Surfaces et workers e-mail sous harness
 
 ### Analyse et choix

@@ -9,8 +9,6 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 EXPECTED_DIRECT_CONSUMERS = {
     "agent.py": 1,
-    "api/content.py": 9,
-    "api/documents.py": 7,
     "api/system_tools.py": 25,
 }
 
@@ -88,8 +86,10 @@ def main() -> int:
     assert "api/email_automation.py" not in observed
     assert "api/email_preferences.py" not in observed
     assert "communication_workers.py" not in observed
-    assert sum(observed.values()) == 42
-    print("Tool Consumer Inventory OK - e-mail migré, dette bornée à 42 accès.")
+    assert "api/content.py" not in observed
+    assert "api/documents.py" not in observed
+    assert sum(observed.values()) == 26
+    print("Tool Consumer Inventory OK - contenu/documents migrés, dette bornée à 26 accès.")
     return 0
 
 

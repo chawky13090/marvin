@@ -1,7 +1,7 @@
 # Migration des consommateurs vers le harness universel
 
 Date de référence : 2026-07-29
-Version : 2.446.0
+Version : 2.447.0
 Source de vérité exécutable : `scripts/test_tool_consumer_inventory.py`
 
 ## Contrat cible
@@ -24,7 +24,8 @@ le Council comme dépendance et n'exécute pas directement un choix du modèle.
 
 ## État mesuré
 
-L'agenda, le domaine proactif, les orchestrateurs et les API/workers e-mail sont migrés.
+L'agenda, le proactif, les orchestrateurs, l'e-mail et les surfaces contenu/documents sont
+migrés.
 Les appels parallèles sont bornés, chaque étape de workflow possède une identité de tentative,
 un cycle cron possède une clé de rejeu stable et une automatisation e-mail planifiée possède
 une clé par minute. L'inventaire détecte les indexations directes, les alias locaux et les
@@ -34,12 +35,10 @@ Les accès directs historiques restants sont temporairement bornés :
 | Composant | Appels directs | Traitement prévu |
 |---|---:|---|
 | `api/system_tools.py` | 25 | migrer par groupes lecture/mutation avec confirmations UI |
-| `api/content.py` | 9 | préserver upload, limites et réponses historiques |
-| `api/documents.py` | 7 | préserver erreurs métier et artefacts |
 | `agent.py` | 1 | injection Council, pas un contournement d'exécution |
 
 Le gate AST échoue si un fichier ou un accès direct apparaît sans mise à jour explicite. La
-valeur 42 est un plafond transitoire, jamais une cible : chaque tranche doit la réduire.
+valeur 26 est un plafond transitoire, jamais une cible : chaque tranche doit la réduire.
 
 ## Sécurité, logs et rollback
 

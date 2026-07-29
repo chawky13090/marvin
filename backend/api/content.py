@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import tools as tool_module
+import tool_runtime
 from platform_paths import system_paths as resolve_system_paths
 
 
@@ -32,6 +33,16 @@ class SearchRequest(BaseModel):
     limit: int = 5
 
 
+async def _content_tool(name: str, arguments: dict):
+    return (
+        await tool_runtime.execute(
+            name,
+            arguments,
+            source="content_ui",
+        )
+    ).result
+
+
 @router.post("/api/search")
 async def semantic_search(request: SearchRequest):
     from vector_store import search
@@ -47,7 +58,8 @@ async def system_paths():
 
 @router.get("/api/system/search")
 async def system_search_endpoint(query: str = "", file_type: str = "", max_results: int = 30):
-    return await tool_module.TOOLS_REGISTRY["system_search"](
+    return await _content_tool(
+        "system_search",
         {"query": query, "file_type": file_type, "max_results": max_results}
     )
 
@@ -58,7 +70,8 @@ async def system_search_content_endpoint(
     file_type: str = "",
     max_results: int = 25,
 ):
-    return await tool_module.TOOLS_REGISTRY["system_search_content"](
+    return await _content_tool(
+        "system_search_content",
         {"query": query, "file_type": file_type, "max_results": max_results}
     )
 
@@ -94,7 +107,8 @@ async def file_preview(path: str):
         return {**info, "kind": "pdf"}
     if extension == ".docx":
         try:
-            result = await tool_module.TOOLS_REGISTRY["docx_to_text"](
+            result = await _content_tool(
+                "docx_to_text",
                 {"path": absolute_path, "format": "markdown"}
             )
             content = result.get("text") or result.get("content") or result.get("markdown") or ""
@@ -109,7 +123,7 @@ async def file_preview(path: str):
             )
     if extension in (".xlsx", ".xls"):
         try:
-            result = await tool_module.TOOLS_REGISTRY["xlsx_read"]({"path": absolute_path})
+            result = await _content_tool("xlsx_read", {"path": absolute_path})
             return {**info, "kind": "table", "data": result}
         except Exception:
             return {**info, "kind": "binary"}
@@ -144,18 +158,19 @@ async def chat_attach(file: UploadFile = File(...)):
     content = ""
     try:
         if extension == ".pdf":
-            result = await tool_module.TOOLS_REGISTRY["pdf_read"]({"path": destination})
+            result = await _content_tool("pdf_read", {"path": destination})
             content = result.get("text") or result.get("content") or ""
         elif extension == ".docx":
-            result = await tool_module.TOOLS_REGISTRY["docx_to_text"](
+            result = await _content_tool(
+                "docx_to_text",
                 {"path": destination, "format": "markdown"}
             )
             content = result.get("text") or result.get("content") or result.get("markdown") or ""
         elif extension == ".pptx":
-            result = await tool_module.TOOLS_REGISTRY["pptx_read"]({"path": destination})
+            result = await _content_tool("pptx_read", {"path": destination})
             content = result.get("text") or result.get("content") or ""
         elif extension in (".xlsx", ".xls"):
-            result = await tool_module.TOOLS_REGISTRY["xlsx_read"]({"path": destination})
+            result = await _content_tool("xlsx_read", {"path": destination})
             rows = result.get("data") or []
             headers = result.get("headers") or []
             lines = [" | ".join(str(header) for header in headers)] if headers else []
@@ -204,7 +219,7 @@ async def unified_search_endpoint(query: str = "", scope: str = "", limit: int =
     args = {"query": query, "limit": limit}
     if scopes:
         args["scope"] = scopes
-    return await tool_module.TOOLS_REGISTRY["unified_search"](args)
+    return await _content_tool("unified_search", args)
 
 
 @router.get("/api/screenshot")

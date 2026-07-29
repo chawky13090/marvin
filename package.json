@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.446.0",
+  "version": "2.447.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -23,6 +23,7 @@
     "check:tool-consumers": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_consumer_inventory.py",
     "check:calendar-gateway": "backend\\.venv\\Scripts\\python.exe scripts\\test_calendar_gateway_api.py",
     "check:orchestration-gateway": "backend\\.venv\\Scripts\\python.exe scripts\\test_orchestration_tool_gateway.py",
+    "check:content-document-gateway": "backend\\.venv\\Scripts\\python.exe scripts\\test_content_document_gateway.py",
     "check:mcp-server-boundary": "backend\\.venv\\Scripts\\python.exe scripts\\test_mcp_server_boundary.py",
     "check:model-proactive-api": "backend\\.venv\\Scripts\\python.exe scripts\\test_model_proactive_api.py",
     "check:main-composition": "backend\\.venv\\Scripts\\python.exe scripts\\test_main_composition.py",
