@@ -173,6 +173,19 @@ def run() -> dict[str, int | str]:
     ):
         if marker not in structured_source:
             raise CheckFailure(f"Fondation de journalisation incomplète : {marker}")
+    api_observability_source = (BACKEND / "api_observability.py").read_text(
+        encoding="utf-8-sig"
+    )
+    for marker in (
+        "_SLO_WINDOW_SECONDS",
+        "_SLO_MIN_SAMPLES",
+        "availability_target",
+        "latency_compliance",
+        "error_budget_remaining",
+        "burn_rate",
+    ):
+        if marker not in api_observability_source:
+            raise CheckFailure(f"Contrat SLO HTTP incomplet : {marker}")
     persistence_inventory_path = ROOT / "MARVIN-PERSISTENCE-INVENTORY.md"
     if not persistence_inventory_path.is_file():
         raise CheckFailure("L'inventaire autoritaire des persistances JSONL est absent.")

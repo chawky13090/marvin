@@ -52,6 +52,55 @@ async def scenario() -> None:
     assert api_observability.normalize_request_id("bad value") != "bad value"
     assert len(api_observability.normalize_request_id(None)) == 32
 
+    api_observability.reset_for_tests()
+    api_observability._store.write = lambda *args, **kwargs: True
+    try:
+        for index in range(99):
+            api_observability._record(
+                "GET", "/api/tasks", 200, 100.0, f"request-{index:08d}"
+            )
+        api_observability._record(
+            "GET", "/api/tasks", 503, 100.0, "request-error-0001"
+        )
+        slo = api_observability.slo_snapshot()
+        assert slo["state"] == "met"
+        assert slo["samples"] == 100
+        assert slo["availability"] == 0.99
+        assert slo["burn_rate"] == 1.0
+        assert slo["error_budget_remaining"] == 0.0
+
+        for index in range(6):
+            api_observability._record(
+                "GET", "/api/tasks", 200, 2501.0, f"request-slow-{index:04d}"
+            )
+        assert api_observability.slo_snapshot()["state"] == "missed"
+        samples = api_observability.slo_snapshot()["samples"]
+        api_observability._record(
+            "GET", "/api/health", 503, 10_000.0, "request-health-0001"
+        )
+        api_observability._record(
+            "POST", "/api/chat", 503, 10_000.0, "request-chat-000001"
+        )
+        api_observability._record(
+            "GET", "/api/coding/events/stream", 503, 10_000.0, "request-stream-001"
+        )
+        api_observability._record(
+            "OPTIONS", "/api/tasks", 503, 10_000.0, "request-options-01"
+        )
+        assert api_observability.slo_snapshot()["samples"] == samples
+        api_observability._slo_samples.appendleft(
+            (
+                api_observability.time.time()
+                - api_observability._SLO_WINDOW_SECONDS
+                - 1,
+                503,
+                10_000.0,
+            )
+        )
+        assert api_observability.slo_snapshot()["samples"] == samples
+    finally:
+        api_observability._store.write = original_write
+
 
 def main() -> int:
     asyncio.run(scenario())

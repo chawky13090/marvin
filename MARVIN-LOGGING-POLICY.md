@@ -110,6 +110,16 @@ Variables actuelles :
 
 ## 6. Résilience, sécurité et supervision
 
+- Le SLI HTTP utilise une fenêtre mémoire roulante d'une heure, au plus 20 000 échantillons
+  et un minimum de 20 requêtes avant décision. Les objectifs initiaux sont 99 % de
+  disponibilité et 95 % des requêtes sous deux secondes.
+- Les probes `/api/health`, requêtes `OPTIONS`, `/api/chat` et routes terminées par `/stream`
+  ne consomment pas le budget : leur fréquence ou leur durée intrinsèque fausserait le signal
+  utilisateur. Elles restent comptées dans les métriques HTTP générales et les erreurs 5xx
+  ou lenteurs continuent d'être journalisées.
+- Le SLO n'enregistre ni route par échantillon, ni identifiant, ni contenu; seuls timestamp,
+  statut et durée agrégés résident en mémoire. Un redémarrage remet volontairement la fenêtre
+  à zéro et produit `insufficient`, jamais un faux succès.
 - L'écriture est synchronisée dans le processus et la rotation utilise un renommage atomique.
 - Une panne de journal est best-effort et ne transforme pas un succès métier en échec.
 - Les tests simulent secrets, contenu, concurrence, rotation, expiration et limite d'archives.

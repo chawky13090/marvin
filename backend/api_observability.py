@@ -5,7 +5,7 @@ import re
 import threading
 import time
 import uuid
-from collections import Counter
+from collections import Counter, deque
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
@@ -24,6 +24,13 @@ _UUID_OR_NUMBER = re.compile(
 _LATENCY_BUCKETS_MS = (25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
 _MAX_ROUTES = 256
 _SLOW_MS = 2000
+_SLO_WINDOW_SECONDS = 60 * 60
+_SLO_MAX_SAMPLES = 20_000
+_SLO_MIN_SAMPLES = 20
+_SLO_AVAILABILITY_TARGET = 0.99
+_SLO_LATENCY_TARGET = 0.95
+_SLO_LATENCY_THRESHOLD_MS = 2000.0
+_SLO_EXCLUDED_ROUTES = frozenset({"/api/health"})
 _current_request_id: ContextVar[str | None] = ContextVar(
     "marvin_request_id",
     default=None,
@@ -39,6 +46,7 @@ _errors = 0
 _slow = 0
 _total_duration_ms = 0.0
 _max_duration_ms = 0.0
+_slo_samples: deque[tuple[float, int, float]] = deque(maxlen=_SLO_MAX_SAMPLES)
 
 _store = StructuredJsonlStore.from_environment(
     Path(DATA_DIR) / "logs" / "api_requests.jsonl",
@@ -62,6 +70,17 @@ def normalize_route(path: str) -> str:
     return normalized if normalized.startswith("/") else "/"
 
 
+def is_slo_eligible(method: str, route: str) -> bool:
+    normalized_method = str(method or "").upper()
+    normalized_route = str(route or "")
+    return (
+        normalized_method != "OPTIONS"
+        and normalized_route not in _SLO_EXCLUDED_ROUTES
+        and normalized_route != "/api/chat"
+        and not normalized_route.endswith("/stream")
+    )
+
+
 def _record(method: str, route: str, status: int, duration_ms: float, request_id: str) -> None:
     global _requests, _errors, _slow, _total_duration_ms, _max_duration_ms
     status_class = f"{max(1, min(status // 100, 5))}xx"
@@ -81,6 +100,8 @@ def _record(method: str, route: str, status: int, duration_ms: float, request_id
             _routes[route_key] += 1
         else:
             _routes["other"] += 1
+        if is_slo_eligible(method, route):
+            _slo_samples.append((time.time(), status, duration_ms))
     if status >= 500 or duration_ms >= _SLOW_MS:
         _store.write(
             "http_request",
@@ -114,7 +135,60 @@ def snapshot() -> dict[str, Any]:
             ],
             "route_cardinality": len(_routes),
             "slow_threshold_ms": _SLOW_MS,
+            "slo": _slo_snapshot_locked(time.time()),
         }
+
+
+def _slo_snapshot_locked(now: float) -> dict[str, Any]:
+    cutoff = now - _SLO_WINDOW_SECONDS
+    while _slo_samples and _slo_samples[0][0] < cutoff:
+        _slo_samples.popleft()
+    total = len(_slo_samples)
+    errors = sum(1 for _, status, _ in _slo_samples if status >= 500)
+    slow = sum(
+        1 for _, _, duration_ms in _slo_samples
+        if duration_ms > _SLO_LATENCY_THRESHOLD_MS
+    )
+    availability = (total - errors) / total if total else None
+    latency_compliance = (total - slow) / total if total else None
+    budget_fraction = 1.0 - _SLO_AVAILABILITY_TARGET
+    error_fraction = errors / total if total else 0.0
+    burn_rate = error_fraction / budget_fraction if budget_fraction > 0 else 0.0
+    if total < _SLO_MIN_SAMPLES:
+        state = "insufficient"
+    elif (
+        availability is not None
+        and availability >= _SLO_AVAILABILITY_TARGET
+        and latency_compliance is not None
+        and latency_compliance >= _SLO_LATENCY_TARGET
+    ):
+        state = "met"
+    else:
+        state = "missed"
+    return {
+        "state": state,
+        "window_seconds": _SLO_WINDOW_SECONDS,
+        "samples": total,
+        "minimum_samples": _SLO_MIN_SAMPLES,
+        "availability": round(availability, 6) if availability is not None else None,
+        "availability_target": _SLO_AVAILABILITY_TARGET,
+        "latency_compliance": (
+            round(latency_compliance, 6) if latency_compliance is not None else None
+        ),
+        "latency_target": _SLO_LATENCY_TARGET,
+        "latency_threshold_ms": _SLO_LATENCY_THRESHOLD_MS,
+        "errors": errors,
+        "slow": slow,
+        "error_budget_remaining": (
+            round(max(0.0, 1.0 - burn_rate), 6) if total else None
+        ),
+        "burn_rate": round(burn_rate, 6) if total else None,
+    }
+
+
+def slo_snapshot(now: float | None = None) -> dict[str, Any]:
+    with _lock:
+        return _slo_snapshot_locked(time.time() if now is None else float(now))
 
 
 def reset_for_tests() -> None:
@@ -125,6 +199,7 @@ def reset_for_tests() -> None:
         _status_classes.clear()
         _latency_buckets.clear()
         _routes.clear()
+        _slo_samples.clear()
 
 
 class ApiObservabilityMiddleware:

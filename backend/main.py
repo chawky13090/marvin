@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.442 — SLO HTTP roulant, budget d'erreur et gate local
 # v2.441 — voix validée pendant navigation et interruption
 # v2.440 — runtime Windows résilient et navigation chat sans perte
 # v2.439 — installateur unique portable et portefeuille local adapté au matériel

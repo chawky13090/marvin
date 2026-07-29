@@ -5,6 +5,36 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.442.0 — SLO HTTP roulant et budget d'erreur local
+
+L'observabilité HTTP exposait compteurs, classes de statut et latences depuis le démarrage,
+mais ne répondait pas à la question opératoire « la fiabilité est-elle encore acceptable ? ».
+OpenTelemetry recommande `http.server.request.duration` et des routes à faible cardinalité;
+Google SRE définit le budget d'erreur comme `1 - SLO` et recommande de piloter les changements
+avec ce budget. Deux options ont été comparées : installer immédiatement Prometheus,
+OpenTelemetry Collector et un stockage temporel, puissant mais disproportionné et non
+portable; ou calculer d'abord un SLI mémoire borné sur les métriques déjà présentes. La
+seconde est retenue pour le socle Windows local, sans fermer la voie à un export OTLP.
+
+`api_observability.py` conserve au plus 20 000 triplets timestamp/statut/durée sur une fenêtre
+d'une heure. Après vingt échantillons, il évalue 99 % de disponibilité et 95 % des requêtes
+sous deux secondes, puis expose état, burn rate et budget restant dans `/api/health`.
+Les probes, preflights et flux SSE longs sont exclus du SLI afin de ne pas fausser le signal,
+mais restent dans les compteurs et logs généraux. Le gate `check_runtime_slo.py` refuse les
+URLs non locales et distingue SLO manqué, données insuffisantes et schéma invalide.
+
+Tests déterministes : seuil exact à 99 %, budget épuisé, latence manquée, expiration de
+fenêtre, exclusions, schéma invalide et valeurs négatives/booléennes. Aucun prompt, réponse,
+route par échantillon, identifiant ou secret n'est conservé. La fenêtre est volontairement
+volatile : un redémarrage produit `insufficient`, jamais un faux `met`. Aucun schéma ni
+donnée métier n'est migré. Rollback exact : `git revert <commit-v2.442>`, redémarrage backend,
+puis `scripts/test_api_observability.py` et `/api/health`.
+
+Validation live sur 2.442 : `insufficient` avec 6 échantillons juste après redémarrage, puis
+`met` avec 33 échantillons après 25 GET locaux (`availability=1.0`,
+`latency_compliance=1.0`, `burn_rate=0.0`). Le gate a refusé `https://example.com` avec le
+code réservé aux erreurs de configuration et le smoke API a conservé 28/28 contrats.
+
 ## 2026-07-29 — v2.441.0 — Contrat vocal pendant les navigations
 
 Le domaine voix restait `partial` malgré la correction anti-chevauchement : aucun test

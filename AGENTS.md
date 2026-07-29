@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.441.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.442.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.441.0)
+## 9. État actuel (v2.442.0)
+
+**v2.442 (SLO HTTP local)** : l'observabilité API maintient une fenêtre roulante bornée
+d'une heure et calcule disponibilité, conformité de latence, budget d'erreur restant et
+burn rate. Le résultat reste `insufficient` avant vingt requêtes puis devient `met` ou
+`missed`. Les probes de santé, preflights et flux SSE longs sont exclus du SLI mais restent
+dans les métriques générales. `/api/health` expose uniquement ces agrégats sans contenu.
+`check_runtime_slo.py` fournit un gate local à trois sorties : conforme, SLO manqué ou
+télémétrie invalide.
 
 **v2.441 (contrat vocal navigateur)** : le smoke vocal sélectionne une conversation
 vocalisable via l'API plutôt que par une classe visuelle fragile. Il vérifie qu'une transition
