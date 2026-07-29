@@ -24,6 +24,8 @@ import {
   MonitorCog,
   NotebookPen,
   PanelsTopLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenLine,
   Plug,
   Puzzle,
@@ -88,6 +90,7 @@ const OLLAMA_PORT = process.env.NEXT_PUBLIC_OLLAMA_PORT || '11434';
 export default function Sidebar() {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState('checking');
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -98,6 +101,18 @@ export default function Sidebar() {
   // — une tâche pouvait tourner en arrière-plan (reprise cron) sans AUCUN signal ambiant.
   const [longTaskCount, setLongTaskCount] = useState(0);
   const chatStatus = useChatStatus();   // { isLoading, status, conversationId, messageCount }
+
+  useEffect(() => {
+    try { setPinned(window.localStorage.getItem('marvin:nav-pinned') === '1'); } catch {}
+  }, []);
+
+  const togglePinned = () => {
+    setPinned((current) => {
+      const next = !current;
+      try { window.localStorage.setItem('marvin:nav-pinned', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
 
   // Détecte le mobile/tactile (tiroir au lieu du survol) — couvre aussi le « mode bureau »
   useEffect(() => {
@@ -173,7 +188,7 @@ export default function Sidebar() {
   }
 
   // Sur mobile : barre déployée (240px) en tiroir, masquée hors écran sauf si ouverte.
-  const open = isMobile ? mobileOpen : expanded;
+  const open = isMobile ? mobileOpen : (expanded || pinned);
 
   return (
     <>
@@ -203,7 +218,7 @@ export default function Sidebar() {
 
       <aside
         onMouseEnter={() => { if (!isMobile) setExpanded(true); }}
-        onMouseLeave={() => { if (!isMobile) setExpanded(false); }}
+        onMouseLeave={() => { if (!isMobile && !pinned) setExpanded(false); }}
         style={{
           position: 'fixed',
           left: 0, top: 0, bottom: 0,
@@ -268,6 +283,23 @@ export default function Sidebar() {
             {avatarStatus === 'starting' ? 'Ouverture avatar…' : avatarStatus === 'running' ? 'Avatar actif — cliquer pour afficher' : 'Avatar bureau — cliquer pour ouvrir'}
           </div>
         </button>
+        {!isMobile && open && (
+          <button
+            type="button"
+            onClick={togglePinned}
+            aria-pressed={pinned}
+            aria-label={pinned ? 'Réduire la navigation' : 'Garder la navigation ouverte'}
+            title={pinned ? 'Réduire la navigation' : 'Garder la navigation ouverte'}
+            style={{
+              marginLeft: 'auto', width: 32, height: 32, flexShrink: 0,
+              display: 'grid', placeItems: 'center', borderRadius: 8,
+              border: '1px solid var(--border)', background: pinned ? 'rgba(79,140,255,.1)' : 'transparent',
+              color: pinned ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: 'pointer',
+            }}
+          >
+            {pinned ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+        )}
       </div>
 
       {/* ── Palette de commandes (Ctrl+K) ──────────────────────── */}

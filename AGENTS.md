@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.477.0)
+## 9. État actuel (v2.478.0)
+
+**v2.478 (Quiet Workbench)** : l'accueil vide utilise un composeur central et des intentions
+explicites; le composeur retourne en bas après le premier message. `/` ouvre la palette
+globale, la navigation peut rester épinglée, et `/historique` fournit recherche, regroupement
+temporel et reprise d'une conversation. Aucun outil, projet, export, mode vocal ou contrôle
+Cortex n'est supprimé.
 
 **v2.477 (activité temps réel des outils)** : `tool_activity.py` fournit un canal contextuel,
 éphémère et borné entre un outil et le flux SSE agentique. `agent_tool_batch.py` relaie les

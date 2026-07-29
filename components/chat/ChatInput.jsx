@@ -5,7 +5,7 @@ import { openMicStream, createRecorder, startVAD as startVADShared } from '@/lib
 import { BACKEND_URL } from '@/lib/backend';
 import CortexControl from '@/components/chat/CortexControl';
 
-export default function ChatInput({ input = '', setInput, handleInputChange, handleSubmit, isLoading, onStop, onImageAttach, messages = [] }) {
+export default function ChatInput({ input = '', setInput, handleInputChange, handleSubmit, isLoading, onStop, onImageAttach, messages = [], variant = 'dock' }) {
   // Voice context (TTS + voice mode)
   const chatCtx = useOptionalChat();
   const voiceCtx = chatCtx?.voice;
@@ -230,6 +230,11 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
   }, [input]);
 
   function onKeyDown(e) {
+    if (e.key === '/' && !input && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      window.dispatchEvent(new Event('marvin:open-command-palette'));
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading && (input.trim() || attachedImages.length > 0 || attachedFiles.length > 0)) {
@@ -351,9 +356,9 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
       onDragOver={onDragOver}
       onDrop={onDrop}
       style={{
-        padding: '16px 24px 20px',
-        borderTop: '1px solid var(--border)',
-        background: 'var(--bg-secondary)',
+        padding: variant === 'welcome' ? '0' : '16px 24px 20px',
+        borderTop: variant === 'welcome' ? 'none' : '1px solid var(--border)',
+        background: variant === 'welcome' ? 'transparent' : 'var(--bg-secondary)',
         position: 'relative',
       }}
     >
@@ -427,11 +432,13 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
         display: 'flex',
         alignItems: 'flex-end',
         gap: '8px',
-        background: 'var(--bg-glass)',
+        background: variant === 'welcome' ? 'rgba(24, 24, 29, .92)' : 'var(--bg-glass)',
         backdropFilter: 'blur(20px)',
-        border: '1px solid var(--border)',
-        borderRadius: '16px',
-        padding: '8px 8px 8px 12px',
+        border: `1px solid ${variant === 'welcome' ? 'rgba(228, 228, 231, .14)' : 'var(--border)'}`,
+        borderRadius: variant === 'welcome' ? '21px' : '16px',
+        padding: variant === 'welcome' ? '13px 13px 13px 16px' : '8px 8px 8px 12px',
+        minHeight: variant === 'welcome' ? '112px' : undefined,
+        boxShadow: variant === 'welcome' ? '0 18px 55px rgba(0, 0, 0, .28)' : 'none',
         transition: 'border-color 0.2s, box-shadow 0.2s',
       }}
       onFocus={(e) => {
@@ -767,7 +774,9 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           }}
           onKeyDown={onKeyDown}
           onPaste={handlePaste}
-          placeholder="Demandez quelque chose… (Entrée pour envoyer, Maj+Entrée pour nouvelle ligne)"
+          placeholder={variant === 'welcome'
+            ? 'Décrivez votre objectif, ou tapez / pour choisir une capacité…'
+            : 'Demandez quelque chose… (Entrée pour envoyer, Maj+Entrée pour nouvelle ligne)'}
           disabled={isLoading}
           rows={1}
           style={{
@@ -780,7 +789,8 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
             fontSize: 'var(--font-base)',
             lineHeight: '1.5',
             resize: 'none',
-            maxHeight: '140px',
+            maxHeight: variant === 'welcome' ? '180px' : '140px',
+            minHeight: variant === 'welcome' ? '72px' : undefined,
             padding: '6px 0',
           }}
         />

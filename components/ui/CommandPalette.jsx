@@ -8,6 +8,10 @@ import { BACKEND_URL as BACKEND } from '@/lib/backend';
 // Actions rapides, en plus de la navigation (pas des pages, des raccourcis d'action)
 const QUICK_ACTIONS = [
   { id: 'new-conv', icon: '➕', label: 'Nouvelle conversation', href: '/?new=1' },
+  { id: 'deep-research', icon: '⌕', label: 'Recherche approfondie', href: '/recherche' },
+  { id: 'code-workspace', icon: '</>', label: 'Produire du code', href: '/code' },
+  { id: 'council', icon: '◉', label: 'Council de modèles', href: '/agents' },
+  { id: 'history', icon: '↶', label: 'Historique des discussions', href: '/historique' },
 ];
 
 function buildIndex() {

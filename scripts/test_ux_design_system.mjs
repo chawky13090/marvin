@@ -6,6 +6,10 @@ const home = fs.readFileSync('app/page.js', 'utf8');
 const sidebar = fs.readFileSync('components/sidebar/Sidebar.module.css', 'utf8');
 const sidebarComponent = fs.readFileSync('components/sidebar/Sidebar.jsx', 'utf8');
 const conversationRow = fs.readFileSync('components/chat/sidebar/ConversationRow.jsx', 'utf8');
+const chatInput = fs.readFileSync('components/chat/ChatInput.jsx', 'utf8');
+const quietWelcome = fs.readFileSync('components/chat/QuietWelcome.jsx', 'utf8');
+const quietWelcomeCss = fs.readFileSync('components/chat/QuietWelcome.module.css', 'utf8');
+const historyPage = fs.readFileSync('app/historique/page.jsx', 'utf8');
 
 for (const [token, value] of [
   ['--fib-1', '3px'],
@@ -49,4 +53,13 @@ assert.doesNotMatch(conversationRow, /opacity:\s*0/);
 assert.match(home, /archived:\s*true/);
 assert.match(home, /Conversation archivée/);
 
-console.log('UX design system: 38 assertions passed.');
+assert.match(chatInput, /marvin:open-command-palette/);
+assert.match(chatInput, /variant === 'welcome'/);
+assert.match(quietWelcome, /Modes de travail suggérés/);
+assert.match(quietWelcome, /Recherche approfondie/);
+assert.match(quietWelcome, /Council/);
+assert.match(quietWelcomeCss, /prefers-reduced-motion/);
+assert.match(historyPage, /Historique des discussions/);
+assert.match(historyPage, /toLocaleDateString\('fr-FR'/);
+
+console.log('UX design system: 46 assertions passed.');

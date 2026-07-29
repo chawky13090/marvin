@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.478 — Quiet Workbench, accueil contextuel et historique unifié
 # v2.477 — Activity Beacon persistant et progression réelle des outils longs
 # v2.476 — SearXNG prioritaire, recherche profonde multi-passes et routeur de capacités
 # v2.475 — contrats Web explicites et refus des promesses d'outils non exécutées

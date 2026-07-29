@@ -5,6 +5,49 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.478.0 — Quiet Workbench inspiré des principes de Kimi
+
+### Demande et décision
+
+L'utilisateur valide l'option B : reprendre la hiérarchie calme et le composeur contextuel de
+Kimi sans copier son identité ni supprimer les capacités de Marvin. Une simple skin aurait
+laissé la navigation et le chat techniquement fragmentés. La solution retenue conserve le
+shell, les outils, Cortex, le vocal et les conversations, mais applique une divulgation
+progressive et des intentions utilisateur explicites.
+
+### Implémentation
+
+Une nouvelle conversation affiche désormais la boucle de Möbius, un objectif unique, le
+composeur complet au centre et six raccourcis orientés intention. Après le premier message,
+le même composeur revient à son ancrage historique en bas. Les contrôles Lecture, Technique
+et Audit ne sont plus affichés à vide. La touche `/` ouvre la palette globale, qui indexe
+aussi Recherche approfondie, Code Workspace, Council et l'historique.
+
+La navigation principale peut être épinglée ou réduite par clic; cette préférence locale ne
+quitte pas le navigateur. La page `/historique` regroupe les discussions par période, filtre
+les titres et rouvre le fil choisi dans le chat. Le panneau des conversations expose un lien
+vers cette vue sans retirer les projets, archives, renommages ou exports existants.
+
+### Sécurité, logs et rollback
+
+Cette tranche ne crée aucune mutation backend, aucun accès réseau nouveau, aucun journal
+technique et aucun stockage de contenu. Seul un booléen de préférence de navigation utilise
+le stockage navigateur. Les identifiants de conversation sont encodés dans l'URL puis
+revalidés par l'API existante; le paramètre est retiré après consommation. Les actions
+sensibles conservent leurs confirmations.
+
+Aucun schéma ni donnée métier n'est migré. Rollback exact : `git revert <commit-v2.478>`.
+
+### Validations
+
+ESLint ne remonte aucune erreur sur les fichiers modifiés; l'avertissement historique
+`no-img-element` de l'aperçu de pièce jointe reste inchangé. Le gate UX réussit 46
+assertions, les contrats de présentation 14 assertions, le tracker de mission 4 assertions
+et la reprise SSE réussit. Le contrôle Chrome réel confirme le composeur central, les
+raccourcis sans barre de défilement, l'historique groupé et la réouverture d'une conversation.
+Le build Next.js 16.2.12 avec Turbopack compile, puis le smoke navigateur valide 41/41 pages
+sans erreur console. Le frontend Turbopack est redémarré et `/historique` répond HTTP 200.
+
 ## 2026-07-29 — v2.477.0 — Activity Beacon et progression réelle
 
 **Demande et mesure.** La dernière recherche approfondie était correcte mais silencieuse

@@ -1,0 +1,104 @@
+.stage {
+  min-height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px 21px 55px;
+}
+
+.content {
+  width: min(860px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: quietEnter 320ms ease-out both;
+}
+
+.avatar { margin-bottom: 8px; filter: saturate(.88); }
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(1.45rem, 3vw, 2.05rem);
+  font-weight: 650;
+  letter-spacing: -.035em;
+}
+
+.subtitle {
+  margin: 5px 0 21px;
+  color: var(--text-secondary);
+  font-size: .92rem;
+}
+
+.composer { width: 100%; }
+
+.intentBar {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  margin-top: 13px;
+  flex-wrap: wrap;
+  justify-content: center;
+  overflow: hidden;
+  padding: 1px 1px 8px;
+  scrollbar-width: thin;
+}
+
+.intent {
+  min-height: 38px;
+  padding: 8px 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, .018);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.intent:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, .04);
+}
+
+.intent:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.hint {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: .68rem;
+  text-align: center;
+}
+
+@keyframes quietEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 720px) {
+  .stage { align-items: flex-start; padding: 55px 13px 21px; }
+  .subtitle { margin-bottom: 13px; }
+  .intentBar { margin-inline: -4px; width: calc(100% + 8px); }
+  .intentBar {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .intentBar::-webkit-scrollbar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content { animation: none; }
+  .intent { transition: none; }
+}

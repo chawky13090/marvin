@@ -1,11 +1,11 @@
 'use client';
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { useChat } from '@/lib/contexts/ChatContext';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import TypingIndicator from '@/components/chat/TypingIndicator';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
+import QuietWelcome from '@/components/chat/QuietWelcome';
 import ConversationViewToolbar from '@/components/chat/ConversationViewToolbar';
 import { BACKEND_URL } from '@/lib/backend';
 import { isLiveConversation } from '@/lib/chatNavigation.mjs';
@@ -54,7 +54,6 @@ export default function ChatContainer({
   // remontait pour relire un passage. Ne force plus le scroll que si l'utilisateur était déjà
   // proche du bas juste avant la mise à jour (seuil 80px) — sinon sa position est respectée.
   const stickToBottomRef = useRef(true);
-  const router = useRouter();
 
   // Le brouillon survit aux changements de page. Une demande préparée par Code Workspace
   // reste prioritaire et remplace le brouillon courant uniquement une fois.
@@ -335,12 +334,14 @@ export default function ChatContainer({
         </div>
       )}
 
-      <ConversationViewToolbar
-        mode={viewMode}
-        onModeChange={changeViewMode}
-        onExport={exportAudit}
-        hasMessages={messages.length > 0}
-      />
+      {messages.length > 0 && (
+        <ConversationViewToolbar
+          mode={viewMode}
+          onModeChange={changeViewMode}
+          onExport={exportAudit}
+          hasMessages
+        />
+      )}
 
       {/* Messages */}
       <div
@@ -360,52 +361,16 @@ export default function ChatContainer({
         }}
       >
         {messages.length === 0 ? (
-          <div className="empty-state">
-            <div style={{ marginBottom: 6 }}>
-              <LivingAvatar size={148} thinking={isLoading} />
-            </div>
-            <div className="empty-state-title holo-text" style={{ letterSpacing: '-0.01em' }}>
-              {getGreeting()}.
-            </div>
-            <div className="empty-state-text">
-              Comment puis-je vous aider aujourd&apos;hui ?
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: '12px',
-              marginTop: '24px',
-              maxWidth: '700px',
-              width: '100%',
-            }}>
-              {[
-                // v2.168 — navigue vers la page dédiée plutôt que de lancer une requête
-                // chat : signalé par l'utilisateur (les prompts v2.167 déclenchaient des
-                // outils lourds — file_large_finder ~150s, email_digest ~54s — beaucoup
-                // trop long pour un premier clic). Chaque page a déjà une UI pensée pour
-                // ça (listes, filtres, actions rapides), instantané côté client.
-                { icon: '📧', label: 'Gérer vos emails', desc: 'Lire, répondre, classer', href: '/emails' },
-                { icon: '📅', label: 'Organiser votre agenda', desc: 'RDV, disponibilités', href: '/calendar' },
-                { icon: '📁', label: 'Classer vos fichiers', desc: 'Parcourir, rechercher, organiser', href: '/fichiers' },
-                { icon: '🖥️', label: 'Contrôler votre PC', desc: 'Santé, logiciels, nettoyage', href: '/systeme' },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  className="card suggestion-card"
-                  onClick={() => router.push(item.href)}
-                  style={{
-                    textAlign: 'center', padding: '20px', cursor: 'pointer',
-                    animation: 'slideUp 0.5s ease forwards',
-                    font: 'inherit', color: 'inherit', width: '100%',
-                  }}
-                >
-                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{item.icon}</div>
-                  <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)', marginBottom: '4px' }}>{item.label}</div>
-                  <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-secondary)' }}>{item.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <QuietWelcome
+            greeting={getGreeting()}
+            input={localInput}
+            setInput={setLocalInput}
+            handleSubmit={handleSend}
+            isLoading={isLoading}
+            onStop={stop}
+            onImageAttach={handleImageAttach}
+            messages={messages}
+          />
         ) : (
           displayMessages.map((msg, index) => (
             <MessageBubble
@@ -506,16 +471,18 @@ export default function ChatContainer({
         />
       )}
 
-      {/* Input */}
-      <ChatInput
-        input={localInput}
-        setInput={setLocalInput}
-        handleSubmit={handleSend}
-        isLoading={isLoading}
-        onStop={stop}
-        onImageAttach={handleImageAttach}
-        messages={messages}
-      />
+      {/* Central sur une nouvelle conversation, ancré en bas après le premier message. */}
+      {messages.length > 0 && (
+        <ChatInput
+          input={localInput}
+          setInput={setLocalInput}
+          handleSubmit={handleSend}
+          isLoading={isLoading}
+          onStop={stop}
+          onImageAttach={handleImageAttach}
+          messages={messages}
+        />
+      )}
     </div>
   );
 }

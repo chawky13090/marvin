@@ -226,6 +226,15 @@ export default function ChatPage() {
     }
   };
 
+  useEffect(() => {
+    const requestedId = new URLSearchParams(window.location.search).get('conversation');
+    if (!requestedId) return;
+    window.history.replaceState({}, '', '/');
+    loadConversation(requestedId);
+    // L'identifiant d'URL est consommé une seule fois à l'arrivée depuis l'historique.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const switchModel = async (modelName) => {
     setActiveModel(modelName);
     setShowModelDropdown(false);
@@ -644,14 +653,17 @@ export default function ChatPage() {
             />
             {convSearch && <button onClick={() => setConvSearch('')} title="Effacer" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14 }}>×</button>}
           </div>
-          <button
-            type="button"
-            onClick={toggleArchivedView}
-            aria-pressed={showArchived}
-            style={{ marginTop: 8, border: 0, background: 'transparent', color: showArchived ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}
-          >
-            {showArchived ? 'Retour aux conversations' : 'Voir les archives'}
-          </button>
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <a href="/historique" style={{ color: 'var(--text-secondary)', fontSize: 11 }}>Historique complet</a>
+            <button
+              type="button"
+              onClick={toggleArchivedView}
+              aria-pressed={showArchived}
+              style={{ border: 0, background: 'transparent', color: showArchived ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}
+            >
+              {showArchived ? 'Retour aux conversations' : 'Archives'}
+            </button>
+          </div>
         </div>
 
         {lastArchivedConversation && !showArchived && (

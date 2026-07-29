@@ -27,7 +27,7 @@ BASE_URL = "http://localhost:3000"
 # documents/vocal) : leur redirect doit rester silencieux, zéro erreur console.
 PAGES = [
     "/", "/agents", "/avatar", "/calendar", "/catharsis", "/code", "/codex", "/cron", "/devis", "/docs", "/evolution",
-    "/documents", "/emails", "/emporium", "/fichiers", "/files", "/forge", "/indexation", "/jour",
+    "/documents", "/emails", "/emporium", "/fichiers", "/files", "/forge", "/historique", "/indexation", "/jour",
     "/market", "/mcp", "/memoire", "/missions", "/mobile", "/monitoring", "/notes", "/outils", "/pantheon",
     "/recherche", "/redaction", "/sante", "/settings", "/skills", "/ssh", "/systeme",
     "/tasks", "/technique", "/video", "/vocal", "/workflows",
