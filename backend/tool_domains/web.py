@@ -45,7 +45,7 @@ def configure(*, generate: Generator, get_setting: GetSetting,
     _net_error = net_error
 
 
-async def execute_web_search(args: dict) -> dict:
+async def _execute_web_search_legacy(args: dict) -> dict:
     """Recherche web multi-provider : DuckDuckGo (gratuit) + Brave/Google/SerpAPI si clé dispo."""
     query = str(args.get("query") or "").strip()
     provider = str(args.get("provider") or "auto").strip().lower()
@@ -249,15 +249,150 @@ async def execute_web_search(args: dict) -> dict:
     # Auto : SearXNG d'abord (auto-hébergé → gratuit, illimité, aucun anti-bot tiers
     # si configuré), puis brave → google → serpapi → duckduckgo (scraping HTML, en
     # dernier recours seulement — le plus fragile face à l'anti-bot).
-    for fn in (_searxng, _brave, _google, _serpapi):
+    attempts: list[dict[str, str]] = []
+    for name, fn in (
+        ("SearXNG", _searxng),
+        ("Brave Search", _brave),
+        ("Google", _google),
+        ("SerpAPI", _serpapi),
+    ):
         r = await fn()
+        if r is None:
+            attempts.append({"provider": name, "status": "not_configured"})
+            continue
         if r and r.get("success"):
+            r["provider_attempts"] = attempts + [{"provider": name, "status": "succeeded"}]
+            r["fallback_used"] = name != "SearXNG"
+            r["provider_priority"] = "SearXNG"
             _wcache_set(_ck, r)
             return r
+        attempts.append({"provider": name, "status": "failed"})
     r = await _ddg()
     if r.get("success"):
+        r["provider_attempts"] = attempts + [{"provider": "DuckDuckGo", "status": "succeeded"}]
+        r["fallback_used"] = True
+        r["provider_priority"] = "SearXNG"
         _wcache_set(_ck, r)
+    elif isinstance(r, dict):
+        r["provider_attempts"] = attempts + [{"provider": "DuckDuckGo", "status": "failed"}]
+        r["fallback_used"] = True
+        r["provider_priority"] = "SearXNG"
     return r
+
+
+async def execute_web_search(args: dict) -> dict:
+    """Recherche Web exclusivement via l'instance SearXNG configurée."""
+    query = str(args.get("query") or "").strip()
+    provider = str(args.get("provider") or "auto").strip().lower()
+    if not query:
+        return {"success": False, "provider": "SearXNG", "error": "Requête vide"}
+    if provider not in {"auto", "searxng"}:
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "error": "Provider invalide : SearXNG est l'unique fournisseur autorisé.",
+        }
+    try:
+        max_results = max(1, min(int(args.get("max_results", 8)), 20))
+    except (TypeError, ValueError):
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "error": "Paramètre 'max_results' invalide : entier attendu entre 1 et 20.",
+        }
+
+    cache_key = ("ws-searxng-only", query.lower(), max_results)
+    cached = _wcache_get(cache_key)
+    if cached is not None:
+        return {**cached, "cached": True}
+
+    import credentials_manager as cm
+    base = cm.get_credential("searxng_url")
+    if not base:
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "query": query,
+            "count": 0,
+            "results": [],
+            "provider_attempts": [{"provider": "SearXNG", "status": "not_configured"}],
+            "fallback_used": False,
+            "provider_priority": "SearXNG",
+            "error": "Instance SearXNG non configurée (réglage 'searxng_url').",
+        }
+    try:
+        client = _get_http_client()
+        response = await client.get(
+            str(base).rstrip("/") + "/search",
+            params={"q": query, "format": "json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        results = [
+            {
+                "title": str(item.get("title") or ""),
+                "url": str(item.get("url") or ""),
+                "snippet": str(item.get("content") or ""),
+            }
+            for item in list(payload.get("results") or [])[:max_results]
+            if item.get("url")
+        ]
+        receipt = {
+            "success": bool(results),
+            "provider": "SearXNG",
+            "query": query,
+            "count": len(results),
+            "results": results,
+            "provider_attempts": [{
+                "provider": "SearXNG",
+                "status": "succeeded" if results else "failed",
+            }],
+            "fallback_used": False,
+            "provider_priority": "SearXNG",
+        }
+        if not results:
+            receipt["error"] = "SearXNG n'a retourné aucun résultat."
+        else:
+            _wcache_set(cache_key, receipt)
+        return receipt
+    except Exception as exc:
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "query": query,
+            "count": 0,
+            "results": [],
+            "provider_attempts": [{"provider": "SearXNG", "status": "failed"}],
+            "fallback_used": False,
+            "provider_priority": "SearXNG",
+            "error": f"SearXNG inaccessible : {type(exc).__name__}",
+        }
+
+
+async def _priority_search(query: str, max_results: int) -> dict[str, Any]:
+    """Recherche via la chaîne officielle : SearXNG d'abord, replis seulement ensuite."""
+    result = await execute_web_search({
+        "query": query,
+        "provider": "auto",
+        "max_results": max_results,
+    })
+    if not isinstance(result, dict):
+        return {"success": False, "results": [], "error": "Réponse de recherche invalide."}
+    return result
+
+
+def _fallback_complement_query(query: str, round_index: int) -> str:
+    angles = (
+        "sources officielles documentation données primaires",
+        "actualités récentes avis indépendants réseaux sociaux",
+        "mentions légales registre entreprise chiffres vérification",
+    )
+    return f"{query} {angles[min(max(round_index, 0), len(angles) - 1)]}"[:150]
+
+
+def _clean_search_query(value: str) -> str:
+    """Neutralise le formatage bavard du LLM sans modifier les termes recherchés."""
+    return " ".join(str(value or "").replace('"', " ").replace("'", " ").split())[:150]
 
 
 async def execute_web_browse(args: dict) -> dict:
@@ -441,16 +576,25 @@ async def execute_web_research(args: dict) -> dict:
         return {"error": "Paramètre 'query' requis."}
     try:
         import web_browser as wb
-        results = await wb.search(query, n=6)
+        search_receipt = await _priority_search(query, 10)
+        results = list(search_receipt.get("results") or [])
     except Exception as e:
         return {"error": f"Recherche navigateur échouée : {str(e)[:160]}"}
     if not results:
-        return {"success": True, "answer": "Aucun résultat web trouvé.", "sources": []}
+        return {
+            "success": False,
+            "answer": "",
+            "sources": [],
+            "provider": "SearXNG",
+            "provider_attempts": search_receipt.get("provider_attempts", []),
+            "fallback_used": False,
+            "error": str(search_receipt.get("error") or "SearXNG n'a retourné aucun résultat."),
+        }
     # Lire le contenu des N meilleurs résultats (profondeur pilotée par le MODE de performance)
     try:
-        web_depth = max(1, int(args.get("depth") or _get_setting("web_depth") or 2))
+        web_depth = max(3, min(int(args.get("depth") or _get_setting("web_depth") or 3), 6))
     except Exception:
-        web_depth = 2
+        web_depth = 3
     pages = []
     for res in results[:web_depth]:
         try:
@@ -476,9 +620,21 @@ async def execute_web_research(args: dict) -> dict:
             await learning.add_qa(query, answer)
     except Exception:
         pass
-    return {"success": True, "answer": answer,
-            "sources": [{"title": r.get("title", ""), "url": r["url"]} for r in results[:4]],
-            "message": "Réponse trouvée sur le web et mémorisée."}
+    return {
+        "success": True,
+        "answer": answer,
+        "sources": [
+            {"title": r.get("title", ""), "url": r["url"]}
+            for r in results[:10]
+        ],
+        "provider": search_receipt.get("provider"),
+        "provider_attempts": search_receipt.get("provider_attempts", []),
+        "fallback_used": bool(search_receipt.get("fallback_used", False)),
+        "message": (
+            f"Réponse trouvée via {search_receipt.get('provider') or 'le Web'} "
+            f"avec {len(results[:10])} source(s) et mémorisée."
+        ),
+    }
 
 
 async def execute_web_deep_research(args: dict) -> dict:
@@ -502,11 +658,22 @@ async def execute_web_deep_research(args: dict) -> dict:
     seen_urls = set()
     sources: list[dict] = []
     queries_done = [query]
+    search_receipts: list[dict[str, Any]] = []
+    min_rounds = min(max_rounds, max(1, min(int(args.get("min_rounds", 3)), 4)))
 
     for round_idx in range(max_rounds):
-        current_query = queries_done[-1]
+        current_query = _clean_search_query(queries_done[-1])
+        queries_done[-1] = current_query
         try:
-            results = await wb.search(current_query, n=6)
+            search_receipt = await _priority_search(current_query, 10)
+            results = list(search_receipt.get("results") or [])
+            search_receipts.append({
+                "query": current_query,
+                "provider": search_receipt.get("provider"),
+                "count": len(results),
+                "fallback_used": bool(search_receipt.get("fallback_used", False)),
+                "provider_attempts": search_receipt.get("provider_attempts", []),
+            })
         except Exception:
             results = []
         new_pages = 0
@@ -523,10 +690,12 @@ async def execute_web_deep_research(args: dict) -> dict:
             if text:
                 sources.append({"title": res.get("title", ""), "url": url, "text": text[:3000]})
                 new_pages += 1
-            if new_pages >= 4:  # limite par passe — reste raisonnable en temps total
+            if new_pages >= 6:  # corpus riche mais borné à 36 pages au maximum
                 break
 
         if not sources:
+            break
+        if round_idx >= max_rounds - 1:
             break
 
         # Le modèle juge si c'est suffisant, sinon propose UNE requête complémentaire
@@ -538,7 +707,14 @@ async def execute_web_deep_research(args: dict) -> dict:
             f"Question de recherche : {query}\n\n"
             f"Sources déjà trouvées (passe {round_idx+1}/{max_rounds}) :\n{digest}\n\n"
             "Ces sources suffisent-elles pour répondre COMPLÈTEMENT et précisément à la "
-            "question ? Réponds UNIQUEMENT par « SUFFISANT » si oui, ou par UNE requête de "
+            "question ? "
+            + (
+                f"Il reste des angles obligatoires à explorer avant la passe {min_rounds}; "
+                "propose donc UNE requête complémentaire distincte. "
+                if round_idx + 1 < min_rounds
+                else "Réponds UNIQUEMENT par « SUFFISANT » si oui, ou par "
+            )
+            + "UNE requête de "
             "recherche COURTE (mots-clés seulement, pas une phrase) pour combler ce qui "
             "manque encore — rien d'autre, pas d'explication."
         )
@@ -546,11 +722,18 @@ async def execute_web_deep_research(args: dict) -> dict:
             verdict = (await _generate(judge_prompt, model=args.get("model"), timeout=60) or "").strip()
         except Exception:
             verdict = "SUFFISANT"
-        if not verdict or verdict.upper().startswith("SUFFISANT") or len(verdict) > 150:
+        candidate = _clean_search_query(verdict)
+        duplicate = candidate.lower() in [q.strip().lower() for q in queries_done]
+        invalid = not candidate or len(candidate) > 150
+        sufficient = candidate.upper().startswith("SUFFISANT")
+        if round_idx + 1 < min_rounds and (invalid or sufficient or duplicate):
+            candidate = _fallback_complement_query(query, round_idx)
+            duplicate = candidate.lower() in [q.strip().lower() for q in queries_done]
+        elif invalid or sufficient or duplicate:
             break
-        if verdict.strip().lower() in [q.strip().lower() for q in queries_done]:
-            break  # évite de boucler sur la même requête
-        queries_done.append(verdict.strip())
+        if duplicate:
+            break
+        queries_done.append(candidate)
 
     if not sources:
         return {"success": True, "answer": "Aucune source trouvée pour cette recherche.", "sources": []}
@@ -578,8 +761,11 @@ async def execute_web_deep_research(args: dict) -> dict:
     return {
         "success": True,
         "answer": report,
-        "rounds": len(queries_done),
+        "rounds": len(search_receipts),
         "queries_used": queries_done,
         "sources": [{"title": s["title"], "url": s["url"]} for s in sources],
+        "search_receipts": search_receipts,
+        "provider_priority": "SearXNG",
+        "fallback_used": any(item["fallback_used"] for item in search_receipts),
         "message": f"Recherche approfondie terminée : {len(sources)} source(s) sur {len(queries_done)} passe(s).",
     }

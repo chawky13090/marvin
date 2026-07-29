@@ -97,7 +97,7 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
     reasons: list[str] = []
 
     if resolved["effort"] == "auto":
-        if re.search(r"\b(exhausti|approfond|étude complète|analyse complète)\w*", text):
+        if re.search(r"\b(exhausti|approfond|renforc|étude complète|analyse complète)\w*", text):
             resolved["effort"] = "deep"; reasons.append("profondeur demandée")
         else:
             resolved["effort"] = "standard"
@@ -175,7 +175,12 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
             reasons.append("profondeur multi-experts explicitement demandée")
     evidence_is_required = "evidence" in explicit or natural_primary_request or natural_web_request
     if evidence_is_required:
-        if resolved["evidence"] == "web": forced_tools.append("web_research")
+        if resolved["evidence"] == "web":
+            forced_tools.append(
+                "web_deep_research"
+                if resolved["effort"] == "deep"
+                else "web_research"
+            )
         elif resolved["evidence"] == "primary": forced_tools.append("web_deep_research")
     if ("effort" in explicit and resolved["effort"] == "mission") or (
         "autonomy" in explicit and resolved["autonomy"] == "mission"

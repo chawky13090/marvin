@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.475.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.476.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.475.0)
+## 9. État actuel (v2.476.0)
+
+**v2.476 (recherche Web et routage de capacités)** : `web_search`, `web_research` et
+`web_deep_research`, ainsi que Research Swarm, utilisent exclusivement SearXNG. Aucun repli
+direct Brave, Google, SerpAPI ou DuckDuckGo n'est autorisé; une indisponibilité SearXNG produit
+un échec explicite. Brave et DuckDuckGo sont aussi désactivés dans la configuration SearXNG
+livrée. La recherche normale expose jusqu'à dix sources.
+La recherche approfondie exécute au moins trois angles bornés, lit jusqu'à six pages par
+passe, déduplique les URLs et cite le corpus complet. Une relance contextuelle reprend
+déterministement le sujet utilisateur précédent dans les arguments de l'outil au lieu de
+rechercher le texte « refait la recherche ». « web search renforcer » route vers
+`web_deep_research`. Le routeur d'outils ajoute un classement lexical portable dérivé des
+noms, descriptions et paramètres des 344 contrats; les résultats d'embedding ont désormais
+un seuil minimal au lieu d'accepter aveuglément un top-k.
 
 **v2.475 (exécution Web prouvée)** : les formulations naturelles `web search`, `recherche
 internet`, `derniers infos` et `visiter le site` imposent désormais un outil Web en lecture

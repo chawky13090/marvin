@@ -86,6 +86,11 @@ async def main() -> int:
         tools_available=True,
     ) is False
     assert promises_unexecuted_action(
+        "Je lance des recherches complémentaires.",
+        executed_tool_names={"web_research"},
+        tools_available=True,
+    ) is True
+    assert promises_unexecuted_action(
         "Je pense que cette recherche est pertinente.",
         executed_tool_names=set(),
         tools_available=True,

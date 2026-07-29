@@ -52,6 +52,12 @@ def main() -> int:
         ))))
         assert {"email_accounts", "email_list", "email_read"} <= email
 
+        portable = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "effectue une prévision météorologique pour Lyon"}],
+            "agent",
+        ))))
+        assert "weather" in portable
+
     sample = [_spec(name) for name in ("a", "b", "c", "d", "z")]
     with (
         patch.dict(sys.modules, {"tool_router": empty_router}),
@@ -59,6 +65,7 @@ def main() -> int:
         patch.object(selection, "_ALWAYS_INCLUDE", {"z", "a"}),
         patch.object(selection, "_COMMON_TOOLS", set()),
         patch.object(selection, "_KEYWORD_TOOLS_NORM", [(('trigger',), {"d", "c", "b"})]),
+        patch.object(selection, "_CAPABILITY_CATALOG", ()),
         patch.object(selection.db, "get_setting", return_value="3"),
     ):
         first = _names(asyncio.run(selection.filter_relevant_tools(

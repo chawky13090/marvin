@@ -65,10 +65,16 @@ async def ensure_tool_index(tools_spec: list) -> bool:
     return True
 
 
-async def route_tools(query: str, k_sem: int = 8, k_learn: int = 5, min_learn: float = 0.72) -> dict:
+async def route_tools(
+    query: str,
+    k_sem: int = 8,
+    k_learn: int = 5,
+    min_semantic: float = 0.40,
+    min_learn: float = 0.72,
+) -> dict:
     """Renvoie {'semantic': set, 'learned': set} pour une requête.
     'learned' = outils ayant réussi sur des demandes TRÈS proches par le passé."""
-    out = {"semantic": set(), "learned": set()}
+    out = {"semantic": set(), "learned": set(), "semantic_scores": {}}
     client = vs.get_client()
     if client is None or not (query or "").strip():
         return out
@@ -78,7 +84,13 @@ async def route_tools(query: str, k_sem: int = 8, k_learn: int = 5, min_learn: f
     # 1) Sémantique : outils dont la description colle au sens de la demande
     try:
         resp = client.query_points(collection_name=_TOOL_COLLECTION, query=vec, limit=k_sem, with_payload=True)
-        out["semantic"] = {h.payload.get("name") for h in resp.points if h.payload.get("name")}
+        scores = {
+            h.payload.get("name"): float(h.score)
+            for h in resp.points
+            if h.payload.get("name") and float(h.score) >= min_semantic
+        }
+        out["semantic_scores"] = scores
+        out["semantic"] = set(scores)
     except Exception:
         pass
     # 2) Appris : outils qui ont déjà bien marché sur des demandes similaires

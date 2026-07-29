@@ -138,7 +138,6 @@ def promises_unexecuted_action(
     text = str(content or "")
     return (
         tools_available
-        and not executed_tool_names
         and bool(_UNEXECUTED_ACTION_RE.search(text))
         and bool(_TOOL_ACTION_RE.search(text))
     )

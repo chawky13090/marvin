@@ -59,10 +59,10 @@ def main() -> int:
                 == "newer-legacy-value"
             )
 
-            credentials_manager.set_credential("brave_search_api_key", "brave-private")
-            assert credentials_manager.get_credential("brave_search_api_key") == "brave-private"
-            assert settings["cred_brave_search_api_key"] is None
-            public = credentials_manager.get_all_credentials()["brave_search_api_key"]
+            credentials_manager.set_credential("canva_api_key", "canva-private")
+            assert credentials_manager.get_credential("canva_api_key") == "canva-private"
+            assert settings["cred_canva_api_key"] is None
+            public = credentials_manager.get_all_credentials()["canva_api_key"]
             assert public["has_value"] is True and public["value"] == ""
 
             credentials_manager.set_credential("searxng_url", "http://localhost:8080")
@@ -72,7 +72,7 @@ def main() -> int:
             # Les propriétaires ne sont pas persistés en clair dans les clés du coffre.
             serialized = vault_path.read_text(encoding="utf-8")
             assert "google_client_secret" not in serialized
-            assert "brave_search_api_key" not in serialized
+            assert "canva_api_key" not in serialized
 
             def write_concurrently(index: int) -> None:
                 secret_vault.set_secret("credential", f"owner-{index}", "value", f"value-{index}")
@@ -94,7 +94,7 @@ def main() -> int:
             )
             assert result["restored"] == 2
             assert settings["cred_google_client_secret"] == "newer-legacy-value"
-            assert settings["cred_brave_search_api_key"] == "brave-private"
+            assert settings["cred_canva_api_key"] == "canva-private"
             assert not secret_vault.has_secret(
                 "credential", "google_client_secret", "value"
             )

@@ -241,8 +241,8 @@ const CATEGORIES = [
     tools: [
       {
         id: 'web_search', icon: '🔍', name: 'Recherche web',
-        description: 'Effectue une recherche DuckDuckGo et retourne titres, URLs et extraits. Aucune clé API requise.',
-        tips: ['Utilise DuckDuckGo par défaut (gratuit)', 'Retourne jusqu\'à 20 résultats', 'Compatible Brave/SerpAPI via les paramètres'],
+        description: 'Effectue une recherche via SearXNG et retourne titres, URLs et extraits.',
+        tips: ['Utilise exclusivement SearXNG', 'Retourne jusqu\'à 20 résultats', 'Aucun fallback direct vers un moteur tiers'],
         params: [
           { name: 'query',       label: 'Requête',               type: 'text',   required: true, placeholder: 'Ollama modèles locaux 2024' },
           { name: 'num_results', label: 'Nombre de résultats',   type: 'number', defaultValue: 5, min: 1, max: 20 },

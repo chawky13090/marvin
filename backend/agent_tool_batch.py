@@ -42,9 +42,18 @@ async def execute_tool_batch(
     create_message: Callable[..., Any],
     id_factory: Callable[[], str] | None = None,
     clock: Callable[[], float] = time.time,
+    tool_argument_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Exécute séquentiellement un lot, en diffusant ses événements UI."""
     make_id = id_factory or (lambda: str(uuid.uuid4()))
+    overrides = tool_argument_overrides or {}
+    for call in tool_calls:
+        function = call.get("function") if isinstance(call, dict) else None
+        name = str((function or {}).get("name") or "")
+        if name in overrides:
+            arguments = dict((function or {}).get("arguments") or {})
+            arguments.update(overrides[name])
+            function["arguments"] = arguments
     calls_for_db = [
         {
             "toolCallId": make_id(),

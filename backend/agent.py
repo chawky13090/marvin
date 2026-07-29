@@ -159,6 +159,7 @@ async def run_agent(
     _cortex_plan = _turn_plan.cortex_plan
     _max_tool_steps = _turn_plan.max_tool_steps
     _max_wall_seconds = _turn_plan.max_wall_seconds
+    _contextual_web_query = _turn_plan.contextual_web_query
     yield _sse({"type": "cortex_contract", "contract": _cortex_plan})
 
     try:
@@ -200,6 +201,7 @@ async def run_agent(
         cortex_prompt_block=_cortex.prompt_block,
         get_real_paths=execute_pc_get_real_paths,
         filter_memories=memory_mesh.filter_active,
+        contextual_web_query=_contextual_web_query,
     )
     _overflow = _base_context.overflow
     ollama_msgs = _base_context.ollama_messages
@@ -494,6 +496,14 @@ async def run_agent(
                 is_tooling_failure=_is_tooling_failure,
                 compact_tool_result=_compact_tool_result,
                 create_message=db.create_message,
+                tool_argument_overrides=(
+                    {
+                        "web_research": {"query": _contextual_web_query},
+                        "web_deep_research": {"query": _contextual_web_query},
+                    }
+                    if _contextual_web_query
+                    else None
+                ),
             ):
                 yield _sse(_event)
 

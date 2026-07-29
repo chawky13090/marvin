@@ -20,7 +20,7 @@ import bug_log
 import model_market
 import outbound_http
 import semantic_evidence
-import web_browser
+from tool_domains.web import execute_web_search
 from config import DATA_DIR, OLLAMA_URL
 from durable_evidence_store import DurableEvidenceStore
 
@@ -282,7 +282,14 @@ async def execute(
         async with semaphore:
             ensure_active()
             try:
-                hits = await web_browser.search(cell["query"], n=max(4, sources_per_agent + 1))
+                receipt = await execute_web_search({
+                    "query": cell["query"],
+                    "provider": "searxng",
+                    "max_results": max(4, sources_per_agent + 1),
+                })
+                if not receipt.get("success"):
+                    raise RuntimeError(str(receipt.get("error") or "SearXNG indisponible"))
+                hits = list(receipt.get("results") or [])
             except Exception as exc:
                 error_type = type(exc).__name__
                 bug_log.log_bug(

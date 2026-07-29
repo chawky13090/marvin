@@ -9,7 +9,6 @@ Le navigateur est lancé une fois puis réutilisé (rapide). Best-effort : si le
 navigateur est indisponible, les outils retombent sur l'outil web interne.
 """
 import asyncio
-import urllib.parse
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -46,21 +45,6 @@ async def _new_context():
                                locale="fr-FR", extra_http_headers={"Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"})
 
 
-def _decode_ddg(url: str) -> str:
-    """Les liens DuckDuckGo sont des redirections (…/l/?uddg=…) → on extrait l'URL réelle."""
-    if "uddg=" in url:
-        try:
-            q = urllib.parse.urlparse(url).query
-            uddg = urllib.parse.parse_qs(q).get("uddg", [None])[0]
-            if uddg:
-                return urllib.parse.unquote(uddg)
-        except Exception:
-            pass
-    if url.startswith("//"):
-        return "https:" + url
-    return url
-
-
 async def fetch_text(url: str, timeout: int = 25000, max_chars: int = 8000) -> dict:
     """Ouvre une URL dans un vrai navigateur et renvoie son texte lisible."""
     ctx = await _new_context()
@@ -75,30 +59,6 @@ async def fetch_text(url: str, timeout: int = 25000, max_chars: int = 8000) -> d
             }"""
         )
         return {"title": data.get("title", ""), "text": (data.get("text") or "").strip()[:max_chars], "url": page.url}
-    finally:
-        await ctx.close()
-
-
-async def search(query: str, n: int = 6) -> list:
-    """Recherche web via DuckDuckGo (HTML, peu bloquant) avec un vrai navigateur."""
-    ctx = await _new_context()
-    try:
-        page = await ctx.new_page()
-        await page.goto("https://duckduckgo.com/html/?q=" + urllib.parse.quote(query),
-                        timeout=25000, wait_until="domcontentloaded")
-        results = await page.evaluate(
-            """(n) => {
-                const out=[];
-                document.querySelectorAll('.result, .web-result').forEach(r=>{
-                    const a = r.querySelector('.result__a, a.result__url, h2 a');
-                    const s = r.querySelector('.result__snippet');
-                    if (a) out.push({ title:(a.innerText||'').trim(), url:a.href, snippet:(s?s.innerText:'').trim() });
-                });
-                return out.slice(0, n);
-            }""", n)
-        for r in results:
-            r["url"] = _decode_ddg(r.get("url", ""))
-        return [r for r in results if r.get("url", "").startswith("http")]
     finally:
         await ctx.close()
 

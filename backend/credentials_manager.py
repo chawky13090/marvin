@@ -31,15 +31,9 @@ CREDENTIAL_DEFINITIONS = {
     "canva_client_id":       {"label": "Client ID",           "service": "Canva",     "group": "canva",     "secret": False},
 
     # ── Recherche web ────────────────────────────────────────────────────────
-    # v2.161 — SearXNG (méta-moteur auto-hébergé, Docker) : gratuit et illimité, sans
-    # dépendre d'une clé/quota tiers. Prioritaire sur DuckDuckGo/Brave/Google en mode
-    # auto (voir execute_web_search) quand une instance est renseignée ici.
+    # SearXNG est l'unique frontière de recherche Web de Marvin.
     "searxng_url":           {"label": "URL de l'instance (ex: http://localhost:8080)",
                                "service": "SearXNG (auto-hébergé)", "group": "search", "secret": False},
-    "brave_search_api_key":  {"label": "API Key",             "service": "Brave Search", "group": "search", "secret": True},
-    "google_search_api_key": {"label": "API Key",             "service": "Google Search","group": "search", "secret": True},
-    "google_search_cx":      {"label": "Search Engine ID",   "service": "Google Search","group": "search", "secret": False},
-    "serpapi_key":           {"label": "API Key",             "service": "SerpAPI",    "group": "search",   "secret": True},
 
     # ── Traduction ──────────────────────────────────────────────────────────
     "mymemory_api_key":      {"label": "API Key (optionnel)",  "service": "MyMemory",  "group": "translate", "secret": True},

@@ -3190,9 +3190,9 @@ TOOLS_SPEC = [
         "limit": {"type": "integer", "description": "Nombre de résultats (défaut 5)"}},
        ["query"]),
 
-    _t("web_search", "Effectue une recherche web (DuckDuckGo gratuit mais sujet à un anti-bot occasionnel, ou SearXNG auto-hébergé/Brave/Google/SerpAPI si configurés — priorité à SearXNG en mode auto, gratuit et illimité).",
+    _t("web_search", "Effectue une recherche Web exclusivement via l'instance SearXNG locale configurée.",
        {"query": {"type": "string", "description": "Requête de recherche"},
-        "provider": {"type": "string", "enum": ["auto", "searxng", "duckduckgo", "brave", "google", "serpapi"], "description": "Moteur de recherche (auto = meilleur disponible, SearXNG en premier si configuré)"},
+        "provider": {"type": "string", "enum": ["auto", "searxng"], "description": "Les deux valeurs utilisent exclusivement SearXNG"},
         "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"}},
        ["query"]),
 

@@ -86,7 +86,6 @@ def main() -> int:
     assert "net_ping" in explicit.explicit_tool_names
 
     for web_query in (
-        "web search renforcer sur le sujet de koios aix-en-provence",
         "donne les derniers infos sur koios.fr en visitant leur site",
         "recherche web sur koios",
     ):
@@ -95,6 +94,39 @@ def main() -> int:
             web_query,
         )
         assert "web_research" in web_plan.required_tool_names, web_query
+    reinforced = planning.compile_turn_plan(
+        [{"role": "user", "content": "web search renforcer sur le sujet de koios"}],
+        "web search renforcer sur le sujet de koios",
+    )
+    assert "web_deep_research" in reinforced.required_tool_names
+    assert "web_research" not in reinforced.required_tool_names
+
+    followup_messages = [
+        {
+            "role": "user",
+            "content": "web search renforcer sur le sujet de koios aix-en-provence",
+        },
+        {"role": "assistant", "content": "Résultats partiels."},
+        {
+            "role": "user",
+            "content": "refait la recherche je veut un maximum de resulats",
+        },
+    ]
+    followup = planning.compile_turn_plan(
+        followup_messages,
+        followup_messages[-1]["content"],
+    )
+    assert "web_deep_research" in followup.required_tool_names
+    assert followup.contextual_web_query == followup_messages[0]["content"]
+
+    unrelated = planning.compile_turn_plan(
+        [
+            {"role": "user", "content": "Explique OSPF"},
+            {"role": "user", "content": "donne un maximum de résultats"},
+        ],
+        "donne un maximum de résultats",
+    )
+    assert not ({"web_research", "web_deep_research"} & unrelated.required_tool_names)
 
     import agent
 

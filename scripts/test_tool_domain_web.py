@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 
@@ -46,6 +47,81 @@ async def _run() -> None:
     )
     assert "max_chars" in invalid_chars["error"]
     assert (await web.execute_web_search({"query": ""}))["error"] == "Requête vide"
+
+    class SearxResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "results": [
+                    {
+                        "title": f"Source {index}",
+                        "url": f"https://example{index}.com/page",
+                        "content": f"Fait vérifié {index}",
+                    }
+                    for index in range(1, 11)
+                ]
+            }
+
+    searx_client = SimpleNamespace(get=AsyncMock(return_value=SearxResponse()))
+    with patch("credentials_manager.get_credential", side_effect=lambda key: (
+        "http://127.0.0.1:8080" if key == "searxng_url" else None
+    )):
+        web.configure(
+            generate=fake_generate,
+            get_setting=lambda _key: 3,
+            get_http_client=lambda: searx_client,
+            cache_get=lambda _key: None,
+            cache_set=lambda _key, _value: None,
+            net_error=lambda exc, what: {"error": str(exc), "resource": what},
+        )
+        priority = await web.execute_web_search({"query": "Marvin", "max_results": 10})
+    assert priority["provider"] == "SearXNG"
+    assert priority["fallback_used"] is False
+    assert priority["count"] == 10
+    assert priority["provider_attempts"] == [
+        {"provider": "SearXNG", "status": "succeeded"}
+    ]
+
+    async def priority_search(query: str, max_results: int) -> dict:
+        query_id = sum(map(ord, query))
+        return {
+            "success": True,
+            "provider": "SearXNG",
+            "fallback_used": False,
+            "provider_attempts": [{"provider": "SearXNG", "status": "succeeded"}],
+            "results": [
+                {
+                    "title": f"{query} source {index}",
+                    "url": f"https://source-{query_id}-{index}.example/page",
+                    "snippet": f"Information {index} pour {query}",
+                }
+                for index in range(1, max_results + 1)
+            ],
+        }
+
+    async def fetch_text(url: str, **_kwargs) -> dict:
+        return {"url": url, "title": "Titre", "text": f"Contenu détaillé de {url}"}
+
+    browser_module = SimpleNamespace(fetch_text=fetch_text)
+    with (
+        patch.object(web, "_priority_search", side_effect=priority_search),
+        patch.dict(sys.modules, {"web_browser": browser_module}),
+    ):
+        normal = await web.execute_web_research({"query": "KOIOS"})
+        deep = await web.execute_web_deep_research({
+            "query": "KOIOS",
+            "max_rounds": 3,
+            "min_rounds": 3,
+        })
+    assert normal["provider"] == "SearXNG"
+    assert len(normal["sources"]) == 10
+    assert deep["provider_priority"] == "SearXNG"
+    assert deep["fallback_used"] is False
+    assert deep["rounds"] == 3
+    assert len(deep["sources"]) == 18
+    assert len(deep["search_receipts"]) == 3
 
     html = (
         b"<html><head><title> Marvin Test </title>"

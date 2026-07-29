@@ -4,6 +4,7 @@ from __future__ import annotations
 import cloud_routing as _cr
 import database as db
 from tools import TOOLS_SPEC
+from tool_capability_ranking import build_catalog, rank_capabilities
 
 _ALWAYS_INCLUDE = {
     "pc_get_real_paths",
@@ -52,7 +53,7 @@ _KEYWORD_TOOLS = {
         {"weather"},
 
     # Recherche web
-    ("web", "internet", "google", "duckduckgo", "cherche sur", "recherche en ligne",
+    ("web", "internet", "searxng", "cherche sur", "recherche en ligne",
      "actualité", "news", "actu", "info", "trouve en ligne", "sur le net", "sur le web",
      "renseigne-toi", "renseigne toi"):
         {"web_search", "web_browse", "web_research"},
@@ -528,6 +529,7 @@ _KEYWORD_TOOLS_NORM = [
     (tuple(_strip_accents(k) for k in keywords), tools)
     for keywords, tools in _KEYWORD_TOOLS.items()
 ]
+_CAPABILITY_CATALOG = build_catalog(TOOLS_SPEC)
 
 
 async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list:
@@ -560,7 +562,13 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
             keyword_hits.update(tools)
     relevant |= keyword_hits
 
-    # 2) Sémantique + appris (comprend les paraphrases, s'améliore avec l'usage).
+    # 2) Contrats lexicaux : signal portable dérivé des noms, descriptions et paramètres
+    #    des 344 outils. Il couvre les paraphrases même sans Ollama/Qdrant.
+    lexical_ranked = rank_capabilities(text_raw, _CAPABILITY_CATALOG)
+    lexical = {name for name, _score in lexical_ranked}
+    relevant |= lexical
+
+    # 3) Sémantique + appris (comprend les paraphrases, s'améliore avec l'usage).
     #    Best-effort : si l'embedding/Qdrant échoue, on garde juste les mots-clés.
     semantic = set()
     try:
@@ -571,7 +579,7 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
         pass
     relevant |= semantic
 
-    # 3) Toujours rien de spécifique → repli BORNÉ sur un petit jeu polyvalent.
+    # 4) Toujours rien de spécifique → repli BORNÉ sur un petit jeu polyvalent.
     #    ⚠️ NE JAMAIS renvoyer les ~245 specs (prompt énorme → réponse très lente).
     if len(relevant) <= len(_ALWAYS_INCLUDE):
         relevant |= _COMMON_TOOLS
@@ -580,7 +588,7 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     names = {s.get("function", {}).get("name") for s in TOOLS_SPEC}
     relevant &= names
 
-    # 4) Plafond selon le MODE de performance (max_tools) : sur petite machine on envoie peu
+    # 5) Plafond selon le MODE de performance (max_tools) : sur petite machine on envoie peu
     #    d'outils (rapide) ; sur machine puissante, beaucoup (meilleure sélection). On garde
     #    PRIORITAIREMENT l'essentiel + les correspondances mots-clés, puis on complète.
     # v2.107 — le profil analysis envoyait TOUS les outils (~294) sans filtrage : sur un
@@ -597,7 +605,13 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
         max_tools = max(max_tools, 90)
     if len(relevant) > max_tools:
         ordered: list[str] = []
-        for group in (set(_ALWAYS_INCLUDE) & names, keyword_hits & names, semantic & names, relevant):
+        for group in (
+            set(_ALWAYS_INCLUDE) & names,
+            keyword_hits & names,
+            lexical & names,
+            semantic & names,
+            relevant,
+        ):
             # Les ensembles Python dépendent du hash seed du processus. Le tri garantit
             # qu'un redémarrage ne change pas silencieusement les outils retenus au plafond.
             for t in sorted(group):

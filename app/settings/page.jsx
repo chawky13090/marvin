@@ -1207,7 +1207,7 @@ export default function SettingsPage() {
               <CredentialGroup
                 groupKey="search"
                 icon="🔍"
-                title="Recherche Web (Brave / Google / SerpAPI)"
+                title="Recherche Web (SearXNG uniquement)"
                 group={credGroups.search}
                 credentials={credentials}
                 credValues={credValues}
@@ -1217,7 +1217,7 @@ export default function SettingsPage() {
                 credSaving={credSaving}
                 onSave={handleSaveCredential}
                 onDelete={handleDeleteCredential}
-                note="Sans clé : DuckDuckGo est utilisé automatiquement (gratuit, sans compte)."
+                note="Toutes les recherches Marvin passent par l'instance SearXNG locale configurée."
               />
 
               {/* ── Traduction ──────────────────────────────────────────────────── */}

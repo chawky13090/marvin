@@ -19,3 +19,13 @@ server:
   secret_key: "CHANGE_ME_AUTO_GENERATED"
   limiter: false   # pas de Redis nécessaire pour un usage local mono-utilisateur
   image_proxy: false
+
+# Marvin n'utilise que SearXNG. Brave et DuckDuckGo sont aussi désactivés dans
+# l'agrégateur ; les autres moteurs SearXNG restent disponibles.
+engines:
+  - name: bing
+    disabled: false
+  - name: brave
+    disabled: true
+  - name: duckduckgo
+    disabled: true

@@ -36,6 +36,7 @@ async def prepare_agent_context(
     cortex_prompt_block: Callable[[dict[str, Any]], str],
     get_real_paths: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
     filter_memories: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None,
+    contextual_web_query: str = "",
 ) -> PreparedAgentContext:
     """Construit messages, permissions et prompt de base avec replis non bloquants."""
     try:
@@ -131,6 +132,13 @@ async def prepare_agent_context(
             "\n\n=== OUTIL(S) IMPOSÉ(S) PAR LE CONTRAT ===\n"
             f"Tu dois obligatoirement exécuter : {', '.join(sorted(required_tool_names))}. "
             "Tu ne peux pas conclure avant leur exécution réelle."
+        )
+    if contextual_web_query:
+        system_prompt += (
+            "\n\n=== SUJET DE RECHERCHE REPRIS ===\n"
+            "Le dernier message est une demande de relance. L'argument `query` de "
+            "l'outil Web imposé doit reprendre ce sujet antérieur, et non le texte "
+            f"de relance : {contextual_web_query}"
         )
 
     try:

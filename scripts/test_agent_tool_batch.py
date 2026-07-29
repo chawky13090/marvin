@@ -113,12 +113,14 @@ async def main() -> int:
             create_message=lambda *args, **kwargs: persisted.append((args, kwargs)),
             id_factory=lambda: "tool-call-1",
             clock=lambda: next(clock_values),
+            tool_argument_overrides={"ai_test_forge": {"path": "project-repris"}},
         )
     ]
     assert [event["type"] for event in events] == ["tool_start", "tool_end"]
     assert events[1]["result"]["duration"] == 125
     assert events[1]["evidence"]["proof_recorded"] is True
     assert events[1]["evidence"]["sequence"] == 23
+    assert events[0]["args"]["path"] == "project-repris"
     assert read_signatures == {"forge:project"}
     assert runner.blocking[0][0] == "ai_test_forge"
     assert long_chains == [("teste", 1)]

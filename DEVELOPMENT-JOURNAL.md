@@ -5,6 +5,49 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.476.0 — SearXNG prioritaire et sélection généralisable
+
+**Incident.** La dernière demande KOIOS a bien exécuté `web_research`, mais cet outil
+contournait `execute_web_search`, utilisait directement le navigateur DuckDuckGo, ne lisait
+que deux pages sur cette machine et tronquait le reçu à quatre sources. Le résultat contenait
+quatre URLs, puis le modèle a répondu « Je lance des recherches complémentaires » sans
+nouvel appel. La recherche directe SearXNG, elle, renvoyait dix résultats en 1,5 seconde.
+
+**Décision.** Les trois niveaux Web et Research Swarm passent exclusivement par SearXNG.
+Les accès directs Brave, Google, SerpAPI et DuckDuckGo ne sont plus exposés par le contrat
+d'outil; une panne SearXNG est un échec explicite, sans repli silencieux. Brave et DuckDuckGo
+sont aussi désactivés dans le modèle de configuration SearXNG, tandis que Bing, Google CSE,
+Startpage et les autres moteurs sains restent agrégés derrière cette frontière unique.
+La recherche normale conserve jusqu'à dix sources et lit trois à six pages. La recherche
+approfondie impose trois angles au minimum, six pages par passe et un corpus dédupliqué; une
+requête complémentaire LLM vide, répétée, citée ou prématurément « suffisante » reçoit un
+angle déterministe borné. Le dernier tour ne fabrique plus une requête jamais exécutée.
+
+**Routage général.** `tool_capability_ranking.py` construit un index lexical immuable depuis
+les 344 contrats réels et classe nom, description et paramètres sans réseau ni modèle local.
+Il complète les règles métier, les embeddings et les succès appris. Le top-k sémantique
+Qdrant applique désormais un seuil de 0,40. Le catalogue final reste borné par `max_tools`;
+aucun nom hors registre ne peut être proposé.
+
+Une relance telle que « refait la recherche je veut un maximum de résultats » récupère
+désormais le dernier sujet Web explicite et remplace déterministement l'argument `query`
+proposé par le LLM. Le modèle conserve le choix des angles complémentaires, mais ne peut plus
+transformer le texte de relance en sujet de recherche.
+
+**Sécurité, logs et rollback.** La lecture des pages conserve les protections réseau et
+timeouts existants. Les reçus enregistrent noms de fournisseurs, états, nombres et requêtes,
+jamais clé API ni URL de configuration privée. Aucun schéma ou contenu utilisateur n'est
+migré. Rollback exact : `git revert <commit-v2.476>`.
+
+**Validation observée.** Les tests couvrent fournisseur unique SearXNG, dix sources normales,
+trois passes, dix-huit pages synthétiques, seuil lexical, borne, stabilité, promesse après un
+premier outil et routage « renforcer ». Le gateway réel a rendu vingt résultats avec
+`provider=SearXNG`, `fallback_used=false`. L'instance réelle a rendu 28 résultats KOIOS issus
+de Google CSE, Bing et Startpage, sans Brave ni DuckDuckGo. Le chat réel a imposé
+`web_deep_research`; le premier essai a révélé la perte du sujet antérieur, puis le test de
+non-régression a observé l'argument corrigé
+`web search renforcer sur le sujet de koios aix-en-provence`.
+
 ## 2026-07-29 — v2.475.0 — Recherche Web réellement exécutée
 
 **Incident observé.** Dans la conversation `Salutation simple`, la demande « web search
