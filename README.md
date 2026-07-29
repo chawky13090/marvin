@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.480.0**
+**Version 2.481.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 344 outils pour agir sur Windows, les
@@ -137,7 +137,7 @@ npm run dev
 Backend, depuis `backend/` :
 
 ```powershell
-.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8005
+.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8005
 ```
 
 Contrôle rapide pendant le développement :

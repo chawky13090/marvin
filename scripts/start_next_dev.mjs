@@ -37,7 +37,7 @@ for (const relativePath of [
 }
 
 const nextCli = join(projectRoot, 'node_modules', 'next', 'dist', 'bin', 'next');
-const result = spawnSync(process.execPath, [nextCli, 'dev', '-H', '0.0.0.0'], {
+const result = spawnSync(process.execPath, [nextCli, 'dev', '-H', '127.0.0.1'], {
   cwd: projectRoot,
   env: process.env,
   stdio: 'inherit',

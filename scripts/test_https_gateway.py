@@ -18,6 +18,12 @@ def main() -> int:
     installer = (ROOT / "scripts" / "install-marvin-https.ps1").read_text(
         encoding="utf-8"
     )
+    next_runtime = (ROOT / "scripts" / "start_next_dev.mjs").read_text(
+        encoding="utf-8"
+    )
+    backend_runtime = (ROOT / "backend" / "server_runtime.py").read_text(
+        encoding="utf-8"
+    )
     assert "tls internal" in template
     assert "uri strip_prefix /marvin-api" in template
     assert "reverse_proxy 127.0.0.1:8005" in template
@@ -27,6 +33,10 @@ def main() -> int:
     assert "window.location.origin}/marvin-api" in frontend
     assert "2.11.4" in installer
     assert "ExpectedSha512" in installer
+    assert "'127.0.0.1'" in next_runtime
+    assert "'0.0.0.0'" not in next_runtime
+    assert 'host="127.0.0.1"' in backend_runtime
+    assert 'host="0.0.0.0"' not in backend_runtime
 
     state_path = ROOT / "runtime" / "https" / "state.json"
     if state_path.exists():

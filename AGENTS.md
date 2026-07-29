@@ -30,12 +30,12 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 
 | Couche | Techno | Port | Démarrage |
 |---|---|---|---|
-| Frontend | Next.js 16 (App Router, JSX) | **3000** | `npm run dev` (`next dev -H 0.0.0.0`) |
-| Backend | FastAPI + uvicorn | **8005** | `uvicorn main:app --host 0.0.0.0 --port 8005` (depuis `backend/`) |
+| Frontend | Next.js 16 (App Router, JSX) | **3000 local** | `npm run dev` (`next dev -H 127.0.0.1`) |
+| Backend | FastAPI + uvicorn | **8005 local** | `uvicorn main:app --host 127.0.0.1 --port 8005` (depuis `backend/`) |
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.480.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.481.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -83,7 +83,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 # tuer le process qui tient le port 8005
 Get-NetTCPConnection -LocalPort 8005 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 # relancer caché
-Start-Process -WindowStyle Hidden .venv\Scripts\python.exe -ArgumentList '-m','uvicorn','main:app','--host','0.0.0.0','--port','8005' -WorkingDirectory backend
+Start-Process -WindowStyle Hidden .venv\Scripts\python.exe -ArgumentList '-m','uvicorn','main:app','--host','127.0.0.1','--port','8005' -WorkingDirectory backend
 ```
 ⚠️ Si le backend a été lancé **en administrateur** (via `start.bat` en admin), un shell Codex **non-élevé ne peut PAS le tuer** (`Stop-Process`/`taskkill /F` → « Accès refusé »). Dans ce cas, demander à l'utilisateur de fermer la fenêtre « SecretaryAI - Backend », ou relancer Marvin **non-admin**. `taskkill /PID <pid> /F` est plus fiable que `Stop-Process` pour les process de même niveau.
 
@@ -196,7 +196,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.480.0)
+## 9. État actuel (v2.481.0)
+
+**v2.481 (fermeture HTTP LAN)** : Next.js `3000` et FastAPI `8005` écoutent uniquement sur
+`127.0.0.1`. La passerelle HTTPS `8443` est désormais la seule entrée réseau distante.
+Le fonctionnement local historique reste disponible sur la boucle locale pour le diagnostic
+et les communications internes; aucun pare-feu large n'est nécessaire pour les deux upstreams.
 
 **v2.480 (HTTPS LAN progressif)** : Caddy 2.11.4, téléchargé depuis la release officielle et
 contrôlé par SHA-512 épinglé, fournit `https://hôte:8443`. `/marvin-api/*` rejoint FastAPI et

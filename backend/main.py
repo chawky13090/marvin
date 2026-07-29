@@ -1,12 +1,13 @@
 """Composition root FastAPI de Marvin.
 
 Lancement :
-    uvicorn main:app --host 0.0.0.0 --port 8005
+    uvicorn main:app --host 127.0.0.1 --port 8005
 
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.481 — fermeture des listeners HTTP LAN derrière la passerelle HTTPS
 # v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique
 # v2.479 — activation vocale explicite, dock inférieur et retry TTS borné
 # v2.478 — Quiet Workbench, accueil contextuel et historique unifié

@@ -18,7 +18,7 @@ def loop_factory():
 def main() -> int:
     config = uvicorn.Config(
         "main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8005,
         reload=False,
         access_log=True,

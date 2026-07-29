@@ -12025,3 +12025,19 @@ Rollback : `git revert <commit-v2.480>` pour le code, puis
 `scripts\rollback-marvin-https.ps1 -Confirm:$false` pour le runtime. Aucun schéma ni donnée
 métier n'est migré. La dette restante est conservée dans SEC-001 jusqu'à fermeture des ports
 HTTP LAN, service Windows/port 443 et révocation multiplateforme.
+## 2026-07-29 — v2.481.0 — Fermeture des upstreams HTTP au LAN
+
+Après confirmation que le second PC est arrêté, l'utilisateur autorise la fermeture des
+accès devenus inutiles. Next.js et FastAPI écoutent désormais uniquement sur `127.0.0.1`.
+Caddy reste le seul listener LAN applicatif sur `8443` et transmet localement vers `3000` et
+`8005`. Cette réduction retire l'interception en clair des conversations, cookies et fichiers
+sur le réseau sans modifier les sessions, bases ou certificats.
+
+Les recherches de règles pare-feu ne trouvent aucune règle Marvin ou filtre explicite sur
+`3000/8005`; aucune suppression hasardeuse n'est donc réalisée. Le contrôle de fin exige que
+les listeners 3000/8005 montrent `127.0.0.1`, que 8443 reste exposé, et que frontend comme
+health FastAPI répondent via HTTPS.
+
+Rollback exact : `git revert <commit-v2.481>`, puis redémarrage de Marvin. Aucun schéma,
+secret ou donnée métier n'est migré. Le journal d'accès Caddy reste désactivé; les décisions
+d'autorisation continuent dans le logger backend expurgé.
