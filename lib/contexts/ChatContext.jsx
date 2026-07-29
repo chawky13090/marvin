@@ -269,6 +269,14 @@ export function ChatProvider({ children }) {
               break;
 
             case 'answer_final':
+              // Certains modèles Cloud livrent toute la réponse dans answer_final sans
+              // émettre de fragments `text`. Le rendu React est asynchrone : l'événement
+              // `done` suivant ne peut donc pas compter sur messagesRef pour retrouver
+              // immédiatement ce texte. Conserver aussi la réponse dans le tampon vocal
+              // garantit sa lecture, sans doubler les fragments déjà prononcés.
+              if (voiceStream.active && event.text) {
+                voiceStream.text = event.text;
+              }
               setMessages(prev => prev.map(m => {
                 if (m.id !== assistantId) return m;
                 const finalText = event.text || '';

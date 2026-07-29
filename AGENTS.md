@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.484.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.485.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.484.0)
+## 9. État actuel (v2.485.0)
+
+**v2.485 (réponses Cloud vocalisées)** : les réponses livrées directement par l’événement
+Cloud `answer_final` alimentent désormais le tampon vocal avant `done`; elles sont synthétisées
+et lues exactement une fois. Les échecs HTTP TTS, refus de lecture du navigateur et pannes de
+sortie audio deviennent visibles dans le bandeau vocal au lieu d’être ignorés. Un test
+navigateur reproduit ce flux sans dépendre d’un LLM réel.
 
 **v2.484 (contexte de travail stable)** : la capsule flottante de disposition est supprimée
 des modes Focus et Classique. Une barre contextuelle de 48 px, intégrée au flux de chaque

@@ -12256,3 +12256,45 @@ existants. La surface d’attaque et la rétention des logs sont donc inchangée
 Aucune migration ni donnée métier. Le rollback est la réversion atomique du commit v2.484,
 suivie du redémarrage frontend. En urgence, le mode Classique reste disponible depuis
 `Ctrl+K`; il ne dépend d’aucune nouvelle clé de stockage.
+
+## 2026-07-29 — v2.485.0 — Réponses Cloud vocalisées
+
+### Incident et cause racine
+
+Après activation explicite du mode vocal, la dernière réponse Cloud était affichée mais
+Marvin restait silencieux. Le moteur Edge-TTS répondait pourtant HTTP 200 avec un MP3 valide.
+La réponse concernée utilisait `answer_final` sans fragments `text`. Cette branche mettait
+à jour React, puis `done` tentait immédiatement de relire `messagesRef`, encore antérieur à
+la mise à jour asynchrone. Aucun texte n’atteignait donc la file TTS et aucune requête vocale
+n’était émise.
+
+### Correction
+
+- `ChatContext.jsx` copie `answer_final.text` dans le tampon vocal synchrone avant `done` ;
+- `useVoice.js` expose les échecs HTTP, les refus autoplay et les erreurs de sortie audio ;
+- `ChatInput.jsx` n’associe plus les propriétés CSS conflictuelles `border`/`borderRight` ;
+- `test_voice_answer_final.py` simule le flux Cloud et exige une synthèse et une lecture
+  exactement une fois ;
+- `test_voice_frontend.mjs` protège le tampon Cloud et les erreurs vocales visibles.
+
+### Sécurité, logs et confidentialité
+
+Le texte vocal suit le flux déjà autorisé vers l’endpoint TTS local existant. Aucun nouveau
+service, droit microphone, stockage, secret ou journal de contenu n’est ajouté. Les messages
+d’erreur exposent uniquement une catégorie et un statut HTTP; ils ne contiennent ni texte
+prononcé, ni périphérique, ni donnée personnelle. Les erreurs backend continuent d’utiliser
+le journal structuré et sa rétention existante.
+
+### Validation réelle
+
+- endpoint Edge-TTS : HTTP 200, `audio/mpeg`, 14 112 octets ;
+- test frontend : 20 assertions réussies ;
+- test API voix : retry borné, audio valide et échec final explicite ;
+- test SSE : reprise sans fragment dupliqué ;
+- test navigateur `answer_final` : `tts=1`, `plays=1` ;
+- lecture réelle de la dernière réponse : état `Marvin parle`, aucune erreur voix/audio/TTS.
+
+### Rollback
+
+Aucune migration ni donnée persistante. Réversion atomique du commit v2.485 puis redémarrage
+du frontend et du backend. La lecture manuelle historique reste disponible pendant le rollback.

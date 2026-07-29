@@ -638,8 +638,9 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
                 : voiceState === 'transcribing'
                   ? 'rgba(79, 140, 255,0.1)'
                   : 'transparent',
-              border: `1px solid ${voiceState === 'recording' ? 'rgba(239,68,68,0.5)' : 'transparent'}`,
-              borderRight: 'none',
+              borderStyle: 'solid',
+              borderWidth: '1px 0 1px 1px',
+              borderColor: voiceState === 'recording' ? 'rgba(239,68,68,0.5)' : 'transparent',
               color: voiceState === 'recording' ? '#ef4444'
                 : voiceState === 'transcribing' ? 'var(--accent-primary)'
                 : 'var(--text-muted)',
