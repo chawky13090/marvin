@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.441.0 — Contrat vocal pendant les navigations
+
+Le domaine voix restait `partial` malgré la correction anti-chevauchement : aucun test
+fonctionnel ne couvrait une transition App Router puis une interruption explicite. La
+documentation Next.js confirme que les changements de route se détectent avec les hooks de
+navigation et que les layouts partagés conservent leur état. Marvin garde donc volontairement
+la lecture pendant une consultation d'une autre page, sans en créer une seconde.
+
+Le smoke ne dépend plus d'une ancienne classe visuelle de sidebar. Il choisit via les API GET
+une conversation contenant au moins deux réponses, ne conserve que son identifiant opaque,
+puis vérifie le compteur d'instances audio. Résultat réel : pendant navigation `max=1`,
+aucune pause implicite; après nouvelle lecture et arrêt `max=1`, `active=0`, une pause
+explicite. Aucun audio, texte ou contenu de conversation n'est enregistré dans les logs.
+
+Aucune logique métier, donnée ou configuration n'est migrée. Rollback exact :
+`git revert <commit-v2.441>`. Le rollback retire seulement le test renforcé et le statut de
+preuve; le fonctionnement vocal 2.440 reste identique.
+
 ## 2026-07-29 — v2.440.0 — Runtime Windows résilient et chat durable
 
 La validation globale a reproduit une panne trompeuse : le processus FastAPI restait vivant

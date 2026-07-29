@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.440.0
+Version courante auditée : 2.441.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -139,7 +139,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | security | Permissions, confirmations et guardrails | partial | 65 restrictions, gateway commun et tests de sécurité agent | threat model OWASP agentique complet et tests d'abus par surface |
 | frontend | Frontend, accessibilité et expérience chat | partial | compilation/lint ciblés, 40 pages recensées et smoke Playwright | audit WCAG, états erreur/chargement/reprise et E2E des parcours critiques |
 | avatar | Avatar de bureau et démarrage | partial | `scripts/test_avatar_api.py` et contrat installateur | test Electron réel démarrage/arrêt, déplacement, raccourcis et reprise |
-| voice | Entrée/sortie vocale | partial | tests service proactif et sérialisation existante | test fonctionnel anti-chevauchement, interruption et changement de page |
+| voice | Entrée/sortie vocale | verified | test frontend statique et smoke navigateur de sérialisation, navigation et interruption | maintenir le parcours dans le gate de non-régression |
 | installer | Installation, mise à jour et désinstallation Windows | partial | `scripts/test_installer_contract.py`, preflight et health check | machine propre, reprise reboot, rollback mise à jour et désinstallation |
 
 <!-- frontier-matrix

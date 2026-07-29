@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.440.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.441.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,12 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.440.0)
+## 9. État actuel (v2.441.0)
+
+**v2.441 (contrat vocal navigateur)** : le smoke vocal sélectionne une conversation
+vocalisable via l'API plutôt que par une classe visuelle fragile. Il vérifie qu'une transition
+App Router ne crée ni pause ni seconde lecture, qu'une nouvelle lecture reste exclusive et
+que l'arrêt explicite libère l'audio. Le domaine voix passe à `verified` dans la matrice.
 
 **v2.440 (runtime Windows et continuité du chat)** : le démarrage backend passe par un
 superviseur borné et un runtime Uvicorn qui conserve la boucle Proactor nécessaire aux
