@@ -90,12 +90,12 @@ export default function ChatContainer({
   } = useChat();
 
   // Detect if a tool call is currently in flight (latest message has a pending invocation)
-  const activeTool = (() => {
+  const activeInvocation = (() => {
     const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
     if (!lastAssistant?.toolInvocations) return null;
-    const pending = lastAssistant.toolInvocations.find(inv => inv.state === 'call' && !inv.result);
-    return pending?.toolName || null;
+    return lastAssistant.toolInvocations.find(inv => inv.state === 'call' && !inv.result) || null;
   })();
+  const activeTool = activeInvocation?.toolName || null;
 
   // v2.244 — les appels techniques consécutifs forment une seule activité lisible.
   const displayMessages = useMemo(
@@ -418,12 +418,6 @@ export default function ChatContainer({
             />
           ))
         )}
-        {isLoading && (
-          <TypingIndicator
-            status={activeTool ? 'tool' : status === 'streaming' ? 'streaming' : 'submitted'}
-            toolName={activeTool}
-          />
-        )}
         {error && (
           <div style={{
             padding: '12px 18px',
@@ -500,6 +494,17 @@ export default function ChatContainer({
           </div>
         )}
       </div>
+
+      {isLoading && (
+        <TypingIndicator
+          status={activeTool ? 'tool' : status === 'streaming' ? 'streaming' : 'submitted'}
+          toolName={activeTool}
+          progress={activeInvocation?.progress}
+          progressEvents={activeInvocation?.progressEvents}
+          startedAt={activeInvocation?.startedAt}
+          onStop={stop}
+        />
+      )}
 
       {/* Input */}
       <ChatInput

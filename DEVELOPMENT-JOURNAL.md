@@ -5,6 +5,37 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.477.0 — Activity Beacon et progression réelle
+
+**Demande et mesure.** La dernière recherche approfondie était correcte mais silencieuse
+pendant environ 157 secondes, puis la synthèse finale a pris encore 23 secondes. L'ancien
+indicateur était placé dans le contenu défilant et ne recevait rien entre `tool_start` et
+`tool_end`; son texte pouvait donc suggérer à tort un chargement de modèle.
+
+**Architecture retenue.** `tool_activity.py` transporte dans un `ContextVar` uniquement une
+étape, un libellé, un détail borné, des compteurs et huit métriques entières au maximum.
+`agent_tool_batch.py` exécute l'outil dans une tâche supervisée, relaie `tool_progress`, émet
+un heartbeat après quinze secondes silencieuses et annule la tâche si le client interrompt
+le flux. Le canal est générique et consommé par la recherche Web, la recherche profonde,
+Research Swarm et Council. Il ne persiste ni prompt, ni page, ni réponse, ni secret.
+
+**Interface.** L'Activity Beacon est hors du conteneur défilant, juste au-dessus de la saisie.
+Il affiche l'outil en langage humain, le temps écoulé, l'étape réelle, les compteurs, une
+barre seulement lorsque `current/total` existe, une chronologie repliable, la surveillance
+d'une attente et le bouton d'arrêt. Le mouvement respecte la règle globale
+`prefers-reduced-motion`. Au plus vingt-quatre étapes restent en mémoire par invocation.
+
+**Sécurité, logs et rollback.** Les champs backend sont en liste fermée ou bornés; les
+métriques sont numériques et aucun argument/résultat n'est recopié dans la progression.
+Le heartbeat n'est pas journalisé ni persisté afin d'éviter croissance et données trompeuses.
+Aucun schéma, réglage ou contenu utilisateur n'est modifié. Rollback exact après livraison :
+`git revert <commit-v2.477>`, puis redémarrage backend/frontend.
+
+**Validation réelle.** Tests du normaliseur, du lot agentique, du domaine Web, de Council,
+du contrat statique frontend, lint ciblé, architecture, composition, smoke API et build
+Turbopack. Un chat SSE réel a produit successivement `tool_start(web_research)` puis
+`tool_progress(searching, Recherche SearXNG)`; la conversation de test a été supprimée.
+
 ## 2026-07-29 — v2.476.0 — SearXNG prioritaire et sélection généralisable
 
 **Incident.** La dernière demande KOIOS a bien exécuté `web_research`, mais cet outil

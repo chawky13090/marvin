@@ -21,6 +21,7 @@ import model_market
 import outbound_http
 import semantic_evidence
 from tool_domains.web import execute_web_search
+import tool_activity
 from config import DATA_DIR, OLLAMA_URL
 from durable_evidence_store import DurableEvidenceStore
 
@@ -260,6 +261,19 @@ async def execute(
 ) -> dict[str, Any]:
     started_at = time.perf_counter()
     async def notify(stage: str, completed: int = 0, total: int = 0) -> None:
+        activity = {
+            "researching": ("searching", "Recherche parallèle des cellules"),
+            "cross_verification": ("checking", "Vérification croisée des résultats"),
+            "synthesis": ("synthesizing", "Synthèse du Research Swarm"),
+            "completed": ("synthesizing", "Rapport Research Swarm terminé"),
+        }.get(stage, ("waiting", "Research Swarm actif"))
+        await tool_activity.emit(
+            activity[0],
+            activity[1],
+            current=completed,
+            total=total,
+            metrics={"cellules": completed},
+        )
         if progress:
             value = progress({"stage": stage, "completed": completed, "total": total})
             if hasattr(value, "__await__"):

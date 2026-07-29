@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
+import tool_activity
 
 
 _routing: Any = None
@@ -199,6 +200,13 @@ async def run(args: dict) -> dict:
             )
             for index, ((role, instruction), model) in enumerate(zip(_ROLES, selected))
         ]
+        await tool_activity.emit(
+            "planning",
+            "Consultation de cinq familles de modèles",
+            current=0,
+            total=_PANEL_SIZE,
+            metrics={"modeles": _PANEL_SIZE},
+        )
         results = list(
             await asyncio.gather(
                 *[
@@ -206,6 +214,13 @@ async def run(args: dict) -> dict:
                     for model, prompt in prompts
                 ]
             )
+        )
+        await tool_activity.emit(
+            "checking",
+            "Comparaison des cinq avis",
+            current=sum(1 for item in results if item.get("ok")),
+            total=_PANEL_SIZE,
+            metrics={"avis_recus": sum(1 for item in results if item.get("ok"))},
         )
         attempt_log: list[dict] = []
         for index, result in enumerate(results):
@@ -264,6 +279,11 @@ async def run(args: dict) -> dict:
             critic_prompt,
             "cross_critique",
         )
+        await tool_activity.emit(
+            "checking",
+            "Critique contradictoire terminée",
+            metrics={"avis_valides": len(successful)},
+        )
         reverse_digest = "\n\n".join(
             f"[AVIS {item['id']}]\n{item['answer']}"
             for item in reversed(anonymous)
@@ -280,6 +300,11 @@ async def run(args: dict) -> dict:
             f"{critique.get('answer', 'indisponible')[:5000]}"
         )
         arbitration = None
+        await tool_activity.emit(
+            "synthesizing",
+            "Arbitrage final du Council",
+            metrics={"modeles": len(successful)},
+        )
         for judge in (successful[0], successful[2], successful[1], successful[4]):
             attempt = await cloud_call(
                 client,

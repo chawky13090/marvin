@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.477 — Activity Beacon persistant et progression réelle des outils longs
 # v2.476 — SearXNG prioritaire, recherche profonde multi-passes et routeur de capacités
 # v2.475 — contrats Web explicites et refus des promesses d'outils non exécutées
 # v2.474 — sidebar conversations accessible, archivage réversible et exports
@@ -48,7 +49,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.419 — sauvegardes SQLite intègres, atomiques et compensables
 # v2.418 — connaissances IT extraites vers un repository borné et injectable
 # v2.417 — fiches de révision extraites vers un repository déterministe
-# v2.416 — recherche Web explicite garantie et réponses modèle vides récupérées
 
 from __future__ import annotations
 

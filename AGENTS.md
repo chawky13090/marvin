@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.476.0)
+## 9. État actuel (v2.477.0)
+
+**v2.477 (activité temps réel des outils)** : `tool_activity.py` fournit un canal contextuel,
+éphémère et borné entre un outil et le flux SSE agentique. `agent_tool_batch.py` relaie les
+événements `tool_progress`, émet un heartbeat après quinze secondes sans étape et annule
+proprement l'outil si le flux est interrompu. Recherche Web, recherche approfondie, Research
+Swarm et Council publient leurs phases et métriques réelles. Le frontend conserve au plus
+vingt-quatre étapes par invocation et affiche hors de la zone défilante un Activity Beacon
+avec durée, étape, métriques, progression déterminée quand elle existe, détection d'attente,
+chronologie repliable et arrêt. Aucune progression artificielle en pourcentage n'est produite.
 
 **v2.476 (recherche Web et routage de capacités)** : `web_search`, `web_research` et
 `web_deep_research`, ainsi que Research Swarm, utilisent exclusivement SearXNG. Aucun repli

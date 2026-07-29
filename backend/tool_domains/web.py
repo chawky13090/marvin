@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import outbound_http
+import tool_activity
 
 Generator = Callable[..., Awaitable[str]]
 GetSetting = Callable[[str], Any]
@@ -574,6 +575,11 @@ async def execute_web_research(args: dict) -> dict:
     query = str(args.get("query") or args.get("q") or "").strip()
     if not query:
         return {"error": "Paramètre 'query' requis."}
+    await tool_activity.emit(
+        "searching",
+        "Recherche SearXNG",
+        detail="Interrogation de l'index Web.",
+    )
     try:
         import web_browser as wb
         search_receipt = await _priority_search(query, 10)
@@ -596,12 +602,26 @@ async def execute_web_research(args: dict) -> dict:
     except Exception:
         web_depth = 3
     pages = []
-    for res in results[:web_depth]:
+    await tool_activity.emit(
+        "reading",
+        "Lecture des meilleures sources",
+        current=0,
+        total=web_depth,
+        metrics={"sources_trouvees": len(results)},
+    )
+    for page_index, res in enumerate(results[:web_depth], start=1):
         try:
             p = await wb.fetch_text(res["url"], max_chars=2800)
         except Exception:
             p = None
         pages.append((res, p))
+        await tool_activity.emit(
+            "reading",
+            "Lecture des meilleures sources",
+            current=page_index,
+            total=web_depth,
+            metrics={"sources_trouvees": len(results), "pages_lues": page_index},
+        )
     if any(p for _, p in pages):
         context = "\n\n".join(
             f"[{i+1}] {res.get('title', '')} ({res['url']})\n{(p['text'] if p else res.get('snippet', ''))[:1500]}"
@@ -612,6 +632,11 @@ async def execute_web_research(args: dict) -> dict:
         "En te basant UNIQUEMENT sur ces résultats web, réponds à la question en français, "
         "concis et factuel. Indique la source (domaine) si pertinent. Si l'info n'y est pas, dis-le.\n\n"
         f"QUESTION : {query}\n\nRÉSULTATS WEB :\n{context}\n\nRÉPONSE :")
+    await tool_activity.emit(
+        "synthesizing",
+        "Synthèse de la réponse",
+        metrics={"sources": len(results[:10]), "pages_lues": len(pages)},
+    )
     answer = (await _generate(prompt, model=args.get("model"), timeout=180) or "").strip()
     # Enrichir la base de connaissances (apprentissage)
     try:
@@ -664,6 +689,14 @@ async def execute_web_deep_research(args: dict) -> dict:
     for round_idx in range(max_rounds):
         current_query = _clean_search_query(queries_done[-1])
         queries_done[-1] = current_query
+        await tool_activity.emit(
+            "searching",
+            f"Passe de recherche {round_idx + 1}/{max_rounds}",
+            detail="Recherche SearXNG d'un nouvel angle.",
+            current=round_idx + 1,
+            total=max_rounds,
+            metrics={"sources_uniques": len(sources)},
+        )
         try:
             search_receipt = await _priority_search(current_query, 10)
             results = list(search_receipt.get("results") or [])
@@ -690,6 +723,17 @@ async def execute_web_deep_research(args: dict) -> dict:
             if text:
                 sources.append({"title": res.get("title", ""), "url": url, "text": text[:3000]})
                 new_pages += 1
+                await tool_activity.emit(
+                    "reading",
+                    f"Lecture des sources · passe {round_idx + 1}",
+                    detail=f"{new_pages}/6 nouvelles pages exploitables.",
+                    current=new_pages,
+                    total=6,
+                    metrics={
+                        "resultats": len(results),
+                        "sources_uniques": len(sources),
+                    },
+                )
             if new_pages >= 6:  # corpus riche mais borné à 36 pages au maximum
                 break
 
@@ -703,6 +747,13 @@ async def execute_web_deep_research(args: dict) -> dict:
         # approfondie" d'une simple recherche répétée à l'identique.
         digest = "\n\n".join(f"[{i+1}] {s['title']} ({s['url']})\n{s['text'][:800]}"
                               for i, s in enumerate(sources[-8:]))
+        await tool_activity.emit(
+            "checking",
+            "Vérification des angles manquants",
+            current=round_idx + 1,
+            total=max_rounds,
+            metrics={"sources_uniques": len(sources)},
+        )
         judge_prompt = (
             f"Question de recherche : {query}\n\n"
             f"Sources déjà trouvées (passe {round_idx+1}/{max_rounds}) :\n{digest}\n\n"
@@ -748,6 +799,14 @@ async def execute_web_deep_research(args: dict) -> dict:
         "factuel, ne comble pas les trous par supposition — dis explicitement si un point "
         "reste incertain plutôt que d'inventer.\n\n"
         f"QUESTION : {query}\n\nSOURCES :\n{context}\n\nRAPPORT :"
+    )
+    await tool_activity.emit(
+        "synthesizing",
+        "Rédaction du rapport vérifié",
+        detail="Structuration des constats et des citations.",
+        current=len(search_receipts),
+        total=len(search_receipts),
+        metrics={"sources": len(sources), "passes": len(search_receipts)},
     )
     report = (await _generate(report_prompt, model=args.get("model"), timeout=240) or "").strip()
 

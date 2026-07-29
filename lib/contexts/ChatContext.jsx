@@ -295,6 +295,40 @@ export function ChatProvider({ children }) {
               break;
             }
 
+            case 'tool_progress':
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const progress = {
+                  ...(event.progress || {}),
+                  receivedAt: Date.now(),
+                };
+                const updateInvocation = inv => (
+                  inv.toolCallId === event.toolCallId
+                    ? {
+                        ...inv,
+                        progress,
+                        progressEvents: [...(inv.progressEvents || []), progress].slice(-24),
+                      }
+                    : inv
+                );
+                return {
+                  ...m,
+                  parts: m.parts.map(part => (
+                    part.type === 'tool-invocation'
+                    && part.toolInvocation?.toolCallId === event.toolCallId
+                      ? { ...part, toolInvocation: updateInvocation(part.toolInvocation) }
+                      : part
+                  )),
+                  toolInvocations: (m.toolInvocations || []).map(updateInvocation),
+                  executionGraph: (m.executionGraph || []).map(node => (
+                    node.id === event.toolCallId
+                      ? { ...node, detail: progress.label, progress }
+                      : node
+                  )),
+                };
+              }));
+              break;
+
             case 'tool_end':
               setMessages(prev => prev.map(m => {
                 if (m.id !== assistantId) return m;

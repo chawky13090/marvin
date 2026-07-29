@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from agent_observability import ObservationReceipt
 from agent_tool_batch import execute_tool_batch
+import tool_activity
 
 
 class Runner:
@@ -38,7 +39,7 @@ async def main() -> int:
     long_chains: list[tuple] = []
     read_signatures: set[str] = set()
     runner = Runner()
-    clock_values = iter((10.0, 10.125))
+    clock_values = iter((10.0, 10.0, 10.0, 10.125))
 
     async def dispatch(request, *, validate, execute):
         assert request.name == "ai_test_forge"
@@ -49,6 +50,13 @@ async def main() -> int:
         )
 
     async def execute(_name, arguments, _conversation_id, _request_id):
+        await tool_activity.emit(
+            "testing",
+            "Tests natifs",
+            current=1,
+            total=2,
+            metrics={"tests": 1},
+        )
         return {"success": True, "production_ready": True, "args": arguments}
 
     async def postprocess(**kwargs):
@@ -116,10 +124,16 @@ async def main() -> int:
             tool_argument_overrides={"ai_test_forge": {"path": "project-repris"}},
         )
     ]
-    assert [event["type"] for event in events] == ["tool_start", "tool_end"]
-    assert events[1]["result"]["duration"] == 125
-    assert events[1]["evidence"]["proof_recorded"] is True
-    assert events[1]["evidence"]["sequence"] == 23
+    assert [event["type"] for event in events] == [
+        "tool_start",
+        "tool_progress",
+        "tool_end",
+    ]
+    assert events[1]["progress"]["label"] == "Tests natifs"
+    assert events[1]["progress"]["current"] == 1
+    assert events[2]["result"]["duration"] == 125
+    assert events[2]["evidence"]["proof_recorded"] is True
+    assert events[2]["evidence"]["sequence"] == 23
     assert events[0]["args"]["path"] == "project-repris"
     assert read_signatures == {"forge:project"}
     assert runner.blocking[0][0] == "ai_test_forge"

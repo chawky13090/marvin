@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
@@ -9,6 +10,7 @@ from typing import Any, AsyncIterator, Awaitable, Callable
 
 from agent_observability import ObservationReceipt, ToolObservation
 from agent_tool_dispatch import ToolDispatchRequest
+import tool_activity
 
 
 async def execute_tool_batch(
@@ -102,22 +104,74 @@ async def execute_tool_batch(
             arguments,
             conversation_id,
         )
-        dispatch = await dispatch_tool(
-            ToolDispatchRequest(
-                name=tool_name,
-                arguments=arguments,
-                conversation_id=conversation_id,
-                request_id=request_id,
-                permission_level=permission_level,
-                read_signature=read_signature,
-                seen_read_signatures=read_signatures,
-                explicit_names=explicit_tool_names,
-                required_names=required_tool_names,
-                command_text_only=command_text_only,
-            ),
-            validate=validate_tool_args,
-            execute=execute_registered_tool,
-        )
+        progress_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=64)
+
+        def publish_progress(event: dict[str, Any]) -> None:
+            if progress_queue.full():
+                try:
+                    progress_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            progress_queue.put_nowait(event)
+
+        async def run_dispatch():
+            with tool_activity.bind(publish_progress):
+                return await dispatch_tool(
+                    ToolDispatchRequest(
+                        name=tool_name,
+                        arguments=arguments,
+                        conversation_id=conversation_id,
+                        request_id=request_id,
+                        permission_level=permission_level,
+                        read_signature=read_signature,
+                        seen_read_signatures=read_signatures,
+                        explicit_names=explicit_tool_names,
+                        required_names=required_tool_names,
+                        command_text_only=command_text_only,
+                    ),
+                    validate=validate_tool_args,
+                    execute=execute_registered_tool,
+                )
+
+        dispatch_task = asyncio.create_task(run_dispatch())
+        last_activity_at = clock()
+        try:
+            while not dispatch_task.done():
+                try:
+                    progress = await asyncio.wait_for(progress_queue.get(), timeout=1.0)
+                    last_activity_at = clock()
+                    yield {
+                        "type": "tool_progress",
+                        "toolCallId": tool_call_id,
+                        "toolName": tool_name,
+                        "progress": progress,
+                    }
+                except asyncio.TimeoutError:
+                    now = clock()
+                    if now - last_activity_at >= 15:
+                        last_activity_at = now
+                        yield {
+                            "type": "tool_progress",
+                            "toolCallId": tool_call_id,
+                            "toolName": tool_name,
+                            "progress": tool_activity.normalize({
+                                "stage": "waiting",
+                                "label": "Toujours actif",
+                                "detail": "L'outil poursuit son travail.",
+                            }),
+                        }
+            dispatch = await dispatch_task
+            while not progress_queue.empty():
+                yield {
+                    "type": "tool_progress",
+                    "toolCallId": tool_call_id,
+                    "toolName": tool_name,
+                    "progress": progress_queue.get_nowait(),
+                }
+        finally:
+            if not dispatch_task.done():
+                dispatch_task.cancel()
+                await asyncio.gather(dispatch_task, return_exceptions=True)
         result = dispatch.result
         arguments = dispatch.arguments
         duration_ms = max(0, int((clock() - started_at) * 1000))
