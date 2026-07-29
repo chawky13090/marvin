@@ -120,6 +120,8 @@ def _arguments_for(
         }
     if name in {"web_research", "web_deep_research"}:
         return {"query": context.user_query}
+    if name == "web_site_crawl":
+        return {"site": context.user_query}
     if name == "file_write":
         return _file_delivery_arguments(context)
     if name == "long_task_start":

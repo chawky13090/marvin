@@ -122,6 +122,22 @@ def _check_repository(path: Path) -> None:
         raise AssertionError("Le CHECK SQL des roles devait refuser la valeur.")
     assert len(repository.get_messages_by_conversation(first["id"])) == 2
 
+    long_conversation = repository.create_conversation("Conversation longue")
+    for index in range(105):
+        repository.create_message(
+            long_conversation["id"],
+            "assistant",
+            f"reponse-{index:03d}",
+        )
+    recent_window = repository.get_messages_by_conversation(
+        long_conversation["id"],
+        limit=100,
+    )
+    assert len(recent_window) == 100
+    assert recent_window[0]["content"] == "reponse-005"
+    assert recent_window[-1]["content"] == "reponse-104"
+    repository.delete_conversation(long_conversation["id"])
+
     repository.delete_conversation(first["id"])
     assert repository.get_conversation(first["id"]) is None
     with db(path) as connection:

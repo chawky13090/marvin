@@ -12730,3 +12730,54 @@ SSE, pas encore dans un superviseur de jobs indépendant.
 Rollback code sans migration : réverter le commit v2.494. Les artefacts de crawl sont
 isolés dans `data/site_crawls` et peuvent être conservés ou supprimés séparément après arrêt
 de Marvin. Le mode d'orchestration déterministe reste la valeur par défaut pendant le canary.
+
+## 2026-07-29 — v2.495 — Résolution SearXNG avant aspiration d'un site nommé
+
+### Incident reproduit
+
+Dans la dernière conversation, « aspire le site France Travail » n'a produit aucun appel
+SearXNG. Le modèle a supposé trois URL et appelé `web_browser_open`, malgré la présence de
+`web_site_crawl` dans le catalogue. SearXNG fonctionnait : la requête directe
+`site officiel France Travail` retourne dix résultats et place
+`https://www.francetravail.fr/accueil/` en première position.
+
+### Correction
+
+- les intentions explicites `aspire/crawl/parcours ... site` imposent le contrat de crawl
+  dans le mode déterministe actuellement actif;
+- l'injection fournit la demande originale dans le champ `site`;
+- sans URL explicite, `web_site_crawl` interroge exclusivement SearXNG et transmet l'URL
+  retenue au crawler;
+- le filtre local ne reclasse plus les résultats SearXNG : il élimine uniquement les entrées
+  hors sujet et conserve l'ordre du moteur. L'ancien reclassement lexical faisait remonter
+  `francetravail.org` devant le premier résultat officiel `francetravail.fr`;
+- une page HTML trop creuse est rendue par le navigateur pour découvrir les liens ajoutés
+  par JavaScript;
+- le résultat conserve le fournisseur, la requête, l'URL sélectionnée et dix candidats;
+- une URL HTTP(S) fournie par l'utilisateur évite une recherche inutile.
+
+La disparition apparente d'une conversation après rechargement avait une autre cause
+déterministe : `get_messages_by_conversation(..., limit=100)` sélectionnait les cent messages
+les plus anciens. La conversation réelle en contenait 139; sa réponse finale de 4 659
+caractères était bien persistée mais exclue de l'API. Le repository sélectionne maintenant
+la fenêtre la plus récente, la borne entre 1 et 1 000, puis la restitue en ordre chronologique.
+Le test crée 105 messages et vérifie exactement la fenêtre `005..104`.
+
+### Validation et rollback
+
+Les tests de planification, outils obligatoires, domaine Web, crawler, repository des
+conversations, compilation et architecture sont réussis. Après toutes les corrections,
+le gate consolidé `check_marvin.py --quick` a réussi 213 étapes sur 213 en 468,8 secondes :
+346 outils couverts par le harness, 371 routes, compilation de 305 fichiers Python et lint
+frontend sans erreur (35 avertissements historiques). Le smoke réel sélectionne
+`https://www.francetravail.fr/accueil/`, rend la page JavaScript, aspire trois pages et
+conserve quinze liens en attente. Après redémarrage du backend, l'API de la conversation
+concernée retourne sa réponse finale complète en dernier message.
+
+Journalisation : aucun contenu utilisateur supplémentaire n'est journalisé. La découverte
+Web reste dans son reçu métier borné; la pagination ne crée aucun nouvel événement technique.
+Sécurité : les URLs restent soumises au transport public anti-SSRF existant, aux ports
+standards et aux limites du crawler. La requête SQLite reste paramétrée et la limite est
+bornée. Aucun schéma ni donnée persistante n'est modifié.
+Rollback sans migration : réverter le commit v2.495; aucun artefact existant ni schéma
+SQLite n'est modifié.

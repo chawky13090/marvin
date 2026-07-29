@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.494.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.495.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.494.0)
+## 9. État actuel (v2.495.0)
+
+**v2.495 (résolution SearXNG avant crawl nommé)** : une demande explicite d'aspiration
+matérialise `web_site_crawl` dans le mode déterministe au lieu de laisser le modèle enchaîner
+des URL supposées avec `web_browser_open`. Si aucune URL n'est fournie, l'outil interroge
+exclusivement SearXNG avec le nom du site, conserve l'ordre natif de ses résultats après
+filtrage hors sujet, puis aspire le site officiel sélectionné. Les pages JavaScript trop
+creuses sont rendues par le navigateur afin de découvrir leurs liens internes. Une URL
+explicite reste directement utilisable sans recherche superflue. Le rechargement des
+conversations longues lit désormais les cent messages les plus récents, dans l'ordre
+chronologique, au lieu de masquer silencieusement toute réponse située après le centième.
 
 **v2.494 (crawler Web reprenable et politique d'effets)** : `web_site_crawl` découvre les
 sitemaps et les liens internes, extrait jusqu'à 5 000 pages par appel et conserve le contenu

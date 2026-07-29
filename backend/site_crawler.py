@@ -314,6 +314,40 @@ async def crawl_site(args: dict[str, Any]) -> dict[str, Any]:
                 final_url = _canonical_url(
                     canonical and urljoin(response.url, canonical) or response.url
                 )
+                if browser_fallback and len(links) < 2:
+                    try:
+                        import web_browser
+
+                        rendered = await web_browser.fetch_page(
+                            response.url,
+                            timeout=60_000,
+                            max_chars=per_page_chars,
+                        )
+                        rendered_links: list[str] = []
+                        for raw_link in rendered.get("links") or []:
+                            try:
+                                rendered_links.append(
+                                    _canonical_url(str(raw_link))
+                                )
+                            except ValueError:
+                                continue
+                        if len(rendered_links) > len(links):
+                            links = rendered_links
+                        rendered_text = str(rendered.get("text") or "")
+                        if len(rendered_text) > len(text):
+                            text = rendered_text
+                            title = str(rendered.get("title") or title)[:500]
+                            final_url = _canonical_url(
+                                str(rendered.get("url") or final_url)
+                            )
+                    except Exception as exc:
+                        failures.append(
+                            {
+                                "url": url,
+                                "browser_fallback": "degraded",
+                                "browser_error": type(exc).__name__,
+                            }
+                        )
             record = {
                 "url": final_url,
                 "title": title,

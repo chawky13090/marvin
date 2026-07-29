@@ -214,11 +214,18 @@ class ConversationRepository:
     def get_messages_by_conversation(
         self, conversation_id: str, limit: int = 100
     ) -> list[dict]:
+        safe_limit = max(1, min(int(limit), 1_000))
         with self._connection_scope() as connection:
             rows = connection.execute(
-                """SELECT * FROM messages WHERE conversation_id = ?
-                   ORDER BY created_at ASC, rowid ASC LIMIT ?""",
-                (conversation_id, limit),
+                """SELECT * FROM (
+                       SELECT rowid AS _message_rowid, *
+                       FROM messages
+                       WHERE conversation_id = ?
+                       ORDER BY created_at DESC, rowid DESC
+                       LIMIT ?
+                   )
+                   ORDER BY created_at ASC, _message_rowid ASC""",
+                (conversation_id, safe_limit),
             ).fetchall()
         return [self._parse_message(row_to_dict(row)) for row in rows]
 

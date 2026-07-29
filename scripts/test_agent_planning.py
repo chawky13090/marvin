@@ -123,6 +123,12 @@ def main() -> int:
     )
     assert "web_research" in typo_web.required_tool_names
 
+    crawl = planning.compile_turn_plan(
+        [{"role": "user", "content": "aspire le site France Travail"}],
+        "aspire le site France Travail",
+    )
+    assert "web_site_crawl" in crawl.required_tool_names
+
     followup_messages = [
         {
             "role": "user",

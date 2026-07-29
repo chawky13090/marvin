@@ -3272,6 +3272,7 @@ TOOLS_SPEC = [
        "pas web_browser_open pour un parcours interactif ou une authentification.",
        {
         "url": {"type": "string", "description": "URL de départ du site"},
+        "site": {"type": "string", "description": "Nom ou demande décrivant le site lorsque l'URL n'est pas connue; Marvin le résout d'abord exclusivement via SearXNG"},
         "max_pages": {"type": "integer", "minimum": 1, "maximum": 5000,
                       "description": "Plafond adaptatif de pages (défaut 250, maximum 5000)"},
         "max_depth": {"type": "integer", "minimum": 0, "maximum": 20,
@@ -3291,7 +3292,7 @@ TOOLS_SPEC = [
         "job_id": {"type": "string",
                    "description": "Identifiant optionnel pour retrouver les artefacts du crawl"}
        },
-       ["url"]),
+       []),
 
     _t("infographic_create", "Crée un graphique PNG. Types : bar, horizontal_bar, pie, donut, line, area, multi_line, scatter, radar, grouped_bar, stacked_bar. Pour les multi-séries (grouped/stacked/multi_line/radar), fournir 'series' = [{name, values}].",
        {"chart_type": {"type": "string", "enum": ["bar", "horizontal_bar", "pie", "donut", "line", "area", "multi_line", "scatter", "radar", "grouped_bar", "stacked_bar"], "description": "Type de graphique"},

@@ -67,6 +67,7 @@ async def main() -> None:
                     "max_pages": 10,
                     "max_depth": 3,
                     "job_id": "test-crawl-job",
+                    "browser_fallback": False,
                 }
             )
         finally:
@@ -90,6 +91,7 @@ async def main() -> None:
                 "url": "https://example.com",
                 "max_pages": 1,
                 "job_id": "test-resume-job",
+                "browser_fallback": False,
             }
         )
         assert partial["status"] == "partial" and partial["pages_pending"] > 0
@@ -99,6 +101,7 @@ async def main() -> None:
                 "max_pages": 10,
                 "job_id": "test-resume-job",
                 "resume": True,
+                "browser_fallback": False,
             }
         )
         assert resumed["status"] == "completed"

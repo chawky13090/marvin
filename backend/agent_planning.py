@@ -81,6 +81,11 @@ _CODE_FILE_DELIVERY_RE = re.compile(
     r"\b(?:mets?|enregistre|sauvegarde|écris|ecris)\w*\b.{0,120}\b"
     r"(?:script|code|programme)\b.{0,120}\b(?:fichier|bureau|desktop)\b"
 )
+_SITE_CRAWL_RE = re.compile(
+    r"\b(?:aspire|aspirer|aspiration|crawl|crawler|explore|parcours)\w*\b"
+    r".{0,80}\b(?:site|domaine|pages?)\b|"
+    r"\b(?:site|domaine)\b.{0,80}\b(?:complet|entier|toutes?\s+les?\s+pages?)\b"
+)
 _CONTEXT_ONLY_WEB_RE = re.compile(
     r"^\s*(?:cherche|recherche|regarde|fouille|explore)\w*\s+"
     r"(?:uniquement\s+|aussi\s+)?(?:sur\s+)?(?:les?\s+)?"
@@ -156,6 +161,8 @@ def _deterministic_action_requirements(
         requirements.add("event_list")
     if _CODE_FILE_DELIVERY_RE.search(text):
         requirements.add("file_write")
+    if _SITE_CRAWL_RE.search(text):
+        requirements.add("web_site_crawl")
     return requirements
 
 

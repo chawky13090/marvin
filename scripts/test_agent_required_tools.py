@@ -89,6 +89,20 @@ def main() -> int:
     }
     assert arguments["web_deep_research"] == {"query": "reprends ce script"}
 
+    crawl = inject_required_tool_calls(
+        required_names={"web_site_crawl"},
+        executed_names=set(),
+        tool_calls=[],
+        step=0,
+        max_steps=10,
+        context=RequiredToolContext(user_query="aspire le site France Travail"),
+        call_id_factory=lambda: "required-crawl",
+    )
+    assert crawl.injected_names == ("web_site_crawl",)
+    assert crawl.tool_calls[0]["function"]["arguments"] == {
+        "site": "aspire le site France Travail"
+    }
+
     satisfied = inject_required_tool_calls(
         required_names={"ai_model_council", "long_task_start"},
         executed_names={"ai_model_council"},

@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 import re
 from typing import Any
 import unicodedata
+from urllib.parse import urlsplit
 
 import outbound_http
 import site_crawler
@@ -147,20 +148,18 @@ def _topic_tokens(value: str) -> set[str]:
 
 
 def _filter_relevant_results(query: str, results: list[dict]) -> list[dict]:
-    """Écarte les résultats sans aucun recouvrement avec le sujet recherché."""
+    """Écarte le hors-sujet sans altérer le classement natif de SearXNG."""
     topic = _topic_tokens(query)
     if not topic:
         return results
-    ranked: list[tuple[int, int, dict]] = []
-    for index, item in enumerate(results):
+    filtered: list[dict] = []
+    for item in results:
         haystack = _topic_tokens(
             f"{item.get('title', '')} {item.get('snippet', '')} {item.get('url', '')}"
         )
-        score = len(topic & haystack)
-        if score:
-            ranked.append((score, -index, item))
-    ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
-    return [item for _score, _index, item in ranked]
+        if topic & haystack:
+            filtered.append(item)
+    return filtered
 
 
 async def _execute_web_search_legacy(args: dict) -> dict:
@@ -670,13 +669,94 @@ async def execute_web_browse(args: dict) -> dict:
 
 async def execute_web_site_crawl(args: dict) -> dict:
     """Aspire atomiquement les pages internes d'un site public."""
+    crawl_args = dict(args)
+    discovery: dict[str, Any] | None = None
+    if not str(crawl_args.get("url") or "").strip():
+        site = str(crawl_args.get("site") or "").strip()
+        explicit_url = re.search(r"https?://[^\s<>\"]+", site)
+        if explicit_url:
+            crawl_args["url"] = explicit_url.group(0).rstrip(".,;)")
+        elif site:
+            subject = re.sub(
+                r"^\s*(?:(?:peux[- ]tu|merci\s+de|je\s+veux\s+que\s+tu)\s+)?"
+                r"(?:aspire|aspirer|aspiration|crawl|crawler|explore|explorer|"
+                r"parcours|parcourir)\w*\s+(?:(?:tout|entierement|entièrement)\s+)?"
+                r"(?:le|la|les|un|une)?\s*(?:site|domaine|pages?)?\s*(?:de|du|des)?\s*",
+                "",
+                site,
+                flags=re.IGNORECASE,
+            ).strip(" \t\r\n:;,.")
+            if not subject:
+                subject = site
+            discovery = await execute_web_search(
+                {
+                    "query": f"site officiel {subject}",
+                    "provider": "searxng",
+                    "max_results": 10,
+                    "language": "fr-FR",
+                }
+            )
+            results = [
+                item
+                for item in discovery.get("results") or []
+                if isinstance(item, dict) and item.get("url")
+            ]
+            if not results:
+                return {
+                    "success": False,
+                    "provider": "SearXNG",
+                    "error": discovery.get("error")
+                    or "Impossible d'identifier le site à aspirer via SearXNG.",
+                    "discovery": discovery,
+                }
+            query_tokens = _topic_tokens(subject)
+
+            def official_score(
+                indexed_item: tuple[int, dict[str, Any]],
+            ) -> tuple[int, int]:
+                index, item = indexed_item
+                parsed = urlsplit(str(item.get("url") or ""))
+                host_tokens = _topic_tokens(parsed.hostname or "")
+                title_tokens = _topic_tokens(str(item.get("title") or ""))
+                return (
+                    5 * len(query_tokens & host_tokens)
+                    + 2 * len(query_tokens & title_tokens),
+                    -index,
+                )
+
+            _selected_index, selected = max(
+                enumerate(results),
+                key=official_score,
+            )
+            crawl_args["url"] = str(selected["url"])
+        else:
+            return {
+                "success": False,
+                "provider": "SearXNG",
+                "error": "Paramètre 'url' ou 'site' requis.",
+            }
     await tool_activity.emit(
         "browsing",
         "Aspiration du site",
-        detail=str(args.get("url") or "")[:300],
+        detail=str(crawl_args.get("url") or "")[:300],
     )
     try:
-        return await site_crawler.crawl_site(args)
+        result = await site_crawler.crawl_site(crawl_args)
+        if discovery is not None:
+            result["discovery"] = {
+                "provider": "SearXNG",
+                "query": discovery.get("search_query") or discovery.get("query"),
+                "selected_url": crawl_args["url"],
+                "candidates": [
+                    {
+                        "title": str(item.get("title") or "")[:300],
+                        "url": str(item.get("url") or "")[:2_000],
+                    }
+                    for item in (discovery.get("results") or [])[:10]
+                    if isinstance(item, dict)
+                ],
+            }
+        return result
     except (OSError, TypeError, ValueError, outbound_http.httpx.HTTPError) as exc:
         return {
             "success": False,

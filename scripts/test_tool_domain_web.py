@@ -78,7 +78,69 @@ async def _run() -> None:
             net_error=lambda exc, what: {"error": str(exc), "resource": what},
         )
         priority = await web.execute_web_search({"query": "Marvin", "max_results": 10})
+    discovery = {
+        "success": True,
+        "provider": "SearXNG",
+        "query": "site officiel France Travail",
+        "search_query": "site officiel France Travail",
+        "results": [
+            {
+                "title": "France Travail",
+                "url": "https://www.francetravail.fr/accueil/",
+                "snippet": "Site officiel",
+            },
+            {
+                "title": "France Travail — Wikipédia",
+                "url": "https://fr.wikipedia.org/wiki/France_Travail",
+                "snippet": "Encyclopédie",
+            },
+            {
+                "title": "France Travail recrute",
+                "url": "https://recrute.francetravail.org/",
+                "snippet": "Site de recrutement",
+            },
+        ],
+    }
+    with (
+        patch.object(
+            web,
+            "execute_web_search",
+            AsyncMock(return_value=discovery),
+        ) as search_mock,
+        patch.object(
+            web.site_crawler,
+            "crawl_site",
+            AsyncMock(return_value={"success": True, "pages_succeeded": 12}),
+        ) as crawl_site,
+    ):
+        crawled = await web.execute_web_site_crawl(
+            {"site": "aspire le site France Travail"}
+        )
+    assert crawled["discovery"]["provider"] == "SearXNG"
+    assert search_mock.await_args.args[0]["query"] == "site officiel France Travail"
+    assert crawled["discovery"]["selected_url"].startswith(
+        "https://www.francetravail.fr/"
+    )
+    assert crawl_site.await_args.args[0]["url"].startswith(
+        "https://www.francetravail.fr/"
+    )
     assert priority["provider"] == "SearXNG"
+    ordered = web._filter_relevant_results(
+        "site officiel France Travail",
+        [
+            {
+                "title": "Accueil | France Travail",
+                "url": "https://www.francetravail.fr/accueil/",
+                "snippet": "",
+            },
+            {
+                "title": "Site institutionnel officiel France Travail",
+                "url": "https://www.francetravail.org/accueil/",
+                "snippet": "",
+            },
+        ],
+    )
+    assert ordered[0]["url"] == "https://www.francetravail.fr/accueil/"
     assert priority["fallback_used"] is False
     assert priority["count"] == 10
     assert priority["provider_attempts"] == [
