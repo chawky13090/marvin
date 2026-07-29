@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import sys
+import subprocess
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -47,6 +49,25 @@ def main() -> int:
     assert "--cap-drop" in command and "ALL" in command
     assert "no-new-privileges=true" in command
     assert "/var/run/docker.sock" not in " ".join(command)
+    with tempfile.TemporaryDirectory(prefix="marvin-test-forge-env-") as temporary:
+        with patch.object(
+            test_forge.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], 0, "", ""),
+        ) as mocked_run:
+            test_forge._run(
+                "docker",
+                "image@sha256:abc",
+                Path(temporary),
+                ["python", "/workspace/tests/test_probe.py"],
+                name="python_unittest",
+                environment={"PYTHONPATH": "/workspace/src"},
+            )
+        observed_command = mocked_run.call_args.args[0]
+        image_index = observed_command.index("image@sha256:abc")
+        assert observed_command[image_index - 2:image_index] == [
+            "--env", "PYTHONPATH=/workspace/src",
+        ]
 
     with (
         patch.object(

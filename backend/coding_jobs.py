@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -18,6 +19,7 @@ import coding_workspace
 import repository_intelligence
 import windows_validation
 import hyperv_test_runner
+import linux_test_runner
 import engineering_runtime
 import bug_log
 import cloud_routing
@@ -345,7 +347,8 @@ def latest_for_mission(mission_id: str) -> dict[str, Any] | None:
 
 
 def _result_summary(result: dict[str, Any], applied: dict[str, Any] | None,
-                    windows_route: dict[str, Any] | None) -> dict[str, Any]:
+                    windows_route: dict[str, Any] | None,
+                    linux_validation: dict[str, Any] | None = None) -> dict[str, Any]:
     test_report = dict(result.get("test_report") or {})
     production = dict(result.get("production_contract") or {})
     return {
@@ -377,6 +380,7 @@ def _result_summary(result: dict[str, Any], applied: dict[str, Any] | None,
         },
         "applied": applied,
         "windows_validation": windows_route,
+        "linux_validation": linux_validation,
     }
 
 
@@ -487,6 +491,12 @@ async def _run(job_id: str) -> None:
             )
             repair_context = dict(job.get("repair_context") or {})
             previous_result = dict(job.get("result") or {})
+            validated_candidate = dict(job.get("validated_candidate") or {})
+            replay_validated_candidate = bool(
+                repair_context.get("category") == "target_validation"
+                and validated_candidate.get("success")
+                and validated_candidate.get("files")
+            )
             if repair_context and previous_result and not previous_result.get("success"):
                 # Les anciens jobs pouvaient ne conserver que le nom de l'étape en échec.
                 # Recalcule au démarrage le diagnostic à partir du rapport persistant afin
@@ -526,25 +536,34 @@ async def _run(job_id: str) -> None:
                     "job_id": job_id, "attempt": attempts + 1,
                     "repair_context": repair_context,
                 })
-            _emit(job["mission_id"], "code.forge.started", {
-                "job_id": job_id, "selected_files": len(repo_context["selected_files"]),
-            })
-            progress_task = asyncio.create_task(
-                _mirror_mission_progress(job_id, job["mission_id"])
-            )
-            try:
-                result = await asyncio.wait_for(
-                    code_forge.execute(
-                        request,
-                        evidence=forge_evidence,
-                        mission_id=job["mission_id"],
-                        defer_acceptance=True,
-                    ),
-                    timeout=max(30, slice_seconds),
+            if replay_validated_candidate:
+                result = validated_candidate
+                _emit(job["mission_id"], "target.validation.reused", {
+                    "job_id": job_id,
+                    "attempt": attempts + 1,
+                    "file_count": len(result.get("files") or {}),
+                    "reason": str(repair_context.get("error") or "")[:500],
+                })
+            else:
+                _emit(job["mission_id"], "code.forge.started", {
+                    "job_id": job_id, "selected_files": len(repo_context["selected_files"]),
+                })
+                progress_task = asyncio.create_task(
+                    _mirror_mission_progress(job_id, job["mission_id"])
                 )
-            finally:
-                progress_task.cancel()
-                await asyncio.gather(progress_task, return_exceptions=True)
+                try:
+                    result = await asyncio.wait_for(
+                        code_forge.execute(
+                            request,
+                            evidence=forge_evidence,
+                            mission_id=job["mission_id"],
+                            defer_acceptance=True,
+                        ),
+                        timeout=max(30, slice_seconds),
+                    )
+                finally:
+                    progress_task.cancel()
+                    await asyncio.gather(progress_task, return_exceptions=True)
             if _sync_privacy_contract(
                 job_id,
                 job["mission_id"],
@@ -605,6 +624,7 @@ async def _run(job_id: str) -> None:
 
             applied = None
             windows_route = None
+            linux_validation = None
             targets = {str(item).casefold() for item in mission.get("target_platforms") or []}
             all_targets_validated = True
             if "windows" in targets:
@@ -645,11 +665,50 @@ async def _run(job_id: str) -> None:
                 windows_route["native_execution_validated"] = native_windows_ok
                 all_targets_validated = native_windows_ok
 
+            native_linux_requested = (
+                "linux" in targets
+                and bool(
+                    re.search(
+                        r"\b(?:debian|native|nativement|vm\s+linux|machine\s+virtuelle)\b",
+                        str(mission.get("request") or ""),
+                        re.IGNORECASE,
+                    )
+                )
+            )
+            if native_linux_requested:
+                _update(job_id, progress={"stage": "linux_native_vm", "percent": 93})
+                try:
+                    native_bundle = linux_test_runner.prepare_native_bundle(
+                        dict(result.get("files") or {}),
+                        str(result.get("language") or ""),
+                    )
+                    linux_validation = await asyncio.to_thread(
+                        linux_test_runner.execute,
+                        native_bundle,
+                        timeout_seconds=min(slice_seconds, 7_200),
+                        capture_result=False,
+                    )
+                except (linux_test_runner.LinuxRunnerError, OSError, ValueError) as exc:
+                    linux_validation = {
+                        "success": False,
+                        "production_ready": False,
+                        "tests_executed": False,
+                        "error": f"{type(exc).__name__}: {str(exc)[:1000]}",
+                        "steps": [],
+                    }
+                all_targets_validated = (
+                    all_targets_validated
+                    and bool(linux_validation.get("production_ready"))
+                )
+
             done = engineering_runtime.definition_of_done(
-                result, targets=targets, windows_validation=windows_route,
+                result,
+                targets=targets,
+                windows_validation=windows_route,
+                linux_validation=linux_validation,
             )
             all_targets_validated = all_targets_validated and bool(done["success"])
-            summary = _result_summary(result, applied, windows_route)
+            summary = _result_summary(result, applied, windows_route, linux_validation)
             summary["definition_of_done"] = done
             validation_cache = _validation_cache(result)
             if all_targets_validated:
@@ -695,8 +754,25 @@ async def _run(job_id: str) -> None:
                            "all_targets_validated": False, "reason": reason},
                 )
                 synthetic = {**result, "error": reason}
-                repair_context = engineering_runtime.classify_failure(synthetic)
-                _update(job_id, result=summary, validation_cache=validation_cache)
+                repair_context = {
+                    "category": "target_validation",
+                    "retryable": True,
+                    "error": reason,
+                    "target": "windows",
+                    "signature": hashlib.sha256(
+                        ("target_validation:windows:" + reason).encode("utf-8")
+                    ).hexdigest(),
+                    "instructions": (
+                        "Conserver l'artefact Forge accepté et rejouer uniquement "
+                        "la validation native Windows défaillante."
+                    ),
+                }
+                _update(
+                    job_id,
+                    result=summary,
+                    validated_candidate=result,
+                    validation_cache=validation_cache,
+                )
                 _emit(job["mission_id"], "repair.diagnosed", {
                     "job_id": job_id,
                     "attempt": attempts + 1,

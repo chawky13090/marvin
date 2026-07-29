@@ -136,11 +136,17 @@ def _run(
     name: str,
     timeout: int = 60,
     entrypoint: str | None = None,
+    environment: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     command = _base_command(executable, image, directory)
-    if entrypoint:
+    if entrypoint or environment:
         image_index = command.index(image)
-        command[image_index:image_index] = ["--entrypoint", entrypoint]
+        options: list[str] = []
+        if entrypoint:
+            options.extend(["--entrypoint", entrypoint])
+        for key, value in sorted((environment or {}).items()):
+            options.extend(["--env", f"{key}={value}"])
+        command[image_index:image_index] = options
     command.extend(args)
     started = time.perf_counter()
     try:
@@ -671,6 +677,11 @@ def execute(
                     executable, IMAGES["python"], directory,
                     ["python", f"/workspace/{test_name}"],
                     name="python_unittest", timeout=timeout,
+                    environment=(
+                        {"PYTHONPATH": "/workspace/src"}
+                        if python_library_layout
+                        else None
+                    ),
                 ))
         elif language == "javascript":
             steps.append(_run(

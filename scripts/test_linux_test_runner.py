@@ -16,6 +16,17 @@ import linux_test_runner
 
 
 def main() -> int:
+    python_bundle = linux_test_runner.prepare_native_bundle(
+        {
+            "src/demo/__init__.py": "",
+            "tests/test_demo.py": "import unittest\n",
+        },
+        "python",
+    )
+    assert "PYTHONPATH" in python_bundle["main.sh"]
+    assert "unittest discover -s tests" in python_bundle["main.sh"]
+    assert "MARVIN_INTEGRATION_COMPLETE=full" in python_bundle["integration.sh"]
+    assert "run bash ./main.sh" in python_bundle["test_main.bats"]
     with tempfile.TemporaryDirectory(prefix="marvin-linux-runner-") as temporary:
         root = Path(temporary)
         old_state = linux_test_runner.STATE_PATH

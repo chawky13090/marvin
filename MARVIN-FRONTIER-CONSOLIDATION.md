@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.452.0
+Version courante auditée : 2.457.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -130,8 +130,8 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | tools | Catalogue, harness et appels d'outils | verified | registre 344/344, zéro consommateur direct, 78 restrictions, sélection/erreurs/approbations/résultats testés par `test_agent_tool_selection.py`, `test_tool_gateway.py`, `test_system_tools_gateway.py` et `test_engineering_runtime.py` | maintenir le gate et ajouter les nouveaux outils uniquement avec schéma, politique, résultat et preuves |
 | models | Routage modèles, Council et confidentialité | partial | matrice des quatre profils, provenance SSE, Ultra Cloud-only, Council cinq familles, preuves génératives et découverte locale dynamique par capacités Ollama | tester les combinaisons négatives de chaque domaine avant promotion |
 | memory | Mémoire, RAG et vérité durable | partial | cycle SQLite autoritatif, empreintes de contenu, audit/réparation des projections, quarantaine des contradictions et apprentissage historique migré vers SQLite (`scripts/test_memory_lifecycle.py`, `scripts/test_knowledge_mesh.py`, `scripts/test_learning_durability.py`) | valider chiffrement, rétention/restauration globale et dérive factuelle |
-| coding | Code Workspace, Forge et missions longues | partial | tests Code/Test Forge, production contract, Coding Mission et jobs | scénarios E2E Linux/Windows avec artefact et reprise après panne |
-| isolation | Docker, VM Debian et VM Windows | partial | tests VM Lab, Hyper-V runner et Test Forge | preuves natives propres, snapshot/revert et réseau gouverné |
+| coding | Code Workspace, Forge et missions longues | verified | mission réelle `da59b089bff44e77974d7d35324e88b3`, Delivery Pack accepté, réparation après échecs, artefact préservé, 12 tests Windows et 12 tests Debian + Bats | maintenir les gates E2E, le rejeu ciblé et l'absence de régression d'artefact |
+| isolation | Docker, VM Debian et VM Windows | verified | Docker hors ligne sans socket hôte; Windows 11 non-admin réseau coupé; Debian 13 native; checkpoints restaurés avant/après; smokes live et mission v2.457 | maintenir les images figées, le moindre privilège, la gouvernance réseau et les restaurations |
 | persistence | SQLite, migrations et repositories | partial | les 13 JSONL sont classifiés et structurés; preuves métier et Truth Ledger chaînés | tester sauvegarde, restauration et protection globale au repos |
 | api | FastAPI, contrats et compatibilité | partial | 354 routes uniques et `scripts/smoke_test_api.py` | schémas, erreurs, idempotence, autorisation et versionnement par famille |
 | workers | Workers, cron et missions proactives | verified | tests supervisor, runtime workers, communication, cron et proactif | chaos tests arrêt/redémarrage, doublon et dépendance indisponible |
@@ -148,8 +148,8 @@ sessions|verified
 tools|verified
 models|partial
 memory|partial
-coding|partial
-isolation|partial
+coding|verified
+isolation|verified
 persistence|partial
 api|partial
 workers|verified

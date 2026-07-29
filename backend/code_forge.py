@@ -427,6 +427,36 @@ def render_bundle(files: dict[str, str], language: str, *, limit: int = 100_000)
     return "\n\n".join(rendered)
 
 
+def _recover_named_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Ignore un bloc annexe non nommé seulement si le projet nommé reste testable."""
+    format_error = "Bloc de code sans attribut file= dans un livrable multi-fichiers."
+    errors = list(bundle.get("errors") or [])
+    files = dict(bundle.get("files") or {})
+    remaining = [error for error in errors if error != format_error]
+    has_tests = any(
+        path.startswith(("tests/", "test/"))
+        or path.casefold().endswith((".tests.ps1", "_test.go"))
+        for path in files
+    )
+    if (
+        format_error in errors
+        and not remaining
+        and len(files) >= 2
+        and bool(bundle.get("primary"))
+        and has_tests
+    ):
+        return {
+            **bundle,
+            "errors": [],
+            "warnings": [
+                *list(bundle.get("warnings") or []),
+                "Bloc Markdown annexe non nommé ignoré; les fichiers nommés "
+                "restent soumis aux gates de compilation et de tests.",
+            ],
+        }
+    return bundle
+
+
 async def _call(client: httpx.AsyncClient, model: str, prompt: str, phase: str, need: str) -> dict[str, Any]:
     started = time.perf_counter()
     long_generation = phase == "implementation" or "repair" in phase
@@ -715,7 +745,12 @@ async def execute(
             }
         extracted_code, fence_language = extract_code(implementation["answer"])
         language = detect_language(request, extracted_code, fence_language)
-        bundle = deliverable_bundle.parse(implementation["answer"], default_language=language)
+        bundle = _recover_named_bundle(
+            deliverable_bundle.parse(
+                implementation["answer"],
+                default_language=language,
+            )
+        )
         if bundle["errors"] or not bundle["files"] or not bundle["primary"]:
             if active_mission_id:
                 coding_mission.checkpoint(
@@ -753,7 +788,12 @@ async def execute(
             named_bundle = bool(re.search(r"```[^\n`]*\b(?:file|path|filename)=", raw, re.I))
             if not named_bundle:
                 return extracted, candidate_language, dict(artifact_files)
-            candidate_bundle = deliverable_bundle.parse(raw, default_language=candidate_language)
+            candidate_bundle = _recover_named_bundle(
+                deliverable_bundle.parse(
+                    raw,
+                    default_language=candidate_language,
+                )
+            )
             if (
                 candidate_bundle["errors"]
                 or not candidate_bundle["files"]

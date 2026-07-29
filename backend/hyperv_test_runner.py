@@ -334,9 +334,23 @@ def commands_for(language: str, files: dict[str, str]) -> list[dict[str, Any]]:
     normalized = str(language or "").casefold()
     names = {str(path).replace("\\", "/") for path in files}
     if normalized == "python":
+        discovery = (
+            "python -m unittest discover -s tests -v"
+            if any(name.startswith("tests/") for name in names)
+            else "python -m unittest discover -v"
+        )
+        unittest_command = discovery
+        if any(name.startswith("src/") for name in names):
+            # Les projets Python modernes utilisent souvent un src-layout. La VM
+            # reçoit le livrable brut, sans installation préalable : rendre ce
+            # dossier importable est donc une responsabilité du harness natif.
+            unittest_command = (
+                "set PYTHONPATH=%CD%\\src;%PYTHONPATH%"
+                f" && {discovery}"
+            )
         return [
             {"name": "python_compile_windows", "command": "python -m compileall -q .", "timeout_seconds": 180},
-            {"name": "python_unittest_windows", "command": "python -m unittest discover -v", "timeout_seconds": 600},
+            {"name": "python_unittest_windows", "command": unittest_command, "timeout_seconds": 600},
         ]
     if normalized in {"javascript", "typescript"}:
         commands = []

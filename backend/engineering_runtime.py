@@ -201,7 +201,9 @@ def diagnose_public_urls(files: dict[str, str], *, limit: int = 8) -> list[dict[
 
 
 def definition_of_done(
-    result: dict[str, Any], *, targets: set[str], windows_validation: dict[str, Any] | None = None,
+    result: dict[str, Any], *, targets: set[str],
+    windows_validation: dict[str, Any] | None = None,
+    linux_validation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compute acceptance independently from the LLM narrative."""
     report = dict(result.get("test_report") or {})
@@ -221,7 +223,11 @@ def definition_of_done(
             (windows_validation or {}).get("native_execution_validated")
         )
     if "linux" in targets:
-        checks["linux_execution"] = report.get("production_ready") is True
+        checks["linux_execution"] = (
+            bool(linux_validation.get("production_ready"))
+            if linux_validation is not None
+            else report.get("production_ready") is True
+        )
     failures = [name for name, passed in checks.items() if not passed]
     return {
         "version": CONTRACT_VERSION,

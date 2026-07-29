@@ -77,6 +77,18 @@ def main() -> int:
                 "python", {"app.py": "print('ok')", "test_app.py": "assert True"},
             )
             assert [item["name"] for item in commands] == ["python_compile_windows", "python_unittest_windows"]
+            assert commands[1]["command"] == "python -m unittest discover -v"
+            src_commands = hyperv_test_runner.commands_for(
+                "python",
+                {
+                    "src/marvin_platform_probe/__init__.py": "",
+                    "tests/test_probe.py": "",
+                },
+            )
+            assert "set PYTHONPATH=%CD%\\src;%PYTHONPATH%" in src_commands[1]["command"]
+            assert src_commands[1]["command"].endswith(
+                "python -m unittest discover -s tests -v"
+            )
             result = hyperv_test_runner.execute(
                 {"app.py": "print('ok')\n", "test_app.py": "assert True\n"},
                 commands, confirmed=True,

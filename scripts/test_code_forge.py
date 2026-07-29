@@ -113,6 +113,20 @@ def main() -> int:
     assert code_forge.should_create_coding_mission("Crée un petit script Python.") is False
     code, language = code_forge.extract_code("Texte\n```python\nprint('ok')\n```\n")
     assert code == "print('ok')" and language == "python"
+    format_only = code_forge.deliverable_bundle.parse(
+        "```python file=main.py\nprint('ok')\n```\n"
+        "```python file=tests/test_main.py\nassert True\n```\n"
+        "```bash\npython -m unittest\n```",
+        default_language="python",
+    )
+    recovered = code_forge._recover_named_bundle(format_only)
+    assert recovered["errors"] == [] and recovered["warnings"]
+    incomplete = code_forge.deliverable_bundle.parse(
+        "```python file=main.py\nprint('ok')\n```\n"
+        "```bash\npython main.py\n```",
+        default_language="python",
+    )
+    assert code_forge._recover_named_bundle(incomplete)["errors"]
     assert code_forge.detect_language("script Python", code) == "python"
     assert code_forge.validate_code("x = 1\nprint(x)\n", "python")["success"] is True
     unlocked = code_forge.validate_deliverable(

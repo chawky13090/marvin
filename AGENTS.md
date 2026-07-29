@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.456.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.457.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.456.0)
+## 9. État actuel (v2.457.0)
+
+**v2.457 (Code Workspace natif et reprise ciblée)** : les livrables multi-fichiers peuvent
+tolérer un bloc Markdown supplémentaire non nommé uniquement si un point d'entrée et une
+suite de tests nommés existent; chemins, tailles et gates restent inchangés. Pour Python,
+le point d'entrée déclaré dans `[project.scripts]` devient le fichier principal, avant
+`__main__.py` et les autres modules du `src-layout`. Test Forge et les VM Windows/Debian
+injectent le chemin `src` de façon déterministe. Un échec de cible native conserve désormais
+l'artefact Forge accepté et ne rejoue que la validation défaillante, avec preuve durable
+`target.validation.reused`. Une mission réelle a produit un Delivery Pack accepté après
+12 tests sous Windows 11 et 12 tests plus Bats sous Debian 13, avec restauration des deux
+checkpoints et chaîne de 236 preuves intègre.
 
 **v2.456 (corrélation bout en bout)** : l'identifiant de requête suit désormais le transport
 HTTP, le Runner, le gateway commun, l'audit JSONL et les exécutions SQLite. Le transport SSE

@@ -47,6 +47,17 @@ httpx==0.28.1
     assert python_library["errors"] == []
     assert python_library["primary"] == "src/slugify_safe/__init__.py"
     assert "main.py" not in python_library["files"]
+    scripted_library = deliverable_bundle.parse(
+        "```toml file=pyproject.toml\n"
+        "[project]\nname='probe'\nversion='0.1.0'\n"
+        "[project.scripts]\nprobe='probe.cli:main'\n```\n"
+        "```python file=src/probe/__init__.py\nfrom .cli import main\n```\n"
+        "```python file=src/probe/__main__.py\nfrom .cli import main\nmain()\n```\n"
+        "```python file=src/probe/cli.py\ndef main() -> int: return 0\n```\n",
+        default_language="python",
+    )
+    assert scripted_library["errors"] == []
+    assert scripted_library["primary"] == "src/probe/cli.py"
 
     escaped_metadata = deliverable_bundle.parse(
         '```python file=\\"src/pkg/__init__.py\\"\ndef value(): return 1\n```\n'

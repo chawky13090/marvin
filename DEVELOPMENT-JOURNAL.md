@@ -5,6 +5,53 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.457.0 — Code Workspace natif et réparation ciblée
+
+### Constat et décisions
+
+Une mission réelle Python 3.12 visant Windows 11 et Debian 13 a révélé quatre causes
+indépendantes : un bloc Markdown supplémentaire non nommé faisait rejeter six fichiers
+correctement nommés; les runners ne rendaient pas `src/` importable; la découverte Windows
+ne ciblait pas `tests/`; enfin un échec de VM relançait Forge et pouvait dégrader un artefact
+déjà accepté. Deux stratégies ont été comparées : assouplir globalement le parseur et
+régénérer à chaque erreur, ou appliquer une récupération bornée puis séparer génération
+validée et validations de cibles. La seconde est retenue : elle préserve les gates, réduit
+les appels Cloud et empêche une cible instable de modifier du code accepté.
+
+Le parseur n'ignore un bloc non nommé que si tous les autres blocs sont sûrs, qu'un point
+d'entrée existe et qu'une suite de tests nommée est présente. Pour les packages Python,
+`[project.scripts]` désigne le module principal; les replis sont `__main__.py`, un module
+source réel, puis `__init__.py`. Test Forge injecte `/workspace/src`. Hyper-V injecte le
+chemin Windows sans guillemets incompatibles avec l'encapsulation `cmd.exe` et utilise
+`unittest discover -s tests`. Le superviseur conserve le candidat accepté, inscrit
+`target.validation.reused` et rejoue uniquement la cible. Une demande explicite de Debian
+ou d'exécution native exige désormais la VM Debian au lieu d'assimiler Docker à Debian.
+
+### Preuves réelles
+
+- Mission `da59b089bff44e77974d7d35324e88b3` : `completed`, Delivery Pack `accepted`,
+  Definition of Done entièrement vraie et 236 preuves chaînées valides.
+- Windows 11 : compilation, 12/12 tests, invité non administrateur, réseau déconnecté,
+  checkpoint `Marvin-Clean` restauré avant et après.
+- Debian 13 : 12/12 tests Python et 1/1 Bats, marqueur natif, aucune modification réseau
+  hôte, checkpoint propre restauré avant et après.
+- Docker hors ligne : compilation et 12/12 tests, racine en lecture seule, aucun socket
+  Docker, aucune capacité, aucun port publié.
+
+### Sécurité, logs et rollback
+
+Les commandes natives sont construites par le harness, jamais depuis du shell généré.
+Chemins relatifs, tailles, nombre de fichiers, validation, revue et Production Contract
+restent bloquants. Les secrets VM demeurent sous DPAPI et sont masqués dans les rapports.
+Les nouveaux événements ne contiennent ni code, ni prompt, ni secret; ils rejoignent le
+registre métier chaîné à rétention propriétaire, sans modifier la rotation des logs
+techniques. Les retries restent bornés par la politique du job.
+
+Rollback sans donnée applicative : `git revert <commit-v2.457>`. Les missions et preuves
+historiques restent lisibles par l'ancienne version; le champ `validated_candidate` est
+ignoré. Les checkpoints VM sont déjà revenus à `Marvin-Clean`. Aucune migration de schéma
+ni suppression de donnée n'est réalisée.
+
 ## 2026-07-29 — v2.456.0 — Corrélation bout en bout
 
 ### Constat et décision

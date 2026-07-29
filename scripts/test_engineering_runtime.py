@@ -96,6 +96,18 @@ def main() -> int:
     result = accepted_result()
     linux_done = engineering_runtime.definition_of_done(result, targets={"linux"})
     assert linux_done["success"] is True
+    linux_native_refused = engineering_runtime.definition_of_done(
+        result,
+        targets={"linux"},
+        linux_validation={"production_ready": False},
+    )
+    assert linux_native_refused["success"] is False
+    linux_native_done = engineering_runtime.definition_of_done(
+        result,
+        targets={"linux"},
+        linux_validation={"production_ready": True},
+    )
+    assert linux_native_done["success"] is True
     windows_refused = engineering_runtime.definition_of_done(result, targets={"windows"})
     assert windows_refused["success"] is False
     assert "windows_native_execution" in windows_refused["failures"]

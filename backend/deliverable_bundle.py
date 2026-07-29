@@ -77,6 +77,33 @@ def _block_metadata(info: str) -> tuple[str, str | None]:
 def _library_primary(files: dict[str, str], language: str) -> str | None:
     """Select a conventional package entry without inventing an executable main file."""
     if language == "python" and "pyproject.toml" in files:
+        try:
+            pyproject = tomllib.loads(files["pyproject.toml"])
+        except (tomllib.TOMLDecodeError, AttributeError):
+            pyproject = {}
+        scripts = (pyproject.get("project") or {}).get("scripts") or {}
+        for target in scripts.values() if isinstance(scripts, dict) else ():
+            module = str(target).split(":", 1)[0].strip()
+            candidate = "src/" + module.replace(".", "/") + ".py"
+            if candidate in files:
+                return candidate
+        package_mains = sorted(
+            path for path in files
+            if path.startswith("src/") and path.endswith("/__main__.py")
+        )
+        if package_mains:
+            return package_mains[0]
+        package_sources = sorted(
+            (
+                path for path in files
+                if path.startswith("src/")
+                and path.endswith(".py")
+                and not path.endswith("/__init__.py")
+            ),
+            key=lambda path: (-len(files[path]), path),
+        )
+        if package_sources:
+            return package_sources[0]
         package_inits = sorted(
             path for path in files
             if path.startswith("src/") and path.endswith("/__init__.py")

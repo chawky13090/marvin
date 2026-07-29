@@ -32,6 +32,37 @@ class LinuxRunnerError(RuntimeError):
     pass
 
 
+def prepare_native_bundle(files: dict[str, str], language: str) -> dict[str, str]:
+    """Add deterministic Debian-native checks without executing generated shell text."""
+    bundle = {str(path): str(content) for path, content in files.items()}
+    normalized = str(language or "").casefold()
+    if normalized == "python":
+        bundle.update({
+            "main.sh": (
+                '#!/usr/bin/env bash\nset -Eeuo pipefail\n'
+                'export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"\n'
+                "python3 -m compileall -q .\n"
+                "python3 -m unittest discover -s tests -v\n"
+            ),
+            "integration.sh": (
+                '#!/usr/bin/env bash\nset -Eeuo pipefail\n'
+                "bash ./main.sh\n"
+                'printf "%s\\n" "MARVIN_INTEGRATION_COMPLETE=full"\n'
+            ),
+            "test_main.bats": (
+                '#!/usr/bin/env bats\n'
+                '@test "python project passes natively" {\n'
+                "  run bash ./main.sh\n"
+                '  [ "$status" -eq 0 ]\n'
+                "}\n"
+            ),
+        })
+        return bundle
+    raise LinuxRunnerError(
+        f"Aucun harnais Debian natif déterministe pour le langage {normalized or 'inconnu'}."
+    )
+
+
 def _powershell(script: str, *, input_text: str = "", timeout: int = 30) -> subprocess.CompletedProcess[str]:
     executable = os.environ.get("SystemRoot", r"C:\Windows") + r"\System32\WindowsPowerShell\v1.0\powershell.exe"
     return subprocess.run(

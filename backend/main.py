@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.457 — Code Workspace E2E natif, réparation ciblée et artefact préservé
 # v2.456 — corrélation HTTP, Runner, outils et preuves persistées
 # v2.455 — découverte dynamique des capacités des modèles locaux
 # v2.454 — apprentissage durable avec SQLite autoritatif

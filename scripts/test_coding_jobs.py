@@ -328,12 +328,18 @@ async def scenario(repository: Path) -> None:
             windows_completed = await wait_terminal(windows_job["id"])
         assert windows_completed["status"] == "completed"
         assert windows_completed["attempts"] == 2
-        assert windows_calls == 2 and windows_candidates == 2
+        assert windows_calls == 2 and windows_candidates == 1
         worktree = Path(fourth_workspace["worktree_root"])
-        assert not (worktree / "stale.py").exists()
-        assert (worktree / "app.py").read_text(encoding="utf-8") == (
-            "print('windows accepted')\n"
+        assert (worktree / "stale.py").read_text(encoding="utf-8") == (
+            "raise RuntimeError('refused')\n"
         )
+        assert not (worktree / "app.py").exists()
+        assert windows_completed["validated_candidate"]["success"] is True
+        reused_events = [
+            entry for entry in coding_mission.list_events(fourth["id"], limit=200)
+            if entry.get("type") == "target.validation.reused"
+        ]
+        assert len(reused_events) == 1
         paused_entries = [
             entry for entry in coding_mission.get(fourth["id"])["history"]
             if entry.get("phase") == "paused"
