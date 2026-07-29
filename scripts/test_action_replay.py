@@ -14,6 +14,7 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 import action_replay
+import api_observability
 from db_connection import db
 from db_migrations import MIGRATIONS, apply_migrations
 
@@ -24,6 +25,7 @@ def _initialize(path: Path) -> None:
 
 
 async def _exercise(path: Path) -> None:
+    api_observability.reset_for_tests()
     calls = 0
 
     async def create_once():
@@ -161,6 +163,14 @@ async def _exercise(path: Path) -> None:
         else:
             raise AssertionError("Une clé HTTP réutilisée avec un autre payload doit échouer.")
         assert http_calls == 2
+        assert api_observability.snapshot()["idempotency_decisions"] == {
+            "completed": 4,
+            "in_progress": 1,
+            "mismatch": 1,
+            "receipt_error": 1,
+            "replayed": 3,
+            "unknown": 1,
+        }
 
 
 def main() -> int:

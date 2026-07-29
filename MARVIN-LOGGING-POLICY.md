@@ -113,6 +113,12 @@ Variables actuelles :
 - Le SLI HTTP utilise une fenêtre mémoire roulante d'une heure, au plus 20 000 échantillons
   et un minimum de 20 requêtes avant décision. Les objectifs initiaux sont 99 % de
   disponibilité et 95 % des requêtes sous deux secondes.
+- Les décisions d'accès et d'idempotence utilisent uniquement des compteurs en mémoire à
+  étiquettes fermées. Elles distinguent authentification, capacité, origine, CSRF, exécution,
+  replay, conflit, résultat inconnu et panne de reçu sans conserver session, adresse, clé,
+  empreinte, route métier ou charge utile. Un redémarrage remet volontairement ces compteurs
+  à zéro; les anomalies nécessitant une enquête gardent leur incident corrélé dans les
+  journaux structurés existants.
 - Les probes `/api/health`, requêtes `OPTIONS`, `/api/chat` et routes terminées par `/stream`
   ne consomment pas le budget : leur fréquence ou leur durée intrinsèque fausserait le signal
   utilisateur. Elles restent comptées dans les métriques HTTP générales et les erreurs 5xx

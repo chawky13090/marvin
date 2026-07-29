@@ -9,6 +9,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import api_observability
 from db_connection import db
 
 
@@ -132,6 +133,7 @@ def claim(
                 or str(identity["tool_name"]) != tool_name
                 or str(identity["args_hash"]) != args_hash
             ):
+                api_observability.record_idempotency_decision("mismatch")
                 raise IdempotencyMismatchError(
                     "Cette clé d'idempotence appartient à une autre opération."
                 )
@@ -191,8 +193,10 @@ async def execute_once(
     state = receipt["state"]
     key = receipt["key"]
     if state == "completed":
+        api_observability.record_idempotency_decision("replayed")
         return _with_replay(receipt["result"], reused=True, state=state, key=key)
     if state == "in_progress":
+        api_observability.record_idempotency_decision("in_progress")
         return {
             "success": False,
             "error": "Cette action est deja en cours pour cette demande; elle n'a pas ete relancee.",
@@ -200,6 +204,7 @@ async def execute_once(
             "_replay": {"reused": False, "state": state, "key": key},
         }
     if state == "unknown":
+        api_observability.record_idempotency_decision("unknown")
         return {
             "success": False,
             "error": (
@@ -222,6 +227,7 @@ async def execute_once(
             type(exc).__name__,
             incident,
         )
+        api_observability.record_idempotency_decision("receipt_error")
         return _with_replay(
             result,
             reused=False,
@@ -231,4 +237,5 @@ async def execute_once(
             warning=f"Le reçu n'a pas pu être persisté. Incident : {incident}.",
             incident=incident,
         )
+    api_observability.record_idempotency_decision("completed")
     return _with_replay(result, reused=False, state="completed", key=key, receipt_persisted=True)

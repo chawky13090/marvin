@@ -5,6 +5,40 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.468.0 — Observabilité des décisions d'accès et d'idempotence
+
+### Constat et choix
+
+Les requêtes HTTP exposaient statuts, latence et SLO, mais un opérateur ne pouvait pas
+distinguer une hausse des refus d'authentification, de capacité, d'origine ou de CSRF, ni
+les replays et conflits idempotents. Journaliser chaque événement donnerait un historique
+détaillé mais créerait volume, risque de divulgation et amplification par déni de service.
+Des compteurs agrégés à cardinalité fermée dans le snapshot existant sont retenus; seules
+les anomalies nécessitant une enquête continuent vers les journaux structurés.
+
+### Implémentation, sécurité, compatibilité et rollback
+
+`api_observability.py` accepte quatre décisions d'accès et six états d'idempotence, refuse
+toute étiquette libre et les expose sous `api.access_decisions` et
+`api.idempotency_decisions` dans `/api/health`. La garde LAN et le reçu transactionnel
+alimentent ces compteurs aux points de décision réels. Aucun IP, profil, session, cookie,
+clé d'idempotence, hash, argument, résultat ou contenu utilisateur n'est conservé. Le
+changement ne crée ni table, ni fichier, ni migration et ne modifie aucun effet métier.
+Rollback exact : `git revert <commit-v2.468>` puis redémarrage du backend; les compteurs
+étant volatils, aucune donnée ne doit être restaurée.
+
+### Validation
+
+Les tests unitaires couvrent toutes les étiquettes acceptées, le refus des valeurs libres,
+la remise à zéro et les états réels exécution/replay/concurrence/conflit/interruption/panne
+de reçu. Les gardes LAN vérifient authentification, capacité, CSRF, origine et WebSocket.
+Compilation Python, tests ciblés, inventaire OpenAPI, composition et architecture réussissent.
+Le build Next.js 16.2.12 Turbopack réussit hors concurrence. Sur le backend réel 2.468.0,
+un calcul idempotent répond `200/false`, puis `200/true`; une origine hostile répond 403 et
+le snapshot ne contient que `completed`, `replayed` et `origin_rejected`. Les smokes live
+réussissent **28/28 API** et **40/40 pages**. Le diff ne touche ni schéma ni donnée; le
+rollback est la réversion atomique du commit suivie du redémarrage et des mêmes tests.
+
 ## 2026-07-29 — v2.467.0 — Idempotence HTTP des gateways d'outils
 
 ### Constat et comparaison

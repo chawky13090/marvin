@@ -51,6 +51,29 @@ async def scenario() -> None:
     assert metrics["top_routes"][0]["route"] == "GET /api/jobs/{id}/{id}"
     assert api_observability.normalize_request_id("bad value") != "bad value"
     assert len(api_observability.normalize_request_id(None)) == 32
+    api_observability.record_access_decision("csrf_rejected")
+    api_observability.record_access_decision("capability_required")
+    api_observability.record_idempotency_decision("completed")
+    api_observability.record_idempotency_decision("replayed")
+    metrics = api_observability.snapshot()
+    assert metrics["access_decisions"] == {
+        "capability_required": 1,
+        "csrf_rejected": 1,
+    }
+    assert metrics["idempotency_decisions"] == {
+        "completed": 1,
+        "replayed": 1,
+    }
+    for invalid, recorder in (
+        ("raw-session-value", api_observability.record_access_decision),
+        ("raw-idempotency-key", api_observability.record_idempotency_decision),
+    ):
+        try:
+            recorder(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Une étiquette non bornée a été acceptée.")
 
     api_observability.reset_for_tests()
     api_observability._store.write = lambda *args, **kwargs: True

@@ -14,6 +14,7 @@ from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlsplit
 
+import api_observability
 import secret_vault
 
 
@@ -267,6 +268,14 @@ class LanAccessMiddleware:
         self.manager = manager
 
     async def _reject(self, scope, receive, send, status: int, code: str) -> None:
+        decision = {
+            "lan_authentication_required": "authentication_required",
+            "capability_required": "capability_required",
+            "origin_rejected": "origin_rejected",
+            "csrf_rejected": "csrf_rejected",
+        }.get(code)
+        if decision is not None:
+            api_observability.record_access_decision(decision)
         if scope["type"] == "websocket":
             await send({"type": "websocket.close", "code": 4401})
             return

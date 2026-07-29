@@ -31,6 +31,20 @@ _SLO_AVAILABILITY_TARGET = 0.99
 _SLO_LATENCY_TARGET = 0.95
 _SLO_LATENCY_THRESHOLD_MS = 2000.0
 _SLO_EXCLUDED_ROUTES = frozenset({"/api/health"})
+_ACCESS_DECISIONS = frozenset({
+    "authentication_required",
+    "capability_required",
+    "csrf_rejected",
+    "origin_rejected",
+})
+_IDEMPOTENCY_DECISIONS = frozenset({
+    "completed",
+    "in_progress",
+    "mismatch",
+    "receipt_error",
+    "replayed",
+    "unknown",
+})
 _current_request_id: ContextVar[str | None] = ContextVar(
     "marvin_request_id",
     default=None,
@@ -47,6 +61,8 @@ _slow = 0
 _total_duration_ms = 0.0
 _max_duration_ms = 0.0
 _slo_samples: deque[tuple[float, int, float]] = deque(maxlen=_SLO_MAX_SAMPLES)
+_access_decisions: Counter[str] = Counter()
+_idempotency_decisions: Counter[str] = Counter()
 
 _store = StructuredJsonlStore.from_environment(
     Path(DATA_DIR) / "logs" / "api_requests.jsonl",
@@ -63,6 +79,24 @@ def normalize_request_id(value: str | None) -> str:
 
 def current_request_id() -> str | None:
     return _current_request_id.get()
+
+
+def record_access_decision(decision: str) -> None:
+    """Compte un refus d'accès sans identité, adresse ni contenu utilisateur."""
+    normalized = str(decision or "").strip().lower()
+    if normalized not in _ACCESS_DECISIONS:
+        raise ValueError("Décision d'accès non reconnue.")
+    with _lock:
+        _access_decisions[normalized] += 1
+
+
+def record_idempotency_decision(decision: str) -> None:
+    """Compte un état de reçu sans clé, empreinte ni charge utile."""
+    normalized = str(decision or "").strip().lower()
+    if normalized not in _IDEMPOTENCY_DECISIONS:
+        raise ValueError("Décision d'idempotence non reconnue.")
+    with _lock:
+        _idempotency_decisions[normalized] += 1
 
 
 def normalize_route(path: str) -> str:
@@ -135,6 +169,8 @@ def snapshot() -> dict[str, Any]:
             ],
             "route_cardinality": len(_routes),
             "slow_threshold_ms": _SLOW_MS,
+            "access_decisions": dict(sorted(_access_decisions.items())),
+            "idempotency_decisions": dict(sorted(_idempotency_decisions.items())),
             "slo": _slo_snapshot_locked(time.time()),
         }
 
@@ -200,6 +236,8 @@ def reset_for_tests() -> None:
         _latency_buckets.clear()
         _routes.clear()
         _slo_samples.clear()
+        _access_decisions.clear()
+        _idempotency_decisions.clear()
 
 
 class ApiObservabilityMiddleware:
