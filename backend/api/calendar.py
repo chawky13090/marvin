@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
 
 import tool_runtime
+from http_idempotency import IDEMPOTENCY_RESPONSES, IdempotencyKey, execute as execute_idempotent
 
 
 router = APIRouter(tags=["calendar"])
@@ -58,12 +59,20 @@ class EventBody(BaseModel):
     local_only: bool = False
 
 
-@router.post("/api/events")
-async def create_event(body: EventBody):
-    result = await _calendar_tool("event_create", body.model_dump())
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
+@router.post("/api/events", responses=IDEMPOTENCY_RESPONSES)
+async def create_event(body: EventBody, idempotency_key: IdempotencyKey = None):
+    async def create_once():
+        result = await _calendar_tool("event_create", body.model_dump())
+        if result.get("error"):
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    return await execute_idempotent(
+        operation_name="http_event_create",
+        payload=body.model_dump(),
+        operation=create_once,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.patch("/api/events/{event_id}")

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 import database as db
 import api_errors
 import tool_runtime
+from http_idempotency import IDEMPOTENCY_RESPONSES, IdempotencyKey, execute as execute_idempotent
 
 
 router = APIRouter(tags=["workflows"])
@@ -149,8 +150,7 @@ def _condition(expression, context: dict) -> bool:
     return bool(resolved)
 
 
-@router.post("/api/workflows/{workflow_id}/run")
-async def run_workflow(workflow_id: str):
+async def _run_workflow_once(workflow_id: str):
     workflow = db.get_workflow(workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow introuvable")
@@ -247,3 +247,15 @@ async def run_workflow(workflow_id: str):
         "duration_ms": total_ms,
         "steps_results": step_results,
     }
+
+
+@router.post("/api/workflows/{workflow_id}/run", responses=IDEMPOTENCY_RESPONSES)
+async def run_workflow(workflow_id: str, idempotency_key: IdempotencyKey = None):
+    if not db.get_workflow(workflow_id):
+        raise HTTPException(status_code=404, detail="Workflow introuvable")
+    return await execute_idempotent(
+        operation_name="http_workflow_run",
+        payload={"workflow_id": workflow_id},
+        operation=lambda: _run_workflow_once(workflow_id),
+        idempotency_key=idempotency_key,
+    )

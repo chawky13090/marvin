@@ -10,6 +10,7 @@ from database_bootstrap import initialize_database
 import memory_lifecycle
 import memory_recovery
 import full_backup
+from http_idempotency import IDEMPOTENCY_RESPONSES, IdempotencyKey, execute as execute_idempotent
 
 
 router = APIRouter(tags=["backups"])
@@ -62,22 +63,30 @@ class RestoreRequest(BaseModel):
     confirmed: StrictBool = False
 
 
-@router.post("/api/backups/restore")
-async def restore_backup_now(body: RestoreRequest):
+@router.post("/api/backups/restore", responses=IDEMPOTENCY_RESPONSES)
+async def restore_backup_now(body: RestoreRequest, idempotency_key: IdempotencyKey = None):
     # Cette route reste hors du registre d'outils : le LLM ne peut pas la piloter.
     if not body.confirmed:
         raise HTTPException(status_code=400, detail="Confirmation requise (confirmed=true).")
-    async with _restore_lock:
-        result = await memory_recovery.restore_and_reconcile(
-            body.filename,
-            restore=backup.restore_backup,
-            initialize=initialize_database,
-            repair=memory_lifecycle.repair_consistency,
-        )
-    if result.get("error"):
-        status = {
-            "backup_not_found": 404,
-            "invalid_backup": 409,
-        }.get(result.get("error_code"), 500)
-        raise HTTPException(status_code=status, detail=result["error"])
-    return result
+    async def restore_once():
+        async with _restore_lock:
+            result = await memory_recovery.restore_and_reconcile(
+                body.filename,
+                restore=backup.restore_backup,
+                initialize=initialize_database,
+                repair=memory_lifecycle.repair_consistency,
+            )
+        if result.get("error"):
+            status = {
+                "backup_not_found": 404,
+                "invalid_backup": 409,
+            }.get(result.get("error_code"), 500)
+            raise HTTPException(status_code=status, detail=result["error"])
+        return result
+
+    return await execute_idempotent(
+        operation_name="http_backup_restore",
+        payload=body.model_dump(),
+        operation=restore_once,
+        idempotency_key=idempotency_key,
+    )

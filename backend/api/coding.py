@@ -15,6 +15,7 @@ import engineering_radar
 import language_registry
 import repository_intelligence
 import windows_validation
+from http_idempotency import IDEMPOTENCY_RESPONSES, IdempotencyKey, execute as execute_idempotent
 import test_forge
 import hyperv_test_runner
 import linux_test_runner
@@ -225,27 +226,40 @@ async def coding_linux_hyperv_session(payload: LinuxResultSessionRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.post("/projects", status_code=201)
-async def coding_project_create(payload: CodingProjectCreateRequest):
+@router.post("/projects", status_code=201, responses=IDEMPOTENCY_RESPONSES)
+async def coding_project_create(
+    payload: CodingProjectCreateRequest,
+    idempotency_key: IdempotencyKey = None,
+):
     if payload.create_worktree and not payload.confirmed:
         raise HTTPException(status_code=409, detail="Confirme explicitement la création du worktree isolé.")
-    try:
-        return coding_service.start(
-            payload.request,
-            repository_path=payload.repository_path,
-            target_mode=payload.target_mode,
-            target_platforms=payload.target_platforms,
-            autonomy=payload.autonomy,
-            max_duration_minutes=payload.max_duration_minutes,
-            max_iterations=payload.max_iterations,
-            max_files_changed=payload.max_files_changed,
-            max_consecutive_failures=payload.max_consecutive_failures,
-            create_worktree=payload.create_worktree,
-            start_auto=payload.start_auto,
-            confirmed=payload.confirmed,
-        )
-    except coding_service.CodingServiceError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    async def create_once():
+        try:
+            return coding_service.start(
+                payload.request,
+                repository_path=payload.repository_path,
+                target_mode=payload.target_mode,
+                target_platforms=payload.target_platforms,
+                autonomy=payload.autonomy,
+                max_duration_minutes=payload.max_duration_minutes,
+                max_iterations=payload.max_iterations,
+                max_files_changed=payload.max_files_changed,
+                max_consecutive_failures=payload.max_consecutive_failures,
+                create_worktree=payload.create_worktree,
+                start_auto=payload.start_auto,
+                confirmed=payload.confirmed,
+            )
+        except coding_service.CodingServiceError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return await execute_idempotent(
+        operation_name="http_coding_project_create",
+        payload=payload.model_dump(),
+        operation=create_once,
+        idempotency_key=idempotency_key,
+        success_status=201,
+    )
 
 
 @router.get("/projects/{mission_id}/workspace")

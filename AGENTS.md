@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.468.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.469.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.468.0)
+## 9. État actuel (v2.469.0)
+
+**v2.469 (idempotence des effets critiques directs)** : e-mail sortant, création
+d'événement, restauration, lancement de workflow, création de Coding Mission et installation
+VM acceptent le même UUID et le même reçu transactionnel que les gateways. Le frontend
+génère la clé avant l'appel. Un effet externe ayant levé une exception devient `unknown` et
+ne peut jamais être rejoué silencieusement; OpenAPI mesure huit mutations idempotentes.
 
 **v2.468 (décisions de sécurité et d'idempotence observables)** : le snapshot HTTP agrège
 désormais, avec des étiquettes fermées, les refus d'authentification, de capacité, d'origine

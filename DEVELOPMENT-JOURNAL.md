@@ -5,6 +5,39 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.469.0 — Idempotence métier des effets critiques
+
+### Décision et périmètre
+
+L'inventaire compte 192 mutations. Protéger aveuglément chaque POST créerait de faux conflits
+sur recherches, prévisualisations et opérations volontairement répétables. Le périmètre
+retenu couvre d'abord les effets externes, coûteux ou destructeurs : envoi e-mail, création
+d'événement, restauration, workflow, nouvelle Coding Mission et installation VM. L'IETF,
+Google AIP-155 et Stripe convergent sur UUID client, fingerprint, replay du premier résultat,
+409 concurrent et refus d'une clé utilisée avec d'autres paramètres.
+
+### Implémentation, sécurité, logs et rollback
+
+`http_idempotency.py` adapte les routes directes au registre `action_receipts`; aucune seconde
+base ni cache n'est créé. Le frontend génère la clé avant l'appel. Une exception pendant un
+effet externe ferme atomiquement le reçu en `unknown`; un retry reçoit 409 au lieu de risquer
+un second e-mail ou une seconde opération. La clé et les payloads bruts ne sont jamais
+persistés : seuls SHA-256, identité d'opération, statut, corrélation et résultat expurgé le
+sont. Les compteurs bornés v2.468 mesurent les issues sans nouveau journal. Aucun schéma ni
+donnée existante n'est migré. Rollback : `git revert <commit-v2.469>` puis redémarrage et
+tests ciblés; les reçus historiques restent inertes et lisibles.
+
+### Validation
+
+Les tests déterministes prouvent exécution unique, réponse 201 préservée, replay, conflit
+de fingerprint, résultat externe inconnu, non-divulgation de la clé et du payload, routes
+frontend couvertes et intégrité SQLite. Compilation Python, tests des six domaines,
+composition, architecture et inventaire OpenAPI réussissent. Le build Next.js 16.2.12
+Turbopack passe hors concurrence. Sur le backend réel 2.469.0, une installation VM avec
+profil invalide et non confirmé répond d'abord 422, puis 409 au retry du même UUID; la liste
+des VM reste strictement inchangée. Les smokes live réussissent **28/28 API** et
+**40/40 pages**.
+
 ## 2026-07-29 — v2.468.0 — Observabilité des décisions d'accès et d'idempotence
 
 ### Constat et choix

@@ -172,6 +172,35 @@ async def _exercise(path: Path) -> None:
             "unknown": 1,
         }
 
+        failing_calls = 0
+
+        async def uncertain_action():
+            nonlocal failing_calls
+            failing_calls += 1
+            raise ConnectionError("coupure après effet potentiel")
+
+        try:
+            await action_replay.execute_once(
+                request_id="request-failure",
+                conversation_id="conversation-1",
+                tool_name="email_send",
+                arguments={"to": "test@example.invalid"},
+                operation=uncertain_action,
+            )
+        except ConnectionError:
+            pass
+        else:
+            raise AssertionError("L'exception causale doit être propagée.")
+        refused = await action_replay.execute_once(
+            request_id="request-failure",
+            conversation_id="conversation-1",
+            tool_name="email_send",
+            arguments={"to": "test@example.invalid"},
+            operation=uncertain_action,
+        )
+        assert refused["action_outcome_unknown"] is True
+        assert failing_calls == 1
+
 
 def main() -> int:
     assert action_replay.should_guard("email_send")

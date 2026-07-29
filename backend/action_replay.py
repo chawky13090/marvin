@@ -168,6 +168,16 @@ def complete(key: str, result: Any) -> None:
             raise RuntimeError("Le recu d'action ne peut pas etre finalise par ce processus.")
 
 
+def mark_unknown(key: str) -> None:
+    """Ferme un reçu dont l'effet peut avoir eu lieu avant une exception."""
+    with db() as connection:
+        connection.execute(
+            """UPDATE action_receipts SET status = 'unknown'
+               WHERE idempotency_key = ? AND status = 'started' AND owner_token = ?""",
+            (key, _PROCESS_TOKEN),
+        )
+
+
 async def execute_once(
     *,
     request_id: str | None,
@@ -215,7 +225,12 @@ async def execute_once(
             "_replay": {"reused": False, "state": state, "key": key},
         }
 
-    result = await operation()
+    try:
+        result = await operation()
+    except BaseException:
+        mark_unknown(key)
+        api_observability.record_idempotency_decision("unknown")
+        raise
     try:
         complete(key, result)
     except Exception as exc:

@@ -14,6 +14,7 @@ import email_account_service as accounts
 import email_manager
 import api_errors
 import api_observability
+from http_idempotency import IDEMPOTENCY_RESPONSES, IdempotencyKey, execute as execute_idempotent
 
 
 router = APIRouter()
@@ -175,32 +176,45 @@ async def email_folders(account: str | None = None):
         )
 
 
-@router.post("/api/email/send")
-async def email_send(body: SendEmailRequest, account: str | None = None):
+@router.post("/api/email/send", responses=IDEMPOTENCY_RESPONSES)
+async def email_send(
+    body: SendEmailRequest,
+    account: str | None = None,
+    idempotency_key: IdempotencyKey = None,
+):
     config = accounts.get_resolved(account)
     if not config:
         raise HTTPException(status_code=400, detail="Email non configuré")
-    try:
-        result = await asyncio.get_running_loop().run_in_executor(
-            None,
-            lambda: email_manager.send_email(
-                config["smtp_host"], config["smtp_port"], config["username"], config["password"],
-                to=body.to, subject=body.subject, body=body.body, cc=body.cc,
-                reply_to=body.reply_to, html_body=body.html_body,
-            ),
-        )
-        db.log_execution(
-            "email_send",
-            {"to": body.to, "subject": body.subject},
-            result,
-            0,
-            request_id=api_observability.current_request_id(),
-        )
-        return result
-    except Exception as exc:
-        raise api_errors.internal_http_error(
-            "email_send", exc, "Envoi du message impossible."
-        ) from exc
+
+    async def send_once():
+        try:
+            result = await asyncio.get_running_loop().run_in_executor(
+                None,
+                lambda: email_manager.send_email(
+                    config["smtp_host"], config["smtp_port"], config["username"], config["password"],
+                    to=body.to, subject=body.subject, body=body.body, cc=body.cc,
+                    reply_to=body.reply_to, html_body=body.html_body,
+                ),
+            )
+            db.log_execution(
+                "email_send",
+                {"to": body.to, "subject": body.subject},
+                result,
+                0,
+                request_id=api_observability.current_request_id(),
+            )
+            return result
+        except Exception as exc:
+            raise api_errors.internal_http_error(
+                "email_send", exc, "Envoi du message impossible."
+            ) from exc
+
+    return await execute_idempotent(
+        operation_name="http_email_send",
+        payload={"account": account or "", **body.model_dump()},
+        operation=send_once,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.delete("/api/email/{uid}")
