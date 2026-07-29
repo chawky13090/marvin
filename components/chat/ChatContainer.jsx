@@ -180,7 +180,7 @@ export default function ChatContainer({
         targetConversationId: conversationId,
         liveMessageCount: messages.length,
       })) return;
-      if (initialMessages && initialMessages.length > 0) {
+      if (Array.isArray(initialMessages)) {
         setMessages(initialMessages);
       } else if (!conversationId) {
         // Truly new conversation → clear the chat
@@ -345,6 +345,10 @@ export default function ChatContainer({
       {/* Messages */}
       <div
         ref={scrollRef}
+        data-active-conversation-id={conversationId || ''}
+        data-live-conversation-id={liveConversationId || ''}
+        data-chat-status={status}
+        data-message-count={messages.length}
         onScroll={handleScroll}
         style={{
           flex: 1,

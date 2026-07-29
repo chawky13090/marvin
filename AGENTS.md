@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.439.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.440.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.439.0)
+## 9. État actuel (v2.440.0)
+
+**v2.440 (runtime Windows et continuité du chat)** : le démarrage backend passe par un
+superviseur borné et un runtime Uvicorn qui conserve la boucle Proactor nécessaire aux
+sous-processus. Sous Windows, une erreur transitoire `WinError 64` sur `accept()` réarme le
+listener au lieu de le fermer silencieusement. Le superviseur distingue une saturation HTTP
+d'une perte réelle du service, applique backoff et budget de relance, et ne rejoue aucune
+mutation. Les lectures Next.js de conversations ont des retries bornés et des erreurs
+expurgées. La vue chat reste montée, ignore les réponses de navigation devenues obsolètes et
+restaure cinq conversations réelles avec leur contenu après rechargement.
 
 **v2.439 (installation portable consolidée)** : `install.ps1` n'est plus un second
 installateur divergent; il délègue au seul orchestrateur `INSTALLER-NOUVEAU-PC.bat` et

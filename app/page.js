@@ -29,10 +29,8 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [projects, setProjects] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(initialSelection.conversationId);
-  const [chatKey, setChatKey] = useState(initialSelection.chatKey);
   const [selectionHydrated, setSelectionHydrated] = useState(false);
-  const [pendingActiveId, setPendingActiveId] = useState(null);
-  const pendingIdRef = useRef(null);
+  const navigationRequestRef = useRef(0);
   const [initialMessages, setInitialMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newProjectName, setNewProjectName] = useState('');
@@ -62,7 +60,6 @@ export default function ChatPage() {
       }
       setActiveConversationId(null);
       setInitialMessages([]);
-      setChatKey('new_' + Date.now());
       setShowConv(false);
     };
     window.addEventListener('marvin:new-conversation', onNewConv);
@@ -148,7 +145,6 @@ export default function ChatPage() {
         if (cancelled) return;
         setInitialMessages(Array.isArray(data.messages) ? data.messages : []);
         setActiveConversationId(savedId);
-        setChatKey(savedId);
       } catch (error) {
         console.error('Erreur restauration conversation:', error);
       } finally {
@@ -179,19 +175,20 @@ export default function ChatPage() {
     if (!id) {
       setInitialMessages([]);
       setActiveConversationId(null);
-      setChatKey('new_' + Date.now());
       return;
     }
     if (activeConversationId === id) return;
+    const requestSequence = ++navigationRequestRef.current;
     try {
       const path = `/api/conversations/${id}?t=${Date.now()}`;
       const res = await fetchWithBackendFallback(path);
       if (!res.ok) throw new Error(`Conversation HTTP ${res.status}`);
       const data = await res.json();
-      setInitialMessages(data.messages || []);
+      if (requestSequence !== navigationRequestRef.current) return;
+      setInitialMessages(Array.isArray(data.messages) ? data.messages : []);
       setActiveConversationId(id);
-      setChatKey(id);
     } catch (err) {
+      if (requestSequence !== navigationRequestRef.current) return;
       console.error('Erreur chargement messages:', err);
       toast.error('Conversation inaccessible', 'Les messages sont conservés. Réessayez après le diagnostic du frontend.');
     }
@@ -278,7 +275,6 @@ export default function ChatPage() {
         // Clear the chat view when deleting the active conversation
         setActiveConversationId(null);
         setInitialMessages([]);
-        setChatKey('new_' + Date.now());
       }
       fetchData();
     } catch (err) {
@@ -442,7 +438,12 @@ export default function ChatPage() {
       <div style={{ width: '280px', minWidth: '280px', display: 'flex', flexDirection: 'column', background: '#0d0d0d', height: '100%' }}>
         <div style={{ padding: '16px' }}>
           <button
-            onClick={() => { setActiveConversationId(null); setInitialMessages([]); setChatKey('new_' + Date.now()); setShowConv(false); }}
+            onClick={() => {
+              navigationRequestRef.current += 1;
+              setActiveConversationId(null);
+              setInitialMessages([]);
+              setShowConv(false);
+            }}
             style={{
               width: '100%', padding: '12px',
               background: 'var(--accent-gradient)', color: 'white',
@@ -755,7 +756,6 @@ export default function ChatPage() {
             se remonte et les messages affichés sont perdus (car initialMessages reste vide). */}
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <ChatContainer
-            key={chatKey}
             conversationId={activeConversationId}
             initialMessages={initialMessages}
             activeModel={activeModel}
@@ -795,6 +795,7 @@ function ConversationItem({ conv, isActive, onSelect, onDelete, onAssign, onRena
   return (
     <div
       role="listitem"
+      data-conversation-id={conv.id}
       aria-current={isActive ? 'true' : undefined}
       onClick={() => !editing && onSelect(conv.id)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}

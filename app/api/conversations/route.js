@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { BACKEND_URL as BACKEND } from '@/lib/backend';
+import { fetchBackendRead } from '@/lib/backendRead.mjs';
 
 // v2.107 — proxy pur vers le backend Python (source de vérité unique pour
 // data/secretary.db). Avant : accès SQLite direct côté JS (lib/database/queries.js)
@@ -10,12 +11,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const r = await fetch(`${BACKEND}/api/conversations`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetchBackendRead(`${BACKEND}/api/conversations`);
     if (!r.ok) throw new Error(`Backend ${r.status}`);
     const conversations = await r.json();
     return NextResponse.json({ conversations });
   } catch (error) {
-    console.error('[Conversations API] Error fetching conversations:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération des conversations' }, { status: 500 });
+    console.error('[Conversations API] Backend indisponible:', error?.name || 'Error');
+    return NextResponse.json(
+      { error: 'Conversations temporairement indisponibles' },
+      { status: 503, headers: { 'Retry-After': '2' } },
+    );
   }
 }

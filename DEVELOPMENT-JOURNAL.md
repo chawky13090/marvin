@@ -5,6 +5,34 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.440.0 — Runtime Windows résilient et chat durable
+
+La validation globale a reproduit une panne trompeuse : le processus FastAPI restait vivant
+mais son listener disparaissait après `OSError: [WinError 64]` dans la boucle Proactor
+Windows. Trois options ont été comparées. Passer à Selector a été rejeté car Marvin exécute
+des sous-processus asyncio et Selector ne les prend pas en charge sous Windows. Un superviseur
+seul corrige la disponibilité mais provoquait des 502 s'il confondait saturation HTTP et
+panne. La solution retenue conserve Proactor, réarme uniquement les erreurs `accept()`
+transitoires connues et ajoute un superviseur borné qui distingue timeout applicatif et
+service injoignable, avec backoff et budget de cinq relances par dix minutes.
+
+Les routes Next.js de lecture des conversations utilisent désormais un repli borné réservé
+aux GET idempotents; aucune création, modification ou suppression n'est rejouée. Les erreurs
+client sont fixes et expurgées. Le chat ne remonte plus son composant à chaque sélection,
+ignore une réponse réseau devenue obsolète et synchronise aussi les conversations vides.
+Les métadonnées DOM de diagnostic restent limitées aux identifiants opaques, état et compteurs :
+aucun message, prompt, secret ou contenu personnel n'est journalisé.
+
+Validations réelles : tests du superviseur, de la boucle Windows et des retries frontend;
+compilation Python; ESLint sans erreur; contrôle d'architecture; API, pages, voix et chat.
+Le smoke chat recharge cinq conversations réelles contenant 57, 29, 10, 51 et 6 messages,
+avec identifiant actif exact et aucune erreur console. Un parcours interactif distinct a
+validé les clics successifs sur trois fils. Le contrôle global rapide a passé 197/197 étapes.
+
+Aucun schéma ni contenu métier n'est migré. Rollback exact : arrêter Marvin puis exécuter
+`git revert <commit-v2.440>` et relancer `start.bat`. La version antérieure redémarrera Uvicorn
+directement; les conversations et la base restent inchangées.
+
 ## 2026-07-29 — v2.439.0 — Installateur unique et modèles locaux adaptés au PC
 
 L'audit de portabilité a trouvé un chemin utilisateur absolu dans le nettoyage VM, ainsi qu'un

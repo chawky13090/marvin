@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { BACKEND_URL as BACKEND } from '@/lib/backend';
+import { fetchBackendRead } from '@/lib/backendRead.mjs';
 
 // v2.107 — proxy pur vers le backend Python (voir app/api/conversations/route.js).
 // L'ancienne implémentation dupliquait ici la reconstruction messages BD → format UI
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req, { params }) {
   try {
     const { id } = await params;
-    const r = await fetch(`${BACKEND}/api/conversations/${id}`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetchBackendRead(`${BACKEND}/api/conversations/${id}`);
     if (r.status === 404) {
       return NextResponse.json({ error: 'Conversation non trouvée' }, { status: 404 });
     }
@@ -19,8 +20,11 @@ export async function GET(req, { params }) {
     const data = await r.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('[Conversation ID API] Error fetching conversation:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération de la conversation' }, { status: 500 });
+    console.error('[Conversation ID API] Backend indisponible:', error?.name || 'Error');
+    return NextResponse.json(
+      { error: 'Conversation temporairement indisponible' },
+      { status: 503, headers: { 'Retry-After': '2' } },
+    );
   }
 }
 
@@ -31,8 +35,8 @@ export async function DELETE(req, { params }) {
     const r = await fetch(`${BACKEND}/api/conversations/${id}`, { method: 'DELETE', signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error(`Backend ${r.status}`);
     return NextResponse.json(await r.json());
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Suppression de conversation impossible' }, { status: 500 });
   }
 }
 
@@ -49,7 +53,7 @@ export async function PUT(req, { params }) {
     });
     if (!r.ok) throw new Error(`Backend ${r.status}`);
     return NextResponse.json(await r.json());
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Modification de conversation impossible' }, { status: 500 });
   }
 }

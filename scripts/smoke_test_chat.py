@@ -34,23 +34,64 @@ RAW_JSON_RE = re.compile(
 )
 
 
-async def check_conversation(page, title_snippet: str) -> dict:
+async def check_conversation(page, title_snippet: str, conversation_id: str) -> dict:
     issues = []
-    item = page.locator(f"text={title_snippet}").first
+    item = page.get_by_role(
+        "button",
+        name=f"Ouvrir la conversation {title_snippet}",
+        exact=True,
+    ).first
     try:
-        await item.click(timeout=5000)
+        await item.wait_for(state="visible", timeout=5000)
+        await item.evaluate("(element) => element.click()")
     except Exception as e:
-        return {"title": title_snippet, "ok": False, "issues": [f"clic impossible : {e}"]}
+        return {
+            "title": title_snippet,
+            "conversation_id": conversation_id,
+            "ok": False,
+            "issues": [f"clic impossible : {e}"],
+        }
 
-    await page.wait_for_timeout(2000)
+    try:
+        await page.wait_for_function(
+            """conversationId => {
+                const container = document.querySelector('[data-active-conversation-id]');
+                return container
+                    && container.dataset.activeConversationId === conversationId
+                    && Number(container.dataset.messageCount || 0) > 0;
+            }""",
+            arg=conversation_id,
+            timeout=25000,
+        )
+    except Exception:
+        issues.append("conversation non matérialisée après 25 secondes")
 
     body_text = await page.locator("body").inner_text()
-    if await page.locator(".empty-state").count():
+    active = page.locator(
+        f'[data-active-conversation-id="{conversation_id}"]'
+    )
+    if await active.count() == 0 or int(await active.get_attribute("data-message-count") or 0) == 0:
         issues.append("conversation ouverte mais contenu absent (état vide affiché)")
+        container = page.locator("[data-active-conversation-id]").first
+        if await container.count():
+            issues.append(
+                "état observé : active=%s live=%s status=%s messages=%s"
+                % (
+                    await container.get_attribute("data-active-conversation-id"),
+                    await container.get_attribute("data-live-conversation-id"),
+                    await container.get_attribute("data-chat-status"),
+                    await container.get_attribute("data-message-count"),
+                )
+            )
     if RAW_JSON_RE.search(body_text):
         issues.append("JSON brut détecté dans le texte visible de la page")
 
-    return {"title": title_snippet, "ok": not issues, "issues": issues}
+    return {
+        "title": title_snippet,
+        "conversation_id": conversation_id,
+        "ok": not issues,
+        "issues": issues,
+    }
 
 
 async def main() -> int:
@@ -62,8 +103,12 @@ async def main() -> int:
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
         page.on("pageerror", lambda exc: console_errors.append(str(exc)))
 
-        await page.goto(BASE_URL + "/", wait_until="networkidle", timeout=30000)
-        await page.wait_for_timeout(1500)
+        # La page possède des pollers à 10/15 s : `networkidle` n'est donc pas
+        # un contrat de disponibilité et devient aléatoire sous charge. Attendre
+        # les éléments métier réellement nécessaires au parcours.
+        await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30000)
+        await page.get_by_role("heading", name="Marvin").wait_for(timeout=15000)
+        await page.locator("[data-conversation-id]").first.wait_for(timeout=15000)
 
         title_ok = "Marvin" in (await page.locator("body").inner_text())
         if not title_ok:
@@ -74,14 +119,29 @@ async def main() -> int:
         # Récupère les titres de conversation visibles dans la sidebar. Les lignes de
         # conversation n'ont pas de className (styles inline, cf. app/page.js) — repérées
         # par leur signature de style (div cliquable avec bordure gauche + son <span> titre).
-        items = await page.locator(
-            'div[style*="cursor: pointer"][style*="border-left"] span'
-        ).all_inner_texts()
-        titles = [t.strip() for t in items if t.strip()][:SAMPLE_SIZE]
+        rows = page.locator("[data-conversation-id]:visible")
+        samples = []
+        sampled_ids = set()
+        for index in range(await rows.count()):
+            if len(samples) >= SAMPLE_SIZE:
+                break
+            row = rows.nth(index)
+            conversation_id = await row.get_attribute("data-conversation-id")
+            title = (await row.locator('[role="button"]').first.inner_text()).strip()
+            if conversation_id and title and conversation_id not in sampled_ids:
+                sampled_ids.add(conversation_id)
+                samples.append((title, conversation_id))
 
         results = []
-        for t in titles:
-            results.append(await check_conversation(page, t))
+        for title, conversation_id in samples:
+            await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30000)
+            await page.get_by_role("heading", name="Marvin").wait_for(timeout=15000)
+            await page.get_by_role(
+                "button",
+                name=f"Ouvrir la conversation {title}",
+                exact=True,
+            ).first.wait_for(state="visible", timeout=15000)
+            results.append(await check_conversation(page, title, conversation_id))
 
         await browser.close()
 
@@ -90,7 +150,7 @@ async def main() -> int:
     failed = [r for r in results if not r["ok"]]
     for r in results:
         status = "OK" if r["ok"] else "ECHEC"
-        print(f"  [{status}] {r['title']}")
+        print(f"  [{status}] {r['title']} ({r['conversation_id']})")
         for issue in r["issues"]:
             print(f"          -> {issue}")
 

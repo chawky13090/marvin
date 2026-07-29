@@ -355,6 +355,9 @@ def run() -> dict[str, int | str]:
     starter = (ROOT / "start.bat").read_text(encoding="utf-8-sig")
     if "check_runtime.mjs" not in starter or "/api/health" not in starter:
         raise CheckFailure("start.bat doit conserver le preflight runtime et le controle HTTP.")
+    backend_starter = (ROOT / "backend" / "start.bat").read_text(encoding="utf-8-sig")
+    if "server_supervisor.py" not in backend_starter:
+        raise CheckFailure("Le backend Windows doit rester protégé par son superviseur de santé.")
     consolidation_plan = (ROOT / "BACKEND-CONSOLIDATION-PLAN.md").read_text(
         encoding="utf-8-sig"
     )
