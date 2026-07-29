@@ -756,6 +756,49 @@ function renderToolResult(toolName, result) {
     );
   }
 
+  if (toolName === 'ai_research_swarm' && result.answer) {
+    const coverage = result.source_coverage || {};
+    const forge = result.forge || {};
+    return (
+      <div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
+          <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 999, background: 'rgba(20,184,166,.12)', color: '#5eead4' }}>
+            {result.engine_version === 'v3' ? 'Recherche adaptative v3' : 'Research Swarm v2'}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{(result.sources || []).length} sources</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{coverage.unique_domains || 0} domaines</span>
+          {forge.citation_validity != null && (
+            <span style={{ fontSize: 10, color: forge.gate_passed ? '#34d399' : '#fbbf24' }}>
+              {Math.round(forge.citation_validity * 100)} % de citations valides
+            </span>
+          )}
+        </div>
+        <MarkdownBlock text={result.answer} />
+        {(result.sources || []).length > 0 && (
+          <CollapsibleDetail label={`Sources et preuves (${result.sources.length})`}>
+            {result.sources.map((source, index) => (
+              <div key={source.url || index} style={{ fontSize: 11, marginBottom: 6 }}>
+                <a href={source.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                  [{source.id || source.citation || index + 1}] {source.title || source.url}
+                </a>
+                {source.source_type && <span style={{ marginLeft: 6, color: 'var(--text-muted)' }}>{source.source_type}</span>}
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+        {(result.queries || []).length > 0 && (
+          <CollapsibleDetail label={`Trajectoire de recherche (${result.queries.length})`}>
+            {result.queries.map((query, index) => (
+              <div key={query.id || index} style={{ fontSize: 11, marginBottom: 5, color: 'var(--text-secondary)' }}>
+                {index + 1}. {query.query} · {query.accepted_sources || 0} source(s) retenue(s)
+              </div>
+            ))}
+          </CollapsibleDetail>
+        )}
+      </div>
+    );
+  }
+
   // ── ai_model_council (v2.141) — Panel d'experts IA ─────
   if (toolName === 'ai_model_council' && result.answer) {
     return (

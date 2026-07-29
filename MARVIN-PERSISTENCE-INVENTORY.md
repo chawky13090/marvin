@@ -49,7 +49,7 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `frontier_arena.py` — `frontier_arena_matches.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
 | `frontier_arena.py` — `frontier_arena_votes.jsonl` | evaluation_ledger | Frontier Arena | archivage explicite | structuré |
 | `model_market.py` — `model_market_observations.jsonl` | evaluation_ledger | Model Market | archivage explicite | structuré |
-| `research_swarm.py` — `research_swarm_runs.jsonl` | evaluation_ledger | Research Swarm | archivage explicite | structuré |
+| `research_swarm.py` / `research_engine_v3.py` — `research_swarm_runs.jsonl` | evaluation_ledger | Recherche approfondie v2/v3 | archivage explicite | structuré |
 | `truth_ledger.py` — `truth_ledger.jsonl` | truth_ledger | Memory Mesh | contrat mémoire | structuré |
 
 <!-- persistence-inventory

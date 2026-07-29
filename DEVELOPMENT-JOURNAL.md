@@ -12298,3 +12298,68 @@ le journal structuré et sa rétention existante.
 
 Aucune migration ni donnée persistante. Réversion atomique du commit v2.485 puis redémarrage
 du frontend et du backend. La lecture manuelle historique reste disponible pendant le rollback.
+
+## 2026-07-29 — v2.486.0 — Research Engine v3
+
+### Demande et diagnostic
+
+L'utilisateur demande une recherche approfondie mesurable face aux services spécialisés.
+Le Research Swarm historique utilisait cinq modèles Cloud mais chaque cellule ne lançait
+qu'une requête et retenait trois sources par défaut, cinq au maximum. Le nombre de modèles
+augmentait donc davantage la diversité d'analyse que la couverture documentaire.
+
+Les références publiques OpenAI Deep Research, BrowseComp, Perplexity Research,
+Deep Research Bench et la documentation SearXNG convergent sur une recherche persistante,
+adaptative, pilotée par les lacunes et vérifiée au niveau des citations.
+
+### Décisions et réalisation
+
+- `research_contract.py` compile profondeur, langue, fraîcheur, domaines, livrable et budgets ;
+- `research_sources.py` canonicalise les URL, classe les sources et retire copies exactes ou
+  quasi-identiques tout en limitant la concentration par domaine ;
+- `research_engine_v3.py` orchestre six axes initiaux, reformulation adaptative, cinq rôles
+  Cloud, audit, synthèse et réparation des citations ;
+- `research_forge.py` mesure citations valides, couverture des phrases factuelles, diversité
+  de domaines et taux de sources primaires ;
+- `research_swarm.execute_v2` reste intact et la façade `execute` choisit v3, v2 restant
+  sélectionnable explicitement ou via `research_engine_v3_enabled=false` ;
+- l'API et les jobs transportent la politique complète sans casser les anciens appels ;
+- chaque passe sauvegarde un checkpoint sans contenu de page; la reprise relit les URL
+  publiques et conserve la trajectoire, tandis qu'une route bornée permet d'ajouter un angle ;
+- l'interface Market expose profondeur, fraîcheur, politique, progression et métriques ;
+- les rapports sont exportables en Markdown, JSON technique, Word DOCX et PDF ;
+- le chat restitue rapport, trajectoire et sources sans afficher le JSON brut ;
+- SearXNG accepte désormais langue et filtre temporel validés, sans autre fournisseur ;
+- le baseline API déjà décalé de deux routes a été réaligné puis inclut la route de
+  réorientation et l'export, soit 308 chemins et 370 opérations.
+
+### Sécurité, logs et preuves
+
+Les pages restent des données non fiables, l'accès public passe par le transport anti-SSRF
+et les domaines sont validés. Hyper local et détection sensible conservent leurs blocages.
+Les budgets bornent requêtes, pages, durée, réponses modèles et concentration. Aucun contenu,
+prompt ou secret supplémentaire ne rejoint les logs techniques. Les runs v3 utilisent le
+registre chaîné `research_swarm_runs.jsonl`, déjà classé `evaluation_ledger`; aucun nouveau
+chemin persistant n'est créé.
+
+Dette résiduelle déclarée : Research Forge contrôle déterministement la structure des
+citations mais une comparaison « supérieur à Perplexity » exige encore un corpus de
+référence humain et une évaluation aveugle. Aucun statut de supériorité n'est donc revendiqué.
+
+### Validation réelle
+
+- SearXNG local : 38 résultats sur une requête officielle, premier domaine
+  `fastapi.tiangolo.com` ;
+- test Research v3 : succès, contrat, erreurs, déduplication et exécution adaptative simulée ;
+- test Model Market/Swarm : succès ;
+- compilation Python des modules touchés : succès ;
+- ESLint ciblé : zéro erreur, six avertissements historiques dans `MessageBubble.jsx` ;
+- contrôle architecture : 344 outils, harness 344/344, 369 routes ;
+- inventaire API initialement en échec sur une baseline antérieure (304/366), réaligné sur
+  les 306 chemins et 368 opérations réellement mesurés.
+
+### Rollback
+
+Aucune migration de schéma ni réécriture de preuve. Désactivation immédiate avec
+`research_engine_v3_enabled=false` ou appel `engine_version=v2`. Le rollback complet est la
+réversion atomique du commit v2.486 suivie du redémarrage et du test Model Market.

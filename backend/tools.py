@@ -1313,16 +1313,29 @@ async def execute_ai_cortex_search(args: dict) -> dict:
 
 
 async def execute_ai_research_swarm(args: dict) -> dict:
-    """Essaim de cinq chercheurs cloud spécialisés avec recherche web et vérification croisée."""
+    """Recherche Web adaptative avec cinq rôles Cloud et gate de preuves."""
     question = (args.get("question") or args.get("query") or "").strip()
     try:
         agent_count = int(args.get("agent_count") or 5)
         sources_per_agent = int(args.get("sources_per_agent") or 3)
+        max_duration_seconds = int(args.get("max_duration_seconds") or 900)
     except (TypeError, ValueError):
-        agent_count, sources_per_agent = 5, 3
+        agent_count, sources_per_agent, max_duration_seconds = 5, 3, 900
     import research_swarm
     return await research_swarm.execute(
-        question, agent_count=agent_count, sources_per_agent=sources_per_agent,
+        question,
+        agent_count=agent_count,
+        sources_per_agent=sources_per_agent,
+        engine_version=str(args.get("engine_version") or "auto"),
+        max_duration_seconds=max_duration_seconds,
+        research_options={
+            key: args.get(key)
+            for key in (
+                "depth", "language", "region", "freshness", "source_policy",
+                "preferred_domains", "excluded_domains", "deliverable",
+            )
+            if args.get(key) is not None
+        },
     )
 
 
@@ -3738,15 +3751,27 @@ TOOLS_SPEC = [
         "candidate_count": {"type": "integer", "description": "Nombre de stratégies, entre 2 et 3", "minimum": 2, "maximum": 3}},
         ["question"]),
     _t("ai_research_swarm",
-       "RESEARCH SWARM : lance 3 à 5 cellules de recherche web spécialisées avec des familles "
-       "Ollama Cloud distinctes, puis effectue une contradiction, une vérification croisée et "
-       "une synthèse sourcée. À utiliser uniquement si l'utilisateur sélectionne explicitement "
-       "Research Swarm ou demande un essaim de recherche sur un sujet complexe et non sensible.",
+       "RECHERCHE APPROFONDIE : planifie une recherche adaptative exclusivement via SearXNG, "
+       "lit et déduplique les sources, comble les angles morts, puis fait analyser, contredire "
+       "et vérifier les citations par cinq rôles Ollama Cloud. À utiliser lorsque l'utilisateur "
+       "demande explicitement une recherche approfondie, exhaustive ou un état de l'art.",
        {"question": {"type": "string", "description": "Question de recherche complexe"},
         "agent_count": {"type": "integer", "minimum": 3, "maximum": 5,
-                        "description": "Nombre de cellules de recherche, défaut 5"},
-        "sources_per_agent": {"type": "integer", "minimum": 1, "maximum": 5,
-                              "description": "Sources maximum par cellule, défaut 3"}},
+                        "description": "Nombre de rôles d'analyse, défaut 5"},
+        "sources_per_agent": {"type": "integer", "minimum": 1, "maximum": 8,
+                              "description": "Pages retenues par requête, défaut 3"},
+        "depth": {"type": "string", "enum": ["quick", "deep", "exhaustive"],
+                  "description": "Profondeur de recherche"},
+        "freshness": {"type": "string", "enum": ["day", "week", "month", "year"],
+                      "description": "Filtre temporel optionnel"},
+        "source_policy": {"type": "string",
+                          "enum": ["balanced", "primary_first", "academic", "official_only"],
+                          "description": "Politique de sélection des sources"},
+        "preferred_domains": {"type": "array", "items": {"type": "string"},
+                              "description": "Domaines à privilégier"},
+        "excluded_domains": {"type": "array", "items": {"type": "string"},
+                             "description": "Domaines à exclure"},
+        "max_duration_seconds": {"type": "integer", "minimum": 60, "maximum": 1800}},
        ["question"]),
     _t("ai_adaptive_team",
        "ADAPTIVE TEAM : pour une demande explicitement approfondie et complexe, compose "

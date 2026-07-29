@@ -80,14 +80,22 @@ async def _run(job_id: str) -> None:
         return
     _update(job_id, status="running", progress={"stage": "starting", "completed": 0, "total": job["agent_count"]})
     async def progress(value):
-        _update(job_id, progress=value)
+        public_value = dict(value)
+        checkpoint = public_value.pop("checkpoint", None)
+        updates: dict[str, Any] = {"progress": public_value}
+        if checkpoint is not None:
+            updates["checkpoint"] = checkpoint
+        _update(job_id, **updates)
     try:
         result = await research_swarm.execute(
             job["question"], agent_count=job["agent_count"],
             sources_per_agent=job["sources_per_agent"],
             max_duration_seconds=job["max_duration_seconds"],
+            engine_version=job.get("engine_version", "auto"),
+            research_options=job.get("research_options"),
             progress=progress,
             cancelled=lambda: bool(get_job(job_id).get("cancel_requested")),
+            steering=lambda: consume_steering(job_id),
         )
         if result.get("error"):
             _update(job_id, status="failed", error=result["error"], result=result)
@@ -101,16 +109,28 @@ async def _run(job_id: str) -> None:
         _TASKS.pop(job_id, None)
 
 
-def create_job(question: str, agent_count: int, sources_per_agent: int, max_duration_seconds: int) -> dict[str, Any]:
+def create_job(
+    question: str,
+    agent_count: int,
+    sources_per_agent: int,
+    max_duration_seconds: int,
+    *,
+    engine_version: str = "auto",
+    research_options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     job = {
         "id": "swarm-job-" + uuid.uuid4().hex[:12],
         "question": question,
         "agent_count": agent_count,
         "sources_per_agent": sources_per_agent,
         "max_duration_seconds": max_duration_seconds,
+        "engine_version": engine_version,
+        "research_options": dict(research_options or {}),
         "status": "queued",
         "progress": {"stage": "queued", "completed": 0, "total": agent_count},
         "cancel_requested": False,
+        "steering_queries": [],
+        "checkpoint": None,
         "result": None,
         "error": None,
         "created_at": _now(),
@@ -132,12 +152,52 @@ def cancel_job(job_id: str) -> dict[str, Any] | None:
     return job
 
 
+def steer_job(job_id: str, query: str) -> dict[str, Any] | None:
+    normalized = " ".join(str(query or "").split()).strip()
+    if not 3 <= len(normalized) <= 500:
+        raise ValueError("La réorientation doit contenir entre 3 et 500 caractères.")
+    with _LOCK:
+        rows = _load()
+        for index, row in enumerate(rows):
+            if row.get("id") != job_id:
+                continue
+            if row.get("status") not in {"queued", "running"}:
+                return None
+            queue = list(row.get("steering_queries") or [])
+            queue.append(normalized)
+            row = {**row, "steering_queries": queue[-20:], "updated_at": _now()}
+            rows[index] = row
+            _write(rows)
+            return row
+    return None
+
+
+def consume_steering(job_id: str) -> list[str]:
+    with _LOCK:
+        rows = _load()
+        for index, row in enumerate(rows):
+            if row.get("id") != job_id:
+                continue
+            queries = [str(value) for value in list(row.get("steering_queries") or [])[:20]]
+            if queries:
+                row = {**row, "steering_queries": [], "updated_at": _now()}
+                rows[index] = row
+                _write(rows)
+            return queries
+    return []
+
+
 def resume_job(job_id: str) -> dict[str, Any] | None:
     old = get_job(job_id)
     if not old or old.get("status") not in {"interrupted", "failed", "cancelled"}:
         return None
+    options = dict(old.get("research_options") or {})
+    if isinstance(old.get("checkpoint"), dict):
+        options["_resume_checkpoint"] = old["checkpoint"]
     return create_job(
         old["question"], old["agent_count"], old["sources_per_agent"], old["max_duration_seconds"],
+        engine_version=old.get("engine_version", "auto"),
+        research_options=options,
     )
 
 

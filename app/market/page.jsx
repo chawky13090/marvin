@@ -26,6 +26,12 @@ export default function ModelMarketPage() {
   const [swarmIntegrity, setSwarmIntegrity] = useState(null);
   const [fleetBusy, setFleetBusy] = useState(false);
   const [modelToPull, setModelToPull] = useState('');
+  const [researchConfig, setResearchConfig] = useState({
+    depth: 'deep',
+    freshness: '',
+    sourcePolicy: 'primary_first',
+  });
+  const [steeringQuery, setSteeringQuery] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -95,7 +101,16 @@ export default function ModelMarketPage() {
       const response = await fetch(`${BACKEND_URL}/api/model-market/swarm/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), agent_count: 5, sources_per_agent: 3 }),
+        body: JSON.stringify({
+          question: question.trim(),
+          agent_count: 5,
+          sources_per_agent: researchConfig.depth === 'exhaustive' ? 8 : 5,
+          max_duration_seconds: researchConfig.depth === 'exhaustive' ? 1800 : 900,
+          engine_version: 'v3',
+          depth: researchConfig.depth,
+          freshness: researchConfig.freshness || null,
+          source_policy: researchConfig.sourcePolicy,
+        }),
       });
       const data = await response.json();
       if (!response.ok || !data.job) throw new Error(data.detail || `HTTP ${response.status}`);
@@ -134,10 +149,61 @@ export default function ModelMarketPage() {
     }
   };
 
+  const downloadReport = (format) => {
+    if (!result) return;
+    const sources = (result.sources || [])
+      .map((source, index) => `[${source.id || index + 1}] ${source.title || source.url}\n${source.url}`)
+      .join('\n\n');
+    const content = format === 'json'
+      ? JSON.stringify(result, null, 2)
+      : `# Rapport de recherche\n\n${result.answer || ''}\n\n## Sources\n\n${sources}\n`;
+    const blob = new Blob([content], {
+      type: format === 'json' ? 'application/json;charset=utf-8' : 'text/markdown;charset=utf-8',
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `marvin-research-${result.id || 'report'}.${format === 'json' ? 'json' : 'md'}`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const steerResearch = async () => {
+    if (!job?.id || !steeringQuery.trim()) return;
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/model-market/swarm/jobs/${job.id}/steer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: steeringQuery.trim() }),
+      });
+      if (!response.ok) throw new Error(`Réorientation HTTP ${response.status}`);
+      setSteeringQuery('');
+    } catch (err) {
+      setError(err.message || 'Réorientation impossible');
+    }
+  };
+
+  const downloadGeneratedReport = async (format) => {
+    if (!result?.id) return;
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/model-market/swarm/runs/${encodeURIComponent(result.id)}/export?format=${format}`,
+      );
+      if (!response.ok) throw new Error(`Export ${format.toUpperCase()} HTTP ${response.status}`);
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `marvin-research-${result.id}.${format}`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      setError(err.message || 'Export impossible');
+    }
+  };
+
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '28px 32px', color: 'var(--text-primary)' }}>
       <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-        <h1 style={{ margin: 0, color: '#2dd4bf', fontSize: '1.7rem' }}>Model Market et Research Swarm</h1>
+        <h1 style={{ margin: 0, color: '#2dd4bf', fontSize: '1.7rem' }}>Model Market et Recherche approfondie</h1>
         <p style={{ color: 'var(--text-muted)', maxWidth: 820, fontSize: 13 }}>
           Classement fondé sur les modèles réellement installés et leurs appels réels. Aucune sonde cloud payante n’est déclenchée pour produire les scores.
         </p>
@@ -217,9 +283,9 @@ export default function ModelMarketPage() {
         </section>
 
         <section style={{ border: '1px solid rgba(20,184,166,.35)', borderRadius: 14, padding: 16, background: 'rgba(20,184,166,.05)', marginTop: 18 }}>
-          <div style={{ fontWeight: 750 }}>Research Swarm</div>
+          <div style={{ fontWeight: 750 }}>Research Engine v3</div>
           <div style={{ color: 'var(--text-muted)', fontSize: 12, margin: '5px 0 11px' }}>
-            Cinq familles cloud distinctes recherchent en parallèle : sources primaires, état de l’art, contradiction, exécution et vérification.
+            Marvin planifie, explore via SearXNG, comble les angles morts puis audite les citations avec cinq rôles Cloud spécialisés.
           </div>
           {swarmIntegrity && <div style={{ color: swarmIntegrity.valid ? swarmIntegrity.legacy_records ? '#fbbf24' : '#34d399' : '#fb7185', fontSize: 10, marginBottom: 9 }}>
             {swarmIntegrity.valid
@@ -231,22 +297,88 @@ export default function ModelMarketPage() {
           <textarea value={question} onChange={event => setQuestion(event.target.value)}
             placeholder="Question de recherche complexe et non sensible"
             style={{ width: '100%', minHeight: 90, resize: 'vertical', boxSizing: 'border-box', borderRadius: 10, padding: 11, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8, marginTop: 9 }}>
+            <label style={{ display: 'grid', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+              Profondeur
+              <select value={researchConfig.depth} onChange={event => setResearchConfig(current => ({ ...current, depth: event.target.value }))}
+                style={{ padding: '8px 10px', borderRadius: 9, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                <option value="quick">Rapide</option>
+                <option value="deep">Approfondie</option>
+                <option value="exhaustive">Exhaustive</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+              Sources
+              <select value={researchConfig.sourcePolicy} onChange={event => setResearchConfig(current => ({ ...current, sourcePolicy: event.target.value }))}
+                style={{ padding: '8px 10px', borderRadius: 9, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                <option value="balanced">Équilibrées</option>
+                <option value="primary_first">Primaires d’abord</option>
+                <option value="academic">Académiques</option>
+                <option value="official_only">Officielles uniquement</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+              Fraîcheur
+              <select value={researchConfig.freshness} onChange={event => setResearchConfig(current => ({ ...current, freshness: event.target.value }))}
+                style={{ padding: '8px 10px', borderRadius: 9, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                <option value="">Sans filtre</option>
+                <option value="day">24 heures</option>
+                <option value="week">7 jours</option>
+                <option value="month">30 jours</option>
+                <option value="year">12 mois</option>
+              </select>
+            </label>
+          </div>
           <button type="button" onClick={runSwarm} disabled={running || !question.trim()}
             style={{ marginTop: 9, padding: '9px 14px', borderRadius: 9, border: '1px solid rgba(45,212,191,.45)', background: 'rgba(45,212,191,.14)', color: '#5eead4', cursor: 'pointer', fontWeight: 700 }}>
-            {running ? 'Essaim en cours…' : 'Lancer Research Swarm'}
+            {running ? 'Recherche en cours…' : 'Lancer la recherche'}
           </button>
-          {job && running && <div style={{ marginTop: 8, color: 'var(--text-muted)', fontSize: 12 }}>
-            {job.progress?.stage || job.status} · {job.progress?.completed || 0}/{job.progress?.total || job.agent_count}
-            <button onClick={() => fetch(`${BACKEND_URL}/api/model-market/swarm/jobs/${job.id}`, { method: 'DELETE' })} style={{ marginLeft: 10 }}>Annuler</button>
+          {job && running && <div style={{ marginTop: 10, padding: 11, border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <span>{job.progress?.message || job.progress?.stage || job.status}</span>
+              <span>{job.progress?.completed || 0}/{job.progress?.total || job.agent_count}</span>
+            </div>
+            <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,.08)', marginTop: 8, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, ((job.progress?.completed || 0) / Math.max(1, job.progress?.total || 1)) * 100)}%`, height: '100%', background: '#2dd4bf', transition: 'width .25s ease' }} />
+            </div>
+            {job.progress?.metrics && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8, fontSize: 10 }}>
+              <span>{job.progress.metrics.queries || 0} requêtes</span>
+              <span>{job.progress.metrics.unique_sources || 0} sources uniques</span>
+              <span>{job.progress.metrics.unique_domains || 0} domaines</span>
+              {job.progress.metrics.axis_coverage != null && <span>{Math.round(job.progress.metrics.axis_coverage * 100)} % de couverture</span>}
+            </div>}
+            <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
+              <input value={steeringQuery} onChange={event => setSteeringQuery(event.target.value)}
+                placeholder="Ajouter un angle ou un domaine à examiner"
+                style={{ flex: 1, minWidth: 0, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
+              <button type="button" onClick={steerResearch} disabled={!steeringQuery.trim()}
+                style={{ padding: '6px 9px', borderRadius: 7, border: '1px solid var(--border)' }}>Orienter</button>
+            </div>
+            <button onClick={() => fetch(`${BACKEND_URL}/api/model-market/swarm/jobs/${job.id}`, { method: 'DELETE' })}
+              style={{ marginTop: 9, padding: '5px 9px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}>Annuler</button>
           </div>}
         </section>
 
         {result && (
           <section style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 14, padding: 16, background: 'rgba(255,255,255,.02)' }}>
-            <div style={{ fontWeight: 750, marginBottom: 8 }}>Rapport final</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 12 }}>
-              {result.cells?.length || 0} cellules · {result.sources?.length || 0} sources · {(result.models_consulted || []).length} modèles
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <div style={{ fontWeight: 750 }}>Rapport final</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" onClick={() => downloadReport('md')}>Markdown</button>
+                <button type="button" onClick={() => downloadGeneratedReport('docx')}>Word</button>
+                <button type="button" onClick={() => downloadGeneratedReport('pdf')}>PDF</button>
+                <button type="button" onClick={() => downloadReport('json')}>Données et preuves</button>
+              </div>
             </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 12 }}>
+              {result.engine_version === 'v3' ? 'Moteur adaptatif v3' : 'Moteur historique v2'} · {result.queries?.length || result.cells?.length || 0} requêtes/analyses · {result.sources?.length || 0} sources · {(result.models_consulted || []).length} modèles
+            </div>
+            {result.forge && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8, marginBottom: 12 }}>
+              <div style={{ padding: 9, borderRadius: 9, background: 'rgba(255,255,255,.03)' }}>Citations valides<br /><strong>{Math.round(result.forge.citation_validity * 100)} %</strong></div>
+              <div style={{ padding: 9, borderRadius: 9, background: 'rgba(255,255,255,.03)' }}>Faits cités<br /><strong>{Math.round(result.forge.factual_citation_coverage * 100)} %</strong></div>
+              <div style={{ padding: 9, borderRadius: 9, background: 'rgba(255,255,255,.03)' }}>Domaines<br /><strong>{result.source_coverage?.unique_domains || 0}</strong></div>
+              <div style={{ padding: 9, borderRadius: 9, background: 'rgba(255,255,255,.03)', color: result.forge.gate_passed ? '#34d399' : '#fbbf24' }}>Contrôle qualité<br /><strong>{result.forge.gate_passed ? 'Validé' : 'À vérifier'}</strong></div>
+            </div>}
             <div style={{ color: result.evidence_persisted === true ? '#34d399' : result.evidence_persisted === false ? '#fb7185' : '#fbbf24', fontSize: 11, marginBottom: 12 }}>
               {result.evidence_persisted === true
                 ? `Preuve persistée · séquence ${result.sequence || 'N/D'} · ${result.record_hash?.slice(0, 14) || 'empreinte indisponible'}`

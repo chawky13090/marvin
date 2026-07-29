@@ -403,8 +403,23 @@ async def execute_web_search(args: dict) -> dict:
             "error": "Paramètre 'max_results' invalide : entier attendu entre 1 et 20.",
         }
 
+    language = str(args.get("language") or "fr-FR").strip()
+    if not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?", language):
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "error": "Paramètre 'language' invalide.",
+        }
+    time_range = str(args.get("time_range") or "").strip().lower() or None
+    if time_range not in {None, "day", "week", "month", "year"}:
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "error": "Paramètre 'time_range' invalide.",
+        }
+
     search_query = _prepare_searxng_query(query)
-    cache_key = ("ws-searxng-only", search_query.lower(), max_results)
+    cache_key = ("ws-searxng-only", search_query.lower(), max_results, language, time_range)
     cached = _wcache_get(cache_key)
     if cached is not None:
         return {**cached, "cached": True}
@@ -425,9 +440,16 @@ async def execute_web_search(args: dict) -> dict:
         }
     try:
         client = _get_http_client()
+        request_params = {
+            "q": search_query,
+            "format": "json",
+            "language": language,
+        }
+        if time_range:
+            request_params["time_range"] = time_range
         response = await client.get(
             str(base).rstrip("/") + "/search",
-            params={"q": search_query, "format": "json", "language": "fr-FR"},
+            params=request_params,
         )
         response.raise_for_status()
         payload = response.json()
@@ -446,6 +468,8 @@ async def execute_web_search(args: dict) -> dict:
             "provider": "SearXNG",
             "query": query,
             "search_query": search_query,
+            "language": language,
+            "time_range": time_range,
             "count": len(results),
             "results": results,
             "provider_attempts": [{

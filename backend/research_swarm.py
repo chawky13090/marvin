@@ -255,7 +255,7 @@ async def _model_call(client: httpx.AsyncClient, model: str, prompt: str, phase:
                 "error": error_type}
 
 
-async def execute(
+async def execute_v2(
     question: str, *, agent_count: int = 5, sources_per_agent: int = 3,
     max_duration_seconds: int = 600, progress=None, cancelled=None,
 ) -> dict[str, Any]:
@@ -512,3 +512,40 @@ async def execute(
 
 def list_runs(limit: int = 30) -> list[dict[str, Any]]:
     return _run_store().recent(max(1, min(int(limit), 200)))
+
+
+async def execute(
+    question: str, *, agent_count: int = 5, sources_per_agent: int = 3,
+    max_duration_seconds: int = 600, progress=None, cancelled=None,
+    engine_version: str = "auto", research_options: dict[str, Any] | None = None,
+    steering=None,
+) -> dict[str, Any]:
+    """Façade stable avec rollback immédiat vers le moteur historique v2."""
+    requested = str(engine_version or "auto").strip().lower()
+    if requested not in {"auto", "v2", "v3"}:
+        return {"error": "Version du moteur invalide : auto, v2 ou v3 attendue."}
+    enabled_setting = db.get_setting("research_engine_v3_enabled")
+    use_v3 = requested == "v3" or (
+        requested == "auto" and enabled_setting is not False
+    )
+    if use_v3:
+        from research_engine_v3 import execute as execute_v3
+
+        return await execute_v3(
+            question,
+            agent_count=agent_count,
+            sources_per_agent=sources_per_agent,
+            max_duration_seconds=max_duration_seconds,
+            progress=progress,
+            cancelled=cancelled,
+            options=research_options,
+            steering=steering,
+        )
+    return await execute_v2(
+        question,
+        agent_count=agent_count,
+        sources_per_agent=sources_per_agent,
+        max_duration_seconds=max_duration_seconds,
+        progress=progress,
+        cancelled=cancelled,
+    )

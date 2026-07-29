@@ -4,21 +4,21 @@ Date de référence : 2026-07-29
 
 ## État mesuré
 
-Le schéma OpenAPI expose désormais 304 chemins et 366 opérations HTTP, répartis dans
-64 familles. Les 366 opérations ont un identifiant unique. La garde LAN documente 362
+Le schéma OpenAPI expose désormais 308 chemins et 370 opérations HTTP, répartis dans
+64 familles. Les 370 opérations ont un identifiant unique. La garde LAN documente 366
 opérations protégées, leur capacité et leurs erreurs 401/403; les quatre surfaces publiques sont santé,
 état de jumelage, jumelage et introspection cryptographique interne. Grâce aux erreurs
-communes, 364 opérations ont maintenant un
+communes, 368 opérations ont maintenant un
 schéma non vide. Les réponses métier génériques et 71 opérations sans tag restent à
 résorber famille par famille.
 
 Le constat critique est objectif :
 
-- 192 mutations ;
+- 194 mutations ;
 - 129 mutations avec corps de requête ;
-- 363 opérations avec une erreur 4xx documentée ;
-- 362 opérations protégées par le contrat de session LAN ;
-- 362 opérations déclarant une capacité serveur contrôlée à chaque requête ;
+- 367 opérations avec une erreur 4xx documentée ;
+- 366 opérations protégées par le contrat de session LAN ;
+- 366 opérations déclarant une capacité serveur contrôlée à chaque requête ;
 - 8 mutations critiques déclarant une clé d'idempotence UUID optionnelle.
 
 La garde globale fournit l'identité réseau et l'autorisation par capacité.
@@ -35,15 +35,15 @@ non taguée et dérive de la baseline. Toute évolution modifie le contrat et sa
 même commit.
 
 <!-- api-contract-baseline
-paths|304
-operations|366
-mutations|192
-typed_responses|364
-documented_errors|363
-secured|362
-capability_declared|362
+paths|308
+operations|370
+mutations|194
+typed_responses|368
+documented_errors|367
+secured|366
+capability_declared|366
 idempotent_mutations|8
-request_bodies|129
+request_bodies|130
 untagged|71
 missing_operation_ids|0
 -->

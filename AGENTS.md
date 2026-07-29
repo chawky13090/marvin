@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.485.0)
+## 9. État actuel (v2.486.0)
+
+**v2.486 (Research Engine v3)** : la recherche approfondie compile un contrat borné,
+explore six axes via SearXNG, reformule selon les lacunes, canonicalise et déduplique les
+sources puis répartit les preuves entre cinq rôles Ollama Cloud. Un audit distinct contrôle
+les affirmations; Research Forge mesure la structure des citations avant livraison et peut
+déclencher une réparation bornée. L'API, les jobs SSE, le chat et Model Market exposent
+progression, couverture et sources. `research_swarm.execute_v2` reste disponible et le
+réglage `research_engine_v3_enabled=false` fournit un rollback immédiat sans migration.
 
 **v2.485 (réponses Cloud vocalisées)** : les réponses livrées directement par l’événement
 Cloud `answer_final` alimentent désormais le tampon vocal avant `done`; elles sont synthétisées
