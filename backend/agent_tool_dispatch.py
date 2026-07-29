@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from config import PERMISSION_EXPERT, PERMISSION_SECURE, SECURE_BLOCKED_TOOLS
+from config import (
+    CONDITIONAL_TOOL_SAFE_ACTIONS,
+    DANGEROUS_TOOLS,
+    PERMISSION_EXPERT,
+    PERMISSION_SECURE,
+    SECURE_BLOCKED_TOOLS,
+)
 
 
 EXECUTION_TOOLS = frozenset(
@@ -25,7 +31,7 @@ ALWAYS_CONFIRM_TOOLS = frozenset(
         "pc_gui_click", "pc_gui_type", "code_workspace_start",
         "code_workspace_control",
     }
-)
+) | frozenset(DANGEROUS_TOOLS) | frozenset(CONDITIONAL_TOOL_SAFE_ACTIONS)
 
 Validator = Callable[[str, dict[str, Any]], str | None]
 Executor = Callable[
@@ -143,6 +149,13 @@ async def dispatch_tool(
         and request.name not in ALWAYS_CONFIRM_TOOLS
     ):
         arguments["confirmed"] = True
+    elif request.name in ALWAYS_CONFIRM_TOOLS:
+        # Le LLM et le texte utilisateur appartiennent au même canal non fiable :
+        # ils peuvent demander une action, mais pas fabriquer la preuve de clic UI.
+        # Le premier appel produit `requiresConfirmation`; le bouton du frontend
+        # rejoue ensuite les arguments via le gateway avec `confirmed_by_ui=True`.
+        arguments.pop("confirmed", None)
+        arguments.pop("__confirmed", None)
 
     result = await execute(
         request.name,

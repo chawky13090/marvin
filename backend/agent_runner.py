@@ -17,12 +17,14 @@ class RunnerState:
     successful_tools: int = 0
     failed_tools: int = 0
     trace: list[str] = field(default_factory=list)
+    attempted_calls: list[str] = field(default_factory=list)
     successful_calls: list[dict[str, str]] = field(default_factory=list)
     successful_results: list[dict[str, Any]] = field(default_factory=list)
     blocking_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
     long_chain_reported: bool = False
     nudged: bool = False
     empty_response_nudged: bool = False
+    exhausted_tool_budgets: set[str] = field(default_factory=set)
 
     @property
     def tool_count(self) -> int:
@@ -55,6 +57,7 @@ class RunnerState:
         tooling_failure: bool,
     ) -> bool:
         """Enregistre un résultat et signale une seule fois une chaîne supérieure à 8."""
+        self.attempted_calls.append(tool_name)
         self.executed_tool_names.add(tool_name)
         if tooling_failure:
             self.failed_tools += 1
@@ -129,6 +132,16 @@ class RunnerState:
         if not self.stop_reason:
             self.stop_reason = "max_tool_steps"
         return self.stop_reason
+
+    def successful_call_count(self, tool_name: str) -> int:
+        return sum(
+            1
+            for call in self.successful_calls
+            if call.get("tool") == tool_name
+        )
+
+    def attempted_call_count(self, tool_name: str) -> int:
+        return self.attempted_calls.count(tool_name)
 
     def budget_usage(self, stop_reason: str | None = None) -> dict[str, Any]:
         return {

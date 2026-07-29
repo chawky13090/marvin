@@ -129,18 +129,13 @@ async def execute_tool(
     ):
         return ToolGatewayResult(_permission_denied(request.tool_name), False, 403)
     dangerous_call = request.tool_name in DANGEROUS_TOOLS or conditional_mutation
-    if dangerous_call and not (
-        request.confirmed_by_ui or request.permission_level == PERMISSION_EXPERT
-    ):
+    if dangerous_call and not request.confirmed_by_ui:
         # Une confirmation déclarée dans les arguments appartient à la zone non fiable :
         # elle peut provenir d'un modèle ou d'un client HTTP. Seul le canal UI explicite
         # ou le niveau Expert peut autoriser l'action.
         arguments.pop("confirmed", None)
         arguments.pop("__confirmed", None)
-    elif (
-        request.confirmed_by_ui
-        and dangerous_call
-    ) or request.permission_level == PERMISSION_EXPERT:
+    elif request.confirmed_by_ui and dangerous_call:
         arguments["confirmed"] = True
 
     started = time.monotonic()

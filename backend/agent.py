@@ -95,11 +95,13 @@ from agent_turn_completion import complete_turn as _complete_turn
 from agent_loop_policy import (
     build_action_execution_nudge as _build_action_execution_nudge,
     build_empty_response_nudge as _build_empty_response_nudge,
+    build_native_budget_nudge as _build_native_budget_nudge,
     build_skill_nudge as _build_skill_nudge,
     promises_unexecuted_action as _promises_unexecuted_action,
     render_blocking_outcomes as _render_blocking_outcomes,
     render_latest_web_result as _render_latest_web_result,
     retryable_cloud_model_error as _retryable_cloud_model_error,
+    native_tool_call_limit as _native_tool_call_limit,
     should_suppress_model_text as _should_suppress_model_text,
     skill_requires_nudge as _skill_requires_nudge,
     sensitive_tool_model_switch as _sensitive_tool_model_switch,
@@ -698,6 +700,36 @@ async def _run_deterministic_agent(
                         if name and name not in present:
                             tools_payload.append(specification)
                             present.add(name)
+                newly_exhausted = {
+                    str(spec.get("function", {}).get("name") or "")
+                    for spec in tools_payload
+                    if (
+                        str(spec.get("function", {}).get("name") or "")
+                        not in _runner_state.exhausted_tool_budgets
+                        and _runner_state.attempted_call_count(
+                            str(spec.get("function", {}).get("name") or "")
+                        )
+                        >= _native_tool_call_limit(
+                            str(spec.get("function", {}).get("name") or "")
+                        )
+                    )
+                }
+                if newly_exhausted:
+                    _runner_state.exhausted_tool_budgets.update(newly_exhausted)
+                    tools_payload[:] = [
+                        spec
+                        for spec in tools_payload
+                        if str(spec.get("function", {}).get("name") or "")
+                        not in newly_exhausted
+                    ]
+                    ollama_msgs.append(
+                        _build_native_budget_nudge(newly_exhausted)
+                    )
+                    yield _sse({
+                        "type": "capability_budget",
+                        "exhausted": sorted(newly_exhausted),
+                        "remaining": len(tools_payload),
+                    })
 
         elif (
             not full_content.strip()

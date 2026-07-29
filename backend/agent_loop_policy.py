@@ -6,6 +6,16 @@ import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
+
+_NATIVE_TOOL_CALL_LIMITS = {
+    # Outils de découverte, jamais des moteurs de travail longs.
+    "tool_search": 4,
+    "web_search": 3,
+    "web_browse": 12,
+    "web_browser_open": 12,
+}
+_NATIVE_DEFAULT_TOOL_CALL_LIMIT = 8
+
 _UNEXECUTED_ACTION_RE = re.compile(
     r"\b(?:je\s+(?:vais|peux|dois)\s+|je\s+)"
     r"(?:lance(?:r)?|effectue(?:r)?|ex[ée]cute(?:r)?|d[ée]marre(?:r)?|"
@@ -140,6 +150,27 @@ def build_empty_response_nudge(*, required_tool_names: set[str]) -> dict[str, st
             f"{requirement} Réponds maintenant à la demande initiale : émets un appel "
             "d'outil natif si une preuve est requise, sinon livre directement une "
             "réponse utile. Ne décris pas une action future et ne reste pas silencieux."
+        ),
+    }
+
+
+def native_tool_call_limit(tool_name: str) -> int:
+    """Budget par capacité pour éviter une boucle sans retirer la décision au LLM."""
+    return _NATIVE_TOOL_CALL_LIMITS.get(
+        str(tool_name or ""),
+        _NATIVE_DEFAULT_TOOL_CALL_LIMIT,
+    )
+
+
+def build_native_budget_nudge(tool_names: set[str]) -> dict[str, str]:
+    names = ", ".join(sorted(tool_names))
+    return {
+        "role": "user",
+        "content": (
+            "Le budget de répétition de cette capacité est atteint pour ce tour : "
+            f"{names}. N'appelle plus ces capacités. Analyse les résultats déjà observés, "
+            "recherche une capacité complémentaire avec les schémas encore visibles, "
+            "ou conclus honnêtement avec le blocage et les preuves disponibles."
         ),
     }
 

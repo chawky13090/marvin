@@ -4,13 +4,20 @@
 const prompt = process.argv.slice(2).join(" ").trim();
 const model = String(process.env.MARVIN_SMOKE_MODEL || "auto").trim();
 const summaryOnly = String(process.env.MARVIN_SMOKE_SUMMARY || "") === "1";
+const requestedTimeout = Number.parseInt(
+  String(process.env.MARVIN_SMOKE_TIMEOUT_MS || "180000"),
+  10,
+);
+const timeoutMs = Number.isFinite(requestedTimeout)
+  ? Math.max(10_000, Math.min(requestedTimeout, 900_000))
+  : 180_000;
 if (!prompt) {
   console.error("Usage: node scripts/smoke_native_agent.mjs <prompt>");
   process.exit(2);
 }
 
 const controller = new AbortController();
-const timer = setTimeout(() => controller.abort(), 180_000);
+const timer = setTimeout(() => controller.abort(), timeoutMs);
 try {
   const response = await fetch("http://127.0.0.1:8005/api/chat", {
     method: "POST",
@@ -44,6 +51,7 @@ try {
       .filter((event) => [
         "orchestration_mode",
         "capability_context",
+        "capability_budget",
         "model_info",
         "tool_start",
         "tool_end",
@@ -57,6 +65,8 @@ try {
         enabled: event.enabled,
         count: event.count,
         names: event.names,
+        exhausted: event.exhausted,
+        remaining: event.remaining,
         systemChars: event.system_chars,
         messageRoles: event.message_roles,
         messageChars: event.message_chars,

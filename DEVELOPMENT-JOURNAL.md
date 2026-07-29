@@ -12639,3 +12639,43 @@ Le backend doit rester en mode déterministe après la campagne. Rollback de cod
 le commit v2.492. Rollback fonctionnel immédiat : supprimer `MARVIN_ORCHESTRATOR` ou définir
 `MARVIN_ORCHESTRATOR=deterministic`, puis redémarrer le backend. Le tag
 `marvin-deterministic-2026-07-29` demeure la restauration complète antérieure au pivot.
+
+## 2026-07-29 — v2.493 — Anti-stagnation et confirmations critiques de confiance
+
+### Constat
+
+Le canary Next.js exécutait plusieurs variantes de `web_search` avant de lire les pages.
+Ce comportement ne venait plus du routeur déterministe : le LLM disposait des bons schémas,
+mais persistait avec une capacité de découverte insuffisante. Par ailleurs, le niveau Expert
+du gateway pouvait encore transformer implicitement un appel dangereux en appel confirmé,
+ce qui contredisait la cible « LLM libre, effets destructifs sous harnais ».
+
+### Livraison
+
+- `RunnerState` compte toutes les tentatives par outil, succès et échecs;
+- la boucle native retire une capacité de découverte lorsque son budget est épuisé et émet
+  un événement `capability_budget` visible et durable;
+- `web_search` est borné à trois tentatives; les lecteurs de pages disposent de douze appels;
+- le smoke accepte un timeout borné configurable pour les recherches longues;
+- `ALWAYS_CONFIRM_TOOLS` couvre désormais l'union des outils explicitement critiques,
+  `DANGEROUS_TOOLS` et des capacités conditionnellement mutatrices;
+- les champs `confirmed` issus du LLM ou de MCP sont supprimés pour ces outils;
+- le niveau Expert ne contourne plus la confirmation des actions dangereuses dans le gateway;
+  seul `confirmed_by_ui=True` permet le rejeu confirmé.
+
+### Validation réelle
+
+Le canary Next.js a utilisé SearXNG en premier, atteint le budget de découverte, puis lu huit
+pages officielles avec `web_browse`. Il a identifié Next.js 16, cité le blog Next.js 16, le
+blog Next.js 15 et les releases GitHub officielles. La recherche a terminé en 170 secondes,
+sans repli local dans le profil Ultra. Le test négatif de suppression sans confirmation n'a
+émis aucun appel d'outil. Les suites Agent Runner, dispatch, Tool Gateway, Agent Gateway,
+orchestration, calendrier et outils système sont réussies.
+
+### Sécurité, logs et rollback
+
+Les budgets n'examinent ni prompt ni contenu de résultat; ils ne journalisent que le nom de
+capacité et le compteur du tour. La confirmation UI reste liée au rejeu HTTP existant et aux
+reçus d'idempotence; l'intégration complète du digest `PolicyEngine` reste une dette ouverte.
+Rollback : réverter le commit v2.493; aucun schéma ni donnée métier n'a été migré. Le mode
+déterministe reste le défaut pendant la suite du canary.

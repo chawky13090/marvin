@@ -191,7 +191,10 @@ async def main() -> None:
 
     expert = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
-            "file_delete", {"path": "x"}, "mcp", PERMISSION_EXPERT
+            "file_delete",
+            {"path": "x", "confirmed": True},
+            "mcp",
+            PERMISSION_EXPERT,
         ),
         registry=registry,
         specifications=specifications,
@@ -199,7 +202,8 @@ async def main() -> None:
         normalizer=normalize,
         audit_logger=audit,
     )
-    assert expert.result["success"] and calls[-1]["confirmed"] is True
+    assert expert.result["requiresConfirmation"]
+    assert "confirmed" not in calls[-1]
 
     secure_status = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(

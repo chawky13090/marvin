@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.492.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.493.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.492.0)
+## 9. État actuel (v2.493.0)
+
+**v2.493 (anti-stagnation et confirmation de confiance)** : la boucle native applique des
+budgets de répétition par capacité sans choisir l'outil à la place du LLM. `web_search` est
+retiré après trois tentatives et le modèle doit exploiter les preuves, découvrir une
+capacité complémentaire ou conclure; les lectures de pages conservent un budget supérieur.
+Un canary réel Next.js a ainsi basculé de SearXNG vers la lecture directe de huit pages
+officielles et livré une réponse sourcée sur Next.js 16. Les échecs comptent désormais dans
+le budget, pas seulement les succès. Côté effets critiques, le niveau Expert ne fabrique
+plus de confirmation : tous les outils dangereux et conditionnellement mutateurs ignorent
+le champ `confirmed` provenant du LLM ou de MCP. Seul un clic UI transmis par
+`confirmed_by_ui=True` peut autoriser le rejeu exact dans le gateway.
 
 **v2.492 (canary LLM natif réel)** : `agent.py` branche désormais réellement le chemin
 `llm_native_canary` sur Ollama tout en gardant le mode déterministe par défaut et comme

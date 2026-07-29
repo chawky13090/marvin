@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from agent_tool_dispatch import ToolDispatchRequest, dispatch_tool
-from config import PERMISSION_EXPERT, PERMISSION_SECURE
+from agent_tool_dispatch import ALWAYS_CONFIRM_TOOLS, ToolDispatchRequest, dispatch_tool
+from config import DANGEROUS_TOOLS, PERMISSION_EXPERT, PERMISSION_SECURE
 
 
 async def main() -> int:
@@ -83,12 +83,17 @@ async def main() -> int:
 
     irreversible = await dispatch_tool(
         ToolDispatchRequest(
-            "file_delete", {"path": "x"}, "c1", "r1", PERMISSION_EXPERT
+            "file_delete",
+            {"path": "x", "confirmed": True},
+            "c1",
+            "r1",
+            PERMISSION_EXPERT,
         ),
         validate=valid,
         execute=execute,
     )
     assert "confirmed" not in irreversible.arguments
+    assert DANGEROUS_TOOLS <= set(ALWAYS_CONFIRM_TOOLS)
     assert len(calls) == 2
     print(
         "Agent Tool Dispatch OK - polling, explicite, texte, validation, permissions et confirmation."

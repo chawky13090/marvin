@@ -12,6 +12,7 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 from agent_runner import RunnerState
+from agent_loop_policy import build_native_budget_nudge, native_tool_call_limit
 
 
 def main() -> int:
@@ -33,11 +34,32 @@ def main() -> int:
     assert state.successful_tools == 9 and state.failed_tools == 0
     assert long_chain_signals.count(True) == 1
     assert "confirmed" not in state.successful_calls[0]["args"]
+    for index in range(3):
+        state.record_tool(
+            "web_search",
+            {"query": f"variante {index}"},
+            {"success": True},
+            tooling_failure=False,
+        )
+    assert state.successful_call_count("web_search") == 3
+    assert state.attempted_call_count("web_search") == 3
+    assert native_tool_call_limit("web_search") == 3
+    assert native_tool_call_limit("web_browse") == 12
+    nudge = build_native_budget_nudge({"web_search"})
+    assert "N'appelle plus ces capacités" in nudge["content"]
+    state.record_tool(
+        "web_search",
+        {"query": "échec"},
+        {"error": "aucun résultat"},
+        tooling_failure=True,
+    )
+    assert state.successful_call_count("web_search") == 3
+    assert state.attempted_call_count("web_search") == 4
 
     state.record_tool(
         "broken", {"host": "x"}, {"error": "outil inconnu"}, tooling_failure=True
     )
-    assert state.failed_tools == 1 and state.succeeded is False
+    assert state.failed_tools == 2 and state.succeeded is False
     assert "outil inconnu" in state.trace[-1]
 
     state.update_blocking_outcome("ai_test_forge", {"success": True, "production_ready": False})
