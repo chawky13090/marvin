@@ -111,8 +111,8 @@ def main() -> int:
     for name, function in expected.items():
         assert tools.TOOLS_REGISTRY[name] is function, name
         assert any(spec["function"]["name"] == name for spec in tools.TOOLS_SPEC), name
-    assert len(tools.TOOLS_REGISTRY) == len(tools.TOOLS_SPEC) == 345
-    print("Tool Domain Media OK - vidéo, GIF, audio, chemins et façade 345/345.")
+    assert len(tools.TOOLS_REGISTRY) == len(tools.TOOLS_SPEC) == 346
+    print("Tool Domain Media OK - vidéo, GIF, audio, chemins et façade 346/346.")
     return 0
 
 

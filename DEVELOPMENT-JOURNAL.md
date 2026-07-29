@@ -12679,3 +12679,54 @@ capacité et le compteur du tour. La confirmation UI reste liée au rejeu HTTP e
 reçus d'idempotence; l'intégration complète du digest `PolicyEngine` reste une dette ouverte.
 Rollback : réverter le commit v2.493; aucun schéma ni donnée métier n'a été migré. Le mode
 déterministe reste le défaut pendant la suite du canary.
+
+## 2026-07-29 — v2.494 — Aspiration de sites et politique d'effets réelle
+
+### Incident reproduit
+
+La conversation `Meilleurs basket sketchers` a découvert les six URL du sitemap KOIOS,
+mais a utilisé `web_browser_open` sur la majorité des pages. Cet outil rendait le site dans
+Chrome sans fournir au tour suivant un corpus multi-page exploitable. Une seule sous-page
+avait ensuite reçu `web_browse`; la synthèse annonçait donc seulement deux pages aspirées.
+Le site, le transport public et SearXNG n'étaient pas la cause de cet échec.
+
+### Livraison
+
+- `web_site_crawl` aspire les sitemaps et liens internes d'un domaine en une opération;
+- les URL sont normalisées, dédupliquées et limitées au domaine autorisé;
+- chaque page complète est écrite atomiquement sous `data/site_crawls/<job>/pages`;
+- un checkpoint conserve file d'attente, pages visitées, erreurs et paramètres; un crawl
+  partiel peut reprendre automatiquement ou avec son `job_id`;
+- les plafonds configurables atteignent 5 000 pages, profondeur 20 et un corpus LLM de
+  500 000 caractères; le contenu complet reste hors contexte dans les artefacts;
+- un 401, 403 ou 429 peut basculer vers le vrai navigateur après validation préalable de
+  l'URL publique; aucune authentification, CAPTCHA ou restriction d'accès n'est contournée;
+- le prompt et le catalogue distinguent navigation interactive, lecture d'une page,
+  recherche SearXNG et aspiration d'un site;
+- le gateway des effets critiques évalue désormais un manifeste `PolicyEngine`; seule une
+  preuve UI courte liée au digest exact des arguments permet l'exécution.
+
+### Validation observée
+
+- test déterministe crawler : sitemap, découverte par lien, déduplication, artefacts,
+  crawl partiel et reprise réussis;
+- test réel `https://koios.fr` : les six pages du sitemap et quatre contenus internes
+  supplémentaires ont été extraits en 10,7 secondes avec les URL directes;
+- gateway commun : 346/346 outils;
+- catalogue différé : 346 capacités;
+- architecture : 346 schémas, 346 exécuteurs, 371 routes, 41 pages et 78 restrictions.
+- gate globale finale : 213/213 étapes, compilation de 305 fichiers Python et lint
+  frontend sans erreur.
+
+### Sécurité, logs et rollback
+
+Le crawler passe exclusivement par `outbound_http.fetch_public` avant tout repli navigateur :
+résolution publique contrôlée, ports HTTP(S), redirections revalidées, taille et timeout
+bornés. Les identifiants dans les URL sont refusés. Les contenus ne rejoignent pas les logs
+techniques; seuls état, compteurs et classes d'erreur figurent dans le checkpoint. Dette
+restante : les très grands crawls sont reprenables mais restent exécutés dans le producteur
+SSE, pas encore dans un superviseur de jobs indépendant.
+
+Rollback code sans migration : réverter le commit v2.494. Les artefacts de crawl sont
+isolés dans `data/site_crawls` et peuvent être conservés ou supprimés séparément après arrêt
+de Marvin. Le mode d'orchestration déterministe reste la valeur par défaut pendant le canary.

@@ -13,6 +13,7 @@ _NATIVE_TOOL_CALL_LIMITS = {
     "web_search": 3,
     "web_browse": 12,
     "web_browser_open": 12,
+    "web_site_crawl": 4,
 }
 _NATIVE_DEFAULT_TOOL_CALL_LIMIT = 8
 

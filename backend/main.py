@@ -7,7 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
-# v2.493 — budgets anti-stagnation et confirmations UI obligatoires pour les effets critiques
+# v2.494 — crawler Web reprenable et PolicyEngine branché sur les effets critiques
 # v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
 # v2.485 — vocalisation fiable des réponses Cloud answer_final
 # v2.484 — barre contextuelle stable et accueil orienté travail

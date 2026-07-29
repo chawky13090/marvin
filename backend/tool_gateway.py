@@ -8,6 +8,15 @@ from typing import Any, Awaitable, Callable, Mapping, Sequence
 
 from agent_safety import validator_for
 from agent_execution import execute_registered_tool
+from critical_tool_policy import manifest_for_critical_call
+from policy_engine import (
+    ApprovalEvidence,
+    ExecutionEnvironment,
+    PolicyAction,
+    PolicyContext,
+    PolicyEngine,
+    call_digest,
+)
 from config import (
     CONDITIONAL_TOOL_SAFE_ACTIONS,
     DANGEROUS_TOOLS,
@@ -129,13 +138,72 @@ async def execute_tool(
     ):
         return ToolGatewayResult(_permission_denied(request.tool_name), False, 403)
     dangerous_call = request.tool_name in DANGEROUS_TOOLS or conditional_mutation
-    if dangerous_call and not request.confirmed_by_ui:
-        # Une confirmation déclarée dans les arguments appartient à la zone non fiable :
-        # elle peut provenir d'un modèle ou d'un client HTTP. Seul le canal UI explicite
-        # ou le niveau Expert peut autoriser l'action.
+    if dangerous_call:
+        # Le digest porte sur les arguments métier, jamais sur un booléen fabriqué
+        # par le modèle. La preuve UI est recréée pour ce digest exact seulement.
         arguments.pop("confirmed", None)
         arguments.pop("__confirmed", None)
-    elif request.confirmed_by_ui and dangerous_call:
+        context = PolicyContext(
+            identity=f"{request.source}:user",
+            tool_name=request.tool_name,
+            arguments=arguments,
+            permission_level=request.permission_level,
+            environment=ExecutionEnvironment.HOST,
+            source=request.source,
+            target=str(
+                arguments.get("path")
+                or arguments.get("host")
+                or arguments.get("id")
+                or ""
+            )[:2_000],
+            request_id=request.request_id or "",
+            conversation_id=request.conversation_id or "",
+        )
+        digest = call_digest(context)
+        if request.confirmed_by_ui:
+            context = PolicyContext(
+                identity=context.identity,
+                tool_name=context.tool_name,
+                arguments=context.arguments,
+                permission_level=context.permission_level,
+                environment=context.environment,
+                source=context.source,
+                target=context.target,
+                approval=ApprovalEvidence(
+                    call_digest=digest,
+                    approved_by="trusted_ui",
+                    expires_at=time.time() + 60,
+                    approval_id=request.request_id or f"ui-{digest[:16]}",
+                ),
+                request_id=context.request_id,
+                conversation_id=context.conversation_id,
+            )
+        decision = PolicyEngine().evaluate(
+            manifest_for_critical_call(request.tool_name, arguments),
+            context,
+        )
+        if decision.action is PolicyAction.DENY:
+            return ToolGatewayResult(
+                {
+                    "error": "Action refusée par la politique d'effets.",
+                    "policyReason": decision.reason_code,
+                    "riskTier": int(decision.risk_tier),
+                },
+                False,
+                403,
+            )
+        if decision.action is PolicyAction.REQUIRE_APPROVAL:
+            return ToolGatewayResult(
+                {
+                    "success": False,
+                    "requiresConfirmation": True,
+                    "policyReason": decision.reason_code,
+                    "approvalDigest": decision.call_digest,
+                    "riskTier": int(decision.risk_tier),
+                },
+                False,
+                409,
+            )
         arguments["confirmed"] = True
 
     started = time.monotonic()

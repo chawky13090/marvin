@@ -66,6 +66,7 @@ PUBLIC_TOOL_NAMES = frozenset({
     "weather",
     "web_search",
     "web_browse",
+    "web_site_crawl",
     "web_research",
     "web_deep_research",
 })

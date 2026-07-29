@@ -161,6 +161,7 @@ async def main() -> None:
     assert Database.logs[-1][1]["request_id"] == ui_request_id
     assert AUDIT[-1][4] == ui_request_id
 
+    calls_before_mcp = len(calls)
     mcp = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
             "file_delete", {"path": "x"}, "mcp", PERMISSION_STANDARD
@@ -171,7 +172,8 @@ async def main() -> None:
         normalizer=normalize,
         audit_logger=audit,
     )
-    assert mcp.result["requiresConfirmation"] and "confirmed" not in calls[-1]
+    assert mcp.result["requiresConfirmation"] and len(calls) == calls_before_mcp
+    assert mcp.result["approvalDigest"]
 
     forged_confirmation = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
@@ -187,7 +189,8 @@ async def main() -> None:
         audit_logger=audit,
     )
     assert forged_confirmation.result["requiresConfirmation"]
-    assert "confirmed" not in calls[-1]
+    assert len(calls) == calls_before_mcp
+    assert forged_confirmation.result["approvalDigest"] == mcp.result["approvalDigest"]
 
     expert = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
@@ -203,7 +206,7 @@ async def main() -> None:
         audit_logger=audit,
     )
     assert expert.result["requiresConfirmation"]
-    assert "confirmed" not in calls[-1]
+    assert len(calls) == calls_before_mcp
 
     secure_status = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
@@ -306,11 +309,11 @@ async def main() -> None:
 
     report = tool_gateway.coverage_report(tools.TOOLS_REGISTRY, tools.TOOLS_SPEC)
     assert report["complete"] is True
-    assert report["covered"] == report["total"] == 345
+    assert report["covered"] == report["total"] == 346
     assert report["missing_schema"] == report["missing_executor"] == []
     assert len(report["layers"]) == 8
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-    print("OK - gateway outils 345/345")
+    print("OK - gateway outils 346/346")

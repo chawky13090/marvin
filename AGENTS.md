@@ -6,7 +6,7 @@
 
 ## 1. Qu'est-ce que Marvin
 
-Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **345 outils**.
+Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **346 outils**.
 
 L'utilisateur veut un Marvin **complet, puissant, qui ne fait pas de compromis**. Travailler de façon **autonome** : décider, innover, vérifier et améliorer les outils, ne pas s'arrêter pour demander à chaque étape.
 
@@ -35,14 +35,14 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.493.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.494.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
 ### Fichiers backend clés (`backend/`)
 - `main.py` — cycle de vie et majorité des endpoints FastAPI historiques (gros fichier ; historique versionné en commentaires `# vX.Y`).
 - `api/` — routeurs FastAPI extraits progressivement : Doctor, conversations, projets, tâches et notes ont leurs modules dédiés.
-- `tools.py` — les **345 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
+- `tools.py` — les **346 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
 - `auto_config.py` — détecte le matériel, choisit le **mode** (eco/balanced/performance/max) et applique les leviers + choisit les modèles Ollama selon la VRAM.
 - `skills.py` — système de **compétences** (fichiers Markdown, voir §5).
@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.493.0)
+## 9. État actuel (v2.494.0)
+
+**v2.494 (crawler Web reprenable et politique d'effets)** : `web_site_crawl` découvre les
+sitemaps et les liens internes, extrait jusqu'à 5 000 pages par appel et conserve le contenu
+complet dans `data/site_crawls`. Les checkpoints atomiques permettent de reprendre un crawl
+partiel; le corpus rendu au LLM reste borné indépendamment des artefacts. Le transport public
+SSRF-safe précède tout repli vers le navigateur réel pour les pages dynamiques ou les réponses
+401/403/429. Le LLM choisit librement navigation, recherche ou crawl; authentification,
+CAPTCHA, paywall et contrôle d'accès ne sont jamais contournés. Le gateway des effets
+critiques passe désormais par `PolicyEngine` et seule une preuve UI liée au digest exact de
+l'appel autorise l'exécution. Le catalogue contient 346 capacités.
 
 **v2.493 (anti-stagnation et confirmation de confiance)** : la boucle native applique des
 budgets de répétition par capacité sans choisir l'outil à la place du LLM. `web_search` est

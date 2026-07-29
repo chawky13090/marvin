@@ -93,10 +93,10 @@ def main() -> int:
     for name, function in expected.items():
         assert tools.TOOLS_REGISTRY[name] is function, name
         assert any(spec["function"]["name"] == name for spec in tools.TOOLS_SPEC), name
-    assert len(tools.TOOLS_REGISTRY) == len(tools.TOOLS_SPEC) == 345
+    assert len(tools.TOOLS_REGISTRY) == len(tools.TOOLS_SPEC) == 346
     api_source = (BACKEND / "api" / "ssh.py").read_text(encoding="utf-8")
     assert "import tools" not in api_source and "tool_module" not in api_source
-    print("Tool Domain SSH OK - secrets, garde, exécution, API et façade 345/345.")
+    print("Tool Domain SSH OK - secrets, garde, exécution, API et façade 346/346.")
     return 0
 
 

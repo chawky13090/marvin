@@ -2269,6 +2269,7 @@ weather_domain.configure(
 )
 
 execute_web_browse = web_domain.execute_web_browse
+execute_web_site_crawl = web_domain.execute_web_site_crawl
 execute_web_browser_open = web_domain.execute_web_browser_open
 execute_web_deep_research = web_domain.execute_web_deep_research
 execute_web_research = web_domain.execute_web_research
@@ -2466,6 +2467,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     # Web
     "web_search": execute_web_search,
     "web_browse": execute_web_browse,
+    "web_site_crawl": execute_web_site_crawl,
     # Documents avancés
     "infographic_create": execute_infographic_create,
     "file_create_xlsx": execute_file_create_xlsx,
@@ -3259,6 +3261,36 @@ TOOLS_SPEC = [
        "À utiliser pour vérifier une source primaire avant de la citer.",
        {"url": {"type": "string", "description": "URL de la page à visiter"},
         "max_chars": {"type": "integer", "description": "Limite de caractères à retourner (défaut 25000, max 60000)"}},
+       ["url"]),
+
+    _t(
+       "web_site_crawl",
+       "Aspire automatiquement un site public complet à partir de ses sitemaps et liens "
+       "internes. À choisir dès que l'utilisateur demande d'aspirer, crawler, parcourir "
+       "tout un site ou analyser plusieurs pages du même domaine. Conserve chaque page "
+       "dans un artefact local et retourne textes, titres et URL directes. Ne remplace "
+       "pas web_browser_open pour un parcours interactif ou une authentification.",
+       {
+        "url": {"type": "string", "description": "URL de départ du site"},
+        "max_pages": {"type": "integer", "minimum": 1, "maximum": 5000,
+                      "description": "Plafond adaptatif de pages (défaut 250, maximum 5000)"},
+        "max_depth": {"type": "integer", "minimum": 0, "maximum": 20,
+                      "description": "Profondeur maximale des liens internes (défaut 8)"},
+        "include_subdomains": {"type": "boolean",
+                               "description": "Inclure les sous-domaines du domaine initial"},
+        "use_sitemaps": {"type": "boolean",
+                         "description": "Découvrir prioritairement les sitemaps (défaut true)"},
+        "browser_fallback": {"type": "boolean",
+                             "description": "Rendre avec le vrai navigateur en cas de 401, 403 ou 429 (défaut true); ne contourne aucun contrôle d'accès"},
+        "resume": {"type": "boolean",
+                   "description": "Reprendre automatiquement le dernier crawl incomplet de la même URL (défaut true)"},
+        "per_page_chars": {"type": "integer", "minimum": 1000, "maximum": 100000,
+                           "description": "Texte maximal renvoyé au LLM par page"},
+        "max_return_chars": {"type": "integer", "minimum": 5000, "maximum": 500000,
+                             "description": "Corpus total maximal renvoyé au LLM; le contenu complet reste dans les artefacts"},
+        "job_id": {"type": "string",
+                   "description": "Identifiant optionnel pour retrouver les artefacts du crawl"}
+       },
        ["url"]),
 
     _t("infographic_create", "Crée un graphique PNG. Types : bar, horizontal_bar, pie, donut, line, area, multi_line, scatter, radar, grouped_bar, stacked_bar. Pour les multi-séries (grouped/stacked/multi_line/radar), fournir 'series' = [{name, values}].",

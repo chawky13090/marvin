@@ -47,6 +47,12 @@ async def _new_context():
 
 async def fetch_text(url: str, timeout: int = 25000, max_chars: int = 8000) -> dict:
     """Ouvre une URL dans un vrai navigateur et renvoie son texte lisible."""
+    data = await fetch_page(url, timeout=timeout, max_chars=max_chars)
+    return {"title": data["title"], "text": data["text"], "url": data["url"]}
+
+
+async def fetch_page(url: str, timeout: int = 25000, max_chars: int = 100000) -> dict:
+    """Rend une page autorisée et restitue son texte ainsi que ses liens absolus."""
     ctx = await _new_context()
     try:
         page = await ctx.new_page()
@@ -54,11 +60,21 @@ async def fetch_text(url: str, timeout: int = 25000, max_chars: int = 8000) -> d
         await page.wait_for_timeout(700)   # laisser le JS se poser
         data = await page.evaluate(
             """() => {
+                const links = [...document.querySelectorAll('a[href]')].map(a => a.href);
                 document.querySelectorAll('script,style,nav,footer,header,noscript,svg,iframe').forEach(e=>e.remove());
-                return { title: document.title || '', text: (document.body && document.body.innerText) || '' };
+                return {
+                    title: document.title || '',
+                    text: (document.body && document.body.innerText) || '',
+                    links
+                };
             }"""
         )
-        return {"title": data.get("title", ""), "text": (data.get("text") or "").strip()[:max_chars], "url": page.url}
+        return {
+            "title": data.get("title", ""),
+            "text": (data.get("text") or "").strip()[:max_chars],
+            "url": page.url,
+            "links": list(dict.fromkeys(data.get("links") or []))[:10000],
+        }
     finally:
         await ctx.close()
 

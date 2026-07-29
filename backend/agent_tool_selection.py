@@ -25,7 +25,7 @@ _ALWAYS_INCLUDE = {
 # polyvalents, AU LIEU des ~245 specs (qui font un prompt énorme → réponse de
 # plusieurs minutes, surtout sur petit GPU). Les noms inexistants sont ignorés.
 _COMMON_TOOLS = {
-    "web_search", "web_browse", "datetime_info", "weather",
+    "web_search", "web_browse", "web_site_crawl", "datetime_info", "weather",
     "task_create", "task_list", "task_update",
     "note_create", "note_list",
     "event_create", "event_list", "daily_briefing",
@@ -65,7 +65,7 @@ _KEYWORD_TOOLS = {
     ("web", "internet", "searxng", "cherche sur", "recherche en ligne",
      "actualité", "news", "actu", "info", "trouve en ligne", "sur le net", "sur le web",
      "renseigne-toi", "renseigne toi"):
-        {"web_search", "web_browse", "web_research"},
+        {"web_search", "web_browse", "web_site_crawl", "web_research"},
 
     # v2.142 — Recherche APPROFONDIE (« Deep Research ») : groupe de mots-clés SÉPARÉ et
     # plus restrictif que la recherche web générale ci-dessus — outil volontairement lent
@@ -109,7 +109,7 @@ _KEYWORD_TOOLS = {
 
     # Lire une page web
     ("url", "site", "page web", "lien", "http", "navigateur", "ouvre le site"):
-        {"web_browse", "url_analyze", "web_browser_open", "web_research"},
+        {"web_browse", "web_site_crawl", "url_analyze", "web_browser_open", "web_research"},
 
     # Fichiers
     ("fichier", "dossier", "bureau", "documents", "downloads", "téléchargement",

@@ -199,7 +199,7 @@ async def _run() -> None:
         for name in dir(web)
         if name.startswith("execute_web_")
     ]
-    assert len(names) == 5
+    assert len(names) == 6
     for public_name in names:
         implementation = getattr(web, f"execute_{public_name}")
         assert getattr(tools, f"execute_{public_name}") is implementation

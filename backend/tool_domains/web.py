@@ -7,6 +7,7 @@ from typing import Any
 import unicodedata
 
 import outbound_http
+import site_crawler
 import tool_activity
 
 Generator = Callable[..., Awaitable[str]]
@@ -665,6 +666,23 @@ async def execute_web_browse(args: dict) -> dict:
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+async def execute_web_site_crawl(args: dict) -> dict:
+    """Aspire atomiquement les pages internes d'un site public."""
+    await tool_activity.emit(
+        "browsing",
+        "Aspiration du site",
+        detail=str(args.get("url") or "")[:300],
+    )
+    try:
+        return await site_crawler.crawl_site(args)
+    except (OSError, TypeError, ValueError, outbound_http.httpx.HTTPError) as exc:
+        return {
+            "success": False,
+            "error": str(exc)[:500],
+            "error_type": type(exc).__name__,
+        }
 
 
 async def execute_url_analyze(args: dict) -> dict:
