@@ -42,6 +42,8 @@ async def _exercise(mesh_path: Path) -> None:
         assert result["consistency"] == "complete"
         assert memory_mesh.list_metadata()[0]["memory_id"] == "memory-1"
         assert memory_mesh.list_metadata()[0]["source"] == "test"
+        original_valid_from = memory_mesh.list_metadata()[0]["valid_from"]
+        assert len(memory_mesh.list_metadata()[0]["content_sha256"]) == 64
         try:
             await memory_lifecycle.create("test", "working", source="test")
         except ValueError:
@@ -61,6 +63,35 @@ async def _exercise(mesh_path: Path) -> None:
             [{"id": "working-1"}, {"id": "legacy"}],
             now=future,
         ) == [{"id": "legacy"}]
+
+        with patch.object(memory_lifecycle, "_index", AsyncMock()):
+            await memory_lifecycle.refresh(
+                {**created, "content": "Préférence de test mise à jour"},
+                source="repair",
+            )
+        refreshed_metadata = next(
+            item
+            for item in memory_mesh.list_metadata()
+            if item["memory_id"] == "memory-1"
+        )
+        assert refreshed_metadata["valid_from"] == original_valid_from
+        assert refreshed_metadata["source_history"] == ["test", "repair"]
+
+        memory_mesh.register("memory-2", "Préférence contradictoire", "fact", source="test")
+        memory_mesh.record_contradiction(
+            "memory-1",
+            "memory-2",
+            reason_code="content_conflict",
+        )
+        assert memory_mesh.conflicted_ids() == {"memory-1", "memory-2"}
+        assert memory_mesh.stats()["conflicted"] == 2
+        assert memory_mesh.filter_active(
+            [{"id": "memory-1"}, {"id": "memory-2"}, {"id": "legacy"}]
+        ) == [{"id": "legacy"}]
+        assert memory_mesh.resolve_contradiction("memory-1", "memory-2") is True
+        assert memory_mesh.conflicted_ids() == set()
+        assert memory_mesh.resolve_contradiction("memory-1", "memory-2") is False
+        assert memory_mesh.remove("memory-2") is True
 
         corrupt_path = mesh_path.with_name("corrupt.json")
         corrupt_path.write_text("{invalid", encoding="utf-8")
@@ -126,6 +157,39 @@ async def _exercise(mesh_path: Path) -> None:
         assert {
             item["memory_id"] for item in memory_mesh.list_metadata()
         } == {"working-1"}
+
+        memory_mesh.clear()
+        memory_mesh.register("stale", "Ancien contenu", "fact", source="test")
+        memory_mesh.register("orphan", "Projection orpheline", "fact", source="test")
+        authoritative = [
+            {"id": "stale", "content": "Nouveau contenu", "category": "fact"},
+            {"id": "missing", "content": "Projection absente", "category": "fact"},
+        ]
+        with patch.object(
+            memory_lifecycle.db, "get_memories", return_value=authoritative
+        ):
+            audit = memory_lifecycle.audit_consistency()
+        assert audit["consistent"] is False
+        assert audit["missing_mesh"] == ["missing"]
+        assert audit["orphan_mesh"] == ["orphan"]
+        assert audit["stale_content"] == ["stale"]
+
+        with (
+            patch.object(
+                memory_lifecycle.db, "get_memories", return_value=authoritative
+            ),
+            patch.object(memory_lifecycle, "_index", AsyncMock()),
+            patch.object(memory_lifecycle, "_delete_index", AsyncMock()),
+        ):
+            preview_repair = await memory_lifecycle.repair_consistency(dry_run=True)
+            repaired = await memory_lifecycle.repair_consistency(dry_run=False)
+        assert preview_repair["actions"] == []
+        assert repaired["success"] is True
+        assert repaired["after"]["consistent"] is True
+        assert {item["action"] for item in repaired["actions"]} == {
+            "refresh",
+            "remove_orphan",
+        }
 
         with (
             patch.object(
@@ -270,6 +334,20 @@ async def _exercise(mesh_path: Path) -> None:
                 assert exc.status_code == 503
             else:
                 raise AssertionError("Un oubli incomplet ne devait pas retourner un succès.")
+        with patch.object(
+            memories_api.memory_lifecycle,
+            "audit_consistency",
+            return_value={"consistent": True},
+        ):
+            assert (await memories_api.memory_consistency())["consistent"] is True
+        try:
+            await memories_api.repair_memory_consistency(
+                confirmed=False, dry_run=False
+            )
+        except HTTPException as exc:
+            assert exc.status_code == 409
+        else:
+            raise AssertionError("Une réparation réelle devait exiger confirmation.")
         settings_proxy = (
             ROOT / "app" / "api" / "settings" / "route.js"
         ).read_text(encoding="utf-8")

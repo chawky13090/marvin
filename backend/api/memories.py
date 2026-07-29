@@ -68,3 +68,24 @@ async def run_memory_consolidation():
     import memory_consolidation
 
     return await memory_consolidation.consolidate_memories(dry_run=False)
+
+
+@router.get("/api/memories/consistency")
+async def memory_consistency():
+    return memory_lifecycle.audit_consistency()
+
+
+@router.post("/api/memories/consistency/repair")
+async def repair_memory_consistency(
+    confirmed: bool = Query(default=False),
+    dry_run: bool = Query(default=True),
+):
+    if not dry_run and not confirmed:
+        raise HTTPException(
+            status_code=409,
+            detail="Confirmation explicite requise pour réparer les projections mémoire.",
+        )
+    result = await memory_lifecycle.repair_consistency(dry_run=dry_run)
+    if not result["success"]:
+        raise HTTPException(status_code=503, detail=result)
+    return result

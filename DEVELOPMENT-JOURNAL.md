@@ -5,6 +5,48 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.453.0 — Cohérence et conflits du Memory Mesh
+
+### Constat et décision
+
+SQLite était déjà la source autoritative du cycle de vie, mais le sidecar Mesh ne conservait
+pas l'empreinte du contenu. Une mise à jour partielle pouvait donc laisser une projection
+obsolète sans signal exploitable. Deux approches ont été comparées : supprimer et reconstruire
+toutes les projections périodiquement, coûteux et destructeur pour les métadonnées d'usage,
+ou comparer des empreintes déterministes et ne réparer que les divergences. La seconde est
+retenue. Pour les faits contradictoires, fusionner automatiquement risquerait de fabriquer une
+vérité; Marvin les met désormais en quarantaine jusqu'à résolution explicite.
+
+### Implémentation
+
+`memory_mesh.py` conserve l'empreinte SHA-256 du contenu, la date d'origine et un historique
+borné des sources. Les contradictions sont enregistrées symétriquement, sans recopier le
+contenu, et les souvenirs concernés sont exclus de la construction du contexte.
+`memory_lifecycle.audit_consistency()` compare SQLite au Mesh et classe projections absentes,
+orphelines, périmées, malformées, expirées ou conflictuelles. Le réparateur reconstruit les
+projections invalides et retire les orphelines sans modifier la source SQLite. Qdrant reçoit
+la même empreinte. L'API expose un audit en lecture seule et un réparateur dont l'exécution
+réelle exige `confirmed=true`.
+
+### Sécurité, logs, tests et rollback
+
+Les empreintes ne permettent pas de restituer le contenu et l'audit public ne l'expose jamais.
+Les identifiants, listes, sources et conflits restent bornés; aucun secret ni texte mémoire
+n'est ajouté aux logs techniques. La réparation n'est ni automatique ni silencieuse. Les
+tests couvrent mise à jour, origine, contradiction, quarantaine, résolution, projection
+absente, obsolète et orpheline, prévisualisation, confirmation HTTP et compensation des
+pannes. Aucun schéma SQLite n'est modifié. L'audit live initial a trouvé 7 projections
+absentes et 3 projections historiques périmées parmi 10 souvenirs SQLite. Une sauvegarde
+SQLite chiffrée et vérifiée a été créée, puis Mesh et Qdrant ont été copiés avec Marvin
+arrêté dans `data/backups/memory-projections-v2.453-before-repair-20260729-0511/`.
+La réparation confirmée a exécuté 10 actions sans échec; l'audit final est cohérent avec
+zéro projection absente, obsolète, invalide ou orpheline. `/api/health` expose **2.453.0**.
+
+Rollback code : `git revert <commit-v2.453>`. Les sidecars historiques sans empreinte restent
+lisibles; après rollback ils sont simplement ignorés par l'ancienne version. Si une réparation
+réelle devait être exécutée ultérieurement, sauvegarder préalablement le sidecar Mesh, la base
+SQLite et le stockage Qdrant, puis restaurer les trois avec Marvin arrêté.
+
 ## 2026-07-29 — v2.452.0 — Confidentialité durable des Coding Missions
 
 ### Constat et décision

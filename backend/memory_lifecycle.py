@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+import math
+import re
 from typing import Any
 
 import database as db
@@ -162,5 +165,113 @@ async def prune_expired() -> dict[str, Any]:
         "success": not failures,
         "expired_count": len(expired),
         "forgotten_count": len(forgotten),
+        "failures": failures,
+    }
+
+
+def audit_consistency() -> dict[str, Any]:
+    """Compare SQLite et Memory Mesh sans ouvrir un second client Qdrant."""
+    memories = db.get_memories()
+    by_id = {str(item["id"]): item for item in memories}
+    metadata = {
+        str(item.get("memory_id") or ""): item
+        for item in memory_mesh.list_metadata()
+        if str(item.get("memory_id") or "")
+    }
+    database_ids = set(by_id)
+    mesh_ids = set(metadata)
+    stale = sorted(
+        memory_id
+        for memory_id in database_ids & mesh_ids
+        if metadata[memory_id].get("content_sha256")
+        != memory_mesh.content_sha256(str(by_id[memory_id].get("content") or ""))
+    )
+
+    def valid_metadata(item: dict[str, Any]) -> bool:
+        try:
+            confidence = float(item.get("confidence"))
+            datetime.fromisoformat(str(item.get("valid_from") or ""))
+            if item.get("expires_at"):
+                datetime.fromisoformat(str(item["expires_at"]))
+        except (TypeError, ValueError):
+            return False
+        return (
+            item.get("kind") in {"working", "episodic", "semantic", "procedural"}
+            and bool(str(item.get("source") or "").strip())
+            and math.isfinite(confidence)
+            and 0.0 <= confidence <= 1.0
+            and bool(re.fullmatch(r"[0-9a-f]{64}", str(item.get("content_sha256") or "")))
+            and isinstance(item.get("source_history"), list)
+            and isinstance(item.get("contradictions"), list)
+        )
+
+    invalid = sorted(
+        memory_id
+        for memory_id, item in metadata.items()
+        if not valid_metadata(item)
+    )
+    return {
+        "consistent": not (
+            database_ids - mesh_ids
+            or mesh_ids - database_ids
+            or stale
+            or invalid
+        ),
+        "database_count": len(database_ids),
+        "mesh_count": len(mesh_ids),
+        "missing_mesh": sorted(database_ids - mesh_ids),
+        "orphan_mesh": sorted(mesh_ids - database_ids),
+        "stale_content": stale,
+        "invalid_metadata": invalid,
+        "expired": sorted(memory_mesh.expired_ids()),
+        "conflicted": sorted(memory_mesh.conflicted_ids()),
+    }
+
+
+async def repair_consistency(*, dry_run: bool = True) -> dict[str, Any]:
+    """Répare uniquement les projections; SQLite reste la source autoritative."""
+    before = audit_consistency()
+    if dry_run:
+        return {"success": True, "dry_run": True, "before": before, "actions": []}
+    memories = {
+        str(item["id"]): item
+        for item in db.get_memories()
+    }
+    actions: list[dict[str, str]] = []
+    failures: list[dict[str, str]] = []
+    for memory_id in sorted(
+        set(before["missing_mesh"])
+        | set(before["stale_content"])
+        | set(before["invalid_metadata"])
+    ):
+        memory = memories.get(memory_id)
+        if not memory:
+            continue
+        projection = await refresh(memory, source="reconciliation")
+        actions.append({"id": memory_id, "action": "refresh"})
+        for warning in projection.get("warnings") or []:
+            failures.append(
+                {"id": memory_id, "stage": str(warning).split(":", 1)[0]}
+            )
+    for memory_id in before["orphan_mesh"]:
+        try:
+            await _delete_index(memory_id)
+            memory_mesh.remove(memory_id)
+            actions.append({"id": memory_id, "action": "remove_orphan"})
+        except Exception as exc:
+            failures.append(
+                {
+                    "id": memory_id,
+                    "stage": "orphan",
+                    "error_type": type(exc).__name__,
+                }
+            )
+    after = audit_consistency()
+    return {
+        "success": not failures and after["consistent"],
+        "dry_run": False,
+        "before": before,
+        "after": after,
+        "actions": actions,
         "failures": failures,
     }

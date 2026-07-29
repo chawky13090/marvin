@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.452.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.453.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.452.0)
+## 9. État actuel (v2.453.0)
+
+**v2.453 (cohérence du Memory Mesh)** : chaque projection mémoire conserve désormais
+l'empreinte SHA-256 du contenu autoritatif, son origine courante et un historique borné des
+origines. Un audit déterministe détecte les projections absentes, orphelines, périmées ou
+malformées; son réparateur confirmé ne modifie que les projections Mesh/Qdrant et laisse
+SQLite autoritatif. Les contradictions sont symétriques, bornées et excluent les souvenirs
+concernés du contexte tant qu'elles ne sont pas explicitement résolues. L'audit HTTP est
+non destructif; toute réparation réelle exige une confirmation explicite.
 
 **v2.452 (confidentialité des missions longues)** : chaque job Code Workspace capture le
 profil effectif au démarrage et avant/après chaque génération. Une transition produit un

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import threading
@@ -34,6 +35,10 @@ def classify(content: str, category: str = "fact") -> str:
     if category in {"working", "temporary"}:
         return "working"
     return "semantic"
+
+
+def content_sha256(content: str) -> str:
+    return hashlib.sha256(str(content).encode("utf-8")).hexdigest()
 
 
 def _load() -> dict[str, dict[str, Any]]:
@@ -77,6 +82,8 @@ def register(
         "memory_id": str(memory_id),
         "kind": kind,
         "source": source[:120],
+        "source_history": [],
+        "content_sha256": content_sha256(content),
         "confidence": max(0.0, min(float(confidence), 1.0)),
         "sensitive": bool(re.search(r"\b(mail|ssh|client|facture|mot de passe|token|secret)\b", content.lower())),
         "valid_from": now.isoformat(),
@@ -89,9 +96,20 @@ def register(
     with _LOCK:
         mesh = _load()
         previous = mesh.get(str(memory_id), {})
+        record["valid_from"] = previous.get("valid_from") or record["valid_from"]
         record["use_count"] = int(previous.get("use_count") or 0)
         record["last_used_at"] = previous.get("last_used_at")
         record["contradictions"] = previous.get("contradictions") or []
+        history = [
+            str(item)[:120]
+            for item in previous.get("source_history") or []
+            if str(item).strip()
+        ]
+        previous_source = str(previous.get("source") or "").strip()
+        for item in (previous_source, record["source"]):
+            if item and item not in history:
+                history.append(item)
+        record["source_history"] = history[-20:]
         mesh[str(memory_id)] = record
         _save(mesh)
     return record
@@ -118,6 +136,77 @@ def remove(memory_id: str | int) -> bool:
         if removed:
             _save(mesh)
         return removed
+
+
+def record_contradiction(
+    first_id: str | int,
+    second_id: str | int,
+    *,
+    reason_code: str = "manual",
+) -> None:
+    """Marque symétriquement un conflit sans recopier le contenu des souvenirs."""
+    first = str(first_id)
+    second = str(second_id)
+    if not first or not second or first == second:
+        raise ValueError("Deux souvenirs distincts sont requis.")
+    if reason_code not in {"manual", "user_correction", "content_conflict"}:
+        raise ValueError("Code de contradiction invalide.")
+    with _LOCK:
+        mesh = _load()
+        if first not in mesh or second not in mesh:
+            raise KeyError("Souvenir absent du Memory Mesh.")
+        detected_at = _now().isoformat()
+        for current, other in ((first, second), (second, first)):
+            conflicts = [
+                item
+                for item in mesh[current].get("contradictions") or []
+                if isinstance(item, dict) and item.get("memory_id") != other
+            ]
+            conflicts.append(
+                {
+                    "memory_id": other,
+                    "reason_code": reason_code,
+                    "detected_at": detected_at,
+                }
+            )
+            mesh[current]["contradictions"] = conflicts[-50:]
+            mesh[current]["updated_at"] = detected_at
+        _save(mesh)
+
+
+def resolve_contradiction(first_id: str | int, second_id: str | int) -> bool:
+    """Retire symétriquement un conflit explicitement résolu."""
+    first = str(first_id)
+    second = str(second_id)
+    changed = False
+    with _LOCK:
+        mesh = _load()
+        for current, other in ((first, second), (second, first)):
+            if current not in mesh:
+                continue
+            before = list(mesh[current].get("contradictions") or [])
+            after = [
+                item
+                for item in before
+                if not isinstance(item, dict) or item.get("memory_id") != other
+            ]
+            if after != before:
+                mesh[current]["contradictions"] = after
+                mesh[current]["updated_at"] = _now().isoformat()
+                changed = True
+        if changed:
+            _save(mesh)
+    return changed
+
+
+def conflicted_ids() -> set[str]:
+    with _LOCK:
+        records = _load()
+    return {
+        str(memory_id)
+        for memory_id, record in records.items()
+        if record.get("contradictions")
+    }
 
 
 def clear() -> int:
@@ -157,11 +246,11 @@ def filter_active(
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Exclut du prompt les souvenirs expirés, sans masquer les entrées legacy sans Mesh."""
-    expired = expired_ids(now=now)
+    excluded = expired_ids(now=now) | conflicted_ids()
     return [
         memory
         for memory in memories
-        if str(memory.get("id") or "") not in expired
+        if str(memory.get("id") or "") not in excluded
     ]
 
 
@@ -183,4 +272,5 @@ def stats() -> dict[str, Any]:
         "by_kind": by_kind,
         "sensitive": sum(1 for item in records if item.get("sensitive")),
         "used": sum(1 for item in records if int(item.get("use_count") or 0) > 0),
+        "conflicted": sum(1 for item in records if item.get("contradictions")),
     }

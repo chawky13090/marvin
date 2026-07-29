@@ -289,7 +289,18 @@ def _safe_id(raw_id: str) -> str:
 
 
 async def index_memory(memory_id: str, content: str, category: str):
-    await upsert_document("memories", memory_id, content, {"category": category, "original_id": memory_id})
+    import memory_mesh
+
+    await upsert_document(
+        "memories",
+        memory_id,
+        content,
+        {
+            "category": category,
+            "original_id": memory_id,
+            "content_sha256": memory_mesh.content_sha256(content),
+        },
+    )
 
 
 async def index_note(note_id: str, title: str, content: str, tags: list):
