@@ -213,6 +213,65 @@ def main() -> int:
     assert "web_research" in deictic.required_tool_names
     assert deictic.contextual_web_query == deictic_messages[0]["content"]
 
+    confirmed_web_messages = [
+        {"role": "user", "content": "je veux connaitre le cours de la bourse française"},
+        {"role": "assistant", "content": "Une recherche actuelle est nécessaire."},
+        {"role": "user", "content": "oui recherche sur le web"},
+    ]
+    confirmed_web = planning.compile_turn_plan(
+        confirmed_web_messages,
+        confirmed_web_messages[-1]["content"],
+    )
+    assert confirmed_web.required_tool_names == {"web_research"}
+    assert "cours de la bourse française" in confirmed_web.contextual_web_query
+
+    desktop_messages = [
+        {"role": "user", "content": "liste les dossiers présents sur mon bureau"},
+    ]
+    desktop = planning.compile_turn_plan(
+        desktop_messages,
+        desktop_messages[-1]["content"],
+    )
+    assert "pc_get_real_paths" in desktop.required_tool_names
+
+    desktop_retry = [
+        *desktop_messages,
+        {"role": "assistant", "content": "Je n'ai pas exécuté l'action."},
+        {"role": "user", "content": "tu as les outils nécessaires pourtant"},
+    ]
+    retry_plan = planning.compile_turn_plan(
+        desktop_retry,
+        desktop_retry[-1]["content"],
+    )
+    assert "pc_get_real_paths" in retry_plan.required_tool_names
+
+    for query, required in (
+        ("liste mes tâches", "task_list"),
+        ("affiche mes notes", "note_list"),
+        ("montre mes emails", "email_list"),
+        ("donne les rendez-vous de mon agenda", "event_list"),
+    ):
+        action_plan = planning.compile_turn_plan(
+            [{"role": "user", "content": query}],
+            query,
+        )
+        assert required in action_plan.required_tool_names, query
+
+    code_delivery = planning.compile_turn_plan(
+        [{
+            "role": "user",
+            "content": (
+                "Crée un script Bash pour installer les outils C sur Ubuntu "
+                "et mets-le dans un fichier sur mon bureau"
+            ),
+        }],
+        "Crée un script Bash pour installer les outils C sur Ubuntu "
+        "et mets-le dans un fichier sur mon bureau",
+    )
+    assert "ai_code_forge" in code_delivery.required_tool_names
+    assert "ai_adaptive_team" not in code_delivery.required_tool_names
+    assert "file_write" in code_delivery.required_tool_names
+
     unrelated = planning.compile_turn_plan(
         [
             {"role": "user", "content": "Explique OSPF"},

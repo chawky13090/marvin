@@ -74,6 +74,55 @@ def prune(retention_days: int = 30) -> int:
         return max(0, int(cursor.rowcount))
 
 
+def incomplete_tool_calls(conversation_id: str) -> dict[str, dict[str, str]]:
+    """Projette les appels sans tool_end d'un tour terminal comme erreurs durables."""
+    normalized = str(conversation_id or "").strip()
+    if not normalized:
+        return {}
+    starts: dict[str, dict[str, str]] = {}
+    completed: set[str] = set()
+    terminal_status: dict[str, str] = {}
+    with db() as connection:
+        rows = connection.execute(
+            """SELECT turn.request_id, turn.status, event.event_json
+               FROM chat_turns AS turn
+               JOIN chat_turn_events AS event
+                 ON event.request_id = turn.request_id
+               WHERE turn.conversation_id = ?
+                 AND turn.status IN ('completed','failed','interrupted')
+               ORDER BY turn.created_at ASC, event.sequence ASC""",
+            (normalized,),
+        ).fetchall()
+    for row in rows:
+        try:
+            event = json.loads(row["event_json"])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        call_id = str(event.get("toolCallId") or "")
+        if not call_id:
+            continue
+        terminal_status[call_id] = str(row["status"])
+        if event.get("type") == "tool_start":
+            starts[call_id] = {
+                "toolName": str(event.get("toolName") or ""),
+            }
+        elif event.get("type") == "tool_end":
+            completed.add(call_id)
+    return {
+        call_id: {
+            **value,
+            "state": "error",
+            "error": (
+                "Appel interrompu avant la persistance de son résultat."
+                if terminal_status.get(call_id) == "interrupted"
+                else "Appel terminé sans résultat durable; relance automatique refusée."
+            ),
+        }
+        for call_id, value in starts.items()
+        if call_id not in completed
+    }
+
+
 def _decode_agent_chunk(chunk: str) -> dict[str, Any]:
     for line in str(chunk).splitlines():
         if line.startswith("data: "):
@@ -91,6 +140,11 @@ def _encode_event(event: dict[str, Any], sequence: int) -> str:
 
 def _append_event(request_id: str, event: dict[str, Any]) -> int:
     with db() as connection:
+        # Sérialise l'allocation MAX(sequence)+1 entre le producteur, une reprise
+        # et une interruption. Sans verrou d'écriture acquis avant le SELECT,
+        # deux connexions pouvaient choisir la même séquence puis provoquer une
+        # IntegrityError sur la clé primaire (request_id, sequence).
+        connection.execute("BEGIN IMMEDIATE")
         row = connection.execute(
             "SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence FROM chat_turn_events WHERE request_id = ?",
             (request_id,),

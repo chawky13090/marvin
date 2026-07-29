@@ -1,18 +1,24 @@
 """Selection bornee et explicable des outils exposes au LLM."""
 from __future__ import annotations
 
+import re
+
 import cloud_routing as _cr
 import database as db
 from tools import TOOLS_SPEC
 from tool_capability_ranking import build_catalog, rank_capabilities
 
+_TOOL_FOLLOWUP_RE = re.compile(
+    r"^\s*(?:oui|non|vas[- ]?y|fais[- ]?le|continue|reprends|réessaie|reessaie|"
+    r"tu\s+as\s+les?\s+outils?|utilise\s+(?:donc\s+)?les?\s+outils?|"
+    r"pourtant|ça\s+ne\s+marche\s+pas|ca\s+ne\s+marche\s+pas)\b",
+    re.IGNORECASE,
+)
+
 _ALWAYS_INCLUDE = {
     "pc_get_real_paths",
     "memory_save", "memory_list",
     "datetime_info",
-    # Façade Research universelle : le LLM peut vérifier spontanément un fait
-    # sans dépendre d'un mot-clé fragile.
-    "web_research",
 }
 
 # Repli BORNÉ quand aucun mot-clé métier ne matche : un petit jeu d'outils
@@ -554,6 +560,24 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     if isinstance(content, list):
         content = " ".join(p.get("text", "") for p in content if p.get("type") == "text")
     text_raw = (content or "")
+    if _TOOL_FOLLOWUP_RE.search(text_raw):
+        previous_user = next(
+            (
+                item
+                for item in reversed(messages[:-1])
+                if item.get("role") == "user" and item.get("content")
+            ),
+            None,
+        )
+        if previous_user:
+            previous_content = previous_user.get("content", "")
+            if isinstance(previous_content, list):
+                previous_content = " ".join(
+                    part.get("text", "")
+                    for part in previous_content
+                    if isinstance(part, dict) and part.get("type") == "text"
+                )
+            text_raw = f"{previous_content}\nSuivi utilisateur : {text_raw}"
     text = text_raw.lower()
     text_norm = _strip_accents(text)   # « caracteristiques » doit matcher « caractéristiques »
 

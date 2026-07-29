@@ -126,6 +126,8 @@ class ToolExecuteRequest(BaseModel):
 
 @router.post("/api/chat")
 async def chat(request: ChatRequest):
+    if request.conversationId and db.get_conversation(request.conversationId) is None:
+        raise HTTPException(status_code=404, detail="Conversation introuvable.")
     if not request.requestId:
 
         async def event_stream():

@@ -234,7 +234,7 @@ def main() -> int:
     assert calibrated[1]["category"] == "security"
 
     compiled = cortex.compile_contract("Crée un script d'installation Bash sécurisé et complet.")
-    assert compiled["forced_tools"] == ["ai_adaptive_team"]
+    assert compiled["forced_tools"] == ["ai_code_forge"]
     direct = cortex.compile_contract("Crée un script Python complet qui lit un fichier CSV local.")
     assert direct["forced_tools"] == ["ai_code_forge"]
     assert adaptive_team.plan(

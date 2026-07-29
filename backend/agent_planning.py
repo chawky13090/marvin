@@ -47,11 +47,39 @@ _WEB_DEICTIC_RE = re.compile(
     r"cela|[çc]a|dessus|sur\s+ceci)\b"
 )
 _GENERIC_WEB_REQUEST_RE = re.compile(
-    r"^\s*(?:je\s+te\s+demande\s+)?(?:de\s+)?"
+    r"^\s*(?:oui[\s,;:!-]+)?(?:je\s+te\s+demande\s+)?(?:de\s+)?"
     r"(?:faire|lancer|effectuer)?\s*(?:une\s+)?"
     r"recherche\s+(?:sur\s+le\s+)?(?:web|internet)"
     r"(?:\s+(?:maintenant|simple|s['’]il\s+te\s+pla[îi]t|stp|svp))*"
     r"[\s!?.]*$"
+)
+_GENERIC_ACTION_FOLLOWUP_RE = re.compile(
+    r"^\s*(?:oui|vas[- ]?y|fais[- ]?le|continue|reprends|réessaie|reessaie|"
+    r"tu\s+as\s+les?\s+outils?|utilise\s+(?:donc\s+)?les?\s+outils?|pourtant)\b",
+    re.IGNORECASE,
+)
+_DESKTOP_LIST_RE = re.compile(
+    r"\b(?:liste|affiche|montre|donne)\w*\b.{0,60}\b(?:fichiers?|dossiers?)\b"
+    r".{0,60}\b(?:bureau|desktop)\b"
+)
+_TASK_LIST_RE = re.compile(
+    r"\b(?:liste|affiche|montre|donne|quelles?)\w*\b.{0,50}\b(?:taches?|tasks?)\b"
+)
+_NOTE_LIST_RE = re.compile(
+    r"\b(?:liste|affiche|montre|donne|quelles?)\w*\b.{0,50}\bnotes?\b"
+)
+_EMAIL_LIST_RE = re.compile(
+    r"\b(?:liste|affiche|montre|donne|quels?)\w*\b.{0,50}\b(?:emails?|mails?|courriels?)\b"
+)
+_EVENT_LIST_RE = re.compile(
+    r"\b(?:liste|affiche|montre|donne|quels?)\w*\b.{0,50}\b"
+    r"(?:agenda|calendrier|rendez[- ]?vous|evenements?)\b"
+)
+_CODE_FILE_DELIVERY_RE = re.compile(
+    r"\b(?:script|code|programme)\b.{0,180}\b"
+    r"(?:dans|vers|sous)\s+(?:un\s+)?fichier\b|"
+    r"\b(?:mets?|enregistre|sauvegarde|écris|ecris)\w*\b.{0,120}\b"
+    r"(?:script|code|programme)\b.{0,120}\b(?:fichier|bureau|desktop)\b"
 )
 _CONTEXT_ONLY_WEB_RE = re.compile(
     r"^\s*(?:cherche|recherche|regarde|fouille|explore)\w*\s+"
@@ -91,6 +119,44 @@ def _message_text(message: dict[str, Any]) -> str:
             if isinstance(part, dict)
         )
     return str(content or "")
+
+
+def _action_context(messages: list[dict[str, Any]], user_query: str) -> str:
+    current = cloud_routing.strip_accents((user_query or "").casefold())
+    if not _GENERIC_ACTION_FOLLOWUP_RE.search(current):
+        return current
+    prior = messages[:-1] if messages and messages[-1].get("role") == "user" else messages
+    previous = next(
+        (
+            _message_text(item)
+            for item in reversed(prior)
+            if item.get("role") == "user" and _message_text(item).strip()
+        ),
+        "",
+    )
+    return cloud_routing.strip_accents(f"{previous}\n{user_query}".casefold())
+
+
+def _deterministic_action_requirements(
+    messages: list[dict[str, Any]],
+    user_query: str,
+) -> set[str]:
+    """Garantit les lectures explicites sans transformer une explication en action."""
+    text = _action_context(messages, user_query)
+    requirements: set[str] = set()
+    if _DESKTOP_LIST_RE.search(text):
+        requirements.add("pc_get_real_paths")
+    if _TASK_LIST_RE.search(text):
+        requirements.add("task_list")
+    if _NOTE_LIST_RE.search(text):
+        requirements.add("note_list")
+    if _EMAIL_LIST_RE.search(text):
+        requirements.add("email_list")
+    if _EVENT_LIST_RE.search(text):
+        requirements.add("event_list")
+    if _CODE_FILE_DELIVERY_RE.search(text):
+        requirements.add("file_write")
+    return requirements
 
 
 def _assistant_research_gaps(messages: list[dict[str, Any]]) -> tuple[str, ...]:
@@ -227,6 +293,9 @@ def compile_turn_plan(
     execution_budget = cortex_plan["execution_budget"]
     if not tool_suppression:
         required_tool_names.update(cortex_plan.get("forced_tools") or [])
+        required_tool_names.update(
+            _deterministic_action_requirements(messages, user_query)
+        )
         if (
             "web_research" in required_tool_names
             and _DYNAMIC_RESEARCH_RE.search(workspace_norm)

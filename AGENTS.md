@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.489.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.490.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.489.0)
+## 9. État actuel (v2.490.0)
+
+**v2.490 (routage agentique vérifié en conditions réelles)** : les demandes locales explicites
+imposent désormais leur lecture déterministe sans polluer chaque tour avec la recherche Web.
+Un livrable code simple passe directement par Code Forge puis est écrit sans écraser un fichier
+existant. Les outils disposent d'un timeout réel et leurs résultats sont persistés dès leur fin;
+les appels interrompus sont projetés comme tels après reprise. Le mode Auto choisit le meilleur
+modèle Cloud observé pour le besoin courant : Kimi K3 possède un prior officiel élevé pour le
+raisonnement, le code, la vision et les travaux agentiques, mais une panne ou un refus 402
+déclenche un repli Cloud borné sans bascule locale en Ultra. Les demandes Web courtes utilisent
+`web_research`; seule une profondeur explicite déclenche `web_deep_research`. Les consignes de
+rendu sont retirées du sujet puis un LLM planifie librement les requêtes et angles dans un budget
+borné exclusivement SearXNG; les résultats hors sujet sont filtrés. Research v3 utilise le même
+principe dès son portefeuille initial, puis réévalue les lacunes. Le gate couvre 344/344 outils; l'auto-diagnostic
+réel en lecture seule valide 45/45 sondes avec services Web inclus.
 
 **v2.489 (recherche livrable et bandeau Chat unifié)** : Research Engine tente jusqu’à trois
 réparations de citations; si Forge refuse encore le rapport, un repli déterministe retire les

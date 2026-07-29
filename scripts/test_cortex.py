@@ -49,8 +49,15 @@ def main() -> None:
         "Compare cela avec les sources officielles"
     )
     check(
-        natural_primary["forced_tools"] == ["web_deep_research"],
+        natural_primary["forced_tools"] == ["web_research"],
         "Une demande naturelle de sources primaires doit exécuter la recherche",
+    )
+    natural_primary_deep = cortex.compile_contract(
+        "Recherche approfondie avec les sources officielles"
+    )
+    check(
+        natural_primary_deep["forced_tools"] == ["web_deep_research"],
+        "Sources officielles et profondeur explicite imposent la recherche profonde",
     )
     local_file = cortex.compile_contract("Cherche ce fichier dans mon dossier")
     check(local_file["forced_tools"] == [], "Une recherche locale ne doit pas ouvrir le Web")
@@ -63,6 +70,15 @@ def main() -> None:
     check(swarm["forced_tools"] == ["ai_research_swarm"], "Research Swarm explicite obligatoire")
     team = cortex.compile_contract("Compare plusieurs architectures", {"review": "team"})
     check(team["forced_tools"] == ["ai_adaptive_team"], "Équipe adaptative explicite obligatoire")
+
+    small_script = cortex.compile_contract(
+        "Crée un script Bash pour installer sur Ubuntu le nécessaire pour du C "
+        "et mets-le dans un fichier sur mon bureau"
+    )
+    check(
+        small_script["forced_tools"] == ["ai_code_forge"],
+        "Un script simple passe directement par Code Forge sans Adaptive Team implicite",
+    )
 
     invalid = cortex.normalize_contract({"privacy": "pirate", "unknown": "x"})
     check(invalid["privacy"] == "auto" and "unknown" not in invalid, "Entrée client filtrée")

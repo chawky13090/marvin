@@ -58,6 +58,45 @@ def main() -> int:
         assert model_market.recommend("vision")[0]["model"] == "minimax-m3:cloud"
         assert model_market.recommend("multilingual")[0]["family"] == "qwen"
 
+    frontier_models = [*role_models, "kimi-k3:cloud"]
+    with (
+        patch.object(
+            model_market.cloud_routing,
+            "list_installed_cloud_models",
+            return_value=frontier_models,
+        ),
+        patch.object(
+            model_market.cloud_routing,
+            "get_model_capabilities",
+            return_value={},
+        ),
+        patch.object(model_market, "list_observations", return_value=[]),
+    ):
+        for need in (
+            "general",
+            "reasoning",
+            "agentic",
+            "code",
+            "code_architecture",
+            "code_implementation",
+            "vision",
+            "research",
+            "synthesis",
+        ):
+            assert model_market.recommend(need)[0]["model"] == "kimi-k3:cloud", need
+        # Une observation réelle négative doit rester plus forte que le prior documentaire.
+        failed = [{
+            "at": "2026-07-29T00:00:00+00:00",
+            "model": "kimi-k3:cloud",
+            "family": "kimi",
+            "need": "agentic",
+            "success": False,
+            "duration_ms": 300_000,
+            "phase": "tool_call",
+        }]
+        with patch.object(model_market, "list_observations", return_value=failed):
+            assert model_market.recommend("agentic")[0]["model"] != "kimi-k3:cloud"
+
     failed_kimi = [{
         "at": "2026-07-16T00:00:00+00:00",
         "model": "kimi-k2.7-code:cloud",

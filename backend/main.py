@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.490 — routage outils réel, reprise Cloud, Kimi K3 et recherche SearXNG pertinente
 # v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
 # v2.485 — vocalisation fiable des réponses Cloud answer_final
 # v2.484 — barre contextuelle stable et accueil orienté travail
@@ -47,14 +48,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.447 — contenu et documents sous harness, téléchargement confiné
 # v2.446 — API et workers e-mail sous harness, erreurs bornées et rejeu stable
 # v2.445 — multi-agents, workflows et cron sous harness commun
-# v2.444 — domaine proactif sous harness et inventaire direct exhaustif
-# v2.443 — runtime commun des outils, agenda migré et confirmations authentifiées
-# v2.442 — SLO HTTP roulant, budget d'erreur et gate local
-# v2.441 — voix validée pendant navigation et interruption
-# v2.440 — runtime Windows résilient et navigation chat sans perte
-# v2.439 — installateur unique portable et portefeuille local adapté au matériel
-# v2.438 — restauration durable du fil actif et commandes de conversation accessibles
-# v2.437 — erreurs internes API expurgées et reliées aux incidents
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

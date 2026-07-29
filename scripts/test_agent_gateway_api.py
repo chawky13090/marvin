@@ -39,6 +39,20 @@ async def _exercise_routes() -> None:
     assert response.headers["cache-control"] == "no-cache"
     assert response.headers["x-accel-buffering"] == "no"
 
+    with patch.object(agent_gateway.db, "get_conversation", return_value=None):
+        try:
+            await agent_gateway.chat(
+                agent_gateway.ChatRequest(
+                    messages=[{"role": "user", "content": "bonjour"}],
+                    conversationId="conversation-absente",
+                )
+            )
+        except agent_gateway.HTTPException as exc:
+            assert exc.status_code == 404
+            assert exc.detail == "Conversation introuvable."
+        else:
+            raise AssertionError("Une conversation inconnue doit être refusée avant le SSE.")
+
     async def rejected_subscription(**_kwargs):
         raise ValueError("secret interne qui ne doit pas sortir")
         yield ""

@@ -198,7 +198,30 @@ def _stats() -> dict[tuple[str, str], dict[str, Any]]:
 def _official_prior(model: str, need: str) -> tuple[float, str | None]:
     """Small documented cold-start prior; real observations remain decisive."""
     low = model.lower()
+    kimi_generation = re.search(r"^kimi-k(\d+(?:\.\d+)?)", low)
+    kimi_frontier = bool(
+        kimi_generation and float(kimi_generation.group(1)) >= 3.0
+    )
     adjustments: list[tuple[bool, float, str]] = [
+        (
+            kimi_frontier and need in {
+                "general",
+                "reasoning",
+                "agentic",
+                "code",
+                "code_architecture",
+                "code_implementation",
+                "vision",
+                "research",
+                "synthesis",
+                "multilingual",
+            },
+            35.0,
+            (
+                "prior officiel Ollama : génération Kimi K3 ou ultérieure, "
+                "multimodale, outils, raisonnement, code long et contexte 1M"
+            ),
+        ),
         (
             low.startswith("deepseek") and need in {"general", "reasoning", "research", "synthesis"},
             7.0,

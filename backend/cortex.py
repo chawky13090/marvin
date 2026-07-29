@@ -185,17 +185,14 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
             auto_team = False
         if auto_code_forge:
             resolved["review"] = "team"
-            try:
-                import adaptive_team
-                code_plan = adaptive_team.plan(query)
-            except Exception:
-                code_plan = {"pipeline": ["code_forge"]}
-            if code_plan.get("pipeline", [])[:1] == ["research_swarm"]:
-                forced_tools.append("ai_adaptive_team")
-                reasons.append("versions et pratiques recherchées avant le contrôle expert du code")
-            else:
-                forced_tools.append("ai_code_forge")
-                reasons.append("livrable code complet soumis au contrôle expert")
+            # Code Forge possède déjà ses propres phases d'architecture, revue,
+            # réparation, documentation et tests natifs. Le doubler implicitement
+            # par Research Swarm + Adaptive Team transforme un petit script en mission
+            # de plusieurs minutes et peut épuiser le budget avant sa livraison.
+            # Une recherche multi-agents reste disponible quand elle est demandée
+            # explicitement par le contrat Cortex.
+            forced_tools.append("ai_code_forge")
+            reasons.append("livrable code complet soumis directement au contrôle expert")
         elif auto_team:
             resolved["review"] = "team"
             forced_tools.append("ai_adaptive_team")
@@ -208,7 +205,12 @@ def compile_contract(query: str, raw: dict | None = None) -> dict:
                 if resolved["effort"] == "deep"
                 else "web_research"
             )
-        elif resolved["evidence"] == "primary": forced_tools.append("web_deep_research")
+        elif resolved["evidence"] == "primary":
+            forced_tools.append(
+                "web_deep_research"
+                if "evidence" in explicit or resolved["effort"] == "deep"
+                else "web_research"
+            )
     if ("effort" in explicit and resolved["effort"] == "mission") or (
         "autonomy" in explicit and resolved["autonomy"] == "mission"
     ):

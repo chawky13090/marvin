@@ -102,6 +102,35 @@ async def _run() -> None:
     assert automatic.active_model == "coder:cloud"
     refresh.assert_awaited_once()
 
+    with (
+        patch.object(models, "is_local_only_lockdown", return_value=False),
+        patch.object(models, "is_ultra_unrestricted", return_value=False),
+        patch.object(models, "refresh_model_cache", AsyncMock(return_value=None)),
+        patch.object(models, "detect_profile", return_value=("agent", "local:14b", 0.2)),
+        patch.object(models, "get_cloud_config", return_value=(True, {"agent": "old:cloud"})),
+        patch.object(models, "is_sensitive_request", return_value=False),
+        patch.object(models, "is_cloud_model", side_effect=lambda name: name.endswith(":cloud")),
+        patch.object(
+            models.cloud_routing,
+            "list_installed_cloud_models",
+            return_value=["old:cloud", "kimi-k3:cloud"],
+        ),
+        patch.object(models.cloud_routing, "detect_task", return_value=None),
+        patch.object(
+            models.cloud_routing,
+            "pick_best_cloud_model",
+            return_value="kimi-k3:cloud",
+        ) as pick_best,
+    ):
+        general = await models.resolve_model_config(
+            [{"role": "user", "content": "Bonjour Marvin"}],
+            "Bonjour Marvin",
+            "auto",
+            _plan(),
+        )
+    assert general.active_model == "kimi-k3:cloud"
+    pick_best.assert_called_once_with("agentic")
+
 
 def main() -> int:
     asyncio.run(_run())

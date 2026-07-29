@@ -20,6 +20,7 @@ class RequiredToolContext:
     workspace_mission_id: str = ""
     workspace_action: str = ""
     messages: list[dict[str, Any]] | None = None
+    successful_results: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)
@@ -45,7 +46,52 @@ def _previous_assistant_content(
     return ""
 
 
-def _arguments_for(name: str, context: RequiredToolContext) -> dict[str, Any]:
+def _delivery_filename(context: RequiredToolContext, language: str) -> str:
+    requested = re.search(
+        r"\b([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:sh|ps1|py|js|go|json))\b",
+        context.user_query,
+        re.IGNORECASE,
+    )
+    if requested:
+        return requested.group(1)
+    suffix = {
+        "bash": ".sh",
+        "powershell": ".ps1",
+        "python": ".py",
+        "javascript": ".js",
+        "go": ".go",
+        "json": ".json",
+    }.get(language.casefold(), ".txt")
+    return f"livrable_marvin{suffix}"
+
+
+def _file_delivery_arguments(
+    context: RequiredToolContext,
+) -> dict[str, Any] | None:
+    results = context.successful_results or []
+    forge = next(
+        (
+            item
+            for item in reversed(results)
+            if item.get("tool") == "ai_code_forge" and item.get("code")
+        ),
+        None,
+    )
+    if not forge:
+        return None
+    language = str(forge.get("language") or "")
+    filename = _delivery_filename(context, language)
+    return {
+        "path": f"Bureau/{filename}",
+        "content": str(forge["code"]),
+        "overwrite": False,
+    }
+
+
+def _arguments_for(
+    name: str,
+    context: RequiredToolContext,
+) -> dict[str, Any] | None:
     if name in {
         "ai_model_council",
         "ai_cortex_search",
@@ -74,6 +120,8 @@ def _arguments_for(name: str, context: RequiredToolContext) -> dict[str, Any]:
         }
     if name in {"web_research", "web_deep_research"}:
         return {"query": context.user_query}
+    if name == "file_write":
+        return _file_delivery_arguments(context)
     if name == "long_task_start":
         return {"goal": context.user_query}
     if name == "document_generate":
@@ -113,12 +161,15 @@ def inject_required_tool_calls(
     result = list(tool_calls)
     injected_names: list[str] = []
     for name in sorted(missing):
+        arguments = _arguments_for(name, context)
+        if arguments is None:
+            continue
         result.append(
             {
                 "id": make_id(),
                 "function": {
                     "name": name,
-                    "arguments": _arguments_for(name, context),
+                    "arguments": arguments,
                 },
             }
         )

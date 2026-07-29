@@ -25,6 +25,22 @@ class ModelSwitch:
     event: dict[str, Any]
 
 
+def retryable_cloud_model_error(exc: Exception) -> bool:
+    """Autorise un repli Cloud borné pour une panne de modèle sans contenu partiel."""
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return (
+            status_code in {402, 404, 408, 409, 425, 429}
+            or 500 <= status_code <= 599
+        )
+    return type(exc).__name__ in {
+        "ConnectError",
+        "ConnectTimeout",
+        "ReadTimeout",
+        "RemoteProtocolError",
+    }
+
+
 def sensitive_tool_model_switch(
     *,
     tool_calls: list[dict[str, Any]],
@@ -198,4 +214,37 @@ def render_blocking_outcomes(outcomes: dict[str, dict[str, Any]]) -> str | None:
         + "\n".join(details)
         + "\n\nLe livrable reste refusé tant qu'une correction suivie d'un "
         "nouveau reçu `production_ready=true` n'a pas été observée."
+    )
+
+
+def render_latest_web_result(
+    successful_results: list[dict[str, Any]],
+) -> str | None:
+    """Restitue le dernier reçu Web si le modèle répète une promesse d'action."""
+    result = next(
+        (
+            item
+            for item in reversed(successful_results)
+            if item.get("tool") in {"web_search", "web_research", "web_deep_research"}
+        ),
+        None,
+    )
+    if not result:
+        return None
+    answer = str(result.get("answer") or result.get("message") or "").strip()
+    sources = [
+        source
+        for source in result.get("sources") or []
+        if isinstance(source, dict)
+        and str(source.get("url") or "").startswith(("http://", "https://"))
+    ][:20]
+    source_lines = "\n".join(
+        f"- [{str(source.get('title') or source['url']).strip()}]({source['url']})"
+        for source in sources
+    )
+    if not answer and not source_lines:
+        return None
+    return (
+        (answer or "La recherche est terminée.")
+        + (f"\n\n### Sources\n\n{source_lines}" if source_lines else "")
     )

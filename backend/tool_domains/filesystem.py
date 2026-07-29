@@ -607,11 +607,17 @@ async def write(args: dict[str, Any]) -> dict[str, Any]:
     append = bool(args.get("append", False) or args.get("mode") == "append")
     try:
         target = Path(path)
+        if not append and args.get("overwrite") is False:
+            target = Path(dedupe_path(str(target)))
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("a" if append else "w", encoding="utf-8") as stream:
             stream.write(content)
         action = "complété" if append else "écrit"
-        return {"success": True, "message": f"Fichier {action} : {path}", "path": str(target)}
+        return {
+            "success": True,
+            "message": f"Fichier {action} : {target}",
+            "path": str(target),
+        }
     except Exception as exc:
         return {"error": str(exc)}
 

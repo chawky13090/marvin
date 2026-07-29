@@ -2785,6 +2785,7 @@ TOOLS_SPEC = [
     _t("file_write", "Écrit du contenu dans un fichier texte ou markdown. Crée le fichier s'il n'existe pas.",
        {"path": {"type": "string", "description": "Chemin du fichier à écrire"},
         "content": {"type": "string", "description": "Contenu à écrire"},
+        "overwrite": {"type": "boolean", "description": "Autoriser l'écrasement d'un fichier existant (défaut historique : true)"},
         "append": {"type": "boolean", "description": "Ajouter au fichier existant (true) ou écraser (false, défaut)"},
         "mode": {"type": "string", "enum": ["overwrite", "append"], "description": "Mode d'écriture : 'overwrite' (défaut) ou 'append'"}},
        ["path", "content"]),
@@ -3206,7 +3207,9 @@ TOOLS_SPEC = [
     _t("web_search", "Effectue une recherche Web exclusivement via l'instance SearXNG locale configurée.",
        {"query": {"type": "string", "description": "Requête de recherche"},
         "provider": {"type": "string", "enum": ["auto", "searxng"], "description": "Les deux valeurs utilisent exclusivement SearXNG"},
-        "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"}},
+        "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"},
+        "language": {"type": "string", "description": "Langue SearXNG, par exemple fr-FR ou en-US"},
+        "time_range": {"type": "string", "enum": ["day", "week", "month", "year"], "description": "Fenêtre temporelle optionnelle"}},
        ["query"]),
 
     _t("web_browse", "Récupère et extrait le texte principal d'une page web depuis une URL. Retourne titre, description et contenu texte.",

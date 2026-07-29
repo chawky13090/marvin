@@ -45,10 +45,16 @@ async def execute_tool_batch(
     id_factory: Callable[[], str] | None = None,
     clock: Callable[[], float] = time.time,
     tool_argument_overrides: dict[str, dict[str, Any]] | None = None,
+    tool_timeout_seconds: float | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Exécute séquentiellement un lot, en diffusant ses événements UI."""
     make_id = id_factory or (lambda: str(uuid.uuid4()))
     overrides = tool_argument_overrides or {}
+    batch_deadline = (
+        clock() + max(1.0, min(float(tool_timeout_seconds), 3_600.0))
+        if tool_timeout_seconds is not None
+        else None
+    )
     for call in tool_calls:
         function = call.get("function") if isinstance(call, dict) else None
         name = str((function or {}).get("name") or "")
@@ -78,7 +84,6 @@ async def execute_tool_batch(
         }
     )
 
-    results_for_db: list[dict[str, Any]] = []
     for tool_call, db_call in zip(tool_calls, calls_for_db):
         prepared = prepare_tool_call(
             tool_call["function"]["name"],
@@ -135,10 +140,25 @@ async def execute_tool_batch(
 
         dispatch_task = asyncio.create_task(run_dispatch())
         last_activity_at = clock()
+        dispatch = None
+        timed_out = False
         try:
             while not dispatch_task.done():
+                remaining = (
+                    batch_deadline - clock()
+                    if batch_deadline is not None
+                    else None
+                )
+                if remaining is not None and remaining <= 0:
+                    timed_out = True
+                    dispatch_task.cancel()
+                    await asyncio.gather(dispatch_task, return_exceptions=True)
+                    break
                 try:
-                    progress = await asyncio.wait_for(progress_queue.get(), timeout=1.0)
+                    progress = await asyncio.wait_for(
+                        progress_queue.get(),
+                        timeout=min(1.0, remaining) if remaining is not None else 1.0,
+                    )
                     last_activity_at = clock()
                     yield {
                         "type": "tool_progress",
@@ -160,7 +180,8 @@ async def execute_tool_batch(
                                 "detail": "L'outil poursuit son travail.",
                             }),
                         }
-            dispatch = await dispatch_task
+            if not timed_out:
+                dispatch = await dispatch_task
             while not progress_queue.empty():
                 yield {
                     "type": "tool_progress",
@@ -172,8 +193,18 @@ async def execute_tool_batch(
             if not dispatch_task.done():
                 dispatch_task.cancel()
                 await asyncio.gather(dispatch_task, return_exceptions=True)
-        result = dispatch.result
-        arguments = dispatch.arguments
+        if timed_out:
+            result = {
+                "success": False,
+                "error": (
+                    "L'outil a dépassé le budget temporel restant du tour "
+                    "et a été annulé proprement."
+                ),
+                "timeout": True,
+            }
+        else:
+            result = dispatch.result
+            arguments = dispatch.arguments
         duration_ms = max(0, int((clock() - started_at) * 1000))
         if read_signature:
             read_signatures.add(read_signature)
@@ -236,13 +267,19 @@ async def execute_tool_batch(
             except Exception:
                 pass
 
-        results_for_db.append(
-            {
-                "toolCallId": tool_call_id,
-                "toolName": tool_name,
-                "result": result,
-                "evidence": evidence,
-            }
+        persisted_result = {
+            "toolCallId": tool_call_id,
+            "toolName": tool_name,
+            "result": result,
+            "evidence": evidence,
+        }
+        # Persistance au fil de l'eau : une coupure pendant le prochain outil
+        # ne doit jamais faire réapparaître cet appel terminé comme `state=call`.
+        create_message(
+            conversation_id,
+            "tool",
+            json.dumps([persisted_result]),
+            tool_results=[persisted_result],
         )
         ollama_messages.append(
             {
@@ -250,10 +287,3 @@ async def execute_tool_batch(
                 "content": compact_tool_result(result),
             }
         )
-
-    create_message(
-        conversation_id,
-        "tool",
-        json.dumps(results_for_db),
-        tool_results=results_for_db,
-    )

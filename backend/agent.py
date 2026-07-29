@@ -4,6 +4,7 @@ Orchestre Ollama via l'adaptateur de transport, gère la boucle d'appel d'outils
 et produit les événements SSE du frontend.
 """
 import asyncio
+import time
 from typing import AsyncIterator
 
 import cloud_routing as _cr
@@ -96,6 +97,8 @@ from agent_loop_policy import (
     build_skill_nudge as _build_skill_nudge,
     promises_unexecuted_action as _promises_unexecuted_action,
     render_blocking_outcomes as _render_blocking_outcomes,
+    render_latest_web_result as _render_latest_web_result,
+    retryable_cloud_model_error as _retryable_cloud_model_error,
     should_suppress_model_text as _should_suppress_model_text,
     skill_requires_nudge as _skill_requires_nudge,
     sensitive_tool_model_switch as _sensitive_tool_model_switch,
@@ -386,6 +389,7 @@ async def run_agent(
     else:
         ollama_msgs[0]["content"] = system_prompt
 
+    _failed_cloud_models: set[str] = set()
     async with _create_ollama_client(read_timeout=300.0) as _ollama_client:
       for step in range(_max_tool_steps):
         if not _runner_state.begin_step(step, _max_wall_seconds):
@@ -414,6 +418,58 @@ async def run_agent(
             ):
                 yield _sse(_event)
         except Exception as exc:
+            if (
+                _is_cloud_model(active_model)
+                and not _model_step.content
+                and not _model_step.tool_calls
+                and _retryable_cloud_model_error(exc)
+                and len(_failed_cloud_models) < 2
+                and step < _max_tool_steps - 1
+            ):
+                _failed_cloud_models.add(active_model)
+                _fallback_need = (
+                    _cr.detect_task(_user_query)
+                    or {
+                        "analysis": "reasoning",
+                        "agent": "agentic",
+                        "vision": "vision",
+                    }.get(profile_name, "general")
+                )
+                try:
+                    import model_market as _model_market
+
+                    _model_market.record_observation(
+                        active_model,
+                        _fallback_need,
+                        False,
+                        int(
+                            (time.monotonic() - _runner_state.started_at)
+                            * 1000
+                        ),
+                        phase="agent_transport",
+                        error_type=type(exc).__name__,
+                    )
+                except Exception:
+                    pass
+                _alternate_cloud = _cr.pick_best_cloud_model(
+                    _fallback_need,
+                    exclude=frozenset(_failed_cloud_models),
+                )
+                if _alternate_cloud and _alternate_cloud != active_model:
+                    active_model = _alternate_cloud
+                    yield _sse({
+                        "type": "model_info",
+                        "profile": profile_name,
+                        "model": active_model,
+                        "label": f"Repli Cloud · {active_model}",
+                        "provider": "ollama_cloud",
+                        "privacyMode": "ultra_cloud" if _ultra else "standard",
+                        "privacyPreset": _cr.get_privacy_preset(),
+                        "cloudOnly": _ultra,
+                        "sensitive": _model_config.sensitive,
+                        "switchReason": "cloud_model_unavailable",
+                    })
+                    continue
             yield _sse(_ollama_error_event(
                 exc,
                 model=active_model,
@@ -441,6 +497,7 @@ async def run_agent(
                 workspace_mission_id=_workspace_mission_id,
                 workspace_action=_workspace_action,
                 messages=messages,
+                successful_results=_runner_state.successful_results,
             ),
             salvage_text_tool_calls=_salvage_text_tool_calls,
             inject_required_tool_calls=_inject_required_tool_calls,
@@ -504,6 +561,11 @@ async def run_agent(
                     if _contextual_web_query
                     else None
                 ),
+                tool_timeout_seconds=max(
+                    1.0,
+                    _max_wall_seconds
+                    - (time.monotonic() - _runner_state.started_at),
+                ),
             ):
                 yield _sse(_event)
 
@@ -517,6 +579,49 @@ async def run_agent(
             # explicite si le modèle reste silencieux.
             _runner_state.empty_response_nudged = True
             _remaining_required = _required_tool_names - _executed_tool_names
+            if _is_cloud_model(active_model):
+                _empty_need = (
+                    _cr.detect_task(_user_query)
+                    or {
+                        "analysis": "reasoning",
+                        "agent": "agentic",
+                        "vision": "vision",
+                    }.get(profile_name, "general")
+                )
+                try:
+                    import model_market as _model_market
+
+                    _model_market.record_observation(
+                        active_model,
+                        _empty_need,
+                        False,
+                        int(
+                            (time.monotonic() - _runner_state.started_at)
+                            * 1000
+                        ),
+                        phase="empty_agent_response",
+                        error_type="EmptyModelResponse",
+                    )
+                except Exception:
+                    pass
+                _alternate_cloud = _cr.pick_best_cloud_model(
+                    _empty_need,
+                    exclude=frozenset({active_model}),
+                )
+                if _alternate_cloud and _alternate_cloud != active_model:
+                    active_model = _alternate_cloud
+                    yield _sse({
+                        "type": "model_info",
+                        "profile": profile_name,
+                        "model": active_model,
+                        "label": f"Repli réponse vide · {active_model}",
+                        "provider": "ollama_cloud",
+                        "privacyMode": "ultra_cloud" if _ultra else "standard",
+                        "privacyPreset": _cr.get_privacy_preset(),
+                        "cloudOnly": _ultra,
+                        "sensitive": _model_config.sensitive,
+                        "switchReason": "empty_model_response",
+                    })
             ollama_msgs.append(_build_empty_response_nudge(
                 required_tool_names=_remaining_required,
             ))
@@ -574,6 +679,16 @@ async def run_agent(
 
         else:
             # ── Réponse finale — pas de tool calls ────────────────────────────
+            if _promises_unexecuted_action(
+                full_content,
+                executed_tool_names=_executed_tool_names,
+                tools_available=bool(tools_payload),
+            ):
+                _web_receipt_answer = _render_latest_web_result(
+                    _runner_state.successful_results
+                )
+                if _web_receipt_answer:
+                    full_content = _web_receipt_answer
             _blocking_answer = _render_blocking_outcomes(_blocking_outcomes)
             if _blocking_answer:
                 full_content = _blocking_answer

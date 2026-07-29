@@ -12430,6 +12430,73 @@ secret, contenu de page ou stockage n’est ajouté. Il n’existe aucune migrat
 Rollback : réversion atomique du commit v2.488 puis redémarrage du backend; le comportement
 antérieur peut aussi être restauré en retirant `web_research` de `_ALWAYS_INCLUDE`.
 
+## 2026-07-29 — v2.490 — Routage agentique et certification réelle des outils
+
+### Demande et incidents reproduits
+
+L'utilisateur demande que tous les outils soient fonctionnels, sélectionnés correctement par
+Marvin et testés en conditions réelles. Les conversations récentes montraient quatre défauts :
+
+- `web_research` était proposé sur des demandes sans rapport avec Internet;
+- une lecture locale explicite pouvait rester sans appel d'outil;
+- un simple script Bash partait dans Adaptive Team pendant plusieurs minutes sans livrable;
+- Kimi K3 installé n'était pas sélectionné dynamiquement et les réponses Cloud vides ou
+  indisponibles n'avaient pas de repli agentique fiable.
+
+Le test réel a aussi révélé qu'une demande courte avec sources officielles déclenchait une
+recherche profonde de plus de cinq minutes. La phrase complète, exigences de rendu comprises,
+polluait les requêtes SearXNG et produisait des résultats hors sujet.
+
+### Corrections
+
+- suppression de `web_research` du catalogue universel et reprise du contexte sur les suivis;
+- exigences déterministes pour Bureau, tâches, notes, e-mails, agenda et livraison de code;
+- Code Forge direct pour les scripts simples, puis `file_write` seulement après résultat;
+- écriture automatique non destructive avec suffixe de collision;
+- timeout réel par lot d'outils et persistance de chaque résultat dès sa fin;
+- reprise visuelle des appels interrompus et allocation SSE transactionnelle;
+- priorité dynamique Model Market; prior officiel Kimi K3 et repli Cloud borné sur 402,
+  404, 408, 409, 425, 429 et 5xx, sans repli local en Ultra;
+- refus HTTP 404 explicite d'un identifiant de conversation inexistant;
+- recherche standard pour une demande courte, même avec sources officielles;
+- nettoyage du sujet SearXNG, planification libre des requêtes par LLM dans un budget borné et
+  filtrage renforcé des résultats;
+- Research v3 confie également son portefeuille initial au LLM; le cœur conserve seulement les
+  minima/maxima, les axes de preuve, les délais et le repli déterministe;
+- restitution déterministe du dernier reçu Web si un modèle répète une promesse d'action.
+
+### Validations observées
+
+- tests ciblés Agent, Cortex, Model Market, SSE, filesystem, Web et gateway : réussis;
+- architecture : 344 outils, 344 schémas et harness 344/344;
+- auto-diagnostic réel avec Web : 45/45 sondes réussies;
+- chat PC : Kimi K3 sélectionné, refus 402 observé, repli MiniMax M3, appel
+  `pc_get_real_paths`, preuve persistée et tour terminé;
+- Web direct après planification LLM : SearXNG exclusif, cinq requêtes adaptées, résultats hors
+  sujet retirés, documentation Python retrouvée et environ 28 secondes;
+- la limite de 350 lignes du composition root est restaurée en retirant uniquement huit
+  commentaires historiques déjà présents dans Git et ce journal.
+
+### Sécurité, logs et limites
+
+Les permissions, confirmations, idempotence et le harness restent l'unique frontière
+d'exécution. Aucun outil sortant ou destructeur n'a été lancé sur une donnée réelle pour
+fabriquer une preuve. Les erreurs de modèle enregistrent uniquement classe, modèle, phase et
+durée; aucun prompt, réponse, token ou secret supplémentaire n'est journalisé. Les URLs et
+résultats Web continuent de passer par le transport anti-SSRF et SearXNG reste l'unique moteur.
+Les preuves métier append-only et la politique de rétention existante sont inchangées.
+
+La certification réelle exhaustive des actions conditionnelles nécessite une cible dédiée :
+compte e-mail de test, VM saine, hôte SSH de test ou service externe configuré. Leur absence
+doit produire `dégradé` ou `indisponible`, jamais un succès fictif.
+
+### Rollback
+
+Aucune migration de schéma ni mutation de données métier. Rollback complet : réversion
+atomique du commit v2.490, redémarrage du backend, puis exécution de
+`backend\.venv\Scripts\python.exe scripts\check_marvin.py --quick`. Les observations Model
+Market append-only peuvent rester conservées car elles correspondent à des résultats réels.
+
 ## 2026-07-29 — v2.489 — Citations directes et bandeau Chat compact
 
 ### Incident reproduit

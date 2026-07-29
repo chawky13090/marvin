@@ -101,6 +101,25 @@ async def _exercise(path: Path) -> None:
         assert interrupted[-1]["turnInterrupted"] is True
         assert starts == 1
 
+        with db(path) as connection:
+            connection.execute(
+                """INSERT INTO chat_turns
+                   (request_id, payload_hash, conversation_id, status, owner_token)
+                   VALUES ('turn-tool-cut', 'hash-tool', 'conv-1', 'interrupted', 'old')"""
+            )
+            connection.execute(
+                """INSERT INTO chat_turn_events(request_id, sequence, event_json)
+                   VALUES ('turn-tool-cut', 1, ?)""",
+                (json.dumps({
+                    "type": "tool_start",
+                    "toolCallId": "tool-cut",
+                    "toolName": "file_list",
+                }),),
+            )
+        incomplete = chat_turn_runtime.incomplete_tool_calls("conv-1")
+        assert incomplete["tool-cut"]["state"] == "error"
+        assert incomplete["tool-cut"]["toolName"] == "file_list"
+
         async def failing_producer():
             yield 'data: {"type":"text","text":"avant"}\n\n'
             raise RuntimeError("secret-interne C:\\chemin\\prive token=abc")

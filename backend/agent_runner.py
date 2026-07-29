@@ -77,6 +77,13 @@ class RunnerState:
                 self.successful_results.append({
                     "tool": tool_name,
                     "answer": str(result.get("answer") or "")[:16_000],
+                    "code": str(result.get("code") or "")[:500_000],
+                    "language": str(result.get("language") or "")[:40],
+                    "artifacts": (
+                        result.get("artifacts")
+                        if isinstance(result.get("artifacts"), dict)
+                        else {}
+                    ),
                     "sources": [
                         {
                             "title": str(source.get("title") or "")[:300],

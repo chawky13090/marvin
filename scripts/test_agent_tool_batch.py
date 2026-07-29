@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,6 +31,18 @@ class Runner:
         assert arguments["conversation_id"] == "conv"
         assert tooling_failure is False
         return self.tool_count == 1
+
+
+class TimeoutRunner:
+    def update_blocking_outcome(self, name, result) -> None:
+        assert name == "ai_test_forge"
+        assert result.get("timeout") is True
+
+    def record_tool(self, name, arguments, result, *, tooling_failure) -> bool:
+        assert name == "ai_test_forge"
+        assert tooling_failure is True
+        assert result.get("timeout") is True
+        return False
 
 
 async def main() -> int:
@@ -146,6 +159,59 @@ async def main() -> int:
     assert persisted[0][1]["tool_calls"][0]["toolCallId"] == "tool-call-1"
     assert persisted[1][1]["tool_results"][0]["result"]["production_ready"] is True
     assert persisted[1][1]["tool_results"][0]["evidence"]["record_hash"] == "b" * 64
+
+    async def slow_dispatch(_request, *, validate, execute):
+        await asyncio.sleep(5)
+        raise AssertionError("L'outil lent aurait dû être annulé.")
+
+    timeout_events = [
+        event
+        async for event in execute_tool_batch(
+            tool_calls=[{
+                "function": {
+                    "name": "ai_test_forge",
+                    "arguments": {"path": "slow"},
+                },
+            }],
+            assistant_content="Je teste lentement.",
+            ollama_messages=[],
+            conversation_id="conv",
+            request_id="request-timeout",
+            user_query="teste avec budget",
+            active_model="cloud:model",
+            permission_level=2,
+            explicit_tool_names=set(),
+            required_tool_names={"ai_test_forge"},
+            command_text_only=False,
+            read_signatures=set(),
+            runner_state=TimeoutRunner(),
+            dangerous_tools=set(),
+            prepare_tool_call=lambda name, arguments: SimpleNamespace(
+                name=name,
+                arguments=dict(arguments),
+                read_signature="",
+            ),
+            inject_internal_context=lambda _name, arguments, conversation_id: {
+                **arguments,
+                "conversation_id": conversation_id,
+            },
+            dispatch_tool=slow_dispatch,
+            validate_tool_args=lambda _name, _arguments: None,
+            execute_registered_tool=execute,
+            postprocess_tool_result=postprocess,
+            critique_action=lambda *_args, **_kwargs: None,
+            scan_document=lambda *_args, **_kwargs: [],
+            record_tool_observation=observe,
+            record_long_chain=lambda *_args: None,
+            is_tooling_failure=lambda result: bool(result.get("error")),
+            compact_tool_result=lambda result: str(result),
+            create_message=lambda *_args, **_kwargs: None,
+            clock=time.monotonic,
+            tool_timeout_seconds=1,
+        )
+    ]
+    assert timeout_events[-1]["type"] == "tool_end"
+    assert timeout_events[-1]["result"]["timeout"] is True
     print("Agent Tool Batch OK - dispatch, événements, preuves, état et persistance.")
     return 0
 

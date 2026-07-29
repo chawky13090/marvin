@@ -190,6 +190,8 @@ def main() -> int:
                 answer = "Le système est nécessairement parfait et sans aucune limite."
             elif phase.startswith("adaptive_gap"):
                 answer = "[]"
+            elif phase == "v3_query_plan":
+                answer = "[]"
             else:
                 answer = "Fait vérifié [source-1]. Limite documentée [source-2]."
             return {

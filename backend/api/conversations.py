@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import database as db
+import chat_turn_runtime
 
 
 router = APIRouter(tags=["conversations"])
@@ -89,6 +90,25 @@ async def get_conversation(cid: str):
                 "toolInvocations": invocations,
             }
         )
+
+    incomplete = chat_turn_runtime.incomplete_tool_calls(cid)
+    if incomplete:
+        for message in formatted:
+            if message.get("role") != "assistant":
+                continue
+            for invocation in message.get("toolInvocations", []):
+                state = incomplete.get(invocation.get("toolCallId", ""))
+                if state and invocation.get("state") == "call":
+                    invocation.update(state)
+            for part in message.get("parts", []):
+                invocation = part.get("toolInvocation") if isinstance(part, dict) else None
+                state = incomplete.get(
+                    invocation.get("toolCallId", "")
+                    if isinstance(invocation, dict)
+                    else ""
+                )
+                if state and invocation.get("state") == "call":
+                    invocation.update(state)
 
     return {"conversation": conv, "messages": formatted}
 

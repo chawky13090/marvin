@@ -49,6 +49,12 @@ _SEARCH_PREFIX_RE = re.compile(
     r")\s+",
     re.IGNORECASE,
 )
+_SEARCH_DELIVERABLE_RE = re.compile(
+    r"(?:[.!?]\s*|,\s*)"
+    r"(?:donne|fais|cite|résume|resume|restitue|indique|présente|presente)"
+    r"\b.*$",
+    re.IGNORECASE,
+)
 _FRESH_STATUS_RE = re.compile(
     r"\b(?:statut|[ée]tat|situation|bilan)\b",
     re.IGNORECASE,
@@ -69,6 +75,7 @@ _SEARCH_STOP_WORDS = {
     "aux", "avec", "ces", "cours", "dans", "de", "dernier", "derniers", "derniere",
     "dernieres", "des", "donne", "du", "en", "et", "etat", "est", "faire", "hui",
     "info", "infos", "la", "le", "les", "leur", "mais", "ou", "pour", "que", "qui",
+    "nouveaute", "nouveautes", "officiel", "officielle", "officielles",
     "recherche", "son", "sont", "statut", "sur", "un", "une", "verifiable", "web",
 }
 
@@ -93,6 +100,14 @@ def _prepare_searxng_query(value: str) -> str:
     """Transforme une consigne en requête moteur sans perdre son sujet métier."""
     original = " ".join(str(value or "").replace('"', " ").split()).strip()
     cleaned = _SEARCH_PREFIX_RE.sub("", original, count=1).strip(" ?!.,:;")
+    cleaned = re.sub(
+        r"^(?:via|avec)\s+searxng\s+",
+        "",
+        cleaned,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    cleaned = _SEARCH_DELIVERABLE_RE.sub("", cleaned, count=1).strip(" ?!.,:;")
     cleaned = re.sub(
         r"^(?:le|la|les|des|du|de\s+l['’])\s+",
         "",
@@ -121,7 +136,7 @@ def _topic_tokens(value: str) -> set[str]:
     tokens = {
         token
         for token in _SEARCH_TOKEN_RE.findall(_normalize_search_text(value))
-        if token not in _SEARCH_STOP_WORDS
+        if token not in _SEARCH_STOP_WORDS and not token.isdigit()
     }
     if {"feu", "feux", "foret"} & tokens:
         tokens.update({"incendie", "incendies"})
@@ -524,6 +539,49 @@ def _clean_search_query(value: str) -> str:
     return " ".join(str(value or "").replace('"', " ").replace("'", " ").split())[:150]
 
 
+def _parse_research_queries(value: str, *, fallback: str) -> tuple[str, ...]:
+    """Lit un portefeuille JSON LLM borné; la requête sujet reste le repli sûr."""
+    match = re.search(r"\[[\s\S]{2,4000}\]", str(value or ""))
+    parsed: Any = None
+    if match:
+        try:
+            import json
+
+            parsed = json.loads(match.group(0))
+        except (TypeError, ValueError):
+            parsed = None
+    values: list[str] = []
+    if isinstance(parsed, list):
+        for item in parsed:
+            query = str(
+                item.get("query") if isinstance(item, dict) else item or ""
+            ).strip()
+            if 3 <= len(query) <= 300 and "\n" not in query:
+                values.append(query)
+    normalized_fallback = _prepare_searxng_query(fallback)
+    if normalized_fallback and normalized_fallback not in values:
+        values.insert(0, normalized_fallback)
+    return tuple(dict.fromkeys(values[:6]))
+
+
+async def _plan_research_queries(value: str, *, model: Any = None) -> tuple[str, ...]:
+    """Laisse le LLM choisir les requêtes dans un contrat SearXNG de 1 à 6 appels."""
+    subject = _prepare_searxng_query(value)
+    prompt = (
+        "Tu pilotes une recherche Web via SearXNG. Planifie entre 3 et 6 requêtes "
+        "complémentaires et précises pour répondre au sujet. Choisis librement les langues, "
+        "synonymes, domaines ou opérateurs utiles. Couvre la découverte, les sources primaires "
+        "et la contre-vérification. Ne réponds pas au sujet. Retourne uniquement un tableau JSON "
+        'de chaînes, par exemple ["requête 1","requête 2","requête 3"].\n\n'
+        f"SUJET UTILISATEUR : {subject}"
+    )
+    try:
+        planned = await _generate(prompt, model=model, timeout=60)
+    except Exception:
+        planned = ""
+    return _parse_research_queries(planned, fallback=subject)
+
+
 async def execute_web_browse(args: dict) -> dict:
     """Récupère et extrait le texte d'une page web."""
     url = str(args.get("url") or "").strip()
@@ -710,8 +768,29 @@ async def execute_web_research(args: dict) -> dict:
     )
     try:
         import web_browser as wb
-        search_receipt = await _priority_search(query, 20)
-        results = list(search_receipt.get("results") or [])
+        planned_queries = await _plan_research_queries(
+            query,
+            model=args.get("model"),
+        )
+        receipts: list[dict[str, Any]] = []
+        results_by_url: dict[str, dict[str, Any]] = {}
+        search_results = await asyncio.gather(
+            *(_priority_search(variant, 20) for variant in planned_queries)
+        )
+        for receipt in search_results:
+            receipts.append(receipt)
+            for item in receipt.get("results") or []:
+                url = str(item.get("url") or "")
+                if url and url not in results_by_url:
+                    results_by_url[url] = item
+        results = _filter_relevant_results(
+            _prepare_searxng_query(query),
+            list(results_by_url.values()),
+        )[:20]
+        search_receipt = next(
+            (receipt for receipt in receipts if receipt.get("success")),
+            receipts[-1] if receipts else {},
+        )
     except Exception as e:
         return {"error": f"Recherche navigateur échouée : {str(e)[:160]}"}
     if not results:
@@ -783,6 +862,7 @@ async def execute_web_research(args: dict) -> dict:
         "provider": search_receipt.get("provider"),
         "provider_attempts": search_receipt.get("provider_attempts", []),
         "fallback_used": bool(search_receipt.get("fallback_used", False)),
+        "query_variants": list(planned_queries),
         "message": (
             f"Réponse trouvée via {search_receipt.get('provider') or 'le Web'} "
             f"avec {len(results[:20])} source(s) et mémorisée."
@@ -818,8 +898,9 @@ async def execute_web_deep_research(args: dict) -> dict:
             300,
             min(int(args.get("max_seconds") or (3600 if depth == "exhaustive" else 1800)), 3600),
         )
+        research_query = _prepare_searxng_query(query)
         return await research_swarm.execute(
-            query,
+            research_query,
             agent_count=5,
             sources_per_agent=8,
             max_duration_seconds=max_seconds,

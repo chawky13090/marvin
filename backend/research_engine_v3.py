@@ -224,6 +224,31 @@ async def execute(
             raise TimeoutError("Budget temporel Research Engine v3 dépassé.")
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=10.0)) as model_client:
+        if not query_history:
+            planner_model = selected_models[0]["model"]
+            initial_plan = await _model_call(
+                model_client,
+                planner_model,
+                "Tu pilotes librement une recherche Web via SearXNG. Propose les requêtes "
+                "initiales les plus utiles pour répondre au sujet, sans répondre au sujet. "
+                "Respecte strictement le budget indiqué. Couvre au minimum les axes discovery, "
+                "primary, counterevidence et verification. Choisis les langues, synonymes, "
+                "domaines et opérateurs pertinents. Retourne uniquement un tableau JSON "
+                '[{"axis":"discovery","query":"..."}, ...].\n\n'
+                f"SUJET: {contract.question}\n"
+                f"REQUÊTES MAXIMALES: {min(contract.budget.max_queries, 6)}\n"
+                f"PAGES MINIMALES: {contract.budget.min_pages}\n"
+                f"PAGES MAXIMALES: {contract.budget.max_pages}",
+                "v3_query_plan",
+                "research",
+            )
+            if initial_plan.get("ok"):
+                llm_queries = _bounded_gap_queries(
+                    initial_plan.get("answer", ""),
+                    round_number=0,
+                )
+                if llm_queries:
+                    query_queue = llm_queries[: contract.budget.max_queries]
         for round_number in range(1, contract.budget.max_rounds + 1):
             ensure_active()
             if steering:

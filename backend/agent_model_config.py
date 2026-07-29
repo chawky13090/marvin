@@ -93,14 +93,21 @@ async def resolve_model_config(
             if ultra or not is_sensitive_request(messages, normalized_text):
                 configured = cloud_overrides[profile_name]
                 installed = cloud_routing.list_installed_cloud_models()
-                active_model = (
-                    configured
-                    if configured in installed
-                    else (cloud_routing.pick_best_cloud_model("general") or active_model)
+                need = (
+                    cloud_routing.detect_task(user_query)
+                    or {
+                        "analysis": "reasoning",
+                        "agent": "agentic",
+                        "vision": "vision",
+                    }.get(profile_name, "general")
                 )
-                task = cloud_routing.detect_task(user_query)
-                if task:
-                    active_model = cloud_routing.pick_best_cloud_model(task) or active_model
+                # Les overrides de profil proviennent souvent d'un ancien preset et
+                # vieillissent dès qu'un modèle Cloud supérieur est installé. En mode
+                # Auto, le Model Market qualifié gagne; l'override reste un repli.
+                active_model = (
+                    cloud_routing.pick_best_cloud_model(need)
+                    or (configured if configured in installed else active_model)
+                )
     else:
         active_model = requested_model
         profile_name = "manual"

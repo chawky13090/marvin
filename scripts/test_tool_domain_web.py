@@ -90,6 +90,18 @@ async def _run() -> None:
     assert web._prepare_searxng_query(
         "recher sur le web les derniers infos sur les feux de foret en france"
     ) == "derniers infos sur les feux de foret en france"
+    assert web._prepare_searxng_query(
+        "Recherche sur le web via SearXNG les nouveautés officielles de Python 3.14. "
+        "Donne un résumé court et cite les liens directs."
+    ) == "nouveautés officielles de Python 3.14"
+    assert web._parse_research_queries(
+        '["Python 3.14 official docs", "Python 3.14 release notes"]',
+        fallback="nouveautés officielles de Python 3.14",
+    ) == (
+        "nouveautés officielles de Python 3.14",
+        "Python 3.14 official docs",
+        "Python 3.14 release notes",
+    )
     filtered = web._filter_relevant_results(
         "feux de foret France",
         [

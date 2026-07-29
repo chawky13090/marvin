@@ -19,10 +19,13 @@ from agent_loop_policy import (
     build_skill_nudge,
     promises_unexecuted_action,
     render_blocking_outcomes,
+    render_latest_web_result,
+    retryable_cloud_model_error,
     should_suppress_model_text,
     skill_requires_nudge,
     sensitive_tool_model_switch,
 )
+from agent_transport import OllamaHTTPError
 
 
 async def main() -> int:
@@ -120,6 +123,21 @@ async def main() -> int:
     })
     assert refusal and "tests échoués" in refusal and "pytest" in refusal
     assert render_blocking_outcomes({}) is None
+    web_receipt = render_latest_web_result([
+        {
+            "tool": "web_research",
+            "answer": "Résultat vérifié.",
+            "sources": [{"title": "Source", "url": "https://example.com/page"}],
+        }
+    ])
+    assert web_receipt == (
+        "Résultat vérifié.\n\n### Sources\n\n"
+        "- [Source](https://example.com/page)"
+    )
+    assert retryable_cloud_model_error(OllamaHTTPError(402, "quota modèle")) is True
+    assert retryable_cloud_model_error(OllamaHTTPError(503, "indisponible")) is True
+    assert retryable_cloud_model_error(OllamaHTTPError(401, "auth")) is False
+    assert retryable_cloud_model_error(ValueError("entrée invalide")) is False
 
     class Client:
         async def __aenter__(self):

@@ -58,11 +58,22 @@ def main() -> int:
         ))))
         assert "weather" in portable
 
-        spontaneous_research = set(_names(asyncio.run(selection.filter_relevant_tools(
+        stable_explanation = set(_names(asyncio.run(selection.filter_relevant_tools(
             [{"role": "user", "content": "explique-moi cette technologie"}],
             "agent",
         ))))
-        assert "web_research" in spontaneous_research
+        assert "web_research" not in stable_explanation
+
+        local_followup = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [
+                {"role": "user", "content": "liste les dossiers présents sur mon bureau"},
+                {"role": "assistant", "content": "Je n'ai pas exécuté l'action."},
+                {"role": "user", "content": "tu as les outils nécessaires pourtant"},
+            ],
+            "agent",
+        ))))
+        assert {"file_list", "file_write", "pc_get_real_paths"} <= local_followup
+        assert "web_research" not in local_followup
 
     sample = [_spec(name) for name in ("a", "b", "c", "d", "z")]
     with (

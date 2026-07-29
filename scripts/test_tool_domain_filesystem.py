@@ -55,8 +55,19 @@ async def main() -> int:
         assert "introuvable" in missing_search["error"]
         await filesystem.write({"path": "docs/a.txt", "content": "b", "mode": "append"})
         assert (base / "docs/a.txt").read_text(encoding="utf-8") == "ab"
+        non_destructive = await filesystem.write(
+            {
+                "path": "docs/a.txt",
+                "content": "nouveau",
+                "overwrite": False,
+            }
+        )
+        assert non_destructive["success"] is True
+        assert non_destructive["path"].endswith("a (2).txt")
+        assert (base / "docs/a.txt").read_text(encoding="utf-8") == "ab"
+        assert (base / "docs/a (2).txt").read_text(encoding="utf-8") == "nouveau"
         copied = await filesystem.copy({"source": "docs/a.txt", "destination": "docs"})
-        assert copied["success"] and copied["destination"].endswith("a (2).txt")
+        assert copied["success"] and copied["destination"].endswith("a (3).txt")
         renamed = await filesystem.rename({"source": "docs/a.txt", "new_name": "b.txt"})
         assert renamed["success"] and (base / "docs/b.txt").exists()
         same = await filesystem.move({"source": "docs/b.txt", "destination": "docs/b.txt"})

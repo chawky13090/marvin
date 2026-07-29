@@ -103,6 +103,41 @@ def main() -> int:
         context=context,
     )
     assert not satisfied.injected
+
+    delivery_waits_for_forge = inject_required_tool_calls(
+        required_names={"file_write"},
+        executed_names=set(),
+        tool_calls=[],
+        step=0,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query="mets le script dans install-c.sh sur mon bureau",
+        ),
+    )
+    assert not delivery_waits_for_forge.injected
+
+    delivery_ready = inject_required_tool_calls(
+        required_names={"file_write"},
+        executed_names=set(),
+        tool_calls=[],
+        step=1,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query="mets le script dans install-c.sh sur mon bureau",
+            successful_results=[{
+                "tool": "ai_code_forge",
+                "code": "#!/usr/bin/env bash\nset -Eeuo pipefail\n",
+                "language": "bash",
+            }],
+        ),
+        call_id_factory=lambda: "required-file",
+    )
+    assert delivery_ready.injected_names == ("file_write",)
+    assert delivery_ready.tool_calls[0]["function"]["arguments"] == {
+        "path": "Bureau/install-c.sh",
+        "content": "#!/usr/bin/env bash\nset -Eeuo pipefail\n",
+        "overwrite": False,
+    }
     print(
         "Agent Required Tools OK - contrats, autonomie, budget, Workspace et dédoublonnage."
     )
