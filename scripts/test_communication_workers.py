@@ -6,6 +6,7 @@ import ast
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 
@@ -59,7 +60,9 @@ async def _check_reminder_once() -> None:
         if sleep_calls > 1:
             raise StopWorker()
 
-    notify = AsyncMock(return_value={"success": True})
+    notify = AsyncMock(
+        return_value=SimpleNamespace(executed=True, result={"success": True})
+    )
     update = Mock()
     event = {
         "id": "evt-1",
@@ -71,7 +74,7 @@ async def _check_reminder_once() -> None:
         patch.object(communication_workers.asyncio, "sleep", controlled_sleep),
         patch.object(communication_workers.db, "events_needing_reminder", return_value=[event]),
         patch.object(communication_workers.db, "update_event", update),
-        patch.dict(communication_workers.tool_module.TOOLS_REGISTRY, {"pc_notify": notify}),
+        patch.object(communication_workers, "_worker_tool", notify),
     ):
         try:
             await communication_workers.event_reminder_worker()
@@ -79,14 +82,56 @@ async def _check_reminder_once() -> None:
             pass
         else:
             raise AssertionError("Le worker de test devait etre arrete apres un passage.")
-    payload = notify.await_args.args[0]
+    assert notify.await_args.args[0] == "pc_notify"
+    payload = notify.await_args.args[1]
     assert payload == {"title": "📅 Rappel : Intervention", "message": "À 08:30 (KOIOS)"}
+    assert notify.await_args.kwargs["source"] == "event_reminder_worker"
+    assert notify.await_args.kwargs["request_id"] == "event-reminder:evt-1"
     update.assert_called_once_with("evt-1", {"reminded": True})
+
+    failed_update = Mock()
+    sleep_calls = 0
+    failed = AsyncMock(
+        return_value=SimpleNamespace(
+            executed=True,
+            result={"error": "notification indisponible"},
+        )
+    )
+    with (
+        patch.object(communication_workers.asyncio, "sleep", controlled_sleep),
+        patch.object(communication_workers.db, "events_needing_reminder", return_value=[event]),
+        patch.object(communication_workers.db, "update_event", failed_update),
+        patch.object(communication_workers, "_worker_tool", failed),
+    ):
+        try:
+            await communication_workers.event_reminder_worker()
+        except StopWorker:
+            pass
+    failed_update.assert_not_called()
+
+
+def _check_error_deduplication() -> None:
+    communication_workers._last_worker_errors.clear()
+    log_bug = Mock()
+    with (
+        patch.object(communication_workers.bug_log, "log_bug", log_bug),
+        patch.object(
+            communication_workers.time,
+            "monotonic",
+            side_effect=[10.0, 20.0, 400.0],
+        ),
+    ):
+        communication_workers._report_worker_failure("worker", RuntimeError("secret-a"))
+        communication_workers._report_worker_failure("worker", RuntimeError("secret-b"))
+        communication_workers._report_worker_failure("worker", RuntimeError("secret-c"))
+    assert log_bug.call_count == 2
+    assert "secret" not in str(log_bug.call_args_list)
 
 
 def main() -> int:
     _check_main_facade()
     _check_background_scale()
+    _check_error_deduplication()
     asyncio.run(_check_reminder_once())
     print("Communication Workers OK - facade, cadence et rappel agenda sans effet externe.")
     return 0

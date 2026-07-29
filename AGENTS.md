@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.445.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.446.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.445.0)
+## 9. État actuel (v2.446.0)
+
+**v2.446 (surfaces e-mail sous harness)** : génération, résumé, digest, règles,
+surveillance et automatisation manuelle passent par `tool_runtime`. Les workers e-mail,
+rappels Agenda et synchronisation calendrier utilisent une identité de worker corrélée.
+L'automatisation planifiée possède une clé de rejeu par minute. Un rappel n'est marqué envoyé
+qu'après une notification réellement réussie. Les erreurs workers sont expurgées, dédupliquées
+pendant cinq minutes et conservées par le journal borné. La dette directe descend de 50 à 42.
 
 **v2.445 (orchestrateurs sous harness)** : multi-agents, workflows persistants et cron ne
 résolvent plus directement les outils. Le parallélisme est borné à 32 tâches, les workflows

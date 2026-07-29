@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException
 
 import database as db
-import tools as tool_module
+import tool_runtime
 
 
 router = APIRouter()
@@ -85,7 +85,13 @@ async def set_email_watch(body: dict = Body(...)):
 
 @router.post("/api/email/watch/run")
 async def run_email_watch():
-    return await tool_module.TOOLS_REGISTRY["email_watch_check"]({"force": True})
+    return (
+        await tool_runtime.execute(
+            "email_watch_check",
+            {"force": True},
+            source="email_ui",
+        )
+    ).result
 
 
 @router.get("/api/email/watch/alerts")
@@ -114,6 +120,10 @@ async def set_email_rules(body: dict = Body(...)):
 
 @router.post("/api/email/rules/run")
 async def run_email_rules(dry_run: bool = False, account: str | None = None):
-    return await tool_module.TOOLS_REGISTRY["email_apply_rules"](
-        {"dry_run": dry_run, "account": account}
-    )
+    return (
+        await tool_runtime.execute(
+            "email_apply_rules",
+            {"dry_run": dry_run, "account": account},
+            source="email_ui",
+        )
+    ).result

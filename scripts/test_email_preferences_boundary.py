@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 
@@ -40,14 +41,23 @@ async def _run() -> None:
     assert result["count"] == 1
     save.assert_called_once_with("email_templates", [{"name": "Réponse", "body": "Nouveau"}])
 
-    watch = AsyncMock(return_value={"success": True})
-    rules = AsyncMock(return_value={"success": True, "count": 2})
-    registry = {"email_watch_check": watch, "email_apply_rules": rules}
-    with patch.object(email_preferences.tool_module, "TOOLS_REGISTRY", registry):
+    calls = []
+
+    async def execute(name, arguments, **options):
+        calls.append((name, arguments, options))
+        return SimpleNamespace(result={"success": True})
+
+    with patch.object(email_preferences.tool_runtime, "execute", side_effect=execute):
         await email_preferences.run_email_watch()
         await email_preferences.run_email_rules(dry_run=True, account="user@example.test")
-    watch.assert_awaited_once_with({"force": True})
-    rules.assert_awaited_once_with({"dry_run": True, "account": "user@example.test"})
+    assert calls == [
+        ("email_watch_check", {"force": True}, {"source": "email_ui"}),
+        (
+            "email_apply_rules",
+            {"dry_run": True, "account": "user@example.test"},
+            {"source": "email_ui"},
+        ),
+    ]
 
 
 def main() -> int:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
@@ -46,17 +47,33 @@ async def _run() -> None:
     assert stored["send_delay_min"] == 1 and "scheduler_confirmed" not in stored
     assert stored["accounts"] == ["a@example.test", "b@example.test"]
 
-    draft = AsyncMock(return_value={"success": True, "draft": "Bonjour"})
-    run = AsyncMock(return_value={"success": True, "processed": 0})
-    registry = {"email_draft_reply": draft, "email_automation_run": run}
+    gateway_calls = []
+
+    async def execute(name, arguments, **options):
+        gateway_calls.append((name, arguments, options))
+        result = (
+            {"success": True, "draft": "Bonjour"}
+            if name == "email_draft_reply"
+            else {"success": True, "processed": 0}
+        )
+        return SimpleNamespace(result=result, status_code=200)
     request = email_automation.DraftReplyRequest(
         uid="42", **{"from": "sender@example.test"}, instruction="Réponds brièvement"
     )
-    with patch.object(email_automation.tool_module, "TOOLS_REGISTRY", registry):
+    with patch.object(email_automation.tool_runtime, "execute", side_effect=execute):
         await email_automation.email_draft_reply(request)
         await email_automation.run_email_automation(dry_run=True, mode="autonome")
-    assert draft.call_args.args[0]["from"] == "sender@example.test"
-    run.assert_awaited_once_with({"dry_run": True, "mode": "autonome", "source": "manual"})
+    assert gateway_calls[0][1]["from"] == "sender@example.test"
+    assert gateway_calls[0][2] == {
+        "source": "email_ui",
+        "confirmed_by_ui": False,
+    }
+    assert gateway_calls[1][1] == {
+        "dry_run": True,
+        "mode": "autonome",
+        "source": "manual",
+    }
+    assert gateway_calls[1][2]["confirmed_by_ui"] is False
 
     outbox = [{"id": "keep"}, {"id": "cancel"}]
     with (

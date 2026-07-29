@@ -5,6 +5,44 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.446.0 — Surfaces et workers e-mail sous harness
+
+### Analyse et choix
+
+Huit accès directs subsistaient dans les API d'automatisation/préférences et les workers de
+communication. Les remplacer par un simple helper local aurait conservé des politiques
+divergentes. Le runtime commun est retenu pour appliquer validation, permission, confirmation,
+reçu, résultat, corrélation et audit. Les verrous, profils multi-comptes, listes
+d'expéditeurs, dry-run et confirmation persistée du scheduler restent dans le domaine e-mail,
+où leur contexte métier est nécessaire.
+
+### Implémentation
+
+Les actions manuelles portent `email_ui`; l'exécution autonome non simulée issue du bouton
+explicite transmet la confirmation UI. Les workers possèdent des conversations techniques
+séparées. L'automatisation planifiée utilise `email-automation:<minute>` afin qu'un redémarrage
+dans le même cycle ne double pas une action dangereuse. Les rappels utilisent
+`event-reminder:<id>` et ne passent à `reminded=true` qu'après succès réel. Les erreurs de
+workers sont réduites à leur classe, dédupliquées cinq minutes par composant et envoyées au
+journal borné sans traceback ni contenu d'e-mail.
+
+### Sécurité, logs et rollback
+
+Le changement ne journalise ni corps, destinataire, compte, token ni exception brute. Une
+action e-mail dangereuse reste soumise au niveau de permission, au geste UI ou à la
+confirmation persistée du scheduler et aux listes autorisées du domaine. Aucun schéma ni
+donnée n'est migré. Rollback exact : `git revert <commit-v2.446>`, redémarrage backend,
+tests des trois frontières e-mail, workers, inventaire, architecture et smoke API.
+
+### Validation
+
+Les tests ciblés couvrent confirmation d'activation, dry-run, comptes, arguments, sources,
+règles, surveillance, rappel réussi/échoué, non-marquage après panne et déduplication sans
+secret. Après relance, `/api/health` expose **2.446.0**; l'état d'automatisation est relu
+sans déclencher d'envoi (`scheduler=false`, un compte sélectionné) et le smoke API réussit
+**28/28**. Le gate consolidé réussit **205/205 étapes**, dont compilation de 279 fichiers
+Python, lint sans erreur et build Turbopack.
+
 ## 2026-07-29 — v2.445.0 — Orchestrateurs sous harness commun
 
 ### Analyse et décision

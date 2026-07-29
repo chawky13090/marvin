@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 import database as db
+import tool_runtime
 import tools as tool_module
 
 
@@ -72,7 +73,16 @@ def _as_list(value) -> list:
 
 
 async def _run_tool(name: str, arguments: dict):
-    result = await tool_module.TOOLS_REGISTRY[name](arguments)
+    outcome = await tool_runtime.execute(
+        name,
+        arguments,
+        source="email_ui",
+        confirmed_by_ui=name == "email_automation_run" and not arguments.get("dry_run"),
+    )
+    result = outcome.result
+    if outcome.status_code != 200:
+        detail = result.get("error") if isinstance(result, dict) else "Action e-mail refusée."
+        raise HTTPException(status_code=outcome.status_code, detail=detail)
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     return result

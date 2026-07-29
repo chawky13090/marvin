@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.446 — API et workers e-mail sous harness, erreurs bornées et rejeu stable
 # v2.445 — multi-agents, workflows et cron sous harness commun
 # v2.444 — domaine proactif sous harness et inventaire direct exhaustif
 # v2.443 — runtime commun des outils, agenda migré et confirmations authentifiées
