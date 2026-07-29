@@ -12363,3 +12363,39 @@ référence humain et une évaluation aveugle. Aucun statut de supériorité n'e
 Aucune migration de schéma ni réécriture de preuve. Désactivation immédiate avec
 `research_engine_v3_enabled=false` ou appel `engine_version=v2`. Le rollback complet est la
 réversion atomique du commit v2.486 suivie du redémarrage et du test Model Market.
+
+## 2026-07-29 — v2.487 — Recherche profonde contextuelle et mesurable
+
+### Demande et constats
+
+Deux conversations réelles ont mis en évidence deux régressions : une recherche d’actualité
+sur les feux de forêt est restée sur une seule requête légère, et une relance concernant une
+personne a perdu le nom et la zone au profit de la seule phrase « cherche sur les réseaux
+sociaux ». La façade historique annonçait les liens retournés comme sources alors qu’elle ne
+lisait réellement que trois à six pages.
+
+### Décisions et modifications
+
+- `agent_planning.py` conserve le sujet initial, cumule les contraintes de source et promeut
+  les demandes d’actualité dynamique vers `web_deep_research`;
+- `web_deep_research` reste compatible mais délègue à Research Engine v3;
+- le profil profond exige 24 requêtes et 50 pages uniques;
+- le profil exhaustif exige 100 requêtes et 50 pages uniques;
+- le moteur distingue requêtes, pages tentées, pages lues, rejets et sources uniques;
+- l’API et l’interface acceptent une mission exhaustive de 3 600 secondes;
+- les tests reproduisent les deux dérives constatées.
+
+### Sécurité, logs et preuves
+
+L’autonomie porte sur les ressources accessibles par la session autorisée. Aucun
+contournement d’authentification, vol de session ou franchissement de contrôle d’accès n’est
+introduit. Les pages restent des données non fiables analysées par les protections anti-SSRF
+et anti-instructions existantes. Aucun contenu de page, secret ou donnée personnelle
+supplémentaire n’est ajouté aux logs. Les compteurs agrégés rejoignent le registre de
+recherche existant; aucune nouvelle classe de rétention n’est créée.
+
+### Rollback
+
+Aucune migration de schéma ni mutation de données. Rollback fonctionnel immédiat :
+`research_engine_v3_enabled=false`. Rollback complet : réversion atomique du commit v2.487,
+redémarrage du backend, puis exécution des tests Web, Agent Planning et Research v3.

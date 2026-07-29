@@ -735,10 +735,27 @@ function renderToolResult(toolName, result) {
 
   // ── web_deep_research (v2.142) ─────
   if (toolName === 'web_deep_research' && result.answer) {
+    const coverage = result.source_coverage || {};
     return (
       <div>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-          🔍 {result.rounds || 1} passe(s) de recherche · {(result.sources || []).length} source(s)
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
+          <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 999, background: 'rgba(20,184,166,.12)', color: '#5eead4' }}>
+            {result.engine_version === 'v3' ? 'Recherche vérifiée v3' : 'Recherche approfondie'}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            {coverage.queries_executed ?? result.rounds ?? 1} requête(s)
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            {coverage.pages_read ?? (result.sources || []).length} page(s) lue(s)
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            {(result.sources || []).length} source(s) unique(s)
+          </span>
+          {coverage.pages_rejected != null && (
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {coverage.pages_rejected} rejet(s)
+            </span>
+          )}
         </div>
         <MarkdownBlock text={result.answer} />
         {(result.sources || []).length > 0 && (

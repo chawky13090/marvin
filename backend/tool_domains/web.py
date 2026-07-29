@@ -793,6 +793,54 @@ async def execute_web_research(args: dict) -> dict:
 
 
 async def execute_web_deep_research(args: dict) -> dict:
+    """Façade stable vers Research Engine v3.
+
+    Une demande explicitement approfondie utilise le contrat exhaustif par
+    défaut. Le moteur historique reste disponible ci-dessous pour un rollback
+    interne, sans être exposé comme outil supplémentaire.
+    """
+    query = str(args.get("query") or args.get("q") or "").strip()
+    if not query:
+        return {"error": "Paramètre 'query' requis."}
+    try:
+        import research_swarm
+
+        explicit_depth = str(args.get("depth") or "").strip().lower()
+        exhaustive_request = bool(re.search(
+            r"\b(?:exhausti|approfond|massive?|maximum\s+de\s+(?:sources|résultats)|"
+            r"fouille\s+(?:réellement|le\s+web))",
+            query.casefold(),
+        ))
+        depth = explicit_depth or ("exhaustive" if exhaustive_request else "deep")
+        if depth not in {"deep", "exhaustive"}:
+            depth = "exhaustive"
+        max_seconds = max(
+            300,
+            min(int(args.get("max_seconds") or (3600 if depth == "exhaustive" else 1800)), 3600),
+        )
+        return await research_swarm.execute(
+            query,
+            agent_count=5,
+            sources_per_agent=8,
+            max_duration_seconds=max_seconds,
+            engine_version="v3",
+            research_options={
+                "depth": depth,
+                "source_policy": str(args.get("source_policy") or "primary_first"),
+                "freshness": args.get("freshness"),
+                "language": str(args.get("language") or "fr-FR"),
+                "region": str(args.get("region") or "FR"),
+            },
+        )
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": f"Recherche approfondie indisponible ({type(exc).__name__}).",
+            "engine_version": "v3",
+        }
+
+
+async def _execute_web_deep_research_legacy(args: dict) -> dict:
     """Recherche approfondie multi-passes sur le web : boucle recherche → identifie les
     angles morts → recherche complémentaire ciblée, plusieurs fois, avant de produire un
     rapport structuré avec citations numérotées. BEAUCOUP plus lent que web_research

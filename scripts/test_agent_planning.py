@@ -112,7 +112,7 @@ def main() -> int:
         )
         expected = (
             "web_deep_research"
-            if "approfondie" in dynamic_query
+            if "approfondie" in dynamic_query or "statut des feux" in dynamic_query
             else "web_research"
         )
         assert expected in dynamic.required_tool_names, dynamic_query
@@ -140,6 +140,24 @@ def main() -> int:
     )
     assert "web_deep_research" in followup.required_tool_names
     assert followup.contextual_web_query == followup_messages[0]["content"]
+
+    person_followup_messages = [
+        {
+            "role": "user",
+            "content": "recherche Julie Solé Boussayri à Aix-en-Provence et Marseille",
+        },
+        {"role": "assistant", "content": "Premiers résultats partiels."},
+        {"role": "user", "content": "cherche sur les réseaux sociaux"},
+        {"role": "assistant", "content": "Je poursuis."},
+        {"role": "user", "content": "refait la recherche"},
+    ]
+    person_followup = planning.compile_turn_plan(
+        person_followup_messages,
+        person_followup_messages[-1]["content"],
+    )
+    assert "web_research" in person_followup.required_tool_names
+    assert "Julie Solé Boussayri" in person_followup.contextual_web_query
+    assert "réseaux sociaux" in person_followup.contextual_web_query
 
     deictic_messages = [
         {

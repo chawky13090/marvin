@@ -50,6 +50,17 @@ _GENERIC_WEB_REQUEST_RE = re.compile(
     r"(?:\s+(?:maintenant|simple|s['’]il\s+te\s+pla[îi]t|stp|svp))*"
     r"[\s!?.]*$"
 )
+_CONTEXT_ONLY_WEB_RE = re.compile(
+    r"^\s*(?:cherche|recherche|regarde|fouille|explore)\w*\s+"
+    r"(?:uniquement\s+|aussi\s+)?(?:sur\s+)?(?:les?\s+)?"
+    r"(?:r[ée]seaux?\s+sociaux|sources?|sites?|web|internet)"
+    r"(?:\s+(?:publics?|officiels?|locaux?|r[ée]cents?))*[\s!?.]*$"
+)
+_DYNAMIC_RESEARCH_RE = re.compile(
+    r"\b(?:derni[èe]res?\s+(?:infos?|nouvelles?|actualit[ée]s?)|"
+    r"actualit[ée]s?|en\s+ce\s+moment|aujourd['’]hui|"
+    r"statut\s+(?:actuel|des)|situation\s+actuelle)\b"
+)
 
 
 def _message_text(message: dict[str, Any]) -> str:
@@ -94,6 +105,8 @@ def _contextual_web_requirement(
         for raw, normalized in reversed(previous_users)
         if raw
         and not _GENERIC_WEB_REQUEST_RE.fullmatch(normalized)
+        and not _CONTEXT_ONLY_WEB_RE.fullmatch(normalized)
+        and not _WEB_FOLLOWUP_RE.search(normalized)
         and not (
             cortex._EXPLICIT_WEB_RE.search(normalized)
             and _WEB_DEICTIC_RE.search(normalized)
@@ -107,11 +120,19 @@ def _contextual_web_requirement(
         )
     if not matched_query:
         return None
+    modifiers = [
+        raw
+        for raw, normalized in previous_users
+        if _CONTEXT_ONLY_WEB_RE.fullmatch(normalized)
+    ][-2:]
+    contextual_query = matched_query
+    if modifiers:
+        contextual_query += "\nContraintes complémentaires : " + " ; ".join(modifiers)
     return (
         "web_deep_research"
         if _DEEP_WEB_FOLLOWUP_RE.search(current)
         else "web_research",
-        matched_query,
+        contextual_query,
     )
 
 
@@ -160,6 +181,12 @@ def compile_turn_plan(
     execution_budget = cortex_plan["execution_budget"]
     if not tool_suppression:
         required_tool_names.update(cortex_plan.get("forced_tools") or [])
+        if (
+            "web_research" in required_tool_names
+            and _DYNAMIC_RESEARCH_RE.search(workspace_norm)
+        ):
+            required_tool_names.discard("web_research")
+            required_tool_names.add("web_deep_research")
         contextual_web = _contextual_web_requirement(messages, user_query)
         if contextual_web:
             required_tool_names.discard("web_research")

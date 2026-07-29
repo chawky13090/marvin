@@ -26,9 +26,18 @@ _DEPTH_ALIASES = {
     "exhaustive": "exhaustive",
 }
 _BUDGETS = {
-    "quick": {"max_queries": 6, "max_pages": 18, "max_rounds": 2, "max_seconds": 180},
-    "deep": {"max_queries": 18, "max_pages": 60, "max_rounds": 6, "max_seconds": 900},
-    "exhaustive": {"max_queries": 36, "max_pages": 120, "max_rounds": 10, "max_seconds": 1800},
+    "quick": {
+        "max_queries": 6, "max_pages": 18, "max_rounds": 2,
+        "max_seconds": 180, "min_queries": 1, "min_pages": 3,
+    },
+    "deep": {
+        "max_queries": 60, "max_pages": 100, "max_rounds": 20,
+        "max_seconds": 1800, "min_queries": 24, "min_pages": 50,
+    },
+    "exhaustive": {
+        "max_queries": 120, "max_pages": 150, "max_rounds": 40,
+        "max_seconds": 3600, "min_queries": 100, "min_pages": 50,
+    },
 }
 _DOMAIN_RE = re.compile(
     r"^(?:[a-z][a-z0-9+.-]*://)?([a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?)$",
@@ -73,6 +82,8 @@ class ResearchBudget:
     max_pages: int
     max_rounds: int
     max_seconds: int
+    min_queries: int = 1
+    min_pages: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +140,8 @@ def build_contract(question: object, options: dict[str, Any] | None = None) -> R
             if not floor <= value <= ceiling:
                 raise ValueError(f"{key} doit être compris entre {floor} et {ceiling}.")
             defaults[key] = value
+    defaults["min_queries"] = min(defaults["min_queries"], defaults["max_queries"])
+    defaults["min_pages"] = min(defaults["min_pages"], defaults["max_pages"])
     preferred = _domains(options.get("preferred_domains"))
     excluded = _domains(options.get("excluded_domains"))
     overlap = sorted(set(preferred) & set(excluded))
@@ -175,6 +188,52 @@ def initial_query_portfolio(contract: ResearchContract) -> list[dict[str, str]]:
         ("implementation", f"{question} pratiques production retour expérience"),
         ("verification", f"{question} données preuves méthodologie"),
     ]
+    if contract.depth != "quick":
+        rows.extend([
+            ("news", f"{question} actualité informations récentes"),
+            ("institutions", f"{question} autorités institutions organismes compétents"),
+            ("data", f"{question} données ouvertes statistiques dataset"),
+            ("academic", f"{question} étude recherche publication"),
+            ("regional", f"{question} sources locales régionales"),
+            ("international", f"{question} sources internationales comparaison"),
+            ("timeline", f"{question} chronologie dates événements"),
+            ("causes", f"{question} causes facteurs explications"),
+            ("impacts", f"{question} impacts conséquences mesures"),
+            ("criticism", f"{question} critiques controverses réfutations"),
+            ("experts", f"{question} experts spécialistes analyse"),
+            ("legal", f"{question} réglementation cadre juridique"),
+            ("technical", f"{question} documentation technique détails"),
+            ("archive", f"{question} archives historique évolution"),
+            ("factcheck", f"{question} fact check vérification affirmations"),
+            ("alternatives", f"{question} alternatives comparaison solutions"),
+            ("limitations", f"{question} limites incertitudes données manquantes"),
+            ("methodology", f"{question} méthodologie collecte qualité données"),
+        ])
+    if contract.depth == "exhaustive":
+        source_families = (
+            "site gouvernemental", "rapport PDF", "communiqué officiel",
+            "base de données publique", "presse locale", "presse nationale",
+            "analyse indépendante", "publication scientifique",
+            "organisation professionnelle", "source internationale",
+        )
+        evidence_lenses = (
+            "faits et chiffres vérifiés", "chronologie et dates",
+            "méthodologie et qualité des données", "limites et incertitudes",
+            "contradictions et réfutations", "causes et facteurs",
+            "impacts et conséquences", "mise à jour récente",
+        )
+        axes = ("discovery", "primary", "verification", "counterevidence")
+        rows.extend(
+            (
+                axes[index % len(axes)],
+                f"{question} {source_family} {evidence_lens}",
+            )
+            for index, (source_family, evidence_lens) in enumerate(
+                (source_family, evidence_lens)
+                for source_family in source_families
+                for evidence_lens in evidence_lenses
+            )
+        )
     if contract.preferred_domains:
         target = contract.preferred_domains[0]
         rows[1] = ("primary", f"site:{target} {question}")

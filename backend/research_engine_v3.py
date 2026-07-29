@@ -56,7 +56,11 @@ def _rank_hit(hit: dict[str, Any], contract: ResearchContract) -> tuple[int, str
     return (_source_priority(hit, contract.question) + (10 if preferred else 0), url)
 
 
-def _coverage(index: SourceIndex, queries: list[dict[str, Any]]) -> dict[str, Any]:
+def _coverage(
+    index: SourceIndex,
+    queries: list[dict[str, Any]],
+    contract: ResearchContract,
+) -> dict[str, Any]:
     sources = index.values()
     completed_axes = set()
     for row in queries:
@@ -68,13 +72,22 @@ def _coverage(index: SourceIndex, queries: list[dict[str, Any]]) -> dict[str, An
         completed_axes.add(axis)
     required = {"discovery", "primary", "counterevidence", "verification"}
     metrics = index.metrics()
+    attempted_pages = sum(int(row.get("pages_attempted") or 0) for row in queries)
+    readable_pages = sum(int(row.get("pages_read") or 0) for row in queries)
+    rejected_pages = sum(int(row.get("pages_rejected") or 0) for row in queries)
     metrics.update({
-        "queries": len(queries),
+        "queries_executed": len(queries),
+        "query_target": contract.budget.min_queries,
+        "pages_attempted": attempted_pages,
+        "pages_read": readable_pages,
+        "page_target": contract.budget.min_pages,
+        "pages_rejected": rejected_pages,
         "completed_axes": sorted(completed_axes),
         "missing_axes": sorted(required - completed_axes),
         "axis_coverage": round(len(completed_axes & required) / len(required), 4),
         "sufficient": bool(
-            len(sources) >= 8
+            len(queries) >= contract.budget.min_queries
+            and len(sources) >= contract.budget.min_pages
             and len({source.domain for source in sources}) >= 4
             and not (required - completed_axes)
         ),
@@ -259,6 +272,9 @@ async def execute(
                     "result_count": len(receipt.get("results") or []),
                     "accepted_sources": 0,
                     "primary_sources": 0,
+                    "pages_attempted": 0,
+                    "pages_read": 0,
+                    "pages_rejected": 0,
                     "error": receipt.get("error"),
                 }
                 hits = sorted(
@@ -273,9 +289,14 @@ async def execute(
                     if len(index.values()) >= contract.budget.max_pages:
                         break
                     url = str(hit.get("url") or "")
+                    record["pages_attempted"] += 1
                     try:
                         page = await _fetch_public_source(url, max_chars=10_000)
                         text = str(page.get("text") or hit.get("snippet") or "").strip()
+                        if not text:
+                            record["pages_rejected"] += 1
+                            continue
+                        record["pages_read"] += 1
                         resolved_url = str(page.get("url") or url)
                         resolved_title = str(page.get("title") or hit.get("title") or "")
                         if (
@@ -296,12 +317,13 @@ async def execute(
                             if accepted_source.source_type in {"primary", "academic"}:
                                 record["primary_sources"] += 1
                     except (OverflowError, RuntimeError, ValueError, httpx.HTTPError):
+                        record["pages_rejected"] += 1
                         continue
                     if record["accepted_sources"] >= pages_per_query:
                         break
                 query_history.append(record)
 
-            coverage = _coverage(index, query_history)
+            coverage = _coverage(index, query_history, contract)
             checkpoint = {
                 "contract": contract.as_dict(),
                 "queries": query_history,
@@ -356,7 +378,13 @@ async def execute(
                 "source_coverage": index.metrics(),
             }
 
-        await _notify(progress, "analysis", current=model_count, total=model_count, metrics=_coverage(index, query_history))
+        await _notify(
+            progress,
+            "analysis",
+            current=model_count,
+            total=model_count,
+            metrics=_coverage(index, query_history, contract),
+        )
         source_blocks = [
             f"[{source.id}] {source.title}\nURL: {source.url}\nTYPE: {source.source_type}\n"
             f"BEGIN_UNTRUSTED_SOURCE_DATA\n{source.text[:7000]}\nEND_UNTRUSTED_SOURCE_DATA"
@@ -449,12 +477,12 @@ async def execute(
                 "contract": contract.as_dict(),
                 "queries": query_history,
                 "sources": public_sources,
-                "source_coverage": _coverage(index, query_history),
+                "source_coverage": _coverage(index, query_history, contract),
                 "forge": forge,
                 "draft_withheld": True,
             }
 
-    coverage = _coverage(index, query_history)
+    coverage = _coverage(index, query_history, contract)
     run = {
         "id": "swarm-" + uuid.uuid4().hex[:12],
         "created_at": datetime.now(timezone.utc).isoformat(),

@@ -21,7 +21,7 @@ class SwarmRequest(BaseModel):
     question: str = Field(min_length=3, max_length=12000)
     agent_count: int = Field(default=5, ge=3, le=5)
     sources_per_agent: int = Field(default=3, ge=1, le=8)
-    max_duration_seconds: int = Field(default=600, ge=60, le=1800)
+    max_duration_seconds: int = Field(default=600, ge=60, le=3600)
     engine_version: str = Field(default="auto", pattern=r"^(auto|v2|v3)$")
     depth: str | None = Field(default=None, pattern=r"^(quick|deep|exhaustive)$")
     language: str = Field(default="fr-FR", min_length=2, max_length=12)

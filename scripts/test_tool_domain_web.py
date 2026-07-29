@@ -15,6 +15,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 import outbound_http
+import research_swarm
 import tools
 from tool_domains import web
 
@@ -123,9 +124,22 @@ async def _run() -> None:
         return {"url": url, "title": "Titre", "text": f"Contenu détaillé de {url}"}
 
     browser_module = SimpleNamespace(fetch_text=fetch_text)
+    deep_result = {
+        "success": True,
+        "engine_version": "v3",
+        "answer": "Rapport vérifié.",
+        "sources": [{"id": "source-1", "title": "Titre", "url": "https://source.example"}],
+        "queries": [{"id": "query-1", "query": "KOIOS", "accepted_sources": 1}],
+        "source_coverage": {
+            "queries_executed": 100,
+            "pages_read": 50,
+            "unique_sources": 50,
+        },
+    }
     with (
         patch.object(web, "_priority_search", side_effect=priority_search),
         patch.dict(sys.modules, {"web_browser": browser_module}),
+        patch.object(research_swarm, "execute", new=AsyncMock(return_value=deep_result)) as deep_execute,
     ):
         normal = await web.execute_web_research({"query": "KOIOS"})
         deep = await web.execute_web_deep_research({
@@ -135,11 +149,10 @@ async def _run() -> None:
         })
     assert normal["provider"] == "SearXNG"
     assert len(normal["sources"]) == 20
-    assert deep["provider_priority"] == "SearXNG"
-    assert deep["fallback_used"] is False
-    assert deep["rounds"] == 3
-    assert len(deep["sources"]) == 18
-    assert len(deep["search_receipts"]) == 3
+    assert deep["engine_version"] == "v3"
+    assert deep["source_coverage"]["queries_executed"] == 100
+    assert deep_execute.await_args.kwargs["engine_version"] == "v3"
+    assert deep_execute.await_args.kwargs["research_options"]["depth"] == "deep"
 
     html = (
         b"<html><head><title> Marvin Test </title>"

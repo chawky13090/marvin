@@ -3888,7 +3888,10 @@ TOOLS_SPEC = [
        "détaillé (« fais une recherche approfondie sur... », « fais-moi un rapport complet sur... »), "
        "jamais pour une question simple (utiliser web_research à la place, bien plus rapide).",
        {"query": {"type": "string", "description": "Le sujet à rechercher en profondeur"},
-        "max_rounds": {"type": "integer", "description": "Nombre max de passes de recherche (1-6, défaut 4)"}},
+        "depth": {"type": "string", "enum": ["deep", "exhaustive"],
+                  "description": "deep vise 50 pages; exhaustive vise au moins 100 requêtes et 50 pages"},
+        "freshness": {"type": "string", "enum": ["day", "week", "month", "year"],
+                      "description": "Fenêtre temporelle SearXNG optionnelle"}},
        ["query"]),
     _t("web_browser_open", "Ouvre une page web précise dans un vrai navigateur et renvoie son texte (utile si l'outil web interne est bloqué ou pour un site dynamique).",
        {"url": {"type": "string", "description": "L'adresse de la page à ouvrir"}},

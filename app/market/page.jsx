@@ -105,7 +105,7 @@ export default function ModelMarketPage() {
           question: question.trim(),
           agent_count: 5,
           sources_per_agent: researchConfig.depth === 'exhaustive' ? 8 : 5,
-          max_duration_seconds: researchConfig.depth === 'exhaustive' ? 1800 : 900,
+          max_duration_seconds: researchConfig.depth === 'exhaustive' ? 3600 : 1800,
           engine_version: 'v3',
           depth: researchConfig.depth,
           freshness: researchConfig.freshness || null,

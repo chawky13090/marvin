@@ -37,10 +37,10 @@ def main() -> int:
         },
     )
     assert contract.depth == "deep"
-    assert contract.budget.max_rounds == 6
+    assert contract.budget.max_rounds == 20
     assert contract.preferred_domains == ("docs.searxng.org",)
     portfolio = initial_query_portfolio(contract)
-    assert len(portfolio) == 6
+    assert len(portfolio) >= 24
     assert {item["axis"] for item in portfolio} >= {"primary", "counterevidence", "verification"}
     assert portfolio[1]["query"].startswith("site:docs.searxng.org")
 
@@ -52,7 +52,7 @@ def main() -> int:
         "preferred_domains": ["docs.example.org"],
         "excluded_domains": ["docs.example.org"],
     }))
-    expect_value_error(lambda: build_contract("x", {"max_pages": 121}))
+    expect_value_error(lambda: build_contract("x", {"max_pages": 151}))
 
     assert canonical_url(
         "HTTPS://Example.COM:443/docs//guide/?utm_source=test&a=2&a=1#part"
@@ -230,9 +230,9 @@ def main() -> int:
         assert result["forge"]["gate_passed"] is True
         assert result["source_coverage"]["unique_sources"] >= 8
         assert result["source_coverage"]["axis_coverage"] == 1.0
-        assert len(result["queries"]) == 6
+        assert len(result["queries"]) >= 24
         assert resumed["success"] is True
-        assert len(resumed["queries"]) == 6
+        assert len(resumed["queries"]) >= 24
         assert refused["draft_withheld"] is True
         assert "refusé" in refused["error"]
 

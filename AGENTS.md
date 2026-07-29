@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.485.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.487.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.486.0)
+## 9. État actuel (v2.487.0)
+
+**v2.487 (recherche profonde consolidée)** : `web_deep_research` conserve sa façade publique
+mais délègue au Research Engine v3. Le profil profond exige 24 requêtes et 50 pages uniques;
+le profil exhaustif exige 100 requêtes et 50 pages uniques. Le contexte déterministe préserve
+le sujet et cumule les contraintes des relances (« réseaux sociaux », « refais »). Les
+actualités dynamiques sont promues vers le profil profond. Le chat distingue requêtes
+exécutées, pages réellement lues, rejets et sources uniques. Les accès restent limités aux
+ressources accessibles sans contournement d’authentification; le contenu Web demeure non
+fiable et passe par le transport anti-SSRF. Le moteur v2 et le réglage
+`research_engine_v3_enabled=false` restent le rollback.
 
 **v2.486 (Research Engine v3)** : la recherche approfondie compile un contrat borné,
 explore six axes via SearXNG, reformule selon les lacunes, canonicalise et déduplique les
