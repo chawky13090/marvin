@@ -2,7 +2,7 @@
 
 Date de référence : 2026-07-28
 Version de départ : 2.386.0
-Version courante auditée : 2.460.0
+Version courante auditée : 2.461.0
 Périmètre : tout le produit Marvin, du Runner à l'installateur Windows.
 
 ## 1. Objet et règle de preuve
@@ -132,7 +132,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | memory | Mémoire, RAG et vérité durable | partial | autorité SQLite, contenu SQLite/Qdrant chiffré, audit/réparation 10/10/10, quarantaine de fraîcheur, rétention déterministe et restauration compensée (`test_memory_encryption.py`, `test_memory_lifecycle.py`, `test_memory_recovery.py`) | valider la restauration isolée de bout en bout et l'exclusion live des faits périmés avant promotion |
 | coding | Code Workspace, Forge et missions longues | verified | mission réelle `da59b089bff44e77974d7d35324e88b3`, Delivery Pack accepté, réparation après échecs, artefact préservé, 12 tests Windows et 12 tests Debian + Bats | maintenir les gates E2E, le rejeu ciblé et l'absence de régression d'artefact |
 | isolation | Docker, VM Debian et VM Windows | verified | Docker hors ligne sans socket hôte; Windows 11 non-admin réseau coupé; Debian 13 native; checkpoints restaurés avant/après; smokes live et mission v2.457 | maintenir les images figées, le moindre privilège, la gouvernance réseau et les restaurations |
-| persistence | SQLite, migrations et repositories | partial | les 13 JSONL sont classifiés et structurés; preuves métier et Truth Ledger chaînés | tester sauvegarde, restauration et protection globale au repos |
+| persistence | SQLite, migrations et repositories | partial | 14 JSONL classifiés, repositories injectables, preuves chaînées et bundle global AES-256-GCM/DPAPI vérifié sur 1 066 fichiers; restauration isolée SHA-256 complète | ajouter application hors ligne compensée et export portable/hors machine avant promotion |
 | api | FastAPI, contrats et compatibilité | partial | 354 routes uniques et `scripts/smoke_test_api.py` | schémas, erreurs, idempotence, autorisation et versionnement par famille |
 | workers | Workers, cron et missions proactives | verified | tests supervisor, runtime workers, communication, cron et proactif | chaos tests arrêt/redémarrage, doublon et dépendance indisponible |
 | observability | Logs, traces, métriques, coûts et évaluations | partial | audit JSONL, état Runner, SLO HTTP roulant, Forge, corrélation HTTP→Runner→outils→SQLite/audit et gate reproductible | alertes et suites capacité/régression |

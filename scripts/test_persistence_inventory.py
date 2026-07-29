@@ -18,12 +18,19 @@ ALLOWED_CLASSES = {
     "truth_ledger",
 }
 ALLOWED_STATES = {"structured", "pending"}
+# Ce module référence les registres pour les copier, mais ne les crée ni ne les
+# écrit. Le comptabiliser comme propriétaire du même chemin produirait un faux
+# doublon et diluerait l'unicité d'autorité contrôlée par ce gate.
+READ_ONLY_JSONL_CONSUMERS = {"backend/full_backup.py"}
 
 
 def discovered_jsonl() -> set[tuple[str, str]]:
     discovered: set[tuple[str, str]] = set()
     for path in BACKEND.rglob("*.py"):
         if ".venv" in path.parts or "__pycache__" in path.parts:
+            continue
+        relative_module = path.relative_to(ROOT).as_posix()
+        if relative_module in READ_ONLY_JSONL_CONSUMERS:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         for node in ast.walk(tree):
@@ -33,7 +40,7 @@ def discovered_jsonl() -> set[tuple[str, str]]:
                 and node.value.endswith(".jsonl")
             ):
                 continue
-            discovered.add((path.relative_to(ROOT).as_posix(), Path(node.value).name))
+            discovered.add((relative_module, Path(node.value).name))
     return discovered
 
 

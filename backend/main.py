@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.461 — bundle global chiffré et restauration isolée vérifiée
 # v2.460 — fraîcheur factuelle et restauration mémoire compensée
 # v2.459 — chiffrement DPAPI actif des souvenirs SQLite et Qdrant
 # v2.458 — politique de données modèles exhaustive et privée par défaut
@@ -48,22 +49,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.405 — première frontière de persistance extraite : paramètres globaux injectables
 # v2.404 — sources statiques officielles du Radar; erreurs de coquilles JavaScript supprimées
 # v2.403 — composition FastAPI finalisée; routes modèles et proactives extraites et typées
-
-# v2.423 — secrets SSH persistants migrés vers des enveloppes DPAPI
-# v2.422 — secrets e-mail multi-comptes migrés vers des enveloppes DPAPI
-# v2.421 — événements SSE orphelins archivés et intégrité défensive
-# v2.420 — sauvegardes AES-256-GCM, clé DPAPI et migration réversible
-
-# v2.433 — arbitrage RAM Cloud/VM et preuves natives Debian/Windows
-# v2.432 — acceptation Code Workspace transactionnelle et jobs récupérables
-# v2.431 — cycle de vie mémoire cohérent entre SQLite, Mesh et Qdrant
-# v2.430 — provenance modèle/confidentialité visible et repli Agent cohérent
-# v2.429 — erreurs d'outils expurgées et observabilité UI/MCP explicite
-# v2.428 — erreurs transport Ollama expurgées avant événement SSE
-# v2.427 — erreurs SSE expurgées, incidents corrélables et états terminaux fermés
-# v2.426 — FastAPI propriétaire SQLite unique, runtime Node natif allégé
-# v2.425 — composition SQLite déterministe extraite de la façade database
-# v2.424 — OAuth unifié dans FastAPI et jetons historiques migrés vers DPAPI
 
 from __future__ import annotations
 

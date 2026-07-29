@@ -5,6 +5,54 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.461.0 — Point de récupération global chiffré
+
+### Constat et conception
+
+La sauvegarde quotidienne protégeait uniquement SQLite. Les preuves JSONL, Coding Missions,
+compétences et documents utilisateur restaient hors du point de récupération. Copier tout
+`data/` aurait inclus récursivement plus de 1 Gio de sauvegardes, Qdrant, caches, logs et
+états VM spécifiques à cette machine. Deux approches ont été comparées : copie exhaustive
+opaque, simple mais incohérente et volumineuse, ou manifeste fermé distinguant autorités,
+artefacts et projections. La seconde est retenue.
+
+`full_backup.py` capture SQLite avec `sqlite3_backup`, copie 14 registres/configurations et
+onze familles d'artefacts, refuse toute persistance de premier niveau non classifiée, les
+liens et chemins dangereux, puis produit un manifeste taille/SHA-256. L'archive est chiffrée
+en flux par AES-256-GCM avec une clé aléatoire enveloppée DPAPI. Le contexte cryptographique
+est séparé des sauvegardes SQLite historiques. La restauration ne cible qu'une zone vide,
+valide tous les chemins avant extraction et écrit chaque fichier par remplacement atomique.
+
+Références primaires : l'API de sauvegarde cohérente SQLite
+(`https://sqlite.org/backup.html`), l'avertissement Python contre le path traversal ZIP
+(`https://docs.python.org/3/library/zipfile.html`), les contrôles NIST CP-9 sur l'intégrité
+et les exercices de restauration, et le guide NIST SP 1339 demandant création, test et revue
+régulière des sauvegardes (`https://csrc.nist.gov/pubs/sp/1339/final`).
+
+### Preuve réelle, sécurité, logs et rollback
+
+Le bundle réel `marvin_full_20260729_050528_517680.mrvfull` contient 1 066 fichiers,
+272 589 371 octets utiles et occupe 191 319 856 octets chiffrés. Il a été déchiffré,
+chaque SHA-256 revérifié, extrait dans une zone temporaire vide puis supprimé sans laisser
+de `.partial`, `.restore` ou `.verify`. Les tests couvrent inventaire inconnu, SQLite réel,
+artefact, cache exclu, destination occupée, contexte de chiffrement, fichier ZIP non déclaré
+et roundtrip. Le gate de composition a aussi détecté puis supprimé seize commentaires de
+versions dupliqués dans `main.py`, sans retirer de code actif.
+
+Les événements `full_backup_create` et `full_backup_verify` ne conservent que succès, nombre
+de fichiers, volume et classe d'erreur. Trois bundles locaux sont conservés. Limite de
+sécurité assumée et inscrite SEC-024 : même disque et DPAPI non portable; une copie hors
+machine/immuable et un export par phrase secrète restent nécessaires.
+
+Aucun fichier de production n'est remplacé. Rollback : `git revert <commit-v2.461>`.
+Le bundle déjà créé reste lisible par v2.461 et peut être supprimé explicitement après
+création d'un autre point vérifié.
+
+Validations observées : compilation Python, inventaire des 14 JSONL, sauvegarde globale,
+sauvegarde SQLite/migration, composition FastAPI, architecture (344 outils, 363 routes,
+40 pages, harness 344/344), smoke API 28/28, backend réel v2.461.0, frontend HTTP 200 et
+vérification API du bundle réel sur 1 066 fichiers.
+
 ## 2026-07-29 — v2.460.0 — Fraîcheur et récupération mémoire
 
 ### Constat et décisions

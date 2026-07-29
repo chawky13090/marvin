@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.460.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.461.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.460.0)
+## 9. État actuel (v2.461.0)
+
+**v2.461 (point de récupération global)** : `full_backup.py` classe explicitement les
+persistances, capture SQLite par son API de snapshot, archive registres, compétences,
+missions et artefacts utilisateur, puis chiffre le bundle par AES-256-GCM avec clé DPAPI.
+Chaque chemin, taille et SHA-256 est vérifié après déchiffrement et extraction dans une zone
+vide. Qdrant, caches, logs techniques, états VM et sauvegardes précédentes sont exclus par
+contrat. Le bundle réel `marvin_full_20260729_050528_517680.mrvfull` contient 1 066 fichiers,
+272 589 371 octets utiles et a été restauré/vérifié sans résidu partiel.
 
 **v2.460 (fraîcheur et récupération mémoire)** : les faits et habitudes ont une échéance
 de révision déterministe et une rétention de 730 jours; profils et préférences sont revus

@@ -2,13 +2,14 @@
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel, Field, StrictBool
 
 import backup
 from database_bootstrap import initialize_database
 import memory_lifecycle
 import memory_recovery
+import full_backup
 
 
 router = APIRouter(tags=["backups"])
@@ -18,6 +19,30 @@ _restore_lock = asyncio.Lock()
 @router.get("/api/backups")
 async def list_backups():
     return backup.list_backups()
+
+
+@router.get("/api/backups/full")
+async def list_full_backups():
+    return await asyncio.to_thread(full_backup.list_backups)
+
+
+@router.post("/api/backups/full")
+async def create_full_backup():
+    return await asyncio.to_thread(full_backup.create)
+
+
+@router.post("/api/backups/full/{filename}/verify")
+async def verify_full_backup(
+    filename: str = Path(
+        min_length=39,
+        max_length=64,
+        pattern=r"^marvin_full_\d{8}_\d{6}_\d{6}\.mrvfull$",
+    ),
+):
+    try:
+        return await asyncio.to_thread(full_backup.verify, filename)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Bundle global introuvable.") from exc
 
 
 @router.post("/api/backups")

@@ -48,8 +48,9 @@ def encrypt_file(
     destination: Path,
     *,
     wrap: Wrap | None = None,
+    purpose: str = PURPOSE,
 ) -> dict[str, object]:
-    wrap = wrap or (lambda key: protect_bytes(key, purpose=PURPOSE))
+    wrap = wrap or (lambda key: protect_bytes(key, purpose=purpose))
     key, nonce = os.urandom(32), os.urandom(12)
     digest = hashlib.sha256()
     size = source.stat().st_size
@@ -61,6 +62,7 @@ def encrypt_file(
         "nonce": _encode(nonce),
         "wrapped_key": _encode(wrap(key)),
         "plaintext_size": size,
+        "purpose": purpose,
     }
     header_bytes = json.dumps(
         header, sort_keys=True, separators=(",", ":")
@@ -88,8 +90,9 @@ def decrypt_file(
     destination: Path,
     *,
     unwrap: Wrap | None = None,
+    purpose: str = PURPOSE,
 ) -> dict[str, object]:
-    unwrap = unwrap or (lambda value: unprotect_bytes(value, purpose=PURPOSE))
+    unwrap = unwrap or (lambda value: unprotect_bytes(value, purpose=purpose))
     total = source.stat().st_size
     with source.open("rb") as reader:
         if reader.read(len(MAGIC)) != MAGIC:
@@ -107,6 +110,9 @@ def decrypt_file(
             raise BackupEncryptionError("En-tête de sauvegarde invalide.") from exc
         if header.get("schema") != 1 or header.get("cipher") != "AES-256-GCM":
             raise BackupEncryptionError("Version de sauvegarde non prise en charge.")
+        stored_purpose = header.get("purpose", PURPOSE)
+        if stored_purpose != purpose:
+            raise BackupEncryptionError("Contexte de sauvegarde invalide.")
         nonce = _decode(header.get("nonce"), maximum=12)
         if len(nonce) != 12:
             raise BackupEncryptionError("Nonce de sauvegarde invalide.")
