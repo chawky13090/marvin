@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
@@ -11,6 +13,7 @@ from lan_access import (
     SESSION_COOKIE,
     LanAccessError,
     is_loopback,
+    required_capability,
 )
 
 
@@ -20,6 +23,13 @@ router = APIRouter(prefix="/api/auth/lan", tags=["access"])
 class PairRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     code: StrictStr = Field(min_length=12, max_length=128)
+    access_profile: Literal["read_only", "standard", "full"] = "full"
+
+
+class IntrospectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    path: StrictStr = Field(min_length=1, max_length=512, pattern=r"^/api(?:/|$)")
+    method: Literal["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]
 
 
 def _set_session_cookies(
@@ -65,11 +75,9 @@ def _audit_pair(success: bool, *, error_code: str | None = None) -> None:
 async def lan_status(request: Request, response: Response):
     client = request.client.host if request.client else ""
     headers = {key.casefold(): value for key, value in request.headers.items()}
-    authenticated = (
-        is_loopback(client)
-        or ACCESS.authenticated(headers, client=client) is not None
-    )
-    if is_loopback(client) and ACCESS.authenticated(headers, client=client) is None:
+    session = ACCESS.authenticated(headers, client=client)
+    authenticated = is_loopback(client) or session is not None
+    if is_loopback(client) and session is None:
         token, csrf = ACCESS.issue(client)
         _set_session_cookies(
             response,
@@ -82,31 +90,54 @@ async def lan_status(request: Request, response: Response):
         "authenticated": authenticated,
         "transport_secure": request.url.scheme == "https",
     }
+    if session is not None:
+        result["access_profile"] = session["profile"]
     if is_loopback(client):
         result["pairing_code"] = ACCESS.pairing_code
     return result
 
 
 @router.post("/introspect")
-async def lan_introspect(request: Request, response: Response):
+async def lan_introspect(
+    payload: IntrospectRequest,
+    request: Request,
+    response: Response,
+):
     """Valide la signature d'une session pour le proxy Next.js local."""
     headers = {key.casefold(): value for key, value in request.headers.items()}
     response.headers["Cache-Control"] = "no-store"
-    return {"authenticated": ACCESS.authenticated(headers) is not None}
+    session = ACCESS.authenticated(headers)
+    capability = required_capability(payload.path, payload.method)
+    return {
+        "authenticated": session is not None,
+        "authorized": (
+            session is not None and ACCESS.authorized(session, capability)
+        ),
+        "required_capability": capability,
+    }
 
 
 @router.post("/pair")
 async def lan_pair(payload: PairRequest, request: Request, response: Response):
     client = request.client.host if request.client else ""
     try:
-        token, csrf = ACCESS.pair(client, payload.code)
+        token, csrf = ACCESS.pair(
+            client,
+            payload.code,
+            profile=payload.access_profile,
+        )
     except LanAccessError as exc:
         _audit_pair(False, error_code=type(exc).__name__)
         raise HTTPException(status_code=401, detail="Jumelage refusé.") from exc
     secure = request.url.scheme == "https"
     _set_session_cookies(response, token=token, csrf=csrf, secure=secure)
     _audit_pair(True)
-    return {"success": True, "authenticated": True, "transport_secure": secure}
+    return {
+        "success": True,
+        "authenticated": True,
+        "transport_secure": secure,
+        "access_profile": payload.access_profile,
+    }
 
 
 @router.post("/logout")

@@ -24,13 +24,23 @@ export async function proxy(request) {
   try {
     const response = await fetch(`${INTROSPECTION_URL}/api/auth/lan/introspect`, {
       method: 'POST',
-      headers: { cookie },
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: request.nextUrl.pathname,
+        method: request.method,
+      }),
       cache: 'no-store',
       signal: AbortSignal.timeout(3000),
     });
     const result = response.ok ? await response.json() : null;
-    if (result?.authenticated === true) {
+    if (result?.authenticated === true && result?.authorized === true) {
       return NextResponse.next();
+    }
+    if (result?.authenticated === true) {
+      return Response.json(
+        { detail: 'capability_required' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
   } catch {
     // Échec fermé : une panne du backend ne rend jamais les routes Next publiques.

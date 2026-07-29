@@ -7,6 +7,7 @@ import { BACKEND_URL } from '@/lib/backend';
 export default function LanAccessGate({ children }) {
   const [state, setState] = useState({ loading: true, required: false, authenticated: false });
   const [code, setCode] = useState('');
+  const [accessProfile, setAccessProfile] = useState('full');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -36,7 +37,10 @@ export default function LanAccessGate({ children }) {
       const response = await fetch(`${BACKEND_URL}/api/auth/lan/pair`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim() }),
+        body: JSON.stringify({
+          code: code.trim(),
+          access_profile: accessProfile,
+        }),
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) throw new Error('pairing_rejected');
@@ -76,6 +80,16 @@ export default function LanAccessGate({ children }) {
             autoComplete="one-time-code"
             autoFocus
           />
+          <label htmlFor="marvin-access-profile">Niveau d’accès de cet appareil</label>
+          <select
+            id="marvin-access-profile"
+            value={accessProfile}
+            onChange={(event) => setAccessProfile(event.target.value)}
+          >
+            <option value="full">Complet — toutes les fonctions</option>
+            <option value="standard">Standard — sans administration sensible</option>
+            <option value="read_only">Lecture seule</option>
+          </select>
           {error && <div className="lan-access-error">{error}</div>}
           <button type="submit" disabled={busy || code.trim().length < 12}>
             {busy ? 'Vérification…' : 'Autoriser cet appareil'}

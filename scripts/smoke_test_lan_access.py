@@ -122,6 +122,35 @@ async def run(lan_host: str) -> None:
         )
         assert next_proxy_status == 200
         await remote.close()
+
+        restricted = await browser.new_context(viewport={"width": 390, "height": 844})
+        restricted_page = await restricted.new_page()
+        await restricted_page.goto(
+            f"http://{lan_host}:3000/",
+            wait_until="domcontentloaded",
+            timeout=45_000,
+        )
+        await restricted_page.get_by_label("Code de jumelage").fill(pairing_code)
+        await restricted_page.get_by_label(
+            "Niveau d’accès de cet appareil"
+        ).select_option("read_only")
+        await restricted_page.get_by_role(
+            "button",
+            name="Autoriser cet appareil",
+        ).click()
+        await restricted_page.get_by_label(
+            "Code de jumelage"
+        ).wait_for(state="detached", timeout=20_000)
+        restricted_statuses = await restricted_page.evaluate(
+            """async () => ({
+              tasks: (await fetch('/api/tasks', {cache: 'no-store'})).status,
+              settings: (await fetch('/api/settings', {cache: 'no-store'})).status,
+            })"""
+        )
+        assert restricted_statuses == {"tasks": 200, "settings": 403}, (
+            f"Profil lecture seule incorrect via Next: {restricted_statuses!r}"
+        )
+        await restricted.close()
         await browser.close()
 
 
@@ -130,7 +159,10 @@ def main() -> int:
     parser.add_argument("--lan-host", required=True)
     args = parser.parse_args()
     asyncio.run(run(args.lan_host))
-    print("LAN Browser Smoke OK - local, blocage anonyme, jumelage et session distante.")
+    print(
+        "LAN Browser Smoke OK - local, anonyme, complet et lecture seule "
+        "validés sur FastAPI/Next."
+    )
     return 0
 
 

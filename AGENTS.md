@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.465.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.466.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.465.0)
+## 9. État actuel (v2.466.0)
+
+**v2.466 (autorisation LAN par capacités)** : chaque session jumelée signe un profil
+`read_only`, `standard` ou `full`; `full` reste le défaut compatible. La garde recalcule à
+chaque requête les capacités `read`, `operate` et `administer`. Outils, fichiers, stockage,
+SSH, VM, Code Workspace, sauvegardes, identifiants, OAuth, commandes et réglages exigent
+`administer`. Le proxy Next transmet chemin et méthode à l'introspection FastAPI et échoue
+fermé; il ne possède pas une seconde politique. OpenAPI publie la capacité des 362 opérations
+protégées. Les refus ne journalisent ni session ni contenu.
 
 **v2.465 (identité et garde LAN)** : `lan_access.py` protège HTTP, SSE et WebSocket hors
 boucle locale par une session HMAC liée au client, expirant en douze heures et signée avec

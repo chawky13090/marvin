@@ -799,7 +799,8 @@ body { background: var(--bg-primary); position: relative; }
   font-weight: 650;
 }
 
-.lan-access-card input {
+.lan-access-card input,
+.lan-access-card select {
   min-height: 46px;
   padding: 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);

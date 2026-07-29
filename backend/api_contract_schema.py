@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi.openapi.utils import get_openapi
 
-from lan_access import PUBLIC_PATHS, SESSION_COOKIE
+from lan_access import PUBLIC_PATHS, SESSION_COOKIE, required_capability
 
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
@@ -70,9 +70,12 @@ def install_access_contract(app) -> None:
                         )
                     continue
                 operation["security"] = [{"MarvinLanSession": []}]
+                operation["x-marvin-capability"] = required_capability(
+                    path,
+                    method.upper(),
+                )
                 operation.setdefault("responses", {}).setdefault("401", error_response)
-                if method in {"post", "put", "patch", "delete"}:
-                    operation["responses"].setdefault("403", csrf_response)
+                operation["responses"].setdefault("403", csrf_response)
         app.openapi_schema = schema
         return schema
 

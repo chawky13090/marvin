@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.466.0 — Autorisation LAN par capacités
+
+### Constat et décision
+
+La v2.465 authentifiait les appareils mais accordait à toute session jumelée le même pouvoir.
+OWASP demande moindre privilège, refus par défaut et validation sur chaque requête; NIST
+sépare le point de décision du point d'application et recommande des droits juste suffisants.
+Deux approches ont été comparées : dupliquer des contrôles dans chaque route, avec risque
+d'oubli, ou étendre la garde centrale avec une politique attributaire chemin/méthode. La
+seconde est retenue, avec FastAPI comme autorité unique et Next.js comme point d'application.
+
+### Implémentation, compatibilité et sécurité
+
+La session signe désormais un profil `read_only`, `standard` ou `full`. Les capacités
+résolues sont `read`, `operate` et `administer`. Les familles sauvegardes, commandes,
+Code Workspace, identifiants, fichiers, OAuth, réglages, SSH, stockage, outils et VM exigent
+toujours l'administration; les autres lectures et mutations suivent leur méthode. WebSocket
+exige au moins `operate`. Le profil complet reste le choix par défaut pour ne retirer aucune
+fonctionnalité existante.
+
+L'écran de jumelage rend le choix explicite. Le proxy Next.js transmet chemin et méthode à
+l'introspection FastAPI, qui valide signature puis capacité; une valeur de cookie inventée
+ou un profil modifié invalide la signature. OpenAPI publie `x-marvin-capability` sur chaque
+opération protégée et le gate en compte 362. Aucun chemin de machine, secret ou donnée métier
+n'est ajouté aux logs. Les refus retournent seulement `capability_required`.
+
+### Validation, limites et rollback
+
+Les tests couvrent lecture seule autorisée en GET, mutation et réglages refusés en 403,
+profil complet compatible, WebSocket, introspection Next et schéma OpenAPI. Le build
+Next.js 16.2.12 Turbopack, compilation Python, composition, architecture, lint ciblé et gate
+OpenAPI réussissent. Sur `192.168.1.105`, Playwright vérifie réellement le refus anonyme,
+le profil complet, puis un second appareil lecture seule : `/api/tasks` répond 200 et
+`/api/settings` 403 à travers Next. Les smokes live réussissent **28/28 API** et
+**40/40 pages**. Le transport HTTP LAN reste la dette empêchant `VERIFIED`.
+Rollback exact : `git revert <commit-v2.466>`; aucun
+schéma ni contenu persistant n'est migré et les sessions v2.466 deviennent simplement
+invalides après réversion.
+
 ## 2026-07-29 — v2.465.0 — Identité et garde LAN
 
 ### Menace et choix

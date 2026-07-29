@@ -1,7 +1,7 @@
 # Accès LAN protégé de Marvin
 
 Date de référence : 2026-07-29
-Version : 2.465.0
+Version : 2.466.0
 
 ## Frontière de confiance
 
@@ -26,6 +26,21 @@ minutes bloquent les tentatives du client. Le code n'est jamais écrit dans un l
 - contrôle strict de l'origine pour toute mutation navigateur ;
 - logout supprimant les deux cookies ;
 - refus WebSocket avec le code 4401 et HTTP avec 401/403 expurgés.
+
+## Autorisation par capacité
+
+Le jumelage attribue un profil signé et non modifiable côté navigateur :
+
+- `read_only` : lectures sans administration ;
+- `standard` : lectures et opérations métier courantes ;
+- `full` : ajoute administration, outils, fichiers, stockage, SSH, VM, Code Workspace,
+  sauvegardes, identifiants, OAuth et réglages.
+
+Le profil complet reste sélectionné par défaut afin de préserver le comportement existant.
+Le propriétaire peut choisir un profil plus faible lors du jumelage d'un téléphone ou d'un
+autre PC. La décision est recalculée sur chaque requête par la garde FastAPI. Le proxy Next
+transmet uniquement chemin et méthode à l'introspection; il ne décide jamais lui-même.
+OpenAPI publie `x-marvin-capability` sur chaque opération protégée.
 
 `SameSite=Lax` est retenu pour conserver les retours OAuth en navigation principale.
 Il ne remplace pas la défense CSRF : toutes les mutations navigateur exigent aussi origine
@@ -60,6 +75,6 @@ passent dans les métriques HTTP agrégées existantes sans corps de requête.
 
 ## Rollback
 
-Réversion atomique du commit v2.465. La clé DPAPI inutilisée peut rester sans impact; sa
+Réversion atomique des commits v2.466 puis v2.465. La clé DPAPI inutilisée peut rester sans impact; sa
 suppression éventuelle doit être une opération explicite après retour confirmé. Aucun schéma
 SQLite ni contenu métier n'est modifié.

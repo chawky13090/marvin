@@ -72,6 +72,7 @@ def inventory(schema: dict[str, Any]) -> dict[str, Any]:
             "typed_responses": 0,
             "documented_errors": 0,
             "secured": 0,
+            "capability_declared": 0,
             "idempotent_mutations": 0,
         }
     )
@@ -84,6 +85,7 @@ def inventory(schema: dict[str, Any]) -> dict[str, Any]:
         row["typed_responses"] += int(_has_explicit_schema(operation))
         row["documented_errors"] += int(_has_error_contract(operation))
         row["secured"] += int(bool(operation.get("security")))
+        row["capability_declared"] += int(bool(operation.get("x-marvin-capability")))
 
     mutations = [
         operation
@@ -104,6 +106,10 @@ def inventory(schema: dict[str, Any]) -> dict[str, Any]:
         ),
         "secured": sum(
             bool(operation.get("security"))
+            for _path, _method, operation in operations
+        ),
+        "capability_declared": sum(
+            bool(operation.get("x-marvin-capability"))
             for _path, _method, operation in operations
         ),
         "idempotent_mutations": sum(

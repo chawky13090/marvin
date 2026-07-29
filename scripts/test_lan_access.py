@@ -99,6 +99,30 @@ def main() -> int:
         method="POST",
         headers=browser,
     ))) == 200
+    read_token, read_csrf = manager.issue("192.168.1.70", profile="read_only")
+    read_cookie = f"{SESSION_COOKIE}={read_token}; {CSRF_COOKIE}={read_csrf}"
+    assert _status(asyncio.run(_request(
+        middleware,
+        client="192.168.1.70",
+        headers={"cookie": read_cookie},
+    ))) == 200
+    assert _status(asyncio.run(_request(
+        middleware,
+        client="192.168.1.70",
+        path="/api/settings/privacy",
+        headers={"cookie": read_cookie},
+    ))) == 403
+    assert _status(asyncio.run(_request(
+        middleware,
+        client="192.168.1.70",
+        method="POST",
+        headers={
+            "cookie": read_cookie,
+            "origin": "http://192.168.1.10:3000",
+            "host": "192.168.1.10:8005",
+            "x-marvin-csrf": read_csrf,
+        },
+    ))) == 403
     without_csrf = {key: value for key, value in browser.items() if key != "x-marvin-csrf"}
     assert _status(asyncio.run(_request(
         middleware,

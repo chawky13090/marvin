@@ -66,9 +66,16 @@ async def _run() -> None:
             for item in cookies
         )
         assert (await client.get("/api/tasks")).status_code == 200
-        introspection = await client.post("/api/auth/lan/introspect")
+        introspection = await client.post(
+            "/api/auth/lan/introspect",
+            json={"path": "/api/tasks", "method": "GET"},
+        )
         assert introspection.status_code == 200
-        assert introspection.json() == {"authenticated": True}
+        assert introspection.json() == {
+            "authenticated": True,
+            "authorized": True,
+            "required_capability": "read",
+        }
         blocked = await client.post(
             "/api/contract-only-test",
             headers={"Origin": "http://marvin.local:3000"},
@@ -87,6 +94,16 @@ async def _run() -> None:
         assert schema["paths"]["/api/tasks"]["get"]["security"] == [
             {"MarvinLanSession": []}
         ]
+        assert (
+            schema["paths"]["/api/tasks"]["get"]["x-marvin-capability"]
+            == "read"
+        )
+        assert (
+            schema["paths"]["/api/settings/{key}"]["get"][
+                "x-marvin-capability"
+            ]
+            == "administer"
+        )
         assert "401" in schema["paths"]["/api/tasks"]["get"]["responses"]
         assert "403" in schema["paths"]["/api/tasks"]["post"]["responses"]
         with patch("audit.log_action"):
@@ -98,9 +115,35 @@ async def _run() -> None:
                 },
             )
         assert logout.status_code == 200
-        introspection = await client.post("/api/auth/lan/introspect")
-        assert introspection.json() == {"authenticated": False}
+        introspection = await client.post(
+            "/api/auth/lan/introspect",
+            json={"path": "/api/tasks", "method": "GET"},
+        )
+        assert introspection.json() == {
+            "authenticated": False,
+            "authorized": False,
+            "required_capability": "read",
+        }
         assert (await client.get("/api/tasks")).status_code == 401
+        read_only = await client.post(
+            "/api/auth/lan/pair",
+            json={
+                "code": ACCESS.pairing_code,
+                "access_profile": "read_only",
+            },
+            headers={"Origin": "http://marvin.local:3000"},
+        )
+        assert read_only.status_code == 200
+        assert read_only.json()["access_profile"] == "read_only"
+        assert (await client.get("/api/tasks")).status_code == 200
+        assert (await client.get("/api/settings/permission_level")).status_code == 403
+        assert (
+            await client.post(
+                "/api/tasks",
+                json={},
+                headers={"Origin": "http://marvin.local:3000"},
+            )
+        ).status_code == 403
         await client.aclose()
         print("LAN Access API OK - pairing, cookies, garde HTTP, CSRF et OpenAPI.")
     finally:

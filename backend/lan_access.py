@@ -29,6 +29,24 @@ PUBLIC_PATHS = {
 }
 MAX_PAIR_ATTEMPTS = 5
 PAIR_WINDOW_SECONDS = 10 * 60
+ACCESS_PROFILES = {
+    "read_only": frozenset({"read"}),
+    "standard": frozenset({"read", "operate"}),
+    "full": frozenset({"read", "operate", "administer"}),
+}
+ADMIN_PATH_PREFIXES = (
+    "/api/backups",
+    "/api/cmd",
+    "/api/coding",
+    "/api/credentials",
+    "/api/files",
+    "/api/oauth",
+    "/api/settings",
+    "/api/ssh",
+    "/api/storage",
+    "/api/tools",
+    "/api/vm-lab",
+)
 
 
 class LanAccessError(RuntimeError):
@@ -82,6 +100,18 @@ def _origin_allowed(origin: str, host_header: str) -> bool:
     )
 
 
+def required_capability(path: str, method: str, *, websocket: bool = False) -> str:
+    normalized = str(path or "")
+    if any(
+        normalized == prefix or normalized.startswith(f"{prefix}/")
+        for prefix in ADMIN_PATH_PREFIXES
+    ):
+        return "administer"
+    if websocket or str(method or "GET").upper() not in SAFE_METHODS:
+        return "operate"
+    return "read"
+
+
 class LanAccessManager:
     def __init__(
         self,
@@ -131,7 +161,13 @@ class LanAccessManager:
             attempts.popleft()
         return attempts
 
-    def pair(self, client: str, code: str) -> tuple[str, str]:
+    def pair(
+        self,
+        client: str,
+        code: str,
+        *,
+        profile: str = "full",
+    ) -> tuple[str, str]:
         with self._lock:
             attempts = self._prune_attempts(client)
             if len(attempts) >= MAX_PAIR_ATTEMPTS:
@@ -140,10 +176,12 @@ class LanAccessManager:
                 attempts.append(self._clock())
                 raise LanAccessError("Code de jumelage invalide.")
             attempts.clear()
-        return self.issue(client)
+        return self.issue(client, profile=profile)
 
-    def issue(self, client: str) -> tuple[str, str]:
+    def issue(self, client: str, *, profile: str = "full") -> tuple[str, str]:
         """Émet une session signée; réservé aux frontières déjà authentifiées."""
+        if profile not in ACCESS_PROFILES:
+            raise LanAccessError("Profil d'accès LAN invalide.")
         now = int(self._clock())
         csrf = secrets.token_urlsafe(24)
         payload = {
@@ -153,6 +191,7 @@ class LanAccessManager:
             "csrf": csrf,
             "sid": secrets.token_urlsafe(18),
             "client": hashlib.sha256(client.encode("utf-8")).hexdigest()[:32],
+            "profile": profile,
         }
         encoded = _b64encode(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -188,6 +227,7 @@ class LanAccessManager:
             or len(payload["csrf"]) < 24
             or int(payload.get("exp") or 0) <= int(self._clock())
             or int(payload.get("iat") or 0) > int(self._clock()) + 30
+            or payload.get("profile") not in ACCESS_PROFILES
         ):
             raise LanAccessError("Session LAN expirée ou invalide.")
         if client is not None and not hmac.compare_digest(
@@ -196,6 +236,10 @@ class LanAccessManager:
         ):
             raise LanAccessError("La session LAN appartient à un autre client.")
         return payload
+
+    @staticmethod
+    def authorized(session: dict[str, Any], capability: str) -> bool:
+        return capability in ACCESS_PROFILES.get(str(session.get("profile") or ""), ())
 
     def authenticated(
         self,
@@ -253,6 +297,15 @@ class LanAccessMiddleware:
         if not is_loopback(client) and session is None:
             await self._reject(scope, receive, send, 401, "lan_authentication_required")
             return
+        if session is not None:
+            capability = required_capability(
+                path,
+                method,
+                websocket=scope["type"] == "websocket",
+            )
+            if not self.manager.authorized(session, capability):
+                await self._reject(scope, receive, send, 403, "capability_required")
+                return
         if scope["type"] == "http" and method not in SAFE_METHODS:
             browser_request = "origin" in headers or "sec-fetch-site" in headers
             if browser_request:

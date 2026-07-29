@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.466 — autorisation LAN par capacités et profils d'appareil
 # v2.465 — identité LAN signée, jumelage, CSRF et WebSocket protégés
 # v2.464 — inventaire OpenAPI exhaustif et gate contractuel par famille
 # v2.463 — réplication chiffrée hors stockage, idempotente et vérifiée
