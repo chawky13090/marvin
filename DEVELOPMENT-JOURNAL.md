@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.470.0 — Comparatif mesuré de la persistance
+
+Le terme « MARVA » est résolu comme **Mastra** à partir de l'article Kimi fourni. LangGraph
+et Mastra sont comparés comme frameworks de checkpoints, et non présentés à tort comme des
+bases. SQLite WAL, PostgreSQL/pgvector, Qdrant local/serveur et Microsoft Agent Framework
+sont évalués selon sécurité, résilience, maintenabilité, performance, coût et portabilité.
+
+Le benchmark sans contenu métier mesure la base réelle en lecture seule : SQLite 3.50.4,
+75 182 080 octets, 51 tables, WAL, clés étrangères actives, `quick_check=ok`, lecture de
+schéma p50/p95 0,1045/0,1652 ms. Une base temporaire avec quatre writers valide 400 commits
+à 325,64 transactions/s et conserve `quick_check=ok`. Ces valeurs sont une baseline locale,
+pas un benchmark inventé des concurrents.
+
+La décision est de conserver SQLite et Qdrant local. Marvin reprendra progressivement le
+contrat checkpoint/thread/run derrière ses stores existants. PostgreSQL et Qdrant serveur
+ne seront promus qu'après franchissement de seuils mesurés, pilote isolé, double vérification,
+sauvegarde restaurée et rollback complet. Aucun schéma, service, port, dépendance ou donnée
+n'est modifié. Benchmark, inventaire de persistance, hygiène SQLite, bootstrap, architecture
+et build Next.js 16.2.12 Turbopack réussissent. Après relance, `/api/health` expose 2.470.0;
+les smokes live réussissent **28/28 API** et **40/40 pages**. Rollback exact :
+`git revert <commit-v2.470>`.
+
 ## 2026-07-29 — v2.469.0 — Idempotence métier des effets critiques
 
 ### Décision et périmètre

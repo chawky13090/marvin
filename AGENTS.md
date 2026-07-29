@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.469.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.470.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.469.0)
+## 9. État actuel (v2.470.0)
+
+**v2.470 (comparatif de persistance mesuré)** : la base réelle est inspectée en lecture seule
+et les écritures concurrentes utilisent une base synthétique temporaire, sans contenu métier.
+La baseline confirme SQLite WAL pour le socle local. LangGraph et Mastra apportent surtout
+des contrats de checkpoints, pas une meilleure base par défaut; PostgreSQL et Qdrant serveur
+restent des promotions conditionnelles à des seuils mesurés et à un rollback complet.
 
 **v2.469 (idempotence des effets critiques directs)** : e-mail sortant, création
 d'événement, restauration, lancement de workflow, création de Coding Mission et installation

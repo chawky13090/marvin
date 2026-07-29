@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.469.0",
+  "version": "2.470.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -76,6 +76,7 @@
     "check:agent-tool-selection": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_tool_selection.py",
     "check:action-replay": "backend\\.venv\\Scripts\\python.exe scripts\\test_action_replay.py",
     "check:http-idempotency": "backend\\.venv\\Scripts\\python.exe scripts\\test_http_idempotency.py",
+    "check:persistence-benchmark": "backend\\.venv\\Scripts\\python.exe scripts\\benchmark_persistence.py",
     "check:chat-turn-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_chat_turn_runtime.py",
     "check:chat-stream": "node --no-warnings scripts/test_chat_stream.mjs",
     "check:tool-domain-quiz": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_domain_quiz.py",
