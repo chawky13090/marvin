@@ -220,6 +220,9 @@ def run() -> dict[str, int | str]:
         "check:forge-evidence",
         "check:credentials-vault",
         "check:agent-gateway-api",
+        "check:tool-runtime",
+        "check:tool-consumers",
+        "check:calendar-gateway",
         "check:model-proactive-api",
         "check:main-composition",
         "check:architecture",
@@ -298,6 +301,9 @@ def run() -> dict[str, int | str]:
         ROOT / "scripts" / "test_db_connection_hygiene.py",
         ROOT / "scripts" / "test_credentials_vault.py",
         ROOT / "scripts" / "test_agent_gateway_api.py",
+        ROOT / "scripts" / "test_tool_runtime.py",
+        ROOT / "scripts" / "test_tool_consumer_inventory.py",
+        ROOT / "scripts" / "test_calendar_gateway_api.py",
         ROOT / "scripts" / "test_model_proactive_api.py",
         ROOT / "scripts" / "test_main_composition.py",
         ROOT / "scripts" / "rollback-credentials-vault.py",
@@ -430,12 +436,27 @@ def run() -> dict[str, int | str]:
         encoding="utf-8-sig"
     )
     if (
-        "tool_gateway.execute_tool(" not in gateway_source
+        "tool_runtime.execute(" not in gateway_source
         or "tool_gateway.coverage_report(" not in gateway_source
     ):
         raise CheckFailure(
             "Les surfaces UI/MCP et le catalogue doivent utiliser le gateway commun."
         )
+    runtime_source = (BACKEND / "tool_runtime.py").read_text(encoding="utf-8-sig")
+    for marker in (
+        "tool_gateway.execute_tool(",
+        "current_permission_level",
+        "api_observability.current_request_id()",
+    ):
+        if marker not in runtime_source:
+            raise CheckFailure(f"Runtime commun des outils incomplet : {marker}")
+    calendar_source = (BACKEND / "api" / "calendar.py").read_text(
+        encoding="utf-8-sig"
+    )
+    if "tool_runtime.execute(" not in calendar_source or "TOOLS_REGISTRY[" in calendar_source:
+        raise CheckFailure("Les routes agenda doivent rester derriere le runtime commun.")
+    if not (ROOT / "TOOL-CONSUMER-MIGRATION.md").exists():
+        raise CheckFailure("Le registre de migration des consommateurs d'outils manque.")
 
     routes = fastapi_routes()
     if duplicates([f"{method} {path}" for method, path in routes]):

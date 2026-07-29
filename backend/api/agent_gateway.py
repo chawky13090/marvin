@@ -10,11 +10,10 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
-import audit
 import chat_turn_runtime
 import database as db
-import engineering_runtime
 import tool_gateway
+import tool_runtime
 import tools as tool_module
 from agent import run_agent
 from config import (
@@ -167,16 +166,7 @@ async def chat(request: ChatRequest):
 
 
 def _current_permission_level() -> int:
-    try:
-        value = db.get_setting("permission_level")
-        candidate = int(value) if value is not None else DEFAULT_PERMISSION_LEVEL
-    except Exception:
-        # Lecture best-effort d'un réglage : toute panne SQLite doit revenir au
-        # défaut autoritaire, jamais interrompre le catalogue ni élargir les droits.
-        candidate = DEFAULT_PERMISSION_LEVEL
-    if candidate not in {PERMISSION_SECURE, PERMISSION_STANDARD, PERMISSION_EXPERT}:
-        return DEFAULT_PERMISSION_LEVEL
-    return candidate
+    return tool_runtime.current_permission_level(db)
 
 
 async def _execute_through_gateway(
@@ -185,21 +175,14 @@ async def _execute_through_gateway(
     source: str,
     confirmed_by_ui: bool,
 ) -> tool_gateway.ToolGatewayResult:
-    return await tool_gateway.execute_tool(
-        tool_gateway.ToolGatewayRequest(
-            tool_name=request.toolName,
-            arguments=request.args,
-            source=source,
-            permission_level=_current_permission_level(),
-            conversation_id=request.conversationId,
-            request_id=request.requestId,
-            confirmed_by_ui=confirmed_by_ui,
-        ),
-        registry=tool_module.TOOLS_REGISTRY,
-        specifications=tool_module.TOOLS_SPEC,
-        database=db,
-        normalizer=engineering_runtime.normalize_tool_result,
-        audit_logger=audit.log_action,
+    return await tool_runtime.execute(
+        request.toolName,
+        request.args,
+        source=source,
+        permission_level=_current_permission_level(),
+        conversation_id=request.conversationId,
+        request_id=request.requestId,
+        confirmed_by_ui=confirmed_by_ui,
     )
 
 

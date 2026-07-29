@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.442.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.443.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.442.0)
+## 9. État actuel (v2.443.0)
+
+**v2.443 (harness universel progressif)** : `tool_runtime.py` compose le gateway commun
+pour les consommateurs HTTP et workers : validation, permission fail-closed, confirmation,
+reçu idempotent, capture d'exception, résultat normalisé, historique et audit corrélé.
+Les huit routes Agenda utilisent cette frontière sans modifier leur contrat public. Une
+confirmation fournie dans les arguments par un modèle ou un client n'est plus fiable :
+pour un outil dangereux, seul le geste UI explicite ou le niveau Expert peut l'établir.
+Un inventaire AST interdit que la dette historique augmente et borne les 48 accès directs
+restants, documentés dans `TOOL-CONSUMER-MIGRATION.md`.
 
 **v2.442 (SLO HTTP local)** : l'observabilité API maintient une fenêtre roulante bornée
 d'une heure et calcule disponibilité, conformité de latence, budget d'erreur restant et

@@ -3,10 +3,32 @@
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
 
-import tools as tool_module
+import tool_runtime
 
 
 router = APIRouter(tags=["calendar"])
+
+
+async def _calendar_tool(
+    name: str,
+    arguments: dict,
+    *,
+    confirmed_by_ui: bool = False,
+):
+    outcome = await tool_runtime.execute(
+        name,
+        arguments,
+        source="calendar_ui",
+        confirmed_by_ui=confirmed_by_ui,
+    )
+    if outcome.status_code != 200:
+        detail = (
+            outcome.result.get("error")
+            if isinstance(outcome.result, dict)
+            else "Outil agenda refusé."
+        )
+        raise HTTPException(status_code=outcome.status_code, detail=detail)
+    return outcome.result
 
 
 @router.get("/api/events")
@@ -21,7 +43,7 @@ async def list_events(
     if end:
         args["end"] = end
     args["limit"] = limit
-    return await tool_module.TOOLS_REGISTRY["event_list"](args)
+    return await _calendar_tool("event_list", args)
 
 
 class EventBody(BaseModel):
@@ -38,7 +60,7 @@ class EventBody(BaseModel):
 
 @router.post("/api/events")
 async def create_event(body: EventBody):
-    result = await tool_module.TOOLS_REGISTRY["event_create"](body.model_dump())
+    result = await _calendar_tool("event_create", body.model_dump())
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -47,7 +69,7 @@ async def create_event(body: EventBody):
 @router.patch("/api/events/{event_id}")
 async def update_event(event_id: str, body: dict = Body(...)):
     body["id"] = event_id
-    result = await tool_module.TOOLS_REGISTRY["event_update"](body)
+    result = await _calendar_tool("event_update", body)
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -57,14 +79,16 @@ async def update_event(event_id: str, body: dict = Body(...)):
 async def delete_event(event_id: str):
     # La requête DELETE provient du geste explicite de l'interface. Les appels du LLM
     # continuent à recevoir une demande de confirmation avant toute suppression.
-    return await tool_module.TOOLS_REGISTRY["event_delete"](
-        {"id": event_id, "confirmed": True}
+    return await _calendar_tool(
+        "event_delete",
+        {"id": event_id},
+        confirmed_by_ui=True,
     )
 
 
 @router.get("/api/calendar/subscriptions")
 async def list_calendar_subscriptions():
-    return await tool_module.TOOLS_REGISTRY["calendar_subscriptions"]({})
+    return await _calendar_tool("calendar_subscriptions", {})
 
 
 class CalendarSubscriptionBody(BaseModel):
@@ -75,7 +99,7 @@ class CalendarSubscriptionBody(BaseModel):
 
 @router.post("/api/calendar/subscriptions")
 async def add_calendar_subscription(body: CalendarSubscriptionBody):
-    result = await tool_module.TOOLS_REGISTRY["calendar_subscribe"](body.model_dump())
+    result = await _calendar_tool("calendar_subscribe", body.model_dump())
     if result.get("error") and not result.get("subscription"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -85,12 +109,14 @@ async def add_calendar_subscription(body: CalendarSubscriptionBody):
 async def remove_calendar_subscription(subscription_id: str):
     # Le clic explicite sur la route DELETE constitue la confirmation UI. Les appels LLM
     # restent soumis à la demande de confirmation du domaine.
-    return await tool_module.TOOLS_REGISTRY["calendar_unsubscribe"](
-        {"id": subscription_id, "confirmed": True}
+    return await _calendar_tool(
+        "calendar_unsubscribe",
+        {"id": subscription_id, "confirmed": True},
+        confirmed_by_ui=True,
     )
 
 
 @router.post("/api/calendar/subscriptions/sync")
 async def sync_calendar_subscriptions(subscription_id: str = ""):
     args = {"id": subscription_id} if subscription_id else {}
-    return await tool_module.TOOLS_REGISTRY["calendar_sync"](args)
+    return await _calendar_tool("calendar_sync", args)

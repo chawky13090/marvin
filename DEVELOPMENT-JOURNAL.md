@@ -5,6 +5,50 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.443.0 — Harness universel et migration Agenda
+
+### Contexte et décision
+
+Le catalogue déclarait 344 outils couverts, mais plusieurs API et workers appelaient encore
+directement `TOOLS_REGISTRY`. Deux approches ont été comparées. Envelopper globalement le
+registre aurait créé un double harness dans le Runner, perdu le contexte de permission de
+l'appelant et rendu le rollback risqué. La composition progressive par `tool_runtime.py`
+conserve les façades publiques et permet une migration mesurée par famille. Cette approche
+est cohérente avec les outils typés, guardrails et approbations documentés par OpenAI, avec
+les contrats ciblés évalués recommandés par Anthropic et avec le contexte d'outil de Google
+ADK, sans ajouter un framework fournisseur.
+
+### Implémentation
+
+Le runtime commun résout tardivement registre, schémas, stockage, normalisation et audit. Il
+hérite de la corrélation HTTP, valide le niveau de permission en échec fermé et borne
+l'identité de la source. Les huit routes Agenda passent désormais par ce runtime. Le gateway
+supprime toute auto-confirmation fournie dans les arguments non fiables d'un outil dangereux;
+seuls le geste UI explicite ou le niveau Expert peuvent injecter la confirmation.
+
+`scripts/test_tool_consumer_inventory.py` établit un plafond transitoire de 48 accès directs
+répartis dans neuf composants. Il échoue si la dette augmente ou si Agenda régresse. Le
+contrat, les risques et l'ordre de migration sont conservés dans
+`TOOL-CONSUMER-MIGRATION.md`.
+
+### Sécurité, logs et rollback
+
+Le changement ferme un contournement d'approbation. Il ne crée aucun stockage ni log
+supplémentaire : les arguments et résultats réutilisent l'expurgation, la corrélation, la
+rotation et la rétention existantes. Une panne d'observabilité est exposée sans rejouer une
+action déjà effectuée. Aucun schéma ni donnée métier n'est migré. Rollback exact :
+`git revert <commit-v2.443>`, redémarrage backend, puis exécution des tests gateway, runtime,
+Agenda, inventaire, architecture et smoke API.
+
+### Validation
+
+Les tests ciblés couvrent validation, permissions, refus d'une confirmation forgée,
+confirmation UI, mode Expert, corrélation, dépendances injectées, huit routes Agenda, refus
+HTTP et inventaire AST. Le gate consolidé réussit **204/204 étapes**, dont compilation Python,
+qualité frontend et build Turbopack. Après relance, `/api/health` expose **2.443.0**; les
+lectures réelles événements/abonnements passent par le nouveau runtime, le smoke API réussit
+**28/28** et le SLO local reste `met` sur 330 échantillons (disponibilité 1,0).
+
 ## 2026-07-29 — v2.442.0 — SLO HTTP roulant et budget d'erreur local
 
 L'observabilité HTTP exposait compteurs, classes de statut et latences depuis le démarrage,
