@@ -9,6 +9,22 @@
   flex-wrap: wrap;
 }
 
+.toolbarInHeader {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbarInHeader .description {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .modeGroup {
   display: inline-flex;
   padding: 3px;

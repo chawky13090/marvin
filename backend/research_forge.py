@@ -14,6 +14,61 @@ def extract_citations(text: object) -> list[int]:
     return [int(match.group(1)) for match in _CITATION.finditer(str(text or ""))]
 
 
+def link_citations(report: object, sources: list[dict[str, Any]]) -> str:
+    """Transforme les références validées en liens Markdown directs.
+
+    Les URL proviennent du SourceIndex, déjà limité à HTTP(S) public. Une URL
+    absente ou hors plage conserve la citation textuelle pour rester explicite.
+    """
+    text = str(report or "")
+
+    def replace(match: re.Match[str]) -> str:
+        number = int(match.group(1))
+        if not 1 <= number <= len(sources):
+            return match.group(0)
+        url = str(sources[number - 1].get("url") or "").strip()
+        if urlsplit(url).scheme not in {"http", "https"}:
+            return match.group(0)
+        return f"[source-{number}]({url})"
+
+    return _CITATION.sub(replace, text)
+
+
+def conservative_cited_report(
+    report: object,
+    sources: list[dict[str, Any]],
+) -> str:
+    """Produit un rapport de repli uniquement à partir de passages cités.
+
+    Ce repli évite qu'un échec Forge entraîne une nouvelle réponse de mémoire
+    non sourcée. Les affirmations factuelles détectées sans citation sont
+    retirées; les titres et explications non factuelles restent lisibles.
+    """
+    kept: list[str] = []
+    for line in str(report or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            kept.append("")
+            continue
+        parts = _SENTENCE.split(stripped)
+        retained_parts = [
+            part
+            for part in parts
+            if not factual_sentences(part) or extract_citations(part)
+        ]
+        if retained_parts:
+            kept.append(" ".join(retained_parts))
+    body = "\n".join(kept).strip()
+    if not body:
+        return ""
+    return (
+        body
+        + "\n\n## Limite de validation\n\n"
+        + "Les affirmations insuffisamment reliées à une source ont été retirées "
+        + "automatiquement par Research Forge."
+    )
+
+
 def factual_sentences(report: object) -> list[str]:
     rows = []
     for sentence in _SENTENCE.split(str(report or "").strip()):

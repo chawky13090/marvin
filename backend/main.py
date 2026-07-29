@@ -30,6 +30,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.461 — bundle global chiffré et restauration isolée vérifiée
 # v2.460 — fraîcheur factuelle et restauration mémoire compensée
 # v2.459 — chiffrement DPAPI actif des souvenirs SQLite et Qdrant
+# v2.489 — citations Research cliquables et bandeau Chat compact unifié
 # v2.488 — Research universel visible et suivis référentiels vérifiables
 # v2.487 — recherche profonde contextuelle, seuils mesurables et façade v3 unifiée
 # v2.458 — politique de données modèles exhaustive et privée par défaut

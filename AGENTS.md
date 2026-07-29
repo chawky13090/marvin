@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.488.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.489.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.488.0)
+## 9. État actuel (v2.489.0)
+
+**v2.489 (recherche livrable et bandeau Chat unifié)** : Research Engine tente jusqu’à trois
+réparations de citations; si Forge refuse encore le rapport, un repli déterministe retire les
+affirmations factuelles non citées au lieu de permettre une synthèse de mémoire. Après le
+gate, chaque `[source-N]` devient un lien Markdown direct vers l’URL réellement lue. Dans le
+Chat, l’identité Marvin redondante est supprimée du bandeau local : conversations,
+Lecture/Technique/Audit et le sélecteur LLM partagent désormais le bandeau supérieur compact.
+Les exports Audit et le repli du toolbar hors page principale restent fonctionnels.
 
 **v2.488 (Research universel pour les LLM)** : `web_research` reste visible dans le catalogue
 borné à chaque tour afin que le modèle puisse vérifier spontanément une information sans

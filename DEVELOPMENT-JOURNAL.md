@@ -12429,3 +12429,35 @@ exécuté et seules des sous-questions textuelles bornées sont extraites. Aucun
 secret, contenu de page ou stockage n’est ajouté. Il n’existe aucune migration de données.
 Rollback : réversion atomique du commit v2.488 puis redémarrage du backend; le comportement
 antérieur peut aussi être restauré en retirant `web_research` de `_ALWAYS_INCLUDE`.
+
+## 2026-07-29 — v2.489 — Citations directes et bandeau Chat compact
+
+### Incident reproduit
+
+La recherche profonde sur les feux de forêt a exécuté 24 requêtes, tenté 328 pages, lu 221
+pages et conservé 84 sources. Forge a cependant refusé le rapport à 58,8 % de couverture
+factuelle. Le résultat outil vide a ensuite conduit le modèle à écrire une synthèse de
+secours sans URL directes et contenant des chiffres explicitement issus de la mémoire. Sur
+l’interface, le nom et l’avatar Marvin étaient répétés dans le bandeau local tandis que le
+sélecteur Lecture/Technique/Audit occupait une seconde ligne.
+
+### Correction
+
+- Research tente trois réparations mesurées au lieu d’une seule;
+- si le gate échoue encore, un repli déterministe retire les phrases factuelles non citées;
+- aucune synthèse de mémoire n’est utilisée comme remplacement d’un rapport refusé;
+- après validation, chaque citation devient un lien Markdown direct vers la page lue;
+- Lecture/Technique/Audit est rendu dans le bandeau supérieur par portail React;
+- le nom/avatar Marvin redondant est retiré de la page Chat;
+- accès conversations, modes de lecture et sélecteur LLM partagent le même bandeau;
+- le composant conserve un repli local lorsqu’il est utilisé hors de la page principale.
+
+### Sécurité, logs, limites et rollback
+
+Seules les URL HTTP(S) déjà validées par `SourceIndex` deviennent cliquables. Aucun HTML brut,
+schéma d’URL arbitraire, secret, contenu de page ou nouveau journal n’est introduit. Les
+métriques et preuves utilisent les registres existants. Le contrôle visuel via navigateur
+intégré n’a pas rendu localhost et cette validation n’est donc pas revendiquée; lint,
+compilation, tests DOM/Research et smoke HTTP restent obligatoires. Aucune migration de
+données. Rollback complet : réversion atomique du commit v2.489 puis redémarrage backend;
+le frontend Turbopack recharge automatiquement les sources antérieures.

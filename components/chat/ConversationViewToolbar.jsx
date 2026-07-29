@@ -8,9 +8,18 @@ const MODES = [
   { id: 'audit', short: 'A', label: 'Audit', description: 'Chronologie complète et exportable' },
 ];
 
-export default function ConversationViewToolbar({ mode, onModeChange, onExport, hasMessages }) {
+export default function ConversationViewToolbar({
+  mode,
+  onModeChange,
+  onExport,
+  hasMessages,
+  inHeader = false,
+}) {
   return (
-    <div className={styles.toolbar} aria-label="Mode d'affichage de la conversation">
+    <div
+      className={`${styles.toolbar} ${inHeader ? styles.toolbarInHeader : ''}`}
+      aria-label="Mode d'affichage de la conversation"
+    >
       <div className={styles.modeGroup} role="tablist" aria-label="Niveau de détail">
         {MODES.map((item) => (
           <button

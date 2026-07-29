@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useChat } from '@/lib/contexts/ChatContext';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
@@ -48,6 +49,8 @@ export default function ChatContainer({
 }) {
   const [localInput, setLocalInput] = useState('');
   const [viewMode, setViewMode] = useState('reading');
+  const [toolbarHost, setToolbarHost] = useState(null);
+  const [toolbarHostResolved, setToolbarHostResolved] = useState(false);
   const scrollRef = useRef(null);
   // v2.183 — "coller au bas" façon Claude/ChatGPT : l'ancien effet forçait scrollTop=scrollHeight
   // à CHAQUE frappe de token pendant le streaming, kidnappant le scroll dès que l'utilisateur
@@ -77,6 +80,11 @@ export default function ChatContainer({
   useEffect(() => {
     const saved = window.localStorage.getItem('marvin:conversation-view');
     if (['reading', 'technical', 'audit'].includes(saved)) setViewMode(saved);
+  }, []);
+
+  useEffect(() => {
+    setToolbarHost(document.getElementById('marvin-conversation-toolbar-host'));
+    setToolbarHostResolved(true);
   }, []);
 
   const {
@@ -272,7 +280,17 @@ export default function ChatContainer({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {messages.length > 0 && (
+      {messages.length > 0 && toolbarHost && createPortal(
+        <ConversationViewToolbar
+          mode={viewMode}
+          onModeChange={changeViewMode}
+          onExport={exportAudit}
+          hasMessages
+          inHeader
+        />,
+        toolbarHost,
+      )}
+      {messages.length > 0 && toolbarHostResolved && !toolbarHost && (
         <ConversationViewToolbar
           mode={viewMode}
           onModeChange={changeViewMode}

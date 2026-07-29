@@ -2,7 +2,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import ChatContainer from '@/components/chat/ChatContainer';
 import ConversationRow from '@/components/chat/sidebar/ConversationRow';
-import LivingAvatar from '@/components/avatar/LivingAvatar';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
@@ -868,16 +867,18 @@ export default function ChatPage() {
 
       {/* ═══ Zone de chat ═══ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {/* Header avec modèle dynamique */}
-        <div className="page-header" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-primary)', zIndex: 10 }}>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Bandeau d'actions unique : identité Marvin déjà portée par la navigation globale. */}
+        <div className="page-header" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-primary)', zIndex: 10, gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             <button className="conv-toggle" onClick={() => setShowConv(true)} aria-label="Conversations" title="Conversations"
               style={{ background: 'rgba(79, 140, 255,0.12)', border: '1px solid rgba(79, 140, 255,0.3)', color: '#4f8cff',
                        borderRadius: 8, width: 36, height: 36, fontSize: 16, cursor: 'pointer', flexShrink: 0,
                        alignItems: 'center', justifyContent: 'center' }}>💬</button>
-            <LivingAvatar size={36} thinking={chatStatus?.isLoading} />
-            <span className="holo-text">Marvin</span>
-          </h1>
+            <div
+              id="marvin-conversation-toolbar-host"
+              style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
             {/* Indicateur Ollama */}
             <span className={`badge-dot ${ollamaConnected ? 'connected' : 'disconnected'}`} />

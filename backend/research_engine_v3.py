@@ -450,23 +450,44 @@ async def execute(
 
         public_sources = [source.as_dict(include_text=False) for source in sources]
         forge = research_forge.evaluate_report(synthesis["answer"], public_sources)
-        if not forge["gate_passed"]:
+        for repair_round in range(1, 4):
+            if forge["gate_passed"]:
+                break
             repair = await _model_call(
                 model_client,
                 synthesizer,
-                "Répare exclusivement les citations du rapport suivant. Supprime ou qualifie toute "
-                "affirmation non soutenue. Les seules citations valides vont de [source-1] à "
-                f"[source-{len(sources)}]. Conserve le fond et réponds avec le rapport complet.\n\n"
+                "Répare le rapport pour satisfaire Research Forge. Chaque phrase factuelle doit "
+                "porter une citation valide; supprime toute affirmation que le dossier ne permet "
+                "pas de citer. Les seules citations valides vont de [source-1] à "
+                f"[source-{len(sources)}]. Réponds avec le rapport complet, sans commentaire.\n\n"
+                f"PASSE: {repair_round}/3\n"
                 f"MÉTRIQUES: {json.dumps(forge, ensure_ascii=False)}\n\n"
                 f"DOSSIER DE PREUVES:\n{dossiers}\n\nRAPPORT À RÉPARER:\n{synthesis['answer']}",
-                "v3_citation_repair",
+                f"v3_citation_repair_{repair_round}",
                 "synthesis",
             )
-            if repair.get("ok"):
-                repaired_forge = research_forge.evaluate_report(repair["answer"], public_sources)
-                if repaired_forge["gate_passed"] or repaired_forge["citation_validity"] > forge["citation_validity"]:
-                    synthesis = repair
-                    forge = repaired_forge
+            if not repair.get("ok"):
+                continue
+            repaired_forge = research_forge.evaluate_report(repair["answer"], public_sources)
+            if (
+                repaired_forge["gate_passed"]
+                or repaired_forge["factual_citation_coverage"]
+                > forge["factual_citation_coverage"]
+            ):
+                synthesis = repair
+                forge = repaired_forge
+        if not forge["gate_passed"]:
+            conservative = research_forge.conservative_cited_report(
+                synthesis["answer"],
+                public_sources,
+            )
+            conservative_forge = research_forge.evaluate_report(
+                conservative,
+                public_sources,
+            )
+            if conservative_forge["gate_passed"]:
+                synthesis = {**synthesis, "answer": conservative}
+                forge = conservative_forge
         if not forge["gate_passed"]:
             return {
                 "error": (
@@ -483,13 +504,17 @@ async def execute(
             }
 
     coverage = _coverage(index, query_history, contract)
+    linked_answer = research_forge.link_citations(
+        synthesis["answer"],
+        public_sources,
+    )
     run = {
         "id": "swarm-" + uuid.uuid4().hex[:12],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "engine_version": "v3",
         "question": contract.question,
         "contract": contract.as_dict(),
-        "answer": synthesis["answer"],
+        "answer": linked_answer,
         "queries": query_history,
         "sources": public_sources,
         "source_coverage": coverage,

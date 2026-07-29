@@ -11,7 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from research_contract import build_contract, initial_query_portfolio
-from research_forge import evaluate_report, extract_citations
+from research_forge import (
+    conservative_cited_report,
+    evaluate_report,
+    extract_citations,
+    link_citations,
+)
 from research_sources import SourceIndex, canonical_url
 import research_engine_v3
 import research_export
@@ -101,6 +106,14 @@ def main() -> int:
     failed = evaluate_report("Le système est documenté [3].", sources)
     assert failed["gate_passed"] is False
     assert failed["invalid_citations"] == [3]
+    linked = link_citations(report, sources)
+    assert "[source-1](https://docs.example.org/guide)" in linked
+    conservative = conservative_cited_report(
+        "Le système est documenté [source-1]. Une affirmation est sans preuve.",
+        sources,
+    )
+    assert "documenté [source-1]" in conservative
+    assert "sans preuve" not in conservative
     export_run = {
         "id": "swarm-123456789abc",
         "answer": report,
@@ -173,7 +186,7 @@ def main() -> int:
                     ),
                     "duration_ms": 1,
                 }
-            if phase == "v3_citation_repair" and behavior["bad_synthesis"]:
+            if phase.startswith("v3_citation_repair") and behavior["bad_synthesis"]:
                 answer = "Le système est nécessairement parfait et sans aucune limite."
             elif phase.startswith("adaptive_gap"):
                 answer = "[]"
@@ -228,6 +241,7 @@ def main() -> int:
         assert result["success"] is True
         assert result["engine_version"] == "v3"
         assert result["forge"]["gate_passed"] is True
+        assert "[source-1](https://" in result["answer"]
         assert result["source_coverage"]["unique_sources"] >= 8
         assert result["source_coverage"]["axis_coverage"] == 1.0
         assert len(result["queries"]) >= 24
