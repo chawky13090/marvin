@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Claude Code, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant au 2026-07-29 : v2.449.0, 344 outils.** `AGENTS.md`,
+> **État courant au 2026-07-29 : v2.450.0, 344 outils.** `AGENTS.md`,
 > `MARVIN-FRONTIER-CONSOLIDATION.md` et `DEVELOPMENT-JOURNAL.md` sont les sources de vérité
 > actuelles. Les sections versionnées plus bas dans ce fichier décrivent l'historique ancien
 > et ne doivent pas remplacer ces contrats. FastAPI est l'unique propriétaire SQLite;

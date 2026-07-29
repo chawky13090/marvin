@@ -5,6 +5,37 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.450.0 — Frontière générative de la vidéo locale
+
+### Constat, décision et implémentation
+
+L'inventaire des appels Ollama directs a trouvé un écart concret : la route
+`/api/video/enhance-prompt` parcourait une liste locale figée puis appelait `/api/chat`
+directement. En Ultra débridé, cette génération pouvait donc rester locale contrairement au
+contrat Cloud-only. Deux corrections ont été comparées : dupliquer la matrice de routage dans
+la route ou réutiliser le runtime partagé. La seconde est retenue afin de conserver une seule
+politique de modèle, de retry, de timeout et de repli.
+
+La route passe désormais par `tools._ollama_generate`, façade de `generation_runtime`, sans
+liste de modèles codée en dur. Elle restitue modèle réel, fournisseur, profil effectif et
+Cloud-only. Le reste de la génération vidéo locale, qui est une capacité GPU et non un appel
+LLM, ne change pas.
+
+### Sécurité, logs, tests et rollback
+
+Le prompt reste borné par le schéma Pydantic existant et aucune donnée nouvelle n'est
+journalisée. Les erreurs continuent de passer par l'incident API expurgé. Hyper local,
+contenu sensible et Ultra utilisent maintenant exactement les garde-fous centraux. Le test
+`test_video_local_boundary.py` couvre le chemin Cloud et la provenance, en plus des refus et
+nettoyages historiques. Compilation Python et `git diff --check` réussissent.
+Après relance, `/api/health` expose **2.450.0**. Un appel live non sensible à
+`/api/video/enhance-prompt` a utilisé `qwen3.5:397b-cloud` et retourné
+`provider=ollama_cloud`, `privacy_preset=ultra`, `cloud_only=true`, avec un prompt vidéo
+effectivement amélioré.
+
+Rollback exact : `git revert <commit-v2.450>`. Aucun schéma, réglage ni fichier utilisateur
+n'est migré.
+
 ## 2026-07-29 — v2.449.0 — Matrice modèles et confidentialité
 
 ### Constat et décision

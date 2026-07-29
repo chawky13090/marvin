@@ -6,7 +6,6 @@ import json
 import os
 import tempfile
 
-import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -14,7 +13,6 @@ from pydantic import BaseModel
 import database as db
 import api_errors
 import local_video
-from config import OLLAMA_URL
 
 
 router = APIRouter()
@@ -124,53 +122,32 @@ async def enhance_video_prompt(body: PromptEnhanceRequest):
         "describe motion suitable for a short clip; NO preamble, NO quotes, NO explanations, NO line breaks. "
         "Output ONLY the final prompt, under 60 words."
     )
-    candidates = ["qwen2.5:3b", "llama3.2:3b", "qwen2.5:7b", "hermes3:8b"]
-    model = None
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.get(f"{OLLAMA_URL}/api/tags")
-            available = (
-                [item["name"] for item in response.json().get("models", [])]
-                if response.status_code == 200
-                else []
-            )
-        model = next(
-            (candidate for candidate in candidates if candidate in available),
-            (available[0] if available else None),
-        )
-    except Exception:
-        model = None
-    if not model:
-        raise HTTPException(
-            status_code=503,
-            detail="Ollama indisponible pour l'amélioration du prompt",
-        )
+        import cloud_routing
+        import tools
 
-    try:
-        async with httpx.AsyncClient(timeout=40.0) as client:
-            response = await client.post(
-                f"{OLLAMA_URL}/api/chat",
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": raw_prompt},
-                    ],
-                    "stream": False,
-                    "keep_alive": "30m",
-                    "options": {"temperature": 0.7, "num_predict": 160},
-                },
-            )
-        data = response.json()
-        enhanced = (data.get("message", {}) or {}).get("content", "").strip()
+        generated = await tools._ollama_generate(
+            f"{system_prompt}\n\nUSER IDEA:\n{raw_prompt}",
+            timeout=60,
+            return_metadata=True,
+        )
+        enhanced = str(generated.get("text") or "").strip()
         enhanced = enhanced.strip().strip('"').strip("'").replace("\n", " ").strip()
         if not enhanced:
             raise ValueError("réponse vide")
+        model = str(generated.get("model") or "")
         return {
             "success": True,
             "original": raw_prompt,
             "enhanced": enhanced,
             "model": model,
+            "provider": (
+                "ollama_cloud"
+                if cloud_routing.is_cloud_model(model)
+                else "ollama_local"
+            ),
+            "privacy_preset": cloud_routing.get_privacy_preset(),
+            "cloud_only": cloud_routing.is_cloud_only_mode(),
         }
     except Exception as exc:
         raise api_errors.internal_http_error(

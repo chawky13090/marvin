@@ -18,6 +18,8 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 from api import video_local
+import cloud_routing
+import tools
 
 
 async def _body(response) -> str:
@@ -83,6 +85,24 @@ async def _run() -> None:
         assert exc.status_code == 400
     else:
         raise AssertionError("Un prompt vide doit être refusé")
+
+    async def generate_cloud(_prompt, **kwargs):
+        assert kwargs == {"timeout": 60, "return_metadata": True}
+        return {"text": '"cinematic tracking shot"', "model": "glm-5:cloud"}
+
+    with (
+        patch.object(tools, "_ollama_generate", side_effect=generate_cloud),
+        patch.object(cloud_routing, "is_cloud_model", return_value=True),
+        patch.object(cloud_routing, "get_privacy_preset", return_value="ultra"),
+        patch.object(cloud_routing, "is_cloud_only_mode", return_value=True),
+    ):
+        enhanced = await video_local.enhance_video_prompt(
+            video_local.PromptEnhanceRequest(prompt="un robot")
+        )
+    assert enhanced["enhanced"] == "cinematic tracking shot"
+    assert enhanced["provider"] == "ollama_cloud"
+    assert enhanced["privacy_preset"] == "ultra"
+    assert enhanced["cloud_only"] is True
 
 
 def main() -> int:

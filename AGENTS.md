@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.449.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.450.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.449.0)
+## 9. État actuel (v2.450.0)
+
+**v2.450 (frontière générative vidéo)** : l'amélioration de prompt vidéo ne sélectionne
+plus directement un modèle local. Elle utilise `generation_runtime` via sa façade historique,
+respecte donc Hyper local, le filtrage sensible, Ultra Cloud-only, retry et repli gouverné.
+La réponse expose modèle, fournisseur, profil effectif et contrat Cloud-only; aucun prompt
+ou résultat supplémentaire n'est ajouté aux logs.
 
 **v2.449 (matrice modèles/confidentialité)** : l'identité des quatre profils devient
 persistante et distincte des permissions. Hyper et Ultra restent des coupe-circuits
