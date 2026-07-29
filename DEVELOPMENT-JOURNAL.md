@@ -5,6 +5,44 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.454.0 — Apprentissage durable autoritatif
+
+### Constat et décision
+
+`learning.py` stockait les faits et paires question/réponse uniquement dans deux collections
+Qdrant. Un index indisponible, incomplet ou altéré pouvait donc perdre la connaissance ou
+réinjecter un ancien contenu sans source vérifiable. Deux approches ont été comparées :
+incorporer ces éléments dans la table des souvenirs explicites, ce qui mélangerait faits
+utilisateur et réponses techniques, ou créer un repository typé et garder Qdrant comme
+projection. La seconde préserve les contrats et sépare clairement les responsabilités.
+
+### Implémentation
+
+`repositories/learned_knowledge.py` ajoute une source SQLite transactionnelle avec validation,
+tailles bornées, types fermés, empreinte SHA-256, provenance, dédoublonnage et ordre stable.
+`learning.py` migre idempotemment les anciens points Qdrant au premier accès. Ajout, liste,
+compte et suppression consultent désormais SQLite; Qdrant n'est utilisé que pour classer les
+candidats. Un point vectoriel absent de SQLite, ou dont l'empreinte/contenu ne correspond pas,
+est exclu. Un repli lexical borné maintient le rappel si embeddings ou Qdrant sont indisponibles.
+Les routes HTTP conservent leurs formes et ferment le type de suppression à `facts|qa`.
+
+### Sécurité, logs, tests et rollback
+
+Les textes sont paramétrés dans SQLite, bornés à 4 000 caractères pour une question/fait et
+12 000 pour une réponse. Aucun prompt, fait ou réponse n'est ajouté aux logs techniques.
+La migration ne supprime pas les collections historiques et reste rejouable. Le test
+`test_learning_durability.py` utilise une base SQLite temporaire réelle et couvre
+dédoublonnage, provenance, bornes, filtrage d'un point orphelin, rappel et suppression.
+`test_agent_learning.py` confirme que la planification post-réponse reste suivie.
+Après relance, la migration réelle a importé **127 faits** et **206 réponses réutilisables**;
+la liste HTTP restitue les compteurs autoritatifs et un rappel réel retourne 5 faits et
+2 réponses. `/api/health` expose **2.454.0**.
+
+Rollback code : `git revert <commit-v2.454>`. La table ajoutée est additive et peut rester
+présente sans être lue par l'ancienne version. La restauration des données n'est nécessaire
+qu'en cas de suppression utilisateur ultérieure; elle passe alors par la sauvegarde SQLite
+chiffrée standard créée avant cette tranche.
+
 ## 2026-07-29 — v2.453.0 — Cohérence et conflits du Memory Mesh
 
 ### Constat et décision

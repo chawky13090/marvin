@@ -18,6 +18,7 @@ from repositories.events import repository as event_repository
 from repositories.executions import repository as execution_repository
 from repositories.flashcards import repository as flashcard_repository
 from repositories.it_knowledge import repository as it_knowledge_repository
+from repositories.learned_knowledge import repository as learned_knowledge_repository
 from repositories.network_inventory import repository as network_inventory_repository
 from repositories.operations import repository as operations_repository
 from repositories.system_snapshots import repository as system_snapshot_repository
@@ -44,6 +45,7 @@ SCHEMA_REPOSITORIES: tuple[SchemaRepository, ...] = (
     command_safety_repository,
     client_health_repository,
     it_knowledge_repository,
+    learned_knowledge_repository,
     flashcard_repository,
     event_repository,
 )

@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.453.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.454.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.453.0)
+## 9. État actuel (v2.454.0)
+
+**v2.454 (apprentissage durable)** : les faits et réponses réutilisables extraits des
+conversations ne dépendent plus de Qdrant comme source unique. Le repository
+`learned_knowledge` conserve texte, type, source, empreinte et dates dans SQLite; les deux
+collections Qdrant deviennent des projections de recherche. La migration des points
+historiques est idempotente. Le rappel refuse les points absents de SQLite ou dont le contenu
+ne correspond plus à la source autoritative, avec repli lexical local si l'index est
+indisponible. Ajout et suppression restent compatibles avec l'API existante.
 
 **v2.453 (cohérence du Memory Mesh)** : chaque projection mémoire conserve désormais
 l'empreinte SHA-256 du contenu autoritatif, son origine courante et un historique borné des

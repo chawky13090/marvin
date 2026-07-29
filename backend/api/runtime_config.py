@@ -1,5 +1,7 @@
 """Routes d'apprentissage, configuration matérielle, Telegram et audit."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel, Field
 
@@ -58,7 +60,7 @@ async def learning_recall(q: str):
 
 
 @router.delete("/api/learning/{kind}/{point_id}")
-async def learning_delete(kind: str, point_id: str):
+async def learning_delete(kind: Literal["facts", "qa"], point_id: str):
     import learning
 
     learning.delete_learned("facts" if kind == "facts" else "qa", point_id)
@@ -66,7 +68,7 @@ async def learning_delete(kind: str, point_id: str):
 
 
 class TeachBody(BaseModel):
-    text: str
+    text: str = Field(min_length=4, max_length=4_000)
 
 
 class LocalModelInstallBody(BaseModel):
