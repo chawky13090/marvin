@@ -163,6 +163,7 @@ async def execute_tool(
             result,
             duration_ms,
             conversation_id=request.conversation_id,
+            request_id=request.request_id,
         )
     except Exception as exc:
         observation_errors.append(f"execution:{type(exc).__name__}")
@@ -172,6 +173,7 @@ async def execute_tool(
             request.arguments,
             result,
             source=request.source,
+            request_id=request.request_id,
         )
     except Exception as exc:
         observation_errors.append(f"audit:{type(exc).__name__}")

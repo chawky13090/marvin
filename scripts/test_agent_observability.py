@@ -23,6 +23,7 @@ async def _run() -> None:
         arguments={"host": "127.0.0.1"},
         result={"success": True},
         duration_ms=42,
+        request_id="request-12345678",
     )
     route = AsyncMock(return_value=None)
     with (
@@ -37,11 +38,13 @@ async def _run() -> None:
     ):
         receipt = await observability.record_tool_observation(observation)
     audit.assert_called_once_with(
-        "net_ping", {"host": "127.0.0.1"}, {"success": True}, source="chat"
+        "net_ping", {"host": "127.0.0.1"}, {"success": True}, source="chat",
+        request_id="request-12345678",
     )
     execution.assert_called_once_with(
         "net_ping", {"host": "127.0.0.1"}, {"success": True}, 42,
         conversation_id="conversation-1",
+        request_id="request-12345678",
     )
     proof.assert_called_once()
     route.assert_awaited_once_with("teste le serveur", "net_ping")

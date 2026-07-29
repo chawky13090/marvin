@@ -95,6 +95,7 @@ from repositories.events import (
 )
 from repositories.executions import (
     get_conversation_trace,
+    get_request_trace,
     get_execution_stats,
     get_tool_reliability,
     list_executions,

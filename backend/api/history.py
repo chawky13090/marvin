@@ -1,6 +1,6 @@
 """Routes de consultation de l'historique et de la fiabilité des outils."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Path
 
 import database as db
 
@@ -16,6 +16,17 @@ async def list_history(tool_name: str | None = None, limit: int = 50, offset: in
 @router.get("/api/history/stats")
 async def history_stats():
     return db.get_execution_stats()
+
+
+@router.get("/api/history/request/{request_id}")
+async def history_by_request(
+    request_id: str = Path(
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]+$",
+    ),
+):
+    return {"request_id": request_id, "executions": db.get_request_trace(request_id)}
 
 
 @router.get("/api/history/reliability")

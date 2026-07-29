@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+import api_observability
 from structured_logging import StructuredJsonlStore, sanitize
 
 
@@ -36,6 +37,7 @@ def log_action(
     args: dict | None = None,
     result: Any = None,
     source: str = "chat",
+    request_id: str | None = None,
 ) -> None:
     """Enregistre une action : chat | ui | proactif | cron | agent."""
     try:
@@ -71,6 +73,7 @@ def log_action(
                 if failed
                 else ("pending" if compatibility.get("pending") else "success")
             ),
+            trace_id=request_id or api_observability.current_request_id(),
             compatibility=compatibility,
         )
     except Exception:

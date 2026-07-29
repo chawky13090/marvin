@@ -140,6 +140,7 @@ async def execute_tool_batch(
         try:
             receipt = await record_tool_observation(
                 ToolObservation(
+                    request_id=request_id,
                     conversation_id=conversation_id,
                     user_query=user_query,
                     tool_name=tool_name,

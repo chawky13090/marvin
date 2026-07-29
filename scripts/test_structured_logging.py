@@ -119,10 +119,12 @@ def run() -> None:
                 {"prompt": "confidentiel", "password": secret, "safe": "ok"},
                 {"success": True, "message": "terminé"},
                 source="test",
+                request_id="request-audit-1234",
             )
             actions = audit.recent(10)
             assert actions[0]["tool"] == "test_tool"
             assert actions[0]["source"] == "test"
+            assert actions[0]["trace_id"] == "request-audit-1234"
             assert actions[0]["args"]["prompt"]["redacted"] is True
             assert actions[0]["result_message"]["redacted"] is True
             assert secret not in audit_path.read_text(encoding="utf-8")

@@ -135,7 +135,7 @@ et rollback. Sans avantage mesuré face au moteur Marvin, la dépendance est ref
 | persistence | SQLite, migrations et repositories | partial | les 13 JSONL sont classifiés et structurés; preuves métier et Truth Ledger chaînés | tester sauvegarde, restauration et protection globale au repos |
 | api | FastAPI, contrats et compatibilité | partial | 354 routes uniques et `scripts/smoke_test_api.py` | schémas, erreurs, idempotence, autorisation et versionnement par famille |
 | workers | Workers, cron et missions proactives | verified | tests supervisor, runtime workers, communication, cron et proactif | chaos tests arrêt/redémarrage, doublon et dépendance indisponible |
-| observability | Logs, traces, métriques, coûts et évaluations | partial | audit JSONL, état Runner, SLO HTTP roulant, Forge et gate reproductible | corrélation bout en bout, alertes et suites capacité/régression |
+| observability | Logs, traces, métriques, coûts et évaluations | partial | audit JSONL, état Runner, SLO HTTP roulant, Forge, corrélation HTTP→Runner→outils→SQLite/audit et gate reproductible | alertes et suites capacité/régression |
 | security | Permissions, confirmations et guardrails | partial | 65 restrictions, gateway commun et tests de sécurité agent | threat model OWASP agentique complet et tests d'abus par surface |
 | frontend | Frontend, accessibilité et expérience chat | partial | compilation/lint ciblés, 40 pages recensées et smoke Playwright | audit WCAG, états erreur/chargement/reprise et E2E des parcours critiques |
 | avatar | Avatar de bureau et démarrage | partial | `scripts/test_avatar_api.py` et contrat installateur | test Electron réel démarrage/arrêt, déplacement, raccourcis et reprise |

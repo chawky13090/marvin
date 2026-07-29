@@ -3,10 +3,12 @@ import { durableChatEvents } from '../lib/chatStream.js';
 
 const encoder = new TextEncoder();
 const bodies = [];
+const headers = [];
 let calls = 0;
 globalThis.fetch = async (_url, options) => {
   calls += 1;
   bodies.push(JSON.parse(options.body));
+  headers.push(options.headers);
   if (calls === 1) {
     return new Response(new ReadableStream({
       start(controller) {
@@ -34,6 +36,8 @@ for await (const event of durableChatEvents({
 assert.equal(calls, 2);
 assert.equal(bodies[0].afterEvent, 0);
 assert.equal(bodies[1].afterEvent, 1);
+assert.equal(headers[0]['X-Request-ID'], 'request-1');
+assert.equal(headers[1]['X-Request-ID'], 'request-1');
 assert.deepEqual(events.map(event => event.type), ['text', 'text', 'done']);
 assert.equal(events.map(event => event.text || '').join(''), 'AB');
 

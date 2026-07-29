@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.455.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.456.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.455.0)
+## 9. État actuel (v2.456.0)
+
+**v2.456 (corrélation bout en bout)** : l'identifiant de requête suit désormais le transport
+HTTP, le Runner, le gateway commun, l'audit JSONL et les exécutions SQLite. Le transport SSE
+du chat place son identifiant durable dans `X-Request-ID`, y compris lors des reconnexions.
+La table `tool_executions` migre additivement avec `request_id` et un index; l'API
+`/api/history/request/{request_id}` restitue la trace expurgée correspondante. Les appels
+directs e-mail et SSH héritent aussi du contexte HTTP.
 
 **v2.455 (modèles locaux dynamiques)** : l'inventaire Ollama enrichit jusqu'à trente-deux
 modèles locaux par `/api/show`, avec concurrence bornée, afin de lire capacités, famille et

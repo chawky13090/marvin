@@ -5,6 +5,42 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-29 — v2.456.0 — Corrélation bout en bout
+
+### Constat et décision
+
+Le middleware HTTP créait déjà un identifiant corrélé et le Runner le transmettait aux reçus
+d'idempotence, mais l'audit JSONL et `tool_executions` ne le conservaient pas. Une enquête
+devait donc recouper manuellement heure, conversation et outil. Deux approches ont été
+comparées : introduire immédiatement un collecteur OpenTelemetry externe, disproportionné
+pour une installation Windows locale, ou propager d'abord un identifiant stable dans les
+preuves existantes et garder leur export futur possible. La seconde réduit le couplage tout
+en respectant le modèle de données OpenTelemetry où `TraceId` relie les logs d'une requête.
+
+### Implémentation
+
+Le transport SSE ajoute `X-Request-ID` à chaque tentative et reconnexion. Le ContextVar HTTP,
+le Runner et le gateway transmettent ce même identifiant à `audit.log_action` et au repository
+d'exécutions. `tool_executions` reçoit une colonne/index `request_id` par migration additive.
+Les appels directs e-mail et SSH héritent du contexte HTTP. La nouvelle route
+`GET /api/history/request/{request_id}` valide strictement l'identifiant et retourne les
+résultats déjà expurgés, dans l'ordre. Référence primaire :
+`https://opentelemetry.io/docs/specs/otel/logs/data-model/`.
+
+### Sécurité, logs, tests et rollback
+
+L'identifiant est limité à 128 caractères et à une grammaire fermée; il ne contient ni prompt,
+ni résultat, ni secret. Les politiques de rotation restent inchangées : audit 90 jours,
+requêtes HTTP 30 jours, tandis que la preuve SQLite suit sa politique métier. Les tests
+valident migration d'une base historique, index, propagation gateway, audit structuré,
+ContextVar, Runner et reconnexion SSE. Rollback code : `git revert <commit-v2.456>`.
+La colonne additive peut rester présente; l'ancienne version l'ignore. Aucun contenu existant
+n'est réécrit.
+La preuve live exécute `calculator` avec un identifiant aléatoire : résultat 42, même
+`X-Request-ID` dans la réponse, une exécution SQLite retrouvée par la nouvelle route et un
+événement `tool.calculator` dans l'audit avec le même `trace_id`. `/api/health` expose
+**2.456.0**.
+
 ## 2026-07-29 — v2.455.0 — Découverte dynamique des modèles locaux
 
 ### Constat et décision

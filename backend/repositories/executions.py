@@ -61,6 +61,10 @@ class ExecutionRepository:
             connection.execute(
                 "ALTER TABLE tool_executions ADD COLUMN conversation_id TEXT"
             )
+        if "request_id" not in columns:
+            connection.execute(
+                "ALTER TABLE tool_executions ADD COLUMN request_id TEXT"
+            )
         connection.execute(
             """CREATE INDEX IF NOT EXISTS idx_tool_executions_created
                ON tool_executions(created_at DESC)"""
@@ -74,6 +78,10 @@ class ExecutionRepository:
                ON tool_executions(conversation_id, created_at ASC)"""
         )
         connection.execute(
+            """CREATE INDEX IF NOT EXISTS idx_tool_executions_request
+               ON tool_executions(request_id, created_at ASC)"""
+        )
+        connection.execute(
             """CREATE INDEX IF NOT EXISTS idx_tool_exec_success
                ON tool_executions(success, created_at DESC)"""
         )
@@ -85,6 +93,7 @@ class ExecutionRepository:
         result: dict,
         duration_ms: int,
         conversation_id: str | None = None,
+        request_id: str | None = None,
     ) -> dict:
         execution_id = str(uuid.uuid4())
         succeeded = not (
@@ -97,8 +106,8 @@ class ExecutionRepository:
             connection.execute(
                 """INSERT INTO tool_executions (
                        id, tool_name, args, result, success, duration_ms,
-                       conversation_id
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       conversation_id, request_id
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     execution_id,
                     tool_name,
@@ -107,6 +116,7 @@ class ExecutionRepository:
                     int(succeeded),
                     duration_ms,
                     conversation_id,
+                    request_id,
                 ),
             )
         return {
@@ -125,6 +135,24 @@ class ExecutionRepository:
                    ORDER BY created_at ASC
                    LIMIT ?""",
                 (conversation_id, _MAX_TRACE_ROWS),
+            ).fetchall()
+        return [
+            _parse_execution(row_to_dict(row), decode_payloads=False)
+            for row in rows
+        ]
+
+    def request_trace(self, request_id: str) -> list[dict]:
+        normalized = str(request_id or "").strip()
+        if not normalized or len(normalized) > 128:
+            raise ValueError("request_id invalide.")
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            rows = connection.execute(
+                """SELECT * FROM tool_executions
+                   WHERE request_id = ?
+                   ORDER BY created_at ASC, id ASC
+                   LIMIT ?""",
+                (normalized, _MAX_TRACE_ROWS),
             ).fetchall()
         return [
             _parse_execution(row_to_dict(row), decode_payloads=False)
@@ -253,6 +281,7 @@ class ExecutionRepository:
 repository = ExecutionRepository()
 log_execution = repository.log
 get_conversation_trace = repository.conversation_trace
+get_request_trace = repository.request_trace
 list_executions = repository.list
 get_execution_stats = repository.stats
 get_tool_reliability = repository.reliability

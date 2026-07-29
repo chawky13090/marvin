@@ -9,6 +9,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 import database as db
+import api_observability
 import security
 import ssh_transport
 from tool_domains import ssh as ssh_domain
@@ -149,7 +150,8 @@ async def exec_ssh(body: SSHCommandRequest):
         db.touch_ssh_connection(body.connection_id)
         try:
             db.log_execution("ssh_exec", {"connection_id": body.connection_id,
-                             "command": body.command}, result, 0)
+                             "command": body.command}, result, 0,
+                             request_id=api_observability.current_request_id())
         except Exception:
             pass
         return result

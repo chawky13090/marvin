@@ -13,6 +13,7 @@ import database as db
 import email_account_service as accounts
 import email_manager
 import api_errors
+import api_observability
 
 
 router = APIRouter()
@@ -188,7 +189,13 @@ async def email_send(body: SendEmailRequest, account: str | None = None):
                 reply_to=body.reply_to, html_body=body.html_body,
             ),
         )
-        db.log_execution("email_send", {"to": body.to, "subject": body.subject}, result, 0)
+        db.log_execution(
+            "email_send",
+            {"to": body.to, "subject": body.subject},
+            result,
+            0,
+            request_id=api_observability.current_request_id(),
+        )
         return result
     except Exception as exc:
         raise api_errors.internal_http_error(

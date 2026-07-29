@@ -25,6 +25,7 @@ class ToolObservation:
     arguments: dict[str, Any]
     result: Any
     duration_ms: int
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +69,7 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
             observation.arguments,
             observation.result,
             source="chat",
+            request_id=observation.request_id,
         )
         audit_recorded = True
     except Exception as exc:
@@ -80,6 +82,7 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
             observation.result,
             observation.duration_ms,
             conversation_id=observation.conversation_id,
+            request_id=observation.request_id,
         )
         execution_recorded = True
     except Exception as exc:

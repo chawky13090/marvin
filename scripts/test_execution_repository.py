@@ -34,6 +34,7 @@ def main() -> int:
                 {"success": True, "token": "interdit", "message": "OK"},
                 42,
                 conversation_id="conversation-1",
+                request_id="request-12345678",
             )
         assert first["success"] is True
 
@@ -64,6 +65,9 @@ def main() -> int:
         trace = repository.conversation_trace("conversation-1")
         assert {row["id"] for row in trace} == {"execution-1", "execution-2"}
         assert "interdit" not in str(trace)
+        request_trace = repository.request_trace("request-12345678")
+        assert [row["id"] for row in request_trace] == ["execution-1"]
+        assert request_trace[0]["request_id"] == "request-12345678"
         assert repository.list(limit=0)
         assert repository.list(limit=10, offset=-10)
 
@@ -128,7 +132,7 @@ def main() -> int:
                     "PRAGMA table_info(tool_executions)"
                 ).fetchall()
             }
-        assert "conversation_id" in columns
+        assert {"conversation_id", "request_id"} <= columns
 
     import database
     from repositories import executions
@@ -136,6 +140,7 @@ def main() -> int:
     expected = {
         "log_execution": executions.log_execution,
         "get_conversation_trace": executions.get_conversation_trace,
+        "get_request_trace": executions.get_request_trace,
         "list_executions": executions.list_executions,
         "get_execution_stats": executions.get_execution_stats,
         "get_tool_reliability": executions.get_tool_reliability,

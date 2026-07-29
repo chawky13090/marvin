@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,8 +30,8 @@ def normalize(name, result, *, duration_ms):
 AUDIT: list[tuple] = []
 
 
-def audit(name, arguments, result, *, source):
-    AUDIT.append((name, arguments, result, source))
+def audit(name, arguments, result, *, source, request_id=None):
+    AUDIT.append((name, arguments, result, source, request_id))
 
 
 async def main() -> None:
@@ -138,6 +139,7 @@ async def main() -> None:
     )
     assert secure.status_code == 403 and not secure.executed
 
+    ui_request_id = f"request-ui-{uuid.uuid4().hex}"
     ui = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
             "file_delete",
@@ -145,6 +147,7 @@ async def main() -> None:
             "ui",
             PERMISSION_STANDARD,
             conversation_id="conversation-ui",
+            request_id=ui_request_id,
             confirmed_by_ui=True,
         ),
         registry=registry,
@@ -155,6 +158,8 @@ async def main() -> None:
     )
     assert ui.result["success"] and calls[-1]["confirmed"] is True
     assert Database.logs[-1][1]["conversation_id"] == "conversation-ui"
+    assert Database.logs[-1][1]["request_id"] == ui_request_id
+    assert AUDIT[-1][4] == ui_request_id
 
     mcp = await tool_gateway.execute_tool(
         tool_gateway.ToolGatewayRequest(
