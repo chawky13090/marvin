@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.511 — historique tolérant aux deux contrats API et applications Winget idempotentes
 # v2.510 — boucle visuelle LLM libre et confirmation des engagements externes
 # v2.509 — Computer Runtime unifié et accès complet persistant révocable
 # v2.508 — axe de lecture centré et palette anthracite cohérente
@@ -41,7 +42,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.489 — citations Research cliquables et bandeau Chat compact unifié
 # v2.488 — Research universel visible et suivis référentiels vérifiables
 # v2.487 — recherche profonde contextuelle, seuils mesurables et façade v3 unifiée
-# v2.458 — politique de données modèles exhaustive et privée par défaut
 # v2.457 — Code Workspace E2E natif, réparation ciblée et artefact préservé
 # v2.456 — corrélation HTTP, Runner, outils et preuves persistées
 # v2.455 — découverte dynamique des capacités des modèles locaux

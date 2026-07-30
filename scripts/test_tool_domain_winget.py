@@ -55,8 +55,15 @@ async def _run() -> None:
         )["error"]
         confirmation = await winget.execute_winget_install({"id": "Git.Git"})
         assert confirmation["requiresConfirmation"] is True
+        install_states = iter((
+            None,
+            {"name": "Git", "id": "Git.Git", "version": "2.50.0"},
+        ))
         async def installed(package_id: str):
-            return {"name": "Git", "id": package_id, "version": "2.50.0"}
+            state = next(install_states)
+            if state:
+                state["id"] = package_id
+            return state
         winget._installed_exact = installed
         installed_result = await winget.execute_winget_install(
             {"id": "Git.Git", "confirmed": True}
@@ -64,6 +71,16 @@ async def _run() -> None:
         assert installed_result["success"] is True
         assert installed_result["verification"]["observed"] == "installed"
         assert calls[-1][0] == "install"
+
+        async def already_installed(package_id: str):
+            return {"name": "Git", "id": package_id, "version": "2.50.0"}
+        winget._installed_exact = already_installed
+        calls_before = len(calls)
+        unchanged = await winget.execute_winget_install(
+            {"id": "Git.Git", "confirmed": True}
+        )
+        assert unchanged["success"] is True and unchanged["changed"] is False
+        assert len(calls) == calls_before
 
         states = iter(({"name": "Git", "id": "Git.Git"}, None))
         async def uninstall_state(_package_id: str):

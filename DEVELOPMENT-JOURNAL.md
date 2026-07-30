@@ -5,6 +5,43 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-30 — v2.511.0 — Restauration de l'historique et parcours CrystalDiskInfo
+
+### Demande et constats
+
+L'utilisateur ne voyait plus aucune conversation ni archive. La base
+`data/secretary.db` était intacte et FastAPI renvoyait bien les conversations. Le frontend
+recevait cependant deux formes de réponse selon le chemin réseau : la route Next.js
+retournait un objet enveloppé, tandis que le repli direct FastAPI retournait un tableau.
+Le code ne reconnaissait que la première forme et remplaçait donc une réponse valide par
+une liste vide. L'audit de la dernière conversation CrystalDiskInfo a aussi montré une
+réinstallation inutile et un lancement fragile après une installation pourtant réussie.
+
+### Décisions et modifications
+
+- Un normaliseur pur et partagé accepte explicitement les deux contrats de liste.
+- La sidebar, les archives et la palette de commandes utilisent le même normaliseur.
+- La lecture des archives bénéficie maintenant du même repli FastAPI que les conversations.
+- `winget_install` vérifie l'état installé avant toute nouvelle exécution et retourne
+  `changed=false` si la cible est déjà présente.
+- La résolution Windows sélectionne un exécutable principal unique dans Program Files et
+  écarte les désinstalleurs, crash reporters et updaters.
+- Le test du normaliseur est intégré au gate principal.
+
+### Validation réelle
+
+- API FastAPI : 100 conversations actives et 1 archive retournées sans perte.
+- Navigateur Turbopack : `Rechercher (50)…`, conversations regroupées et archive visible.
+- CrystalDiskInfo 9.9.2 confirmé par Winget; son raccourci Windows est résolu.
+- Tests ciblés Node et Python réussis; build et gate complet consignés dans la livraison.
+
+### Sécurité, logs et rollback
+
+Aucune donnée persistante ni secret n'est modifié. Le correctif ne journalise aucun contenu
+de conversation supplémentaire. Les contrôles d'approbation et le gateway d'outils restent
+inchangés. Rollback exact : réversion atomique du commit v2.511; aucune migration descendante
+n'est nécessaire.
+
 ## 2026-07-30 — v2.510.0 — Boucle visuelle LLM libre sous harness
 
 ### Demande et constats

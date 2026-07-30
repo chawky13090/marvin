@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { NAV_SECTIONS } from '@/components/sidebar/Sidebar';
 import { BACKEND_URL as BACKEND } from '@/lib/backend';
+import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
 
 // Actions rapides, en plus de la navigation (pas des pages, des raccourcis d'action)
 const QUICK_ACTIONS = [
@@ -81,7 +82,7 @@ export default function CommandPalette() {
     fetch('/api/conversations?limit=20')
       .then(response => response.ok ? response.json() : Promise.reject(new Error('ConversationIndexUnavailable')))
       .then(data => {
-        setConversations((data.conversations || []).slice(0, 20).map(conversation => ({
+        setConversations(conversationListFromPayload(data).slice(0, 20).map(conversation => ({
           id: `conversation:${conversation.id}`,
           icon: '◌',
           label: conversation.title || 'Conversation sans titre',

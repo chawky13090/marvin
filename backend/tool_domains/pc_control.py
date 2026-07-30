@@ -316,6 +316,27 @@ def _find_app_target(name: str):
                     exe = os.path.join(pf, entry, base + ".exe")
                     if os.path.exists(exe):
                         return ("exe", exe)
+                    app_dir = os.path.join(pf, entry)
+                    if not os.path.isdir(app_dir):
+                        continue
+                    executables = [
+                        item for item in os.listdir(app_dir)
+                        if item.lower().endswith(".exe")
+                        and not item.lower().startswith(
+                            ("unins", "uninstall", "update", "crash")
+                        )
+                    ]
+                    if len(executables) == 1:
+                        return ("exe", os.path.join(app_dir, executables[0]))
+                    preferred_suffix = "64.exe" if os.environ.get(
+                        "PROCESSOR_ARCHITECTURE", ""
+                    ).endswith("64") else "32.exe"
+                    preferred = [
+                        item for item in executables
+                        if item.lower().endswith(preferred_suffix)
+                    ]
+                    if len(preferred) == 1:
+                        return ("exe", os.path.join(app_dir, preferred[0]))
         except Exception:
             pass
     return (None, None)

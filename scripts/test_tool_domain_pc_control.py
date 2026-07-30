@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -65,6 +67,23 @@ class _ResolveWindow:
 
 
 async def _run() -> None:
+    previous_program_files = os.environ.get("ProgramFiles")
+    with tempfile.TemporaryDirectory() as temp_root:
+        app_dir = Path(temp_root) / "MarvinResolverFixture"
+        app_dir.mkdir()
+        (app_dir / "Resolver64.exe").touch()
+        (app_dir / "unins000.exe").touch()
+        os.environ["ProgramFiles"] = temp_root
+        try:
+            kind, target = pc_control._find_app_target("MarvinResolverFixture")
+        finally:
+            if previous_program_files is None:
+                os.environ.pop("ProgramFiles", None)
+            else:
+                os.environ["ProgramFiles"] = previous_program_files
+        assert kind == "exe"
+        assert target and target.endswith("Resolver64.exe")
+
     browse = await pc_control.execute_pc_browse({})
     assert browse["success"] is True
     assert isinstance(browse["roots"], list)

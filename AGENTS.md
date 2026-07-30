@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.510.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.511.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.510.0)
+## 9. État actuel (v2.511.0)
+
+**v2.511 (historique et lancement d'applications Windows)** : l'interface accepte désormais
+les deux contrats de liste réellement exposés par Marvin (`Conversation[]` direct ou objet
+`{conversations: Conversation[]}`), y compris lorsque la route Next.js est momentanément
+indisponible et que la lecture bascule vers FastAPI. Conversations actives, archives et
+palette de commandes partagent le même normaliseur testé. Les installations Winget sont
+idempotentes : une application déjà installée produit un succès sans changement au lieu
+d'une fausse erreur. La résolution d'une application Windows sait aussi sélectionner
+l'exécutable principal d'un dossier Program Files tout en excluant désinstalleurs et
+updaters. Aucune migration de données. Rollback : réversion atomique du commit v2.511.
 
 **v2.510 (boucle visuelle libre sous harness)** : `computer_control` expose au LLM une
 boucle Observe/Decide/Act/Verify/Repair sans routeur métier imposant une séquence. Les

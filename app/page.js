@@ -7,6 +7,7 @@ import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
 import { createConversationAudit, conversationAuditToMarkdown } from '@/lib/chatPresentation.mjs';
+import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
 import {
   canSwitchConversation,
   initialChatSelection,
@@ -129,7 +130,7 @@ export default function ChatPage() {
       ]);
       if (convRes.ok) {
         const data = await convRes.json();
-        setConversations(data.conversations || []);
+        setConversations(conversationListFromPayload(data));
       }
       if (projRes.ok) {
         const data = await projRes.json();
@@ -425,10 +426,12 @@ export default function ChatPage() {
 
   const loadArchivedConversations = async () => {
     try {
-      const response = await fetch('/api/conversations?archived=true&limit=100');
+      const response = await fetchWithBackendFallback(
+        '/api/conversations?archived=true&limit=100',
+      );
       if (!response.ok) throw new Error(`Archives HTTP ${response.status}`);
       const payload = await response.json();
-      setArchivedConversations(payload.conversations || []);
+      setArchivedConversations(conversationListFromPayload(payload));
     } catch {
       toast.error('Archives indisponibles', 'Impossible de charger les conversations archivées.');
     }

@@ -260,6 +260,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Tours chat durables et detachables", (python, "scripts/test_chat_turn_runtime.py")),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
         Stage("Reprise des lectures backend frontend", ("node", "scripts/test_backend_read.mjs")),
+        Stage("Normalisation des listes de conversations", ("node", "scripts/test_conversation_payload.mjs")),
         Stage("Domaine d'outils Fichiers", (python, "scripts/test_tool_domain_filesystem.py")),
         Stage("Formatage documentaire partagé", (python, "scripts/test_document_formatting.py")),
         Stage("Profil et modèles documentaires", (python, "scripts/test_document_profile.py")),

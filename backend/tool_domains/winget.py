@@ -218,6 +218,21 @@ async def execute_winget_install(args: dict) -> dict:
     pkg_label = resolved_id or query
     if not args.get("confirmed"):
         return {"requiresConfirmation": True, "message": f"Installer le paquet « {pkg_label} » via winget ?"}
+    already_installed = await _installed_exact(resolved_id)
+    if already_installed:
+        return {
+            "success": True,
+            "package": pkg_label,
+            "code": 0,
+            "changed": False,
+            "verification": {
+                "expected": "installed",
+                "observed": "installed",
+                "package": already_installed,
+            },
+            "message": "Le paquet est déjà installé et vérifié dans Winget.",
+            "output": "",
+        }
     selector = ["--id", resolved_id, "-e"] if resolved_id else [query]
     r = await asyncio.to_thread(_winget_run, ["install"] + selector + ["--silent", "--accept-package-agreements",
                      "--accept-source-agreements"], timeout=900)
