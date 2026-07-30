@@ -34,7 +34,7 @@ _NEEDS = {
 _FAMILY_PREFERENCES = {
     "general": ("deepseek", "minimax", "glm", "qwen", "mistral", "nemotron", "kimi"),
     "reasoning": ("deepseek", "glm", "minimax", "qwen", "nemotron", "mistral", "kimi"),
-    "agentic": ("kimi", "glm", "deepseek", "minimax", "nemotron", "mistral", "qwen"),
+    "agentic": ("qwen", "kimi", "glm", "deepseek", "mistral", "minimax", "nemotron", "gemma"),
     "code": ("glm", "deepseek", "kimi", "minimax", "qwen", "mistral", "nemotron"),
     "code_architecture": ("glm", "deepseek", "minimax", "qwen", "mistral", "nemotron", "kimi"),
     "code_implementation": ("kimi", "glm", "deepseek", "minimax", "qwen", "mistral", "nemotron"),
@@ -62,18 +62,18 @@ _NEED_LABELS = {
     "multilingual": "français et multilingue",
 }
 RECOMMENDED_CLOUD_MODELS = (
-    {"model": "deepseek-v4-pro:cloud", "roles": ("general", "reasoning", "research", "synthesis"),
-     "reason": "raisonnement profond, navigation et contexte long"},
+    {"model": "deepseek-v4-pro:cloud", "roles": ("general", "reasoning", "research", "synthesis", "agentic"),
+     "reason": "raisonnement profond, navigation, outils et contexte long"},
     {"model": "glm-5.2:cloud", "roles": ("code_architecture", "code_review", "agentic"),
      "reason": "ingénierie de projet et tâches longues"},
-    {"model": "kimi-k2.7-code:cloud", "roles": ("code_implementation",),
-     "reason": "implémentation logicielle agentique spécialisée"},
+    {"model": "kimi-k2.7-code:cloud", "roles": ("code_implementation", "agentic"),
+     "reason": "implémentation logicielle et missions agentiques longues"},
     {"model": "minimax-m3:cloud", "roles": ("agentic", "vision", "research"),
      "reason": "orchestration, navigation, multimodal et contexte long"},
-    {"model": "qwen3.5:397b-cloud", "roles": ("vision", "multilingual"),
-     "reason": "vision unifiée et couverture multilingue"},
-    {"model": "mistral-large-3:675b-cloud", "roles": ("verification", "productivity", "multilingual"),
-     "reason": "vérification structurée, français, JSON et entreprise"},
+    {"model": "qwen3.5:397b-cloud", "roles": ("agentic", "research", "vision", "multilingual", "code"),
+     "reason": "appels d'outils, agents, recherche, vision et multilingue"},
+    {"model": "mistral-large-3:675b-cloud", "roles": ("agentic", "verification", "productivity", "multilingual"),
+     "reason": "appels d'outils, vérification structurée, français et entreprise"},
     {"model": "nemotron-3-super:cloud", "roles": ("agentic", "verification"),
      "reason": "collaboration multi-agent et automatisation IT"},
     {"model": "minimax-m2.7:cloud", "roles": ("productivity", "code_review"),
@@ -184,12 +184,43 @@ def _stats() -> dict[tuple[str, str], dict[str, Any]]:
     for key, rows in grouped.items():
         rows = rows[:100]
         successes = [row for row in rows if row.get("success")]
+        outcome_rows = [
+            row for row in rows
+            if str(row.get("phase") or "").lower() in {
+                "computer_action_unfulfilled",
+                "mission_completed",
+                "mission_failed",
+                "production_gate",
+                "adjudication",
+                "research_synthesis",
+            }
+        ]
+        outcome_successes = [row for row in outcome_rows if row.get("success")]
+        execution_rows = [
+            row for row in rows
+            if str(row.get("phase") or "").lower() == "tool_execution"
+        ]
+        execution_successes = [row for row in execution_rows if row.get("success")]
         durations = [int(row.get("duration_ms") or 0) for row in successes if row.get("duration_ms")]
         result[key] = {
             "calls": len(rows),
             "successes": len(successes),
             "success_rate": round(len(successes) / len(rows), 4),
             "average_duration_ms": round(sum(durations) / len(durations)) if durations else None,
+            "outcome_calls": len(outcome_rows),
+            "outcome_successes": len(outcome_successes),
+            "outcome_success_rate": (
+                round(len(outcome_successes) / len(outcome_rows), 4)
+                if outcome_rows
+                else None
+            ),
+            "execution_calls": len(execution_rows),
+            "execution_successes": len(execution_successes),
+            "execution_success_rate": (
+                round(len(execution_successes) / len(execution_rows), 4)
+                if execution_rows
+                else None
+            ),
             "last_seen": rows[0].get("at"),
         }
     return result
@@ -223,19 +254,23 @@ def _official_prior(model: str, need: str) -> tuple[float, str | None]:
             ),
         ),
         (
-            low.startswith("deepseek") and need in {"general", "reasoning", "research", "synthesis"},
-            7.0,
-            "prior officiel : raisonnement, recherche et contexte long",
+            low.startswith("deepseek") and need in {
+                "general", "reasoning", "research", "synthesis", "agentic",
+            },
+            10.0,
+            "prior officiel : raisonnement, recherche, agents avec outils et contexte long",
         ),
         (
             low.startswith("glm") and need in {"code", "code_architecture", "code_review", "agentic"},
-            7.0,
+            10.0,
             "prior officiel : ingénierie de projet et tâches longues",
         ),
         (
-            low.startswith("kimi") and need == "code_implementation" and "code" in low,
-            9.0,
-            "prior officiel : modèle spécialisé en implémentation agentique",
+            low.startswith("kimi")
+            and need in {"code", "code_implementation", "agentic"}
+            and "code" in low,
+            15.0,
+            "prior officiel : modèle spécialisé en implémentation et missions agentiques",
         ),
         (
             "minimax-m3" in low and need in {"general", "reasoning", "agentic", "vision", "research"},
@@ -248,18 +283,22 @@ def _official_prior(model: str, need: str) -> tuple[float, str | None]:
             "prior officiel : productivité professionnelle et ingénierie",
         ),
         (
-            low.startswith("qwen") and need in {"vision", "multilingual"},
-            9.0,
-            "prior officiel : vision unifiée et couverture multilingue",
+            low.startswith("qwen3.5") and need in {
+                "agentic", "code", "research", "vision", "multilingual",
+            },
+            20.0,
+            "prior officiel : agents, appels d'outils, recherche, vision et 201 langues",
         ),
         (
-            low.startswith("gemma4") and need == "vision",
-            8.0,
-            "prior officiel : modèle multimodal Cloud natif",
+            low.startswith("gemma4") and need in {"agentic", "code", "reasoning", "vision"},
+            10.0,
+            "prior officiel : raisonnement, agents, code et multimodal natif",
         ),
         (
-            low.startswith("mistral") and need in {"verification", "multilingual", "productivity"},
-            7.0,
+            low.startswith("mistral") and need in {
+                "agentic", "verification", "multilingual", "productivity",
+            },
+            10.0,
             "prior officiel : JSON, function calling, multilingue et entreprise",
         ),
         (
@@ -294,7 +333,7 @@ def _score(model: str, need: str, stats: dict[str, Any] | None) -> tuple[float, 
         reasons.append(prior_reason)
     learned = cloud_routing.get_model_capabilities().get(model, {}).get(need, {}).get("ok")
     if learned is True:
-        score += 15
+        score += 6
         reasons.append("capacité prouvée par un appel réel")
     elif learned is False:
         score -= 40
@@ -305,11 +344,27 @@ def _score(model: str, need: str, stats: dict[str, Any] | None) -> tuple[float, 
             score -= 40
             reasons.append("aucun appel réel réussi sur cette installation")
         else:
-            score += (success_rate - 0.5) * 30
+            score += (success_rate - 0.5) * 16
         reasons.append(f"{stats['success_rate'] * 100:.0f}% de succès observé")
+        execution_rate = stats.get("execution_success_rate")
+        if execution_rate is not None:
+            score += (float(execution_rate) - 0.5) * 30
+            reasons.append(
+                f"{float(execution_rate) * 100:.0f}% d'appels exécutables observés"
+            )
+        else:
+            reasons.append("aucune preuve d'appel exécutable")
+        outcome_rate = stats.get("outcome_success_rate")
+        if outcome_rate is not None:
+            score += (float(outcome_rate) - 0.5) * 50
+            reasons.append(
+                f"{float(outcome_rate) * 100:.0f}% de missions abouties observées"
+            )
+        else:
+            reasons.append("aucune preuve de mission complète")
         latency = stats.get("average_duration_ms")
         if latency:
-            score += max(-10.0, min(8.0, (45_000 - latency) / 5_000))
+            score += max(-5.0, min(4.0, (45_000 - latency) / 10_000))
             reasons.append(f"latence moyenne {latency} ms")
     else:
         reasons.append("aucune télémétrie payante déclenchée artificiellement")
@@ -331,7 +386,11 @@ def catalog(need: str = "general") -> dict[str, Any]:
             "score": score,
             "observations": model_stats or {
                 "calls": 0, "successes": 0, "success_rate": None,
-                "average_duration_ms": None, "last_seen": None,
+                "average_duration_ms": None, "outcome_calls": 0,
+                "outcome_successes": 0, "outcome_success_rate": None,
+                "execution_calls": 0, "execution_successes": 0,
+                "execution_success_rate": None,
+                "last_seen": None,
             },
             "reasons": reasons,
         })
@@ -342,7 +401,7 @@ def catalog(need: str = "general") -> dict[str, Any]:
         "models": models,
         "installed_count": len(models),
         "observation_count": len(list_observations(5000)) if integrity["valid"] else 0,
-        "policy": "passive_real_calls_only",
+        "policy": "documented_priors_plus_real_outcomes",
         "observation_window_per_model_need": 100,
         "telemetry_trusted": integrity["valid"],
         "evidence_integrity": integrity,

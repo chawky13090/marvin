@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.515 — marché multi-modèles fondé sur les appels exécutables et missions abouties
 # v2.514 — reprise contextuelle PC et routage Cloud fondé sur les résultats
 # v2.513 — reprise d'approbation sensible au résultat et focus Windows tolérant
 # v2.512 — reprise agentique automatique après une approbation UI à usage unique
@@ -47,7 +48,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.457 — Code Workspace E2E natif, réparation ciblée et artefact préservé
 # v2.456 — corrélation HTTP, Runner, outils et preuves persistées
 # v2.455 — découverte dynamique des capacités des modèles locaux
-# v2.454 — apprentissage durable avec SQLite autoritatif
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

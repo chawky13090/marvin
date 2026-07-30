@@ -13574,6 +13574,57 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
 - Gate global rapide : 217/217 étapes réussies.
 - Rendu Playwright réel validé en 1920 × 1080, 1280 × 900 et 390 × 844 sans débordement.
 - Runtime relancé : backend `2.508.0`, santé `ok`, Ollama disponible et frontend HTTP 200.
+## 2026-07-30 — v2.515 — Model Market multi-modèles et preuves métier
+
+### Constat
+
+- Dix modèles Cloud sont présents dans l'inventaire réel Ollama 0.32.5, mais les modèles
+  jamais choisis par Auto ne recevaient aucune preuve et ne pouvaient pas concurrencer les
+  historiques de GLM ou MiniMax.
+- Les anciens taux à 100 % signifiaient principalement « appel d'outil émis » ou « texte
+  non vide ». Ils ne démontraient ni arguments valides, ni exécution, ni mission terminée.
+- Les capacités officielles de Qwen 3.5, Kimi K2.7 Code, DeepSeek V4 Pro, Mistral Large 3,
+  Nemotron 3 Super et Gemma 4 étaient insuffisamment représentées.
+
+### Épreuves Cloud réelles sans effet externe
+
+- Qwen 3.5 397B : appel natif `software_install` correct, arguments exacts, 2,5 secondes.
+- Mistral Large 3 675B : appel natif correct, 1,3 seconde.
+- Kimi K2.7 Code : appel natif correct, 1,5 seconde.
+- Nemotron 3 Super : intention correcte mais pseudo-balise textuelle, aucun `tool_calls`
+  natif; il ne reçoit donc pas de priorité opérationnelle.
+- Aucun outil n'a été exécuté : ces sondes ont uniquement vérifié le contrat Ollama.
+
+### Correction
+
+- La matrice par tâche couvre toutes les familles installées et place Qwen, Kimi Code, GLM,
+  DeepSeek, Mistral, MiniMax, Nemotron et Gemma selon leurs spécialités documentées.
+- Les succès de transport et de génération ont un poids faible. Les appels réellement
+  validés puis exécutés ont un poids supérieur. Les preuves de mission complète dominent
+  toutes les autres métriques.
+- Le Runner n'enregistre plus un appel avant validation comme une capacité prouvée. Il attend
+  qu'un nouveau reçu d'outil réussi apparaisse après le batch.
+- Les scorecards exposent séparément `execution_success_rate` et `outcome_success_rate`.
+
+### Sécurité, journalisation et rollback
+
+- Les sondes n'ont exécuté aucune installation, navigation, mutation ou action sortante.
+- Aucune invite, réponse ou argument sensible n'est ajouté aux observations; seulement le
+  modèle, le besoin, la phase, le résultat et la durée.
+- Aucune migration. Rollback : réversion atomique du commit v2.515, puis redémarrage des
+  services. Les observations historiques restent lisibles mais ont un poids réduit.
+
+### Validation réelle
+
+- Model Market, Agent Loop Policy, Agent Transport, Agent Model Step, Agent Routing et Agent
+  Tool Batch : réussis.
+- Test de priorité aux missions complètes : Mistral dépasse le prior Qwen après trois preuves
+  métier positives.
+- Architecture : 356 outils, 356 harness, 375 routes et 41 pages.
+- Compilation Python et `git diff --check` : réussis.
+- Build Next.js 16.2.12 Turbopack à froid : réussi.
+- Backend 2.515.0 et frontend : santé HTTP validée après redémarrage.
+
 ## 2026-07-30 — v2.514 — Auto contextuel et routage Cloud vérifiable
 
 ### Incident et diagnostic

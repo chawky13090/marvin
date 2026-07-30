@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.514.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.515.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.514.0)
+## 9. État actuel (v2.515.0)
+
+**v2.515 (Model Market multi-modèles et preuves métier)** : Auto évalue désormais toutes les
+familles Cloud installées par spécialité au lieu de survaloriser MiniMax. Qwen 3.5 bénéficie
+de ses capacités documentées en appels d'outils, agents, recherche, vision et multilingue;
+Kimi K2.7 Code, DeepSeek V4 Pro, Mistral Large 3, GLM 5.2, Nemotron et Gemma conservent des
+rôles explicites. Une réponse non vide ou un appel seulement formé ne constitue plus une
+preuve agentique. Le modèle n'est déclaré capable qu'après l'exécution réussie d'au moins un
+appel validé par le harness. Les scorecards séparent disponibilité transport, appels
+exécutables et missions complètes; ces dernières ont le poids maximal et peuvent modifier
+dynamiquement le classement. Les essais réels non destructifs ont validé les appels natifs
+de Qwen 3.5 397B, Mistral Large 3 et Kimi K2.7 Code; Nemotron 3 Super a produit une balise
+textuelle non native et reste donc secondaire. Aucun schéma ni donnée persistante n'est
+modifié. Rollback : réversion atomique du commit v2.515 puis redémarrage backend/frontend.
 
 **v2.514 (Auto contextuel et routage Cloud vérifiable)** : une relance courte telle que
 « re teste », « continue » ou « trouve une solution » hérite des dernières demandes

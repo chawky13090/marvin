@@ -35,7 +35,7 @@ def main() -> int:
     ):
         catalog = model_market.catalog("research")
         assert len(catalog["models"]) == 5
-        assert catalog["policy"] == "passive_real_calls_only"
+        assert catalog["policy"] == "documented_priors_plus_real_outcomes"
         selected = model_market.recommend("research", count=5, distinct_families=True)
         assert len(selected) == 5
         assert len({item["family"] for item in selected}) == 5
@@ -52,11 +52,31 @@ def main() -> int:
         patch.object(model_market, "list_observations", return_value=[]),
     ):
         assert model_market.recommend("reasoning")[0]["family"] == "deepseek"
-        assert model_market.recommend("agentic")[0]["model"] == "glm-5.2:cloud"
+        assert model_market.recommend("agentic")[0]["model"] == "qwen3.5:397b-cloud"
         assert model_market.recommend("code_implementation")[0]["family"] == "kimi"
         assert model_market.recommend("code_architecture")[0]["family"] == "glm"
-        assert model_market.recommend("vision")[0]["model"] == "minimax-m3:cloud"
+        assert model_market.recommend("vision")[0]["model"] == "qwen3.5:397b-cloud"
         assert model_market.recommend("multilingual")[0]["family"] == "qwen"
+
+        completed_missions = [
+            {
+                "at": f"2026-07-30T00:00:{index:02d}+00:00",
+                "model": "mistral-large-3:675b-cloud",
+                "family": "mistral",
+                "need": "agentic",
+                "success": True,
+                "duration_ms": 2_000,
+                "phase": "mission_completed",
+            }
+            for index in range(3)
+        ]
+        with patch.object(
+            model_market,
+            "list_observations",
+            return_value=completed_missions,
+        ):
+            # Une preuve de mission complète surpasse un simple prior documentaire.
+            assert model_market.recommend("agentic")[0]["family"] == "mistral"
 
     frontier_models = [*role_models, "kimi-k3:cloud"]
     with (
@@ -80,10 +100,10 @@ def main() -> int:
             "code_architecture",
             "code_implementation",
             "vision",
-            "research",
             "synthesis",
         ):
             assert model_market.recommend(need)[0]["model"] == "kimi-k3:cloud", need
+        assert model_market.recommend("research")[0]["model"] == "qwen3.5:397b-cloud"
         # Une observation réelle négative doit rester plus forte que le prior documentaire.
         failed = [{
             "at": "2026-07-29T00:00:00+00:00",

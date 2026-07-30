@@ -644,19 +644,14 @@ async def _run_deterministic_agent(
                         }.get(profile_name, "general")
                     )
                 )
-                _model_market.record_observation(
-                    active_model,
-                    _observed_need,
-                    True,
-                    int((time.monotonic() - _runner_state.started_at) * 1000),
-                    phase=(
-                        "native_tool_call"
-                        if native_decision_mode and tool_calls_found
-                        else "agent_model_step"
-                    ),
-                )
-                if native_decision_mode and tool_calls_found:
-                    _cr.record_model_capability(active_model, "agentic", True)
+                if not tool_calls_found:
+                    _model_market.record_observation(
+                        active_model,
+                        _observed_need,
+                        True,
+                        int((time.monotonic() - _runner_state.started_at) * 1000),
+                        phase="agent_model_step",
+                    )
             except Exception:
                 pass
         # v2.119 — protection mid-boucle : un outil sensible vient d'être demandé alors
@@ -666,6 +661,7 @@ async def _run_deterministic_agent(
         # ne l'ait anticipé — dernier filet, pas le mécanisme principal.
         # v2.121 — désactivé en mode Ultra débridé (l'utilisateur a explicitement accepté
         # que ces données partent au cloud, y compris celles découvertes en cours de tour).
+        _decision_model = active_model
         _model_switch = _sensitive_tool_model_switch(
             tool_calls=tool_calls_found,
             active_model=active_model,
@@ -681,6 +677,7 @@ async def _run_deterministic_agent(
 
         # ── Traiter les tool calls ─────────────────────────────────────────────
         if tool_calls_found:
+            _successful_call_count_before = len(_runner_state.successful_calls)
             async for _event in _execute_tool_batch(
                 tool_calls=tool_calls_found,
                 assistant_content=full_content,
@@ -724,6 +721,28 @@ async def _run_deterministic_agent(
                 ),
             ):
                 yield _sse(_event)
+            if (
+                _is_cloud_model(_decision_model)
+                and len(_runner_state.successful_calls)
+                > _successful_call_count_before
+            ):
+                try:
+                    import model_market as _model_market
+
+                    _model_market.record_observation(
+                        _decision_model,
+                        "agentic",
+                        True,
+                        int((time.monotonic() - _runner_state.started_at) * 1000),
+                        phase="tool_execution",
+                    )
+                    _cr.record_model_capability(
+                        _decision_model,
+                        "agentic",
+                        True,
+                    )
+                except Exception:
+                    pass
             if native_decision_mode:
                 # `tool_search` reste consultatif. Après son observation, seuls les
                 # schémas exacts des candidats sont ajoutés pour le prochain tour.
