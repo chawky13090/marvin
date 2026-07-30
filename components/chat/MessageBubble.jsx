@@ -1060,6 +1060,9 @@ function renderToolResult(toolName, result) {
       <FileExplorerCard
         title={`📂 ${result.currentDir || result.path || 'Dossier'}`}
         items={items}
+        directory={result.currentDir || result.path}
+        nextOffset={result.has_more ? result.next_offset : null}
+        totalCount={result.total_count ?? result.count ?? items.length}
       />
     );
   }

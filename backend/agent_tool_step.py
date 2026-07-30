@@ -109,6 +109,28 @@ def compact_tool_result(
 ) -> str:
     """Projette un résultat borné pour le contexte LLM sans toucher au reçu complet."""
     serialized = json.dumps(result, ensure_ascii=False)
+    if (
+        tool_name == "file_list"
+        and isinstance(result, dict)
+        and isinstance(result.get("files"), list)
+    ):
+        projection = {
+            key: result.get(key)
+            for key in (
+                "success", "currentDir", "count", "total_count", "offset",
+                "limit", "has_more", "next_offset",
+            )
+        }
+        projection["files"] = [
+            {
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "size": item.get("size"),
+            }
+            for item in result["files"]
+            if isinstance(item, dict)
+        ]
+        return json.dumps(projection, ensure_ascii=False)
     if tool_name == "pdf_read":
         max_chars = max(max_chars, 16_000)
     if len(serialized) <= max_chars:

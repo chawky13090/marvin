@@ -2838,9 +2838,11 @@ TOOLS_SPEC = [
        "Auto-diagnostic : Marvin teste un échantillon de ses propres outils et rapporte ceux qui fonctionnent ou non (+ latence). include_web=true teste aussi les outils réseau. Pour répondre à 'est-ce que tout fonctionne ?'.",
        {"category":    {"type": "string", "description": "Filtrer par catégorie/outil (optionnel)"},
         "include_web": {"type": "boolean", "description": "Inclure les outils réseau (web, météo)"}}, []),
-    _t("file_list", "Liste les fichiers et dossiers dans un répertoire.",
+    _t("file_list", "Liste un dossier avec pagination exacte. Si l'utilisateur demande tout, rappelle l'outil avec next_offset jusqu'à has_more=false ; n'affirme jamais qu'il manque des éléments sans lire ces pages.",
        {"path": {"type": "string", "description": "Chemin du répertoire à lister"},
-        "show_hidden": {"type": "boolean", "description": "Afficher les fichiers cachés"}},
+        "show_hidden": {"type": "boolean", "description": "Afficher les fichiers cachés"},
+        "offset": {"type": "integer", "minimum": 0, "description": "Position de départ (défaut 0)"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Éléments par page (défaut 100)"}},
        ["path"]),
 
     _t("file_info", "Retourne les métadonnées détaillées d'un fichier ou dossier (taille, dates, hash MD5 optionnel).",

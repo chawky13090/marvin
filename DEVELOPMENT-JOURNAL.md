@@ -13345,3 +13345,39 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
 - ESLint : 0 erreur, 35 avertissements préexistants.
 - Build Next.js 16.2.12 Turbopack : réussi, 12 pages statiques générées.
 - Runtime relancé : backend `2.506.0`, santé `ok`, Ollama disponible et frontend HTTP 200.
+
+## 2026-07-30 — v2.507 — Listes de fichiers complètes et paginées
+
+### Incident et preuve causale
+
+- Dans la conversation « Meilleurs basket sketchers », `file_list` avait réellement renvoyé
+  51 éléments de Documents.
+- La projection de contexte générique a conservé seulement les vingt premiers. Marvin a donc
+  affirmé à tort que l'outil ne permettait ni liste complète ni pagination.
+
+### Correction
+
+- `file_list` accepte `offset` et `limit` (1 à 1 000) et renvoie le total, la position suivante
+  et un indicateur de fin sans ambiguïté.
+- La projection LLM de cette capacité conserve tous les noms, types et tailles de la page,
+  mais retire chemins et dates redondants afin de maîtriser le contexte.
+- Le prompt impose la lecture de toutes les pages pour une demande contenant « tout ».
+- Le rendu du chat affiche le total et propose « Afficher la suite » sans recharger la page.
+
+### Sécurité, logs et rollback
+
+- Lecture seule, aucun nouveau privilège, flux réseau, secret ou donnée persistante.
+- Les reçus complets restent audités ; la projection allégée ne modifie pas la preuve métier.
+- Rollback : réversion atomique du commit v2.507 puis redémarrage backend/frontend.
+
+### Validation réelle
+
+- Tests filesystem : pagination 105 éléments en 40/40/25, bornes et fin de flux réussies.
+- Test de projection LLM : 51/51 noms conservés avec métadonnées réduites.
+- Tests prompt, sélection, architecture et présentation Chat réussis.
+- ESLint : 0 erreur, 35 avertissements préexistants.
+- Build Next.js 16.2.12 Turbopack réussi.
+- Reproduction API sur Documents : 51 éléments uniques reçus en trois pages 20/20/11,
+  total déclaré 51, sans perte ni doublon.
+- Runtime : backend 2.507.0 et frontend HTTP 200.
+- Gate global rapide : 217/217 étapes réussies.

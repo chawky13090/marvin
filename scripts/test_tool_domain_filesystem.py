@@ -25,6 +25,21 @@ async def main() -> int:
         assert written["success"]
         listing = await filesystem.list_entries({"path": "docs"})
         assert listing["count"] == 1 and listing["files"][0]["category"] == "Texte"
+        (base / "paged").mkdir()
+        for index in range(105):
+            (base / "paged" / f"page-{index:03}.txt").write_text("x", encoding="utf-8")
+        first_page = await filesystem.list_entries({"path": "paged", "limit": 40})
+        assert first_page["count"] == 40
+        assert first_page["total_count"] == 105 and first_page["has_more"] is True
+        second_page = await filesystem.list_entries({
+            "path": "paged", "limit": 40, "offset": first_page["next_offset"]
+        })
+        assert second_page["offset"] == 40 and second_page["count"] == 40
+        last_page = await filesystem.list_entries({"path": "paged", "limit": 40, "offset": 80})
+        assert last_page["count"] == 25 and last_page["has_more"] is False
+        assert last_page["next_offset"] is None
+        invalid_page = await filesystem.list_entries({"path": "paged", "limit": 1001})
+        assert "compris entre 1 et 1 000" in invalid_page["error"]
         metadata = await filesystem.info({"path": "docs/a.txt", "hash": True})
         assert metadata["size_bytes"] == 1
         assert len(metadata["md5"]) == 32 and len(metadata["sha256"]) == 64

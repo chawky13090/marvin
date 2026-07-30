@@ -305,8 +305,51 @@ function ActionBtn({ title, onClick, children }) {
  *   - elapsedMs: search time
  *   - onOpenInChat?: (path) => void — for "read file" action
  */
-export default function FileExplorerCard({ items = [], title, method, elapsedMs, onOpenInChat }) {
-  const safeItems = items.filter(i => i && (i.path || i.name));
+export default function FileExplorerCard({
+  items = [],
+  title,
+  method,
+  elapsedMs,
+  onOpenInChat,
+  directory,
+  nextOffset = null,
+  totalCount = null,
+}) {
+  const [visibleItems, setVisibleItems] = useState(items);
+  const [remainingOffset, setRemainingOffset] = useState(nextOffset);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const safeItems = visibleItems.filter(i => i && (i.path || i.name));
+
+  const loadMore = useCallback(async () => {
+    if (!directory || remainingOffset == null || loadingMore) return;
+    setLoadingMore(true);
+    setLoadError('');
+    try {
+      const result = await callTool('file_list', {
+        path: directory,
+        offset: remainingOffset,
+        limit: 100,
+      });
+      if (result.error) throw new Error(result.error);
+      const list = result.files || result.entries || [];
+      setVisibleItems(current => [
+        ...current,
+        ...list.map(f => ({
+          name: f.name,
+          path: f.path || `${directory}\\${f.name}`,
+          is_dir: f.type === 'dossier' || f.type === 'folder' || f.is_dir,
+          size: f.size_bytes || (typeof f.size === 'number' ? f.size : 0),
+          extension: f.extension || '',
+        })),
+      ]);
+      setRemainingOffset(result.has_more ? result.next_offset : null);
+    } catch (error) {
+      setLoadError(error.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [directory, loadingMore, remainingOffset]);
   if (safeItems.length === 0) {
     return (
       <div style={{
@@ -351,6 +394,28 @@ export default function FileExplorerCard({ items = [], title, method, elapsedMs,
           <FileRow key={i} item={item} onOpenInChat={onOpenInChat} />
         ))}
       </div>
+      {remainingOffset != null && (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={loadingMore}
+          style={{
+            width: '100%', marginTop: '8px', padding: '8px',
+            borderRadius: '7px', border: '1px solid var(--border)',
+            background: 'var(--bg-tertiary)', color: 'var(--accent)',
+            cursor: loadingMore ? 'wait' : 'pointer',
+          }}
+        >
+          {loadingMore
+            ? 'Chargement…'
+            : `Afficher la suite (${Math.max(0, (totalCount || 0) - safeItems.length)} restant(s))`}
+        </button>
+      )}
+      {loadError && (
+        <div style={{ color: '#f87171', fontSize: '11px', marginTop: '6px' }}>
+          {loadError}
+        </div>
+      )}
       <div style={{
         marginTop: '8px', paddingTop: '6px',
         borderTop: '1px solid rgba(255,255,255,0.05)',

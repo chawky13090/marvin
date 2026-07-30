@@ -57,6 +57,17 @@ assert.equal(audit.messages[0].toolInvocations[0].result.nested.password, '[MASQ
 assert.equal(audit.messages[0].toolInvocations[0].args.path, 'C:/safe', 'les données non sensibles doivent être conservées');
 const markdownAudit = conversationAuditToMarkdown(audit);
 const messageBubbleSource = fs.readFileSync(new URL('../components/chat/MessageBubble.jsx', import.meta.url), 'utf8');
+const fileExplorerSource = fs.readFileSync(new URL('../components/chat/FileExplorerCard.jsx', import.meta.url), 'utf8');
+assert.match(
+  messageBubbleSource,
+  /nextOffset=\{result\.has_more \? result\.next_offset : null\}/,
+  'la pagination file_list doit etre transmise au composant du chat',
+);
+assert.match(
+  fileExplorerSource,
+  /remainingOffset[\s\S]*Afficher la suite/,
+  'le navigateur de fichiers doit pouvoir charger toutes les pages',
+);
 assert.match(
   messageBubbleSource,
   /tool\.result !== undefined && isCodingMissionTool[\s\S]*?<CodingMissionTracker result=\{tool\.result\}/,

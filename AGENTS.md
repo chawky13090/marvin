@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.506.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.507.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.506.0)
+## 9. État actuel (v2.507.0)
+
+**v2.507 (listes de fichiers complètes)** : `file_list` expose une pagination explicite
+(`offset`, `limit`, `total_count`, `has_more`, `next_offset`). Quand l'utilisateur demande
+« tout », le Runner doit lire toutes les pages. La projection destinée au LLM conserve chaque
+nom et type de la page au lieu de réduire arbitrairement les listes à vingt éléments. Le reçu
+complet garde les métadonnées et le composant du chat charge les pages suivantes à la demande.
+Rollback : réversion atomique du commit v2.507 puis redémarrage backend/frontend.
 
 **v2.506 (opérations logicielles vérifiées)** : l'installation et la désinstallation Windows
 privilégient Winget, résolvent l'identifiant exact et vérifient l'inventaire après l'action.

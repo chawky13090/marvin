@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.507 — listes de fichiers paginées sans troncature LLM silencieuse
 # v2.506 — opérations logicielles vérifiées et PowerShell sous preuve UI
 # v2.505 — approbations durables dans le chat et autonomie temporaire visible
 # v2.504 — bandeau conversation unifié et composeur Cortex responsive
@@ -47,7 +48,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.451 — provenance générative documents, e-mails et Code Workspace
 # v2.449 — matrice confidentialité/modèles et provenance du profil effectif
 # v2.448 — zéro consommateur direct, outils système conditionnels et Council sous harness
-# v2.447 — contenu et documents sous harness, téléchargement confiné
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

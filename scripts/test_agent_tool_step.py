@@ -74,6 +74,34 @@ def main() -> int:
     assert projected_pdf["truncated"] is False
     assert projected["items"][-1] == "…+10 éléments"
 
+    file_page = {
+        "success": True,
+        "currentDir": r"C:\Users\Chawb\Documents",
+        "count": 51,
+        "total_count": 51,
+        "offset": 0,
+        "limit": 100,
+        "has_more": False,
+        "next_offset": None,
+        "files": [
+            {
+                "name": f"document-{index}.txt",
+                "type": "fichier",
+                "size": "1 Ko",
+                "path": f"C:/private/document-{index}.txt",
+                "modified": "now",
+            }
+            for index in range(51)
+        ],
+    }
+    projected_files = json.loads(compact_tool_result(
+        file_page, max_chars=100, tool_name="file_list"
+    ))
+    assert len(projected_files["files"]) == 51
+    assert projected_files["files"][-1]["name"] == "document-50.txt"
+    assert projected_files["has_more"] is False
+    assert "path" not in projected_files["files"][0]
+
     print(
         "Agent Tool Step OK - alias, JSON, contexte interne, PDF complet et projection bornée."
     )

@@ -97,6 +97,13 @@ async def list_entries(args: dict[str, Any]) -> dict[str, Any]:
     path = _resolve(str(args.get("path", "")))
     show_hidden = bool(args.get("show_hidden", False))
     try:
+        offset = max(0, int(args.get("offset", 0)))
+        limit = int(args.get("limit", 100))
+    except (TypeError, ValueError):
+        return {"error": "Paramètres 'offset' et 'limit' invalides : entiers attendus."}
+    if not 1 <= limit <= 1_000:
+        return {"error": "Le paramètre 'limit' doit être compris entre 1 et 1 000."}
+    try:
         directory = Path(path)
         if not directory.exists():
             return {"error": f"Chemin introuvable : {path}"}
@@ -133,11 +140,19 @@ async def list_entries(args: dict[str, Any]) -> dict[str, Any]:
                     "path": str(item),
                     "modified": "",
                 })
+        total_count = len(entries)
+        page = entries[offset:offset + limit]
+        next_offset = offset + len(page)
         return {
             "success": True,
             "currentDir": str(directory),
-            "count": len(entries),
-            "files": entries,
+            "count": len(page),
+            "total_count": total_count,
+            "offset": offset,
+            "limit": limit,
+            "has_more": next_offset < total_count,
+            "next_offset": next_offset if next_offset < total_count else None,
+            "files": page,
         }
     except Exception as exc:
         return {"error": str(exc)}
