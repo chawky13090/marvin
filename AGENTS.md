@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.504.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.505.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.504.0)
+## 9. État actuel (v2.505.0)
+
+**v2.505 (approbations UI et autonomie explicite)** : tous les appels d'outils issus du chat
+traversent désormais le gateway d'effets commun. Une action sensible crée une demande
+persistante liée au digest exact de l'appel et valable cinq minutes; le chat affiche
+`Oui, autoriser` et `Non, refuser`, puis une prise atomique empêche tout double clic ou rejeu.
+Le texte du LLM ne peut jamais fabriquer cette preuve. Le composeur expose `Normal`, `Auto`
+et `Accès complet`, la permission effective et la durée restante. Auto autorise temporairement
+les risques bornés au niveau 3; Accès complet exige une seconde confirmation et expire aussi.
+Validation, idempotence, preuves et audit restent actifs. Les arguments en attente restent
+dans SQLite local au plus cinq minutes puis sont effacés à la décision ou à l'expiration.
+Le rollback est la réversion atomique du commit; supprimer la table
+`tool_approval_requests` est optionnel car elle est additive et sans dépendance descendante.
 
 **v2.504 (bandeau Chat et Cortex unifiés)** : Lecture, Technique et Audit sont projetés dans
 la barre contextuelle globale avec les actions de conversation et le sélecteur de modèle ;

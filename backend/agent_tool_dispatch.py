@@ -8,7 +8,6 @@ from typing import Any, Awaitable, Callable
 from config import (
     CONDITIONAL_TOOL_SAFE_ACTIONS,
     DANGEROUS_TOOLS,
-    PERMISSION_EXPERT,
     PERMISSION_SECURE,
     SECURE_BLOCKED_TOOLS,
 )
@@ -144,16 +143,11 @@ async def dispatch_tool(
             False,
         )
 
-    if (
-        request.permission_level == PERMISSION_EXPERT
-        and request.name not in ALWAYS_CONFIRM_TOOLS
-    ):
-        arguments["confirmed"] = True
-    elif request.name in ALWAYS_CONFIRM_TOOLS:
+    if request.name in ALWAYS_CONFIRM_TOOLS:
         # Le LLM et le texte utilisateur appartiennent au même canal non fiable :
         # ils peuvent demander une action, mais pas fabriquer la preuve de clic UI.
-        # Le premier appel produit `requiresConfirmation`; le bouton du frontend
-        # rejoue ensuite les arguments via le gateway avec `confirmed_by_ui=True`.
+        # Le gateway décide si l'autonomie active fournit une preuve valide ou
+        # si le frontend doit afficher une approbation.
         arguments.pop("confirmed", None)
         arguments.pop("__confirmed", None)
 

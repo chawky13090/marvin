@@ -192,6 +192,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_command_safety_repository.py"),
         ),
         Stage(
+            "Approbations d'outils et autonomie temporaire",
+            (python, "scripts/test_tool_approval_flow.py"),
+        ),
+        Stage(
             "Repository des fiches de révision",
             (python, "scripts/test_flashcard_repository.py"),
         ),

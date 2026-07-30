@@ -13,10 +13,12 @@ from pydantic import BaseModel, Field, model_validator
 
 import chat_turn_runtime
 import database as db
+import agent_autonomy
 from action_replay import IdempotencyMismatchError
 import tool_gateway
 import tool_runtime
 import tools as tool_module
+from repositories import tool_approvals
 from agent import run_agent
 from config import (
     BACKEND_DIR,
@@ -122,6 +124,11 @@ class ToolExecuteRequest(BaseModel):
         if _json_size(self.args) > MAX_TOOL_ARGUMENT_BYTES:
             raise ValueError("Les arguments de l'outil dépassent la limite autorisée.")
         return self
+
+
+class AutonomyRequest(BaseModel):
+    mode: str = Field(pattern=r"^(normal|auto|full)$")
+    durationMinutes: int = Field(default=60, ge=5, le=480)
 
 
 @router.post("/api/chat")
@@ -248,7 +255,7 @@ async def execute_tool_endpoint(
         outcome = await _execute_through_gateway(
             request,
             source="ui",
-            confirmed_by_ui=True,
+            confirmed_by_ui=False,
             idempotency_key=str(idempotency_key) if idempotency_key else None,
         )
     except IdempotencyMismatchError as exc:
@@ -257,6 +264,100 @@ async def execute_tool_endpoint(
             detail="Cette clé d'idempotence appartient à une autre opération.",
         ) from exc
     return _tool_outcome_response(outcome)
+
+
+@router.post("/api/approvals/{approval_id}/approve", responses=IDEMPOTENCY_RESPONSES)
+async def approve_tool_endpoint(
+    approval_id: UUID,
+    idempotency_key: Annotated[
+        UUID | None,
+        Header(alias="Idempotency-Key"),
+    ] = None,
+):
+    approval = tool_approvals.claim(str(approval_id))
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Demande d'approbation introuvable.")
+    if approval["status"] == "expired":
+        raise HTTPException(status_code=410, detail="Cette demande d'approbation a expiré.")
+    if approval["status"] != "executing" or not approval.get("claimed"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cette demande est déjà {approval['status']}.",
+        )
+    request = ToolExecuteRequest(
+        toolName=approval["tool_name"],
+        args=approval["arguments"],
+        requestId=approval.get("request_id") or None,
+        conversationId=approval.get("conversation_id") or None,
+    )
+    try:
+        outcome = await _execute_through_gateway(
+            request,
+            source="approval_ui",
+            confirmed_by_ui=True,
+            idempotency_key=str(idempotency_key) if idempotency_key else None,
+        )
+    except Exception:
+        tool_approvals.finish(
+            str(approval_id),
+            approved=False,
+            reason="execution_exception",
+        )
+        raise
+    approved = outcome.executed and outcome.status_code == 200
+    tool_approvals.finish(
+        str(approval_id),
+        approved=approved,
+        reason="executed" if approved else f"status_{outcome.status_code}",
+    )
+    return _tool_outcome_response(outcome)
+
+
+@router.post("/api/approvals/{approval_id}/deny")
+async def deny_tool_endpoint(approval_id: UUID):
+    approval = tool_approvals.deny(str(approval_id))
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Demande d'approbation introuvable.")
+    if approval["status"] != "denied":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cette demande est déjà {approval['status']}.",
+        )
+    return {"status": "denied", "approvalId": str(approval_id)}
+
+
+@router.get("/api/autonomy")
+async def get_autonomy():
+    grant = agent_autonomy.current(db)
+    permission_level = _current_permission_level()
+    return {
+        **grant,
+        "permissionLevel": permission_level,
+        "permissionLabel": {
+            PERMISSION_SECURE: "Sécurisé",
+            PERMISSION_STANDARD: "Standard",
+            PERMISSION_EXPERT: "Expert",
+        }.get(permission_level, "Standard"),
+    }
+
+
+@router.put("/api/autonomy")
+async def set_autonomy(request: AutonomyRequest):
+    grant = agent_autonomy.configure(
+        db,
+        request.mode,
+        request.durationMinutes,
+    )
+    permission_level = _current_permission_level()
+    return {
+        **grant,
+        "permissionLevel": permission_level,
+        "permissionLabel": {
+            PERMISSION_SECURE: "Sécurisé",
+            PERMISSION_STANDARD: "Standard",
+            PERMISSION_EXPERT: "Expert",
+        }.get(permission_level, "Standard"),
+    }
 
 
 @router.get("/api/tools/list")

@@ -392,6 +392,23 @@ async def _run_deterministic_agent(
         )
         return outcome.result
 
+    async def _execute_agent_tool(
+        tool_name: str,
+        arguments: dict,
+        tool_conversation_id: str,
+        tool_request_id: str | None,
+    ):
+        """Fait traverser tous les appels du chat par le gateway d'effets commun."""
+        outcome = await tool_runtime.execute(
+            tool_name,
+            arguments,
+            source="agent_chat",
+            conversation_id=tool_conversation_id,
+            request_id=tool_request_id,
+            permission_level=permission_level,
+        )
+        return outcome.result
+
     async def _cortex_disagreement_escalation(critique_text: str | None, answer: str):
         return await _escalate_council_on_disagreement(
             critique_text,
@@ -668,7 +685,7 @@ async def _run_deterministic_agent(
                 inject_internal_context=_inject_internal_tool_context,
                 dispatch_tool=_dispatch_tool,
                 validate_tool_args=_validate_tool_args,
-                execute_registered_tool=_execute_registered_tool,
+                execute_registered_tool=_execute_agent_tool,
                 postprocess_tool_result=_postprocess_tool_result,
                 critique_action=_critique_action,
                 scan_document=_scan_dangerous_script_patterns,

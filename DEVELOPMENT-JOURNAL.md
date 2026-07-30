@@ -5,6 +5,49 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-30 — v2.505.0 — Approbations dans le chat et autonomie temporaire
+
+### Demande et cause racine
+
+Lors d'une demande d'installation de VLC, `winget_install` renvoyait une confirmation que le
+frontend ne reconnaissait pas, car sa liste statique d'outils critiques ne contenait pas cet
+outil. Le chemin du Runner appelait en plus l'exécuteur de domaine directement et contournait
+le gateway commun. Enfin, le dispatcher Expert ajoutait `confirmed=true` aux outils sûrs,
+ce qui violait le schéma strict de `tool_search`.
+
+### Correction
+
+Tous les appels du chat traversent maintenant `tool_runtime` et `PolicyEngine`. Une demande
+d'approbation SQLite contient temporairement l'appel exact, son digest, sa criticité et une
+expiration de cinq minutes. L'approbation est réclamée atomiquement avant exécution; refus,
+expiration, succès et échec effacent les arguments. Le frontend rend le résultat du gateway
+autoritaire et affiche des boutons Oui/Non. Répondre « oui » en texte ne constitue jamais une
+preuve de clic.
+
+Le composeur affiche trois états distincts des permissions : Normal, Auto et Accès complet.
+Auto couvre pendant une heure les effets locaux jusqu'au niveau de risque 3. Accès complet
+couvre temporairement tous les effets admis par la permission courante, mais demande une
+seconde confirmation. Les deux modes expirent, affichent le temps restant et sont révocables.
+Le niveau de permission Sécurisé/Standard/Expert reste séparé et visible dans le panneau.
+
+### Sécurité, logs et rollback
+
+Les contrôles de schéma, permission, politique d'effets, idempotence et preuves restent actifs
+dans tous les modes. Les changements d'autonomie sont audités sans contenu utilisateur. Les
+arguments exacts sont conservés uniquement dans la base SQLite locale pendant l'attente, au
+maximum cinq minutes, puis expurgés. Aucun secret supplémentaire n'est journalisé.
+
+Rollback : réverter atomiquement le commit v2.505 puis redémarrer backend et frontend. La table
+additive `tool_approval_requests` peut rester en place sans effet; pour un retour strict, la
+supprimer après sauvegarde de `data/marvin.db` et arrêt du backend.
+
+### Validations réelles
+
+- Test unitaire du cycle création, prise unique, refus, expiration et expurgation.
+- Tests gateway, dispatcher, lot d'outils, API et UX.
+- Parcours navigateur réel : demande `Installe VLC avec winget`, boutons actifs, clic sur
+  `Non, refuser`, aucune installation lancée et état final `Action refusée par l'utilisateur`.
+
 ## 2026-07-29 — v2.479.0 — Mode vocal explicitement consenti
 
 ### Incident et cause racine

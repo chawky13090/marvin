@@ -1313,6 +1313,26 @@ img { max-width: 100%; display: block; }
     width: auto !important;
     max-height: calc(100dvh - 144px) !important;
   }
+
+  .autonomy-control-trigger {
+    width: 34px !important;
+    max-width: 34px !important;
+    padding-inline: 8px !important;
+    justify-content: center;
+  }
+
+  .autonomy-control-label,
+  .autonomy-control-chevron {
+    display: none;
+  }
+
+  .autonomy-control-popover {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 88px !important;
+    width: auto !important;
+  }
 }
 
 /* Cible tactile : tout ce qui est cliquable reste assez grand au doigt */

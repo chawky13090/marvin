@@ -79,7 +79,7 @@ async def main() -> int:
         validate=valid,
         execute=execute,
     )
-    assert expert.executed and expert.arguments["confirmed"] is True
+    assert expert.executed and "confirmed" not in expert.arguments
 
     irreversible = await dispatch_tool(
         ToolDispatchRequest(

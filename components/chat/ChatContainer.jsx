@@ -254,14 +254,18 @@ export default function ChatContainer({
   }, []);
 
   // ── Confirmation d'outils critiques (appel direct au backend Python) ───────
-  const handleConfirmTool = useCallback(async (toolCallId, toolName, args) => {
+  const handleConfirmTool = useCallback(async (toolCallId, approvalId) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/tools`, {
+      if (!approvalId) throw new Error('Cette demande est ancienne ou invalide. Relancez l’action.');
+      const res = await fetch(`${BACKEND_URL}/api/approvals/${approvalId}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toolName, args }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.result?.error || 'Autorisation refusée.');
       addToolResult({
         toolCallId,
         result: data.result || data.error || 'Aucun résultat',
@@ -274,11 +278,27 @@ export default function ChatContainer({
     }
   }, [addToolResult]);
 
-  const handleCancelTool = useCallback((toolCallId) => {
-    addToolResult({
-      toolCallId,
-      result: { error: "Action annulée par l'utilisateur." },
-    });
+  const handleCancelTool = useCallback(async (toolCallId, approvalId) => {
+    try {
+      if (approvalId) {
+        const response = await fetch(`${BACKEND_URL}/api/approvals/${approvalId}/deny`, {
+          method: 'POST',
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.detail || 'Refus impossible.');
+        }
+      }
+      addToolResult({
+        toolCallId,
+        result: { error: "Action refusée par l'utilisateur.", approvalDenied: true },
+      });
+    } catch (error) {
+      addToolResult({
+        toolCallId,
+        result: { error: error.message || 'Refus impossible.' },
+      });
+    }
   }, [addToolResult]);
 
   // Images en attente pour le prochain message

@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Mapping, Sequence
 
+import agent_autonomy
 from agent_safety import validator_for
 from agent_execution import execute_registered_tool
 from critical_tool_policy import manifest_for_critical_call
@@ -16,7 +17,9 @@ from policy_engine import (
     PolicyContext,
     PolicyEngine,
     call_digest,
+    risk_tier,
 )
+from repositories import tool_approvals
 from config import (
     CONDITIONAL_TOOL_SAFE_ACTIONS,
     DANGEROUS_TOOLS,
@@ -178,10 +181,34 @@ async def execute_tool(
                 request_id=context.request_id,
                 conversation_id=context.conversation_id,
             )
-        decision = PolicyEngine().evaluate(
-            manifest_for_critical_call(request.tool_name, arguments),
-            context,
-        )
+        manifest = manifest_for_critical_call(request.tool_name, arguments)
+        tier = risk_tier(manifest, context.environment)
+        try:
+            autonomy = agent_autonomy.current(database)
+        except Exception:
+            autonomy = {"mode": "normal", "active": False}
+        if autonomy.get("active") and agent_autonomy.allows(
+            str(autonomy.get("mode") or "normal"),
+            int(tier),
+        ):
+            context = PolicyContext(
+                identity=context.identity,
+                tool_name=context.tool_name,
+                arguments=context.arguments,
+                permission_level=context.permission_level,
+                environment=context.environment,
+                source=context.source,
+                target=context.target,
+                approval=ApprovalEvidence(
+                    call_digest=digest,
+                    approved_by=f"autonomy:{autonomy['mode']}",
+                    expires_at=float(autonomy["expires_at"]),
+                    approval_id=f"autonomy-{autonomy['mode']}-{digest[:16]}",
+                ),
+                request_id=context.request_id,
+                conversation_id=context.conversation_id,
+            )
+        decision = PolicyEngine().evaluate(manifest, context)
         if decision.action is PolicyAction.DENY:
             return ToolGatewayResult(
                 {
@@ -193,10 +220,26 @@ async def execute_tool(
                 403,
             )
         if decision.action is PolicyAction.REQUIRE_APPROVAL:
+            approval = tool_approvals.create_or_reuse(
+                call_digest=decision.call_digest,
+                tool_name=request.tool_name,
+                arguments=arguments,
+                conversation_id=request.conversation_id or "",
+                request_id=request.request_id or "",
+                source=request.source,
+                risk_tier=int(decision.risk_tier),
+            )
             return ToolGatewayResult(
                 {
                     "success": False,
                     "requiresConfirmation": True,
+                    "approvalId": approval["id"],
+                    "expiresAt": approval["expires_at"],
+                    "message": (
+                        f"Autoriser « {request.tool_name} » sur "
+                        f"{context.target or 'cet appareil'} ? "
+                        "Utilisez les boutons du chat : une réponse texte ne valide pas l'action."
+                    ),
                     "policyReason": decision.reason_code,
                     "approvalDigest": decision.call_digest,
                     "riskTier": int(decision.risk_tier),

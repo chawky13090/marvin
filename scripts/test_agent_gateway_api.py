@@ -88,7 +88,7 @@ async def _exercise_routes() -> None:
     assert response == {"result": {"success": True}}
     assert execute.await_args.kwargs == {
         "source": "ui",
-        "confirmed_by_ui": True,
+        "confirmed_by_ui": False,
         "idempotency_key": None,
     }
 
@@ -234,11 +234,15 @@ def main() -> int:
     asyncio.run(_exercise_routes())
 
     main_source = (BACKEND / "main.py").read_text(encoding="utf-8-sig")
+    agent_source = (BACKEND / "agent.py").read_text(encoding="utf-8-sig")
     assert "app.include_router(agent_gateway_router)" in main_source
     assert "class ChatRequest" not in main_source
     assert "class ToolExecuteRequest" not in main_source
     assert 'content={"detail": f"Erreur interne : {exc}"}' not in main_source
     assert '"incident_id": incident_id' in main_source
+    assert 'source="agent_chat"' in agent_source
+    assert "execute_registered_tool=_execute_agent_tool" in agent_source
+    assert "execute_registered_tool=_execute_registered_tool" not in agent_source
 
     routes = {
         route.path
@@ -247,6 +251,9 @@ def main() -> int:
     assert routes == {
         "/api/chat",
         "/api/tools",
+        "/api/approvals/{approval_id}/approve",
+        "/api/approvals/{approval_id}/deny",
+        "/api/autonomy",
         "/api/tools/list",
         "/api/mcp/execute",
         "/api/mcp/config",

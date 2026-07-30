@@ -569,16 +569,9 @@ function detectTurnMode(toolInvocations, modelInfo) {
 // autonome (réutilisée par ToolCallInline ET par le calcul du repli) pour ne dupliquer
 // cette logique de détection nulle part.
 function toolNeedsAttention(tool) {
-  const toolName = tool.toolName || '';
-  if (!CRITICAL_TOOLS.includes(toolName)) return false;
   const state = tool.state || (tool.result !== undefined ? 'result' : 'pending');
-  if (state !== 'result' && state !== 'error' && (state === 'call' || state === 'pending')) return true;
   if (state === 'result' && tool.result) {
-    let resObj = tool.result;
-    if (typeof resObj === 'string') {
-      try { resObj = JSON.parse(resObj); } catch { return false; }
-    }
-    if (resObj && resObj.type === 'json' && resObj.value !== undefined) resObj = resObj.value;
+    const resObj = unwrapToolResult(tool.result);
     return !!(resObj && resObj.requiresConfirmation);
   }
   return false;
@@ -1532,24 +1525,14 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
   const isCodingMissionTool = ['code_workspace_start', 'code_workspace_status', 'code_workspace_control'].includes(toolName);
 
   // Déterminer si on doit afficher les boutons de confirmation
-  let hasPendingResultConfirmation = false;
-  if (state === 'result' && tool.result) {
-    let resObj = tool.result;
-    if (typeof resObj === 'string') {
-      try { resObj = JSON.parse(resObj); } catch {}
-    }
-    if (resObj && resObj.type === 'json' && resObj.value !== undefined) {
-      resObj = resObj.value;
-    }
-    if (resObj && resObj.requiresConfirmation) {
-      hasPendingResultConfirmation = true;
-    }
-  }
-
-  const needsConfirmation = isCritical && (
-    (state !== 'result' && state !== 'error' && (state === 'call' || state === 'pending')) ||
-    hasPendingResultConfirmation
+  const approvalResult = state === 'result' ? unwrapToolResult(tool.result) : null;
+  const hasPendingResultConfirmation = !!(
+    approvalResult
+    && typeof approvalResult === 'object'
+    && approvalResult.requiresConfirmation
   );
+
+  const needsConfirmation = hasPendingResultConfirmation;
 
   const statusLabel = hasPendingResultConfirmation ? '⏳ En attente de votre confirmation'
     : resultFailed ? '✕ Erreur'
@@ -1643,6 +1626,30 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
         </div>
       )}
 
+      {hasPendingResultConfirmation && (
+        <div
+          role="alertdialog"
+          aria-label="Confirmation requise"
+          style={{
+            marginTop: 10,
+            padding: '11px 12px',
+            borderRadius: 10,
+            border: '1px solid rgba(245,158,11,.36)',
+            background: 'rgba(245,158,11,.08)',
+          }}
+        >
+          <div style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+            Confirmation requise
+          </div>
+          <div style={{ marginTop: 4, color: 'var(--text-secondary)', fontSize: 12 }}>
+            {approvalResult.message || `Autoriser l’action « ${toolLabels[toolName] || prettyFallback(toolName)} » ?`}
+          </div>
+          <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: 10.5 }}>
+            Autorisation valable uniquement pour cet appel exact et pendant cinq minutes.
+          </div>
+        </div>
+      )}
+
       {/* Résultat structuré */}
       {tool.result !== undefined && !isCodingMissionTool && (
         <div style={{ marginTop: '8px' }}>
@@ -1666,7 +1673,11 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
       {needsConfirmation && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
           <button
-            onClick={() => onConfirm?.(tool.toolCallId, toolName, tool.args)}
+            disabled={hasPendingResultConfirmation && !approvalResult?.approvalId}
+            onClick={() => onConfirm?.(
+              tool.toolCallId,
+              approvalResult?.approvalId,
+            )}
             style={{
               padding: '8px 16px',
               background: 'var(--accent-gradient)',
@@ -1677,10 +1688,14 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
               display: 'flex', alignItems: 'center', gap: '6px',
             }}
           >
-            ✅ Confirmer l&apos;action
+            Oui, autoriser
           </button>
           <button
-            onClick={() => onCancel?.(tool.toolCallId)}
+            disabled={hasPendingResultConfirmation && !approvalResult?.approvalId}
+            onClick={() => onCancel?.(
+              tool.toolCallId,
+              approvalResult?.approvalId,
+            )}
             style={{
               padding: '8px 16px',
               background: 'var(--bg-tertiary)',
@@ -1690,7 +1705,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
               display: 'flex', alignItems: 'center', gap: '6px',
             }}
           >
-            ❌ Annuler
+            Non, refuser
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useOptionalChat } from '@/lib/contexts/ChatContext';
 import { openMicStream, createRecorder, startVAD as startVADShared } from '@/lib/voice/voiceRecorder';
 import { BACKEND_URL } from '@/lib/backend';
+import AutonomyControl from '@/components/chat/AutonomyControl';
 import CortexControl from '@/components/chat/CortexControl';
 
 export default function ChatInput({ input = '', setInput, handleInputChange, handleSubmit, isLoading, onStop, onImageAttach, messages = [], variant = 'dock' }) {
@@ -631,6 +632,8 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           disabled={isLoading}
           compact
         />
+
+        <AutonomyControl disabled={isLoading} />
 
         {isLoading && (
           <div

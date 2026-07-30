@@ -3039,7 +3039,7 @@ TOOLS_SPEC = [
        {}, []),
     _t("winget_list_installed", "Liste les logiciels INSTALLÉS sur le PC (filtrable par nom) — pour les voir/désinstaller.",
        {"query": {"type": "string", "description": "Filtre optionnel (nom partiel)"}}, []),
-    _t("winget_install", "Installe un logiciel en silencieux via Winget (demande confirmation).",
+    _t("winget_install", "Installe un logiciel en silencieux via Winget. Appelle directement cet outil quand le paquet est identifié : le gateway affiche lui-même la confirmation UI selon le mode actif, ne la demande pas en prose.",
        {"id":        {"type": "string",  "description": "ID exact du paquet (ex: 7zip.7zip) — préférable"},
         "query":     {"type": "string",  "description": "À défaut d'ID, nom approximatif (moins fiable)"},
         "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
