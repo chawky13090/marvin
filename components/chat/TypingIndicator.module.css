@@ -28,8 +28,8 @@
   place-items: center;
   flex: 0 0 auto;
   background: rgba(8, 12, 24, .78);
-  border: 1px solid rgba(79, 140, 255, .32);
-  box-shadow: 0 0 22px rgba(79, 140, 255, .16);
+  border: 1px solid var(--border-hover);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .04);
 }
 
 .avatar img {

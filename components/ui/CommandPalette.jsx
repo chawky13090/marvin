@@ -227,7 +227,7 @@ export default function CommandPalette() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '9px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                background: active === i ? 'rgba(79, 140, 255,0.12)' : 'transparent',
+                background: active === i ? 'rgba(255, 255, 255,0.07)' : 'transparent',
               }}
             >
               <span style={{ fontSize: 16, width: 22, display: 'grid', placeItems: 'center', flexShrink: 0 }}>

@@ -421,7 +421,7 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
                   alt={`Image ${idx + 1}`}
                   style={{
                     maxWidth: '240px', maxHeight: '180px', borderRadius: '10px',
-                    border: '1px solid rgba(79, 140, 255,0.2)', objectFit: 'cover',
+                    border: '1px solid var(--border-hover)', objectFit: 'cover',
                     cursor: 'pointer',
                   }}
                   onClick={() => window.open(src, '_blank')}
@@ -477,7 +477,7 @@ function BubbleWrapper({ isUser, children }) {
       <div className={`${styles.avatar} ${isUser ? styles.avatarUser : styles.avatarAssistant}`}
         style={!isUser ? {
           background: '#111',
-          border: '1px solid rgba(79, 140, 255,0.2)',
+          border: '1px solid var(--border-hover)',
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
@@ -1285,13 +1285,13 @@ function renderToolResult(toolName, result) {
       <div>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '10px' }}>
           <CircleGauge value={result.cpu_percent} label="CPU" size={90} />
-          <CircleGauge value={result.ram_percent} label="RAM" size={90} color="#38bdf8" />
+          <CircleGauge value={result.ram_percent} label="RAM" size={90} color="#b8bbc1" />
         </div>
         <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', marginBottom: '6px' }}>
           {result.os} · {result.hostname} · uptime {result.uptime}
         </div>
         {(result.disks || []).map((d, i) => (
-          <BarRow key={i} label={d.drive} used={d.total_gb - d.free_gb} total={d.total_gb} color={d.used_pct >= 90 ? '#ef4444' : '#4f8cff'} />
+          <BarRow key={i} label={d.drive} used={d.total_gb - d.free_gb} total={d.total_gb} color={d.used_pct >= 90 ? '#ef4444' : '#b8bbc1'} />
         ))}
         {result.alerts && result.alerts.length > 0 && (
           <div style={{ marginTop: '8px', color: 'var(--danger)', fontSize: 'var(--font-xs)' }}>

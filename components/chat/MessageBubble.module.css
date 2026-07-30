@@ -3,7 +3,7 @@
   gap: var(--space-sm);
   animation: slideUp 0.35s ease forwards;
   opacity: 0;
-  max-width: 85%;
+  max-width: min(88%, 920px);
 }
 
 .wrapperUser {
@@ -17,7 +17,7 @@
      ~65-72 caractères par ligne recommandés pour la lisibilité longue durée.
      min() garde 85% sur mobile/tablette et plafonne à une largeur de lecture
      confortable sur desktop. */
-  max-width: min(85%, 720px);
+  max-width: min(100%, 920px);
 }
 
 .avatar {
@@ -34,7 +34,7 @@
 
 .avatarUser {
   background: var(--accent-gradient);
-  box-shadow: var(--accent-glow);
+  box-shadow: none;
 }
 
 .avatarAssistant {
@@ -57,14 +57,12 @@
   background: var(--accent-gradient);
   color: white;
   border-bottom-right-radius: var(--radius-sm);
-  box-shadow: var(--accent-glow);
+  box-shadow: none;
 }
 
 .bubbleAssistant {
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.055);
   color: var(--text-primary);
   border-bottom-left-radius: var(--radius-sm);
 }

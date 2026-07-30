@@ -352,20 +352,15 @@ export default function ChatContainer({
       {/* Messages */}
       <div
         ref={scrollRef}
+        className="marvin-chat-scroll"
         data-active-conversation-id={conversationId || ''}
         data-live-conversation-id={liveConversationId || ''}
         data-chat-status={status}
         data-message-count={messages.length}
         onScroll={handleScroll}
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
+        style={{ flex: 1, overflowY: 'auto' }}
       >
+        <div className={`marvin-chat-stream${messages.length === 0 ? ' marvin-chat-stream--welcome' : ''}`}>
         {messages.length === 0 ? (
           <QuietWelcome
             greeting={getGreeting()}
@@ -464,6 +459,7 @@ export default function ChatContainer({
             </button>
           </div>
         )}
+        </div>
       </div>
 
       {isLoading && (

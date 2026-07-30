@@ -10,7 +10,7 @@
   background: linear-gradient(180deg, rgba(20,18,14,0.55), rgba(12,12,16,0.78));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(79, 140, 255,0.22);
+  border: 1px solid var(--border-hover);
   border-radius: 18px;
   padding: 8px 8px 8px 14px;
   transition: border-color .25s ease, box-shadow .35s ease, transform .2s ease;
@@ -21,14 +21,14 @@
 .inputContainer::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
-  background: linear-gradient(90deg, transparent, #4f8cff, #38bdf8, #4f8cff, transparent);
+  background: linear-gradient(90deg, transparent, #777a80, #b8bbc1, #777a80, transparent);
   background-size: 200% auto;
   opacity: .5;
   animation: holoShift 6s linear infinite;
 }
 .inputContainer:focus-within {
   border-color: rgba(56, 189, 248,0.5);
-  box-shadow: 0 0 0 2px rgba(79, 140, 255,0.10), 0 0 26px rgba(56, 189, 248,0.18), 0 10px 40px rgba(0,0,0,0.5);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.07), 0 10px 40px rgba(0,0,0,0.5);
   transform: translateY(-1px);
 }
 .inputContainer:focus-within::before { opacity: 1; }
@@ -76,9 +76,9 @@
 }
 
 .micBtn:hover {
-  color: #38bdf8;
-  background: rgba(79, 140, 255,0.12);
-  box-shadow: 0 0 12px rgba(79, 140, 255,0.18);
+  color: var(--accent-primary);
+  background: rgba(255,255,255,0.07);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
 }
 
 .sendBtn {
@@ -99,7 +99,7 @@
 
 .sendBtn:hover:not(:disabled) {
   transform: scale(1.08);
-  box-shadow: 0 0 20px rgba(79, 140, 255,0.45), 0 0 30px rgba(56, 189, 248,0.2);
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
 }
 
 .sendBtn:active:not(:disabled) {

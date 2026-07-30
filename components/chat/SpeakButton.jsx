@@ -43,18 +43,18 @@ export default function SpeakButton({ text, compact = false }) {
       title={active ? 'Arrêter la lecture' : 'Écouter la réponse'}
       style={{
         width: size, height: size, padding: 0,
-        border: '1px solid rgba(79, 140, 255,0.25)',
-        background: active ? 'rgba(79, 140, 255,0.18)' : 'transparent',
+        border: '1px solid var(--border-hover)',
+        background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
         borderRadius: '50%',
         cursor: 'pointer',
         fontSize: font,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        color: active ? '#4f8cff' : 'var(--text-muted)',
+        color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
         transition: 'all 0.15s',
         opacity: error ? 0.6 : 0.85,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = 'rgba(79, 140, 255,0.12)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.85; e.currentTarget.style.background = active ? 'rgba(79, 140, 255,0.18)' : 'transparent'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = 'rgba(255,255,255,0.065)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.85; e.currentTarget.style.background = active ? 'rgba(255,255,255,0.08)' : 'transparent'; }}
     >
       {error ? '⚠' : active ? '⏸' : '🔊'}
     </button>

@@ -99,5 +99,13 @@ assert.match(messageBubble, /<CortexTrace message=\{message\} compact \/>/);
 assert.match(messageBubbleCss, /\.responseMetaRow/);
 assert.match(historyPage, /Historique des discussions/);
 assert.match(historyPage, /toLocaleDateString\('fr-FR'/);
+assert.match(chatContainer, /className="marvin-chat-scroll"/);
+assert.match(chatContainer, /marvin-chat-stream/);
+assert.match(chatInput, /marvin-chat-input-shell/);
+assert.match(globalCss, /\.marvin-chat-stream\s*\{[\s\S]*?width:\s*min\(100%, 1120px\)[\s\S]*?margin-inline:\s*auto/);
+assert.match(globalCss, /\.marvin-chat-input-shell:not\(\.marvin-chat-input-shell--welcome\)[\s\S]*?1120px[\s\S]*?margin:/);
+assert.match(globalCss, /--bg-primary:\s*#0f0f10/);
+assert.match(globalCss, /--accent-primary:\s*#b8bbc1/);
+assert.doesNotMatch(globalCss, /#4f8cff|#38bdf8|rgba\(79,\s*140,\s*255/);
 
-console.log('UX design system: 77 assertions passed.');
+console.log('UX design system: 85 assertions passed.');

@@ -334,11 +334,11 @@ export default function ChatPage() {
 
   // Badge de performance / spécialité par modèle
   const getModelBadge = (modelName) => {
-    if (modelName === 'auto') return { label: '✨ Routing intelligent', color: '#4f8cff' };
+    if (modelName === 'auto') return { label: '✨ Routing intelligent', color: '#b8bbc1' };
     const lower = modelName.toLowerCase();
     if (lower.includes('llava') || lower.includes('vision') || lower.includes('minicpm')) return { label: '👁️ Vision', color: '#8b5cf6' };
     if (lower.includes('coder'))                 return { label: '💻 Code', color: '#06b6d4' };
-    if (lower.includes('qwen2.5:7b'))            return { label: '🤖 Agent IA ⭐', color: '#4f8cff' };
+    if (lower.includes('qwen2.5:7b'))            return { label: '🤖 Agent IA ⭐', color: '#b8bbc1' };
     if (lower.includes('qwen2.5:14b'))           return { label: '🔍 Analyse ⭐', color: '#f97316' };
     if (lower.includes('qwen2.5:3b'))            return { label: '⚡ Chat rapide', color: '#22c55e' };
     if (lower.includes(':1.5b') || lower.includes(':1b') || lower.includes(':0.5b')) return { label: '⚡ Ultra rapide', color: '#10b981' };
@@ -918,7 +918,7 @@ export default function ChatPage() {
         {conversationActionsHost && createPortal(
           <>
             <button className="conv-toggle" onClick={() => setShowConv(true)} aria-label="Conversations" title="Conversations"
-              style={{ background: 'rgba(79, 140, 255,0.12)', border: '1px solid rgba(79, 140, 255,0.3)', color: '#4f8cff',
+              style={{ background: 'rgba(255,255,255,0.055)', border: '1px solid var(--border-hover)', color: 'var(--accent-primary)',
                        borderRadius: 8, width: 32, height: 32, fontSize: 15, cursor: 'pointer', flexShrink: 0,
                        alignItems: 'center', justifyContent: 'center' }}>💬</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '7px', position: 'relative' }}>
@@ -969,15 +969,15 @@ export default function ChatPage() {
                         display: 'flex', width: '100%', textAlign: 'left',
                         alignItems: 'center', justifyContent: 'space-between',
                         padding: '8px 12px', border: 'none', borderRadius: '4px',
-                        background: isActive ? 'rgba(79, 140, 255,0.12)' : 'transparent',
+                        background: isActive ? 'rgba(255,255,255,0.07)' : 'transparent',
                         color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
                         cursor: 'pointer', fontSize: 'var(--font-xs)',
                         fontWeight: isActive ? 700 : 500,
                         borderBottom: '1px solid var(--border)',
                         marginBottom: '4px',
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79, 140, 255,0.08)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = isActive ? 'rgba(79, 140, 255,0.12)' : 'transparent'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = isActive ? 'rgba(255,255,255,0.07)' : 'transparent'}
                     >
                       <span>{isActive ? '✓ ' : '  '}🤖 Auto</span>
                       <span style={{ fontSize: '10px', color: badge.color, fontWeight: 600 }}>{badge.label}</span>

@@ -13381,3 +13381,41 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
   total déclaré 51, sans perte ni doublon.
 - Runtime : backend 2.507.0 et frontend HTTP 200.
 - Gate global rapide : 217/217 étapes réussies.
+
+## 2026-07-30 — v2.508 — Axe de lecture centré et palette anthracite
+
+### Demande et constats
+
+- Sur écran large, le flux de messages commençait au bord gauche tandis que la réponse
+  assistant restait plafonnée à 720 px, laissant une zone vide disproportionnée à droite.
+- Le design system et plusieurs menus du Chat utilisaient encore un bleu électrique très
+  présent dans les focus, sélections, fenêtres et halos.
+
+### Décision et réalisation
+
+- Un conteneur de conversation centré de 1 120 px réunit messages et résultats; la réponse
+  textuelle reste alignée à gauche et bornée à 920 px pour préserver une lecture confortable.
+- Le composeur utilise le même axe, sous forme de surface anthracite flottante; les marges
+  deviennent compactes sous 720 px.
+- Les tokens globaux passent à une gamme anthracite/gris. Menus de modèles, Cortex,
+  autonomie, palette de commandes, vocal, pièces jointes et indicateurs héritent des mêmes
+  surfaces neutres. Les couleurs sémantiques restent distinctes mais sont désaturées.
+
+### Sécurité, logs et rollback
+
+- Changement de présentation uniquement : aucun nouvel accès, privilège, flux réseau, secret,
+  traitement de donnée personnelle ou effet concurrent.
+- Aucun nouvel événement métier n'est nécessaire; les erreurs, confirmations et preuves
+  existantes restent inchangées.
+- Aucune migration ni donnée persistante. Rollback prévu par réversion atomique du commit
+  v2.508 puis redémarrage du frontend et du backend.
+
+### Validation réelle
+
+- Tests UX : 85 assertions réussies.
+- Tests de présentation Chat : 14 assertions et 4 assertions de suivi de mission réussies.
+- ESLint ciblé : 0 erreur; 1 avertissement historique `next/image` sur l'aperçu local.
+- Build Next.js 16.2.12 Turbopack : réussi, 12 pages statiques générées.
+- Gate global rapide : 217/217 étapes réussies.
+- Rendu Playwright réel validé en 1920 × 1080, 1280 × 900 et 390 × 844 sans débordement.
+- Runtime relancé : backend `2.508.0`, santé `ok`, Ollama disponible et frontend HTTP 200.

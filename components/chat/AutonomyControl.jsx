@@ -12,12 +12,12 @@ const MODES = {
   auto: {
     label: 'Auto',
     description: 'Les actions locales réversibles sont autorisées pendant une heure.',
-    color: '#60a5fa',
+    color: '#c2c4c9',
   },
   full: {
     label: 'Accès complet',
     description: 'Toutes les actions validées par le harness sont autorisées pendant une heure.',
-    color: '#c084fc',
+    color: '#dedfe2',
   },
 };
 
@@ -98,7 +98,7 @@ export default function AutonomyControl({ disabled = false }) {
           gap: 6,
           borderRadius: 999,
           border: `1px solid ${mode === 'normal' ? 'var(--border)' : 'color-mix(in srgb, currentColor 42%, transparent)'}`,
-          background: mode === 'normal' ? 'var(--bg-glass)' : 'rgba(79,140,255,.09)',
+          background: mode === 'normal' ? 'var(--bg-glass)' : 'rgba(255,255,255,.055)',
           color: definition.color,
           cursor: disabled || busy ? 'not-allowed' : 'pointer',
           fontSize: 11,
@@ -156,7 +156,7 @@ export default function AutonomyControl({ disabled = false }) {
                   display: 'block',
                   border: '1px solid transparent',
                   borderRadius: 9,
-                  background: mode === key ? 'rgba(79,140,255,.11)' : 'transparent',
+                  background: mode === key ? 'rgba(255,255,255,.07)' : 'transparent',
                   color: 'var(--text-primary)',
                   textAlign: 'left',
                   cursor: busy ? 'wait' : 'pointer',

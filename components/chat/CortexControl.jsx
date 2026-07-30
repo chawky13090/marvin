@@ -52,7 +52,7 @@ export default function CortexControl({
         style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 7, maxWidth: compact ? 170 : '100%',
           minHeight: compact ? 34 : undefined, padding: compact ? '5px 8px' : '6px 11px', borderRadius: 999,
           border: `1px solid ${explicitCount ? 'rgba(56,189,248,.48)' : 'var(--border)'}`,
-          background: explicitCount ? 'linear-gradient(90deg,rgba(79,140,255,.16),rgba(56,189,248,.10))' : 'var(--bg-glass)',
+          background: explicitCount ? 'rgba(255,255,255,.07)' : 'var(--bg-glass)',
           color: explicitCount ? '#7dd3fc' : 'var(--text-secondary)', cursor: disabled ? 'not-allowed' : 'pointer',
           fontSize: compact ? 11 : 12, fontWeight: 650, overflow: 'hidden' }}>
         <span aria-hidden>✦</span>
@@ -72,7 +72,7 @@ export default function CortexControl({
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 110 }} />
           <div className="cortex-control-popover" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 111, width: 'min(680px, calc(100vw - 48px))',
             maxHeight: 'min(620px, 72vh)', overflowY: 'auto', padding: 14, borderRadius: 16,
-            background: 'var(--bg-secondary)', border: '1px solid rgba(79,140,255,.35)', boxShadow: 'var(--shadow-lg)' }}>
+            background: 'var(--bg-secondary)', border: '1px solid var(--border-hover)', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
               <div><div style={{ fontWeight: 750, color: 'var(--text-primary)' }}>✦ Contrat de mission Cortex</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Marvin choisit automatiquement. Ne modifie que ce que tu veux imposer.</div></div>

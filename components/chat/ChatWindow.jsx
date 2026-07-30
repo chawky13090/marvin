@@ -46,7 +46,7 @@ export default function ChatWindow({
             </div>
             <h1 className={`${styles.welcomeTitle} holo-text`}>MARVIN</h1>
             <p className={styles.welcomeText}>
-              Bonjour ! Je suis <strong style={{ color: '#4f8cff' }}>Marvin</strong>, votre assistant informatique.
+              Bonjour ! Je suis <strong style={{ color: 'var(--accent-primary)' }}>Marvin</strong>, votre assistant informatique.
               Plus de 25 ans d&apos;expérience à votre service.
             </p>
             <div className={styles.welcomeSuggestions}>

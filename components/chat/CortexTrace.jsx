@@ -27,7 +27,7 @@ export default function CortexTrace({ message, compact = false }) {
       <button type="button" onClick={() => setOpen(v => !v)}
         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 999,
           border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.05)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10 }}>
-        <span style={{ color: '#38bdf8' }}>✦ Cortex</span>
+        <span style={{ color: 'var(--accent-primary)' }}>✦ Cortex</span>
         <span>{contract?.summary || 'Auto'}</span>
         {reviewed && <span title="Révision indépendante effectuée">· vérifié</span>}
         {tools.length > 0 && <span>· {tools.length} outil{tools.length > 1 ? 's' : ''}</span>}

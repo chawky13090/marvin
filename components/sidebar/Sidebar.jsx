@@ -333,8 +333,8 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
           style={{
             position: 'fixed', top: 8, left: 8, zIndex: 1002,
             width: 42, height: 42, borderRadius: 10,
-            background: 'rgba(13,13,13,0.92)', border: '1px solid rgba(79, 140, 255,0.3)',
-            color: '#4f8cff', fontSize: 20, cursor: 'pointer',
+            background: 'rgba(13,13,13,0.92)', border: '1px solid var(--border-hover)',
+            color: 'var(--accent-primary)', fontSize: 20, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             backdropFilter: 'blur(8px)',
           }}
@@ -426,7 +426,7 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
             style={{
               marginLeft: 'auto', width: 32, height: 32, flexShrink: 0,
               display: 'grid', placeItems: 'center', borderRadius: 8,
-              border: '1px solid var(--border)', background: pinned ? 'rgba(79,140,255,.1)' : 'transparent',
+              border: '1px solid var(--border)', background: pinned ? 'rgba(255,255,255,.06)' : 'transparent',
               color: pinned ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: 'pointer',
             }}
           >
@@ -467,7 +467,7 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
         overflowY: 'auto',
         overflowX: 'hidden',
         scrollbarWidth: 'thin',
-        scrollbarColor: 'rgba(79, 140, 255,0.2) transparent',
+        scrollbarColor: 'rgba(255,255,255,0.14) transparent',
       }}>
         {NAV_SECTIONS.map((section) => (
          <div key={section.title}>
@@ -494,13 +494,13 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
                   minHeight: '44px',
                   justifyContent: open ? 'flex-start' : 'center',
                   borderRadius: 'var(--radius-md)',
-                  color: isActive ? '#4f8cff' : 'var(--text-muted)',
-                  background: isActive ? 'rgba(79, 140, 255,0.07)' : 'transparent',
+                  color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  background: isActive ? 'rgba(255,255,255,0.055)' : 'transparent',
                   position: 'relative',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   overflow: 'hidden',
-                  border: isActive ? '1px solid rgba(79, 140, 255,0.15)' : '1px solid transparent',
+                  border: isActive ? '1px solid var(--border)' : '1px solid transparent',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -525,7 +525,7 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
                     width: '3px',
                     borderRadius: '0 3px 3px 0',
                     background: 'var(--accent-gradient)',
-                    boxShadow: '0 0 8px rgba(79, 140, 255,0.4)',
+                    boxShadow: '0 0 0 3px rgba(255,255,255,0.055)',
                   }} />
                 )}
                 <span style={{
@@ -548,8 +548,8 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
                         width: '10px',
                         height: '10px',
                         borderRadius: '50%',
-                        background: '#4f8cff',
-                        boxShadow: '0 0 8px #4f8cff, 0 0 14px #4f8cff80',
+                        background: 'var(--accent-primary)',
+                        boxShadow: '0 0 0 3px rgba(255,255,255,0.055)',
                         animation: 'pulse 1.4s ease-in-out infinite',
                         border: '2px solid #0d0d0d',
                       }}
@@ -571,7 +571,7 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
                   {item.href === '/' && chatStatus.isLoading && open && (
                     <span style={{
                       fontSize: '10px',
-                      color: '#4f8cff',
+                      color: 'var(--accent-primary)',
                       fontStyle: 'italic',
                       letterSpacing: '0.05em',
                     }}>

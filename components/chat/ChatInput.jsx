@@ -363,6 +363,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
 
   return (
     <form
+      className={`marvin-chat-input-shell${variant === 'welcome' ? ' marvin-chat-input-shell--welcome' : ''}`}
       onSubmit={doSubmit}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
@@ -380,7 +381,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
         <div style={{
           position: 'absolute', inset: 0, zIndex: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(79, 140, 255, 0.12)', backdropFilter: 'blur(2px)',
+          background: 'rgba(255, 255, 255, 0.055)', backdropFilter: 'blur(2px)',
           border: '2px dashed var(--accent-primary)', borderRadius: '16px', margin: '8px',
           pointerEvents: 'none',
         }}>
@@ -394,7 +395,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
       {attachedFiles.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
           {attachedFiles.map((f, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)' }}>
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-hover)' }}>
               <span style={{ fontSize: '1.1rem' }}>📎</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
@@ -442,15 +443,15 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           style={{
             display: 'flex', alignItems: 'center', gap: 8, minHeight: 34,
             marginBottom: 8, padding: '5px 8px 5px 10px',
-            border: '1px solid rgba(79,140,255,.22)', borderRadius: 10,
-            background: 'rgba(79,140,255,.055)', color: 'var(--text-secondary)',
+            border: '1px solid var(--border-hover)', borderRadius: 10,
+            background: 'rgba(255,255,255,.028)', color: 'var(--text-secondary)',
             fontSize: 11,
           }}
         >
           <span aria-hidden="true" style={{
             width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
             background: voiceCtx?.voiceError ? 'var(--warning)' : 'var(--accent-primary)',
-            boxShadow: voiceMode ? '0 0 8px rgba(79,140,255,.7)' : 'none',
+            boxShadow: voiceMode ? '0 0 0 3px rgba(255,255,255,.07)' : 'none',
           }} />
           <strong style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
             {isSpeaking ? 'Marvin parle' : voiceState === 'recording' ? 'Écoute en cours' : voiceCtx?.voiceError ? 'Voix indisponible' : 'Conversation vocale'}
@@ -490,7 +491,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
       }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = 'var(--border-focus)';
-        e.currentTarget.style.boxShadow = '0 0 0 3px hsla(262, 83%, 65%, 0.1)';
+        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255, 255, 255, 0.055)';
       }}
       onBlur={(e) => {
         e.currentTarget.style.borderColor = 'var(--border)';
@@ -516,8 +517,8 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
             title="Joindre ou insérer (image, document, compétence)"
             style={{
               width: '34px', height: '34px', borderRadius: '8px',
-              background: (attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'rgba(79, 140, 255,0.15)' : 'transparent',
-              border: `1px solid ${(attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'rgba(79, 140, 255,0.4)' : 'transparent'}`,
+              background: (attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'rgba(255,255,255,0.075)' : 'transparent',
+              border: `1px solid ${(attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'var(--border-hover)' : 'transparent'}`,
               color: (attachMenu || attachedImages.length > 0 || attachedFiles.length > 0) ? 'var(--accent-primary)' : 'var(--text-muted)',
               fontSize: '1.25rem', lineHeight: 1, cursor: (uploading || fileBusy) ? 'wait' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -647,8 +648,8 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
               maxWidth: 170,
               padding: '0 8px',
               borderRadius: 999,
-              border: '1px solid rgba(79,140,255,.24)',
-              background: 'rgba(79,140,255,.07)',
+              border: '1px solid var(--border-hover)',
+              background: 'rgba(255,255,255,.045)',
               color: 'var(--text-secondary)',
               display: 'inline-flex',
               alignItems: 'center',
@@ -680,7 +681,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
               background: voiceState === 'recording'
                 ? 'rgba(239,68,68,0.15)'
                 : voiceState === 'transcribing'
-                  ? 'rgba(79, 140, 255,0.1)'
+                  ? 'rgba(255,255,255,0.065)'
                   : 'transparent',
               borderStyle: 'solid',
               borderWidth: '1px 0 1px 1px',
@@ -741,14 +742,14 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 8px', fontWeight: 600, textTransform: 'uppercase' }}>Microphone</div>
                 <button type="button" onClick={() => { voiceCtx?.setMicDevice?.(''); setShowMicMenu(false); }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 8px', borderRadius: 6, border: 'none',
-                    background: !voiceCtx?.micDeviceId ? 'rgba(79, 140, 255,0.12)' : 'transparent',
+                    background: !voiceCtx?.micDeviceId ? 'rgba(255,255,255,0.07)' : 'transparent',
                     color: !voiceCtx?.micDeviceId ? 'var(--accent-primary)' : 'var(--text-primary)', cursor: 'pointer', fontSize: 12.5 }}>
                   {!voiceCtx?.micDeviceId ? '✓ ' : ''}🎙️ Micro par défaut du système
                 </button>
                 {(voiceCtx?.micDevices || []).map((d) => (
                   <button key={d.deviceId} type="button" onClick={() => { voiceCtx?.setMicDevice?.(d.deviceId); setShowMicMenu(false); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 8px', borderRadius: 6, border: 'none',
-                      background: voiceCtx?.micDeviceId === d.deviceId ? 'rgba(79, 140, 255,0.12)' : 'transparent',
+                      background: voiceCtx?.micDeviceId === d.deviceId ? 'rgba(255,255,255,0.07)' : 'transparent',
                       color: voiceCtx?.micDeviceId === d.deviceId ? 'var(--accent-primary)' : 'var(--text-primary)', cursor: 'pointer', fontSize: 12.5,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {voiceCtx?.micDeviceId === d.deviceId ? '✓ ' : ''}🎙️ {d.label}
@@ -779,13 +780,13 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
               : 'Activer le mode vocal — Marvin parlera ses réponses à voix haute.'}
             style={{
               width: '34px', height: '34px', borderRadius: '8px',
-              background: voiceMode ? 'rgba(79, 140, 255,0.18)' : 'transparent',
-              border: `1px solid ${voiceMode ? 'rgba(79, 140, 255,0.5)' : 'transparent'}`,
-              color: voiceMode ? '#4f8cff' : 'var(--text-muted)',
+              background: voiceMode ? 'rgba(255,255,255,0.085)' : 'transparent',
+              border: `1px solid ${voiceMode ? 'var(--border-hover)' : 'transparent'}`,
+              color: voiceMode ? 'var(--accent-primary)' : 'var(--text-muted)',
               fontSize: '1rem', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.2s', flexShrink: 0,
-              boxShadow: voiceMode ? '0 0 8px rgba(79, 140, 255,0.3)' : 'none',
+              boxShadow: voiceMode ? '0 0 0 3px rgba(255,255,255,0.055)' : 'none',
             }}
             onMouseEnter={(e) => { if (!voiceMode) e.currentTarget.style.color = 'var(--accent-primary)'; }}
             onMouseLeave={(e) => { if (!voiceMode) e.currentTarget.style.color = 'var(--text-muted)'; }}
@@ -840,7 +841,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
                   {voiceCtx.voiceList.map(v => (
                     <button key={v.key} type="button" onClick={() => { voiceCtx.setVoice(v.key); setShowVoiceMenu(false); }}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 8px', borderRadius: 6, border: 'none',
-                        background: voiceCtx.currentVoice === v.key ? 'rgba(79, 140, 255,0.12)' : 'transparent',
+                        background: voiceCtx.currentVoice === v.key ? 'rgba(255,255,255,0.07)' : 'transparent',
                         color: voiceCtx.currentVoice === v.key ? 'var(--accent-primary)' : 'var(--text-primary)', cursor: 'pointer', fontSize: 12.5,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {voiceCtx.currentVoice === v.key ? '✓ ' : ''}🔊 {v.label?.split('(')[0]?.trim() || v.key}

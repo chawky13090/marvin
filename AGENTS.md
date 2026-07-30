@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.507.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.508.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.507.0)
+## 9. État actuel (v2.508.0)
+
+**v2.508 (lecture centrée et palette anthracite)** : le flux de conversation et le composeur
+partagent un axe centré de 1 120 px, avec une largeur de lecture bornée à 920 px pour les
+réponses et la largeur utile conservée pour les résultats riches. Les paragraphes restent
+alignés à gauche. Le design system remplace le bleu électrique par une gamme anthracite et
+gris neutre appliquée aux surfaces, fenêtres, menus, focus et états actifs; les couleurs
+sémantiques succès, avertissement et erreur restent visibles mais désaturées. Les écrans
+mobiles conservent des marges compactes. Rollback : réversion atomique du commit v2.508,
+sans migration ni modification de donnée.
 
 **v2.507 (listes de fichiers complètes)** : `file_list` expose une pagination explicite
 (`offset`, `limit`, `total_count`, `has_more`, `next_offset`). Quand l'utilisateur demande

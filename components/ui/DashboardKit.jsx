@@ -11,7 +11,7 @@
 // `invert` : pour une jauge où un pourcentage ÉLEVÉ est BON (ex. score de santé),
 // inverse le seuil de couleur (par défaut : haut = mauvais, ex. usage CPU/RAM/disque).
 // `suffix` : texte après la valeur ("%" par défaut, mettre "/100" pour un score).
-export function CircleGauge({ value, max = 100, label, color = '#4f8cff', size = 120, invert = false, suffix = '%' }) {
+export function CircleGauge({ value, max = 100, label, color = '#b8bbc1', size = 120, invert = false, suffix = '%' }) {
   const radius = 44;
   const circumference = 2 * Math.PI * radius;
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -45,7 +45,7 @@ export function CircleGauge({ value, max = 100, label, color = '#4f8cff', size =
 }
 
 // ── Barre horizontale (ex: usage disque) ───────────────────────────────────
-export function BarRow({ label, used, total, color = '#4f8cff' }) {
+export function BarRow({ label, used, total, color = '#b8bbc1' }) {
   const pct = total > 0 ? Math.round((used / total) * 100) : 0;
   const barColor = pct > 85 ? '#ef4444' : pct > 65 ? '#f97316' : color;
   return (
@@ -89,7 +89,7 @@ export function StatCard({ label, value, unit = '', color = 'var(--text-secondar
 }
 
 // ── Historique mini-graphe (sparkline) ──────────────────────────────────────
-export function Sparkline({ data, color = '#4f8cff', height = 40, width = 160 }) {
+export function Sparkline({ data, color = '#b8bbc1', height = 40, width = 160 }) {
   if (!data || data.length < 2) return null;
   const max = Math.max(...data, 1);
   const points = data.map((v, i) => {

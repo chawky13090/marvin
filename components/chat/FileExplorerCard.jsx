@@ -63,7 +63,7 @@ function Toast({ message, type = 'info' }) {
   const colors = {
     success: { bg: 'rgba(34,197,94,0.12)',  border: '#22c55e', text: '#4ade80' },
     error:   { bg: 'rgba(239,68,68,0.12)',  border: '#ef4444', text: '#f87171' },
-    info:    { bg: 'rgba(79, 140, 255,0.12)', border: '#4f8cff', text: '#4f8cff' },
+    info:    { bg: 'rgba(255,255,255,0.055)', border: '#8f9299', text: '#c7c9ce' },
   }[type] || { bg: '#222', border: '#444', text: '#fff' };
   return (
     <div style={{
@@ -189,7 +189,7 @@ function FileRow({ item, onOpenInChat, depth = 0 }) {
           transition: 'all 0.15s',
           fontSize: '12px',
         }}
-        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79, 140, 255,0.06)'}
+        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.045)'}
         onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
       >
         <span style={{ fontSize: '14px', flexShrink: 0, width: '14px', textAlign: 'center' }}>
@@ -288,7 +288,7 @@ function ActionBtn({ title, onClick, children }) {
         opacity: 0.7,
         transition: 'all 0.15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = 'rgba(79, 140, 255,0.15)'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = 'rgba(255,255,255,0.075)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.7; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
     >
       {children}

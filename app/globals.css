@@ -6,40 +6,40 @@
 /* ── CSS Custom Properties ──────────────────────────────── */
 :root {
   /* Backgrounds — graphite neutre (pas de teinte chaude) */
-  --bg-primary:     #0a0a0d;
-  --bg-secondary:   #101116;
-  --bg-tertiary:    #16171d;
-  --bg-glass:       rgba(16, 17, 22, 0.86);
-  --bg-glass-hover: rgba(22, 23, 29, 0.92);
-  --bg-glass-active:rgba(27, 28, 35, 0.95);
+  --bg-primary:      #0f0f10;
+  --bg-secondary:    #141415;
+  --bg-tertiary:     #1b1b1d;
+  --bg-glass:        rgba(22, 22, 24, 0.92);
+  --bg-glass-hover:  rgba(30, 30, 32, 0.96);
+  --bg-glass-active: rgba(38, 38, 40, 0.98);
 
   /* Accents — bleu électrique / cyan (outil pro, pas d'or ni de mystique) */
-  --accent-primary:        #4f8cff;
-  --accent-primary-hover:  #6ea1ff;
-  --accent-secondary:      #38bdf8;
-  --accent-gradient:       linear-gradient(135deg, #4f8cff, #38bdf8);
-  --accent-gradient-hover: linear-gradient(135deg, #6ea1ff, #5fcdf9);
-  --accent-glow:           0 0 20px rgba(79, 140, 255, 0.20);
+  --accent-primary:        #b8bbc1;
+  --accent-primary-hover:  #e0e1e4;
+  --accent-secondary:      #969aa2;
+  --accent-gradient:       linear-gradient(135deg, #44464a, #565960);
+  --accent-gradient-hover: linear-gradient(135deg, #505257, #666970);
+  --accent-glow:           0 0 0 1px rgba(255, 255, 255, 0.06);
 
   /* Text */
-  --text-primary:   #e4e4e7;
-  --text-secondary: #a1a1aa;
-  --text-muted:     #858792;
+  --text-primary:   #ededee;
+  --text-secondary: #b2b2b6;
+  --text-muted:     #818187;
 
   /* Borders — neutres */
-  --border:       rgba(228, 228, 231, 0.08);
-  --border-hover: rgba(228, 228, 231, 0.16);
-  --border-focus: rgba(79, 140, 255, 0.5);
+  --border:       rgba(255, 255, 255, 0.075);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --border-focus: rgba(235, 235, 238, 0.34);
 
   /* Status */
-  --success:    hsl(142, 60%, 42%);
-  --success-bg: hsla(142, 60%, 42%, 0.1);
-  --warning:    hsl(38, 85%, 50%);
-  --warning-bg: hsla(38, 85%, 50%, 0.1);
-  --danger:     hsl(0, 72%, 55%);
-  --danger-bg:  hsla(0, 72%, 55%, 0.1);
-  --info:       hsl(210, 70%, 55%);
-  --info-bg:    hsla(210, 70%, 55%, 0.1);
+  --success:    hsl(142, 34%, 53%);
+  --success-bg: hsla(142, 34%, 53%, 0.1);
+  --warning:    hsl(38, 58%, 58%);
+  --warning-bg: hsla(38, 58%, 58%, 0.1);
+  --danger:     hsl(0, 52%, 62%);
+  --danger-bg:  hsla(0, 52%, 62%, 0.1);
+  --info:       #aeb2ba;
+  --info-bg:    rgba(174, 178, 186, 0.1);
 
   /* Spacing — échelle Fibonacci */
   --fib-1: 3px;
@@ -76,7 +76,7 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.7);
-  --shadow-glow: 0 0 26px rgba(79, 140, 255, 0.14);
+  --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.055);
 
   /* Typography */
   --font-family: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -129,7 +129,7 @@ img { max-width: 100%; display: block; }
 .conversation-row:focus-within { background: rgba(255,255,255,.035); }
 .conversation-row-active {
   border-left-color: var(--accent-primary);
-  background: rgba(79,140,255,.09);
+  background: rgba(255,255,255,.055);
   color: var(--text-primary);
 }
 .conversation-row-main {
@@ -225,17 +225,17 @@ img { max-width: 100%; display: block; }
 :where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--accent-primary-hover);
   outline-offset: 3px;
-  box-shadow: 0 0 0 5px rgba(79, 140, 255, 0.18);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.08);
 }
 
 /* ── Scrollbar ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(79, 140, 255, 0.25);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-full);
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(79, 140, 255, 0.45); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
 
 /* ── Layout ─────────────────────────────────────────────── */
 .app-layout {
@@ -360,10 +360,10 @@ img { max-width: 100%; display: block; }
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(79, 140, 255, .18);
+  border: 1px solid rgba(255, 255, 255, .12);
   border-radius: 9px;
   color: var(--text-primary);
-  background: rgba(79, 140, 255, .08);
+  background: rgba(255, 255, 255, .05);
   cursor: pointer;
   font-size: 11px;
 }
@@ -380,7 +380,7 @@ img { max-width: 100%; display: block; }
 
 .navigation-mode-scope button[aria-pressed="true"] {
   color: var(--text-primary);
-  background: rgba(79, 140, 255, .14);
+  background: rgba(255, 255, 255, .09);
 }
 
 .navigation-mode-options {
@@ -405,8 +405,8 @@ img { max-width: 100%; display: block; }
 
 .navigation-mode-options > button:hover,
 .navigation-mode-options > button[aria-pressed="true"] {
-  border-color: rgba(79, 140, 255, .18);
-  background: rgba(79, 140, 255, .08);
+  border-color: rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .055);
 }
 
 .navigation-mode-options strong,
@@ -532,7 +532,7 @@ img { max-width: 100%; display: block; }
 
 .context-bar__status--active .context-bar__status-dot {
   background: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(79, 140, 255, .12);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .07);
   animation: contextStatusPulse 1.5s ease-in-out infinite;
 }
 
@@ -672,8 +672,8 @@ img { max-width: 100%; display: block; }
 
 .adaptive-nav__link[aria-current="page"] {
   color: var(--accent-primary);
-  border-color: rgba(79, 140, 255, .18);
-  background: rgba(79, 140, 255, .08);
+  border-color: rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .055);
 }
 
 .adaptive-nav__link span {
@@ -748,7 +748,7 @@ img { max-width: 100%; display: block; }
 }
 .btn-primary:hover {
   background: var(--accent-gradient-hover);
-  box-shadow: 0 0 30px rgba(79, 140, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
   transform: translateY(-1px);
 }
 .btn-primary:active { transform: translateY(0); }
@@ -806,7 +806,7 @@ img { max-width: 100%; display: block; }
 
 .input:focus, .textarea:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.055);
 }
 
 .input::placeholder, .textarea::placeholder {
@@ -1117,7 +1117,7 @@ img { max-width: 100%; display: block; }
 
 .search-bar input:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.055);
 }
 
 .search-bar-icon {
@@ -1152,7 +1152,7 @@ img { max-width: 100%; display: block; }
 
 .fab:hover {
   transform: scale(1.1) translateY(-2px);
-  box-shadow: var(--shadow-lg), 0 0 40px rgba(79, 140, 255, 0.35);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 /* ── Loading Skeleton ───────────────────────────────────── */
@@ -1279,6 +1279,50 @@ img { max-width: 100%; display: block; }
   }
 }
 
+/* Axe de lecture commun : la colonne est centrée, le texte reste aligné à
+   gauche et les résultats riches disposent de toute la largeur utile. */
+.marvin-chat-scroll {
+  scrollbar-gutter: stable;
+}
+
+.marvin-chat-stream {
+  width: min(100%, 1120px);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: 24px clamp(18px, 3vw, 42px) 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.marvin-chat-stream--welcome {
+  width: 100%;
+  padding: 0;
+}
+
+.marvin-chat-input-shell:not(.marvin-chat-input-shell--welcome) {
+  width: min(calc(100% - 32px), 1120px);
+  margin: 0 auto 16px;
+  padding: 12px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px;
+  background: rgba(20, 20, 21, 0.96) !important;
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.26);
+}
+
+@media (max-width: 720px) {
+  .marvin-chat-stream {
+    padding: 16px 12px 24px;
+  }
+
+  .marvin-chat-input-shell:not(.marvin-chat-input-shell--welcome) {
+    width: calc(100% - 16px);
+    margin-bottom: 8px;
+    padding: 8px !important;
+    border-radius: 14px;
+  }
+}
+
 @media (max-width: 480px) {
   .marvin-chat-composer {
     flex-wrap: wrap;
@@ -1348,7 +1392,7 @@ img { max-width: 100%; display: block; }
    on les garde, mais recentrées sur un rendu calme et net.
    ════════════════════════════════════════════════════════════════ */
 :root {
-  --neon-cyan:     #38bdf8;
+  --neon-cyan:     #b8bbc1;
   --neon-cyan-dim: #0e7490;
 }
 
