@@ -17,7 +17,7 @@ from lan_access import (
     SESSION_COOKIE,
     LanAccessError,
     effective_client,
-    is_loopback,
+    is_local_client,
     required_capability,
 )
 
@@ -110,8 +110,9 @@ async def lan_status(request: Request, response: Response):
     headers = {key.casefold(): value for key, value in request.headers.items()}
     client = effective_client(request.client.host if request.client else "", headers)
     session = ACCESS.authenticated(headers, client=client)
-    authenticated = is_loopback(client) or session is not None
-    if is_loopback(client) and session is None:
+    local_client = is_local_client(client)
+    authenticated = local_client or session is not None
+    if local_client and session is None:
         token, csrf = ACCESS.issue(client)
         _set_session_cookies(
             response,
@@ -120,16 +121,16 @@ async def lan_status(request: Request, response: Response):
             secure=request.url.scheme == "https",
         )
     result = {
-        "required": not is_loopback(client),
+        "required": not local_client,
         "authenticated": authenticated,
         "transport_secure": request.url.scheme == "https",
     }
     if session is not None:
         result["access_profile"] = session["profile"]
-    if is_loopback(client):
+    if local_client:
         result["pairing_code"] = ACCESS.pairing_code
         result["pairing_expires_in_seconds"] = 300 if ACCESS.pairing_code else 0
-    if is_loopback(client) or session is not None:
+    if local_client or session is not None:
         result["https"] = _https_status()
     return result
 
@@ -138,7 +139,7 @@ async def lan_status(request: Request, response: Response):
 async def regenerate_pairing_code(request: Request):
     headers = {key.casefold(): value for key, value in request.headers.items()}
     client = effective_client(request.client.host if request.client else "", headers)
-    if not is_loopback(client):
+    if not is_local_client(client):
         raise HTTPException(status_code=403, detail="Action réservée au PC principal.")
     code = ACCESS.regenerate_pairing_code()
     _audit_pair(True, error_code="pairing_code_regenerated")

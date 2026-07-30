@@ -13822,6 +13822,44 @@ vider `agent_autonomy.AUTO_MODE_EXCLUDED_TOOLS` restaure le comportement antéri
 `auto`; retirer les six noms de `agent_tool_batch._UNTRUSTED_WEB_TOOLS` désactive le rappel
 de contexte.
 
+## 2026-07-30 — v2.518 — Poste principal DHCP et diagnostic de jumelage
+
+### Incident et cause
+
+- Le frontend restait actif sur 3000 alors que le backend 8005 avait été arrêté explicitement
+  par `Stop-Process`. `LanAccessGate` transformait toute erreur réseau en
+  `required=true`, donc affichait un code de jumelage incapable de résoudre la panne.
+- Un accès du PC principal par sa propre adresse LAN était traité comme distant. Un changement
+  DHCP pouvait aussi invalider un ancien cookie lié à l'adresse cliente.
+
+### Correction
+
+- Une erreur réseau ou un statut backend non réussi ouvre un état distinct
+  `backendUnavailable` avec bouton de nouvelle vérification; aucun champ de jumelage.
+- `local_interface_addresses()` résout les IPv4/IPv6 actuelles du serveur à chaque décision.
+  `is_local_client()` accepte uniquement loopback ou une de ces adresses numériques.
+- L'API de statut, la régénération du code et le middleware partagent cette décision.
+- La dernière adresse de `X-Forwarded-For` est utilisée derrière le proxy local, empêchant
+  une adresse initiale injectée par le navigateur de simuler le PC principal.
+
+### Sécurité, logs et rollback
+
+- Les clients distants conservent le jumelage, la session signée, le profil d'accès, le CSRF
+  et les contrôles d'origine. Aucun `Host` HTTP n'est utilisé comme preuve locale.
+- Aucune nouvelle donnée personnelle ou secrète n'est journalisée.
+- Aucune migration. Rollback : réversion atomique du commit v2.518 et redémarrage des deux
+  services.
+
+### Validation réelle
+
+- Tests LAN et API LAN : réussis, y compris CSRF, origine, expiration, profils et WebSocket.
+- Garde-fous de consolidation des skills v2.517 : toujours réussis.
+- Build Next.js 16.2.12 Turbopack à froid : réussi.
+- Backend 2.518.0 et frontend HTTP 200 après redémarrage.
+- Statut réel : loopback `required=false`, adresse DHCP locale `192.168.1.29`
+  `required=false`, client distant `192.168.1.50` `required=true`.
+- Chaîne falsifiée `192.168.1.29, 192.168.1.50` : `required=true`.
+
 ## 2026-07-30 — v2.517 — Garde-fous de la consolidation automatique des compétences
 
 > Tranche réalisée par **Claude Code**, sur demande de l'utilisateur après vérification

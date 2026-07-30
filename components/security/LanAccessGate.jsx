@@ -5,7 +5,12 @@ import { BACKEND_URL } from '@/lib/backend';
 
 
 export default function LanAccessGate({ children }) {
-  const [state, setState] = useState({ loading: true, required: false, authenticated: false });
+  const [state, setState] = useState({
+    loading: true,
+    required: false,
+    authenticated: false,
+    backendUnavailable: false,
+  });
   const [code, setCode] = useState('');
   const [accessProfile, setAccessProfile] = useState('standard');
   const [error, setError] = useState('');
@@ -17,10 +22,17 @@ export default function LanAccessGate({ children }) {
         cache: 'no-store',
         signal: AbortSignal.timeout(8000),
       });
+      if (!response.ok) throw new Error('backend_status_unavailable');
       const data = await response.json();
-      setState({ loading: false, ...data });
+      setState({ loading: false, backendUnavailable: false, ...data });
+      setError('');
     } catch {
-      setState({ loading: false, required: true, authenticated: false });
+      setState({
+        loading: false,
+        required: false,
+        authenticated: false,
+        backendUnavailable: true,
+      });
       setError('Le backend Marvin ne répond pas.');
     }
   }, []);
@@ -57,6 +69,24 @@ export default function LanAccessGate({ children }) {
     return (
       <div className="lan-access-shell">
         <div className="lan-access-card">Vérification de l’accès Marvin…</div>
+      </div>
+    );
+  }
+  if (state.backendUnavailable) {
+    return (
+      <div className="lan-access-shell">
+        <div className="lan-access-card">
+          <div className="lan-access-mark">M</div>
+          <h1>Marvin doit redémarrer</h1>
+          <p>
+            L’interface est disponible, mais le backend du PC principal ne répond pas.
+            Aucun code de jumelage ne peut corriger cette panne.
+          </p>
+          {error && <div className="lan-access-error">{error}</div>}
+          <button type="button" onClick={refresh}>
+            Réessayer la connexion
+          </button>
+        </div>
       </div>
     );
   }

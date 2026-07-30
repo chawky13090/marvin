@@ -8,6 +8,7 @@ import hmac
 import json
 import ipaddress
 import secrets
+import socket
 import threading
 import time
 from collections import defaultdict, deque
@@ -73,12 +74,54 @@ def is_loopback(host: str | None) -> bool:
     return str(host or "").split("%", 1)[0] in {"127.0.0.1", "::1"}
 
 
+def local_interface_addresses() -> frozenset[str]:
+    """Résout les adresses courantes du PC, y compris après un renouvellement DHCP."""
+    addresses = {"127.0.0.1", "::1"}
+    try:
+        records = socket.getaddrinfo(
+            socket.gethostname(),
+            None,
+            family=socket.AF_UNSPEC,
+            type=socket.SOCK_STREAM,
+        )
+    except OSError:
+        records = []
+    for record in records:
+        try:
+            addresses.add(
+                str(ipaddress.ip_address(str(record[4][0]).split("%", 1)[0]))
+            )
+        except (ValueError, TypeError, IndexError):
+            continue
+    return frozenset(addresses)
+
+
+def is_local_client(
+    host: str | None,
+    *,
+    local_addresses: frozenset[str] | set[str] | None = None,
+) -> bool:
+    """Reconnaît loopback et les interfaces du PC principal sans faire confiance au Host."""
+    candidate = str(host or "").split("%", 1)[0]
+    try:
+        normalized = str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return False
+    return normalized in (
+        frozenset(local_addresses)
+        if local_addresses is not None
+        else local_interface_addresses()
+    )
+
+
 def effective_client(host: str | None, headers: dict[str, str]) -> str:
     """Résout le client transmis uniquement par la passerelle locale de confiance."""
     direct = str(host or "")
     if not is_loopback(direct):
         return direct
-    forwarded = str(headers.get("x-forwarded-for") or "").split(",", 1)[0].strip()
+    # La passerelle locale ajoute l'adresse réellement observée en fin de chaîne.
+    # Prendre le premier élément ferait confiance à une valeur injectée par le client.
+    forwarded = str(headers.get("x-forwarded-for") or "").rsplit(",", 1)[-1].strip()
     if not forwarded:
         return direct
     try:
@@ -341,7 +384,7 @@ class LanAccessMiddleware:
             headers,
         )
         session = self.manager.authenticated(headers, client=client)
-        if not is_loopback(client) and session is None:
+        if not is_local_client(client) and session is None:
             await self._reject(scope, receive, send, 401, "lan_authentication_required")
             return
         if session is not None:

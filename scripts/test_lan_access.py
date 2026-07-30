@@ -18,6 +18,9 @@ from lan_access import (
     LanAccessManager,
     LanAccessMiddleware,
     PAIR_CODE_SECONDS,
+    effective_client,
+    is_local_client,
+    is_loopback,
 )
 
 
@@ -72,6 +75,24 @@ def main() -> int:
             await send({"type": "http.response.body", "body": b"ok"})
 
     middleware = LanAccessMiddleware(app, manager=manager)
+    current_addresses = {"127.0.0.1", "::1", "192.168.1.29"}
+    assert is_loopback("127.0.0.1") is True
+    assert is_local_client(
+        "192.168.1.29",
+        local_addresses=current_addresses,
+    ) is True
+    assert is_local_client(
+        "192.168.1.50",
+        local_addresses=current_addresses,
+    ) is False
+    assert effective_client(
+        "127.0.0.1",
+        {"x-forwarded-for": "192.168.1.29"},
+    ) == "192.168.1.29"
+    assert effective_client(
+        "127.0.0.1",
+        {"x-forwarded-for": "192.168.1.29, 192.168.1.50"},
+    ) == "192.168.1.50"
     assert _status(asyncio.run(_request(middleware, client="127.0.0.1"))) == 200
     assert _status(asyncio.run(_request(middleware, client="192.168.1.50"))) == 401
 

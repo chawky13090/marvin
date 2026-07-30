@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.517.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.518.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.517.0)
+## 9. État actuel (v2.518.0)
+
+**v2.518 (poste principal DHCP et diagnostic de jumelage)** : une panne du backend ne produit
+plus un faux formulaire de jumelage; l'interface affiche explicitement que Marvin doit
+redémarrer et propose une nouvelle vérification. Le backend reconnaît le PC principal par
+loopback ou par l'une de ses adresses d'interface résolues dynamiquement, ce qui couvre un
+renouvellement DHCP et l'accès du serveur à sa propre adresse LAN. Les autres machines
+restent soumises au cookie signé et au code temporaire. Derrière la passerelle locale,
+`X-Forwarded-For` utilise l'adresse ajoutée en dernier par le proxy plutôt qu'une première
+valeur contrôlable par le client. Aucun port, privilège, secret, schéma ou donnée persistante
+n'est modifié. Rollback : réversion atomique du commit v2.518 puis redémarrage backend/frontend.
 
 **v2.517 (garde-fous de la consolidation automatique)** — *tranche livrée par Claude Code.*
 `skill_night_learning_worker` appelait `review_and_consolidate_learnings` toutes les 25 min
