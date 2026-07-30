@@ -296,6 +296,25 @@ async def execute_tool_endpoint(
     return _tool_outcome_response(outcome)
 
 
+@router.get("/api/approvals/{approval_id}")
+async def get_tool_approval_endpoint(approval_id: UUID):
+    approval = tool_approvals.resolve_status(str(approval_id))
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Demande d'approbation introuvable.")
+    reason = str(approval.get("decision_reason") or "")
+    public_status = (
+        "superseded"
+        if approval.get("status") == "expired" and reason == "superseded"
+        else approval.get("status")
+    )
+    return {
+        "approvalId": str(approval_id),
+        "status": public_status,
+        "active": public_status == "pending",
+        "expiresAt": approval.get("expires_at"),
+    }
+
+
 @router.post("/api/approvals/{approval_id}/approve", responses=IDEMPOTENCY_RESPONSES)
 async def approve_tool_endpoint(
     approval_id: UUID,

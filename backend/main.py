@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.522 — approbations historiques fail-closed et obsolescence par conversation
 # v2.521 — lancement Windows vérifié et adaptateur Tailscale
 # v2.518 — poste principal DHCP et panne backend distinguée du jumelage
 # v2.519 — filtrage fail-closed, dédup sémantique et commandes sensibles confirmées

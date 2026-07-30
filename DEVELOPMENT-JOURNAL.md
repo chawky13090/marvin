@@ -14148,3 +14148,54 @@ puis redémarrage du backend. L'ancien lanceur est alors restauré.
 - backend v2.521.0 sain, 357 outils, Ollama disponible et frontend HTTP 200.
 - `check:quick` : 224/224 étapes réussies ; ESLint conserve 35 avertissements
   préexistants et ne rapporte aucune erreur.
+
+## 2026-07-31 — v2.522 — Approbations historiques fail-closed
+
+### Demande et cause racine
+
+Après le refus d'une action récente, une ancienne carte PowerShell affichait toujours
+« Oui, autoriser ». La base savait refuser ou expirer une demande, mais le résultat
+historique persisté dans le message restait `requiresConfirmation=true`. Le frontend ne
+relisait jamais l'état serveur de cet identifiant. Une carte obsolète pouvait donc polluer
+le chat et tenter un rejeu ; le backend refusait les statuts déjà finaux, mais l'interface
+restait trompeuse.
+
+### Correction
+
+- une seule approbation peut rester active par conversation ;
+- une nouvelle demande obsolétise atomiquement les précédentes et efface leurs arguments ;
+- consultation et `claim` recalculent aussi l'obsolescence pour les données historiques ;
+- le refus d'une demande neutralise les demandes plus anciennes de la conversation ;
+- `GET /api/approvals/{approval_id}` expose uniquement état, activité et expiration ;
+- chaque carte recharge cet état au montage, au focus, toutes les quinze secondes et après
+  toute décision locale ;
+- les boutons sont fail-closed pendant la vérification ou en cas d'indisponibilité ;
+- les états finaux sont compacts et lisibles, sans conserver une invitation cliquable.
+
+Cette conception suit les recommandations OWASP : autorisation unique par opération,
+transition d'état contrôlée et validation finale côté serveur.
+
+### Sécurité, logs et rollback
+
+L'endpoint de statut ne retourne ni outil, ni arguments, ni digest. Les identifiants restent
+des UUID non prédictibles et l'autorisation d'exécution reste liée au digest exact. Les
+arguments sont effacés dès refus, expiration, remplacement ou fin d'exécution. Aucun nouveau
+contenu n'est journalisé. La concurrence est traitée par des mises à jour SQLite
+conditionnelles ; un vieux client ne peut pas réactiver une demande finale.
+
+Aucune migration de schéma ni donnée métier. Rollback : réversion atomique du commit v2.522
+puis redémarrage backend/frontend. Les lignes déjà marquées `expired/superseded` restent
+finales, ce qui est le comportement sûr.
+
+### Validation réelle
+
+- tests repository : usage unique, refus, expiration, remplacement et rejeu hérités réussis ;
+- API Gateway : route de statut, projection `superseded` et inventaire des routes réussis ;
+- UI : sept invariants fail-closed réussis ;
+- Chat Presentation : 14 assertions réussies ;
+- UX design system : 85 assertions réussies ;
+- architecture : 357 outils, harness 357/357, 376 routes et 41 pages ;
+- backend v2.522.0 sain, frontend HTTP 200 et Ollama disponible ;
+- conversation réelle de la capture rechargée dans le navigateur : zéro bouton
+  `Oui, autoriser`, anciennes cartes non cliquables et état final lisible.
+- `check:quick` : 225/225 étapes réussies, incluant compilation backend et qualité frontend.

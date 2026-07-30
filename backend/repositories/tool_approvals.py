@@ -88,6 +88,15 @@ class ToolApprovalRepository:
                    WHERE status = 'pending' AND expires_at <= ?""",
                 (now,),
             )
+            if conversation_id:
+                connection.execute(
+                    """UPDATE tool_approval_requests
+                       SET status = 'expired', decided_at = datetime('now'),
+                           decision_reason = 'superseded', arguments_json = '{}'
+                       WHERE conversation_id = ? AND status = 'pending'
+                         AND call_digest <> ?""",
+                    (conversation_id, call_digest),
+                )
             row = connection.execute(
                 """SELECT * FROM tool_approval_requests
                    WHERE call_digest = ? AND status = 'pending'
@@ -133,10 +142,56 @@ class ToolApprovalRepository:
             ).fetchone()
         return self._decode(row)
 
+    def resolve_status(self, approval_id: str) -> dict | None:
+        """Retourne l'état autoritaire en expirant atomiquement une demande échue."""
+        now = time.time()
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            connection.execute(
+                """UPDATE tool_approval_requests
+                   SET status = 'expired', decided_at = datetime('now'),
+                       decision_reason = 'superseded', arguments_json = '{}'
+                   WHERE id = ? AND status = 'pending'
+                     AND conversation_id <> ''
+                     AND EXISTS (
+                         SELECT 1 FROM tool_approval_requests newer
+                         WHERE newer.conversation_id =
+                               tool_approval_requests.conversation_id
+                           AND newer.rowid > tool_approval_requests.rowid
+                     )""",
+                (approval_id,),
+            )
+            connection.execute(
+                """UPDATE tool_approval_requests
+                   SET status = 'expired', decided_at = datetime('now'),
+                       decision_reason = 'expired', arguments_json = '{}'
+                   WHERE id = ? AND status = 'pending' AND expires_at <= ?""",
+                (approval_id, now),
+            )
+            row = connection.execute(
+                "SELECT * FROM tool_approval_requests WHERE id = ?",
+                (approval_id,),
+            ).fetchone()
+        return self._decode(row)
+
     def claim(self, approval_id: str) -> dict | None:
         now = time.time()
         with self._connection_scope() as connection:
             self.ensure_schema(connection)
+            connection.execute(
+                """UPDATE tool_approval_requests
+                   SET status = 'expired', decided_at = datetime('now'),
+                       decision_reason = 'superseded', arguments_json = '{}'
+                   WHERE id = ? AND status = 'pending'
+                     AND conversation_id <> ''
+                     AND EXISTS (
+                         SELECT 1 FROM tool_approval_requests newer
+                         WHERE newer.conversation_id =
+                               tool_approval_requests.conversation_id
+                           AND newer.rowid > tool_approval_requests.rowid
+                     )""",
+                (approval_id,),
+            )
             row = connection.execute(
                 "SELECT * FROM tool_approval_requests WHERE id = ?",
                 (approval_id,),
@@ -216,6 +271,21 @@ class ToolApprovalRepository:
                    WHERE id = ? AND status = 'pending'""",
                 (approval_id,),
             )
+            connection.execute(
+                """UPDATE tool_approval_requests
+                   SET status = 'expired', decided_at = datetime('now'),
+                       decision_reason = 'superseded', arguments_json = '{}'
+                   WHERE status = 'pending'
+                     AND conversation_id = (
+                         SELECT conversation_id FROM tool_approval_requests
+                         WHERE id = ?
+                     )
+                     AND conversation_id <> ''
+                     AND rowid < (
+                         SELECT rowid FROM tool_approval_requests WHERE id = ?
+                     )""",
+                (approval_id, approval_id),
+            )
             row = connection.execute(
                 "SELECT * FROM tool_approval_requests WHERE id = ?",
                 (approval_id,),
@@ -263,6 +333,7 @@ class ToolApprovalRepository:
 repository = ToolApprovalRepository()
 create_or_reuse = repository.create_or_reuse
 get = repository.get
+resolve_status = repository.resolve_status
 claim = repository.claim
 finish = repository.finish
 deny = repository.deny

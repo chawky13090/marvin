@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.521.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.522.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.521.0)
+## 9. État actuel (v2.522.0)
+
+**v2.522 (cycle de vie autoritaire des approbations)** : une conversation ne conserve
+qu'une seule demande d'autorisation active. La création d'un nouvel appel obsolétise
+atomiquement les demandes antérieures, efface leurs arguments et les rend impossibles à
+réclamer. La règle est aussi réévaluée au GET et au claim afin de neutraliser les cartes
+créées avant cette version. Chaque carte historique relit l'état serveur ; seuls
+`status=pending` et `active=true` rendent les boutons cliquables. Refus, expiration,
+approbation, exécution, échec et remplacement deviennent des états finaux compacts. Rollback :
+réversion atomique du commit v2.522 puis redémarrage backend/frontend, sans migration.
 
 **v2.521 (lancement Windows fondé sur le résultat)** : `pc_app_launch` ne confond plus
 la remise d'une commande à Windows avec l'ouverture effective de l'application. Les

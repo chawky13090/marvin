@@ -106,6 +106,76 @@ def main() -> int:
         assert denied and denied["status"] == "denied"
         assert denied["arguments"] == {}
 
+        stale = repository.create_or_reuse(
+            call_digest="c" * 64,
+            tool_name="pc_run_powershell",
+            arguments={"script": "Get-Service Tailscale"},
+            conversation_id="conversation-2",
+            request_id="request-3",
+            source="chat",
+            risk_tier=4,
+        )
+        current = repository.create_or_reuse(
+            call_digest="d" * 64,
+            tool_name="pc_app_launch",
+            arguments={"app_name": "Tailscale"},
+            conversation_id="conversation-2",
+            request_id="request-4",
+            source="chat",
+            risk_tier=2,
+        )
+        stale_status = repository.resolve_status(stale["id"])
+        assert stale_status and stale_status["status"] == "expired"
+        assert stale_status["decision_reason"] == "superseded"
+        assert stale_status["arguments"] == {}
+        assert repository.resolve_status(current["id"])["status"] == "pending"
+        assert repository.claim(stale["id"])["claimed"] is False
+
+        independent = repository.create_or_reuse(
+            call_digest="e" * 64,
+            tool_name="file_delete",
+            arguments={"path": "C:/temp/other.txt"},
+            conversation_id="conversation-3",
+            request_id="request-5",
+            source="chat",
+            risk_tier=5,
+        )
+        assert repository.resolve_status(current["id"])["status"] == "pending"
+        assert repository.resolve_status(independent["id"])["status"] == "pending"
+
+        direct_old = repository.create_or_reuse(
+            call_digest="f" * 64,
+            tool_name="pc_run_command",
+            arguments={"command": "whoami"},
+            conversation_id="conversation-4",
+            request_id="request-6",
+            source="chat",
+            risk_tier=4,
+        )
+        direct_new = repository.create_or_reuse(
+            call_digest="1" * 64,
+            tool_name="pc_app_launch",
+            arguments={"app_name": "notepad"},
+            conversation_id="conversation-4",
+            request_id="request-7",
+            source="chat",
+            risk_tier=2,
+        )
+        # Simule une carte héritée créée avant l'introduction de l'obsolescence.
+        with scope() as connection:
+            connection.execute(
+                """UPDATE tool_approval_requests
+                   SET status = 'pending', decision_reason = '',
+                       arguments_json = '{"command":"whoami"}'
+                   WHERE id = ?""",
+                (direct_old["id"],),
+            )
+        direct_claim = repository.claim(direct_old["id"])
+        assert direct_claim and direct_claim["status"] == "expired"
+        assert direct_claim["decision_reason"] == "superseded"
+        repository.deny(direct_new["id"])
+        assert repository.resolve_status(direct_new["id"])["status"] == "denied"
+
     settings = Settings()
     with patch.object(agent_autonomy.audit, "log_action") as audit_log:
         assert agent_autonomy.current(settings)["mode"] == "normal"
@@ -133,7 +203,7 @@ def main() -> int:
     assert legacy_full["persistence"] == "until_revoked"
 
     print(
-        "Tool Approval Flow OK - digest, usage unique, refus, expiration et autonomie."
+        "Tool Approval Flow OK - usage unique, refus, expiration, remplacement et autonomie."
     )
     return 0
 

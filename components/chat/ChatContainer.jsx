@@ -266,6 +266,9 @@ export default function ChatContainer({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.result?.error || 'Autorisation refusée.');
+      window.dispatchEvent(new CustomEvent('marvin:approval-state-changed', {
+        detail: { approvalId },
+      }));
       const executionResult = data.result || data.error || 'Aucun résultat';
       addToolResult({
         toolCallId,
@@ -318,6 +321,9 @@ export default function ChatContainer({
           const data = await response.json();
           throw new Error(data.detail || 'Refus impossible.');
         }
+        window.dispatchEvent(new CustomEvent('marvin:approval-state-changed', {
+          detail: { approvalId },
+        }));
       }
       addToolResult({
         toolCallId,

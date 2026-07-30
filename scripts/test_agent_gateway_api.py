@@ -54,6 +54,23 @@ async def _exercise_routes() -> None:
             raise AssertionError("Une conversation inconnue doit être refusée avant le SSE.")
 
     approval_id = agent_gateway.UUID("39d97c47-bf56-4f28-a6cb-bcc6f0102190")
+    with patch.object(
+        agent_gateway.tool_approvals,
+        "resolve_status",
+        return_value={
+            "id": str(approval_id),
+            "status": "expired",
+            "decision_reason": "superseded",
+            "expires_at": 123.0,
+        },
+    ):
+        approval_status = await agent_gateway.get_tool_approval_endpoint(approval_id)
+    assert approval_status == {
+        "approvalId": str(approval_id),
+        "status": "superseded",
+        "active": False,
+        "expiresAt": 123.0,
+    }
 
     async def continuation_subscription(**kwargs):
         async for item in kwargs["producer_factory"]():
@@ -318,6 +335,7 @@ def main() -> int:
     assert routes == {
         "/api/chat",
         "/api/tools",
+        "/api/approvals/{approval_id}",
         "/api/approvals/{approval_id}/approve",
         "/api/approvals/{approval_id}/deny",
         "/api/autonomy",

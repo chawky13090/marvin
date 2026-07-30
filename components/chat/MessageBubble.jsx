@@ -1394,6 +1394,58 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
     return () => clearInterval(interval);
   }, [tool?.startedAt, tool?.state]);
 
+  const storedApprovalResult = tool?.state === 'result'
+    ? unwrapToolResult(tool?.result)
+    : null;
+  const storedApprovalId = (
+    storedApprovalResult
+    && typeof storedApprovalResult === 'object'
+    && storedApprovalResult.requiresConfirmation
+  ) ? storedApprovalResult.approvalId : null;
+  const [approvalState, setApprovalState] = useState(null);
+  useEffect(() => {
+    if (!storedApprovalId) {
+      setApprovalState(null);
+      return undefined;
+    }
+    let cancelled = false;
+    let controller = null;
+    const refresh = async () => {
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const response = await fetch(
+          `${BACKEND_URL}/api/approvals/${encodeURIComponent(storedApprovalId)}`,
+          { signal: controller.signal, cache: 'no-store' },
+        );
+        if (!response.ok) {
+          if (!cancelled) setApprovalState({ status: 'unavailable', active: false });
+          return;
+        }
+        const data = await response.json();
+        if (!cancelled) setApprovalState(data);
+      } catch (error) {
+        if (!cancelled && error?.name !== 'AbortError') {
+          setApprovalState({ status: 'unavailable', active: false });
+        }
+      }
+    };
+    const onApprovalChange = () => refresh();
+    const onFocus = () => refresh();
+    setApprovalState({ status: 'checking', active: false });
+    refresh();
+    window.addEventListener('marvin:approval-state-changed', onApprovalChange);
+    window.addEventListener('focus', onFocus);
+    const interval = window.setInterval(refresh, 15_000);
+    return () => {
+      cancelled = true;
+      controller?.abort();
+      window.clearInterval(interval);
+      window.removeEventListener('marvin:approval-state-changed', onApprovalChange);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [storedApprovalId]);
+
   if (!tool) return null;
   const toolName = tool.toolName || '';
   const icon = getToolIcon(toolName);
@@ -1536,9 +1588,26 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
     && approvalResult.requiresConfirmation
   );
 
-  const needsConfirmation = hasPendingResultConfirmation;
+  const approvalIsActive = hasPendingResultConfirmation
+    && approvalState?.status === 'pending'
+    && approvalState?.active === true;
+  const needsConfirmation = approvalIsActive;
+  const approvalFinalLabels = {
+    approved: 'Action déjà autorisée et traitée',
+    denied: 'Action refusée',
+    expired: 'Autorisation expirée',
+    superseded: 'Demande remplacée par une plus récente',
+    failed: 'Action autorisée mais non aboutie',
+    executing: 'Action en cours de traitement',
+    unavailable: 'État de l’autorisation indisponible',
+    checking: 'Vérification de l’autorisation…',
+  };
+  const approvalDisplayStatus = hasPendingResultConfirmation
+    ? approvalState?.status || 'checking'
+    : null;
 
-  const statusLabel = hasPendingResultConfirmation ? '⏳ En attente de votre confirmation'
+  const statusLabel = approvalIsActive ? '⏳ En attente de votre confirmation'
+    : approvalDisplayStatus ? approvalFinalLabels[approvalDisplayStatus] || 'Autorisation terminée'
     : resultFailed ? '✕ Erreur'
     : state === 'result' ? '✓ Terminé'
     : state === 'error' ? '✗ Erreur'
@@ -1551,7 +1620,9 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
     : isCritical ? '⏳ En attente de votre confirmation'
     : '⟳ En cours...';
 
-  const statusBadgeClass = hasPendingResultConfirmation ? 'warning'
+  const statusBadgeClass = approvalIsActive ? 'warning'
+    : approvalDisplayStatus === 'approved' ? 'success'
+    : approvalDisplayStatus ? 'info'
     : resultFailed ? 'danger'
     : state === 'result' ? 'success'
     : state === 'error' ? 'danger'
@@ -1630,7 +1701,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
         </div>
       )}
 
-      {hasPendingResultConfirmation && (
+      {approvalIsActive && (
         <div
           role="alertdialog"
           aria-label="Confirmation requise"
@@ -1650,6 +1721,26 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
           </div>
           <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: 10.5 }}>
             Autorisation valable uniquement pour cet appel exact et pendant cinq minutes.
+          </div>
+        </div>
+      )}
+
+      {hasPendingResultConfirmation && !approvalIsActive && (
+        <div
+          role="status"
+          style={{
+            marginTop: 10,
+            padding: '9px 11px',
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            background: 'var(--bg-tertiary)',
+            color: 'var(--text-secondary)',
+            fontSize: 12,
+          }}
+        >
+          {approvalFinalLabels[approvalDisplayStatus] || 'Cette autorisation n’est plus active.'}
+          <div style={{ marginTop: 3, color: 'var(--text-muted)', fontSize: 10.5 }}>
+            Les boutons ont été désactivés. Relancez explicitement l’action si elle reste nécessaire.
           </div>
         </div>
       )}
@@ -1677,7 +1768,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
       {needsConfirmation && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
           <button
-            disabled={hasPendingResultConfirmation && !approvalResult?.approvalId}
+            disabled={!approvalIsActive || !approvalResult?.approvalId}
             onClick={() => onConfirm?.(
               tool.toolCallId,
               approvalResult?.approvalId,
@@ -1695,7 +1786,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
             Oui, autoriser
           </button>
           <button
-            disabled={hasPendingResultConfirmation && !approvalResult?.approvalId}
+            disabled={!approvalIsActive || !approvalResult?.approvalId}
             onClick={() => onCancel?.(
               tool.toolCallId,
               approvalResult?.approvalId,
