@@ -102,6 +102,31 @@ def main() -> int:
     assert projected_files["has_more"] is False
     assert "path" not in projected_files["files"][0]
 
+    computer_result = {
+        "success": True,
+        "result": {
+            "visual": {
+                "image": "data:image/png;base64," + ("A" * 5_000),
+                "frame_id": "fr_test",
+                "width": 1280,
+            },
+            "ui": {"elements": [{"name": "Réserver", "element_ref": "el_test"}]},
+        },
+    }
+    projected_computer = json.loads(
+        compact_tool_result(
+            computer_result,
+            max_chars=1_000,
+            tool_name="computer_control",
+        )
+    )
+    assert "image" not in projected_computer["result"]["visual"]
+    assert projected_computer["result"]["visual"]["frame_id"] == "fr_test"
+    assert (
+        projected_computer["result"]["ui"]["elements"][0]["element_ref"]
+        == "el_test"
+    )
+
     print(
         "Agent Tool Step OK - alias, JSON, contexte interne, PDF complet et projection bornée."
     )

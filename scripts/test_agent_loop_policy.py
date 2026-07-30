@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 from agent_budget_completion import synthesize_budget_answer
 import agent
 from agent_loop_policy import (
+    _NATIVE_TOOL_CALL_LIMITS,
     build_action_execution_nudge,
     build_empty_response_nudge,
     build_skill_nudge,
@@ -29,6 +30,7 @@ from agent_transport import OllamaHTTPError
 
 
 async def main() -> int:
+    assert _NATIVE_TOOL_CALL_LIMITS["computer_control"] == 24
     # Régression du chemin Skill chat -> agent : la liste doit exister au runtime.
     assert agent.AUTO_MODE_FALLBACKS
 

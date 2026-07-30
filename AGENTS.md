@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.509.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.510.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.509.0)
+## 9. État actuel (v2.510.0)
+
+**v2.510 (boucle visuelle libre sous harness)** : `computer_control` expose au LLM une
+boucle Observe/Decide/Act/Verify/Repair sans routeur métier imposant une séquence. Les
+observations combinent UI Automation ou Playwright, captures visuelles multimodales,
+références d'éléments opaques à durée courte et coordonnées liées à une capture récente.
+Le modèle peut changer de stratégie après un échec. Le gateway reste autoritaire pour les
+permissions, budgets, idempotence et preuves. Le clic final qui réserve, achète, publie ou
+envoie utilise `action=commit` et exige toujours une confirmation par bouton dans le chat,
+même lorsque l'Accès complet est actif. Les textes saisis et résumés d'engagement sont
+expurgés des journaux. Rollback : réversion atomique du commit v2.510, sans migration.
 
 **v2.509 (Computer Runtime et accès complet révocable)** : `computer_control` unifie
 l’observation, l’action et la vérification du navigateur Playwright et du bureau Windows UIA.

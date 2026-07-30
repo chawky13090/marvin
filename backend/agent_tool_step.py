@@ -133,6 +133,23 @@ def compact_tool_result(
         return json.dumps(projection, ensure_ascii=False)
     if tool_name == "pdf_read":
         max_chars = max(max_chars, 16_000)
+    if tool_name == "computer_control" and isinstance(result, dict):
+        def without_images(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    key: without_images(child)
+                    for key, child in value.items()
+                    if key != "image"
+                }
+            if isinstance(value, list):
+                return [without_images(child) for child in value[:100]]
+            return value
+
+        projected = without_images(result)
+        serialized = json.dumps(projected, ensure_ascii=False)
+        if len(serialized) <= 16_000:
+            return serialized
+        return serialized[:16_000] + "…[observation visuelle réduite]"
     if len(serialized) <= max_chars:
         return serialized
     try:

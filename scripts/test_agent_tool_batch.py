@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from agent_observability import ObservationReceipt
-from agent_tool_batch import execute_tool_batch
+from agent_tool_batch import _tool_result_images, execute_tool_batch
 import tool_activity
 
 
@@ -46,6 +46,11 @@ class TimeoutRunner:
 
 
 async def main() -> int:
+    encoded_image = "QUJDRA=="
+    assert _tool_result_images(
+        {"visual": {"image": f"data:image/png;base64,{encoded_image}"}}
+    ) == [encoded_image]
+    assert _tool_result_images({"image": "https://example.com/image.png"}) == []
     messages: list[dict] = []
     persisted: list[tuple] = []
     observed: list[object] = []

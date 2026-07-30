@@ -60,6 +60,13 @@ def approval_summary(tool_name: str, arguments: Mapping[str, Any]) -> str:
         )
     if name == "pc_run_command":
         return "commande système sur cet appareil"
+    if name == "computer_control" and str(arguments.get("action") or "") == "commit":
+        summary = str(arguments.get("commitment_summary") or "").strip()
+        return (
+            f"confirmation finale : {summary[:300]}"
+            if summary
+            else "confirmation finale d'un engagement externe"
+        )
     target = str(
         arguments.get("path")
         or arguments.get("host")
@@ -81,7 +88,11 @@ def manifest_for_critical_call(
         lowered.startswith(("pc_run_", "ssh_"))
         and bool(_DESTRUCTIVE_SCRIPT_PATTERN.search(script))
     )
-    if name in _EXTERNAL_COMMUNICATION:
+    computer_commit = (
+        name == "computer_control"
+        and str(arguments.get("action") or "").strip().casefold() == "commit"
+    )
+    if name in _EXTERNAL_COMMUNICATION or computer_commit:
         effects = frozenset({Effect.EXTERNAL_COMMUNICATION})
         scopes = frozenset({Scope.EXTERNAL_ACCOUNT, Scope.INTERNET})
         data_classes = frozenset({DataClass.PERSONAL})

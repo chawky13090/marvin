@@ -904,8 +904,18 @@ def _gui_read_sync(search: str, max_elements: int) -> dict:
 def _gui_resolve_sync(search: str, control_type: str, name: str, automation_id: str, match_index: int):
     window, title = _gui_get_window_sync(search)
     if automation_id:
-        matches = window.descendants(auto_id=automation_id, control_type=control_type) if control_type \
-            else window.descendants(auto_id=automation_id)
+        # pywinauto 0.6.9 ne transmet pas ``auto_id`` à descendants() avec le
+        # backend UIA. Filtrer les métadonnées évite l'exception IUIA.build_condition
+        # observée en conditions réelles avec Yandex Browser.
+        matches = [
+            control
+            for control in window.descendants(control_type=control_type)
+            if str(control.element_info.automation_id or "") == automation_id
+        ] if control_type else [
+            control
+            for control in window.descendants()
+            if str(control.element_info.automation_id or "") == automation_id
+        ]
     elif control_type in _GUI_CONTENT_TYPES:
         # Contenu non fiable comme clé (cf. _GUI_CONTENT_TYPES) — matching par position uniquement.
         matches = window.descendants(control_type=control_type)

@@ -5,6 +5,53 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-30 — v2.510.0 — Boucle visuelle LLM libre sous harness
+
+### Demande et constats
+
+L'utilisateur a constaté qu'une réservation depuis le chat échouait parce que les boucles
+déterministes de contrôle PC imposaient une stratégie trop rigide. L'audit a aussi reproduit
+une incompatibilité réelle de pywinauto 0.6.9 : `descendants(auto_id=...)` transmet un
+argument non accepté au constructeur de condition UIA.
+
+### Décisions et modifications
+
+Le LLM choisit désormais librement chaque étape de la boucle
+Observe/Decide/Act/Verify/Repair. Le runtime fournit arbre sémantique, captures
+multimodales, références d'éléments opaques et coordonnées rattachées à une capture récente.
+Il sait cliquer, double-cliquer, effectuer un clic droit, déplacer, glisser, saisir,
+envoyer un raccourci, défiler, naviguer et attendre. Après un échec de sélecteur, le prompt
+demande au modèle de réobserver et de changer de méthode au lieu d'abandonner.
+
+La résolution UIA filtre maintenant `automation_id` dans les métadonnées des descendants,
+compatible avec pywinauto 0.6.9. Le clic final créant un engagement externe utilise
+`action=commit` avec un résumé humain. Le gateway exige toujours une preuve issue du bouton
+Oui/Non du chat, y compris en Accès complet.
+
+### Sécurité, logs et rollback
+
+Le contenu affiché reste une donnée non fiable, jamais une instruction. Les références et
+captures expirent après cinq minutes et leur nombre est borné. Les textes saisis et résumés
+d'engagement sont expurgés des logs. Le profil de confidentialité reste autoritaire :
+`computer_control` est privé par défaut et ne poursuit sur le Cloud qu'en Ultra débridé.
+Aucun contournement d'UAC, d'authentification, de CAPTCHA ou de contrôle d'accès n'est ajouté.
+
+Rollback : réversion atomique du commit v2.510 puis redémarrage backend/frontend. Aucune
+migration de schéma ni modification de données persistantes.
+
+### Validation réelle
+
+- six suites ciblées : Computer Runtime, UIA, projection multimodale, budget, gateway et
+  persistance du lot d'outils, toutes réussies ;
+- confirmation `commit` exigée même avec autonomie Full et redaction des saisies vérifiée
+  dans les journaux d'exécution et d'audit ;
+- capture Windows réelle 1600 × 900 avec `frame_id` valide ;
+- Playwright réel : navigation vers `example.com`, extraction d'un contrôle, capture et
+  vérification du texte `Example Domain` ;
+- build Next.js 16.2.12 Turbopack réussi ;
+- `npm run check:quick` réussi : 218 étapes, 356/356 outils sous harness, zéro erreur
+  ESLint (35 avertissements préexistants).
+
 ## 2026-07-30 — v2.509.0 — Computer Runtime et accès complet révocable
 
 ### Demande et constats

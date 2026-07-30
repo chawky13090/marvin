@@ -65,12 +65,17 @@ async def main() -> None:
         calls.append(arguments)
         return {"success": True}
 
+    async def computer_control(arguments):
+        calls.append(arguments)
+        return {"success": True, "action": arguments["action"]}
+
     registry = {
         "calculator": calculator,
         "file_delete": file_delete,
         "os_firewall": os_firewall,
         "broken": broken,
         "pc_run_powershell": pc_run_powershell,
+        "computer_control": computer_control,
     }
     specifications = [
         {
@@ -129,6 +134,20 @@ async def main() -> None:
                         "confirmed": {"type": "boolean"},
                     },
                     "required": ["script"],
+                },
+            }
+        },
+        {
+            "function": {
+                "name": "computer_control",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string"},
+                        "text": {"type": "string"},
+                        "commitment_summary": {"type": "string"},
+                    },
+                    "required": ["action"],
                 },
             }
         },
@@ -301,6 +320,56 @@ async def main() -> None:
     )
     assert confirmed_system_mutation.result["success"]
     assert calls[-1]["confirmed"] is True
+
+    with patch(
+        "tool_gateway.agent_autonomy.current",
+        return_value={"mode": "full", "active": True},
+    ):
+        commitment = await tool_gateway.execute_tool(
+            tool_gateway.ToolGatewayRequest(
+                "computer_control",
+                {
+                    "action": "commit",
+                    "text": "donnée privée",
+                    "commitment_summary": "Réserver une table pour deux",
+                },
+                "ui",
+                PERMISSION_EXPERT,
+                conversation_id="conversation-commit",
+            ),
+            registry=registry,
+            specifications=specifications,
+            database=Database,
+            normalizer=normalize,
+            audit_logger=audit,
+        )
+    assert commitment.result["requiresConfirmation"] is True
+    assert commitment.executed is False
+
+    confirmed_commitment = await tool_gateway.execute_tool(
+        tool_gateway.ToolGatewayRequest(
+            "computer_control",
+            {
+                "action": "commit",
+                "text": "donnée privée",
+                "commitment_summary": "Réserver une table pour deux",
+            },
+            "ui",
+            PERMISSION_EXPERT,
+            conversation_id="conversation-commit",
+            confirmed_by_ui=True,
+        ),
+        registry=registry,
+        specifications=specifications,
+        database=Database,
+        normalizer=normalize,
+        audit_logger=audit,
+    )
+    assert confirmed_commitment.executed is True
+    logged_arguments = Database.logs[-1][0][1]
+    assert logged_arguments["text"].startswith("[REDACTED:")
+    assert logged_arguments["commitment_summary"].startswith("[REDACTED:")
+    assert AUDIT[-1][1]["text"].startswith("[REDACTED:")
 
     with patch("bug_log.log_bug") as log_bug:
         failure = await tool_gateway.execute_tool(

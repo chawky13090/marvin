@@ -14,6 +14,9 @@ _NATIVE_TOOL_CALL_LIMITS = {
     "web_browse": 12,
     "web_browser_open": 12,
     "web_site_crawl": 4,
+    # Une mission visuelle nécessite plusieurs perceptions et actions différentes.
+    # Ce plafond empêche une boucle infinie sans dicter la stratégie au modèle.
+    "computer_control": 24,
 }
 _NATIVE_DEFAULT_TOOL_CALL_LIMIT = 8
 

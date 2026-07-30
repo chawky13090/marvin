@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.510 — boucle visuelle LLM libre et confirmation des engagements externes
 # v2.509 — Computer Runtime unifié et accès complet persistant révocable
 # v2.508 — axe de lecture centré et palette anthracite cohérente
 # v2.507 — listes de fichiers paginées sans troncature LLM silencieuse
@@ -47,7 +48,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.454 — apprentissage durable avec SQLite autoritatif
 # v2.453 — cohérence, provenance et conflits du Memory Mesh
 # v2.452 — transitions de confidentialité durables dans Coding Mission
-# v2.451 — provenance générative documents, e-mails et Code Workspace
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

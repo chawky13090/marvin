@@ -3878,14 +3878,16 @@ TOOLS_SPEC = [
 
     _t(
        "computer_control",
-       "Contrôle unifié et vérifiable du PC et du navigateur. Utilise une boucle "
-       "Observer → Agir → Vérifier : commence par action=observe, réutilise les identifiants "
-       "UIA exacts pour click/type, puis fournis expected afin que Marvin confirme l'effet. "
-       "Le runtime choisit Windows UI Automation ou Playwright sans deviner un sélecteur.",
+       "Contrôle visuel agentique du PC et du navigateur. Le LLM conduit librement la boucle "
+       "Observer → Décider → Agir → Vérifier → Corriger. observe renvoie une capture et des "
+       "element_ref facultatives. Utilise les coordonnées de frame_id lorsque l'UIA ne suffit "
+       "pas. action=commit est obligatoire pour le clic final qui réserve, achète, publie ou "
+       "envoie un formulaire : il demande toujours un clic utilisateur.",
        {
         "action": {"type": "string", "enum": [
-            "observe", "verify", "screenshot", "list_windows", "open", "focus",
-            "click", "type", "keypress", "scroll", "navigate"
+            "observe", "verify", "screenshot", "list_windows", "wait", "open", "focus",
+            "click", "double_click", "right_click", "move", "drag", "type",
+            "keypress", "scroll", "navigate", "commit"
         ]},
         "surface": {"type": "string", "enum": ["auto", "desktop", "browser"],
                     "description": "Surface ciblée. Préciser browser pour les éléments Web Playwright."},
@@ -3894,8 +3896,18 @@ TOOLS_SPEC = [
         "control_type": {"type": "string", "description": "Type UIA desktop ou rôle ARIA Web issu de l'observation"},
         "name": {"type": "string", "description": "Nom accessible exact issu de l'observation"},
         "automation_id": {"type": "string", "description": "Identifiant UIA issu de l'observation"},
+        "element_ref": {"type": "string", "description": "Référence opaque récente issue de observe"},
         "match_index": {"type": "integer", "minimum": 0, "description": "Index UIA en cas d'ambiguïté"},
         "text": {"type": "string", "description": "Texte à saisir, touche Playwright ou amplitude de scroll"},
+        "frame_id": {"type": "string", "description": "Capture récente dont proviennent x et y"},
+        "x": {"type": "number", "minimum": 0, "description": "Coordonnée horizontale dans frame_id"},
+        "y": {"type": "number", "minimum": 0, "description": "Coordonnée verticale dans frame_id"},
+        "end_x": {"type": "number", "minimum": 0, "description": "Destination horizontale du glisser-déposer"},
+        "end_y": {"type": "number", "minimum": 0, "description": "Destination verticale du glisser-déposer"},
+        "amount": {"type": "integer", "minimum": -10000, "maximum": 10000},
+        "duration_ms": {"type": "integer", "minimum": 50, "maximum": 10000},
+        "visual": {"type": "boolean", "description": "Inclure la capture ; vrai par défaut"},
+        "commitment_summary": {"type": "string", "maxLength": 1000, "description": "Résumé humain obligatoire pour action=commit"},
         "expected": {"type": "string", "description": "Texte ou état attendu après l'action"},
         "max_elements": {"type": "integer", "minimum": 1, "maximum": 100},
         "embed": {"type": "boolean", "description": "Inclure la capture dans le résultat"},

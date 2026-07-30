@@ -168,7 +168,7 @@ DANGEROUS_TOOLS: set[str] = {
 # indisponible en mode Sécurisé.
 CONDITIONAL_TOOL_SAFE_ACTIONS: dict[str, frozenset[str]] = {
     "computer_control": frozenset(
-        {"observe", "verify", "screenshot", "list_windows"}
+        {"observe", "verify", "screenshot", "list_windows", "wait"}
     ),
     "tweak_telemetry": frozenset({"status"}),
     "tweak_network_harden": frozenset({"status"}),

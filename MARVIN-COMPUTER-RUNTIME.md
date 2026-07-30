@@ -19,8 +19,20 @@ le gateway d’outils.
 | `backend/policy_engine.py` | Classement de l’effet et décision d’autorisation |
 | `backend/capability_discovery.py` | Description et découverte par le LLM |
 
-Les actions de lecture sont `observe`, `verify`, `screenshot` et `list_windows`. Les actions
-ayant un effet sont `open`, `focus`, `click`, `type`, `keypress`, `scroll` et `navigate`.
+Les actions de lecture sont `observe`, `verify`, `screenshot`, `list_windows` et `wait`.
+Les actions ayant un effet sont `open`, `focus`, `click`, `double_click`, `right_click`,
+`move`, `drag`, `type`, `keypress`, `scroll`, `navigate` et `commit`.
+
+Une observation peut associer :
+
+- un arbre UIA ou DOM pour le ciblage sémantique ;
+- des `element_ref` opaques, valides cinq minutes et impossibles à inventer ;
+- une capture transmise au modèle comme entrée multimodale ;
+- un `frame_id` liant les coordonnées de la capture aux coordonnées réelles de l'écran.
+
+Le modèle choisit la stratégie et peut basculer entre sémantique et vision après un échec.
+Le runtime borne la durée et les répétitions, mais ne choisit ni l'application, ni le
+parcours, ni l'objectif à la place du modèle.
 
 ## Modèle d’autorisation
 
@@ -28,6 +40,9 @@ ayant un effet sont `open`, `focus`, `click`, `type`, `keypress`, `scroll` et `n
 - Mode Auto : autorisation temporaire bornée par sa politique.
 - Accès complet : reste actif jusqu’à révocation explicite, y compris après redémarrage.
 - Les contrôles de schéma, de portée, de risque, d’idempotence et d’audit restent actifs.
+- `commit` est obligatoire pour le clic final d'une réservation, d'un achat, d'une
+  publication ou d'un envoi et demande toujours un clic Oui/Non dans le chat, même en
+  Accès complet.
 - Une preuve d’exécution dérivée de l’accès complet expire après 60 secondes. La persistance
   du choix utilisateur ne crée donc pas de jeton d’exécution rejouable.
 - Les fenêtres élevées restent inaccessibles à un Marvin non élevé. Le runtime ne contourne
@@ -40,8 +55,11 @@ ayant un effet sont `open`, `focus`, `click`, `type`, `keypress`, `scroll` et `n
 - UI Automation dépend de la qualité de l’arbre exposé par l’application. Le Bloc-notes
   Windows 11 expose son éditeur comme un `Document` anonyme et ne restitue pas toujours son
   contenu ; l’action peut réussir alors qu’une preuve textuelle demandée reste négative.
-- Les applications sans sémantique UIA nécessiteront un futur repli visuel borné avec capture
-  avant/après, coordonnées relatives à la fenêtre et arrêt utilisateur.
+- Les applications sans sémantique UIA utilisent le repli visuel borné. Sa qualité dépend
+  de la capacité vision du modèle actif ; un modèle texte conserve le parcours sémantique.
+- Une capture peut contenir des données privées. Elle suit strictement le profil de
+  confidentialité : les outils inconnus ou privés provoquent le repli local sauf en Ultra
+  débridé, où l'utilisateur a explicitement accepté le traitement Cloud.
 
 ## Validation
 
@@ -64,8 +82,10 @@ fenêtres et lire les contrôles d’une application non élevée.
 ## Journalisation, données et rollback
 
 Le gateway journalise la capacité, l’effet, la décision, la corrélation et le résultat. Les
-arguments sensibles ne doivent pas être copiés dans les logs. Les captures restent locales et
-suivent la politique de rétention de Marvin. Aucun nouveau secret ni schéma n’est créé.
+textes saisis et résumés d'engagement sont remplacés par leur longueur dans les logs. Les
+captures ne sont pas ajoutées au contexte texte ni aux arguments journalisés ; elles sont
+transmises au modèle selon le profil de confidentialité. Aucun nouveau secret ni schéma
+n’est créé.
 
-Le rollback est la réversion atomique du commit de la version 2.509, suivie du redémarrage du
+Le rollback est la réversion atomique du commit de la version 2.510, suivie du redémarrage du
 backend et du frontend. Les réglages historiques restent lisibles.

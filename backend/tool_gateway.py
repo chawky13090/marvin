@@ -39,6 +39,21 @@ def _conditional_mutation(tool_name: str, arguments: Mapping[str, Any]) -> bool:
     return action not in safe_actions
 
 
+def _arguments_for_observability(
+    tool_name: str,
+    arguments: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Retire les contenus saisis/capturés des journaux sans altérer l'appel."""
+    projected = dict(arguments)
+    if tool_name == "computer_control":
+        for key in ("text", "commitment_summary"):
+            value = projected.get(key)
+            if value not in (None, ""):
+                projected[key] = f"[REDACTED:{len(str(value))}]"
+        projected.pop("image", None)
+    return projected
+
+
 @dataclass(frozen=True, slots=True)
 class ToolGatewayRequest:
     tool_name: str
@@ -187,9 +202,17 @@ async def execute_tool(
             autonomy = agent_autonomy.current(database)
         except Exception:
             autonomy = {"mode": "normal", "active": False}
-        if autonomy.get("active") and agent_autonomy.allows(
-            str(autonomy.get("mode") or "normal"),
-            int(tier),
+        always_confirm = (
+            request.tool_name == "computer_control"
+            and str(arguments.get("action") or "").strip().casefold() == "commit"
+        )
+        if (
+            not always_confirm
+            and autonomy.get("active")
+            and agent_autonomy.allows(
+                str(autonomy.get("mode") or "normal"),
+                int(tier),
+            )
         ):
             context = PolicyContext(
                 identity=context.identity,
@@ -265,9 +288,13 @@ async def execute_tool(
     except Exception as exc:
         observation_errors.append(f"normalizer:{type(exc).__name__}")
     try:
-        database.log_execution(
+        observable_arguments = _arguments_for_observability(
             request.tool_name,
             request.arguments,
+        )
+        database.log_execution(
+            request.tool_name,
+            observable_arguments,
             result,
             duration_ms,
             conversation_id=request.conversation_id,
@@ -278,7 +305,7 @@ async def execute_tool(
     try:
         audit_logger(
             request.tool_name,
-            request.arguments,
+            observable_arguments,
             result,
             source=request.source,
             request_id=request.request_id,

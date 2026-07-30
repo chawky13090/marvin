@@ -9,6 +9,7 @@ Le navigateur est lancé une fois puis réutilisé (rapide). Best-effort : si le
 navigateur est indisponible, les outils retombent sur l'outil web interne.
 """
 import asyncio
+import base64
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -71,7 +72,15 @@ async def computer_observe(max_elements: int = 80) -> dict:
         """(nodes, limit) => nodes.slice(0, limit).map((node, index) => ({
           index,
           tag: node.tagName.toLowerCase(),
-          role: node.getAttribute('role') || '',
+          role: node.getAttribute('role') || ({
+            a: node.hasAttribute('href') ? 'link' : '',
+            button: 'button',
+            textarea: 'textbox',
+            select: 'combobox',
+            input: ['button', 'submit', 'reset'].includes(
+              (node.getAttribute('type') || '').toLowerCase()
+            ) ? 'button' : 'textbox'
+          }[node.tagName.toLowerCase()] || ''),
           name: (node.getAttribute('aria-label') || node.innerText ||
                  node.getAttribute('placeholder') || node.getAttribute('title') || '')
                 .trim().slice(0, 240),
@@ -81,12 +90,17 @@ async def computer_observe(max_elements: int = 80) -> dict:
         }))""",
         max(1, min(int(max_elements), 100)),
     )
+    screenshot = await page.screenshot(type="png")
     return {
         "success": True,
         "title": await page.title(),
         "url": page.url,
         "text": (await page.locator("body").inner_text())[:20_000],
         "elements": elements,
+        "image": "data:image/png;base64," + base64.b64encode(screenshot).decode("ascii"),
+        "width": 1280,
+        "height": 900,
+        "coordinate_space": "browser_viewport_pixels",
     }
 
 
@@ -125,16 +139,43 @@ async def computer_act(
     name: str = "",
     match_index: int = 0,
     text: str = "",
+    x: int | None = None,
+    y: int | None = None,
+    end_x: int | None = None,
+    end_y: int | None = None,
 ) -> dict:
     page = await _get_computer_page()
-    if action == "click":
-        locator = _browser_locator(
-            page,
-            control_type=control_type,
-            name=name,
-            match_index=match_index,
-        )
-        await locator.click(timeout=15_000)
+    if action in {"click", "double_click", "right_click"}:
+        if x is not None and y is not None:
+            await page.mouse.click(
+                x,
+                y,
+                button="right" if action == "right_click" else "left",
+                click_count=2 if action == "double_click" else 1,
+            )
+        else:
+            locator = _browser_locator(
+                page,
+                control_type=control_type,
+                name=name,
+                match_index=match_index,
+            )
+            await locator.click(
+                timeout=15_000,
+                button="right" if action == "right_click" else "left",
+                click_count=2 if action == "double_click" else 1,
+            )
+    elif action == "move":
+        if x is None or y is None:
+            raise ValueError("x et y sont requis pour déplacer le pointeur Web.")
+        await page.mouse.move(x, y)
+    elif action == "drag":
+        if None in (x, y, end_x, end_y):
+            raise ValueError("x, y, end_x et end_y sont requis pour glisser.")
+        await page.mouse.move(x, y)
+        await page.mouse.down()
+        await page.mouse.move(end_x, end_y, steps=12)
+        await page.mouse.up()
     elif action == "type":
         locator = _browser_locator(
             page,

@@ -46,6 +46,24 @@ class _FakeWindow:
         return [_FakeDocument()]
 
 
+class _ResolveElementInfo:
+    control_type = "Button"
+    automation_id = "submit-booking"
+
+
+class _ResolveControl:
+    element_info = _ResolveElementInfo()
+
+
+class _ResolveWindow:
+    calls: list[dict] = []
+
+    @classmethod
+    def descendants(cls, **kwargs):
+        cls.calls.append(kwargs)
+        return [_ResolveControl()]
+
+
 async def _run() -> None:
     browse = await pc_control.execute_pc_browse({})
     assert browse["success"] is True
@@ -88,6 +106,18 @@ async def _run() -> None:
     assert ui_tree["count"] == 1
     assert ui_tree["elements"][0]["control_type"] == "Document"
     assert ui_tree["elements"][0]["match_index"] == 0
+
+    try:
+        pc_control._gui_get_window_sync = (
+            lambda _search: (_ResolveWindow(), "Fenêtre test")
+        )
+        _, _, resolved = pc_control._gui_resolve_sync(
+            "test", "Button", "", "submit-booking", 0
+        )
+    finally:
+        pc_control._gui_get_window_sync = original_get_window
+    assert resolved.element_info.automation_id == "submit-booking"
+    assert _ResolveWindow.calls[-1] == {"control_type": "Button"}
 
     public_names = [
         name.removeprefix("execute_")
