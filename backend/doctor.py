@@ -69,14 +69,25 @@ async def run_diagnostics() -> dict:
     # ── 3. Compétences → outils cohérents ──────────────────────────────────────
     try:
         import skills
+        # v2.517 — seules les compétences ACTIVES peuvent être sélectionnées par le
+        # matcher : une compétence désactivée ne peut plus induire le modèle en erreur.
+        # Les compter comme des anomalies noyait le diagnostic sous du bruit inerte.
         bad = []
+        disabled_bad = 0
         for s in skills.list_skills():
             miss = [t for t in (s.get("tools") or []) if t not in toolnames]
-            if miss:
+            if not miss:
+                continue
+            if s.get("enabled"):
                 bad.append(f"{s['name']} ({', '.join(miss)})")
+            else:
+                disabled_bad += 1
         if bad:
             add("skills_tools", "Compétences", "warning",
-                f"{len(bad)} compétence(s) citent un outil inexistant : {'; '.join(bad[:3])}")
+                f"{len(bad)} compétence(s) active(s) citent un outil inexistant : {'; '.join(bad[:3])}")
+        elif disabled_bad:
+            add("skills_tools", "Compétences", "ok",
+                f"Aucune compétence active fautive ({disabled_bad} désactivée(s) à nettoyer).")
         else:
             add("skills_tools", "Compétences", "ok",
                 f"{len(skills.list_skills())} compétence(s), outils tous valides.")

@@ -307,6 +307,7 @@ async def skills_consolidate(body: dict = Body(default={})):
     reviewed = await skills.review_and_consolidate_learnings(
         generate,
         skill_name=(body or {}).get("skill"),
+        tool_names=_tool_names(),
     )
     return {
         "reviewed": reviewed,

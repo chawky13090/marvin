@@ -17,6 +17,7 @@ import re
 import shutil
 import threading
 import time
+import unicodedata
 
 from structured_logging import StructuredJsonlStore, sanitize
 
@@ -950,25 +951,107 @@ async def find_overlapping_skills(threshold: float = 0.85) -> list[dict]:
     return pairs
 
 
-async def review_and_consolidate_learnings(generate_fn, skill_name: str = None):
+# v2.517 — Garde-fous de la consolidation automatique.
+# Délai minimal entre deux consolidations réussies, toutes compétences confondues.
+CONSOLIDATION_COOLDOWN_SECONDS = 6 * 3600
+# Sujets que la consolidation ne doit jamais transformer en compétence : ce sont des
+# comportements du code (worker de consolidation, journal d'apprentissage). Les laisser
+# passer crée une boucle auto-référentielle, constatée en conditions réelles.
+_META_SKILL_PATTERNS = (
+    "consolidat", "deduplication", "dedup", "dedoublonnage", "learning log",
+    "learning-log", "learning_log", "journal d'apprentissage", "journal apprentissage",
+    "revue automatique", "revue auto", "reconsolidation", "boucle de revue",
+)
+
+
+def _normalize_for_compare(value: str) -> str:
+    text = unicodedata.normalize("NFD", str(value or "").casefold())
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def _is_meta_skill(name: str, description: str) -> bool:
+    """Vrai si la compétence proposée parle de la gestion des compétences elle-même."""
+    blob = _normalize_for_compare(f"{name} {description}")
+    return any(_normalize_for_compare(p) in blob for p in _META_SKILL_PATTERNS)
+
+
+def _duplicates_existing_skill(name: str, description: str, existing: list) -> bool:
+    """Recoupement lexical déterministe avec une compétence déjà présente.
+
+    Volontairement sans embedding : ce contrôle tourne dans un worker de fond et doit
+    rester rapide, hors ligne et reproductible. `find_overlapping_skills` reste
+    disponible pour l'analyse sémantique à la demande.
+    """
+    candidate_name = _normalize_for_compare(name)
+    candidate_words = set(_normalize_for_compare(description).split())
+    for skill in existing or []:
+        if _normalize_for_compare(skill.get("name")) == candidate_name:
+            return True
+        other = set(_normalize_for_compare(skill.get("description")).split())
+        if not candidate_words or not other:
+            continue
+        overlap = len(candidate_words & other) / len(candidate_words | other)
+        if overlap >= 0.6:
+            return True
+    return False
+
+
+def _consolidation_on_cooldown(skill_name: str = None) -> bool:
+    """Vrai si une consolidation a déjà eu lieu dans la fenêtre de cooldown."""
+    try:
+        for event in get_learning_log(200):
+            if event.get("type") != "consolidate":
+                continue
+            stamp = time.mktime(time.strptime(event["ts"], "%Y-%m-%d %H:%M:%S"))
+            return (time.time() - stamp) < CONSOLIDATION_COOLDOWN_SECONDS
+    except Exception:
+        return False
+    return False
+
+
+async def review_and_consolidate_learnings(generate_fn, skill_name: str = None,
+                                           tool_names: list = None):
     """Le LLM relit son propre Learning Log récent et peut proposer UNE consolidation
     (fusion de compétences proches, sous-compétence dédiée) si un vrai pattern se dégage.
     `generate_fn` : async (str)->str. Conservateur : ne fait rien si le log est trop court
-    ou si le LLM ne propose rien de solide."""
+    ou si le LLM ne propose rien de solide.
+
+    v2.517 — trois garde-fous ajoutés après constat en conditions réelles. Cette passe
+    écrivait dans le Learning Log qu'elle relit ensuite : sans cooldown ni contrôle
+    d'existence, elle a produit 17 compétences quasi identiques en 38 h, toutes sur le
+    thème « empêcher les consolidations répétées ». Les outils n'étaient pas validés ici
+    alors qu'ils le sont déjà dans les deux autres chemins de création (voir plus haut) :
+    18,3 % des références d'outils de la bibliothèque pointaient dans le vide.
+    """
     log = get_learning_log(30, skill_name)
     if len(log) < 3:
         return None
+    if _consolidation_on_cooldown(skill_name):
+        return None
+    existing = list_skills()
+    existing_lines = "\n".join(
+        f"- {s['name']} : {s.get('description', '')}" for s in existing
+    )
+    tools_hint = ", ".join((tool_names or [])[:120])
     prompt = (
         "Tu es Marvin, en revue de ton propre apprentissage. Voici ton Learning Log récent "
         "(créations/améliorations de compétences, avec diffs et raisons). RÉDIGE EN FRANÇAIS.\n"
         "Cherche UN SEUL pattern clair et utile (ex : deux compétences qui se recoupent et "
         "gagneraient à fusionner, ou une méthode qui revient et mérite une compétence dédiée).\n"
+        "⛔ NE PROPOSE RIEN si le pattern porte sur la consolidation, la déduplication, la "
+        "revue du Learning Log ou la gestion des compétences elles-mêmes : ces sujets sont "
+        "gérés par le code, pas par une compétence. Réponds alors: null\n"
+        "⛔ NE PROPOSE RIEN qui recoupe une compétence déjà listée ci-dessous. Réponds: null\n"
         "Si rien de solide ne se dégage, réponds exactement: null\n\n"
-        f"Journal :\n{str(log)[:4000]}\n\n"
+        f"### Compétences DÉJÀ existantes (NE PAS les redoubler)\n{existing_lines or '(aucune)'}\n\n"
+        + (f"### Outils réellement disponibles (n'en invente AUCUN autre)\n{tools_hint}\n\n"
+           if tools_hint else "")
+        + f"Journal :\n{str(log)[:4000]}\n\n"
         "Si tu proposes une consolidation, réponds UNIQUEMENT en JSON, sans texte autour :\n"
         '{"name": "nom-court-kebab", "description": "quand l\'utiliser (1 phrase)", '
-        '"triggers": ["3 à 6 déclencheurs"], "tools": ["outil1"], "body": "## Objectif\\n...\\n'
-        '## Étapes\\n1. ...\\n## Vérification\\n..."}'
+        '"triggers": ["3 à 6 déclencheurs"], "tools": ["nom exact d\'un outil ci-dessus"], '
+        '"body": "## Objectif\\n...\\n## Étapes\\n1. ...\\n## Vérification\\n..."}'
     )
     try:
         raw = await generate_fn(prompt)
@@ -979,8 +1062,19 @@ async def review_and_consolidate_learnings(generate_fn, skill_name: str = None):
     data = parse_skill_json(raw)
     if not data.get("name") or not (data.get("body") or "").strip():
         return None
+    if _is_meta_skill(data["name"], data.get("description", "")):
+        log_learning_event("consolidate_refused", data["name"],
+                           "Sujet méta (consolidation/journal) : géré par le code.")
+        return None
+    if _duplicates_existing_skill(data["name"], data.get("description", ""), existing):
+        log_learning_event("consolidate_refused", data["name"],
+                           "Recoupe une compétence existante.")
+        return None
+    # Même filtre que les deux autres chemins de création : un outil inventé est retiré.
+    valid = set(tool_names or [])
+    kept_tools = [t for t in (data.get("tools") or []) if (not valid or t in valid)][:8]
     save_skill(data["name"], data.get("description", "Consolidation automatique"), data.get("body"),
-               data.get("tools") or [], True, triggers=[str(t)[:40] for t in (data.get("triggers") or [])][:8])
+               kept_tools, True, triggers=[str(t)[:40] for t in (data.get("triggers") or [])][:8])
     log_learning_event("consolidate", data["name"], "Revue automatique du Learning Log")
     return {"consolidated": data["name"]}
 

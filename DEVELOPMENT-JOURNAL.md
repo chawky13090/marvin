@@ -13821,3 +13821,100 @@ v2.516 puis redémarrage du backend. Rollback partiel possible sans redéploieme
 vider `agent_autonomy.AUTO_MODE_EXCLUDED_TOOLS` restaure le comportement antérieur du mode
 `auto`; retirer les six noms de `agent_tool_batch._UNTRUSTED_WEB_TOOLS` désactive le rappel
 de contexte.
+
+## 2026-07-30 — v2.517 — Garde-fous de la consolidation automatique des compétences
+
+> Tranche réalisée par **Claude Code**, sur demande de l'utilisateur après vérification
+> contradictoire d'un constat d'audit. Codex : lire avant toute évolution de `skills.py`,
+> `runtime_workers.py` ou du diagnostic Doctor.
+
+### Incident reproduit et mesuré
+
+L'utilisateur a demandé la vérification d'une affirmation d'audit (« des compétences citent
+des outils inexistants »). Contrôle refait indépendamment du Doctor, en extrayant les 356
+outils du registre live puis en croisant le frontmatter des 178 compétences :
+
+- **60 compétences sur 177 citaient au moins un outil inexistant**, soit 46 noms distincts
+  et 18,3 % des 551 références d'outils pointant dans le vide ;
+- trois familles de noms : concepts Marvin hallucinés (`learning-log`, 34 occurrences),
+  outils d'autres écosystèmes d'agents (`read_file`, `bash`, `grep`, `list_directory`) et
+  erreurs de catégorie (`path`, `fs`, `os` — des modules Node.js, pas des outils) ;
+- **55 % de la bibliothèque tournait autour de trois sujets**, et les 29 compétences créées
+  individuellement en 38 h n'appartenaient qu'à ces trois thèmes, sans aucune exception.
+
+Cause identifiée dans le code, pas supposée : `skill_night_learning_worker`
+(`runtime_workers.py`) appelle `review_and_consolidate_learnings` toutes les 25 minutes en
+journée, pour chaque compétence. Cette fonction (a) ne recevait pas la liste des outils
+réels, son prompt donnant l'exemple `"tools": ["outil1"]`, (b) appelait `save_skill` **sans
+le filtre de validation présent dans les deux autres chemins de création**, (c) écrivait via
+`log_learning_event` dans le Learning Log qu'elle relit à la passe suivante, sans cooldown ni
+contrôle d'existence. La boucle était donc fermée sur elle-même.
+
+Résultat observé : **17 compétences quasi identiques sur le thème « empêcher les
+consolidations répétées »**, dont `consolidation-avec-cooldown` créée le 29/07 à 23h16 —
+suivie de huit autres. Le garde-fou décrit n'a jamais été implémenté, seulement rédigé. Une
+18ᵉ (`garde-fou-consolidation-repetee`) est apparue pendant l'audit lui-même.
+
+Vérification de non-contamination : la couche outils est **intacte**. `save_skill` n'écrit
+que dans `data/skills/*.md`, `skills.py` ne contient ni `exec` ni `importlib`, et
+`assemble_tool_payload` n'ajoute que des specs réelles (`payload.append`) — une compétence
+ne peut jamais retirer un outil. Registre live : 356 outils, `registry_synced: true`.
+
+### Décisions et modifications
+
+- `review_and_consolidate_learnings` accepte `tool_names` et applique **le même filtre que
+  les deux autres chemins de création** ; son prompt liste désormais les outils réels.
+- Trois garde-fous déterministes : `_consolidation_on_cooldown` (six heures entre deux
+  consolidations réussies), `_is_meta_skill` (refuse les sujets consolidation, déduplication
+  et revue du journal — gérés par le code, pas par une compétence) et
+  `_duplicates_existing_skill` (recoupement lexical à 60 %, sans embedding pour rester
+  rapide, hors ligne et reproductible dans un worker de fond).
+- Un refus est journalisé en `consolidate_refused` : il reste observable, il n'est pas
+  silencieux.
+- Les deux appelants (`runtime_workers.py`, `api/skills.py`) transmettent la liste réelle.
+- `doctor.py` ne compte plus que les compétences **actives** : une compétence désactivée ne
+  peut plus être sélectionnée par le matcher et noyait le diagnostic sous du bruit inerte.
+- Nettoyage de `data/skills` : 47 compétences méta et 14 doublons cassés disposant tous
+  d'une sœur saine ont été **désactivés** (`enabled: false`), pas supprimés. Sauvegarde
+  intégrale préalable dans `data/skills_backup_20260730-223100/` (178 fichiers).
+
+### Sécurité, logs et preuves
+
+Aucune capacité utilisateur retirée : les compétences désactivées restent lisibles et
+réactivables d'un champ. Aucun contenu de compétence, secret ou donnée personnelle ne
+rejoint les journaux ; `consolidate_refused` ne transporte qu'un nom et un motif borné.
+Aucun nouveau chemin persistant, aucune migration de schéma : sans impact sur
+`MARVIN-LOGGING-POLICY.md`. Le worker conserve son intervalle et son budget.
+
+Dette résiduelle déclarée, **non traitée** : la famille « stratégie de recherche web »
+compte environ 36 compétences quasi identiques dont les outils sont pourtant **valides** —
+la métrique des outils fantômes ne les détecte donc pas. Leur fusion demande un arbitrage de
+contenu qui appartient au propriétaire ; `find_overlapping_skills` existe déjà pour
+l'instruire. Aucun statut « bibliothèque assainie » n'est revendiqué.
+
+### Validation réelle
+
+- Compilation des quatre modules modifiés : réussie.
+- `test_skill_consolidation_guards.py` (nouveau) : réussi. Il s'exécute dans un dossier de
+  compétences temporaire et n'écrit jamais dans `data/skills` — vérifié, la bibliothèque
+  réelle est restée à 178 fichiers pendant les tests.
+- **Test de mutation** : en neutralisant le filtre d'outils, le test échoue par
+  `AssertionError: ['file_find', 'learning-log', 'bash']` ; restauré, il repasse.
+- Cooldown vérifié en direct sur le journal réel : actif (dernière consolidation 22h25).
+- Effet mesuré du nettoyage : compétences actives fautives **61 → 0**, références mortes
+  actives **103/553 (18,6 %) → 0/435 (0 %)**.
+- Logique Doctor rejouée hors ligne sur les données réelles : passe d'`avertissement` à `ok`.
+- Tests ciblés réussis : Skill Match Logging, Agent Policy, Policy Engine, Main Composition,
+  Frontière web non fiable.
+- Le backend en cours d'exécution n'a **pas** été redémarré pour ne pas interrompre la
+  session de l'utilisateur : le Doctor live affichera l'ancien message jusqu'au prochain
+  redémarrage. Limite déclarée, non masquée.
+
+### Rollback
+
+Aucune migration de schéma. Rollback du code : réversion atomique du commit v2.517 puis
+redémarrage du backend. Rollback partiel sans redéploiement : porter
+`CONSOLIDATION_COOLDOWN_SECONDS` à `0` et vider `_META_SKILL_PATTERNS` restaure le
+comportement antérieur du worker. Rollback des données : recopier
+`data/skills_backup_20260730-223100/*.md` dans `data/skills/` restaure les 178 compétences
+avec leur état `enabled` d'origine.

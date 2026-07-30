@@ -83,11 +83,20 @@ async def skill_night_learning_worker() -> None:
                 async def generate(prompt: str) -> str:
                     return await tool_module._ollama_generate(prompt, model=None, timeout=180)
 
+                # v2.517 — la liste réelle des outils borne ce que le LLM peut citer ;
+                # sans elle, la consolidation inventait des noms d'outils inexistants.
+                real_tool_names = [
+                    spec.get("function", {}).get("name")
+                    for spec in tool_module.TOOLS_SPEC
+                    if spec.get("function", {}).get("name")
+                ]
                 consolidated = 0
                 for skill in skills.list_skills():
                     if len(skills.get_learning_log(8, skill["name"])) < 2:
                         continue
-                    if await skills.review_and_consolidate_learnings(generate, skill["name"]):
+                    if await skills.review_and_consolidate_learnings(
+                        generate, skill["name"], tool_names=real_tool_names
+                    ):
                         consolidated += 1
                 if consolidated:
                     print(f"[Marvin] Consolidation nocturne : {consolidated} competence(s).")

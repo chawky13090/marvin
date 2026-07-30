@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.516.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.517.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,29 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.516.0)
+## 9. État actuel (v2.517.0)
+
+**v2.517 (garde-fous de la consolidation automatique)** — *tranche livrée par Claude Code.*
+`skill_night_learning_worker` appelait `review_and_consolidate_learnings` toutes les 25 min
+par compétence ; cette fonction écrivait dans le Learning Log qu'elle relit ensuite, **sans
+cooldown, sans contrôle d'existence et sans validation des outils** (contrairement aux deux
+autres chemins de création). Mesure avant correction : **60 compétences sur 177 citaient un
+outil inexistant** (46 noms, 18,3 % des références) et **17 compétences quasi identiques**
+sur le thème « empêcher les consolidations répétées » avaient été produites en 38 h, dont
+`consolidation-avec-cooldown` suivie de huit autres. Ajout de `_consolidation_on_cooldown`
+(6 h), `_is_meta_skill` (refuse les sujets consolidation/déduplication/revue du journal :
+c'est du code, pas une compétence), `_duplicates_existing_skill` (recoupement lexical 60 %,
+sans embedding) et du filtre d'outils ; les deux appelants transmettent la liste réelle et
+le prompt la publie. `doctor.py` ne compte plus que les compétences **actives**. Nettoyage :
+61 compétences **désactivées** (jamais supprimées), sauvegarde dans
+`data/skills_backup_20260730-223100/`. Résultat mesuré : références mortes actives
+**18,6 % → 0 %**. Test `scripts/test_skill_consolidation_guards.py`
+(`npm run check:consolidation-guards`), isolé en dossier temporaire et validé par mutation.
+**Dette déclarée non traitée** : ~36 compétences « stratégie de recherche web » quasi
+identiques mais aux outils **valides** — fusion à arbitrer par le propriétaire,
+`find_overlapping_skills` existe pour l'instruire. La couche outils n'a jamais été touchée :
+une compétence n'est que du Markdown, ne peut pas retirer un outil du catalogue, et le
+registre est resté à 356 outils `registry_synced: true`.
 
 **v2.516 (frontière web non fiable et bornes réelles du mode auto)** — *tranche livrée par
 Claude Code après audit complet.* Trois contradictions internes corrigées. (1) Le mode
