@@ -13574,6 +13574,57 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
 - Gate global rapide : 217/217 étapes réussies.
 - Rendu Playwright réel validé en 1920 × 1080, 1280 × 900 et 390 × 844 sans débordement.
 - Runtime relancé : backend `2.508.0`, santé `ok`, Ollama disponible et frontend HTTP 200.
+## 2026-07-30 — v2.514 — Auto contextuel et routage Cloud vérifiable
+
+### Incident et diagnostic
+
+- L'Accès complet était effectivement actif jusqu'à révocation dans le gateway.
+- Les deux dernières relances n'ont produit aucun nouvel appel `computer_control` : le
+  modèle a réutilisé un ancien échec parce que la détection ne lisait que la phrase isolée
+  « re teste et trouve une solution ».
+- `kimi-k3:cloud` était bien le modèle sélectionné, mais un appel réel Ollama l'a refusé :
+  ce modèle consomme des crédits Extra Usage et le solde du compte était vide. Le repli
+  affichait seulement « modèle indisponible », puis MiniMax était surévalué parce qu'une
+  sortie non vide était comptée comme un succès même si la mission restait inexécutée.
+
+### Correction
+
+- Les formulations explicites de continuation récupèrent au plus quatre demandes utilisateur
+  récentes. Les anciennes réponses assistant et le contenu observé ne deviennent jamais des
+  instructions.
+- Le nudge PC rappelle que le gateway décide selon l'autorisation courante et impose une
+  tentative réelle avant de conclure à un blocage.
+- Une mission PC toujours inexécutée après cette relance ajoute une observation agentique
+  négative. Le marché de modèles fait primer un taux réel de 0 % sur un prior documentaire.
+- Le classement agentique documenté devient Kimi, GLM, DeepSeek, MiniMax. Sur cette machine,
+  Kimi reste premier lorsqu'il fonctionne; en l'état du compte, GLM 5.2 est le meilleur repli
+  opérationnel mesuré.
+- Les refus Extra Usage, rate limit et modèle absent sont classés et projetés dans l'UI sans
+  journaliser le corps de réponse, une référence distante ou un secret.
+
+### Sécurité, logs et rollback
+
+- `computer_control action=commit` conserve sa confirmation UI obligatoire, même en Accès
+  complet. Aucun droit, contournement UAC ou exposition réseau supplémentaire.
+- Les journaux ajoutés ne contiennent que modèle, besoin, phase, durée et type d'erreur.
+- Aucune migration de schéma ou de donnée. Rollback : réversion atomique du commit v2.514,
+  puis redémarrage des deux services.
+
+### Validation réelle
+
+- `scripts/test_agent_loop_policy.py` : réussite, incluant continuation contextuelle positive
+  et rejet d'une continuation sans intention PC.
+- `scripts/test_agent_transport.py` : réussite, incluant projection Extra Usage sans fuite.
+- `scripts/test_model_market.py` : réussite, incluant priorité aux observations réelles.
+- Compilation Python de `agent.py`, `agent_loop_policy.py`, `agent_transport.py` et
+  `model_market.py` : réussite.
+- Catalogue réel après correction : GLM 5.2 premier pour `agentic`, puis MiniMax M3,
+  DeepSeek V4 Pro; Kimi K3 exclu par ses échecs de disponibilité observés.
+- `scripts/check_marvin.py` : tous les contrôles backend, outils, harnais, données, sécurité,
+  agent, modèles, Computer Runtime, frontend et lint ont réussi. Seul son second build Next.js
+  a été volontairement refusé parce que Turbopack avait été relancé; le build à froid exécuté
+  juste avant a compilé Next.js 16.2.12 avec succès.
+
 ## 2026-07-30 — v2.513 — Réparation après approbation et focus Windows robuste
 
 ### Incident et preuves

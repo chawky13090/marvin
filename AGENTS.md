@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.513.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.514.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.513.0)
+## 9. État actuel (v2.514.0)
+
+**v2.514 (Auto contextuel et routage Cloud vérifiable)** : une relance courte telle que
+« re teste », « continue » ou « trouve une solution » hérite des dernières demandes
+utilisateur uniquement lorsqu'elles établissent une mission PC/Web. Le Runner retente alors
+réellement `computer_control` au lieu de recycler un ancien refus; le gateway applique le
+mode d'autonomie courant et conserve la confirmation obligatoire de `action=commit`. Une
+mission PC encore inexécutée après la relance est enregistrée comme un échec agentique, et
+non comme un succès fondé sur une simple réponse textuelle. Le classement Auto privilégie
+Kimi K3 lorsqu'il est réellement disponible, puis GLM 5.2, DeepSeek V4 et MiniMax M3 pour
+l'agentique. Les échecs réels priment désormais sur le prior documentaire. Quand Ollama
+refuse Kimi faute de crédits Extra Usage, le repli l'indique sans exposer le corps distant,
+puis sélectionne le meilleur modèle opérationnel observé. Aucun schéma ni donnée persistante
+n'est modifié. Rollback : réversion atomique du commit v2.514 puis redémarrage backend/frontend.
 
 **v2.513 (réparation après approbation et focus Windows robuste)** : la continuation
 agentique distingue désormais le consentement de l'utilisateur du résultat technique de

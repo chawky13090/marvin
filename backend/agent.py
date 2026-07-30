@@ -116,6 +116,7 @@ from agent_transport import (
     OllamaChatRequest as _OllamaChatRequest,
     create_client as _create_ollama_client,
     error_event as _ollama_error_event,
+    public_error_reason as _ollama_public_error_reason,
     stream_chat as _stream_ollama_chat,
 )
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
@@ -561,6 +562,7 @@ async def _run_deterministic_agent(
                     exclude=frozenset(_failed_cloud_models),
                 )
                 if _alternate_cloud and _alternate_cloud != active_model:
+                    _public_reason = _ollama_public_error_reason(exc)
                     active_model = _alternate_cloud
                     yield _sse({
                         "type": "model_info",
@@ -572,7 +574,16 @@ async def _run_deterministic_agent(
                         "privacyPreset": _cr.get_privacy_preset(),
                         "cloudOnly": _ultra,
                         "sensitive": _model_config.sensitive,
-                        "switchReason": "cloud_model_unavailable",
+                        "switchReason": (
+                            _public_reason[0]
+                            if _public_reason
+                            else "cloud_model_unavailable"
+                        ),
+                        "switchMessage": (
+                            _public_reason[1]
+                            if _public_reason
+                            else "Le modèle Cloud initial est temporairement indisponible."
+                        ),
                     })
                     continue
             yield _sse(_ollama_error_event(
@@ -885,6 +896,11 @@ async def _run_deterministic_agent(
                     if spec.get("function", {}).get("name")
                 },
                 successful_calls=_runner_state.successful_calls,
+                recent_user_queries=[
+                    str(message.get("content") or "")
+                    for message in messages
+                    if message.get("role") == "user"
+                ],
             )
             and not _runner_state.nudged
             and step < _max_tool_steps - 1
@@ -937,6 +953,38 @@ async def _run_deterministic_agent(
 
         else:
             # ── Réponse finale — pas de tool calls ────────────────────────────
+            if (
+                _runner_state.nudged
+                and _requires_computer_action_nudge(
+                    _user_query,
+                    executed_tool_names=_executed_tool_names,
+                    available_tool_names={
+                        str(spec.get("function", {}).get("name") or "")
+                        for spec in tools_payload
+                        if spec.get("function", {}).get("name")
+                    },
+                    successful_calls=_runner_state.successful_calls,
+                    recent_user_queries=[
+                        str(message.get("content") or "")
+                        for message in messages
+                        if message.get("role") == "user"
+                    ],
+                )
+                and _is_cloud_model(active_model)
+            ):
+                try:
+                    import model_market as _model_market
+
+                    _model_market.record_observation(
+                        active_model,
+                        "agentic",
+                        False,
+                        int((time.monotonic() - _runner_state.started_at) * 1000),
+                        phase="computer_action_unfulfilled",
+                        error_type="MissionNotExecuted",
+                    )
+                except Exception:
+                    pass
             if _promises_unexecuted_action(
                 full_content,
                 executed_tool_names=_executed_tool_names,

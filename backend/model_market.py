@@ -34,7 +34,7 @@ _NEEDS = {
 _FAMILY_PREFERENCES = {
     "general": ("deepseek", "minimax", "glm", "qwen", "mistral", "nemotron", "kimi"),
     "reasoning": ("deepseek", "glm", "minimax", "qwen", "nemotron", "mistral", "kimi"),
-    "agentic": ("minimax", "glm", "nemotron", "mistral", "deepseek", "qwen", "kimi"),
+    "agentic": ("kimi", "glm", "deepseek", "minimax", "nemotron", "mistral", "qwen"),
     "code": ("glm", "deepseek", "kimi", "minimax", "qwen", "mistral", "nemotron"),
     "code_architecture": ("glm", "deepseek", "minimax", "qwen", "mistral", "nemotron", "kimi"),
     "code_implementation": ("kimi", "glm", "deepseek", "minimax", "qwen", "mistral", "nemotron"),
@@ -300,7 +300,12 @@ def _score(model: str, need: str, stats: dict[str, Any] | None) -> tuple[float, 
         score -= 40
         reasons.append("incapacité observée")
     if stats:
-        score += (float(stats["success_rate"]) - 0.5) * 30
+        success_rate = float(stats["success_rate"])
+        if int(stats.get("calls") or 0) > 0 and success_rate == 0:
+            score -= 40
+            reasons.append("aucun appel réel réussi sur cette installation")
+        else:
+            score += (success_rate - 0.5) * 30
         reasons.append(f"{stats['success_rate'] * 100:.0f}% de succès observé")
         latency = stats.get("average_duration_ms")
         if latency:

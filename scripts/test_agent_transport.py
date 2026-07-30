@@ -108,13 +108,29 @@ def main() -> int:
         read_timeout=120,
     )
     assert "HTTP 503" in http_error["message"]
+    quota_error = transport.OllamaHTTPError(
+        402,
+        '{"error":"this model uses extra usage only and your extra usage balance is empty"}',
+    )
+    assert transport.public_error_reason(quota_error) == (
+        "extra_usage_required",
+        "Ce modèle nécessite des crédits Ollama Extra Usage actuellement indisponibles.",
+    )
+    quota_event = transport.error_event(
+        quota_error,
+        model="kimi-k3:cloud",
+        base_url="http://ollama",
+        read_timeout=10,
+    )
+    assert "Extra Usage" in quota_event["message"]
+    assert "balance" not in quota_event["message"]
     unknown = transport.error_event(
         RuntimeError("C:\\chemin\\prive token=abc"),
         model="modele-prive",
         base_url="http://user:secret@ollama",
         read_timeout=120,
     )
-    for event in (connect, timeout, http_error, unknown):
+    for event in (connect, timeout, http_error, quota_event, unknown):
         serialized = json.dumps(event)
         assert "secret" not in serialized
         assert "modele-prive" not in serialized

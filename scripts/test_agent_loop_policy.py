@@ -118,6 +118,21 @@ async def main() -> int:
         available_tool_names={"computer_control"},
     ) is False
     assert requires_computer_action_nudge(
+        "Re teste et trouve une solution, tu dois le faire.",
+        executed_tool_names=set(),
+        available_tool_names={"computer_control"},
+        recent_user_queries=[
+            "Ouvre le site du restaurant et navigue jusqu'à la réservation.",
+            "Re teste et trouve une solution, tu dois le faire.",
+        ],
+    ) is True
+    assert requires_computer_action_nudge(
+        "Continue et corrige.",
+        executed_tool_names=set(),
+        available_tool_names={"computer_control"},
+        recent_user_queries=["Corrige le formatage de ce texte."],
+    ) is False
+    assert requires_computer_action_nudge(
         "Ouvre la page Web.",
         executed_tool_names={"computer_control"},
         available_tool_names={"computer_control"},
@@ -136,6 +151,7 @@ async def main() -> int:
         }],
     ) is False
     assert "action=navigate" in build_computer_action_nudge()[0]["content"]
+    assert "mode actuel" in build_computer_action_nudge()[0]["content"]
     assert should_suppress_model_text(
         has_blocking_outcomes=False,
         required_tool_names={"web_research"},

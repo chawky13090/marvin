@@ -52,7 +52,7 @@ def main() -> int:
         patch.object(model_market, "list_observations", return_value=[]),
     ):
         assert model_market.recommend("reasoning")[0]["family"] == "deepseek"
-        assert model_market.recommend("agentic")[0]["model"] == "minimax-m3:cloud"
+        assert model_market.recommend("agentic")[0]["model"] == "glm-5.2:cloud"
         assert model_market.recommend("code_implementation")[0]["family"] == "kimi"
         assert model_market.recommend("code_architecture")[0]["family"] == "glm"
         assert model_market.recommend("vision")[0]["model"] == "minimax-m3:cloud"

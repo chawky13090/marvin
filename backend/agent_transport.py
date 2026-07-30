@@ -57,6 +57,25 @@ class OllamaHTTPError(RuntimeError):
         self.body = body[:200]
 
 
+def public_error_reason(exc: Exception) -> tuple[str, str] | None:
+    """Classe une erreur Ollama sans exposer le corps distant ni ses références."""
+    if not isinstance(exc, OllamaHTTPError):
+        return None
+    body = exc.body.lower()
+    if "extra usage" in body and (
+        "balance is empty" in body or "add extra usage" in body
+    ):
+        return (
+            "extra_usage_required",
+            "Ce modèle nécessite des crédits Ollama Extra Usage actuellement indisponibles.",
+        )
+    if exc.status_code == 429:
+        return ("rate_limited", "Ce modèle Ollama Cloud limite temporairement les requêtes.")
+    if exc.status_code == 404:
+        return ("model_unavailable", "Ce modèle n'est pas disponible sur ce compte Ollama.")
+    return None
+
+
 def create_client(*, read_timeout: float = 300.0) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=httpx.Timeout(connect=10.0, read=read_timeout, write=30.0, pool=10.0)
@@ -123,7 +142,12 @@ def error_event(exc: Exception, *, model: str, base_url: str, read_timeout: int)
     }
     if isinstance(exc, OllamaHTTPError):
         context["status_code"] = exc.status_code
-        message = f"Ollama a refusé la requête (HTTP {exc.status_code})."
+        public_reason = public_error_reason(exc)
+        if public_reason:
+            context["reason"] = public_reason[0]
+            message = public_reason[1]
+        else:
+            message = f"Ollama a refusé la requête (HTTP {exc.status_code})."
     elif isinstance(exc, httpx.ConnectError):
         message = "Impossible de contacter Ollama. Vérifiez son état puis relancez Marvin."
     elif isinstance(exc, httpx.ReadTimeout):

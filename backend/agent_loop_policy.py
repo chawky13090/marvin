@@ -41,6 +41,12 @@ _COMPUTER_TARGET_RE = re.compile(
     r"|https?://",
     re.IGNORECASE,
 )
+_CONTINUATION_REQUEST_RE = re.compile(
+    r"\b(?:continue|continuer|reprends?|reprendre|r[ée]essaie|r[ée]essayer|"
+    r"re[\s-]?teste|retenter?|corrige|corriger|trouve\s+une\s+solution|"
+    r"tu\s+dois\s+le\s+faire|fais[\s-]?le|vas[\s-]?y)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -210,9 +216,18 @@ def requires_computer_action_nudge(
     executed_tool_names: set[str],
     available_tool_names: set[str],
     successful_calls: list[dict[str, str]] | None = None,
+    recent_user_queries: list[str] | None = None,
 ) -> bool:
     """Détecte une mission PC/Web terminée sans action mutatrice réussie."""
     text = str(user_query or "")
+    if _CONTINUATION_REQUEST_RE.search(text):
+        prior_context = "\n".join(
+            str(item or "")
+            for item in (recent_user_queries or [])[-4:]
+            if str(item or "").strip() and str(item or "").strip() != text.strip()
+        )
+        if prior_context:
+            text = f"{prior_context}\n{text}"
     successful_computer_action = any(
         call.get("tool") == "computer_control"
         and '"action": "observe"' not in str(call.get("args") or "")
@@ -236,6 +251,9 @@ def build_computer_action_nudge() -> list[dict[str, str]]:
             "courante ne peut pas annuler cette demande. Appelle maintenant "
             "`computer_control`. Si une URL est connue, commence par "
             "`action=navigate` avec `surface=browser`, puis observe et poursuis. "
+            "Une ancienne demande de confirmation n'est pas l'autorisation courante : "
+            "la passerelle appliquera elle-même le mode actuel (Normal, Auto ou Accès "
+            "complet). Ne prétends pas être bloqué avant d'avoir réellement retenté. "
             "Ne demande pas à l'utilisateur de faire une étape que l'outil peut réaliser."
         ),
     }]
