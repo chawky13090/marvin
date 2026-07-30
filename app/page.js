@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import ChatContainer from '@/components/chat/ChatContainer';
 import ConversationRow from '@/components/chat/sidebar/ConversationRow';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
@@ -110,6 +111,13 @@ export default function ChatPage() {
   const [availableModels, setAvailableModels] = useState([]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [ollamaConnected, setOllamaConnected] = useState(false);
+  const [conversationActionsHost, setConversationActionsHost] = useState(null);
+
+  useEffect(() => {
+    setConversationActionsHost(
+      document.getElementById('marvin-conversation-actions-host'),
+    );
+  }, []);
   const [pullModelName, setPullModelName] = useState('');
   const [pullStatus, setPullStatus] = useState(null);
 
@@ -907,24 +915,19 @@ export default function ChatPage() {
 
       {/* ═══ Zone de chat ═══ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {/* Bandeau d'actions unique : identité Marvin déjà portée par la navigation globale. */}
-        <div className="page-header" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-primary)', zIndex: 10, gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+        {conversationActionsHost && createPortal(
+          <>
             <button className="conv-toggle" onClick={() => setShowConv(true)} aria-label="Conversations" title="Conversations"
               style={{ background: 'rgba(79, 140, 255,0.12)', border: '1px solid rgba(79, 140, 255,0.3)', color: '#4f8cff',
-                       borderRadius: 8, width: 36, height: 36, fontSize: 16, cursor: 'pointer', flexShrink: 0,
+                       borderRadius: 8, width: 32, height: 32, fontSize: 15, cursor: 'pointer', flexShrink: 0,
                        alignItems: 'center', justifyContent: 'center' }}>💬</button>
-            <div
-              id="marvin-conversation-toolbar-host"
-              style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', position: 'relative' }}>
             {/* Indicateur Ollama */}
             <span className={`badge-dot ${ollamaConnected ? 'connected' : 'disconnected'}`} />
 
             {/* Sélecteur de modèle rapide */}
             <button
+              className="conversation-model-trigger"
               onClick={() => setShowModelDropdown(!showModelDropdown)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
@@ -1058,7 +1061,9 @@ export default function ChatPage() {
               </div>
             )}
           </div>
-        </div>
+          </>,
+          conversationActionsHost,
+        )}
 
         {/* Chat Container — key force la réinitialisation quand on change de conversation
             IMPORTANT : ne JAMAIS changer la key après un stream finish, sinon le composant

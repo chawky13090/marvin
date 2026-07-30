@@ -355,26 +355,29 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
             <ReadableContent html={htmlContent} text={textContent} viewMode={viewMode} />
           </BubbleWrapper>
         )}
-        {shouldCollapse && (
-          <button
-            type="button"
-            className={styles.activityToggle}
-            onClick={() => setStepsCollapsed(!stepsCollapsed)}
-            aria-expanded={!stepsCollapsed}
-          >
-            <span aria-hidden="true">{errorTools.length > 0 ? '!' : '✓'}</span>
-            <span>
-              {toolInvocations.length} action{toolInvocations.length > 1 ? 's' : ''}
-              {errorTools.length > 0
-                ? ` · ${errorTools.length} en erreur`
-                : ` · terminée${toolInvocations.length > 1 ? 's' : ''}`}
-            </span>
-            {errorTools.length > 0 && stepsCollapsed && (
-              <span className={styles.activityError}>{summarizeToolResult(errorTools[0].toolName, errorTools[0].result)}</span>
-            )}
-            <span className={styles.activityToggleAction}>{stepsCollapsed ? 'Voir le détail' : 'Masquer'}</span>
-          </button>
-        )}
+        <div className={styles.responseMetaRow}>
+          {shouldCollapse && (
+            <button
+              type="button"
+              className={styles.activityToggle}
+              onClick={() => setStepsCollapsed(!stepsCollapsed)}
+              aria-expanded={!stepsCollapsed}
+            >
+              <span aria-hidden="true">{errorTools.length > 0 ? '!' : '✓'}</span>
+              <span>
+                {toolInvocations.length} action{toolInvocations.length > 1 ? 's' : ''}
+                {errorTools.length > 0
+                  ? ` · ${errorTools.length} en erreur`
+                  : ` · terminée${toolInvocations.length > 1 ? 's' : ''}`}
+              </span>
+              {errorTools.length > 0 && stepsCollapsed && (
+                <span className={styles.activityError}>{summarizeToolResult(errorTools[0].toolName, errorTools[0].result)}</span>
+              )}
+              <span className={styles.activityToggleAction}>{stepsCollapsed ? 'Détails' : 'Masquer'}</span>
+            </button>
+          )}
+          <CortexTrace message={message} compact />
+        </div>
         {codingMissionTool && showMissionTracker && (
           <div style={{ marginLeft: '40px', width: 'calc(100% - 40px)' }}>
             <CodingMissionTracker result={codingMissionTool.result} />
@@ -395,7 +398,6 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
           </div>
         )}
         {modelBadge}
-        <CortexTrace message={message} />
       </div>
     );
   }

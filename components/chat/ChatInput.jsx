@@ -11,6 +11,13 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
   const voiceCtx = chatCtx?.voice;
   const voiceMode = voiceCtx?.voiceMode || false;
   const isSpeaking = voiceCtx?.isSpeaking || false;
+  const activeAssistant = [...messages].reverse().find(message => message?.role === 'assistant');
+  const activeInvocations = activeAssistant?.toolInvocations || [];
+  const completedInvocations = activeInvocations.filter(invocation => (
+    invocation?.state === 'result'
+    || invocation?.state === 'error'
+    || invocation?.result !== undefined
+  )).length;
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const [attachedImages, setAttachedImages] = useState([]);
@@ -467,13 +474,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
         </div>
       )}
 
-      <CortexControl
-        contract={chatCtx?.cortexContract}
-        onChange={chatCtx?.setCortexContract}
-        disabled={isLoading}
-      />
-
-      <div style={{
+      <div className="marvin-chat-composer" style={{
         display: 'flex',
         alignItems: 'flex-end',
         gap: '8px',
@@ -623,6 +624,46 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
             </>
           )}
         </div>
+
+        <CortexControl
+          contract={chatCtx?.cortexContract}
+          onChange={chatCtx?.setCortexContract}
+          disabled={isLoading}
+          compact
+        />
+
+        {isLoading && (
+          <div
+            role="status"
+            aria-live="polite"
+            title={activeInvocations.length
+              ? `${completedInvocations}/${activeInvocations.length} action(s) terminée(s)`
+              : 'Marvin analyse la demande'}
+            style={{
+              minHeight: 34,
+              maxWidth: 170,
+              padding: '0 8px',
+              borderRadius: 999,
+              border: '1px solid rgba(79,140,255,.24)',
+              background: 'rgba(79,140,255,.07)',
+              color: 'var(--text-secondary)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              flexShrink: 1,
+              overflow: 'hidden',
+              fontSize: 10.5,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span className="context-bar__status-dot" aria-hidden="true" style={{ background: 'var(--accent-primary)' }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {activeInvocations.length
+                ? `Travail · ${completedInvocations}/${activeInvocations.length}`
+                : 'Marvin travaille'}
+            </span>
+          </div>
+        )}
 
         {/* Bouton microphone — enregistrement vocal + sélecteur de périphérique */}
         <div style={{ position: 'relative', display: 'flex' }}>
@@ -809,6 +850,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
         )}
 
         <textarea
+          className="marvin-chat-composer__input"
           ref={textareaRef}
           value={input}
           onChange={(e) => {
@@ -827,6 +869,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           rows={1}
           style={{
             flex: 1,
+            minWidth: 0,
             background: 'transparent',
             border: 'none',
             outline: 'none',

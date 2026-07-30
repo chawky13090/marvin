@@ -116,7 +116,12 @@
   }
 
   .modeButton {
-    padding: 4px 7px;
+    padding: 4px 6px;
+    gap: 0;
+  }
+
+  .toolbarInHeader .modeButton > span:last-child {
+    display: none;
   }
 
   .exportGroup {

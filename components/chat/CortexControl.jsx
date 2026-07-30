@@ -3,7 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { BACKEND_URL } from '@/lib/backend';
 import { CORTEX_AXES, DEFAULT_CORTEX_CONTRACT, cortexSummary } from '@/lib/cortex';
 
-export default function CortexControl({ contract, onChange, disabled = false }) {
+export default function CortexControl({
+  contract,
+  onChange,
+  disabled = false,
+  compact = false,
+}) {
   const [open, setOpen] = useState(false);
   const [recipes, setRecipes] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -29,24 +34,43 @@ export default function CortexControl({ contract, onChange, disabled = false }) 
   };
 
   return (
-    <div style={{ position: 'relative', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-      <button type="button" disabled={disabled} onClick={() => setOpen(v => !v)} title="Configurer le contrat de mission Cortex"
-        style={{ display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', padding: '6px 11px', borderRadius: 999,
+    <div style={{
+      position: 'relative',
+      marginBottom: compact ? 0 : 8,
+      display: 'flex',
+      alignItems: 'center',
+      gap: compact ? 3 : 7,
+      flexWrap: compact ? 'nowrap' : 'wrap',
+      flexShrink: 0,
+    }}>
+      <button
+        type="button"
+        className={compact ? 'cortex-control-trigger cortex-control-trigger--compact' : 'cortex-control-trigger'}
+        disabled={disabled}
+        onClick={() => setOpen(v => !v)}
+        title="Configurer le contrat de mission Cortex"
+        style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 7, maxWidth: compact ? 170 : '100%',
+          minHeight: compact ? 34 : undefined, padding: compact ? '5px 8px' : '6px 11px', borderRadius: 999,
           border: `1px solid ${explicitCount ? 'rgba(56,189,248,.48)' : 'var(--border)'}`,
           background: explicitCount ? 'linear-gradient(90deg,rgba(79,140,255,.16),rgba(56,189,248,.10))' : 'var(--bg-glass)',
-          color: explicitCount ? '#7dd3fc' : 'var(--text-secondary)', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 650 }}>
-        <span aria-hidden>✦</span><span>Cortex · {cortexSummary(contract)}</span><span style={{ fontSize: 9 }}>▼</span>
+          color: explicitCount ? '#7dd3fc' : 'var(--text-secondary)', cursor: disabled ? 'not-allowed' : 'pointer',
+          fontSize: compact ? 11 : 12, fontWeight: 650, overflow: 'hidden' }}>
+        <span aria-hidden>✦</span>
+        <span className="cortex-control-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          Cortex · {cortexSummary(contract)}
+        </span>
+        <span className="cortex-control-chevron" style={{ fontSize: 9 }}>▼</span>
       </button>
-      {explicitCount > 0 && (
+      {explicitCount > 0 && !compact && (
         <button type="button" onClick={() => onChange({ ...DEFAULT_CORTEX_CONTRACT })}
           style={{ position: 'relative', zIndex: open ? 112 : 'auto', border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>Réinitialiser</button>
       )}
-      {contract?.pinned && <span style={{ color: '#fbbf24', fontSize: 11 }}>📌 conversation</span>}
+      {contract?.pinned && !compact && <span style={{ color: '#fbbf24', fontSize: 11 }}>📌 conversation</span>}
 
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 110 }} />
-          <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 111, width: 'min(680px, calc(100vw - 48px))',
+          <div className="cortex-control-popover" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 111, width: 'min(680px, calc(100vw - 48px))',
             maxHeight: 'min(620px, 72vh)', overflowY: 'auto', padding: 14, borderRadius: 16,
             background: 'var(--bg-secondary)', border: '1px solid rgba(79,140,255,.35)', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>

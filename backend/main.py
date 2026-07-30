@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.504 — bandeau conversation unifié et composeur Cortex responsive
 # v2.503 — découverte enrichie et mesurée des capacités
 # v2.502 — onglets SearXNG redondants et vérifiés
 # v2.501 — recherche Web multi-catégories et verticale
@@ -22,7 +23,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.481 — fermeture des listeners HTTP LAN derrière la passerelle HTTPS
 # v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique
 # v2.479 — activation vocale explicite, dock inférieur et retry TTS borné
-# v2.474 — sidebar conversations accessible, archivage réversible et exports
 # v2.468 — métriques bornées des décisions d'accès et d'idempotence
 # v2.467 — clés d'idempotence HTTP sur les gateways d'outils UI et MCP
 # v2.466 — autorisation LAN par capacités et profils d'appareil

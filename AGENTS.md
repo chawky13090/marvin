@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.503.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.504.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.503.0)
+## 9. État actuel (v2.504.0)
+
+**v2.504 (bandeau Chat et Cortex unifiés)** : Lecture, Technique et Audit sont projetés dans
+la barre contextuelle globale avec les actions de conversation et le sélecteur de modèle ;
+l'ancien bandeau local est supprimé. Cortex vit dans le composeur, affiche une progression
+compacte pendant l'exécution et conserve les preuves terminées auprès de la réponse qui les
+a produites. Sur mobile, la saisie occupe une ligne complète, les commandes passent dessous
+et le panneau Cortex reste borné au viewport. Aucun schéma, réglage persistant, transport ou
+contrat backend n'est modifié ; la réversion atomique du commit est le rollback.
 
 **v2.503 (Capability Discovery Engine v2)** : `tool_search` dérive désormais de chaque contrat
 une fiche compacte avec titre, résumé, paramètres, alias, cas d'usage, contre-indications et

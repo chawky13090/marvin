@@ -186,6 +186,21 @@
   text-align: left;
 }
 
+.responseMetaRow {
+  margin-left: 40px;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.responseMetaRow .activityToggle {
+  margin-left: 0;
+  max-width: 100%;
+}
+
 .activityToggle:hover {
   border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border));
   color: var(--text-primary);
@@ -258,6 +273,11 @@
     max-width: 100%;
     border-radius: var(--radius-md);
     flex-wrap: wrap;
+  }
+
+  .responseMetaRow {
+    margin-left: 0;
+    max-width: 100%;
   }
 
   .activityError {

@@ -13216,3 +13216,51 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
 - appel réel `/api/tools` après redémarrage : `web_site_crawl` classé premier pour l'intention
   d'aspirer un site, fiche v2 avec titre, cas d'usage et deux contre-indications;
 - backend 2.503.0 et frontend répondent correctement après redémarrage.
+## 2026-07-30 — v2.504 — Bandeau conversation unifié et Cortex dans le composeur
+
+### Demande
+
+- Remonter Lecture, Technique et Audit dans le bandeau supérieur, au niveau de
+  `Marvin / Conversation` et de l'état `Prêt`.
+- Déplacer Cortex et l'état des actions vers la barre de chat afin de libérer la
+  hauteur utile, sans perdre la provenance des actions terminées.
+
+### Décisions et réalisation
+
+- `ContextBar` fournit deux hôtes de portail réservés à la conversation : présentation
+  et actions rapides. Le sélecteur de modèle et le bouton du tiroir mobile y sont projetés.
+- L'ancien `page-header` du Chat est supprimé : il n'existe plus de seconde barre vide.
+- Cortex est intégré au composeur. Pendant une génération, un statut compact indique
+  l'activité et le nombre d'actions terminées.
+- Après génération, le résumé Cortex et le détail des actions restent groupés auprès de
+  la réponse concernée ; ils ne sont pas déplacés dans un état global ambigu.
+- Sous 480 px, la saisie utilise toute la largeur, les commandes occupent une seconde ligne
+  et le panneau Cortex est contraint au viewport.
+
+### Sécurité, logs et données
+
+- Aucun nouveau flux réseau, rendu HTML brut, secret, donnée personnelle ou permission.
+- Les appels Cortex, les outils et les confirmations continuent d'utiliser leurs contrats
+  et harness existants ; le changement est strictement présentationnel.
+- Aucun nouvel événement métier à journaliser. Les preuves d'outils existantes restent
+  attachées à leur message et leur politique de rétention est inchangée.
+
+### Validation réelle
+
+- `npm run check:ux` : 69 assertions réussies.
+- `npm run check:chat-presentation` : 18 assertions réussies.
+- `npm run check:chat-stream` : réussite.
+- `npm run lint -- --max-warnings=100` : 0 erreur ; 35 avertissements préexistants.
+- Gate global : tous les contrôles fonctionnels, architecture, sécurité et qualité ont
+  réussi ; son build final a été correctement refusé tant que Turbopack détenait `.next`.
+- `npm run build`, après arrêt du listener frontend : compilation Next.js 16.2.12
+  Turbopack réussie et 12 pages statiques générées.
+- Contrôle navigateur réel desktop : une seule barre supérieure, commandes alignées,
+  ancien bandeau absent et Cortex présent dans le composeur.
+- Contrôle navigateur réel 390 x 844 : champ lisible sur toute la largeur, commandes
+  compactes et panneau Cortex entièrement contenu dans le viewport.
+
+### Rollback
+
+- Aucun schéma ni donnée persistante n'est modifié.
+- Rollback exact : réversion atomique du commit v2.504, puis redémarrage du frontend.

@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 const STATUS_ICON = { done: '✓', running: '◌', error: '!' };
 
-export default function CortexTrace({ message }) {
+export default function CortexTrace({ message, compact = false }) {
   const [open, setOpen] = useState(false);
   const contract = message?.cortex;
   const provenance = message?.cortexProvenance;
@@ -17,7 +17,13 @@ export default function CortexTrace({ message }) {
   const ledgerPersisted = provenance?.truth_ledger?.evidence_persisted;
 
   return (
-    <div style={{ marginLeft: 40, width: 'fit-content', maxWidth: 'calc(100% - 48px)', fontSize: 10, color: 'var(--text-muted)' }}>
+    <div style={{
+      marginLeft: compact ? 0 : 40,
+      width: 'fit-content',
+      maxWidth: compact ? '100%' : 'calc(100% - 48px)',
+      fontSize: 10,
+      color: 'var(--text-muted)',
+    }}>
       <button type="button" onClick={() => setOpen(v => !v)}
         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 999,
           border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.05)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10 }}>

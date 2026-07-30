@@ -62,6 +62,15 @@ export default function ContextBar() {
         </div>
       </div>
 
+      <div
+        id="marvin-conversation-toolbar-host"
+        className="context-bar__conversation-toolbar"
+      />
+      <div
+        id="marvin-conversation-actions-host"
+        className="context-bar__conversation-actions"
+      />
+
       <div className="context-bar__secondary">
         <span
           className={`context-bar__status${chatStatus.isLoading ? ' context-bar__status--active' : ''}`}

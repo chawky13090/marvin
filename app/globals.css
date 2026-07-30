@@ -441,6 +441,8 @@ img { max-width: 100%; display: block; }
 
 .context-bar__primary,
 .context-bar__secondary,
+.context-bar__conversation-toolbar,
+.context-bar__conversation-actions,
 .context-bar__identity,
 .context-bar__command,
 .context-bar__status {
@@ -451,6 +453,19 @@ img { max-width: 100%; display: block; }
 .context-bar__primary,
 .context-bar__secondary {
   min-width: 0;
+  gap: 8px;
+}
+
+.context-bar__conversation-toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.context-bar__conversation-actions {
+  flex: 0 1 auto;
+  min-width: 0;
+  position: relative;
   gap: 8px;
 }
 
@@ -1197,6 +1212,11 @@ img { max-width: 100%; display: block; }
     justify-content: center;
   }
 
+  .context-bar__conversation-toolbar,
+  .context-bar__conversation-actions {
+    flex-shrink: 1;
+  }
+
   /* Hauteur dynamique : le champ de saisie reste visible quand le clavier s'ouvre */
   .app-layout, .main-content { height: 100dvh; }
 
@@ -1235,6 +1255,64 @@ img { max-width: 100%; display: block; }
 
   /* Aucun débordement horizontal (clé pour « ça ne s'adapte pas ») */
   html, body, .app-layout, .main-content { overflow-x: hidden; max-width: 100vw; }
+}
+
+@media (max-width: 640px) {
+  .context-bar {
+    gap: 6px;
+  }
+
+  .context-bar__identity {
+    display: none;
+  }
+
+  .conversation-model-trigger {
+    max-width: 92px;
+    padding-inline: 8px !important;
+    overflow: hidden;
+  }
+
+  .conversation-model-trigger > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .marvin-chat-composer {
+    flex-wrap: wrap;
+    gap: 6px !important;
+    padding: 8px !important;
+  }
+
+  .marvin-chat-composer__input {
+    order: -1;
+    flex: 1 0 100% !important;
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .cortex-control-trigger--compact {
+    width: 34px !important;
+    max-width: 34px !important;
+    padding-inline: 8px !important;
+    justify-content: center;
+  }
+
+  .cortex-control-trigger--compact .cortex-control-label,
+  .cortex-control-trigger--compact .cortex-control-chevron {
+    display: none;
+  }
+
+  .cortex-control-popover {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 88px !important;
+    width: auto !important;
+    max-height: calc(100dvh - 144px) !important;
+  }
 }
 
 /* Cible tactile : tout ce qui est cliquable reste assez grand au doigt */

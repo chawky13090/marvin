@@ -12,6 +12,9 @@ const quietWelcomeCss = fs.readFileSync('components/chat/QuietWelcome.module.css
 const contextBar = fs.readFileSync('components/layout/ContextBar.jsx', 'utf8');
 const appFrame = fs.readFileSync('components/layout/AppFrame.jsx', 'utf8');
 const historyPage = fs.readFileSync('app/historique/page.jsx', 'utf8');
+const cortexControl = fs.readFileSync('components/chat/CortexControl.jsx', 'utf8');
+const messageBubble = fs.readFileSync('components/chat/MessageBubble.jsx', 'utf8');
+const messageBubbleCss = fs.readFileSync('components/chat/MessageBubble.module.css', 'utf8');
 
 for (const [token, value] of [
   ['--fib-1', '3px'],
@@ -66,9 +69,25 @@ assert.match(quietWelcomeCss, /prefers-reduced-motion/);
 assert.match(contextBar, /Ouvrir la navigation Marvin/);
 assert.match(contextBar, /marvin:open-command-palette/);
 assert.match(contextBar, /Travail en cours/);
+assert.match(contextBar, /id="marvin-conversation-toolbar-host"/);
+assert.match(contextBar, /id="marvin-conversation-actions-host"/);
 assert.match(appFrame, /<ContextBar \/>/);
 assert.doesNotMatch(appFrame, /<NavigationModeControl/);
+assert.match(home, /createPortal/);
+assert.match(home, /getElementById\('marvin-conversation-actions-host'\)/);
+assert.doesNotMatch(home, /id="marvin-conversation-toolbar-host"/);
+assert.match(chatInput, /<CortexControl[\s\S]*compact/);
+assert.match(chatInput, /Marvin travaille/);
+assert.match(chatInput, /className="marvin-chat-composer"/);
+assert.match(chatInput, /className="marvin-chat-composer__input"/);
+assert.match(globalCss, /\.marvin-chat-composer__input/);
+assert.match(cortexControl, /cortex-control-trigger--compact/);
+assert.match(cortexControl, /className="cortex-control-popover"/);
+assert.match(globalCss, /\.cortex-control-popover/);
+assert.match(messageBubble, /responseMetaRow/);
+assert.match(messageBubble, /<CortexTrace message=\{message\} compact \/>/);
+assert.match(messageBubbleCss, /\.responseMetaRow/);
 assert.match(historyPage, /Historique des discussions/);
 assert.match(historyPage, /toLocaleDateString\('fr-FR'/);
 
-console.log('UX design system: 53 assertions passed.');
+console.log('UX design system: 69 assertions passed.');
