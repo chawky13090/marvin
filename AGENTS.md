@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.518.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.519.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,32 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.518.0)
+## 9. État actuel (v2.519.0)
+
+**v2.519 (filtrage fail-closed, dédup sémantique et commandes sensibles)** — *tranche livrée
+par Claude Code, sur les quatre remarques de revue de Codex.* (1) `validated_tools()` remplace
+le motif `if (not valid or t in valid)` qui **désactivait le contrôle** quand l'appelant
+omettait le registre : il charge maintenant le registre réel (import paresseux, aucun cycle),
+et un registre introuvable donne zéro outil déclaré. (2) `_semantic_duplicate` complète le
+contrôle lexical (seuil 0,86) — la justification « trop lent » était fausse, `_emb_cache` est
+déjà rempli par le matcher ; embeddings indisponibles ⇒ **refus**, jamais écriture à l'aveugle.
+(3) `security.classify_command_sensitivity` reconnaît cinq familles (élévation, neutralisation
+des défenses, persistance, téléchargement-puis-exécution, accès aux secrets) et
+`tool_gateway.requires_human_confirmation` exige un accord humain pour ces seuls cas, **y
+compris sous `auto` et sous `full`** : la granularité est au niveau de l'ARGUMENT, `net user`
+reste autonome, `net user x /add` demande un clic. Aucun mode n'est bridé. (4) Fusion par
+clustering sémantique (0,88) : la plus riche de chaque grappe est conservée, les autres
+désactivées.
+
+**Régression corrigée au passage** : `save_skill` réinitialisait `enabled` à chaque
+réécriture — le worker a réactivé une compétence neuf minutes après sa désactivation. Les
+chemins automatiques passent `respect_disabled=True` ; le rollback de version et la
+réactivation manuelle restent libres. Bibliothèque : 84 actives sur 178, **0 référence morte
+sur 327**. Tests `check:sensitive-commands` et `check:consolidation-guards`, validés par
+mutation ; le contrôle du gateway a été rendu **comportemental** après avoir constaté qu'un
+contrôle textuel ne détectait pas `if False and …`. **Dette déclarée** : `_SENSITIVE_FAMILIES`
+reste une énumération de motifs, elle rétablit la confirmation mais ne remplace pas un bac à
+sable — l'isolation d'exécution reste le palier non franchi.
 
 **v2.518 (poste principal DHCP et diagnostic de jumelage)** : une panne du backend ne produit
 plus un faux formulaire de jumelage; l'interface affiche explicitement que Marvin doit

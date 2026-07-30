@@ -54,6 +54,79 @@ _SYSTEM_PATH    = _rx(r"(c:\\windows\b|c:\\program files|\$env:systemroot|\$env:
 _DELETE_VERB    = _rx(r"(\bremove-item\b|\bdel\b|\berase\b|\brd\b|\brmdir\b|\brm\b|\bri\b|\brimraf\b)")
 
 
+# ── v2.519 — Familles SENSIBLES (ne bloquent pas : exigent un accord humain) ────
+#
+# `screen_command` ne refuse que la destruction du système ; sa docstring précise que
+# le reste est « géré par les confirmations + niveaux de permission ». Or une
+# autorisation d'autonomie (`auto` ou `full`) accorde justement ces confirmations
+# d'avance : cette moitié du dispositif disparaissait donc exactement quand elle
+# devenait nécessaire. Ces familles la rétablissent, au niveau de l'ARGUMENT et non
+# de l'outil — une commande anodine reste autonome, seule celle qui crée un
+# administrateur, désactive l'antivirus ou installe une persistance redemande un clic.
+_SENSITIVE_FAMILIES = [(_rx(p), family, lbl) for p, family, lbl in [
+    # Élévation / création de comptes
+    (r"\bnet\s+user\b[\s\S]*\/add\b", "privilege_escalation", "création d'un compte local"),
+    (r"\bnet\s+localgroup\b[\s\S]*\b(administrateurs|administrators)\b[\s\S]*\/add\b",
+     "privilege_escalation", "ajout au groupe administrateurs"),
+    (r"\b(new-localuser|add-localgroupmember|set-localuser)\b",
+     "privilege_escalation", "gestion de comptes locaux PowerShell"),
+    (r"\bnet\s+accounts\b", "privilege_escalation", "modification de la politique de comptes"),
+    # Neutralisation des défenses
+    (r"\bset-mppreference\b[\s\S]*\b(disable\w*)\s*\$?true\b",
+     "defense_evasion", "désactivation d'une protection Defender"),
+    (r"\badd-mppreference\b[\s\S]*\bexclusion",
+     "defense_evasion", "ajout d'une exclusion Defender"),
+    (r"\bnetsh\s+advfirewall\b[\s\S]*\b(off|disable)\b",
+     "defense_evasion", "désactivation du pare-feu"),
+    (r"\b(stop-service|sc\s+(stop|delete)|net\s+stop)\b[\s\S]*\b(windefend|mpssvc|sense|wuauserv)\b",
+     "defense_evasion", "arrêt d'un service de sécurité"),
+    (r"\bbcdedit\b[\s\S]*\b(testsigning|nointegritychecks)\b",
+     "defense_evasion", "affaiblissement du démarrage sécurisé"),
+    (r"\bset-executionpolicy\b[\s\S]*\b(bypass|unrestricted)\b",
+     "defense_evasion", "abaissement de la politique d'exécution"),
+    # Persistance
+    (r"\breg(\.exe)?\s+add\b[\s\S]*\\(run|runonce)\b", "persistence", "clé de démarrage Run"),
+    (r"\b(schtasks\b[\s\S]*\/create|new-scheduledtask|register-scheduledtask)\b",
+     "persistence", "tâche planifiée"),
+    (r"\b(sc(\.exe)?\s+create|new-service)\b", "persistence", "création d'un service"),
+    (r"\bwmic\b[\s\S]*\bstartup\b", "persistence", "entrée de démarrage WMI"),
+    # Téléchargement puis exécution
+    (r"\bcertutil\b[\s\S]*-urlcache\b", "remote_payload", "téléchargement via certutil"),
+    (r"\bbitsadmin\b[\s\S]*\/transfer\b", "remote_payload", "téléchargement via bitsadmin"),
+    (r"\b(iex|invoke-expression)\b[\s\S]*\b(downloadstring|invoke-webrequest|iwr|curl|wget)\b",
+     "remote_payload", "exécution directe d'un contenu téléchargé"),
+    (r"\b(curl|wget|invoke-webrequest|iwr)\b[\s\S]*\|\s*(bash|sh|powershell|pwsh)\b",
+     "remote_payload", "téléchargement redirigé vers un interpréteur"),
+    # Accès aux secrets
+    (r"\breg(\.exe)?\s+save\b[\s\S]*\bhk(lm|ey_local_machine)\\(sam|security|system)\b",
+     "credential_access", "extraction des ruches de comptes"),
+    (r"\b(mimikatz|lsassy|procdump\b[\s\S]*lsass|comsvcs\.dll[\s\S]*minidump)\b",
+     "credential_access", "extraction de secrets mémoire"),
+    (r"\b(cmdkey\s+\/list|vaultcmd|get-credential\b[\s\S]*-username)\b",
+     "credential_access", "lecture d'identifiants stockés"),
+]]
+
+
+def classify_command_sensitivity(command: str) -> dict:
+    """Classe une commande AUTORISÉE selon des familles à fort impact.
+
+    Ne bloque rien : renvoie les familles détectées afin que l'appelant exige un
+    accord humain explicite, y compris lorsqu'une autorisation d'autonomie est
+    active. Une commande sans famille détectée reste pleinement autonome.
+    """
+    if not command or not isinstance(command, str):
+        return {"sensitive": False, "families": [], "labels": []}
+    norm = re.sub(r"\s+", " ", command.replace("`", "").replace("^", "")).strip()
+    families, labels = [], []
+    for rx, family, label in _SENSITIVE_FAMILIES:
+        if rx.search(norm):
+            if family not in families:
+                families.append(family)
+            if label not in labels:
+                labels.append(label)
+    return {"sensitive": bool(families), "families": families, "labels": labels}
+
+
 def screen_command(command: str) -> dict:
     """
     Analyse une commande shell/PowerShell brute AVANT exécution.

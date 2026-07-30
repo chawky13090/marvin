@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Mapping, Sequence
 
 import agent_autonomy
+import security
 from agent_safety import validator_for
 from agent_execution import execute_registered_tool
 from critical_tool_policy import approval_summary, manifest_for_critical_call
@@ -37,6 +38,67 @@ def _conditional_mutation(tool_name: str, arguments: Mapping[str, Any]) -> bool:
         return False
     action = str(arguments.get("action") or "").strip().lower()
     return action not in safe_actions
+
+
+# Outils qui EXÉCUTENT une commande brute, et le nom de l'argument qui la porte.
+# Liste dérivée du registre réel ; `scripts/test_sensitive_command_confirmation.py`
+# vérifie que chaque nom existe encore. Les outils `cmd_analyze_risk`,
+# `cmd_suggest_safer_alternative` et `cmd_require_approval` portent aussi un argument
+# `command` mais ne font que l'ANALYSER : leur imposer une confirmation bloquerait
+# précisément l'outillage qui sert à évaluer le risque.
+_COMMAND_BEARING_TOOLS: dict[str, tuple[str, ...]] = {
+    "pc_run_command": ("command",),
+    "pc_run_powershell": ("script", "command"),
+    "pc_run_elevated": ("command", "script"),
+    "ssh_exec": ("command",),
+    "ssh_exec_multi": ("command",),
+}
+
+
+def _command_sensitivity(
+    tool_name: str, arguments: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Familles sensibles portées par les arguments d'un appel d'outil.
+
+    Renvoie toujours un dictionnaire : un outil sans commande n'est jamais sensible.
+    """
+    fields = _COMMAND_BEARING_TOOLS.get(tool_name)
+    if not fields:
+        return {"sensitive": False, "families": [], "labels": []}
+    families: list[str] = []
+    labels: list[str] = []
+    for field in fields:
+        value = arguments.get(field)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        verdict = security.classify_command_sensitivity(value)
+        for family in verdict.get("families", []):
+            if family not in families:
+                families.append(family)
+        for label in verdict.get("labels", []):
+            if label not in labels:
+                labels.append(label)
+    return {"sensitive": bool(families), "families": families, "labels": labels}
+
+
+def requires_human_confirmation(
+    tool_name: str, arguments: Mapping[str, Any]
+) -> bool:
+    """Vrai si cet appel exige un accord humain MALGRÉ une autonomie active.
+
+    v2.519 — Granularité au niveau de l'ARGUMENT, pas de l'outil. Une commande
+    anodine reste autonome sous `auto` comme sous `full` ; celle qui crée un
+    administrateur, neutralise une protection, installe une persistance,
+    télécharge-puis-exécute ou lit des secrets redemande un clic. Fonction pure et
+    isolée afin d'être testable directement : un contrôle par lecture du source ne
+    détecterait pas sa neutralisation.
+    """
+    if (
+        tool_name == "computer_control"
+        and str(arguments.get("action") or "").strip().casefold() == "commit"
+    ):
+        return True
+    return bool(_command_sensitivity(tool_name, arguments).get("sensitive"))
 
 
 def _arguments_for_observability(
@@ -202,10 +264,7 @@ async def execute_tool(
             autonomy = agent_autonomy.current(database)
         except Exception:
             autonomy = {"mode": "normal", "active": False}
-        always_confirm = (
-            request.tool_name == "computer_control"
-            and str(arguments.get("action") or "").strip().casefold() == "commit"
-        )
+        always_confirm = requires_human_confirmation(request.tool_name, arguments)
         if (
             not always_confirm
             and autonomy.get("active")

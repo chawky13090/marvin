@@ -127,9 +127,38 @@ def _llm(payload: dict):
     return generate, captured
 
 
+def _stub_semantic(verdict):
+    """Pilote le controle semantique sans dependre d un service d embeddings."""
+    async def _fake(name, description, existing):
+        return verdict
+    skills._semantic_duplicate = _fake
+
+
+def _check_semantic_guard() -> None:
+    """v2.519 — le lexical rate les paraphrases ; l absence d embeddings doit refuser."""
+    body = "## Objectif\nx.\n## Étapes\n1. y.\n## Vérification\nz."
+    log = [_log_entry("upgrade", "s", _stamp(7200 + i)) for i in range(4)]
+    payload = {"name": "sujet-inedit-abcdef", "description": "Un sujet totalement inedit ici",
+               "triggers": ["x"], "tools": [], "body": body}
+
+    # Doublon detecte par le sens alors que le lexical ne voit rien.
+    _seed_log(log); _stub_semantic(True)
+    gen, _ = _llm(payload)
+    assert _run(skills.review_and_consolidate_learnings(gen, "s", tool_names=REAL_TOOLS)) is None
+    assert any(e.get("reason", "").startswith("Doublon sémantique")
+               for e in skills.get_learning_log(20))
+
+    # Embeddings indisponibles => refus (fail-closed), jamais ecriture a l aveugle.
+    _seed_log(log); _stub_semantic(None)
+    gen, _ = _llm(payload)
+    assert _run(skills.review_and_consolidate_learnings(gen, "s", tool_names=REAL_TOOLS)) is None
+    assert not any(s["name"] == "sujet-inedit-abcdef" for s in skills.list_skills())
+
+
 def _check_end_to_end() -> None:
     body = "## Objectif\nTrier.\n## Étapes\n1. Lister.\n## Vérification\nOK."
     log = [_log_entry("upgrade", "s", _stamp(7200 + i)) for i in range(4)]
+    _stub_semantic(False)   # pas de doublon semantique pour ce scenario
 
     # 1. Cas nominal : outils inventes retires, competence ecrite.
     _seed_log(log)
@@ -173,8 +202,42 @@ def _check_end_to_end() -> None:
     assert _run(skills.review_and_consolidate_learnings(gen5, "s", tool_names=REAL_TOOLS)) is None
 
 
+def _check_failclosed_tool_filter() -> None:
+    """v2.519 — un appelant qui oublie le registre ne doit PAS desactiver le filtre."""
+    real = ["file_find", "web_search"]
+    assert skills.validated_tools(["file_find", "learning-log"], real) == ["file_find"]
+    # Sans registre fourni : le vrai registre est charge, pas le controle abandonne.
+    out = skills.validated_tools(["file_find", "learning-log", "bash"], None)
+    assert "learning-log" not in out and "bash" not in out, out
+    assert "file_find" in out, out
+    # Registre introuvable => aucun outil declare (fail-closed, jamais fail-open).
+    original = skills._registry_tool_names
+    try:
+        skills._registry_tool_names = lambda: set()
+        assert skills.validated_tools(["file_find", "learning-log"], None) == []
+    finally:
+        skills._registry_tool_names = original
+    assert skills.validated_tools(None, real) == []
+    assert len(skills.validated_tools(["file_find"] * 20, ["file_find"], limit=8)) == 8
+
+
+def _check_disabled_is_a_decision(tmp: Path) -> None:
+    """Une reecriture AUTOMATIQUE ne doit jamais reactiver une competence eteinte."""
+    body = "## Objectif\nFaire quelque chose."
+    skills.save_skill("test-eteinte", "Une competence eteinte", body, [], False)
+    assert skills.get_skill("test-eteinte")["enabled"] is False
+    # Chemin automatique : l etat eteint est preserve.
+    skills.save_skill("test-eteinte", "Reecrite par un worker", body, [],
+                      True, respect_disabled=True)
+    assert skills.get_skill("test-eteinte")["enabled"] is False, "worker a rallume une eteinte"
+    # Chemin utilisateur : la reactivation manuelle reste possible.
+    skills.save_skill("test-eteinte", "Rallumee par l utilisateur", body, [], True)
+    assert skills.get_skill("test-eteinte")["enabled"] is True, "reactivation manuelle cassee"
+
+
 def main() -> int:
     original = (skills._SKILLS_DIR, skills._VERSIONS_DIR, skills._LEARNING_LOG_PATH)
+    original_semantic = skills._semantic_duplicate
     with tempfile.TemporaryDirectory() as raw:
         try:
             _isolate(Path(raw))
@@ -182,8 +245,12 @@ def main() -> int:
             _check_duplicate_detection()
             _check_cooldown()
             _check_end_to_end()
+            _check_semantic_guard()
+            _check_failclosed_tool_filter()
+            _check_disabled_is_a_decision(Path(raw))
         finally:
             skills._SKILLS_DIR, skills._VERSIONS_DIR, skills._LEARNING_LOG_PATH = original
+            skills._semantic_duplicate = original_semantic
     print(
         "Consolidation Guards OK - cooldown, sujets meta, doublons refuses "
         "et outils inexistants filtres."

@@ -237,6 +237,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Garde-fous de la consolidation de competences",
             (python, "scripts/test_skill_consolidation_guards.py"),
         ),
+        Stage(
+            "Commandes sensibles confirmees malgre l autonomie",
+            (python, "scripts/test_sensitive_command_confirmation.py"),
+        ),
         Stage("Catalogue dynamique des capacités", (python, "scripts/test_capability_catalog.py")),
         Stage("Découverte enrichie des capacités", (python, "scripts/test_capability_discovery_v2.py")),
         Stage("Boucle agentique LLM native", (python, "scripts/test_native_agent_runtime.py")),

@@ -13956,3 +13956,91 @@ redémarrage du backend. Rollback partiel sans redéploiement : porter
 comportement antérieur du worker. Rollback des données : recopier
 `data/skills_backup_20260730-223100/*.md` dans `data/skills/` restaure les 178 compétences
 avec leur état `enabled` d'origine.
+
+## 2026-07-30 — v2.519 — Filtrage fail-closed, dédup sémantique et commandes sensibles
+
+> Tranche réalisée par **Claude Code**, sur les quatre remarques de revue de **Codex**
+> concernant la tranche v2.517. Les quatre sont traitées ; une cinquième régression,
+> découverte en vérifiant, l'est aussi.
+
+### Remarques traitées
+
+**1. Filtrage des outils fail-closed.** Le motif historique `if (not valid or t in valid)`
+désactivait le contrôle quand l'appelant ne fournissait pas de registre — le défaut même
+qui a laissé entrer 101 références mortes. `validated_tools()` charge désormais le registre
+réel (`_registry_tool_names`, import paresseux ; `tools.py` n'importe pas `skills.py`, donc
+aucun cycle) au lieu d'abandonner le contrôle ; registre introuvable ⇒ aucun outil déclaré.
+Les trois sites de création utilisent ce helper. Le repli de `upgrade_skill` sur les anciens
+outils est validé lui aussi : une compétence réparée ne conserve plus un outil inexistant.
+
+**2. Déduplication sémantique.** Le contrôle lexical ratait les paraphrases. La justification
+initiale (« trop lent pour un worker de fond ») reposait sur une prémisse fausse : `_emb_cache`
+est déjà rempli par le matcher à chaque tour, un candidat ne coûte donc qu'un seul embedding.
+`_semantic_duplicate` s'exécute après le lexical, seuil 0,86. Il retourne `None` si les
+embeddings sont indisponibles et l'appelant **refuse** alors la consolidation : une
+consolidation manquée ne coûte rien, une de trop coûte ce qui vient d'être nettoyé.
+
+**3. Commandes sensibles malgré l'autonomie.** `screen_command` ne refuse que la destruction
+du système ; sa docstring précise que le reste est « géré par les confirmations ». Or une
+autorisation `auto` ou `full` accorde ces confirmations d'avance : cette moitié du dispositif
+disparaissait exactement quand elle devenait nécessaire. `classify_command_sensitivity`
+(security.py) reconnaît cinq familles — élévation, neutralisation des défenses, persistance,
+téléchargement-puis-exécution, accès aux secrets — et `requires_human_confirmation`
+(tool_gateway.py) exige un accord humain pour ces seuls cas. La granularité est au niveau de
+l'**argument** : `net user` reste autonome, `net user x /add` demande un clic. Aucun mode
+n'est bridé ; l'utilisateur emploie `auto` et `full` selon la tâche et conserve les deux.
+
+**4. Fusion des compétences proches.** Clustering sémantique (seuil 0,88) sur les
+compétences actives ; dans chaque grappe la plus riche (outils réels puis longueur du corps)
+est conservée, les autres désactivées. Critère mécanique, aucun arbitrage de contenu.
+
+### Régression découverte en vérifiant
+
+Le nettoyage de la v2.517 s'est révélé **non durable** : la compétence
+`resolution-chemins-fichiers`, désactivée à 22h31, a été réécrite active à 22h40 par le
+worker de consolidation — le backend tournant encore l'ancien code. `save_skill` réinitialisait
+`enabled` à chaque réécriture. Une désactivation est une **décision**, pas un état par défaut :
+les chemins automatiques (`upgrade_skill`, consolidation) passent désormais
+`respect_disabled=True` et ne peuvent plus rallumer une compétence éteinte. Le rollback de
+version et la réactivation manuelle depuis l'interface restent inchangés.
+
+### Sécurité, logs et preuves
+
+Aucune capacité retirée : les commandes sensibles restent exécutables, elles exigent un geste
+explicite. Les familles sont des déclencheurs de confirmation, pas une denylist. Les outils
+`cmd_analyze_risk`, `cmd_suggest_safer_alternative` et `cmd_require_approval` portent aussi un
+argument `command` mais ne font que l'analyser : les inclure aurait bloqué l'outillage même
+qui sert à évaluer le risque. Aucun contenu de commande ne rejoint les journaux. Aucune
+migration de schéma, aucun nouveau chemin persistant.
+
+Dette résiduelle déclarée : `_SENSITIVE_FAMILIES` reste une énumération de motifs et ne
+prétend pas à l'exhaustivité — elle rétablit la confirmation là où l'autonomie l'avait
+supprimée, elle ne remplace pas un bac à sable. Une isolation réelle de l'exécution (le
+`sandbox_mode` que Codex applique à son propre runtime) reste le palier supérieur non franchi.
+
+### Validation réelle
+
+- Classification : 16 commandes sensibles détectées sur 16, 10 commandes ordinaires restées
+  autonomes sur 10, zéro faux positif (`net user` vs `net user x /add`, `sc query` vs
+  `sc create`). Obfuscation par accent grave couverte.
+- Câblage vérifié sur les cinq outils porteurs, dérivés du registre live ; le test contrôle
+  que chaque nom existe encore — il a d'ailleurs rejeté un `vm_lab_run` inventé et fait
+  ajouter `ssh_exec_multi` oublié.
+- **Test de mutation sur quatre gardes** : filtre rendu fail-open ⇒ échec ; worker rallumant
+  une compétence éteinte ⇒ échec ; sensibilité neutralisée ⇒ échec. Restaurés, tous repassent.
+  Le premier contrôle du gateway était textuel et ne détectait PAS `if False and …` : la
+  décision a été extraite en fonction pure `requires_human_confirmation` et le test est
+  devenu comportemental.
+- Bibliothèque : 84 compétences actives sur 178, **0 référence morte sur 327**.
+- 10 tests ciblés réussis ; `check_architecture` OK — 2.519.0, 356 outils, harness 356/356.
+- Sauvegarde préalable `data/skills_backup_20260730-232502/` (178 fichiers).
+- Le backend n'a **pas** été redémarré : les garde-fous ne prendront effet qu'au prochain
+  démarrage, et le worker continue d'ici là avec l'ancien code. Limite déclarée, non masquée.
+
+### Rollback
+
+Aucune migration de schéma. Rollback complet : réversion atomique du commit v2.519 puis
+redémarrage. Rollback partiel : vider `_SENSITIVE_FAMILIES` restaure l'autonomie sans
+confirmation ; `SEMANTIC_DUPLICATE_THRESHOLD = 2` neutralise la dédup sémantique ;
+`respect_disabled=False` sur les deux chemins automatiques restaure le comportement
+antérieur. Données : `data/skills_backup_20260730-232502/*.md`.

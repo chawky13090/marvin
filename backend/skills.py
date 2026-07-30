@@ -93,7 +93,7 @@ def get_skill(name: str) -> dict | None:
 
 
 def save_skill(name: str, description: str, body: str, tools=None, enabled: bool = True,
-               triggers=None, related=None) -> str:
+               triggers=None, related=None, respect_disabled: bool = False) -> str:
     fn = _safe_name(name)
     path = os.path.join(_dir(), fn + ".md")
     # Versioning : avant d'écraser une compétence existante, on sauvegarde l'ancienne
@@ -104,6 +104,18 @@ def save_skill(name: str, description: str, body: str, tools=None, enabled: bool
             shutil.copy2(path, os.path.join(_VERSIONS_DIR, f"{fn}.{time.strftime('%Y%m%d-%H%M%S')}.md"))
         except Exception:
             pass
+        # v2.519 — Une désactivation est une DÉCISION, pas un état par défaut : une
+        # réécriture AUTOMATIQUE ne doit jamais la révoquer en silence. Constaté en
+        # conditions réelles : le worker de consolidation a réécrit une compétence
+        # désactivée neuf minutes plus tard, la remettant active avec de nouveaux
+        # outils inexistants. Les chemins automatiques passent `respect_disabled=True` ;
+        # l'utilisateur, lui, peut toujours réactiver depuis l'interface.
+        if respect_disabled and enabled:
+            try:
+                if not _parse(path).get("enabled", True):
+                    enabled = False
+            except Exception:
+                pass
     fm = ["---", f"name: {name}", f"description: {description}",
           f"tools: [{', '.join(tools or [])}]",
           f"triggers: [{', '.join(triggers or [])}]",
@@ -369,7 +381,6 @@ async def suggest_skills(generate_fn, messages: list, tool_names=None, max_sugge
         _i = _end
         _collect(_obj)
     existing_names = {s["name"] for s in existing}
-    valid_tools = set(tool_names or [])
     out = []
     for c in (cands or []):
         if not isinstance(c, dict) or not c.get("name"):
@@ -390,7 +401,7 @@ async def suggest_skills(generate_fn, messages: list, tool_names=None, max_sugge
             "name": c["name"],
             "description": c.get("description", ""),
             "triggers": [str(t)[:40] for t in (c.get("triggers") or [])][:6],
-            "tools": [t for t in (c.get("tools") or []) if (not valid_tools or t in valid_tools)][:8],
+            "tools": validated_tools(c.get("tools"), tool_names),
             "why": c.get("why", ""),
             "examples": [str(e)[:120] for e in (c.get("examples") or [])][:3],
         })
@@ -581,8 +592,10 @@ async def upgrade_skill(name: str, generate_fn, reason: str = "", transcript: st
         return {"success": False, "error": "Upgrade : JSON illisible.", "raw": (raw or "")[:300]}
 
     # Ne garder que des outils réellement existants ; conserver ceux d'avant en repli.
-    valid = set(tool_names or [])
-    new_tools = [t for t in (data.get("tools") or []) if (not valid or t in valid)] or sk.get("tools") or []
+    # Le repli sur les anciens outils est validé lui aussi : une compétence réparée
+    # ne doit pas conserver un outil inexistant hérité.
+    new_tools = (validated_tools(data.get("tools"), tool_names)
+                 or validated_tools(sk.get("tools"), tool_names))
 
     # Le déclenchement (triggers + description) sert au MATCHING et a été choisi
     # délibérément → on le PRÉSERVE. Un upgrade corrige la MÉTHODE (body + tools),
@@ -600,7 +613,7 @@ async def upgrade_skill(name: str, generate_fn, reason: str = "", transcript: st
     new_ver = int(s.get("version", 1)) + 1
     # save_skill archive automatiquement l'ancienne version (rollback possible)
     save_skill(data["name"], new_desc, data.get("body"), new_tools, True,
-               triggers=new_trigs, related=sk.get("related"))
+               triggers=new_trigs, related=sk.get("related"), respect_disabled=True)
     s["version"] = new_ver
     s["consecutive_fail"] = 0
     s["last_outcome"] = "upgraded"
@@ -951,6 +964,35 @@ async def find_overlapping_skills(threshold: float = 0.85) -> list[dict]:
     return pairs
 
 
+def _registry_tool_names() -> set:
+    """Noms du registre réel. Import paresseux : `tools` est lourd et n'est pas
+    nécessaire au reste du module (aucun cycle : tools.py n'importe pas skills.py)."""
+    try:
+        import tools as tool_module
+        return {
+            spec.get("function", {}).get("name")
+            for spec in tool_module.TOOLS_SPEC
+            if spec.get("function", {}).get("name")
+        }
+    except Exception:
+        return set()
+
+
+def validated_tools(candidate, tool_names=None, *, limit: int = 8) -> list:
+    """Filtre fail-closed des outils déclarés par une compétence.
+
+    v2.519 — le filtre historique était `if (not valid or t in valid)` : un appelant
+    qui oubliait de fournir le registre **désactivait le contrôle**. C'est exactement
+    le défaut qui a laissé 101 références mortes entrer dans la bibliothèque. Ici,
+    l'absence de registre déclenche son chargement, jamais l'abandon du contrôle ;
+    si le registre est réellement introuvable, aucun outil n'est déclaré.
+    """
+    valid = set(tool_names or ()) or _registry_tool_names()
+    if not valid:
+        return []
+    return [t for t in (candidate or []) if t in valid][:limit]
+
+
 # v2.517 — Garde-fous de la consolidation automatique.
 # Délai minimal entre deux consolidations réussies, toutes compétences confondues.
 CONSOLIDATION_COOLDOWN_SECONDS = 6 * 3600
@@ -995,6 +1037,54 @@ def _duplicates_existing_skill(name: str, description: str, existing: list) -> b
         if overlap >= 0.6:
             return True
     return False
+
+
+SEMANTIC_DUPLICATE_THRESHOLD = 0.86
+
+
+async def _semantic_duplicate(name: str, description: str, existing: list) -> bool | None:
+    """Doublon par le SENS, quand le recouvrement lexical ne suffit pas.
+
+    v2.519 — le contrôle lexical seul ratait les paraphrases : « Trier les photos par
+    date » et « Classer les images selon leur horodatage » n'ont aucun mot commun et
+    décrivent la même compétence. Le coût est faible car `_emb_cache` est déjà rempli
+    par le matcher à chaque tour : un seul embedding est calculé pour le candidat.
+
+    Retourne True/False, ou **None** si les embeddings sont indisponibles — l'appelant
+    doit alors refuser la consolidation plutôt que de la laisser passer sans contrôle.
+    """
+    import vector_store as vs
+    text = (description or name or "").strip()
+    if not text:
+        return None
+    try:
+        candidate_vector = await vs.embed(text)
+    except Exception:
+        candidate_vector = None
+    if not candidate_vector:
+        return None
+    compared = 0
+    for skill in existing or []:
+        reference = skill.get("description") or skill.get("name") or ""
+        if not reference.strip():
+            continue
+        digest = hashlib.md5(reference.encode("utf-8")).hexdigest()
+        cached = _emb_cache.get(skill.get("name"))
+        if cached and cached[0] == digest:
+            vector = cached[1]
+        else:
+            try:
+                vector = await vs.embed(reference)
+            except Exception:
+                vector = None
+            if vector:
+                _emb_cache[skill.get("name")] = (digest, vector)
+        if not vector:
+            continue
+        compared += 1
+        if _cos(candidate_vector, vector) >= SEMANTIC_DUPLICATE_THRESHOLD:
+            return True
+    return False if compared else None
 
 
 def _consolidation_on_cooldown(skill_name: str = None) -> bool:
@@ -1070,11 +1160,20 @@ async def review_and_consolidate_learnings(generate_fn, skill_name: str = None,
         log_learning_event("consolidate_refused", data["name"],
                            "Recoupe une compétence existante.")
         return None
+    # Second passage, par le sens : rattrape les paraphrases que le lexical laisse
+    # passer. `None` = embeddings indisponibles → on refuse plutôt que d'écrire à
+    # l'aveugle (une consolidation manquée ne coûte rien, une de trop coûte cher).
+    semantic = await _semantic_duplicate(data["name"], data.get("description", ""), existing)
+    if semantic is not False:
+        log_learning_event(
+            "consolidate_refused", data["name"],
+            "Doublon sémantique." if semantic else "Contrôle sémantique indisponible.")
+        return None
     # Même filtre que les deux autres chemins de création : un outil inventé est retiré.
-    valid = set(tool_names or [])
-    kept_tools = [t for t in (data.get("tools") or []) if (not valid or t in valid)][:8]
+    kept_tools = validated_tools(data.get("tools"), tool_names)
     save_skill(data["name"], data.get("description", "Consolidation automatique"), data.get("body"),
-               kept_tools, True, triggers=[str(t)[:40] for t in (data.get("triggers") or [])][:8])
+               kept_tools, True, triggers=[str(t)[:40] for t in (data.get("triggers") or [])][:8],
+               respect_disabled=True)
     log_learning_event("consolidate", data["name"], "Revue automatique du Learning Log")
     return {"consolidated": data["name"]}
 
