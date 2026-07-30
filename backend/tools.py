@@ -31,6 +31,7 @@ import voice_transcription as voice_transcription_runtime
 import web_runtime
 import proactive_briefing
 import generation_runtime
+import computer_runtime
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -591,21 +592,11 @@ execute_webapp_create = webapp_domain.create
 # l'allowlist stricte du sidecar élevé, v2.90) — échec explicite si la fenêtre cible est
 # élevée, à traiter au cas par cas si le besoin se présente vraiment.
 
-_GUI_INTERACTIVE_TYPES = {
-    "Button", "Edit", "Document", "ComboBox", "CheckBox", "RadioButton", "MenuItem", "MenuBar",
-    "ListItem", "List", "TabItem", "Hyperlink", "Slider", "Spinner", "TreeItem",
-    "SplitButton", "ToggleButton", "DataItem",
-}
-
-
-
-
 # Types "porteurs de contenu" : leur `name` UIA EST le texte qu'ils contiennent (constaté en
 # testant sur le Bloc-notes Windows 11 réel — control_type="Document", name="<tout le fichier>").
 # Ce texte n'est PAS un identifiant stable (il change à chaque frappe) → jamais utilisé pour le
 # matching de ré-résolution, seulement affiché (tronqué) à titre informatif. Le matching se fait
 # par position (match_index) parmi les contrôles du même control_type dans la fenêtre.
-_GUI_CONTENT_TYPES = {"Edit", "Document"}
 
 
 
@@ -2167,6 +2158,7 @@ execute_pc_get_real_paths = pc_control_domain.execute_pc_get_real_paths
 execute_pc_gui_click = pc_control_domain.execute_pc_gui_click
 execute_pc_gui_read = pc_control_domain.execute_pc_gui_read
 execute_pc_gui_type = pc_control_domain.execute_pc_gui_type
+execute_computer_control = computer_runtime.execute
 execute_pc_notify = pc_control_domain.execute_pc_notify
 execute_pc_open_file = pc_control_domain.execute_pc_open_file
 execute_pc_process_kill = pc_control_domain.execute_pc_process_kill
@@ -2461,6 +2453,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_gui_read": execute_pc_gui_read,
     "pc_gui_click": execute_pc_gui_click,
     "pc_gui_type": execute_pc_gui_type,
+    "computer_control": execute_computer_control,
     "vm_lab_install": execute_vm_lab_install,
     "pc_notify": execute_pc_notify,
     "pc_pull_ollama_model": execute_pc_pull_ollama_model,
@@ -2791,6 +2784,8 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "client_recommendations_generate": execute_client_recommendations_generate,
     "client_monthly_summary_generate": execute_client_monthly_summary_generate,
 }
+
+computer_runtime.configure(TOOLS_REGISTRY)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3880,6 +3875,34 @@ TOOLS_SPEC = [
         "sign": {"type": "boolean", "description": "Ajouter un bloc signature à la fin"},
         "lieu": {"type": "string", "description": "Lieu pour la signature (« Fait à … »)"}},
        ["text"]),
+
+    _t(
+       "computer_control",
+       "Contrôle unifié et vérifiable du PC et du navigateur. Utilise une boucle "
+       "Observer → Agir → Vérifier : commence par action=observe, réutilise les identifiants "
+       "UIA exacts pour click/type, puis fournis expected afin que Marvin confirme l'effet. "
+       "Le runtime choisit Windows UI Automation ou Playwright sans deviner un sélecteur.",
+       {
+        "action": {"type": "string", "enum": [
+            "observe", "verify", "screenshot", "list_windows", "open", "focus",
+            "click", "type", "keypress", "scroll", "navigate"
+        ]},
+        "surface": {"type": "string", "enum": ["auto", "desktop", "browser"],
+                    "description": "Surface ciblée. Préciser browser pour les éléments Web Playwright."},
+        "target": {"type": "string", "description": "Application à ouvrir ou URL à parcourir"},
+        "window": {"type": "string", "description": "Sous-chaîne exacte du titre de fenêtre"},
+        "control_type": {"type": "string", "description": "Type UIA desktop ou rôle ARIA Web issu de l'observation"},
+        "name": {"type": "string", "description": "Nom accessible exact issu de l'observation"},
+        "automation_id": {"type": "string", "description": "Identifiant UIA issu de l'observation"},
+        "match_index": {"type": "integer", "minimum": 0, "description": "Index UIA en cas d'ambiguïté"},
+        "text": {"type": "string", "description": "Texte à saisir, touche Playwright ou amplitude de scroll"},
+        "expected": {"type": "string", "description": "Texte ou état attendu après l'action"},
+        "max_elements": {"type": "integer", "minimum": 1, "maximum": 100},
+        "embed": {"type": "boolean", "description": "Inclure la capture dans le résultat"},
+        "capture_before": {"type": "boolean", "description": "Observer l'état avant une mutation"},
+        "confirmed": {"type": "boolean", "description": "Injecté uniquement par le gateway après autorisation"}
+       },
+       ["action"]),
 
     # ── Documents (RAG) ────────────────────────────────────────────────────────
     _t("document_index", "Indexe un fichier ou un dossier (PDF, Word, Excel, PowerPoint, texte) pour pouvoir l'interroger. Pour « indexe ce document », « apprends ce dossier ».",

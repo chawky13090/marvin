@@ -122,7 +122,14 @@ _KEYWORD_TOOLS = {
 
     # Lire une page web
     ("url", "site", "page web", "lien", "http", "navigateur", "ouvre le site"):
-        {"web_browse", "web_site_crawl", "url_analyze", "web_browser_open", "web_research"},
+        {"web_browse", "web_site_crawl", "url_analyze", "web_browser_open", "web_research",
+         "computer_control"},
+
+    # Contrôle interactif du poste : le runtime unifié observe et vérifie chaque effet.
+    ("clique", "clic", "souris", "clavier", "remplis le formulaire", "utilise l'application",
+     "pilote le pc", "contrôle le pc", "controle le pc", "navigue dans le navigateur",
+     "interagis avec", "fenêtre windows", "fenetre windows"):
+        {"computer_control", "pc_window_list", "pc_gui_read", "pc_screenshot"},
 
     # Fichiers
     ("fichier", "dossier", "bureau", "documents", "downloads", "téléchargement",

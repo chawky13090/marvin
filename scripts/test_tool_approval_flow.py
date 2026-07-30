@@ -98,15 +98,22 @@ def main() -> int:
         assert not agent_autonomy.allows("auto", 4)
         full = agent_autonomy.configure(settings, "full", 60)
         assert full["active"] and agent_autonomy.allows("full", 5)
+        assert full["expires_at"] is None
+        assert full["persistence"] == "until_revoked"
+        assert settings.values[agent_autonomy.SETTING_KEY]["expires_at"] is None
         normal = agent_autonomy.configure(settings, "normal", 60)
         assert not normal["active"]
+        assert normal["persistence"] == "revoked"
         assert audit_log.call_count == 3
 
     settings.values[agent_autonomy.SETTING_KEY] = {
         "mode": "full",
         "expires_at": time.time() - 1,
     }
-    assert agent_autonomy.current(settings)["mode"] == "normal"
+    legacy_full = agent_autonomy.current(settings)
+    assert legacy_full["mode"] == "full"
+    assert legacy_full["active"] is True
+    assert legacy_full["persistence"] == "until_revoked"
 
     print(
         "Tool Approval Flow OK - digest, usage unique, refus, expiration et autonomie."

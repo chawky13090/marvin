@@ -15,6 +15,9 @@ _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 _pw = None
 _browser = None
 _lock = asyncio.Lock()
+_computer_context = None
+_computer_page = None
+_computer_lock = asyncio.Lock()
 
 
 async def _get_browser():
@@ -43,6 +46,114 @@ async def _new_context():
     b = await _get_browser()
     return await b.new_context(user_agent=_UA, viewport={"width": 1280, "height": 900},
                                locale="fr-FR", extra_http_headers={"Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"})
+
+
+async def _get_computer_page():
+    """Retourne une page persistante réservée aux missions Computer Runtime."""
+    global _computer_context, _computer_page
+    async with _computer_lock:
+        if _computer_page is not None:
+            try:
+                if not _computer_page.is_closed():
+                    return _computer_page
+            except Exception:
+                pass
+        _computer_context = await _new_context()
+        _computer_page = await _computer_context.new_page()
+        return _computer_page
+
+
+async def computer_observe(max_elements: int = 80) -> dict:
+    page = await _get_computer_page()
+    elements = await page.locator(
+        "a,button,input,textarea,select,[role],[contenteditable=true]"
+    ).evaluate_all(
+        """(nodes, limit) => nodes.slice(0, limit).map((node, index) => ({
+          index,
+          tag: node.tagName.toLowerCase(),
+          role: node.getAttribute('role') || '',
+          name: (node.getAttribute('aria-label') || node.innerText ||
+                 node.getAttribute('placeholder') || node.getAttribute('title') || '')
+                .trim().slice(0, 240),
+          type: node.getAttribute('type') || '',
+          disabled: Boolean(node.disabled),
+          visible: Boolean(node.getClientRects().length)
+        }))""",
+        max(1, min(int(max_elements), 100)),
+    )
+    return {
+        "success": True,
+        "title": await page.title(),
+        "url": page.url,
+        "text": (await page.locator("body").inner_text())[:20_000],
+        "elements": elements,
+    }
+
+
+async def computer_navigate(url: str, timeout: int = 30_000) -> dict:
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    # Résolution publique préalable : le navigateur ne devient pas un proxy SSRF
+    # vers les services locaux ou les métadonnées cloud.
+    import outbound_http
+
+    parsed, port = outbound_http._parse_public_url(url)
+    assert parsed.hostname is not None
+    outbound_http._public_addresses(
+        await outbound_http._resolve(parsed.hostname, port)
+    )
+    page = await _get_computer_page()
+    await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+    return await computer_observe()
+
+
+def _browser_locator(page, *, control_type: str, name: str, match_index: int):
+    role = control_type.strip().lower()
+    if role:
+        locator = page.get_by_role(role, name=name or None, exact=bool(name))
+    elif name:
+        locator = page.get_by_text(name, exact=True)
+    else:
+        raise ValueError("control_type ou name requis pour cibler un élément Web.")
+    return locator.nth(max(0, int(match_index)))
+
+
+async def computer_act(
+    action: str,
+    *,
+    control_type: str = "",
+    name: str = "",
+    match_index: int = 0,
+    text: str = "",
+) -> dict:
+    page = await _get_computer_page()
+    if action == "click":
+        locator = _browser_locator(
+            page,
+            control_type=control_type,
+            name=name,
+            match_index=match_index,
+        )
+        await locator.click(timeout=15_000)
+    elif action == "type":
+        locator = _browser_locator(
+            page,
+            control_type=control_type,
+            name=name,
+            match_index=match_index,
+        )
+        await locator.fill(text, timeout=15_000)
+    elif action == "keypress":
+        if not text:
+            raise ValueError("text doit contenir la touche ou combinaison Playwright.")
+        await page.keyboard.press(text)
+    elif action == "scroll":
+        amount = int(text or 600)
+        await page.mouse.wheel(0, max(-5_000, min(amount, 5_000)))
+    else:
+        raise ValueError(f"Action navigateur non prise en charge : {action}")
+    await page.wait_for_timeout(250)
+    return await computer_observe()
 
 
 async def fetch_text(url: str, timeout: int = 25000, max_chars: int = 8000) -> dict:
@@ -80,7 +191,12 @@ async def fetch_page(url: str, timeout: int = 25000, max_chars: int = 100000) ->
 
 
 async def close():
-    global _browser, _pw
+    global _browser, _pw, _computer_context, _computer_page
+    try:
+        if _computer_context:
+            await _computer_context.close()
+    except Exception:
+        pass
     try:
         if _browser:
             await _browser.close()
@@ -93,3 +209,5 @@ async def close():
         pass
     _browser = None
     _pw = None
+    _computer_context = None
+    _computer_page = None

@@ -202,7 +202,7 @@ async def execute_tool(
                 approval=ApprovalEvidence(
                     call_digest=digest,
                     approved_by=f"autonomy:{autonomy['mode']}",
-                    expires_at=float(autonomy["expires_at"]),
+                    expires_at=time.time() + 60,
                     approval_id=f"autonomy-{autonomy['mode']}-{digest[:16]}",
                 ),
                 request_id=context.request_id,

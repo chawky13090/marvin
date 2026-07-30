@@ -16,6 +16,36 @@ import tools
 from tool_domains import pc_control
 
 
+class _FakeElementInfo:
+    control_type = "Document"
+    automation_id = ""
+
+    class element:
+        CurrentIsPassword = False
+
+
+class _FakeDocument:
+    element_info = _FakeElementInfo()
+
+    @staticmethod
+    def window_text() -> str:
+        return ""
+
+    @staticmethod
+    def is_enabled() -> bool:
+        return True
+
+    @staticmethod
+    def is_visible() -> bool:
+        return True
+
+
+class _FakeWindow:
+    @staticmethod
+    def descendants():
+        return [_FakeDocument()]
+
+
 async def _run() -> None:
     browse = await pc_control.execute_pc_browse({})
     assert browse["success"] is True
@@ -48,6 +78,16 @@ async def _run() -> None:
             {"control_type": "Button", "match_index": "premier"}
         )
     )["error"]
+    assert "Document" in pc_control._GUI_INTERACTIVE_TYPES
+    original_get_window = pc_control._gui_get_window_sync
+    try:
+        pc_control._gui_get_window_sync = lambda _search: (_FakeWindow(), "Fenêtre test")
+        ui_tree = pc_control._gui_read_sync("test", 10)
+    finally:
+        pc_control._gui_get_window_sync = original_get_window
+    assert ui_tree["count"] == 1
+    assert ui_tree["elements"][0]["control_type"] == "Document"
+    assert ui_tree["elements"][0]["match_index"] == 0
 
     public_names = [
         name.removeprefix("execute_")

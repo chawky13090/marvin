@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-30 — v2.509.0 — Computer Runtime et accès complet révocable
+
+### Demande et constats
+
+L’utilisateur veut que Marvin puisse piloter le poste et le navigateur depuis le chat, avec
+une autonomie comparable aux agents de code, et que l’Accès complet reste actif jusqu’à son
+annulation. L’audit a confirmé que les capacités historiques étaient fragmentées entre les
+outils PC et Web. Un test réel a aussi révélé une régression d’extraction : les constantes des
+types UI Automation étaient restées dans `tools.py`, alors que leur logique avait rejoint
+`tool_domains/pc_control.py`. Les exceptions absorbées contrôle par contrôle produisaient un
+arbre vide. Le Bloc-notes Windows 11 expose en plus son éditeur comme un `Document` anonyme.
+
+### Décisions et modifications
+
+`computer_control` fournit une façade Observe/Act/Verify à la boucle agentique. Le navigateur
+utilise une session Playwright persistante avec ciblage sémantique ; Windows utilise UI
+Automation. Les actions mutatrices capturent un état avant/après et rendent une vérification
+explicite. La découverte de capacités et la sélection d’outils décrivent ce runtime au LLM.
+Les types UIA sont désormais possédés par leur domaine et les `Document` anonymes sont
+conservés avec un ciblage par type et position.
+
+L’Accès complet ne possède plus d’expiration fonctionnelle et survit aux redémarrages jusqu’à
+révocation. L’interface l’indique clairement et propose une révocation immédiate. Les preuves
+techniques produites pour un appel restent limitées à 60 secondes.
+
+### Sécurité, logs et rollback
+
+Le runtime est enregistré comme un outil unique mais toutes ses actions passent par le
+gateway, `PolicyEngine`, les permissions, l’idempotence et l’audit. Seules l’observation, la
+vérification, la capture et la liste des fenêtres sont classées en lecture. UAC,
+authentification, CAPTCHA et contrôles d’accès ne sont pas contournés. Aucun secret ni contenu
+de saisie n’est ajouté aux logs. Aucun schéma ni donnée métier n’est migré.
+
+Rollback : réversion atomique du commit v2.509 puis redémarrage backend/frontend.
+
+### Validation réelle
+
+- contrats Computer Runtime, approbations, gateway et domaine PC : exécutés ;
+- architecture : catalogue et harness exhaustifs contrôlés ;
+- navigateur réel : navigation vers `example.com`, clic du lien `Learn more` par rôle/nom,
+  arrivée sur `iana.org` et vérification du texte ;
+- Windows réel : liste des fenêtres et lecture de 26 contrôles du Bloc-notes ;
+- limite observée : le `Document` du Bloc-notes n’expose pas toujours son contenu à UIA ;
+  une preuve textuelle manquante reste négative au lieu d’être transformée en succès.
+
 ## 2026-07-30 — v2.505.0 — Approbations dans le chat et autonomie temporaire
 
 ### Demande et cause racine

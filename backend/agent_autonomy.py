@@ -17,14 +17,35 @@ def current(database: Any) -> dict:
     raw = database.get_setting(SETTING_KEY, {})
     grant = raw if isinstance(raw, dict) else {}
     mode = str(grant.get("mode") or "normal")
+    if mode not in MODES or mode == "normal":
+        return {
+            "mode": "normal",
+            "active": False,
+            "expires_at": None,
+            "persistence": "revoked",
+        }
+    if mode == "full":
+        return {
+            "mode": "full",
+            "active": True,
+            "expires_at": None,
+            "created_at": grant.get("created_at"),
+            "persistence": "until_revoked",
+        }
     expires_at = float(grant.get("expires_at") or 0)
-    if mode not in MODES or mode == "normal" or expires_at <= time.time():
-        return {"mode": "normal", "active": False, "expires_at": None}
+    if expires_at <= time.time():
+        return {
+            "mode": "normal",
+            "active": False,
+            "expires_at": None,
+            "persistence": "expired",
+        }
     return {
         "mode": mode,
         "active": True,
         "expires_at": expires_at,
         "created_at": grant.get("created_at"),
+        "persistence": "temporary",
     }
 
 
@@ -33,7 +54,22 @@ def configure(database: Any, mode: str, duration_minutes: int = 60) -> dict:
     if normalized not in MODES:
         raise ValueError("Mode autonome invalide.")
     if normalized == "normal":
-        grant = {"mode": "normal", "expires_at": 0, "created_at": time.time()}
+        now = time.time()
+        grant = {
+            "mode": "normal",
+            "expires_at": 0,
+            "created_at": now,
+            "revoked_at": now,
+            "persistence": "revoked",
+        }
+    elif normalized == "full":
+        grant = {
+            "mode": "full",
+            "created_at": time.time(),
+            "expires_at": None,
+            "revoked_at": None,
+            "persistence": "until_revoked",
+        }
     else:
         duration = min(max(int(duration_minutes), 5), MAX_DURATION_MINUTES)
         now = time.time()
@@ -41,6 +77,8 @@ def configure(database: Any, mode: str, duration_minutes: int = 60) -> dict:
             "mode": normalized,
             "created_at": now,
             "expires_at": now + duration * 60,
+            "revoked_at": None,
+            "persistence": "temporary",
         }
     database.set_setting(SETTING_KEY, grant)
     effective = current(database)
@@ -50,6 +88,7 @@ def configure(database: Any, mode: str, duration_minutes: int = 60) -> dict:
             "mode": effective["mode"],
             "active": effective["active"],
             "expires_at": effective["expires_at"],
+            "persistence": effective["persistence"],
         },
         {"success": True},
         source="settings_ui",

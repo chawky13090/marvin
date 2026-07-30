@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.508.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.509.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.508.0)
+## 9. État actuel (v2.509.0)
+
+**v2.509 (Computer Runtime et accès complet révocable)** : `computer_control` unifie
+l’observation, l’action et la vérification du navigateur Playwright et du bureau Windows UIA.
+Le LLM conserve la liberté de choisir l’outil, tandis que le gateway reste autoritaire pour
+les effets, les preuves UI, l’idempotence et l’audit. Chaque action mutatrice conserve une
+observation avant/après et expose `needs_repair` si la preuve attendue manque. L’extraction du
+domaine PC est corrigée : ses types UIA ne dépendent plus du monolithe et les contrôles
+`Document` anonymes de Windows 11 sont visibles. L’Accès complet persiste désormais après
+redémarrage jusqu’à révocation explicite ; les preuves unitaires d’exécution restent limitées
+à 60 secondes. La session Playwright demeure isolée du profil Chrome personnel et UAC n’est
+pas contourné. Contrats et limites : `MARVIN-COMPUTER-RUNTIME.md`. Rollback : réversion
+atomique du commit v2.509 puis redémarrage backend/frontend, sans migration de données.
 
 **v2.508 (lecture centrée et palette anthracite)** : le flux de conversation et le composeur
 partagent un axe centré de 1 120 px, avec une largeur de lecture bornée à 920 px pour les

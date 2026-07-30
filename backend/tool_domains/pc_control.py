@@ -26,6 +26,14 @@ SizeFormatter = Callable[[int], str]
 _resolve_path: PathResolver
 _format_size: SizeFormatter
 
+_GUI_INTERACTIVE_TYPES = {
+    "Button", "Edit", "Document", "ComboBox", "CheckBox", "RadioButton", "MenuItem", "MenuBar",
+    "ListItem", "List", "TabItem", "Hyperlink", "Slider", "Spinner", "TreeItem",
+    "SplitButton", "ToggleButton", "DataItem",
+}
+_GUI_CONTENT_TYPES = {"Edit", "Document"}
+
+
 def configure(*, resolve_path: PathResolver, format_size: SizeFormatter) -> None:
     global _resolve_path, _format_size
     _resolve_path = resolve_path
@@ -856,7 +864,22 @@ def _gui_read_sync(search: str, max_elements: int) -> dict:
                 is_password = bool(ctrl.element_info.element.CurrentIsPassword)
             except Exception:
                 pass
-            if not name_raw and not auto_id and not is_password:
+            if ctype in _GUI_CONTENT_TYPES and not name_raw and not is_password:
+                try:
+                    name_raw = str(ctrl.get_value() or "").strip()
+                except Exception:
+                    try:
+                        name_raw = str(
+                            ctrl.iface_text.DocumentRange.GetText(-1) or ""
+                        ).strip()
+                    except Exception:
+                        pass
+            if (
+                not name_raw
+                and not auto_id
+                and not is_password
+                and ctype not in _GUI_CONTENT_TYPES
+            ):
                 continue
             enabled = ctrl.is_enabled()
             visible = ctrl.is_visible()
@@ -967,10 +990,15 @@ async def execute_pc_gui_type(args: dict) -> dict:
         if not ctrl.is_enabled():
             raise RuntimeError("Élément désactivé — impossible d'y écrire.")
         ctrl.set_focus()
-        try:
-            ctrl.set_edit_text(text)
-        except Exception:
+        if control_type == "Document":
+            ctrl.click_input()
+            ctrl.type_keys("^a{BACKSPACE}")
             ctrl.type_keys(text, with_spaces=True)
+        else:
+            try:
+                ctrl.set_edit_text(text)
+            except Exception:
+                ctrl.type_keys(text, with_spaces=True)
         return title
 
     try:

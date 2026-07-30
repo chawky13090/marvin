@@ -1434,6 +1434,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
     pc_clipboard_set: 'Copier dans le presse-papiers',
     pc_process_list: 'Liste des processus',
     pc_process_kill: 'Arrêter un processus',
+    computer_control: 'Contrôler le PC ou le navigateur',
     project_list: 'Lister les projets',
     project_create: 'Créer un projet Marvin',
     project_update: 'Modifier un projet Marvin',

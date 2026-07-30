@@ -89,6 +89,30 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         do_not_use_when=("le contenu doit être analysé par Marvin",),
         related_tools=("file_read", "pdf_read", "pc_reveal"),
     ),
+    "computer_control": DiscoveryProfile(
+        "Piloter visuellement le PC ou un navigateur",
+        aliases=(
+            "contrôle ordinateur",
+            "utiliser la souris et le clavier",
+            "cliquer dans une application",
+            "remplir une interface",
+            "naviguer dans le navigateur",
+        ),
+        use_when=(
+            "une tâche exige plusieurs interactions vérifiées dans une interface",
+            "aucune API déterministe ne permet de réaliser l'action",
+        ),
+        do_not_use_when=(
+            "un outil métier direct peut accomplir et vérifier la tâche",
+            "une simple lecture de fichier ou commande suffit",
+        ),
+        related_tools=(
+            "pc_gui_read",
+            "pc_gui_click",
+            "pc_gui_type",
+            "web_browser_open",
+        ),
+    ),
     "file_read": DiscoveryProfile(
         "Lire le contenu d'un fichier",
         aliases=(

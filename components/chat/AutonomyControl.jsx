@@ -16,7 +16,7 @@ const MODES = {
   },
   full: {
     label: 'Accès complet',
-    description: 'Toutes les actions validées par le harness sont autorisées pendant une heure.',
+    description: 'Toutes les actions validées par le harness restent autorisées jusqu’à révocation.',
     color: '#dedfe2',
   },
 };
@@ -45,10 +45,10 @@ export default function AutonomyControl({ disabled = false }) {
   }, []);
 
   useEffect(() => {
-    if (!grant.active) return undefined;
+    if (!grant.active || !grant.expires_at) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
-  }, [grant.active]);
+  }, [grant.active, grant.expires_at]);
 
   const selectMode = async (nextMode) => {
     if (nextMode === 'full' && !confirmFull) {
@@ -107,7 +107,11 @@ export default function AutonomyControl({ disabled = false }) {
       >
         <span aria-hidden>{mode === 'normal' ? '◉' : mode === 'auto' ? '▶' : '◆'}</span>
         <span className="autonomy-control-label">
-          {mode === 'normal' ? 'Normal · confirme' : `${definition.label} · ${remainingMinutes} min`}
+          {mode === 'normal'
+            ? 'Normal · confirme'
+            : mode === 'full'
+              ? 'Accès complet · actif'
+              : `${definition.label} · ${remainingMinutes} min`}
         </span>
         <span className="autonomy-control-chevron" aria-hidden>▼</span>
       </button>
@@ -175,14 +179,14 @@ export default function AutonomyControl({ disabled = false }) {
                   margin: '7px 4px',
                   padding: 9,
                   borderRadius: 9,
-                  border: '1px solid rgba(192,132,252,.35)',
-                  background: 'rgba(192,132,252,.08)',
+                  border: '1px solid var(--border-hover)',
+                  background: 'rgba(255,255,255,.045)',
                   color: 'var(--text-secondary)',
                   fontSize: 10.5,
                   lineHeight: 1.4,
                 }}
               >
-                Accès complet autorise pendant une heure toutes les actions admises par votre niveau de permission, y compris les effets irréversibles.
+                L’accès complet reste actif, y compris après redémarrage, jusqu’à ce que vous reveniez au mode Normal. Les preuves, validations techniques et l’arrêt immédiat restent actifs.
                 <button
                   type="button"
                   disabled={busy}
@@ -192,16 +196,36 @@ export default function AutonomyControl({ disabled = false }) {
                     marginTop: 8,
                     padding: '7px 9px',
                     borderRadius: 8,
-                    border: '1px solid rgba(192,132,252,.5)',
-                    background: 'rgba(192,132,252,.15)',
-                    color: '#d8b4fe',
+                    border: '1px solid var(--border-hover)',
+                    background: 'rgba(255,255,255,.085)',
+                    color: 'var(--text-primary)',
                     fontWeight: 750,
                     cursor: busy ? 'wait' : 'pointer',
                   }}
                 >
-                  Activer l’accès complet pendant 1 h
+                  Activer jusqu’à révocation
                 </button>
               </div>
+            )}
+            {mode === 'full' && !confirmFull && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => selectMode('normal')}
+                style={{
+                  width: 'calc(100% - 8px)',
+                  margin: '8px 4px 2px',
+                  padding: '8px 10px',
+                  borderRadius: 9,
+                  border: '1px solid var(--danger)',
+                  background: 'var(--danger-bg)',
+                  color: 'var(--danger)',
+                  fontWeight: 750,
+                  cursor: busy ? 'wait' : 'pointer',
+                }}
+              >
+                Révoquer immédiatement l’accès complet
+              </button>
             )}
             {error && (
               <div role="alert" style={{ margin: '7px 5px 2px', color: 'var(--danger)', fontSize: 10.5 }}>
@@ -209,7 +233,7 @@ export default function AutonomyControl({ disabled = false }) {
               </div>
             )}
             <div style={{ margin: '7px 5px 2px', color: 'var(--warning)', fontSize: 10.5, lineHeight: 1.4 }}>
-              Auto et Accès complet expirent automatiquement. Validation, preuves, idempotence et journalisation restent actives.
+              Auto expire automatiquement. Accès complet reste actif jusqu’à révocation. Validation, preuves, idempotence et journalisation restent actives.
             </div>
           </div>
         </>
