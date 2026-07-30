@@ -26,6 +26,8 @@ def main() -> int:
     )
     assert platform_paths.expand_user_path("Documents") == platform_paths.PATHS["documents"]
     assert platform_paths.expand_user_path("~") == platform_paths.PATHS["home"]
+    drives = platform_paths.logical_drives()
+    assert drives and all(isinstance(item, str) and item for item in drives)
     previous = os.environ.get("MARVIN_PATH_TEST")
     try:
         os.environ["MARVIN_PATH_TEST"] = platform_paths.PATHS["temp"]

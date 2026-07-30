@@ -59,11 +59,23 @@ def main() -> int:
     projected = json.loads(compact_tool_result(large, max_chars=100))
     assert projected["success"] is True
     assert projected["message"] == "message complet"
-    assert "chars tronqués" in projected["blob"]
+    assert "projection de contexte" in projected["blob"]
+    pdf_result = {
+        "success": True,
+        "text": "contenu intégral " * 350,
+        "truncated": False,
+        "chars": 5_950,
+    }
+    projected_pdf = json.loads(
+        compact_tool_result(pdf_result, tool_name="pdf_read")
+    )
+    assert projected_pdf == pdf_result
+    assert "projection de contexte" not in projected_pdf["text"]
+    assert projected_pdf["truncated"] is False
     assert projected["items"][-1] == "…+10 éléments"
 
     print(
-        "Agent Tool Step OK - alias, JSON, contexte interne, signature et projection bornée."
+        "Agent Tool Step OK - alias, JSON, contexte interne, PDF complet et projection bornée."
     )
     return 0
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import string
 import tempfile
 import uuid
 from pathlib import Path
@@ -80,6 +81,25 @@ def system_paths() -> dict[str, str]:
 
 
 PATHS: Final[dict[str, str]] = system_paths()
+
+
+def logical_drives() -> list[str]:
+    """Liste les lecteurs Windows présents, avec un repli portable et borné."""
+    if os.name != "nt":
+        drive = os.path.splitdrive(PATHS["home"])[0]
+        return [f"{drive}{os.sep}"] if drive else [os.path.abspath(os.sep)]
+    import ctypes
+
+    try:
+        bitmask = int(ctypes.windll.kernel32.GetLogicalDrives())
+        drives = [
+            f"{letter}:\\"
+            for index, letter in enumerate(string.ascii_uppercase)
+            if bitmask & (1 << index)
+        ]
+        return drives or [f"{PATHS['drive']}\\"]
+    except (AttributeError, OSError, TypeError, ValueError):
+        return [f"{PATHS['drive']}\\"]
 
 
 def expand_user_path(value: str) -> str:

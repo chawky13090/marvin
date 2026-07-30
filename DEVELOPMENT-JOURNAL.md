@@ -12826,3 +12826,54 @@ le journal durable du tour sans nouveau secret. Les actions dangereuses restent 
 approbations liées au digest exact des arguments. Aucun schéma ni donnée n'est migré.
 Rollback opérationnel : définir `MARVIN_ORCHESTRATOR=deterministic` puis redémarrer le
 backend. Rollback code : réverter le commit v2.496.
+
+## 2026-07-30 — v2.497 — Ouverture Windows et lecture PDF sans faux tronquage
+
+### Incident reproduit
+
+La dernière conversation contient deux tours défectueux :
+
+- pendant l'exploration du dossier `ALLOpneu`, deux appels `pc_browse` ont échoué avec un
+  `NameError` (`ed05a...` et `5b77...`), avant que `file_find` ne retrouve finalement les
+  trois PDF;
+- « ouvre Lettre_Alternance...pdf » a sélectionné `pdf_read` au lieu de `pc_open_file`.
+  Après une première lecture réellement limitée à 4 000 caractères, les lectures à 10 000
+  puis 20 000 caractères ont retourné le document complet : 4 352 caractères et
+  `truncated=false`. La projection générique réduisait pourtant le champ texte à 500
+  caractères et ajoutait « chars tronqués ». Le modèle a confondu cette réduction de contexte
+  avec l'état métier, relancé deux fois le même outil puis affirmé à tort que le PDF était
+  incomplet.
+
+### Corrections
+
+- `logical_drives()` rejoint `platform_paths.py`; `pc_browse` l'importe directement et ne
+  dépend plus du helper privé `_drive_list` resté dans `tools.py`;
+- les descriptions des capacités rendent `pc_open_file` prioritaire pour ouvrir/afficher
+  dans Windows et réservent `pdf_read` à l'extraction et l'analyse;
+- la projection d'un résultat reçoit le nom de l'outil. `pdf_read` dispose d'une enveloppe
+  de contexte de 16 000 caractères, suffisante pour le contrat `max_chars` courant;
+- `truncated`, `chars` et `pages_read` sont des champs critiques toujours préservés;
+- le marqueur générique précise désormais « projection de contexte réduite » et interdit de
+  l'interpréter comme la valeur métier `truncated`.
+
+### Validation réelle
+
+- tests ciblés : préparation et lot d'outils, chemins portables, domaine PC et catalogue des
+  346 capacités réussis;
+- `pc_browse({})` réel : succès, profil `C:\Users\Chawb`, 9 accès rapides et 36 entrées;
+- tour Marvin « ouvre ...pdf » : `tool_search` puis `pc_open_file`, succès et `done`;
+- tour Marvin « lis ce PDF et résume-le » : `tool_search` puis un seul `pdf_read`, aucune
+  erreur ni nouvelle lecture;
+- les deux conversations artificielles ont été supprimées après le test.
+- gate consolidé final : 213 étapes sur 213 réussies en 412,8 secondes, incluant
+  architecture 346/346, profils de confidentialité, gateway commun, compilation Python et
+  qualité frontend.
+
+### Sécurité, logs et rollback
+
+L'ouverture utilise toujours `os.startfile` sur un chemin existant résolu par le domaine PC;
+aucune commande construite depuis le texte utilisateur n'est introduite. Les résultats
+complets restent dans le journal métier existant mais ne rejoignent pas les logs techniques.
+Les journaux d'incident conservent uniquement classe, outil, corrélation et empreinte des
+arguments. Aucun schéma ni donnée n'est migré. Rollback : réverter le commit v2.497 puis
+redémarrer le backend; les conversations historiques restent inchangées.

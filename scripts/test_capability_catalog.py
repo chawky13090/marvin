@@ -51,6 +51,10 @@ def main() -> None:
         for item in registered_result["candidates"]
     )
     assert result["count"] <= 8
+    open_pdf = catalog.search("ouvrir ou afficher un fichier PDF dans Windows", limit=10)
+    open_names = [item["name"] for item in open_pdf["candidates"]]
+    assert "pc_open_file" in open_names
+    assert open_names.index("pc_open_file") < open_names.index("pdf_read")
 
     print(
         f"OK - {len(catalog)} capacités dérivées du registre, "

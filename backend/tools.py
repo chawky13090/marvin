@@ -2959,7 +2959,11 @@ TOOLS_SPEC = [
        {"content": {"type": "string", "description": "Le code HTML complet de la page (ou un fragment, enveloppé automatiquement)"},
         "title": {"type": "string", "description": "Titre de la mini-appli (utilisé comme nom de fichier)"}},
        ["content"]),
-    _t("pc_open_file", "Ouvre un fichier ou dossier dans son application par défaut.",
+    _t("pc_open_file", (
+           "Ouvre un fichier ou dossier dans son application Windows par défaut. "
+           "Capacité destinée à ouvrir ou afficher un fichier, un PDF ou un document dans Windows. "
+           "À choisir pour « ouvre ce fichier », « affiche ce PDF » ou « lance ce document ». "
+           "Ne lit pas et n'extrait pas le contenu du document."),
        {"path": {"type": "string", "description": "Chemin du fichier à ouvrir"}},
        ["path"]),
 
@@ -4194,7 +4198,9 @@ TOOLS_SPEC = [
         "max_results": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Limite de résultats (défaut 100)"}},
        ["pattern"]),
     # ── Section 16 ──────────────────────────────────────────────────────────
-    _t("pdf_read", "Extrait le texte d'un fichier PDF page par page.",
+    _t("pdf_read", (
+           "Extrait le texte d'un fichier PDF page par page pour une analyse, une citation "
+           "ou un résumé de son contenu."),
        {"path":      {"type": "string", "description": "Chemin du fichier PDF"},
         "pages":     {"type": "string", "description": "Pages à lire : '1-3', '2' ou null pour tout (défaut : tout)"},
         "max_chars": {"type": "integer", "description": "Limite de caractères retournés (défaut 4000)"}},

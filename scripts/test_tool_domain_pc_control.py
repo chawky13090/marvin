@@ -17,6 +17,9 @@ from tool_domains import pc_control
 
 
 async def _run() -> None:
+    browse = await pc_control.execute_pc_browse({})
+    assert browse["success"] is True
+    assert isinstance(browse["roots"], list)
     assert "command" in (await pc_control.execute_pc_run_command({}))["error"]
     assert "timeout" in (
         await pc_control.execute_pc_run_command(

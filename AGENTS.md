@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.496.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.497.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.496.0)
+## 9. État actuel (v2.497.0)
+
+**v2.497 (intentions fichier et projection PDF)** : la découverte progressive distingue
+désormais « ouvrir/afficher » (`pc_open_file`) de « lire/analyser » (`pdf_read`). Les résultats
+PDF complets jusqu'à 16 000 caractères restent intacts dans le contexte du LLM; une réduction
+de contexte ne se présente plus comme une troncature métier. `truncated`, `chars` et
+`pages_read` sont toujours préservés. `pc_browse` utilise la détection portable des lecteurs
+de `platform_paths` et ne dépend plus d'une fonction restée dans le monolithe `tools.py`.
 
 **v2.496 (canary LLM natif en Ultra)** : sans override opérateur, le profil de confidentialité
 Ultra débridé utilise `llm_native_canary`. Le modèle démarre avec le seul schéma

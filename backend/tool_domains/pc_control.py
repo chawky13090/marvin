@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 import psutil
 from config import OLLAMA_URL
-from platform_paths import PATHS as _SYSTEM_PATHS
+from platform_paths import PATHS as _SYSTEM_PATHS, logical_drives
 
 _HOME = _SYSTEM_PATHS["home"]
 _REAL_USER = _SYSTEM_PATHS["username"]
@@ -108,7 +108,7 @@ def _quick_access():
         p = _SYSTEM_PATHS[path_key]
         if os.path.isdir(p):
             qa.append({"label": label, "path": p, "icon": icon, "type": "folder"})
-    for d in _drive_list():
+    for d in logical_drives():
         qa.append({"label": d.rstrip("\\"), "path": d, "icon": "💽", "type": "drive"})
     return qa
 

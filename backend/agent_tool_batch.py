@@ -284,6 +284,6 @@ async def execute_tool_batch(
         ollama_messages.append(
             {
                 "role": "tool",
-                "content": compact_tool_result(result),
+                "content": compact_tool_result(result, tool_name=tool_name),
             }
         )

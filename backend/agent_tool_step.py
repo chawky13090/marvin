@@ -24,6 +24,9 @@ _CRITICAL_RESULT_FIELDS = frozenset(
         "entries_count",
         "pages",
         "total_pages",
+        "pages_read",
+        "truncated",
+        "chars",
     }
 )
 
@@ -91,9 +94,16 @@ def inject_internal_context(
     return enriched
 
 
-def compact_tool_result(result: Any, max_chars: int = 4000) -> str:
+def compact_tool_result(
+    result: Any,
+    max_chars: int = 4000,
+    *,
+    tool_name: str = "",
+) -> str:
     """Projette un résultat borné pour le contexte LLM sans toucher au reçu complet."""
     serialized = json.dumps(result, ensure_ascii=False)
+    if tool_name == "pdf_read":
+        max_chars = max(max_chars, 16_000)
     if len(serialized) <= max_chars:
         return serialized
     try:
@@ -104,7 +114,11 @@ def compact_tool_result(result: Any, max_chars: int = 4000) -> str:
             if key in _CRITICAL_RESULT_FIELDS:
                 compact[key] = value
             elif isinstance(value, str) and len(value) > 500:
-                compact[key] = value[:500] + f"…[{len(value) - 500} chars tronqués]"
+                compact[key] = (
+                    value[:500]
+                    + f"…[projection de contexte réduite de {len(value) - 500} caractères; "
+                    "ne pas confondre avec le champ métier 'truncated']"
+                )
             elif isinstance(value, list) and len(value) > 20:
                 compact[key] = value[:20] + [f"…+{len(value) - 20} éléments"]
             else:
