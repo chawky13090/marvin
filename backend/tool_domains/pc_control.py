@@ -343,6 +343,102 @@ def _find_app_target(name: str):
     return (None, None)
 
 
+def _application_evidence(expected_names: set[str], title_hint: str) -> dict:
+    processes = []
+    for process in psutil.process_iter(["pid", "name"]):
+        try:
+            name = str(process.info.get("name") or "").lower()
+            if name in expected_names:
+                processes.append({"pid": int(process.info["pid"]), "name": name})
+        except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError):
+            continue
+
+    windows = []
+    normalized_hint = title_hint.casefold().strip()
+    if normalized_hint:
+        try:
+            import win32gui
+
+            def collect(hwnd, _):
+                if not win32gui.IsWindowVisible(hwnd):
+                    return
+                title = win32gui.GetWindowText(hwnd).strip()
+                if normalized_hint in title.casefold():
+                    windows.append(title[:200])
+
+            win32gui.EnumWindows(collect, None)
+        except Exception:
+            pass
+    return {
+        "processes": processes,
+        "window_visible": bool(windows),
+        "window_titles": windows,
+    }
+
+
+def _expected_process_names(kind: str, target: str) -> set[str]:
+    if kind in {"exe", "path"}:
+        return {Path(target).name.lower()}
+    if kind != "lnk":
+        return set()
+    try:
+        import win32com.client
+
+        shortcut = win32com.client.Dispatch("WScript.Shell").CreateShortcut(target)
+        resolved = str(shortcut.Targetpath or "").strip()
+        return {Path(resolved).name.lower()} if resolved else set()
+    except Exception:
+        return set()
+
+
+async def _launch_and_verify(
+    *,
+    app_name: str,
+    kind: str,
+    target: str,
+    expected_names: set[str] | None = None,
+) -> dict:
+    expected_names = expected_names or _expected_process_names(kind, target)
+    title_hint = app_name if len(app_name.strip()) >= 3 else ""
+    before = _application_evidence(expected_names, title_hint)
+    try:
+        os.startfile(target)
+    except OSError as exc:
+        return {
+            "success": False,
+            "dispatched": False,
+            "verified": False,
+            "needs_repair": True,
+            "error": f"Impossible de lancer « {app_name} » : {exc}",
+            "method": kind,
+            "resolved": target,
+        }
+
+    after = before
+    for _attempt in range(20):
+        await asyncio.sleep(0.25)
+        after = _application_evidence(expected_names, title_hint)
+        if after["processes"] or after["window_visible"]:
+            break
+    verified = bool(after["processes"] or after["window_visible"])
+    return {
+        "success": verified,
+        "dispatched": True,
+        "verified": verified,
+        "needs_repair": not verified,
+        "message": (
+            f"Application ouverte et vérifiée : {app_name}"
+            if verified
+            else f"Lancement demandé, mais aucune preuve d'ouverture pour « {app_name} »."
+        ),
+        "method": kind,
+        "resolved": target,
+        "expected_processes": sorted(expected_names),
+        "before": before,
+        "after": after,
+    }
+
+
 async def execute_pc_app_launch(args: dict) -> dict:
     app_name = args.get("app_name", "")
     aliases = {
@@ -398,36 +494,62 @@ async def execute_pc_app_launch(args: dict) -> dict:
     if not app_name.strip():
         return {"error": "Paramètre 'app_name' requis."}
     key = app_name.lower().strip()
+    if key in {"tailscale", "tailscale gui", "interface tailscale"}:
+        from tool_domains import tailscale as tailscale_domain
+        return await tailscale_domain.open_ui()
     cmd = aliases.get(key, app_name).strip()
 
     try:
         # Protocoles / URL Windows (ms-settings:, shell:, http://…)
         if cmd.startswith(("ms-", "shell:")) or "://" in cmd:
-            os.startfile(cmd)
-            return {"success": True, "message": f"Ouvert : {app_name}", "method": "protocol"}
+            expected = set()
+            if cmd.startswith("ms-settings:"):
+                expected = {"systemsettings.exe"}
+            elif cmd.startswith("shell:"):
+                expected = {"explorer.exe"}
+            return await _launch_and_verify(
+                app_name=app_name,
+                kind="protocol",
+                target=cmd,
+                expected_names=expected,
+            )
 
         # Snap-ins MMC (.msc)
         if cmd.lower().endswith(".msc"):
-            subprocess.Popen(["mmc", cmd], shell=False)
-            return {"success": True, "message": f"Console ouverte : {app_name}", "method": "mmc"}
+            return await _launch_and_verify(
+                app_name=app_name,
+                kind="mmc",
+                target=cmd,
+                expected_names={"mmc.exe"},
+            )
 
         # Chemin absolu fourni directement
         if os.path.isabs(cmd) and os.path.exists(cmd):
-            os.startfile(cmd)
-            return {"success": True, "message": f"Lancé : {app_name}", "method": "path", "resolved": cmd}
+            return await _launch_and_verify(
+                app_name=app_name, kind="path", target=cmd
+            )
 
         # ── Résolution robuste : PATH → App Paths → menu Démarrer → Program Files ──
         kind, target = _find_app_target(cmd)
         if kind:
-            # os.startfile lance fiablement les .exe ET les .lnk (apps graphiques)
-            os.startfile(target)
-            return {"success": True, "message": f"Application lancée : {app_name}",
-                    "method": kind, "resolved": target}
+            return await _launch_and_verify(
+                app_name=app_name, kind=kind, target=target
+            )
 
         # Dernier recours : laisser Windows tenter (alias UWP, commandes intégrées)
         try:
             os.startfile(cmd)
-            return {"success": True, "message": f"Lancé : {app_name}", "method": "startfile"}
+            return {
+                "success": False,
+                "dispatched": True,
+                "verified": False,
+                "needs_repair": True,
+                "message": (
+                    f"Windows a reçu la demande pour « {app_name} », mais Marvin "
+                    "n'a pas pu identifier l'application afin de vérifier son ouverture."
+                ),
+                "method": "startfile_unverified",
+            }
         except Exception:
             pass
 

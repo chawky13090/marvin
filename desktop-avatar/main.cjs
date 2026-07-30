@@ -20,6 +20,7 @@ const OFFLINE_PATH = path.join(__dirname, 'offline.html');
 const OFFLINE_URL = pathToFileURL(OFFLINE_PATH).href;
 const PREFERENCES_PATH = path.join(app.getPath('userData'), 'window-state.json');
 const STARTUP_LOG_PATH = path.join(app.getPath('userData'), 'startup.log');
+const SHUTDOWN_LOG_PATH = path.join(app.getPath('userData'), 'shutdown.log');
 const MIN_WIDTH = 390;
 const MIN_HEIGHT = 470;
 let windowRef = null;
@@ -125,11 +126,76 @@ function runDetached(command, args, { logPath = null } = {}) {
   });
 }
 
+function runToCompletion(command, args, { logPath, timeoutMs = 30000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      callback(value);
+    };
+    const child = spawn(command, args, {
+      cwd: ROOT,
+      detached: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8').slice(0, 16000); });
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8').slice(0, 16000); });
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(reject, new Error(`Délai d'arrêt dépassé (${timeoutMs / 1000} s).`));
+    }, timeoutMs);
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      finish(reject, error);
+    });
+    child.once('close', (code) => {
+      clearTimeout(timer);
+      if (logPath) {
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        fs.appendFileSync(
+          logPath,
+          `\r\n[${new Date().toISOString()}] exit=${code}\r\n${stdout}${stderr}`,
+          'utf8',
+        );
+      }
+      if (code === 0) {
+        finish(resolve, { code, stdout, stderr });
+      } else {
+        finish(
+          reject,
+          new Error(
+            stderr.trim()
+            || stdout.trim()
+            || `Le script d'arrêt s'est terminé avec le code ${code}.`,
+          ),
+        );
+      }
+    });
+  });
+}
+
 async function waitForMarvin(maxMs = 90000) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     if (await probe(AVATAR_URL)) return true;
     await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return false;
+}
+
+async function waitForMarvinStop(maxMs = 20000) {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    const [frontendRunning, backendRunning] = await Promise.all([
+      probe(AVATAR_URL),
+      probe('http://127.0.0.1:8005/api/health'),
+    ]);
+    if (!frontendRunning && !backendRunning) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return false;
 }
@@ -290,9 +356,33 @@ ipcMain.handle('marvin:start', async (event) => {
 });
 ipcMain.handle('marvin:stop', async (event) => {
   if (!trustedSender(event)) return { success: false, error: 'Origine refusée.' };
-  runDetached('powershell.exe', ['-NoProfile', '-File', path.join(ROOT, 'scripts', 'stop-marvin.ps1')]).catch(() => {});
-  setTimeout(() => loadAvailableView(), 2500);
-  return { success: true };
+  try {
+    await runToCompletion(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(ROOT, 'scripts', 'stop-marvin.ps1'),
+      ],
+      { logPath: SHUTDOWN_LOG_PATH },
+    );
+    if (!(await waitForMarvinStop())) {
+      return {
+        success: false,
+        error: `Marvin répond encore après l'arrêt. Journal : ${SHUTDOWN_LOG_PATH}`,
+      };
+    }
+    setTimeout(() => loadAvailableView(), 100);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Arrêt impossible : ${error?.message || error}. Journal : ${SHUTDOWN_LOG_PATH}`,
+    };
+  }
 });
 ipcMain.handle('marvin:open-main', async (event) => {
   if (!trustedSender(event)) return { success: false, error: 'Origine refusée.' };

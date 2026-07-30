@@ -310,6 +310,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Recherche unifiée traçable", (python, "scripts/test_tool_domain_unified_search.py")),
         Stage("Domaine de contrôle PC", (python, "scripts/test_tool_domain_pc_control.py")),
         Stage("Computer Runtime unifié", (python, "scripts/test_computer_runtime.py")),
+        Stage("Lancement Windows et Tailscale", (python, "scripts/test_tailscale_runtime.py")),
         Stage("Domaine diagnostic PC", (python, "scripts/test_tool_domain_pc_diagnostics.py")),
         Stage("Documentation d'intervention", (python, "scripts/test_tool_domain_intervention_docs.py")),
         Stage("Sécurité des commandes", (python, "scripts/test_tool_domain_command_safety.py")),

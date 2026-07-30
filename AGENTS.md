@@ -6,7 +6,7 @@
 
 ## 1. Qu'est-ce que Marvin
 
-Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **356 outils**.
+Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **357 outils**.
 
 L'utilisateur veut un Marvin **complet, puissant, qui ne fait pas de compromis**. Travailler de façon **autonome** : décider, innover, vérifier et améliorer les outils, ne pas s'arrêter pour demander à chaque étape.
 
@@ -41,14 +41,14 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.519.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.521.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
 ### Fichiers backend clés (`backend/`)
 - `main.py` — cycle de vie et majorité des endpoints FastAPI historiques (gros fichier ; historique versionné en commentaires `# vX.Y`).
 - `api/` — routeurs FastAPI extraits progressivement : Doctor, conversations, projets, tâches et notes ont leurs modules dédiés.
-- `tools.py` — les **356 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
+- `tools.py` — les **357 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
 - `auto_config.py` — détecte le matériel, choisit le **mode** (eco/balanced/performance/max) et applique les leviers + choisit les modèles Ollama selon la VRAM.
 - `skills.py` — système de **compétences** (fichiers Markdown, voir §5).
@@ -202,7 +202,23 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.519.0)
+## 9. État actuel (v2.521.0)
+
+**v2.521 (lancement Windows fondé sur le résultat)** : `pc_app_launch` ne confond plus
+la remise d'une commande à Windows avec l'ouverture effective de l'application. Les
+exécutables et raccourcis résolus sont suivis par processus ou fenêtre, et le reçu distingue
+`dispatched`, `verified` et `needs_repair`. Tailscale possède un adaptateur dédié : Marvin
+lance `tailscale-ipn.exe`, jamais le CLI `tailscale.exe`, vérifie le processus graphique et
+expose séparément l'installation, le service et l'état VPN par `pc_tailscale_status`. La
+projection de statut ne conserve ni pairs, ni identité, ni adresse IP. Rollback : réversion
+atomique du commit v2.521 puis redémarrage du backend, sans migration.
+
+**v2.520 (arrêt vérifié depuis l’avatar)** : Electron attend désormais la fin de
+`stop-marvin.ps1`, contrôle son code de sortie, vérifie que 3000 et 8005 sont réellement
+libérés et conserve un diagnostic borné dans
+`%LOCALAPPDATA%\Marvin\DesktopAvatar\shutdown.log`. Le renderer affiche les échecs au lieu
+d’annoncer un faux succès. Les modes et autorisations v2.519 sont inchangés. Rollback :
+réversion atomique du commit v2.520 puis redémarrage de l’avatar, sans migration.
 
 **v2.519 (filtrage fail-closed, dédup sémantique et commandes sensibles)** — *tranche livrée
 par Claude Code, sur les quatre remarques de revue de Codex.* (1) `validated_tools()` remplace

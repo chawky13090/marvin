@@ -54,6 +54,7 @@ from tool_domains import billing as billing_domain
 from tool_domains import windows as windows_domain
 from tool_domains import web as web_domain
 from tool_domains import pc_control as pc_control_domain
+from tool_domains import tailscale as tailscale_domain
 from tool_domains import pc_diagnostics as pc_diagnostics_domain
 from tool_domains import intervention_docs as intervention_docs_domain
 from tool_domains import command_safety as command_safety_domain
@@ -2151,6 +2152,7 @@ execute_winget_uninstall = winget_domain.execute_winget_uninstall
 pc_control_domain.configure(resolve_path=_resolve_path, format_size=_fmt_bytes)
 
 execute_pc_app_launch = pc_control_domain.execute_pc_app_launch
+execute_pc_tailscale_status = tailscale_domain.status
 execute_pc_browse = pc_control_domain.execute_pc_browse
 execute_pc_clipboard_get = pc_control_domain.execute_pc_clipboard_get
 execute_pc_clipboard_set = pc_control_domain.execute_pc_clipboard_set
@@ -2422,6 +2424,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_reveal": execute_pc_reveal,
     "pc_browse": execute_pc_browse,
     "pc_app_launch": execute_pc_app_launch,
+    "pc_tailscale_status": execute_pc_tailscale_status,
     "pc_run_command":     execute_pc_run_command,
     "pc_run_powershell":  execute_pc_run_powershell,
     "pc_run_elevated":    execute_pc_run_elevated,
@@ -3001,9 +3004,13 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin du fichier/dossier à révéler"}},
        ["path"]),
 
-    _t("pc_app_launch", "Lance une application Windows installée par son nom (Chrome, Word, Spotify, etc.). Résout via PATH, registre App Paths et menu Démarrer → lance n'importe quelle app installée.",
+    _t("pc_app_launch", "Lance une application Windows installée par son nom et vérifie le résultat par processus ou fenêtre. Résout via PATH, registre App Paths et menu Démarrer. Pour Tailscale, utilise explicitement l'interface graphique tailscale-ipn.exe.",
        {"app_name": {"type": "string", "description": "Nom de l'application à lancer"}},
        ["app_name"]),
+
+    _t("pc_tailscale_status", "Diagnostique Tailscale sous Windows sans le modifier : installation, service, connexion VPN et interface graphique. À utiliser avant ou après le lancement.",
+       {},
+       []),
 
     _t("pc_run_command", "Exécute une commande système Windows (demande confirmation).",
        {"command": {"type": "string", "description": "Commande shell à exécuter"},

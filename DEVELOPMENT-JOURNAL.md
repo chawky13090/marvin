@@ -14044,3 +14044,107 @@ redémarrage. Rollback partiel : vider `_SENSITIVE_FAMILIES` restaure l'autonomi
 confirmation ; `SEMANTIC_DUPLICATE_THRESHOLD = 2` neutralise la dédup sémantique ;
 `respect_disabled=False` sur les deux chemins automatiques restaure le comportement
 antérieur. Données : `data/skills_backup_20260730-232502/*.md`.
+
+## 2026-07-30 — v2.520 — Arrêt vérifié depuis l’avatar
+
+### Demande et état initial
+
+L’utilisateur demande de redémarrer Marvin afin d’activer la v2.519 réalisée par Claude Code,
+de lire ses annotations avant toute évolution des modes et autorisations, et signale que
+l’avatar démarre correctement Marvin mais ne l’arrête pas correctement.
+
+Le backend actif était encore en 2.518.0. Les entrées v2.516, v2.517 et v2.519 ont été relues
+avant modification. La v2.519 conserve les modes `auto` et `full`, mais exige un clic humain
+pour cinq familles de commandes sensibles même sous autonomie. Aucun de ces contrats n’est
+modifié dans cette tranche. Après arrêt contrôlé de 3000/8005 puis lancement par `start.bat`,
+le backend 2.519.0 et le frontend HTTP 200 ont été observés.
+
+### Cause racine et correction
+
+`desktop-avatar/main.cjs` lançait `stop-marvin.ps1` en mode détaché, avalait toute exception,
+attendait arbitrairement 2,5 secondes puis renvoyait toujours `{success:true}`. Il ne transmettait
+pas non plus `-ExecutionPolicy Bypass`, contrairement aux autres lanceurs Windows du projet.
+L’avatar ne connaissait donc ni le code de sortie, ni l’échec PowerShell, ni l’état réel des ports.
+
+- le script est désormais attendu avec un délai borné à 30 secondes ;
+- son code de sortie et ses erreurs déterminent le résultat IPC ;
+- PowerShell est appelé avec `-NoProfile -NonInteractive -ExecutionPolicy Bypass` ;
+- frontend 3000 et backend 8005 doivent tous deux être injoignables avant le succès ;
+- un journal borné est écrit dans
+  `%LOCALAPPDATA%\Marvin\DesktopAvatar\shutdown.log` ;
+- le renderer affiche l’erreur reçue et ne passe à `stopped` qu’après succès vérifié.
+
+### Sécurité, logs et rollback
+
+Le renderer reste sandboxé et ne reçoit aucune primitive système générique. L’origine IPC reste
+contrôlée. Le script existant conserve sa validation d’appartenance des processus et préserve
+Ollama. Le journal d’arrêt contient uniquement horodatage, code de sortie, PID arrêtés et erreurs
+PowerShell ; aucun secret, contenu de conversation ou donnée personnelle n’y est ajouté. Il suit
+la rétention du profil local de l’avatar.
+
+Aucune migration ni modification de données. Rollback : réversion atomique de la v2.520 puis
+redémarrage de l’avatar ; Marvin reste arrêtable avec `stop.bat`.
+
+### Validation réelle
+
+- backend 2.519.0 après redémarrage : santé `ok` ;
+- frontend Turbopack : HTTP 200 ;
+- `check:untrusted-web` : réussi ;
+- `check:sensitive-commands` : réussi ;
+- syntaxe Electron et ESLint ciblé : réussis ;
+- `check:avatar` : 38/38 assertions ;
+- `git diff --check` : réussi, hors avertissements de fins de ligne Windows.
+
+## 2026-07-31 — v2.521 — Lancement Windows vérifié et Tailscale
+
+### Demande et cause racine
+
+L'utilisateur a signalé que Tailscale n'avait pas été lancé selon la bonne procédure et a
+généralisé l'exigence : l'exécution d'une commande ne prouve jamais que le résultat demandé
+est atteint. L'audit de `pc_app_launch` a confirmé que chaque branche retournait
+`success:true` immédiatement après `os.startfile`, sans observation. La recherche heuristique
+dans Program Files pouvait aussi choisir un exécutable secondaire ou CLI.
+
+Sur cette machine, le service Tailscale était actif mais le CLI rapportait initialement
+`BackendState=NoState`, aucune adresse et un nœud hors ligne. Aucun processus
+`tailscale-ipn.exe` n'existait. Le binaire graphique réel est distinct du CLI et du démon.
+
+### Correction
+
+- le lanceur générique observe les processus et fenêtres avant/après l'action ;
+- le reçu distingue commande envoyée, résultat vérifié et réparation nécessaire ;
+- une résolution non vérifiable n'est plus annoncée comme un succès ;
+- Tailscale utilise un adaptateur spécialisé qui découvre dynamiquement ses trois binaires,
+  lance uniquement `tailscale-ipn.exe` et vérifie son processus graphique ;
+- `pc_tailscale_status` sépare installation, service, connexion et interface ;
+- le test réel a observé le passage de `NoState` à `Running` avec deux adresses après
+  lancement de l'interface déjà authentifiée ;
+- un lancement réel de Notepad a également produit une preuve de processus.
+
+### Sécurité, logs et rollback
+
+Aucune commande n'est construite depuis une entrée utilisateur dans l'adaptateur Tailscale.
+Le statut projeté exclut les pairs, noms de machine, utilisateurs, clés et adresses ; seuls
+des booléens, compteurs et messages de santé bornés sont exposés. Les règles Normal, Auto,
+Accès complet et les confirmations de commandes sensibles ajoutées en v2.519 restent
+inchangées et leurs tests passent.
+
+Aucune migration ni donnée persistante. Rollback : réversion atomique du commit v2.521,
+puis redémarrage du backend. L'ancien lanceur est alors restauré.
+
+### Validation réelle
+
+- compilation Python : réussie ;
+- `check:tailscale-runtime` : réussi ;
+- `check:computer-runtime` : réussi ;
+- `check:sensitive-commands` : réussi ;
+- `check:agent-prompt` : réussi ;
+- `check:capability-discovery-v2` : réussi ;
+- architecture intermédiaire : 357 outils, harness 357/357, 375 routes, 41 pages ;
+- Tailscale réel : GUI PID vérifié, état final `Running`, aucun message de santé ;
+- Notepad réel : processus vérifié, processus de test refermés.
+- gateway live après redémarrage : contrat `succeeded`, `verified=true`,
+  `needs_repair=false`, observabilité non dégradée ;
+- backend v2.521.0 sain, 357 outils, Ollama disponible et frontend HTTP 200.
+- `check:quick` : 224/224 étapes réussies ; ESLint conserve 35 avertissements
+  préexistants et ne rapporte aucune erreur.

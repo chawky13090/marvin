@@ -29,6 +29,10 @@ assert.match(main, /mediaTypes\.every\(\(type\) => type === 'audio'\)/, 'seul le
 assert.match(main, /source === OFFLINE_URL/, 'seule la page hors ligne livrée peut utiliser IPC');
 assert.match(main, /did-fail-load/, 'une panne de Next.js doit ramener vers la page hors ligne contrôlable');
 assert.match(main, /STARTUP_LOG_PATH/, 'un échec de démarrage doit produire un journal exploitable');
+assert.match(main, /SHUTDOWN_LOG_PATH/, 'un échec d’arrêt doit produire un journal exploitable');
+assert.match(main, /runToCompletion/, 'l’arrêt doit attendre le code de sortie du script');
+assert.match(main, /waitForMarvinStop/, 'l’arrêt doit vérifier que frontend et backend ne répondent plus');
+assert.match(main, /'-ExecutionPolicy',\s*'Bypass'/, 'le script d’arrêt doit fonctionner avec la politique PowerShell du poste');
 assert.match(main, /\['\/d', '\/c', 'call', path\.join\(ROOT, 'start\.bat'\)\]/, 'le batch doit être invoqué par des arguments cmd séparés et portables');
 assert.match(preload, /Object\.freeze/, 'la passerelle IPC doit être minimale et immuable');
 assert.doesNotMatch(preload, /exec|spawn|shell/, 'le renderer ne doit recevoir aucune primitive système générique');
@@ -39,6 +43,7 @@ assert.match(page, /RESIZE_EDGES/, 'des poignées de redimensionnement explicite
 assert.match(page, /startResize/, 'chaque poignée doit déclencher le redimensionnement natif côté process principal');
 assert.match(page, /Ouvrir Marvin/, 'un bouton textuel doit ouvrir l’interface complète');
 assert.match(page, /setWindowMode/, 'la fenêtre doit basculer entre conversation et compact');
+assert.match(page, /result\?\.success \? 'stopped'/, 'l’avatar ne doit annoncer l’arrêt qu’après un succès vérifié');
 assert.match(page, /Conversation avec Marvin/, 'l’historique récent doit rester lisible dans l’avatar');
 assert.match(page, /api\/coding\/jobs/, 'les missions de code actives doivent rester visibles');
 assert.match(livingAvatar, /la-mobius/, 'l’identité doit utiliser une boucle de Möbius animée');
@@ -47,4 +52,4 @@ assert.match(livingAvatar, /Regard asymétrique/, 'le robot doit conserver un re
 assert.match(stopScript, /Test-MarvinProcess/, 'l’arrêt doit vérifier l’appartenance des processus');
 assert.match(stopScript, /preserved_ollama = \$true/, 'arrêter Marvin ne doit pas tuer Ollama');
 
-console.log('Desktop avatar: 33 assertions réussies.');
+console.log('Desktop avatar: 38 assertions réussies.');

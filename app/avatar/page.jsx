@@ -139,7 +139,12 @@ export default function DesktopAvatarPage() {
   const stopMarvin = async () => {
     if (!window.marvinDesktop?.stop) return;
     setDesktopStatus('stopping');
-    await window.marvinDesktop.stop();
+    try {
+      const result = await window.marvinDesktop.stop();
+      setDesktopStatus(result?.success ? 'stopped' : (result?.error || 'stop-error'));
+    } catch (error) {
+      setDesktopStatus(`Arrêt impossible : ${error?.message || error}`);
+    }
   };
 
   const openMarvin = async () => {
