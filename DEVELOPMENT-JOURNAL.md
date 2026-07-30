@@ -13733,3 +13733,91 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
   exclue du contexte Cloud.
 - Tests approval flow, gateway API et session agent : réussis.
 - Compilation Python des modules modifiés : réussie.
+
+## 2026-07-30 — v2.516 — Frontière web non fiable et bornes réelles du mode auto
+
+> Tranche réalisée par **Claude Code** à la suite d'un audit complet demandé par
+> l'utilisateur. Codex : les trois corrections ci-dessous touchent `agent_autonomy`,
+> `tool_gateway`, `tool_domains/web` et `agent_tool_batch` — lire cette entrée avant
+> toute évolution de l'autonomie ou des outils Web.
+
+### Constats de l'audit (mesurés, pas supposés)
+
+1. **Le mode `auto` auto-approuvait l'exécution en administrateur.** `pc_run_elevated`
+   commence par `pc_run_` (`critical_tool_policy._REMOTE_EXECUTION_PREFIXES`) donc porte
+   `Effect.CODE_EXECUTION`; sur un environnement `HOST` cela donne `L3_OPERATIONAL`
+   (`policy_engine.risk_tier`). Or `agent_autonomy.allows` acceptait tout tier ≤ 3 en mode
+   `auto`. Le libellé de l'interface annonçait pourtant « actions locales réversibles », et
+   `config.DANGEROUS_TOOLS` documente `pc_run_elevated` comme « toujours confirmée ».
+   Le code contredisait donc deux de ses propres contrats.
+2. **Asymétrie de confirmation.** `tool_gateway` maintenait la confirmation sous autonomie
+   pour `computer_control action=commit` uniquement; l'outil le plus puissant n'avait pas
+   d'exception équivalente.
+3. **Contenu web non balisé sur les outils directs.** `research_swarm` et
+   `research_engine_v3` encapsulaient déjà leurs sources entre marqueurs
+   `BEGIN/END_UNTRUSTED_SOURCE_DATA` avec consigne explicite. `tool_domains/web.py` n'avait
+   aucun marqueur : `web_research` construisait son prompt avec le texte de page brut
+   (« En te basant UNIQUEMENT sur ces résultats web… ») et `web_browse` / `web_browser_open`
+   renvoyaient le texte au contexte du modèle via un simple `json.dumps`.
+
+Chaîne d'atteignabilité constatée avant correction : page hostile lue par un outil Web non
+balisé → texte dans le contexte agent → émission de `pc_run_elevated` → **auto-approuvé si un
+grant `auto` était actif** → `security.screen_command` (denylist d'environ quinze motifs
+catastrophiques, qui laisse passer `net user /add`, `reg add …\Run`,
+`Set-MpPreference -DisableRealtimeMonitoring`) → exécution administrateur.
+Sans grant actif la chaîne restait bloquée par l'approbation humaine hors canal LLM.
+
+### Décisions et modifications
+
+- `agent_autonomy.AUTO_MODE_EXCLUDED_TOOLS` (nouveau) liste les outils que le mode `auto`
+  n'auto-approuve jamais, quel que soit leur tier; `pc_run_elevated` y figure.
+- `agent_autonomy.allows(mode, risk_tier, tool_name=None)` prend un troisième argument
+  optionnel : la signature reste rétro-compatible, l'exclusion ne s'applique qu'au mode `auto`.
+- **Le mode `full` est volontairement inchangé** : il continue de couvrir l'exécution élevée.
+  L'autonomie complète reste disponible, elle exige simplement un choix explicite.
+- `tool_gateway` transmet désormais le nom d'outil à `allows`.
+- `tool_domains/web.py` expose `wrap_untrusted_web()` et `guard_web_content()`, reprenant le
+  motif de `research_swarm`. Le prompt de `web_research` encapsule chaque source et rappelle
+  la consigne; `web_browse` et `web_browser_open` publient un champ additif `content_guard`.
+- `agent_tool_batch` injecte un rappel borné (≤ 400 caractères) après tout résultat des six
+  outils Web, sur le modèle du rappel déjà appliqué aux observations `computer_control`.
+
+### Sécurité, logs et preuves
+
+Aucune capacité n'est retirée : `full` conserve l'intégralité de sa portée et le niveau
+Sécurisé continue de bloquer `pc_run_elevated`. Le balisage est déclaratif et ne filtre
+jamais le contenu, conformément à `evidence_fabric.scan_untrusted_content`. Aucun contenu de
+page, secret ou donnée personnelle ne rejoint les journaux; `content_guard` ne transporte
+qu'une empreinte de risque (`tainted`, `instruction_like_content`, motifs détectés bornés à
+dix). Aucun nouveau chemin persistant, aucune migration de schéma, aucune classe de rétention
+créée — la tranche est donc sans impact sur `MARVIN-LOGGING-POLICY.md`.
+
+Dette résiduelle déclarée : `security.screen_command` reste une **denylist** et laisse passer
+les primitives standard de persistance et de désactivation de défense. La convertir en
+allowlist, ou l'enrichir, n'est pas fait ici et reste à arbitrer.
+
+### Validation réelle
+
+- Compilation des quatre modules modifiés : réussie.
+- Comportement du gating vérifié directement : `auto`+`pc_run_elevated` → refusé;
+  `auto`+`pc_run_command` → autorisé; `full`+`pc_run_elevated` → autorisé;
+  appel sans `tool_name` → inchangé.
+- `test_untrusted_web_and_autonomy.py` (nouveau) : réussi, enregistré dans `package.json`
+  (`check:untrusted-web`) et dans `check_marvin.py`.
+- **Test de mutation** : en neutralisant `AUTO_MODE_EXCLUDED_TOOLS`, le test échoue bien par
+  `AssertionError`; restauré, il repasse. Le test peut donc réellement échouer.
+- Tests ciblés réussis : Policy Engine, Agent Policy, Orchestration Gateway, Agent Gateway
+  API, Web Runtime, Research Engine v3.
+- `check_architecture.py` : OK — 2.516.0, 356 outils, 375 routes, harness 356/356.
+- ESLint : 0 erreur, 35 avertissements historiques inchangés.
+- Contrôle visuel du libellé d'autonomie non effectué (aucun serveur de preview démarré pour
+  ne pas perturber l'instance de développement en cours) : la modification est un littéral de
+  chaîne, couvert par le lint et sans logique associée. Cette limite est déclarée, pas masquée.
+
+### Rollback
+
+Aucune migration ni donnée persistante. Rollback complet : réversion atomique du commit
+v2.516 puis redémarrage du backend. Rollback partiel possible sans redéploiement :
+vider `agent_autonomy.AUTO_MODE_EXCLUDED_TOOLS` restaure le comportement antérieur du mode
+`auto`; retirer les six noms de `agent_tool_batch._UNTRUSTED_WEB_TOOLS` désactive le rappel
+de contexte.

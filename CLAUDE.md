@@ -2,11 +2,20 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Claude Code, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant au 2026-07-29 : v2.467.0, 344 outils.** `AGENTS.md`,
+> **État courant au 2026-07-30 : v2.516.0, 356 outils, 375 routes.** `AGENTS.md`,
 > `MARVIN-FRONTIER-CONSOLIDATION.md` et `DEVELOPMENT-JOURNAL.md` sont les sources de vérité
 > actuelles. Les sections versionnées plus bas dans ce fichier décrivent l'historique ancien
 > et ne doivent pas remplacer ces contrats. FastAPI est l'unique propriétaire SQLite;
 > Next.js n'utilise plus `better-sqlite3`.
+>
+> ⚠️ **Ce fichier dérive vite** : le corps ci-dessous a été écrit vers la v2.80 et n'a pas
+> suivi le rythme réel (~25 commits/jour). Les tailles de fichiers, listes d'outils et
+> descriptions de sous-systèmes qu'il contient sont probablement périmées — **vérifier dans
+> le code avant de s'y fier**. `AGENTS.md` (tenu à jour par Codex) fait foi.
+>
+> **Codex travaille en parallèle sur ce dépôt.** Toute évolution importante doit être
+> consignée dans `DEVELOPMENT-JOURNAL.md` (journal partagé) *et* résumée dans `AGENTS.md` §9,
+> sans quoi l'autre agent ne saura pas ce qui a été fait.
 
 ---
 

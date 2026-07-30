@@ -212,6 +212,7 @@ async def execute_tool(
             and agent_autonomy.allows(
                 str(autonomy.get("mode") or "normal"),
                 int(tier),
+                request.tool_name,
             )
         ):
             context = PolicyContext(

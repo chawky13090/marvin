@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.516 — frontière web non fiable explicite et exécution élevée hors mode auto
 # v2.515 — marché multi-modèles fondé sur les appels exécutables et missions abouties
 # v2.514 — reprise contextuelle PC et routage Cloud fondé sur les résultats
 # v2.513 — reprise d'approbation sensible au résultat et focus Windows tolérant
@@ -26,28 +27,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.499 — projets et conversations pilotables depuis le chat
 # v2.498 — audit outils, fiabilité runtime et recherche SearXNG pertinente
 # v2.497 — ouverture Windows, navigation PC et projection PDF fiabilisées
-# v2.485 — vocalisation fiable des réponses Cloud answer_final
-# v2.484 — barre contextuelle stable et accueil orienté travail
-# v2.483 — navigation adaptative Focus, Rail, Complet et rollback Classique
-# v2.482 — recherche Web cohérente et palette de commandes React fiabilisée
-# v2.481 — fermeture des listeners HTTP LAN derrière la passerelle HTTPS
-# v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique
-# v2.479 — activation vocale explicite, dock inférieur et retry TTS borné
-# v2.468 — métriques bornées des décisions d'accès et d'idempotence
-# v2.467 — clés d'idempotence HTTP sur les gateways d'outils UI et MCP
-# v2.466 — autorisation LAN par capacités et profils d'appareil
-# v2.465 — identité LAN signée, jumelage, CSRF et WebSocket protégés
-# v2.464 — inventaire OpenAPI exhaustif et gate contractuel par famille
-# v2.463 — réplication chiffrée hors stockage, idempotente et vérifiée
-# v2.462 — restauration globale hors ligne compensée et projections réconciliées
-# v2.461 — bundle global chiffré et restauration isolée vérifiée
-# v2.460 — fraîcheur factuelle et restauration mémoire compensée
-# v2.489 — citations Research cliquables et bandeau Chat compact unifié
-# v2.488 — Research universel visible et suivis référentiels vérifiables
-# v2.487 — recherche profonde contextuelle, seuils mesurables et façade v3 unifiée
-# v2.457 — Code Workspace E2E natif, réparation ciblée et artefact préservé
-# v2.456 — corrélation HTTP, Runner, outils et preuves persistées
-# v2.455 — découverte dynamique des capacités des modèles locaux
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

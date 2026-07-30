@@ -11,12 +11,18 @@ const MODES = {
   },
   auto: {
     label: 'Auto',
-    description: 'Les actions locales réversibles sont autorisées pendant une heure.',
+    description:
+      'Les actions locales réversibles et l’exécution système courante sont autorisées '
+      + 'pendant une heure. L’exécution en administrateur, les suppressions et les envois '
+      + 'vers l’extérieur restent confirmés un par un.',
     color: '#c2c4c9',
   },
   full: {
     label: 'Accès complet',
-    description: 'Toutes les actions validées par le harness restent autorisées jusqu’à révocation.',
+    description:
+      'Toutes les actions validées par le harness restent autorisées jusqu’à révocation, '
+      + 'y compris l’exécution en administrateur et les suppressions. À n’activer que pour '
+      + 'une tâche surveillée.',
     color: '#dedfe2',
   },
 };

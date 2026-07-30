@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.515.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.516.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,25 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.515.0)
+## 9. État actuel (v2.516.0)
+
+**v2.516 (frontière web non fiable et bornes réelles du mode auto)** — *tranche livrée par
+Claude Code après audit complet.* Trois contradictions internes corrigées. (1) Le mode
+d'autonomie `auto` auto-approuvait `pc_run_elevated` : cet outil est `L3_OPERATIONAL`
+(préfixe `pc_run_` → `CODE_EXECUTION` sur `HOST`) et `allows()` acceptait tout tier ≤ 3,
+alors que l'interface annonçait « actions locales réversibles » et que
+`config.DANGEROUS_TOOLS` le déclare « toujours confirmée ». `agent_autonomy` expose
+désormais `AUTO_MODE_EXCLUDED_TOOLS` et `allows(mode, tier, tool_name=None)`;
+**le mode `full` reste volontairement inchangé** et couvre toujours l'exécution élevée.
+(2) Les libellés `auto` et `full` de `AutonomyControl.jsx` énoncent maintenant exactement
+ce qu'ils autorisent. (3) Les outils Web directs balisent leur contenu comme
+`research_swarm` le faisait déjà : `wrap_untrusted_web()` / `guard_web_content()` dans
+`tool_domains/web.py`, champ additif `content_guard`, et rappel borné injecté par
+`agent_tool_batch` après tout résultat Web (même motif que les observations
+`computer_control`). Test de non-régression `scripts/test_untrusted_web_and_autonomy.py`
+(`npm run check:untrusted-web`), validé par mutation. **Dette déclarée non traitée** :
+`security.screen_command` reste une denylist d'environ quinze motifs et laisse passer
+`net user /add`, `reg add …\Run` ou `Set-MpPreference -DisableRealtimeMonitoring`.
 
 **v2.515 (Model Market multi-modèles et preuves métier)** : Auto évalue désormais toutes les
 familles Cloud installées par spécialité au lieu de survaloriser MiniMax. Qwen 3.5 bénéficie

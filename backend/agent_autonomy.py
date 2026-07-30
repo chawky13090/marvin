@@ -12,6 +12,13 @@ SETTING_KEY = "agent_autonomy_grant"
 MODES = frozenset({"normal", "auto", "full"})
 MAX_DURATION_MINUTES = 8 * 60
 
+# v2.516 — Outils que le mode `auto` n'auto-approuve jamais, quel que soit leur
+# tier de risque. Le contrat annoncé de `auto` est « actions locales réversibles » ;
+# une exécution en administrateur ne l'est pas, et `config.DANGEROUS_TOOLS` la
+# déclare déjà « toujours confirmée ». Le mode `full`, activé explicitement et
+# assumé par le propriétaire, continue de les couvrir.
+AUTO_MODE_EXCLUDED_TOOLS = frozenset({"pc_run_elevated"})
+
 
 def current(database: Any) -> dict:
     raw = database.get_setting(SETTING_KEY, {})
@@ -96,7 +103,11 @@ def configure(database: Any, mode: str, duration_minutes: int = 60) -> dict:
     return effective
 
 
-def allows(mode: str, risk_tier: int) -> bool:
+def allows(mode: str, risk_tier: int, tool_name: str | None = None) -> bool:
     if mode == "full":
         return True
-    return mode == "auto" and int(risk_tier) <= 3
+    if mode != "auto":
+        return False
+    if tool_name and str(tool_name) in AUTO_MODE_EXCLUDED_TOOLS:
+        return False
+    return int(risk_tier) <= 3
