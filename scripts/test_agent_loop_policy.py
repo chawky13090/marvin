@@ -16,9 +16,11 @@ import agent
 from agent_loop_policy import (
     _NATIVE_TOOL_CALL_LIMITS,
     build_action_execution_nudge,
+    build_computer_action_nudge,
     build_empty_response_nudge,
     build_skill_nudge,
     promises_unexecuted_action,
+    requires_computer_action_nudge,
     render_blocking_outcomes,
     render_latest_web_result,
     retryable_cloud_model_error,
@@ -105,6 +107,35 @@ async def main() -> int:
     )
     assert "promesse n'est pas un résultat" in action_nudge[0]["content"]
     assert "web_search" in action_nudge[0]["content"]
+    assert requires_computer_action_nudge(
+        "Ouvre le site du restaurant et navigue dans le formulaire.",
+        executed_tool_names=set(),
+        available_tool_names={"computer_control"},
+    ) is True
+    assert requires_computer_action_nudge(
+        "Explique comment fonctionne un navigateur.",
+        executed_tool_names=set(),
+        available_tool_names={"computer_control"},
+    ) is False
+    assert requires_computer_action_nudge(
+        "Ouvre la page Web.",
+        executed_tool_names={"computer_control"},
+        available_tool_names={"computer_control"},
+        successful_calls=[{
+            "tool": "computer_control",
+            "args": '{"action": "observe"}',
+        }],
+    ) is True
+    assert requires_computer_action_nudge(
+        "Ouvre la page Web.",
+        executed_tool_names={"computer_control"},
+        available_tool_names={"computer_control"},
+        successful_calls=[{
+            "tool": "computer_control",
+            "args": '{"action": "navigate", "surface": "browser"}',
+        }],
+    ) is False
+    assert "action=navigate" in build_computer_action_nudge()[0]["content"]
     assert should_suppress_model_text(
         has_blocking_outcomes=False,
         required_tool_names={"web_research"},

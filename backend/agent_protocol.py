@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from agent_tool_step import compact_tool_result
+
 
 def to_ollama_messages(messages: list[dict]) -> list[dict]:
     result: list[dict] = []
@@ -43,28 +45,39 @@ def to_ollama_messages(messages: list[dict]) -> list[dict]:
         if role == "assistant":
             invocations = message.get("toolInvocations") or []
             if invocations:
-                valid_invocations = [item for item in invocations if isinstance(item, dict)]
-                result.append({
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": [
-                        {
-                            "function": {
-                                "name": invocation.get("toolName", ""),
-                                "arguments": invocation.get("args", {}),
+                # A confirmation left pending in a previous turn is not a valid
+                # Ollama tool exchange: a tool_call without its tool response,
+                # followed by newer messages, is rejected with HTTP 400 by
+                # several Ollama Cloud models. Reconstruct only completed pairs.
+                completed_invocations = [
+                    item
+                    for item in invocations
+                    if isinstance(item, dict) and item.get("state") == "result"
+                ]
+                if completed_invocations:
+                    result.append({
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": invocation.get("toolName", ""),
+                                    "arguments": invocation.get("args", {}),
+                                }
                             }
-                        }
-                        for invocation in valid_invocations
-                    ],
-                })
-                for invocation in valid_invocations:
-                    if invocation.get("state") == "result":
+                            for invocation in completed_invocations
+                        ],
+                    })
+                    for invocation in completed_invocations:
                         result.append({
                             "role": "tool",
-                            "content": json.dumps(
-                                invocation.get("result", {}), ensure_ascii=False
+                            "content": compact_tool_result(
+                                invocation.get("result", {}),
+                                tool_name=str(invocation.get("toolName", "")),
                             ),
                         })
+                elif content:
+                    result.append({"role": "assistant", "content": content})
                 continue
 
             stored_calls = message.get("tool_calls") or []
@@ -95,4 +108,3 @@ def to_ollama_messages(messages: list[dict]) -> list[dict]:
 def encode_sse(data: dict) -> str:
     """Encode un événement JSON sur une seule ligne data SSE, Unicode préservé."""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-

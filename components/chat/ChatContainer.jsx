@@ -266,17 +266,37 @@ export default function ChatContainer({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.result?.error || 'Autorisation refusée.');
+      const executionResult = data.result || data.error || 'Aucun résultat';
       addToolResult({
         toolCallId,
-        result: data.result || data.error || 'Aucun résultat',
+        result: executionResult,
       });
+      const executionFailed = (
+        executionResult
+        && typeof executionResult === 'object'
+        && (
+          executionResult.success === false
+          || executionResult.needs_repair === true
+          || Boolean(executionResult.error)
+        )
+      );
       await sendMessage({
-        text: (
-          "L'action explicitement approuvée vient d'être exécutée. "
-          + "Poursuis maintenant la mission initiale à partir d'une nouvelle observation. "
-          + "N'annonce aucun succès sans preuve et utilise action=commit uniquement "
-          + "pour l'engagement externe final."
-        ),
+        text: executionFailed
+          ? (
+            "L'utilisateur a approuvé la sous-action, mais son exécution a échoué ou sa "
+            + "preuve est insuffisante. Ce n'est pas un blocage utilisateur. Observe "
+            + "immédiatement l'état courant avec computer_control, choisis une cible plus "
+            + "robuste ou une autre méthode, puis poursuis la mission initiale. Ne demande "
+            + "pas de nouvelle autorisation tant qu'une action non critique peut réparer "
+            + "l'échec. N'annonce jamais cette sous-action comme réussie."
+          )
+          : (
+            "La sous-action explicitement approuvée a réussi, mais elle ne constitue pas "
+            + "forcément la fin de la mission. Observe immédiatement le nouvel état, puis "
+            + "poursuis la mission initiale sans redemander les choix que l'utilisateur a "
+            + "déjà délégués. N'annonce aucun succès sans preuve et utilise action=commit "
+            + "uniquement pour l'engagement externe final."
+          ),
         internal: true,
         continuationApprovalId: approvalId,
       });

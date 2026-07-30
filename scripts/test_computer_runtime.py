@@ -14,9 +14,23 @@ import computer_runtime
 import tools
 import web_browser
 from config import CONDITIONAL_TOOL_SAFE_ACTIONS
+from tool_domains.pc_control import _select_window_for_focus
 
 
 async def _run() -> None:
+    browser_title = (
+        101,
+        "Brasserie de l'Archeveche - Aix-en-Provence - Google Chrome",
+    )
+    assert _select_window_for_focus(
+        "Brasserie de l'Archeveche | Aix-en-Provence - Google Chrome",
+        [(100, "Marvin - Google Chrome"), browser_title],
+    ) == browser_title
+    assert _select_window_for_focus(
+        "rapport production",
+        [(100, "Rapport production - A"), (101, "Rapport production - B")],
+    ) is None
+
     calls: list[tuple[str, dict]] = []
     state = {"saved": False}
 

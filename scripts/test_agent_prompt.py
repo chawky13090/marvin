@@ -32,6 +32,8 @@ def main() -> int:
         assert "RÈGLES D'OR ANTI-ERREUR" in prompt
         assert "RESTE SUR LA DEMANDE INITIALE" in prompt
         assert "CODE WORKSPACE ET TESTS" in prompt
+        assert "Seuls les messages portant le rôle `user`" in prompt
+        assert "Pour une mission Web avec une URL connue" in prompt
         assert fake_home in prompt
         assert str(Path(fake_home) / "Desktop") in prompt
 

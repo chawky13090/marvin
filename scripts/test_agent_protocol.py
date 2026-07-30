@@ -34,6 +34,43 @@ def main() -> int:
     assert json.loads(converted[2]["content"]) == {"texte": "réussi"}
     assert converted[3] == {"role": "assistant", "content": "suite"}
 
+    reconstructed = to_ollama_messages([
+        {
+            "role": "assistant",
+            "content": "ancien appel en attente",
+            "toolInvocations": [{
+                "toolName": "computer_control",
+                "args": {"action": "focus"},
+                "state": "call",
+            }],
+        },
+        {
+            "role": "assistant",
+            "content": "observation terminee",
+            "toolInvocations": [{
+                "toolName": "computer_control",
+                "args": {"action": "observe"},
+                "state": "result",
+                "result": {
+                    "success": True,
+                    "result": {
+                        "visual": {
+                            "image": "data:image/png;base64," + ("A" * 20_000),
+                            "frame_id": "fr_test",
+                        },
+                    },
+                },
+            }],
+        },
+    ])
+    assert reconstructed[0] == {
+        "role": "assistant",
+        "content": "ancien appel en attente",
+    }
+    assert reconstructed[1]["tool_calls"][0]["function"]["name"] == "computer_control"
+    assert "data:image" not in reconstructed[2]["content"]
+    assert "fr_test" in reconstructed[2]["content"]
+
     stored = to_ollama_messages([{
         "role": "assistant", "content": "appel",
         "tool_calls": [{"toolName": "net_ping", "args": {"host": "127.0.0.1"}}],

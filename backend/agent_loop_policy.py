@@ -31,6 +31,16 @@ _TOOL_ACTION_RE = re.compile(
     r"commande|script|fichier|document|mission)\b",
     re.IGNORECASE,
 )
+_COMPUTER_ACTION_INTENT_RE = re.compile(
+    r"\b(?:navigu(?:e|er)|ouvre|ouvrir|clique|cliquer|remplis|remplir|"
+    r"r[ée]serve|r[ée]server|pilote|piloter|contr[ôo]le|contr[ôo]ler)\b",
+    re.IGNORECASE,
+)
+_COMPUTER_TARGET_RE = re.compile(
+    r"\b(?:site|page|web|navigateur|chrome|edge|fen[êe]tre|formulaire|restaurant)\b"
+    r"|https?://",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -192,6 +202,43 @@ def promises_unexecuted_action(
         and bool(_UNEXECUTED_ACTION_RE.search(text))
         and bool(_TOOL_ACTION_RE.search(text))
     )
+
+
+def requires_computer_action_nudge(
+    user_query: str,
+    *,
+    executed_tool_names: set[str],
+    available_tool_names: set[str],
+    successful_calls: list[dict[str, str]] | None = None,
+) -> bool:
+    """Détecte une mission PC/Web terminée sans action mutatrice réussie."""
+    text = str(user_query or "")
+    successful_computer_action = any(
+        call.get("tool") == "computer_control"
+        and '"action": "observe"' not in str(call.get("args") or "")
+        for call in (successful_calls or [])
+    )
+    return (
+        "computer_control" in available_tool_names
+        and not successful_computer_action
+        and bool(_COMPUTER_ACTION_INTENT_RE.search(text))
+        and bool(_COMPUTER_TARGET_RE.search(text))
+    )
+
+
+def build_computer_action_nudge() -> list[dict[str, str]]:
+    return [{
+        "role": "user",
+        "content": (
+            "La dernière demande `user` exige une action PC/Web concrète, mais aucune "
+            "action mutatrice n'a encore réussi. Une simple observation, une ancienne "
+            "réponse assistant ou la fenêtre de bureau "
+            "courante ne peut pas annuler cette demande. Appelle maintenant "
+            "`computer_control`. Si une URL est connue, commence par "
+            "`action=navigate` avec `surface=browser`, puis observe et poursuis. "
+            "Ne demande pas à l'utilisateur de faire une étape que l'outil peut réaliser."
+        ),
+    }]
 
 
 def build_action_execution_nudge(*, available_tool_names: set[str]) -> list[dict[str, str]]:

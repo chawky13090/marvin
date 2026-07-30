@@ -30,6 +30,32 @@ def main() -> int:
     malformed = prepare_tool_call("calculator", "[invalid")
     assert malformed.arguments == {}
 
+    computer = prepare_tool_call(
+        "computer_control",
+        {
+            "action": "observe",
+            "visual": "false",
+            "capture_before": "TRUE",
+            "embed": "invalide",
+        },
+    )
+    assert computer.arguments["visual"] is False
+    assert computer.arguments["capture_before"] is True
+    assert computer.arguments["embed"] == "invalide"
+
+    browser = prepare_tool_call(
+        "web_browser_open",
+        {"target": "https://example.com/", "max_chars": "30000"},
+    )
+    assert browser.arguments == {"url": "https://example.com/"}
+
+    crawl = prepare_tool_call(
+        "web_site_crawl",
+        {"url": "https://example.com/", "max_pages": "5", "max_depth": "2"},
+    )
+    assert crawl.arguments["max_pages"] == 5
+    assert crawl.arguments["max_depth"] == 2
+
     status = prepare_tool_call(
         "code_workspace_status", {"mission_id": "mission-1"}
     )

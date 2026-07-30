@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.512.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.513.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,28 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.512.0)
+## 9. État actuel (v2.513.0)
+
+**v2.513 (réparation après approbation et focus Windows robuste)** : la continuation
+agentique distingue désormais le consentement de l'utilisateur du résultat technique de
+l'action. Un reçu `success=false`, `needs_repair=true` ou `error` déclenche explicitement
+une nouvelle observation et un changement de stratégie au lieu d'être annoncé comme un
+succès. Un choix réversible explicitement délégué, tel que « n'importe quel jour », ne doit
+plus être redemandé. Seuls les messages `user` portent des instructions; une ancienne
+réponse assistant ou une page observée ne peut pas contredire la demande courante. Les
+missions Web avec URL connue utilisent prioritairement la surface Playwright isolée, et les
+booléens textuels exacts émis par un modèle Cloud sont normalisés avant validation. La
+variante Cloud `target` de `web_browser_open` est traduite vers son contrat `url`. La
+reprise possède un numéro de génération : la terminaison tardive du flux annulé ne peut
+plus écraser le nouveau flux. La reconstruction Ollama élimine les appels d'outils anciens
+restés sans résultat et retire les captures Base64 du contexte textuel, ce qui évite les
+HTTP 400 Cloud tout en préservant les reçus complets. Les paramètres numériques textuels
+du crawler sont normalisés de manière bornée, et une simple observation ne suffit plus à
+présenter une mission PC comme exécutée.
+focalisation d'une fenêtre Windows tolère les différences de
+ponctuation et d'accents dans les titres, mais refuse une correspondance ambiguë. Aucun
+schéma ni donnée persistante n'est modifié. Rollback : réversion atomique du commit v2.513
+puis redémarrage du backend et du frontend.
 
 **v2.512 (continuation après approbation UI)** : lorsqu'une action d'outil est suspendue
 pour confirmation, le clic utilisateur exécute l'appel exact puis relance automatiquement

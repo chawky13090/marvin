@@ -97,10 +97,12 @@ from agent_tool_batch import execute_tool_batch as _execute_tool_batch
 from agent_turn_completion import complete_turn as _complete_turn
 from agent_loop_policy import (
     build_action_execution_nudge as _build_action_execution_nudge,
+    build_computer_action_nudge as _build_computer_action_nudge,
     build_empty_response_nudge as _build_empty_response_nudge,
     build_native_budget_nudge as _build_native_budget_nudge,
     build_skill_nudge as _build_skill_nudge,
     promises_unexecuted_action as _promises_unexecuted_action,
+    requires_computer_action_nudge as _requires_computer_action_nudge,
     render_blocking_outcomes as _render_blocking_outcomes,
     render_latest_web_result as _render_latest_web_result,
     retryable_cloud_model_error as _retryable_cloud_model_error,
@@ -872,6 +874,26 @@ async def _run_deterministic_agent(
                 executed_tool_count=len(_executed_tool_names),
             )
             break
+
+        elif (
+            _requires_computer_action_nudge(
+                _user_query,
+                executed_tool_names=_executed_tool_names,
+                available_tool_names={
+                    str(spec.get("function", {}).get("name") or "")
+                    for spec in tools_payload
+                    if spec.get("function", {}).get("name")
+                },
+                successful_calls=_runner_state.successful_calls,
+            )
+            and not _runner_state.nudged
+            and step < _max_tool_steps - 1
+        ):
+            _runner_state.nudged = True
+            ollama_msgs.append({"role": "assistant", "content": full_content})
+            ollama_msgs.extend(_build_computer_action_nudge())
+            yield _sse({"type": "text", "text": "\n\n"})
+            continue
 
         elif (
             _promises_unexecuted_action(

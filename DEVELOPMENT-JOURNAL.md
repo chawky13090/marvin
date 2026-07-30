@@ -13574,3 +13574,60 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
 - Gate global rapide : 217/217 étapes réussies.
 - Rendu Playwright réel validé en 1920 × 1080, 1280 × 900 et 390 × 844 sans débordement.
 - Runtime relancé : backend `2.508.0`, santé `ok`, Ollama disponible et frontend HTTP 200.
+## 2026-07-30 — v2.513 — Réparation après approbation et focus Windows robuste
+
+### Incident et preuves
+
+- Dans la conversation « Projet raph-it manager it », l'utilisateur a autorisé
+  `computer_control` pour remettre Chrome au premier plan.
+- Le titre demandé contenait un séparateur différent du titre Windows réel. Le reçu a
+  correctement indiqué `success=false` et `needs_repair=true`.
+- La continuation v2.512 a néanmoins décrit la sous-action comme exécutée, puis le modèle a
+  redemandé des choix déjà délégués au lieu d'observer et de réparer.
+
+### Correction
+
+- La reprise UI analyse maintenant le résultat métier, pas seulement le statut HTTP.
+- En cas d'échec, elle impose une observation fraîche et une stratégie alternative; en cas
+  de succès, elle rappelle que la mission initiale continue.
+- Les prompts classique et LLM natif exigent de respecter les choix réversibles délégués et
+  de différencier consentement, exécution et preuve.
+- Seuls les messages `user` peuvent porter des instructions. Les anciennes réponses de
+  Marvin et les pages observées restent des données et ne peuvent pas annuler la demande.
+- Une mission Web avec URL connue privilégie la surface Playwright isolée au lieu d'adopter
+  l'onglet de bureau courant. Les booléens textuels `true`/`false` de Computer Runtime sont
+  normalisés de manière bornée avant la validation stricte; l'alias Cloud observé `target`
+  de `web_browser_open` est traduit vers le paramètre contractuel `url`.
+- Le focus Windows normalise accents et ponctuation. Il accepte une correspondance forte
+  unique et refuse les résultats ambigus.
+- Une génération monotone attribue l'état de streaming au tour le plus récent : la fin
+  tardive d'un flux annulé ne peut plus interrompre la continuation issue du clic.
+- La reconstruction du contexte Ollama ignore les anciens appels sans résultat et projette
+  les captures Base64 hors des résultats texte. Le reçu intégral reste dans SQLite et dans
+  la chaîne de preuves, mais le modèle Cloud ne reçoit plus un historique invalide ou
+  démesuré provoquant HTTP 400.
+- Les entiers sérialisés en chaînes pour `web_site_crawl` sont normalisés avant validation;
+  le réglage étranger `max_chars` est retiré de `web_browser_open`.
+- Une observation seule n'est plus comptée comme l'action PC demandée : le Runner relance
+  une fois le modèle tant qu'aucune action mutatrice `computer_control` n'a réussi.
+
+### Sécurité, logs et rollback
+
+- Le clic final engageant reste soumis à `computer_control action=commit` et à une
+  confirmation UI. Aucun contournement UAC, secret, nouveau privilège ou flux réseau.
+- Les reçus existants et `audit.jsonl` restent la preuve; aucun contenu personnel
+  supplémentaire n'est journalisé.
+- Aucune migration. Rollback : réversion atomique du commit v2.513, puis redémarrage des
+  deux services.
+
+### Validation réelle
+
+- Test Computer Runtime : focus tolérant et refus ambigu, boucle observe/act/verify/repair.
+- Test UI de continuation : résultat transmis, reprise invisible, branche de réparation.
+- Test réel dans la conversation : approbation consommée, continuation automatique
+  observée, échec de référence expirée reconnu, nouvelle observation lancée et absence de
+  nouvelle erreur HTTP 400. Aucune réservation ni action finale n'a été envoyée.
+- Tests de protocole : paire outil/résultat valide, appel pendant ignoré et capture Base64
+  exclue du contexte Cloud.
+- Tests approval flow, gateway API et session agent : réussis.
+- Compilation Python des modules modifiés : réussie.

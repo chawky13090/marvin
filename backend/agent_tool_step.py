@@ -51,12 +51,36 @@ def prepare_tool_call(name: str, raw_arguments: Any) -> PreparedToolCall:
     else:
         arguments = dict(arguments)
 
+    # Certains modèles compatibles OpenAI sérialisent encore les booléens JSON
+    # en chaînes. La coercition reste volontairement limitée aux champs booléens
+    # documentés de Computer Runtime et aux deux littéraux JSON exacts.
+    if name == "computer_control":
+        for key in ("visual", "capture_before", "embed", "confirmed"):
+            value = arguments.get(key)
+            if isinstance(value, str) and value.strip().casefold() in {"true", "false"}:
+                arguments[key] = value.strip().casefold() == "true"
+
     if (
         name == "pc_run_powershell"
         and not arguments.get("script")
         and arguments.get("command")
     ):
         arguments["script"] = arguments.pop("command")
+    if (
+        name == "web_browser_open"
+        and not arguments.get("url")
+        and arguments.get("target")
+    ):
+        arguments["url"] = arguments.pop("target")
+    if name == "web_browser_open":
+        # Cloud models often copy this tuning hint from web_browse. It is not
+        # part of the deliberately small browser-open contract.
+        arguments.pop("max_chars", None)
+    if name == "web_site_crawl":
+        for key in ("max_pages", "max_depth", "per_page_chars", "max_return_chars"):
+            value = arguments.get(key)
+            if isinstance(value, str) and value.strip().isdigit():
+                arguments[key] = int(value.strip())
     if name == "ssh_connect" and arguments.get("save"):
         name = "ssh_connection_save"
         arguments.pop("save", None)

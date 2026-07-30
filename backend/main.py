@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.513 — reprise d'approbation sensible au résultat et focus Windows tolérant
 # v2.512 — reprise agentique automatique après une approbation UI à usage unique
 # v2.511 — historique tolérant aux deux contrats API et applications Winget idempotentes
 # v2.510 — boucle visuelle LLM libre et confirmation des engagements externes
@@ -23,7 +24,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.499 — projets et conversations pilotables depuis le chat
 # v2.498 — audit outils, fiabilité runtime et recherche SearXNG pertinente
 # v2.497 — ouverture Windows, navigation PC et projection PDF fiabilisées
-# v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
 # v2.485 — vocalisation fiable des réponses Cloud answer_final
 # v2.484 — barre contextuelle stable et accueil orienté travail
 # v2.483 — navigation adaptative Focus, Rail, Complet et rollback Classique

@@ -93,6 +93,9 @@ export function ChatProvider({ children }) {
   const cortexContractRef = useRef(cortexContract);
   cortexContractRef.current = cortexContract;
   const abortRef = useRef(null);
+  // Only the newest request owns the visible streaming state. This prevents an
+  // aborted request from marking a newer approval continuation as completed.
+  const runGenerationRef = useRef(0);
 
   // Send a message — does NOT abort on unmount because it lives in the provider
   const sendMessage = useCallback(async ({
@@ -106,6 +109,8 @@ export function ChatProvider({ children }) {
 
     const textContent = text?.trim() || '';
     const imageList = images || [];
+    const runGeneration = ++runGenerationRef.current;
+    const isCurrentRun = () => runGenerationRef.current === runGeneration;
 
     const missionContract = { ...DEFAULT_CORTEX_CONTRACT, ...(cortex || cortexContractRef.current) };
     const userMsg = {
@@ -189,7 +194,7 @@ export function ChatProvider({ children }) {
           cortex: missionContract,
           continuationApprovalId: continuationApprovalId || null,
         };
-      setStatus('streaming');
+      if (isCurrentRun()) setStatus('streaming');
       for await (const event of durableChatEvents({
         url: `${BACKEND_URL}/api/chat`, payload: requestPayload, signal: controller.signal,
       })) {
@@ -406,7 +411,7 @@ export function ChatProvider({ children }) {
               break;
 
             case 'done':
-              setStatus('ready');
+              if (isCurrentRun()) setStatus('ready');
               // Mode vocal : on a déjà lu les phrases au fil de l'eau. Il ne reste
               // qu'à lire la « queue » non terminée par un point (dernier fragment).
               if (voiceStream.active && !spokenMessagesRef.current.has(assistantId)) {
@@ -427,13 +432,15 @@ export function ChatProvider({ children }) {
               break;
 
             case 'error':
-              setError(new Error(
-                event.message ||
-                event.detail ||
-                event.error ||
-                'Erreur backend inconnue (le modèle a peut-être renvoyé une réponse invalide)'
-              ));
-              setStatus('error');
+              if (isCurrentRun()) {
+                setError(new Error(
+                  event.message ||
+                  event.detail ||
+                  event.error ||
+                  'Erreur backend inconnue (le modèle a peut-être renvoyé une réponse invalide)'
+                ));
+                setStatus('error');
+              }
               if (!event.message?.includes('Ollama')) {
                 setMessages(prev => prev.filter(m => m.id !== assistantId || m.content));
               }
@@ -447,15 +454,20 @@ export function ChatProvider({ children }) {
         const msg = err.message
           || err.toString()
           || `Erreur réseau ou backend (${err.name || 'inconnu'})`;
-        setError(new Error(msg));
-        setStatus('error');
-      } else {
+        if (isCurrentRun()) {
+          setError(new Error(msg));
+          setStatus('error');
+        }
+      } else if (isCurrentRun()) {
         setStatus('ready');
       }
     }
 
-    setStatus(s => s === 'streaming' || s === 'submitted' ? 'ready' : s);
-    setCortexContract(prev => resetOneShot(prev));
+    if (isCurrentRun()) {
+      abortRef.current = null;
+      setStatus(s => s === 'streaming' || s === 'submitted' ? 'ready' : s);
+      setCortexContract(prev => resetOneShot(prev));
+    }
   }, []);
 
   const addToolResult = useCallback(({ toolCallId, result }) => {
@@ -480,7 +492,9 @@ export function ChatProvider({ children }) {
   }, []);
 
   const stop = useCallback(() => {
+    runGenerationRef.current += 1;
     abortRef.current?.abort();
+    abortRef.current = null;
     setStatus('ready');
   }, []);
 

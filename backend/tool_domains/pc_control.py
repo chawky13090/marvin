@@ -11,6 +11,7 @@ import re as _re
 import subprocess
 import sys
 import time
+import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -812,21 +813,21 @@ async def execute_pc_window_list(args: dict) -> dict:
 
 
 async def execute_pc_window_focus(args: dict) -> dict:
-    search = args.get("search", "")
+    search = str(args.get("search", "") or "").strip()
     try:
         import win32gui
         import win32con
 
-        target = None
+        candidates: list[tuple[int, str]] = []
 
         def cb(hwnd, _):
-            nonlocal target
             if win32gui.IsWindowVisible(hwnd):
                 title = win32gui.GetWindowText(hwnd)
-                if search.lower() in title.lower():
-                    target = (hwnd, title)
+                if title and title.strip():
+                    candidates.append((hwnd, title))
 
         win32gui.EnumWindows(cb, None)
+        target = _select_window_for_focus(search, candidates)
         if target:
             hwnd, title = target
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
@@ -835,6 +836,62 @@ async def execute_pc_window_focus(args: dict) -> dict:
         return {"error": f"Aucune fenêtre contenant « {search} » trouvée"}
     except Exception as e:
         return {"error": str(e)}
+
+
+def _normalised_title_tokens(value: str) -> set[str]:
+    folded = unicodedata.normalize("NFKD", value.casefold())
+    ascii_text = "".join(char for char in folded if not unicodedata.combining(char))
+    return {
+        token
+        for token in _re.findall(r"[a-z0-9]+", ascii_text)
+        if len(token) >= 2
+    }
+
+
+def _select_window_for_focus(
+    search: str,
+    candidates: list[tuple[int, str]],
+) -> tuple[int, str] | None:
+    """Tolère la ponctuation d'un titre sans sélectionner une fenêtre ambiguë."""
+    if not search:
+        return None
+    exact_title = [
+        candidate
+        for candidate in candidates
+        if search.casefold() == candidate[1].casefold()
+    ]
+    if len(exact_title) == 1:
+        return exact_title[0]
+    substring_matches = [
+        candidate
+        for candidate in candidates
+        if search.casefold() in candidate[1].casefold()
+    ]
+    if len(substring_matches) == 1:
+        return substring_matches[0]
+    if len(substring_matches) > 1:
+        return None
+
+    requested = _normalised_title_tokens(search)
+    if len(requested) < 2:
+        return None
+    ranked: list[tuple[float, int, tuple[int, str]]] = []
+    for candidate in candidates:
+        title_tokens = _normalised_title_tokens(candidate[1])
+        shared = len(requested & title_tokens)
+        score = shared / len(requested)
+        if shared >= 2 and score >= 0.6:
+            ranked.append((score, shared, candidate))
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    if not ranked:
+        return None
+    if (
+        len(ranked) > 1
+        and ranked[0][0] == ranked[1][0]
+        and ranked[0][1] == ranked[1][1]
+    ):
+        return None
+    return ranked[0][2]
 
 
 def _gui_get_window_sync(search: str):
