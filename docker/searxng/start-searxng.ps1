@@ -108,7 +108,21 @@ try {
     if ($missingEngines.Count -gt 0) {
         throw "Configuration non chargee; moteurs absents: $($missingEngines -join ', ')"
     }
-    Write-Host "$($enabledEngines.Count) moteurs actifs; pool general majeur valide." -ForegroundColor Green
+    $requiredTabs = @("general", "images", "videos", "news", "map", "music", "it", "science", "files", "social media", "shopping")
+    $emptyOrFragileTabs = @()
+    foreach ($tab in $requiredTabs) {
+        $tabCount = @(
+            $runtimeConfig.engines |
+                Where-Object { $_.enabled -and ($_.categories -contains $tab) }
+        ).Count
+        if ($tabCount -lt 2) {
+            $emptyOrFragileTabs += "$tab=$tabCount"
+        }
+    }
+    if ($emptyOrFragileTabs.Count -gt 0) {
+        throw "Onglets sans redondance moteur: $($emptyOrFragileTabs -join ', ')"
+    }
+    Write-Host "$($enabledEngines.Count) moteurs actifs; tous les onglets ont au moins deux moteurs." -ForegroundColor Green
 } catch {
     Write-Host "Le conteneur repond mais son pool de moteurs est invalide: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Rollback local: Copy-Item '$settingsPath.bak' '$settingsPath' -Force puis relancer ce script." -ForegroundColor Yellow

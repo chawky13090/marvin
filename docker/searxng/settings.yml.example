@@ -38,6 +38,14 @@ use_default_settings:
       - openverse
       - youtube
       - vimeo
+      - bandcamp
+      - deezer
+      - mixcloud
+      - radio browser
+      - soundcloud
+      - dailymotion
+      - odysee
+      - media.ccc.de
       - reddit
       - lemmy communities
       - lemmy users
@@ -68,6 +76,7 @@ use_default_settings:
       - imdb
       - openstreetmap
       - photon
+      - apple maps
       - reuters
       - dogpile news
       - wikinews
@@ -75,6 +84,10 @@ use_default_settings:
       - fdroid
       - pexels
       - unsplash
+      - flickr
+      - deviantart
+      - tmdb
+      - rottentomatoes
 
 general:
   instance_name: "Marvin SearXNG"
@@ -105,6 +118,10 @@ outgoing:
 # restent exclus conformément au choix opérateur.
 engines:
   - name: bing
+    categories:
+      - general
+      - web
+      - shopping
     disabled: false
   - name: bing images
     disabled: false
@@ -113,6 +130,10 @@ engines:
   - name: bing videos
     disabled: false
   - name: google cse
+    categories:
+      - general
+      - web
+      - shopping
     disabled: false
   - name: google cse images
     disabled: false
@@ -163,6 +184,22 @@ engines:
   - name: youtube
     disabled: false
   - name: vimeo
+    disabled: false
+  - name: bandcamp
+    disabled: false
+  - name: deezer
+    disabled: false
+  - name: mixcloud
+    disabled: false
+  - name: radio browser
+    disabled: false
+  - name: soundcloud
+    disabled: false
+  - name: dailymotion
+    disabled: false
+  - name: odysee
+    disabled: false
+  - name: media.ccc.de
     disabled: false
   - name: reddit
     categories:
@@ -244,6 +281,8 @@ engines:
     disabled: false
   - name: photon
     disabled: false
+  - name: apple maps
+    disabled: false
   - name: reuters
     disabled: false
   - name: dogpile news
@@ -257,4 +296,12 @@ engines:
   - name: pexels
     disabled: false
   - name: unsplash
+    disabled: false
+  - name: flickr
+    disabled: false
+  - name: deviantart
+    disabled: false
+  - name: tmdb
+    disabled: false
+  - name: rottentomatoes
     disabled: false

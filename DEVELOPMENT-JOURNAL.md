@@ -13112,3 +13112,52 @@ le backend. Aucune migration de données n'est concernée.
 - tests domaine Web, configuration SearXNG et Research Engine v3 réussis;
 - gate consolidée : **215/215 étapes** réussies;
 - backend 2.501.0 sain, 355 outils; frontend HTTP 200.
+
+## 2026-07-30 — v2.502 — Onglets SearXNG redondants
+
+### Demande et diagnostic
+
+L'utilisateur a constaté que plusieurs onglets SearXNG n'affichaient aucun moteur exploitable.
+L'inspection de `/config`, de la page Préférences et de recherches réelles a distingué la
+configuration déclarative du service effectivement rendu. Le défaut principal était confirmé :
+`shopping` ne retournait aucun résultat, son unique moteur Geizhals étant indisponible.
+`musique` reposait uniquement sur YouTube; `carte`, `fichiers` et `vidéos` avaient aussi une
+redondance opérationnelle insuffisante.
+
+### Décision et implémentation
+
+Deux stratégies ont été évaluées. Charger tous les moteurs de l'image introduirait des moteurs
+inactifs, à clé, incompatibles ou sans rapport. La solution retenue étend chaque verticale avec
+des moteurs publics pertinents et ajoute des replis généralistes uniquement à `shopping`.
+Bandcamp, Deezer, Mixcloud, Radio Browser, SoundCloud, Dailymotion, Odysee, media.ccc.de,
+Apple Maps, Flickr, DeviantArt, TMDB et Rotten Tomatoes rejoignent le pool explicite.
+
+Le lanceur contrôle désormais les catégories réellement exposées par `/config` et échoue si
+un des onze onglets obligatoires contient moins de deux moteurs actifs. Le test statique
+reproduit la même règle afin d'empêcher une régression avant démarrage.
+
+### Sécurité, logs et rollback
+
+SearXNG reste accessible uniquement en boucle locale. Aucun moteur à clé obligatoire, réseau
+onion/torrent, proxy d'évasion ou contournement anti-bot n'est ajouté. Les erreurs de moteurs
+restent des métadonnées techniques et aucun contenu de recherche n'est ajouté aux logs.
+
+Rollback : réverter atomiquement le commit v2.502 ou restaurer
+`docker/searxng/settings.yml.bak` vers `settings.yml`, puis exécuter
+`docker/searxng/start-searxng.ps1`. Aucun schéma ni donnée métier n'est modifié.
+
+### Validations observées
+
+- 80 moteurs actifs après recréation du conteneur;
+- contrôle de démarrage : onze onglets, au moins deux moteurs chacun;
+- `shopping` : 28 résultats via Bing et Google CSE malgré la panne Geizhals;
+- `musique` : 63 résultats via Deezer, Mixcloud, SoundCloud et YouTube;
+- `vidéos` : 93 résultats via Bing Videos, Dailymotion, Odysee et YouTube;
+- `carte` : 11 résultats via Apple Maps et Photon;
+- `images` : 140 résultats, dont Flickr;
+- `films` : 19 résultats via IMDb et Rotten Tomatoes;
+- contrôle visuel de la page Préférences : aucun onglet moteur vide.
+- architecture : 355 outils, 371 routes, harness 355/355;
+- suite consolidée : tous les contrôles backend, outils et frontend exécutés avant le build
+  sont réussis; le build Next.js 16.2.12 Turbopack a ensuite compilé séparément avec succès;
+- services relancés : backend 2.502.0, frontend et SearXNG répondent HTTP 200.

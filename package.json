@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.501.0",
+  "version": "2.502.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",

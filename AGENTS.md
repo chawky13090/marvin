@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.501.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.502.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.501.0)
+## 9. État actuel (v2.502.0)
+
+**v2.502 (onglets SearXNG sans point de défaillance unique)** : chaque onglet visible possède
+au moins deux moteurs actifs dans la configuration effective. Musique ajoute Bandcamp, Deezer,
+Mixcloud, Radio Browser et SoundCloud; vidéos ajoute Dailymotion, Odysee et media.ccc.de;
+carte ajoute Apple Maps; images ajoute Flickr et DeviantArt; films ajoute TMDB et Rotten
+Tomatoes. L'onglet shopping conserve Geizhals mais utilise aussi Bing et Google CSE comme
+replis, car Geizhals peut être suspendu. Le lanceur refuse désormais une configuration où un
+onglet général, images, vidéos, actualités, carte, musique, IT, science, fichiers, réseaux
+sociaux ou shopping possède moins de deux moteurs. Le secret local et le rollback
+`settings.yml.bak` restent inchangés.
 
 **v2.501 (recherche verticale multi-catégories)** : Marvin ne limite plus implicitement toutes
 les requêtes SearXNG à `general`. Le sujet détermine automatiquement les catégories utiles
