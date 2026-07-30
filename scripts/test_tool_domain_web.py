@@ -55,10 +55,12 @@ async def _run() -> None:
 
         def json(self):
             return {
+                "unresponsive_engines": [["blocked", "access denied"]],
                 "results": [
                     {
                         "title": f"Marvin Source {index}",
                         "url": f"https://example{index}.com/page",
+                        "engines": ["bing", "google cse"],
                         "content": f"Fait vérifié {index}",
                     }
                     for index in range(1, 11)
@@ -77,7 +79,11 @@ async def _run() -> None:
             cache_set=lambda _key, _value: None,
             net_error=lambda exc, what: {"error": str(exc), "resource": what},
         )
-        priority = await web.execute_web_search({"query": "Marvin", "max_results": 10})
+        priority = await web.execute_web_search({
+            "query": "Marvin",
+            "max_results": 10,
+            "categories": ["general", "social media"],
+        })
     discovery = {
         "success": True,
         "provider": "SearXNG",
@@ -125,6 +131,11 @@ async def _run() -> None:
         "https://www.francetravail.fr/"
     )
     assert priority["provider"] == "SearXNG"
+    request_params = searx_client.get.await_args.kwargs["params"]
+    assert request_params["categories"] == "general,social media"
+    assert priority["categories"] == ["general", "social media"]
+    assert priority["results"][0]["engines"] == ["bing", "google cse"]
+    assert priority["unresponsive_engines"] == [["blocked", "access denied"]]
     ordered = web._filter_relevant_results(
         "site officiel France Travail",
         [
@@ -156,6 +167,50 @@ async def _run() -> None:
         "Recherche sur le web via SearXNG les nouveautés officielles de Python 3.14. "
         "Donne un résumé court et cite les liens directs."
     ) == "nouveautés officielles de Python 3.14"
+    assert web._prepare_searxng_query(
+        'recherche sur le web "Chaouki Boussayri" site:linkedin.com'
+    ) == '"Chaouki Boussayri" site:linkedin.com'
+    assert web._clean_search_query(
+        '"Chaouki Boussayri" OR "Chaouki Boussairi" site:linkedin.com'
+    ) == '"Chaouki Boussayri" OR "Chaouki Boussairi" site:linkedin.com'
+    assert web._infer_search_categories("Chaouki Boussayri") == (
+        "general",
+        "social media",
+    )
+    assert web._infer_search_categories(
+        '"Chaouki Boussayri" OR "Chaouki Boussairi"'
+    ) == ("general", "social media")
+    assert web._infer_search_categories("meilleures baskets Skechers prix avis") == (
+        "general",
+        "images",
+    )
+    person_filtered = web._filter_relevant_results(
+        '"Chaouki Boussayri" OR "Chaouki Boussairi" site:linkedin.com',
+        [
+            {
+                "title": "Central Time",
+                "url": "https://time.example",
+                "snippet": "Current time or date",
+            },
+            {
+                "title": "Boussairi Chaouki",
+                "url": "https://social.example/profile",
+                "snippet": "Profil public",
+            },
+            {
+                "title": "Chaouki Loukili",
+                "url": "https://linkedin.com/other",
+                "snippet": "Autre personne",
+            },
+        ],
+    )
+    assert [item["url"] for item in person_filtered] == [
+        "https://social.example/profile"
+    ]
+    invalid_category = await web.execute_web_search(
+        {"query": "Marvin", "categories": ["inconnue"]}
+    )
+    assert "Catégorie SearXNG invalide" in invalid_category["error"]
     assert web._parse_research_queries(
         '["Python 3.14 official docs", "Python 3.14 release notes"]',
         fallback="nouveautés officielles de Python 3.14",

@@ -43,6 +43,17 @@ def test_engine_pool_is_broad_explicit_and_private() -> None:
         "pubmed",
         "crossref",
         "youtube",
+        "lemmy posts",
+        "mastodon users",
+        "pinterest",
+        "hackernews",
+        "gitlab",
+        "huggingface",
+        "apple app store",
+        "google play apps",
+        "geizhals",
+        "openstreetmap",
+        "reuters",
     }
 
     assert required_general <= kept

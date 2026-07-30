@@ -39,6 +39,42 @@ use_default_settings:
       - youtube
       - vimeo
       - reddit
+      - lemmy communities
+      - lemmy users
+      - lemmy posts
+      - lemmy comments
+      - mastodon users
+      - mastodon hashtags
+      - pinterest
+      - hackernews
+      - gitlab
+      - codeberg
+      - gitea.com
+      - huggingface
+      - huggingface datasets
+      - huggingface spaces
+      - askubuntu
+      - superuser
+      - mdn
+      - microsoft learn
+      - docker hub
+      - npm
+      - pypi
+      - apple app store
+      - google play apps
+      - geizhals
+      - steam
+      - goodreads
+      - imdb
+      - openstreetmap
+      - photon
+      - reuters
+      - dogpile news
+      - wikinews
+      - naver news
+      - fdroid
+      - pexels
+      - unsplash
 
 general:
   instance_name: "Marvin SearXNG"
@@ -129,4 +165,96 @@ engines:
   - name: vimeo
     disabled: false
   - name: reddit
+    categories:
+      - social media
+    disabled: false
+  - name: lemmy communities
+    categories:
+      - social media
+    disabled: false
+  - name: lemmy users
+    categories:
+      - social media
+    disabled: false
+  - name: lemmy posts
+    categories:
+      - social media
+    disabled: false
+  - name: lemmy comments
+    categories:
+      - social media
+    disabled: false
+  - name: mastodon users
+    categories:
+      - social media
+    disabled: false
+  - name: mastodon hashtags
+    categories:
+      - social media
+    disabled: false
+  - name: pinterest
+    categories:
+      - social media
+      - images
+    disabled: false
+  - name: hackernews
+    categories:
+      - social media
+      - it
+    disabled: false
+  - name: gitlab
+    disabled: false
+  - name: codeberg
+    disabled: false
+  - name: gitea.com
+    disabled: false
+  - name: huggingface
+    disabled: false
+  - name: huggingface datasets
+    disabled: false
+  - name: huggingface spaces
+    disabled: false
+  - name: askubuntu
+    disabled: false
+  - name: superuser
+    disabled: false
+  - name: mdn
+    disabled: false
+  - name: microsoft learn
+    disabled: false
+  - name: docker hub
+    disabled: false
+  - name: npm
+    disabled: false
+  - name: pypi
+    disabled: false
+  - name: apple app store
+    disabled: false
+  - name: google play apps
+    disabled: false
+  - name: geizhals
+    disabled: false
+  - name: steam
+    disabled: false
+  - name: goodreads
+    disabled: false
+  - name: imdb
+    disabled: false
+  - name: openstreetmap
+    disabled: false
+  - name: photon
+    disabled: false
+  - name: reuters
+    disabled: false
+  - name: dogpile news
+    disabled: false
+  - name: wikinews
+    disabled: false
+  - name: naver news
+    disabled: false
+  - name: fdroid
+    disabled: false
+  - name: pexels
+    disabled: false
+  - name: unsplash
     disabled: false

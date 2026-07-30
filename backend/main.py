@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.501 — recherche Web multi-catégories et verticale
 # v2.500 — SearXNG multi-moteurs et rechargement vérifié
 # v2.499 — projets et conversations pilotables depuis le chat
 # v2.498 — audit outils, fiabilité runtime et recherche SearXNG pertinente
@@ -19,7 +20,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.481 — fermeture des listeners HTTP LAN derrière la passerelle HTTPS
 # v2.480 — passerelle HTTPS LAN, autorité locale et jumelage à usage unique
 # v2.479 — activation vocale explicite, dock inférieur et retry TTS borné
-# v2.478 — Quiet Workbench, accueil contextuel et historique unifié
 # v2.476 — SearXNG prioritaire, recherche profonde multi-passes et routeur de capacités
 # v2.475 — contrats Web explicites et refus des promesses d'outils non exécutées
 # v2.474 — sidebar conversations accessible, archivage réversible et exports

@@ -13054,3 +13054,61 @@ restaurer `docker/searxng/settings.yml.bak` vers `settings.yml`, puis relancer
 - science : 68 résultats via Arxiv, Crossref, OpenAlex, PubMed et Semantic Scholar;
 - appel réel `web_search` via le gateway Marvin : 19 résultats, premier lien vers la
   documentation officielle Next.js, fournisseur SearXNG, aucune erreur.
+
+## 2026-07-30 — v2.501 — Recherche verticale multi-catégories
+
+### Demande et diagnostic
+
+L'utilisateur restait insatisfait de la recherche, notamment pour une personne présente sur
+les réseaux sociaux et pour les marketplaces. L'inspection de la dernière conversation a
+montré que `web_research` puis huit appels `web_search` avaient tous interrogé SearXNG sans
+paramètre `categories`. Malgré l'ajout de moteurs spécialisés, seuls les moteurs de la
+catégorie générale pouvaient donc répondre. Deux autres régressions réduisaient la précision :
+la préparation supprimait les guillemets des noms exacts et le filtre traitait l'opérateur
+`OR` comme un terme pertinent.
+
+### Décision et implémentation
+
+Deux approches ont été comparées. Activer les 279 moteurs recensés par SearXNG inclurait des
+moteurs inactifs, nécessitant des clés, des services privés, Tor ou des index sans rapport,
+avec davantage de délais et d'erreurs. Des packs verticaux explicites, choisis dynamiquement
+selon le sujet, maximisent la couverture exploitable tout en restant reproductibles.
+
+`web_search` accepte désormais des catégories explicites et déduit sinon général, réseaux
+sociaux, actualités, images, vidéos, IT, science, fichiers ou cartes. Les demandes portant sur
+une personne explorent automatiquement les réseaux sociaux; les produits et comparatifs
+ajoutent les index visuels. Les guillemets, opérateurs et `site:` sont conservés. Les résultats
+exposent leurs moteurs ainsi que les moteurs temporairement indisponibles. Le plafond passe à
+50 résultats par requête.
+
+Le pool SearXNG passe à 67 moteurs actifs. Il ajoute Lemmy, Mastodon, Pinterest, Hacker News,
+GitLab, Codeberg, Gitea, Hugging Face, Ask Ubuntu, Super User, MDN, Microsoft Learn, Docker
+Hub, npm, PyPI, catalogues d'applications, Geizhals, Steam, Goodreads, IMDb, OpenStreetMap,
+Photon, Reuters, Wikinews, F-Droid, Pexels et Unsplash.
+
+### Sécurité, logs et rollback
+
+L'instance reste strictement en boucle locale. Aucun proxy d'évasion, contournement de CAPTCHA,
+moteur onion/torrent, secret ou clé tierce n'est introduit. Les catégories et erreurs de
+moteurs restent des métadonnées techniques; aucun contenu personnel supplémentaire n'est
+journalisé. Les contenus Web demeurent non fiables et les lectures conservent le transport
+anti-SSRF existant.
+
+Rollback : réverter atomiquement le commit v2.501, restaurer au besoin
+`docker/searxng/settings.yml.bak`, relancer `docker/searxng/start-searxng.ps1`, puis redémarrer
+le backend. Aucune migration de données n'est concernée.
+
+### Validations observées
+
+- 67 moteurs effectivement chargés dans `/config`;
+- recherche personne multi-catégories : mentions Facebook et avis Google correspondant
+  réellement aux variantes du nom;
+- requête exacte `site:linkedin.com` après exclusion des composants techniques d'URL :
+  trois publications du profil `chaouki-boussayri-6a07102a8`, sans profils homonymes;
+- comparatif Skechers : 41 résultats pertinents après filtrage, issus de dix moteurs,
+  avec offres et comparateurs français;
+- recherche IT et réseaux sociaux : 133 résultats bruts issus notamment de Docker Hub,
+  GitHub, Hacker News, Mastodon, MDN, Microsoft Learn et Pinterest;
+- tests domaine Web, configuration SearXNG et Research Engine v3 réussis;
+- gate consolidée : **215/215 étapes** réussies;
+- backend 2.501.0 sain, 355 outils; frontend HTTP 200.

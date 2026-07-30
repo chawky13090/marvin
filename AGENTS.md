@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.500.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.501.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.500.0)
+## 9. État actuel (v2.501.0)
+
+**v2.501 (recherche verticale multi-catégories)** : Marvin ne limite plus implicitement toutes
+les requêtes SearXNG à `general`. Le sujet détermine automatiquement les catégories utiles
+parmi général, réseaux sociaux, actualités, images, vidéos, IT, science, fichiers et cartes;
+le LLM peut aussi les fournir explicitement. Les guillemets, `site:` et opérateurs booléens
+sont préservés. Le filtre ignore `AND/OR/NOT` et exige un recouvrement renforcé pour les
+requêtes exactes afin d'écarter les homonymes et résultats sans rapport. Les reçus conservent
+catégories, moteurs contributeurs et moteurs indisponibles. Le pool explicite atteint 67
+moteurs avec Lemmy, Mastodon, Pinterest, Hacker News, GitLab, Hugging Face, forums techniques,
+catalogues d'applications, Geizhals, Steam, cartes, actualités et banques d'images. Les moteurs
+inactifs, à clé obligatoire, onion/torrent et les moteurs explicitement exclus ne sont pas
+activés aveuglément.
 
 **v2.500 (SearXNG multi-moteurs vérifié)** : le pool explicite passe de trois moteurs,
 dont deux réellement en panne, à 31 moteurs couvrant recherche générale, actualités, images,

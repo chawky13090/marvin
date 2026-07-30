@@ -3340,8 +3340,18 @@ TOOLS_SPEC = [
        "sourcée, utiliser ensuite web_browse/web_browser_open ou directement web_research.",
        {"query": {"type": "string", "description": "Requête de recherche"},
         "provider": {"type": "string", "enum": ["auto", "searxng"], "description": "Les deux valeurs utilisent exclusivement SearXNG"},
-        "max_results": {"type": "integer", "description": "Nombre de résultats (défaut 8)"},
+        "max_results": {"type": "integer", "minimum": 1, "maximum": 50,
+                        "description": "Nombre de résultats (défaut 12)"},
         "language": {"type": "string", "description": "Langue SearXNG, par exemple fr-FR ou en-US"},
+        "categories": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["general", "news", "images", "videos", "map", "music",
+                         "it", "science", "files", "social media"],
+            },
+            "description": "Catégories SearXNG optionnelles; si absentes Marvin les déduit du sujet.",
+        },
         "time_range": {"type": "string", "enum": ["day", "week", "month", "year"], "description": "Fenêtre temporelle optionnelle"}},
        ["query"]),
 

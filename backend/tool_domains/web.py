@@ -102,7 +102,9 @@ def _normalize_search_text(value: Any) -> str:
 
 def _prepare_searxng_query(value: str) -> str:
     """Transforme une consigne en requête moteur sans perdre son sujet métier."""
-    original = " ".join(str(value or "").replace('"', " ").split()).strip()
+    original = " ".join(
+        str(value or "").replace("\x00", " ").replace("\r", " ").replace("\n", " ").split()
+    ).strip()
     cleaned = _SEARCH_PREFIX_RE.sub("", original, count=1).strip(" ?!.,:;")
     cleaned = re.sub(
         r"^(?:via|avec)\s+searxng\s+",
@@ -136,11 +138,107 @@ def _prepare_searxng_query(value: str) -> str:
     return " ".join(cleaned.split())[:300]
 
 
+_SEARXNG_CATEGORIES = {
+    "general",
+    "images",
+    "videos",
+    "news",
+    "map",
+    "music",
+    "it",
+    "science",
+    "files",
+    "social media",
+}
+_CATEGORY_ALIASES = {
+    "social": "social media",
+    "social_media": "social media",
+    "reseaux sociaux": "social media",
+    "actualites": "news",
+    "code": "it",
+    "tech": "it",
+}
+
+
+def _infer_search_categories(query: str) -> tuple[str, ...]:
+    """Choisit les index SearXNG utiles sans enfermer le LLM dans `general`."""
+    normalized = _normalize_search_text(query)
+    categories = ["general"]
+    signals = (
+        (
+            "social media",
+            (
+                "linkedin", "facebook", "instagram", "tiktok", "twitter", "reddit",
+                "mastodon", "profil", "reseau social", "personne", "habite", "travaille",
+            ),
+        ),
+        ("news", ("actualite", "derniere nouvelle", "aujourd hui", "recent", "en cours")),
+        (
+            "it",
+            (
+                "github", "gitlab", "code", "script", "logiciel", "api", "python",
+                "javascript", "linux", "windows", "cyber", "informatique", "developpeur",
+            ),
+        ),
+        (
+            "science",
+            ("article scientifique", "publication", "etude", "recherche academique", "doi"),
+        ),
+        ("images", ("image", "photo", "illustration", "logo")),
+        ("videos", ("video", "youtube", "dailymotion", "vimeo")),
+        ("files", ("pdf", "fichier", "document", "telecharger")),
+        ("map", ("carte", "adresse", "itineraire", "localisation")),
+    )
+    for category, needles in signals:
+        if any(needle in normalized for needle in needles):
+            categories.append(category)
+
+    words = [
+        word
+        for word in re.findall(r"[^\W\d_]{2,}", query, flags=re.UNICODE)
+        if word.casefold() not in {"and", "or", "not"}
+    ]
+    if 2 <= len(words) <= 4 and not any(
+        category in categories
+        for category in ("news", "science", "images", "videos", "files")
+    ):
+        categories.append("social media")
+    if any(
+        needle in normalized
+        for needle in (
+            "acheter", "prix", "comparatif", "meilleur", "avis", "marketplace",
+            "amazon", "ebay", "leboncoin", "vinted", "produit", "chaussure", "basket",
+        )
+    ):
+        categories.append("images")
+    return tuple(dict.fromkeys(categories))
+
+
+def _resolve_search_categories(args: dict, query: str) -> tuple[str, ...]:
+    requested = args.get("categories")
+    if requested in (None, "", []):
+        return _infer_search_categories(query)
+    values = requested if isinstance(requested, list) else str(requested).split(",")
+    categories: list[str] = []
+    for value in values:
+        normalized = _normalize_search_text(value).replace("_", " ").strip()
+        category = _CATEGORY_ALIASES.get(normalized, normalized)
+        if category not in _SEARXNG_CATEGORIES:
+            raise ValueError(f"Catégorie SearXNG invalide : {value}")
+        categories.append(category)
+    return tuple(dict.fromkeys(categories))
+
+
 def _topic_tokens(value: str) -> set[str]:
     tokens = {
         token
         for token in _SEARCH_TOKEN_RE.findall(_normalize_search_text(value))
-        if token not in _SEARCH_STOP_WORDS and not token.isdigit()
+        if token not in _SEARCH_STOP_WORDS
+        and token not in {
+            "and", "or", "not", "site", "http", "https", "www",
+            "com", "fr", "org", "net", "io",
+        }
+        and not token.isdigit()
     }
     if {"feu", "feux", "foret"} & tokens:
         tokens.update({"incendie", "incendies"})
@@ -151,15 +249,20 @@ def _topic_tokens(value: str) -> set[str]:
 
 def _filter_relevant_results(query: str, results: list[dict]) -> list[dict]:
     """Écarte le hors-sujet sans altérer le classement natif de SearXNG."""
-    topic = _topic_tokens(query)
+    topic_query = re.sub(r"\bsite:\S+", " ", query, flags=re.IGNORECASE)
+    topic = _topic_tokens(topic_query)
     if not topic:
         return results
+    requires_precise_overlap = bool(
+        '"' in query or re.search(r"\b(?:AND|OR|NOT)\b", query, flags=re.IGNORECASE)
+    )
     filtered: list[dict] = []
     for item in results:
         haystack = _topic_tokens(
             f"{item.get('title', '')} {item.get('snippet', '')} {item.get('url', '')}"
         )
-        if topic & haystack:
+        minimum_overlap = 2 if requires_precise_overlap and len(topic) >= 2 else 1
+        if len(topic & haystack) >= minimum_overlap:
             filtered.append(item)
     return filtered
 
@@ -430,12 +533,12 @@ async def execute_web_search(args: dict) -> dict:
             "error": "Provider invalide : SearXNG est l'unique fournisseur autorisé.",
         }
     try:
-        max_results = max(1, min(int(args.get("max_results", 8)), 20))
+        max_results = max(1, min(int(args.get("max_results", 12)), 50))
     except (TypeError, ValueError):
         return {
             "success": False,
             "provider": "SearXNG",
-            "error": "Paramètre 'max_results' invalide : entier attendu entre 1 et 20.",
+            "error": "Paramètre 'max_results' invalide : entier attendu entre 1 et 50.",
         }
 
     language = str(args.get("language") or "fr-FR").strip()
@@ -454,7 +557,22 @@ async def execute_web_search(args: dict) -> dict:
         }
 
     search_query = _prepare_searxng_query(query)
-    cache_key = ("ws-searxng-only", search_query.lower(), max_results, language, time_range)
+    try:
+        categories = _resolve_search_categories(args, search_query)
+    except ValueError as exc:
+        return {
+            "success": False,
+            "provider": "SearXNG",
+            "error": str(exc),
+        }
+    cache_key = (
+        "ws-searxng-only",
+        search_query.lower(),
+        max_results,
+        language,
+        time_range,
+        categories,
+    )
     cached = _wcache_get(cache_key)
     if cached is not None:
         return {**cached, "cached": True}
@@ -479,6 +597,7 @@ async def execute_web_search(args: dict) -> dict:
             "q": search_query,
             "format": "json",
             "language": language,
+            "categories": ",".join(categories),
         }
         if time_range:
             request_params["time_range"] = time_range
@@ -493,6 +612,11 @@ async def execute_web_search(args: dict) -> dict:
                 "title": str(item.get("title") or ""),
                 "url": str(item.get("url") or ""),
                 "snippet": str(item.get("content") or ""),
+                "engines": [
+                    str(engine)
+                    for engine in (item.get("engines") or [item.get("engine")])
+                    if engine
+                ],
             }
             for item in list(payload.get("results") or [])[:max_results]
             if item.get("url")
@@ -505,8 +629,10 @@ async def execute_web_search(args: dict) -> dict:
             "search_query": search_query,
             "language": language,
             "time_range": time_range,
+            "categories": list(categories),
             "count": len(results),
             "results": results,
+            "unresponsive_engines": list(payload.get("unresponsive_engines") or []),
             "provider_attempts": [{
                 "provider": "SearXNG",
                 "status": "succeeded" if results else "failed",
@@ -556,7 +682,9 @@ def _fallback_complement_query(query: str, round_index: int) -> str:
 
 def _clean_search_query(value: str) -> str:
     """Neutralise le formatage bavard du LLM sans modifier les termes recherchés."""
-    return " ".join(str(value or "").replace('"', " ").replace("'", " ").split())[:150]
+    return " ".join(
+        str(value or "").replace("\x00", " ").replace("\r", " ").replace("\n", " ").split()
+    )[:300]
 
 
 def _parse_research_queries(value: str, *, fallback: str) -> tuple[str, ...]:
