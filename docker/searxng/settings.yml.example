@@ -9,8 +9,36 @@ use_default_settings:
     # de nouveaux moteurs lors d'une mise à jour de son image.
     keep_only:
       - bing
-      - mwmbl
-      - yep
+      - bing images
+      - bing news
+      - bing videos
+      - google cse
+      - google cse images
+      - google news
+      - startpage
+      - qwant
+      - mojeek
+      - yahoo
+      - dogpile
+      - presearch
+      - yandex
+      - baidu
+      - naver
+      - seznam
+      - wiby
+      - wikipedia
+      - wikidata
+      - github
+      - stackoverflow
+      - arxiv
+      - semantic scholar
+      - openalex
+      - pubmed
+      - crossref
+      - openverse
+      - youtube
+      - vimeo
+      - reddit
 
 general:
   instance_name: "Marvin SearXNG"
@@ -27,12 +55,78 @@ server:
   limiter: false   # pas de Redis nécessaire pour un usage local mono-utilisateur
   image_proxy: false
 
-# Marvin n'utilise que SearXNG. Ce pool exclut complètement Brave,
-# DuckDuckGo et les moteurs observés en CAPTCHA/403.
+outgoing:
+  # Le délai historique de 3 s éliminait des moteurs encore sains. Ce budget
+  # reste borné afin qu'un moteur lent ne bloque pas toute la métarecherche.
+  request_timeout: 6.0
+  max_request_timeout: 12.0
+  pool_connections: 100
+  pool_maxsize: 30
+  enable_http2: true
+
+# Marvin n'utilise que SearXNG. Ce pool couvre recherche générale, actualités,
+# images, vidéos, code et publications scientifiques. Brave et DuckDuckGo
+# restent exclus conformément au choix opérateur.
 engines:
   - name: bing
     disabled: false
-  - name: mwmbl
+  - name: bing images
     disabled: false
-  - name: yep
+  - name: bing news
+    disabled: false
+  - name: bing videos
+    disabled: false
+  - name: google cse
+    disabled: false
+  - name: google cse images
+    disabled: false
+  - name: google news
+    disabled: false
+  - name: startpage
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: dogpile
+    disabled: false
+  - name: presearch
+    disabled: false
+  - name: yandex
+    disabled: false
+  - name: baidu
+    disabled: false
+  - name: naver
+    disabled: false
+  - name: seznam
+    disabled: false
+  - name: wiby
+    disabled: false
+  - name: wikipedia
+    disabled: false
+  - name: wikidata
+    disabled: false
+  - name: github
+    disabled: false
+  - name: stackoverflow
+    disabled: false
+  - name: arxiv
+    disabled: false
+  - name: semantic scholar
+    disabled: false
+  - name: openalex
+    disabled: false
+  - name: pubmed
+    disabled: false
+  - name: crossref
+    disabled: false
+  - name: openverse
+    disabled: false
+  - name: youtube
+    disabled: false
+  - name: vimeo
+    disabled: false
+  - name: reddit
     disabled: false

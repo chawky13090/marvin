@@ -13000,3 +13000,57 @@ __test-ui-v2499 » appelle correctement `project_create` : le projet apparaît i
 dans la sidebar, sans erreur console, puis le nettoyage le retire également de l'interface.
 Les erreurs de transport visibles dans la gate sont les scénarios négatifs injectés par les
 tests et non des incidents du service redémarré.
+
+## 2026-07-30 — v2.500 — SearXNG multi-moteurs et rechargement vérifié
+
+### Demande et diagnostic
+
+L'utilisateur constatait l'absence de Google et des grands moteurs dans les paramètres
+SearXNG. L'audit de `/config`, des journaux du conteneur et de trois recherches réelles a
+établi que le pool effectif ne contenait que Bing, Yep et Mwmbl. Yep répondait HTTP 403 et
+Mwmbl dépassait systématiquement le délai de trois secondes : seul Bing produisait des
+résultats.
+
+La configuration officielle de l'image épinglée marque `google` et `google images` comme
+`inactive`. Leur activation nominale ne les charge donc pas. Le moteur officiel `google cse`,
+qui n'exige pas de clé API dans cette implémentation SearXNG, fournit la recherche Google
+générale; `google cse images` et `google news` complètent les catégories correspondantes.
+
+### Décision et implémentation
+
+Deux approches ont été comparées. Charger tous les moteurs par défaut maximise le nombre
+affiché mais rend le comportement dépendant de chaque mise à jour et active des moteurs
+inadaptés ou nécessitant une configuration externe. Un pool explicite large conserve la
+reproductibilité tout en couvrant les usages. Cette seconde approche est retenue.
+
+Le pool versionné contient 31 moteurs : généralistes majeurs, actualités, images, vidéos,
+code et littérature scientifique. Brave et DuckDuckGo restent exclus conformément au choix
+opérateur. Les délais passent de 3 à 6 secondes, avec plafond à 12 secondes et pools de
+connexions bornés. Les suspensions natives de SearXNG continuent d'isoler temporairement les
+moteurs répondant par CAPTCHA, 403 ou 429.
+
+Le lanceur PowerShell utilise maintenant le mode strict, recrée systématiquement le conteneur
+pour charger le fichier monté, puis interroge `/config` et vérifie les moteurs structurants.
+Il conserve le secret local et la sauvegarde `settings.yml.bak`.
+
+### Sécurité, logs et rollback
+
+SearXNG reste lié uniquement à `127.0.0.1:8890`; aucun port LAN, proxy d'évasion, contournement
+de CAPTCHA ou clé externe n'est ajouté. Le JSON reste activé pour Marvin. Les journaux
+SearXNG existants indiquent les suspensions sans contenir le secret local; aucune donnée
+métier n'est ajoutée aux logs.
+
+Rollback applicatif : réverter atomiquement le commit v2.500. Rollback local immédiat :
+restaurer `docker/searxng/settings.yml.bak` vers `settings.yml`, puis relancer
+`docker/searxng/start-searxng.ps1`. Aucune donnée ni migration n'est concernée.
+
+### Validations observées
+
+- 31 moteurs actifs visibles dans `/config`;
+- recherche générale : 69 à 86 résultats, 7 à 8 moteurs contributeurs, 1,1 à 1,9 seconde;
+- actualités : Bing News fonctionnel; Google News correctement suspendu après CAPTCHA;
+- images : 56 résultats via Bing Images, Google CSE Images et Openverse;
+- code : 40 résultats via GitHub et Stack Overflow;
+- science : 68 résultats via Arxiv, Crossref, OpenAlex, PubMed et Semantic Scholar;
+- appel réel `web_search` via le gateway Marvin : 19 résultats, premier lien vers la
+  documentation officielle Next.js, fournisseur SearXNG, aucune erreur.

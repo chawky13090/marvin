@@ -275,6 +275,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine d'outils Facturation", (python, "scripts/test_tool_domain_billing.py")),
         Stage("Domaine d'outils Windows", (python, "scripts/test_tool_domain_windows.py")),
         Stage("Domaine d'outils Web", (python, "scripts/test_tool_domain_web.py")),
+        Stage(
+            "Configuration SearXNG multi-moteurs",
+            (python, "scripts/test_searxng_configuration.py"),
+        ),
         Stage("Runtime HTTP et cache Web", (python, "scripts/test_web_runtime.py")),
         Stage("Transport HTTP sortant anti-SSRF", (python, "scripts/test_outbound_http.py")),
         Stage("Inspection Git bornée", (python, "scripts/test_tool_domain_git_repository.py")),

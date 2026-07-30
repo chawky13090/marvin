@@ -5,6 +5,7 @@
 # Usage : powershell -ExecutionPolicy Bypass -File docker\searxng\start-searxng.ps1
 #         (ou double-clic sur INSTALLER-SEARXNG.bat a la racine du depot)
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $port = 8890
@@ -75,7 +76,7 @@ if (-not (Test-Path $settingsPath)) {
 Write-Step "Demarrage du conteneur SearXNG (port $port)..."
 Push-Location $here
 try {
-    docker compose up -d
+    docker compose up -d --force-recreate
     if ($LASTEXITCODE -ne 0) { throw "docker compose up a echoue (code $LASTEXITCODE)" }
 } finally {
     Pop-Location
@@ -97,7 +98,24 @@ if (-not $healthy) {
 }
 Write-Host "SearXNG repond correctement sur http://localhost:$port" -ForegroundColor Green
 
-# -- 6. Configurer Marvin automatiquement (searxng_url) ----------------------
+# -- 6. Verifier la configuration effectivement chargee ----------------------
+Write-Step "Verification du pool de moteurs effectivement charge..."
+$requiredEngines = @("bing", "google cse", "google news", "startpage", "qwant", "mojeek", "yahoo")
+try {
+    $runtimeConfig = Invoke-RestMethod -Uri "http://localhost:$port/config" -TimeoutSec 10
+    $enabledEngines = @($runtimeConfig.engines | Where-Object { $_.enabled } | ForEach-Object { $_.name })
+    $missingEngines = @($requiredEngines | Where-Object { $_ -notin $enabledEngines })
+    if ($missingEngines.Count -gt 0) {
+        throw "Configuration non chargee; moteurs absents: $($missingEngines -join ', ')"
+    }
+    Write-Host "$($enabledEngines.Count) moteurs actifs; pool general majeur valide." -ForegroundColor Green
+} catch {
+    Write-Host "Le conteneur repond mais son pool de moteurs est invalide: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Rollback local: Copy-Item '$settingsPath.bak' '$settingsPath' -Force puis relancer ce script." -ForegroundColor Yellow
+    exit 1
+}
+
+# -- 7. Configurer Marvin automatiquement (searxng_url) ----------------------
 Write-Step "Configuration de Marvin (searxng_url)..."
 try {
     $body = @{ value = "http://localhost:$port" } | ConvertTo-Json

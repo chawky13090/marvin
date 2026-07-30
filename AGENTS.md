@@ -35,7 +35,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.499.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.500.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -196,7 +196,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.499.0)
+## 9. État actuel (v2.500.0)
+
+**v2.500 (SearXNG multi-moteurs vérifié)** : le pool explicite passe de trois moteurs,
+dont deux réellement en panne, à 31 moteurs couvrant recherche générale, actualités, images,
+vidéos, code et publications scientifiques. Google général est fourni par `google cse`, le
+moteur `google` historique étant marqué `inactive` dans l'image SearXNG épinglée; Google News
+et Google CSE Images restent disponibles. Les recherches générales réelles agrègent Google
+CSE, Bing, Dogpile, Yandex, Baidu, Naver, Seznam et Wiby. Brave et DuckDuckGo restent exclus.
+Les délais réseau sont plus généreux mais bornés. Le lanceur recrée désormais le conteneur,
+contrôle `/config` et refuse un succès trompeur si le pool attendu n'est pas chargé. Le secret
+local est préservé et la configuration précédente reste dans `settings.yml.bak`.
 
 **v2.499 (organisation pilotable depuis le chat)** : les projets et conversations de la
 barre latérale sont désormais des capacités métier natives du catalogue. Le LLM peut lister,
