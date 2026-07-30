@@ -18,6 +18,12 @@ après redémarrage, diagnostic exploitable et désinstallation propre. Windows 
 Hyper-V, Docker, GPU et Ollama Cloud sont des capacités optionnelles : leur absence ne doit
 jamais empêcher l'installation du socle Marvin. Chaque fonction doit annoncer clairement son
 niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr quand il existe.
+Cette exigence couvre toutes les dépendances et configurations ajoutées au projet. En
+particulier, l'installeur doit détecter Docker, provisionner et épingler SearXNG, générer son
+secret local, charger le pool de moteurs versionné, vérifier `/config` et une recherche réelle,
+configurer automatiquement `searxng_url`, reprendre après redémarrage et permettre une
+désinstallation propre. L'absence de Docker ou de SearXNG doit être signalée comme capacité
+Web dégradée sans rendre le socle Marvin inutilisable.
 
 **Critère de sécurité global** : chaque tranche fonctionnelle inclut une revue de surface
 d'attaque, validation, autorisation, secrets/données personnelles, concurrence, intégrité,
