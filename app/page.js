@@ -1080,6 +1080,11 @@ export default function ChatPage() {
               // Rafraîchir la liste des conversations pour montrer le titre auto-généré
               fetchData();
             }}
+            onWorkspaceChanged={() => {
+              // Les projets et conversations apparaissent dès le reçu d'outil, sans
+              // attendre la fin d'une éventuelle synthèse LLM plus longue.
+              fetchData();
+            }}
           />
         </div>
       </div>

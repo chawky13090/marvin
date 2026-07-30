@@ -523,7 +523,8 @@ const CRITICAL_TOOLS = [
   'file_create_docx', 'file_convert_docx_to_pdf',
   'email_send', 'email_reply',
   'calendar_create_event', 'calendar_update_event', 'calendar_delete_event',
-  'pc_open_file', 'pc_run_command', 'pc_process_kill', 'pc_pull_ollama_model'
+  'pc_open_file', 'pc_run_command', 'pc_process_kill', 'pc_pull_ollama_model',
+  'project_delete'
 ];
 
 // v2.146 — Bandeau de MODE en tête de réponse : demandé explicitement (« que l'on sache
@@ -652,6 +653,8 @@ function TurnModeBadge({ mode }) {
 
 // ─── Icônes par catégorie d'outil ───
 function getToolIcon(toolName) {
+  if (toolName.startsWith('project_')) return '📂';
+  if (toolName.startsWith('conversation_')) return '💬';
   if (toolName.startsWith('file_')) return '📁';
   if (toolName.startsWith('email_')) return '📧';
   if (toolName.startsWith('calendar_')) return '📅';
@@ -1433,6 +1436,15 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
     pc_clipboard_set: 'Copier dans le presse-papiers',
     pc_process_list: 'Liste des processus',
     pc_process_kill: 'Arrêter un processus',
+    project_list: 'Lister les projets',
+    project_create: 'Créer un projet Marvin',
+    project_update: 'Modifier un projet Marvin',
+    project_delete: 'Supprimer un projet Marvin',
+    conversation_list: 'Lister les conversations',
+    conversation_search: 'Rechercher des conversations',
+    conversation_move: 'Déplacer une conversation',
+    conversation_move_many: 'Déplacer plusieurs conversations',
+    conversation_update: 'Organiser une conversation',
     pc_pull_ollama_model: 'Télécharger un modèle IA',
     email_list_inbox: 'Lister les emails',
     email_read: 'Lire un email',

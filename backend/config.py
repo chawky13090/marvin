@@ -137,7 +137,8 @@ DANGEROUS_TOOLS: set[str] = {
     "task_delete",
     "note_delete",
     "event_delete",     # suppression d'un événement d'agenda (irréversible)
-    "memory_delete",    # suppression de mémoire à long terme
+      "memory_delete",    # suppression de mémoire à long terme
+      "project_delete",   # suppression d'un espace logique persistant
     "email_send",       # envoi d'email irréversible
     "email_automation_run",  # peut envoyer des emails automatiquement (mode autonome)
     "ssh_exec",         # commande distante potentiellement destructrice

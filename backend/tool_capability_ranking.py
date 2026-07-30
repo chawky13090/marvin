@@ -19,6 +19,23 @@ _STOP_WORDS = {
     "les", "leur", "mais", "mes", "mon", "pour", "que", "quel", "quelle", "sans",
     "sur", "tout", "tous", "une", "utilise", "via", "veux",
 }
+_TOKEN_ALIASES = {
+    # Les noms d'outils sont contractuellement en anglais alors que Marvin reçoit
+    # principalement des demandes françaises. Ces équivalences techniques bornées
+    # renforcent le nom exact sans imposer une décision métier au LLM.
+    "archiver": "archive",
+    "creer": "create",
+    "deplacer": "move",
+    "discussion": "conversation",
+    "epingle": "pin",
+    "epingler": "pin",
+    "lister": "list",
+    "projet": "project",
+    "rechercher": "search",
+    "renommer": "rename",
+    "restaurer": "restore",
+    "supprimer": "delete",
+}
 
 
 def _normalize(value: Any) -> str:
@@ -27,11 +44,13 @@ def _normalize(value: Any) -> str:
 
 
 def _tokens(value: Any) -> set[str]:
-    return {
+    tokens = {
         token
         for token in _TOKEN_RE.findall(_normalize(value))
         if token not in _STOP_WORDS
     }
+    tokens.update(_TOKEN_ALIASES[token] for token in tuple(tokens) if token in _TOKEN_ALIASES)
+    return tokens
 
 
 def _parameter_text(schema: Any) -> str:

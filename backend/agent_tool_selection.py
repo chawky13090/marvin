@@ -37,6 +37,19 @@ _COMMON_TOOLS = {
 # Mapping keyword → tools relevant for that keyword
 # When user message contains these words, we include the matching tools
 _KEYWORD_TOOLS = {
+    # Organisation native de la barre latérale Marvin. Le mot « dossier » seul reste
+    # volontairement géré par les outils fichiers ; « projet » ou « conversation »
+    # apporte le signal métier qui distingue l'espace logique d'un dossier Windows.
+    ("barre laterale", "barre latérale", "projet marvin", "nouveau projet",
+     "cree un projet", "crée un projet", "renomme le projet", "instructions du projet",
+     "deplace cette discussion", "déplace cette discussion", "deplace la conversation",
+     "déplace la conversation", "range cette discussion", "classe cette conversation",
+     "conversation sans projet", "discussions sans projet", "archive cette conversation",
+     "epingle cette conversation", "épingle cette conversation"):
+        {"project_list", "project_create", "project_update", "project_delete",
+         "conversation_list", "conversation_search", "conversation_move",
+         "conversation_move_many", "conversation_update"},
+
     # v2.183 — Génération de logo locale (GPU) : sans cette entrée, logo_generate/logo_list
     # sont enregistrés mais INVISIBLES sur les profils filtrés chat/agent (leçon répétée
     # cette session, cf. v2.93/v2.113 — un outil hors _KEYWORD_TOOLS n'est jamais proposé).

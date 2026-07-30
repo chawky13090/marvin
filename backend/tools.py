@@ -58,6 +58,7 @@ from tool_domains import intervention_docs as intervention_docs_domain
 from tool_domains import command_safety as command_safety_domain
 from tool_domains import operations_safety as operations_safety_domain
 from tool_domains import client_health as client_health_domain
+from tool_domains import workspace_organization as workspace_organization_domain
 from tool_domains import winget as winget_domain
 from tool_domains import windows_settings as windows_settings_domain
 from tool_domains import windows_registry as windows_registry_domain
@@ -2381,6 +2382,17 @@ execute_client_health_history = client_health_domain.execute_client_health_histo
 execute_client_recommendations_generate = client_health_domain.execute_client_recommendations_generate
 execute_client_monthly_summary_generate = client_health_domain.execute_client_monthly_summary_generate
 
+# Organisation de l'espace Marvin (projets et conversations).
+execute_project_list = workspace_organization_domain.execute_project_list
+execute_project_create = workspace_organization_domain.execute_project_create
+execute_project_update = workspace_organization_domain.execute_project_update
+execute_project_delete = workspace_organization_domain.execute_project_delete
+execute_conversation_list = workspace_organization_domain.execute_conversation_list
+execute_conversation_search = workspace_organization_domain.execute_conversation_search
+execute_conversation_move = workspace_organization_domain.execute_conversation_move
+execute_conversation_move_many = workspace_organization_domain.execute_conversation_move_many
+execute_conversation_update = workspace_organization_domain.execute_conversation_update
+
 
 # REGISTRE DES OUTILS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2456,6 +2468,15 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_clipboard_set": execute_pc_clipboard_set,
     "pc_process_list": execute_pc_process_list,
     "pc_process_kill": execute_pc_process_kill,
+    "project_list": execute_project_list,
+    "project_create": execute_project_create,
+    "project_update": execute_project_update,
+    "project_delete": execute_project_delete,
+    "conversation_list": execute_conversation_list,
+    "conversation_search": execute_conversation_search,
+    "conversation_move": execute_conversation_move,
+    "conversation_move_many": execute_conversation_move_many,
+    "conversation_update": execute_conversation_update,
     "task_create": execute_task_create,
     "task_list": execute_task_list,
     "task_update": execute_task_update,
@@ -3178,6 +3199,63 @@ TOOLS_SPEC = [
         "name": {"type": "string", "description": "Nom du processus (si PID inconnu)"},
         "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
        []),
+
+    _t("project_list", "Liste les projets persistants affichés dans la barre latérale Marvin, avec leur nombre de conversations.",
+       {}, []),
+
+    _t("project_create", "Crée un projet persistant dans la barre latérale Marvin. Ne crée pas un dossier Windows.",
+       {"name": {"type": "string", "description": "Nom du projet, 120 caractères maximum"},
+        "instructions": {"type": "string", "description": "Instructions communes facultatives du projet"}},
+       ["name"]),
+
+    _t("project_update", "Renomme un projet Marvin et/ou modifie ses instructions persistantes.",
+       {"project_id": {"type": "string", "description": "Identifiant exact du projet"},
+        "project_name": {"type": "string", "description": "Nom exact si l'identifiant est inconnu"},
+        "new_name": {"type": "string", "description": "Nouveau nom facultatif"},
+        "instructions": {"type": "string", "description": "Nouvelles instructions facultatives"}},
+       []),
+
+    _t("project_delete", "Supprime un projet Marvin après confirmation UI. Les conversations sont conservées et deviennent sans projet.",
+       {"project_id": {"type": "string", "description": "Identifiant exact du projet"},
+        "project_name": {"type": "string", "description": "Nom exact si l'identifiant est inconnu"},
+        "confirmed": {"type": "boolean", "description": "Confirmation affichée par l'interface"}},
+       []),
+
+    _t("conversation_list", "Liste les conversations récentes, éventuellement par projet, archivées ou sans projet.",
+       {"project_id": {"type": "string", "description": "Identifiant du projet"},
+        "project_name": {"type": "string", "description": "Nom exact du projet"},
+        "unassigned": {"type": "boolean", "description": "Limiter aux conversations sans projet"},
+        "archived": {"type": "boolean", "description": "Lister les conversations archivées"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 200}},
+       []),
+
+    _t("conversation_search", "Recherche des conversations persistantes par titre ou contenu afin d'obtenir leurs identifiants exacts.",
+       {"query": {"type": "string", "description": "Texte à rechercher"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 50}},
+       ["query"]),
+
+    _t("conversation_move", "Déplace une conversation vers un projet Marvin ou la remet dans Sans projet. Sans identifiant ni titre, agit sur la conversation courante.",
+       {"conversation_id": {"type": "string", "description": "Identifiant exact ; omettre pour la conversation courante"},
+        "conversation_title": {"type": "string", "description": "Titre exact si l'identifiant est inconnu"},
+        "project_id": {"type": "string", "description": "Identifiant du projet cible, ou none"},
+        "project_name": {"type": "string", "description": "Nom exact du projet cible"},
+        "remove_from_project": {"type": "boolean", "description": "True pour remettre dans Sans projet"}},
+       []),
+
+    _t("conversation_move_many", "Déplace atomiquement jusqu'à 50 conversations identifiées vers un projet Marvin ou Sans projet. Utilise conversation_search avant si les identifiants sont inconnus.",
+       {"conversation_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 50,
+                             "description": "Identifiants exacts des conversations"},
+        "project_id": {"type": "string", "description": "Identifiant du projet cible, ou none"},
+        "project_name": {"type": "string", "description": "Nom exact du projet cible"},
+        "remove_from_project": {"type": "boolean", "description": "True pour remettre dans Sans projet"}},
+       ["conversation_ids"]),
+
+    _t("conversation_update", "Renomme, épingle, désépingle, archive ou restaure une conversation. Sans identifiant ni titre, agit sur la conversation courante.",
+       {"conversation_id": {"type": "string", "description": "Identifiant exact ; omettre pour la conversation courante"},
+        "conversation_title": {"type": "string", "description": "Titre exact si l'identifiant est inconnu"},
+        "action": {"type": "string", "enum": ["rename", "pin", "unpin", "archive", "restore"]},
+        "new_title": {"type": "string", "description": "Nouveau titre requis pour rename"}},
+       ["action"]),
 
     _t("task_create", "Crée une nouvelle tâche (todo).",
        {"title": {"type": "string", "description": "Titre de la tâche"},

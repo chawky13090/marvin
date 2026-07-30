@@ -39,12 +39,14 @@ function getGreeting() {
  *   - activeModel     : sync the active model in context
  *   - onConversationCreated : called when a new conversation ID is allocated
  *   - onStreamFinish  : called when the stream completes
+ *   - onWorkspaceChanged : called as soon as a project/conversation tool succeeds
  */
 export default function ChatContainer({
   conversationId,
   initialMessages = [],
   onConversationCreated,
   onStreamFinish,
+  onWorkspaceChanged,
   activeModel,
 }) {
   const [localInput, setLocalInput] = useState('');
@@ -57,6 +59,7 @@ export default function ChatContainer({
   // remontait pour relire un passage. Ne force plus le scroll que si l'utilisateur était déjà
   // proche du bas juste avant la mise à jour (seuil 80px) — sinon sa position est respectée.
   const stickToBottomRef = useRef(true);
+  const workspaceReceiptsRef = useRef(new Set());
 
   // Le brouillon survit aux changements de page. Une demande préparée par Code Workspace
   // reste prioritaire et remplace le brouillon courant uniquement une fois.
@@ -103,6 +106,33 @@ export default function ChatContainer({
     return lastAssistant.toolInvocations.find(inv => inv.state === 'call' && !inv.result) || null;
   })();
   const activeTool = activeInvocation?.toolName || null;
+
+  useEffect(() => {
+    if (!onWorkspaceChanged) return;
+    const workspaceTools = new Set([
+      'project_create', 'project_update', 'project_delete',
+      'conversation_move', 'conversation_move_many', 'conversation_update',
+    ]);
+    for (const message of messages) {
+      const fromParts = message.parts
+        ?.filter((part) => part.type === 'tool-invocation')
+        .map((part) => part.toolInvocation) || [];
+      const invocations = message.toolInvocations?.length ? message.toolInvocations : fromParts;
+      for (const invocation of invocations) {
+        if (!workspaceTools.has(invocation.toolName) || invocation.result === undefined) continue;
+        const receipt = `${invocation.toolCallId || ''}:${invocation.toolName}`;
+        if (workspaceReceiptsRef.current.has(receipt)) continue;
+        let result = invocation.result;
+        if (typeof result === 'string') {
+          try { result = JSON.parse(result); } catch { result = null; }
+        }
+        if (result?.type === 'json' && result.value !== undefined) result = result.value;
+        if (!result || result.success === false || result.error) continue;
+        workspaceReceiptsRef.current.add(receipt);
+        onWorkspaceChanged(result);
+      }
+    }
+  }, [messages, onWorkspaceChanged]);
 
   // v2.244 — les appels techniques consécutifs forment une seule activité lisible.
   const displayMessages = useMemo(

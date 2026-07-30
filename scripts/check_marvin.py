@@ -160,6 +160,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_project_artifact_repositories.py"),
         ),
         Stage(
+            "Organisation des projets et conversations depuis le chat",
+            (python, "scripts/test_workspace_organization.py"),
+        ),
+        Stage(
             "Repository des exécutions et de la fiabilité",
             (python, "scripts/test_execution_repository.py"),
         ),
@@ -304,7 +308,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine traduction Ollama", (python, "scripts/test_tool_domain_translation.py")),
         Stage("Traitement textuel déterministe", (python, "scripts/test_tool_domain_text_processing.py")),
         Stage("Données structurées CSV et SQLite", (python, "scripts/test_tool_domain_structured_data.py")),
-        Stage("Gateway commun des 346 outils", (python, "scripts/test_tool_gateway.py")),
+        Stage("Gateway commun de tous les outils", (python, "scripts/test_tool_gateway.py")),
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),

@@ -142,8 +142,8 @@ def main() -> int:
     for name, function in expected.items():
         assert tools.TOOLS_REGISTRY[name] is function, name
         assert any(spec["function"]["name"] == name for spec in tools.TOOLS_SPEC), name
-    assert len(tools.TOOLS_REGISTRY) == len(tools.TOOLS_SPEC) == 346
-    print("Tool Domain Memory OK - dédoublonnage, Mesh, Qdrant, repli et façade 346/346.")
+    assert len(tools.TOOLS_REGISTRY) == len(tools.TOOLS_SPEC)
+    print("Tool Domain Memory OK - dédoublonnage, Mesh, Qdrant, repli et façade synchronisée.")
     return 0
 
 

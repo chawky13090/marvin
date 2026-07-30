@@ -312,11 +312,13 @@ async def main() -> None:
 
     report = tool_gateway.coverage_report(tools.TOOLS_REGISTRY, tools.TOOLS_SPEC)
     assert report["complete"] is True
-    assert report["covered"] == report["total"] == 346
+    assert report["covered"] == report["total"] == len(tools.TOOLS_REGISTRY)
+    assert "project_create" in tools.TOOLS_REGISTRY
+    assert "conversation_move_many" in tools.TOOLS_REGISTRY
     assert report["missing_schema"] == report["missing_executor"] == []
     assert len(report["layers"]) == 8
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-    print("OK - gateway outils 346/346")
+    print("OK - gateway de tous les outils")

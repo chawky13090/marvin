@@ -12944,3 +12944,59 @@ restaurer ce `.bak`, réverter le compose, puis exécuter `docker compose up -d`
 sauvegarde automatique; le rollback équivalent consiste à rétablir le modèle v2.497 en
 conservant la valeur locale de `secret_key`, puis à recréer le conteneur. Les données métier
 restent intactes.
+
+## 2026-07-30 — v2.499 — Organisation des projets et conversations depuis le chat
+
+### Demande et diagnostic
+
+La dernière conversation Marvin répondait à tort qu'il ne possédait ni barre latérale ni
+projets persistants lorsque l'utilisateur demandait « rajoute dans ta barre latérale un projet
+que tu nommes loic ». L'interface, les routes FastAPI et les repositories SQLite implémentaient
+déjà la création des projets et l'affectation des conversations; aucune capacité correspondante
+n'était cependant exposée au LLM.
+
+### Décision et implémentation
+
+Le domaine indépendant `tool_domains/workspace_organization.py` fournit neuf outils typés :
+liste, création, mise à jour et suppression des projets; liste, recherche, déplacement simple
+ou groupé, puis mise à jour des conversations. Une référence absente utilise l'identifiant
+serveur de la conversation
+courante. Une recherche de titre ambiguë retourne les candidats sans mutation. La création est
+idempotente par nom normalisé. Les résultats exposent une compensation ou un manifeste de
+restauration et demandent le rafraîchissement des projets/conversations.
+
+Le filtre déterministe reconnaît les demandes concernant la barre latérale, les projets et le
+classement des discussions. L'interface traduit les noms d'outils, affiche un résumé exploitable
+et rafraîchit la sidebar dès réception du résultat, sans attendre la synthèse finale du LLM.
+`project_delete` rejoint les actions critiques : le premier appel ne supprime rien et le rejeu
+exige une preuve issue du bouton UI.
+
+### Sécurité, logs et rollback
+
+Les noms sont bornés à 120 caractères, les listes à 200 éléments et la résolution n'accepte
+aucune correspondance approximative silencieuse. Les outils utilisent le pipeline existant de
+validation, reçus idempotents, journal d'exécution et audit; aucun contenu de message n'est ajouté
+aux nouveaux logs. Aucun secret, accès réseau, schéma ou migration n'est introduit.
+
+Rollback : réverter atomiquement le commit v2.499 puis redémarrer backend et frontend. Les
+projets et conversations existants restent compatibles et aucune donnée n'a besoin d'être
+transformée.
+
+### Validations observées
+
+- tests ciblés d'organisation : création idempotente, compensation, déplacement du fil courant,
+  ambiguïté sans mutation, confirmation de suppression et injection serveur ;
+- architecture : 355 outils, harness 355/355, 371 routes et 41 pages ;
+- test du contexte interne de l'agent réussi ;
+- ESLint terminé sans erreur; les 35 avertissements préexistants restent hors de cette tranche.
+
+La gate consolidée finale réussit **214/214 étapes** en mode rapide, avec compilation des
+306 fichiers Python et lint frontend. Le build de production Next.js/Turbopack réussit après
+arrêt contrôlé des listeners, puis Marvin redémarre en 2.499.0 avec backend sain, 355 outils
+et frontend HTTP 200. Un smoke compensé via le gateway crée un projet, crée une conversation
+jetable, la déplace, vérifie le `project_id`, la remet dans Sans projet puis supprime les deux
+objets. Enfin, le prompt réel « Crée dans ta barre latérale un projet nommé
+__test-ui-v2499 » appelle correctement `project_create` : le projet apparaît immédiatement
+dans la sidebar, sans erreur console, puis le nettoyage le retire également de l'interface.
+Les erreurs de transport visibles dans la gate sont les scénarios négatifs injectés par les
+tests et non des incidents du service redémarré.

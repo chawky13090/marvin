@@ -55,6 +55,11 @@ def main() -> None:
     open_names = [item["name"] for item in open_pdf["candidates"]]
     assert "pc_open_file" in open_names
     assert open_names.index("pc_open_file") < open_names.index("pdf_read")
+    sidebar_project = catalog.search(
+        "rajoute dans ta barre laterale un projet que tu nomme loic",
+        limit=5,
+    )
+    assert sidebar_project["candidates"][0]["name"] == "project_create"
 
     print(
         f"OK - {len(catalog)} capacités dérivées du registre, "

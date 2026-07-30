@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.499 — projets et conversations pilotables depuis le chat
 # v2.498 — audit outils, fiabilité runtime et recherche SearXNG pertinente
 # v2.497 — ouverture Windows, navigation PC et projection PDF fiabilisées
 # v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
@@ -31,7 +32,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.462 — restauration globale hors ligne compensée et projections réconciliées
 # v2.461 — bundle global chiffré et restauration isolée vérifiée
 # v2.460 — fraîcheur factuelle et restauration mémoire compensée
-# v2.459 — chiffrement DPAPI actif des souvenirs SQLite et Qdrant
 # v2.489 — citations Research cliquables et bandeau Chat compact unifié
 # v2.488 — Research universel visible et suivis référentiels vérifiables
 # v2.487 — recherche profonde contextuelle, seuils mesurables et façade v3 unifiée
