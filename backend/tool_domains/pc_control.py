@@ -567,11 +567,41 @@ async def execute_pc_run_powershell(args: dict) -> dict:
         stderr_clean = stderr_text.strip()
         if stderr_clean.startswith("#< CLIXML"):
             stderr_clean = ""
+        stdout_clean = stdout_text.strip() or "(aucune sortie)"
+        self_reported_failure = bool(
+            _re.search(r"(?im)^\s*\[x\]\s+", stdout_clean)
+            or _re.search(
+                r"(?im)^\s*\[!\].*(?:échec|echec|encore présent|encore present|"
+                r"dossier restant|introuvable|impossible de supprimer)",
+                stdout_clean,
+            )
+            or _re.search(
+                r"(?im)aucun package installé ne correspond aux critères",
+                stdout_clean,
+            )
+        )
+        business_success = result.returncode == 0 and not stderr_clean and not self_reported_failure
         return {
-            "success":    result.returncode == 0,
+            "success":    business_success,
             "returncode": result.returncode,
-            "stdout":     stdout_text.strip() or "(aucune sortie)",
+            "stdout":     stdout_clean,
             "stderr":     stderr_clean,
+            "process_completed": result.returncode == 0,
+            "business_verification": (
+                "failed"
+                if self_reported_failure
+                else ("passed" if business_success else "unknown")
+            ),
+            **(
+                {
+                    "error": (
+                        "PowerShell s'est terminé, mais la sortie du script signale "
+                        "qu'au moins un objectif métier n'est pas atteint."
+                    )
+                }
+                if self_reported_failure
+                else {}
+            ),
         }
     except FileNotFoundError:
         return {"error": "PowerShell introuvable. Vérifiez qu'il est installé et accessible."}

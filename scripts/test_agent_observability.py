@@ -101,6 +101,30 @@ async def _run() -> None:
     assert receipt.evidence_recorded is False
     assert "evidence:invalid_receipt" in receipt.errors
 
+    already = observability.ToolObservation(
+        conversation_id="conversation-1",
+        user_query="teste le serveur",
+        tool_name="net_ping",
+        arguments={},
+        result={"success": True},
+        duration_ms=1,
+        already_observed=True,
+    )
+    with (
+        patch.object(observability.audit, "log_action") as audit,
+        patch.object(observability.db, "log_execution") as execution,
+        patch.object(
+            observability.mission_os,
+            "record_action",
+            return_value={"evidence_sequence": 14, "evidence_hash": "c" * 64},
+        ),
+        patch.object(observability.tool_router, "record_success", AsyncMock()),
+    ):
+        receipt = await observability.record_tool_observation(already)
+    audit.assert_not_called()
+    execution.assert_not_called()
+    assert receipt.audit_recorded and receipt.execution_recorded
+
     failed = observability.ToolObservation(
         conversation_id="conversation-1", user_query="test", tool_name="net_ping",
         arguments={}, result={"error": "timeout"}, duration_ms=7,

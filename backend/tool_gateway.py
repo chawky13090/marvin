@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Mapping, Sequence
 import agent_autonomy
 from agent_safety import validator_for
 from agent_execution import execute_registered_tool
-from critical_tool_policy import manifest_for_critical_call
+from critical_tool_policy import approval_summary, manifest_for_critical_call
 from policy_engine import (
     ApprovalEvidence,
     ExecutionEnvironment,
@@ -237,7 +237,7 @@ async def execute_tool(
                     "expiresAt": approval["expires_at"],
                     "message": (
                         f"Autoriser « {request.tool_name} » sur "
-                        f"{context.target or 'cet appareil'} ? "
+                        f"{approval_summary(request.tool_name, arguments)} ? "
                         "Utilisez les boutons du chat : une réponse texte ne valide pas l'action."
                     ),
                     "policyReason": decision.reason_code,

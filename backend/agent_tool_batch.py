@@ -241,6 +241,7 @@ async def execute_tool_batch(
                     arguments=arguments,
                     result=result,
                     duration_ms=duration_ms,
+                    already_observed=True,
                 )
             )
             if isinstance(receipt, ObservationReceipt):

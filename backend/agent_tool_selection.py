@@ -155,7 +155,7 @@ _KEYWORD_TOOLS = {
      "mets à jour", "mets a jour", "met à jour", "met a jour", "mettre à jour", "mettre a jour",
      "désinstal", "desinstal", "winget"):
         {"winget_search", "winget_install", "winget_upgrade", "winget_uninstall",
-         "winget_list_upgrades", "winget_list_installed"},
+         "winget_list_upgrades", "winget_list_installed", "win_quick_launch"},
 
     # Recherche unifiée (tout à la fois)
     ("cherche partout", "recherche partout", "retrouve tout", "trouve tout ce qui", "tout ce qui concerne",

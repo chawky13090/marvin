@@ -197,6 +197,56 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         do_not_use_when=("l'utilisateur parle d'un projet dans la barre latérale",),
         related_tools=("project_create",),
     ),
+    "winget_search": DiscoveryProfile(
+        "Rechercher un logiciel disponible dans Winget",
+        aliases=("chercher une application windows", "trouver un paquet winget"),
+        use_when=("identifier l'ID exact avant une installation",),
+        related_tools=("winget_install", "winget_list_installed"),
+    ),
+    "winget_install": DiscoveryProfile(
+        "Installer et vérifier un logiciel Windows avec Winget",
+        aliases=("installer une application windows", "ajouter un logiciel sur le pc"),
+        use_when=("l'utilisateur demande l'installation réelle d'un logiciel Windows",),
+        do_not_use_when=("l'utilisateur demande seulement un script ou une commande",),
+        related_tools=("winget_search", "winget_list_installed"),
+    ),
+    "winget_list_installed": DiscoveryProfile(
+        "Inventorier les logiciels Windows installés avec Winget",
+        aliases=("logiciels installés", "vérifier une application installée"),
+        use_when=("confirmer la présence ou l'absence d'un logiciel",),
+        related_tools=("winget_search", "winget_uninstall"),
+    ),
+    "winget_uninstall": DiscoveryProfile(
+        "Désinstaller et vérifier un logiciel Windows avec Winget",
+        aliases=("désinstaller une application windows", "retirer un logiciel du pc"),
+        use_when=("l'utilisateur demande la désinstallation réelle d'un logiciel",),
+        do_not_use_when=("supprimer aussi le profil ou les données personnelles",),
+        related_tools=("winget_list_installed",),
+    ),
+    "pc_run_powershell": DiscoveryProfile(
+        "Exécuter un script PowerShell générique",
+        aliases=("lancer powershell", "exécuter un script windows"),
+        use_when=("aucun outil dédié ne couvre l'opération explicitement demandée",),
+        do_not_use_when=(
+            "Winget couvre l'installation ou la désinstallation du logiciel",
+            "l'utilisateur demande uniquement le texte d'une commande",
+        ),
+        related_tools=("winget_install", "winget_uninstall"),
+    ),
+    "win_quick_launch": DiscoveryProfile(
+        "Ouvrir les utilitaires Windows natifs",
+        aliases=(
+            "applications installées windows",
+            "programmes et fonctionnalités",
+            "utilitaire de désinstallation windows",
+        ),
+        use_when=(
+            "l'utilisateur veut gérer manuellement les applications",
+            "Winget ne sait pas identifier ou désinstaller le logiciel",
+        ),
+        do_not_use_when=("une désinstallation Winget vérifiable fonctionne",),
+        related_tools=("winget_list_installed", "winget_uninstall", "pc_run_powershell"),
+    ),
 }
 
 

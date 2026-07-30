@@ -13307,3 +13307,41 @@ exécutable et testé; aucune migration ni donnée métier n'est modifiée.
 
 - Aucun schéma ni donnée persistante n'est modifié.
 - Rollback exact : réversion atomique du commit v2.504, puis redémarrage du frontend.
+
+## 2026-07-30 — v2.506 — Installation et désinstallation fiables
+
+### Incident et cause
+
+- La conversation Opera a utilisé PowerShell au lieu des outils Winget dédiés, exécuté un
+  second installateur après un premier succès, puis confondu code de sortie et réussite métier.
+- `pc_run_powershell` n'était pas dans la classification critique complète : une confirmation
+  déclarée par le modèle pouvait donc atteindre l'exécuteur sans clic UI.
+- L'observation du Runner répétait l'audit déjà écrit par le gateway.
+
+### Correction
+
+- Découverte et descriptions privilégient Winget pour les logiciels Windows.
+- Installation et désinstallation résolvent un ID exact et vérifient l'inventaire après action.
+- En repli, Marvin peut ouvrir l'utilitaire Windows natif ou invoquer le désinstalleur officiel
+  via PowerShell confirmé, sans découper naïvement les chemins contenant des espaces.
+- Les profils utilisateurs sont préservés ; nettoyer des résidus est une action séparée.
+- PowerShell requiert une preuve UI fiable. Les scripts destructifs sont classés DELETE,
+  irréversibles, avec résumé d'effet expurgé.
+- Une sortie PowerShell signalant explicitement un échec ne peut plus produire `success=true`.
+- Le Runner conserve la preuve métier sans dupliquer audit et journal d'exécution.
+
+### Sécurité, logs et rollback
+
+- Aucun secret ni contenu de script n'est ajouté au message de confirmation ou aux nouveaux logs.
+- Les approbations restent liées au digest exact, expirables et consommées atomiquement.
+- Aucune migration ni donnée persistante. Rollback : réversion atomique du commit v2.506,
+  puis redémarrage backend.
+
+### Validation réelle
+
+- Tests ciblés : Winget, sélection et dispatch d'outils, gateway, contrôle PC,
+  observabilité, prompt et Capability Discovery v2 réussis.
+- Gate `npm run check:quick` : 217 étapes réussies.
+- ESLint : 0 erreur, 35 avertissements préexistants.
+- Build Next.js 16.2.12 Turbopack : réussi, 12 pages statiques générées.
+- Runtime relancé : backend `2.506.0`, santé `ok`, Ollama disponible et frontend HTTP 200.

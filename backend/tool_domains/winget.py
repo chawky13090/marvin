@@ -147,6 +147,45 @@ async def execute_winget_list_installed(args: dict) -> dict:
     apps = [a for a in apps if a.get("id") and a["id"].lower() not in ("id",)]
     return {"success": True, "count": len(apps), "apps": apps}
 
+
+async def _installed_exact(package_id: str) -> dict | None:
+    """Retourne l'entrée installée exacte, sans se fier au seul code de Winget."""
+    r = await asyncio.to_thread(
+        _winget_run,
+        ["list", "--id", package_id, "-e", "--accept-source-agreements"],
+        timeout=90,
+    )
+    if not r.get("ok") and not r.get("stdout"):
+        raise RuntimeError(
+            r.get("error") or r.get("stderr") or
+            "L'inventaire Winget est indisponible."
+        )
+    apps = _parse_winget_table(r.get("stdout", ""))
+    return next(
+        (
+            app
+            for app in apps
+            if str(app.get("id") or "").casefold() == package_id.casefold()
+        ),
+        None,
+    )
+
+
+async def _resolve_installed_id(query: str) -> tuple[str | None, list[dict]]:
+    listing = await execute_winget_list_installed({"query": query})
+    apps = listing.get("apps", []) if listing.get("success") else []
+    exact = [
+        app for app in apps
+        if str(app.get("id") or "").casefold() == query.casefold()
+        or str(app.get("name") or "").casefold() == query.casefold()
+    ]
+    if len(exact) == 1:
+        return str(exact[0]["id"]), apps
+    if len(apps) == 1:
+        return str(apps[0]["id"]), apps
+    return None, apps
+
+
 async def execute_winget_install(args: dict) -> dict:
     """Installe un paquet en mode SILENCIEUX (nécessite confirmation)."""
     explicit_id = _text(args.get("id"))
@@ -182,9 +221,29 @@ async def execute_winget_install(args: dict) -> dict:
     selector = ["--id", resolved_id, "-e"] if resolved_id else [query]
     r = await asyncio.to_thread(_winget_run, ["install"] + selector + ["--silent", "--accept-package-agreements",
                      "--accept-source-agreements"], timeout=900)
-    return {"success": r.get("ok", False), "package": pkg_label, "code": r.get("code"),
-            "message": ("✅ Installé." if r.get("ok") else "❌ Échec de l'installation."),
-            "output": (r.get("stdout", "")[-600:] if r.get("stdout") else r.get("error") or r.get("stderr"))}
+    installed = await _installed_exact(resolved_id) if r.get("ok") else None
+    success = bool(r.get("ok") and installed)
+    return {
+        "success": success,
+        "package": pkg_label,
+        "code": r.get("code"),
+        "changed": success,
+        "verification": {
+            "expected": "installed",
+            "observed": "installed" if installed else "not_found",
+            "package": installed,
+        },
+        "message": (
+            "Installé et vérifié dans l'inventaire Winget."
+            if success
+            else "Échec : Winget n'a pas confirmé le paquet dans l'inventaire installé."
+        ),
+        "output": (
+            r.get("stdout", "")[-600:]
+            if r.get("stdout")
+            else r.get("error") or r.get("stderr")
+        ),
+    }
 
 async def execute_winget_upgrade(args: dict) -> dict:
     """Met à jour un paquet précis, ou TOUT (`all=true`). Nécessite confirmation."""
@@ -211,15 +270,75 @@ async def execute_winget_upgrade(args: dict) -> dict:
 async def execute_winget_uninstall(args: dict) -> dict:
     """Désinstalle un paquet en mode silencieux (nécessite confirmation)."""
     explicit_id = _text(args.get("id"))
-    pkg = explicit_id or _text(args.get("query"))
+    query = _text(args.get("query"))
+    pkg = explicit_id or query
     if not pkg:
         return {"error": "Paramètre 'id' (ou 'query') requis."}
     if explicit_id and not _valid_identifier(explicit_id):
         return {"error": "Identifiant Winget invalide."}
+    resolved_id = explicit_id
+    if not resolved_id:
+        resolved_id, candidates = await _resolve_installed_id(query)
+        if not resolved_id:
+            if not candidates:
+                return {
+                    "success": True,
+                    "changed": False,
+                    "package": query,
+                    "verification": {"expected": "absent", "observed": "absent"},
+                    "message": "Le logiciel est déjà absent de l'inventaire Winget.",
+                }
+            options = ", ".join(
+                f"{item.get('name')} ({item.get('id')})"
+                for item in candidates[:8]
+            )
+            return {
+                "error": (
+                    f"Plusieurs logiciels installés correspondent à « {query} ». "
+                    f"Précisez l'identifiant exact : {options}"
+                )
+            }
     if not args.get("confirmed"):
-        return {"requiresConfirmation": True, "message": f"⚠️ Désinstaller « {pkg} » ? (action sortante)"}
-    selector = ["--id", pkg, "-e"] if explicit_id else [pkg]
+        return {
+            "requiresConfirmation": True,
+            "message": (
+                f"Désinstaller l'application « {resolved_id} » ? "
+                "Les données du profil utilisateur ne seront pas supprimées."
+            ),
+        }
+    before = await _installed_exact(resolved_id)
+    if before is None:
+        return {
+            "success": True,
+            "changed": False,
+            "package": resolved_id,
+            "verification": {"expected": "absent", "observed": "absent"},
+            "message": "Le logiciel est déjà absent de l'inventaire Winget.",
+        }
+    selector = ["--id", resolved_id, "-e"]
     r = await asyncio.to_thread(_winget_run, ["uninstall"] + selector + ["--silent"], timeout=600)
-    return {"success": r.get("ok", False), "package": pkg, "code": r.get("code"),
-            "message": ("✅ Désinstallé." if r.get("ok") else "❌ Échec de la désinstallation."),
-            "output": (r.get("stdout", "")[-600:] if r.get("stdout") else r.get("error") or r.get("stderr"))}
+    remaining = await _installed_exact(resolved_id)
+    success = remaining is None
+    return {
+        "success": success,
+        "package": resolved_id,
+        "code": r.get("code"),
+        "changed": success,
+        "verification": {
+            "expected": "absent",
+            "observed": "absent" if success else "still_installed",
+            "before": before,
+            "remaining": remaining,
+        },
+        "message": (
+            "Désinstallé et absence vérifiée dans l'inventaire Winget. "
+            "Les données du profil utilisateur ont été conservées."
+            if success
+            else "Échec : le logiciel apparaît encore dans l'inventaire Winget."
+        ),
+        "output": (
+            r.get("stdout", "")[-600:]
+            if r.get("stdout")
+            else r.get("error") or r.get("stderr")
+        ),
+    }

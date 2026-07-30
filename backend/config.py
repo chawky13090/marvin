@@ -132,6 +132,7 @@ SECURE_BLOCKED_TOOLS: set[str] = {
 DANGEROUS_TOOLS: set[str] = {
     "file_delete",
     "pc_run_command",
+    "pc_run_powershell",  # le contenu vient du LLM : preuve UI obligatoire
     "pc_run_elevated",  # exécution EN ADMINISTRATEUR — toujours confirmée
     "pc_process_kill",
     "task_delete",

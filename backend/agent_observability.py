@@ -26,6 +26,7 @@ class ToolObservation:
     result: Any
     duration_ms: int
     request_id: str | None = None
+    already_observed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,30 +64,34 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
     evidence_sequence: int | None = None
     evidence_hash: str | None = None
 
-    try:
-        audit.log_action(
-            observation.tool_name,
-            observation.arguments,
-            observation.result,
-            source="chat",
-            request_id=observation.request_id,
-        )
+    if observation.already_observed:
         audit_recorded = True
-    except Exception as exc:
-        errors.append(f"audit:{type(exc).__name__}")
-
-    try:
-        db.log_execution(
-            observation.tool_name,
-            observation.arguments,
-            observation.result,
-            observation.duration_ms,
-            conversation_id=observation.conversation_id,
-            request_id=observation.request_id,
-        )
         execution_recorded = True
-    except Exception as exc:
-        errors.append(f"execution:{type(exc).__name__}")
+    else:
+        try:
+            audit.log_action(
+                observation.tool_name,
+                observation.arguments,
+                observation.result,
+                source="chat",
+                request_id=observation.request_id,
+            )
+            audit_recorded = True
+        except Exception as exc:
+            errors.append(f"audit:{type(exc).__name__}")
+
+        try:
+            db.log_execution(
+                observation.tool_name,
+                observation.arguments,
+                observation.result,
+                observation.duration_ms,
+                conversation_id=observation.conversation_id,
+                request_id=observation.request_id,
+            )
+            execution_recorded = True
+        except Exception as exc:
+            errors.append(f"execution:{type(exc).__name__}")
 
     try:
         proof = mission_os.record_action(

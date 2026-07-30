@@ -93,8 +93,20 @@ async def main() -> int:
         execute=execute,
     )
     assert "confirmed" not in irreversible.arguments
+    powershell = await dispatch_tool(
+        ToolDispatchRequest(
+            "pc_run_powershell",
+            {"script": "Get-Date", "confirmed": True},
+            "c1",
+            "r1",
+            PERMISSION_EXPERT,
+        ),
+        validate=valid,
+        execute=execute,
+    )
+    assert "confirmed" not in powershell.arguments
     assert DANGEROUS_TOOLS <= set(ALWAYS_CONFIRM_TOOLS)
-    assert len(calls) == 2
+    assert len(calls) == 3
     print(
         "Agent Tool Dispatch OK - polling, explicite, texte, validation, permissions et confirmation."
     )

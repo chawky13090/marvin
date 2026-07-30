@@ -18,6 +18,7 @@ from tool_domains import winget
 
 async def _run() -> None:
     original_run = winget._winget_run
+    original_installed_exact = winget._installed_exact
     calls: list[list[str]] = []
     try:
         def fake_run(args: list[str], timeout: int = 90) -> dict:
@@ -54,6 +55,26 @@ async def _run() -> None:
         )["error"]
         confirmation = await winget.execute_winget_install({"id": "Git.Git"})
         assert confirmation["requiresConfirmation"] is True
+        async def installed(package_id: str):
+            return {"name": "Git", "id": package_id, "version": "2.50.0"}
+        winget._installed_exact = installed
+        installed_result = await winget.execute_winget_install(
+            {"id": "Git.Git", "confirmed": True}
+        )
+        assert installed_result["success"] is True
+        assert installed_result["verification"]["observed"] == "installed"
+        assert calls[-1][0] == "install"
+
+        states = iter(({"name": "Git", "id": "Git.Git"}, None))
+        async def uninstall_state(_package_id: str):
+            return next(states)
+        winget._installed_exact = uninstall_state
+        removed = await winget.execute_winget_uninstall(
+            {"id": "Git.Git", "confirmed": True}
+        )
+        assert removed["success"] is True and removed["changed"] is True
+        assert removed["verification"]["observed"] == "absent"
+        assert calls[-1][:4] == ["uninstall", "--id", "Git.Git", "-e"]
         assert "Identifiant Winget invalide" in (
             await winget.execute_winget_upgrade({"id": "--all"})
         )["error"]
@@ -73,6 +94,7 @@ async def _run() -> None:
             assert tools.TOOLS_REGISTRY[public_name] is implementation
     finally:
         winget._winget_run = original_run
+        winget._installed_exact = original_installed_exact
 
 
 if __name__ == "__main__":
