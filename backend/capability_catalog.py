@@ -10,6 +10,12 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from tool_capability_ranking import build_catalog, rank_capabilities
+from capability_discovery import (
+    DISCOVERY_SCHEMA_VERSION,
+    discovery_enabled,
+    parameter_text,
+    profile_for,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +25,11 @@ class CapabilityDescriptor:
     summary: str
     required_arguments: tuple[str, ...]
     parameter_names: tuple[str, ...]
+    title: str = ""
+    aliases: tuple[str, ...] = ()
+    use_when: tuple[str, ...] = ()
+    do_not_use_when: tuple[str, ...] = ()
+    related_tools: tuple[str, ...] = ()
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -27,6 +38,11 @@ class CapabilityDescriptor:
             "summary": self.summary,
             "required_arguments": list(self.required_arguments),
             "parameter_names": list(self.parameter_names),
+            "title": self.title,
+            "aliases": list(self.aliases),
+            "use_when": list(self.use_when),
+            "do_not_use_when": list(self.do_not_use_when),
+            "related_tools": list(self.related_tools),
         }
 
 
@@ -38,10 +54,18 @@ def _namespace(name: str) -> str:
 class CapabilityCatalog:
     """Vue immuable du registre de schémas fourni par l'application."""
 
-    def __init__(self, specifications: Iterable[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        specifications: Iterable[dict[str, Any]],
+        *,
+        enhanced: bool | None = None,
+    ) -> None:
+        self._enhanced = discovery_enabled() if enhanced is None else bool(enhanced)
         specs: dict[str, dict[str, Any]] = {}
         descriptors: dict[str, CapabilityDescriptor] = {}
         ordered_specs: list[dict[str, Any]] = []
+        discovery_documents: dict[str, str] = {}
+        exclusion_documents: dict[str, str] = {}
         for specification in specifications:
             function = specification.get("function")
             if not isinstance(function, dict):
@@ -60,19 +84,40 @@ class CapabilityCatalog:
             required = parameters.get("required")
             if not isinstance(required, list):
                 required = []
+            summary = " ".join(str(function.get("description") or "").split())[:800]
+            profile = profile_for(name) if self._enhanced else profile_for("")
+            related = tuple(
+                item for item in profile.related_tools if item and item != name
+            )
             descriptor = CapabilityDescriptor(
                 name=name,
                 namespace=_namespace(name),
-                summary=" ".join(str(function.get("description") or "").split())[:800],
+                summary=summary,
                 required_arguments=tuple(str(item) for item in required),
                 parameter_names=tuple(str(item) for item in properties),
+                title=profile.title if self._enhanced else "",
+                aliases=profile.aliases if self._enhanced else (),
+                use_when=profile.use_when if self._enhanced else (),
+                do_not_use_when=profile.do_not_use_when if self._enhanced else (),
+                related_tools=related if self._enhanced else (),
             )
             specs[name] = specification
             descriptors[name] = descriptor
             ordered_specs.append(specification)
+            if self._enhanced:
+                discovery_documents[name] = profile.search_document(
+                    name,
+                    summary,
+                    parameter_text(function),
+                )
+                exclusion_documents[name] = " ".join(profile.do_not_use_when)
         self._specifications = specs
         self._descriptors = descriptors
-        self._ranking_catalog = build_catalog(ordered_specs)
+        self._ranking_catalog = build_catalog(
+            ordered_specs,
+            discovery_documents,
+            exclusion_documents,
+        )
 
     def __len__(self) -> int:
         return len(self._specifications)
@@ -125,5 +170,7 @@ class CapabilityCatalog:
                 for name in names
             ],
             "advisory_only": True,
+            "discovery_schema": (
+                DISCOVERY_SCHEMA_VERSION if self._enhanced else "legacy"
+            ),
         }
-

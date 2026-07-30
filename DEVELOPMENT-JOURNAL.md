@@ -13161,3 +13161,58 @@ Rollback : réverter atomiquement le commit v2.502 ou restaurer
 - suite consolidée : tous les contrôles backend, outils et frontend exécutés avant le build
   sont réussis; le build Next.js 16.2.12 Turbopack a ensuite compilé séparément avec succès;
 - services relancés : backend 2.502.0, frontend et SearXNG répondent HTTP 200.
+
+## 2026-07-30 — v2.503 — Capability Discovery Engine v2
+
+### Demande et diagnostic
+
+L'utilisateur a constaté que Marvin trouvait difficilement ses outils et a proposé un
+descriptif par capacité. Les 355 contrats avaient déjà une description, mais l'audit a établi
+qu'elle ne suffisait pas : 17 descriptions faisaient moins de 45 caractères, le classement
+lexical disposait de peu de synonymes français, et l'index Qdrant n'encodait que le nom et la
+description. Surtout, l'empreinte de cet index dépendait uniquement de la liste des noms :
+modifier une description ou un paramètre ne provoquait aucune réindexation.
+
+### Décision et implémentation
+
+Trois approches ont été comparées : allonger toutes les descriptions, confier la sélection à
+un LLM routeur supplémentaire, ou introduire des fiches structurées avec découverte
+progressive. La troisième a été retenue pour préserver la liberté du LLM principal, réduire
+le contexte et garder un repli déterministe hors ligne.
+
+Chaque capacité expose maintenant une fiche dérivée de `TOOLS_SPEC` : titre, résumé,
+paramètres, alias, cas d'usage, contre-indications et outils voisins. Les distinctions
+prioritaires couvrent notamment recherche/lecture/crawl Web, ouvrir/lire/analyser un fichier,
+projet sidebar/dossier disque, recherche par nom/contenu, brouillon/envoi d'e-mail et
+organisation des conversations. Le classement utilise ces signaux positifs et soustrait les
+contre-indications. Seuls les schémas exacts des candidats retenus sont chargés ensuite.
+
+L'index sémantique encode désormais la fiche complète. Son empreinte SHA-256 contient le
+schéma de découverte, les noms, descriptions, paramètres et métadonnées : toute évolution
+reconstruit automatiquement l'index.
+
+### Sécurité, logs et rollback
+
+Les fiches sont uniquement consultatives et ne modifient ni le registre, ni les exécuteurs,
+ni les règles du `PolicyEngine`. Elles ne peuvent créer ou autoriser un outil inexistant.
+Les journaux existants conservent uniquement les événements techniques de découverte; aucun
+secret ni argument supplémentaire n'est ajouté. Les requêtes de découverte restent bornées à
+2 000 caractères et 20 candidats.
+
+Rollback immédiat : définir `MARVIN_TOOL_DISCOVERY_V2=false` avant le démarrage, ou enregistrer
+`tool_discovery_v2_enabled=false`, puis redémarrer le backend. Le catalogue historique reste
+exécutable et testé; aucune migration ni donnée métier n'est modifiée.
+
+### Validations observées
+
+- corpus initial : 24 formulations françaises couvrant outils proches et domaines variés;
+- historique : Recall@5 66,7 %, MRR 0,604;
+- Discovery v2 : Recall@5 95,8 %, MRR 0,747;
+- modification de description ou de paramètre : empreinte d'index différente;
+- rollback legacy, catalogue enrichi, sélection des outils, runtime natif et chargement
+  différé : tests réussis;
+- architecture : 355 outils, 371 routes, harness 355/355.
+- gate consolidé : **217/217 étapes** réussies, build Next.js 16.2.12 Turbopack inclus;
+- appel réel `/api/tools` après redémarrage : `web_site_crawl` classé premier pour l'intention
+  d'aspirer un site, fiche v2 avec titre, cas d'usage et deux contre-indications;
+- backend 2.503.0 et frontend répondent correctement après redémarrage.

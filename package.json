@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.502.0",
+  "version": "2.503.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -80,6 +80,7 @@
     "check:agent-orchestration": "backend\\.venv\\Scripts\\python.exe scripts\\test_agent_orchestration.py",
     "check:policy-engine": "backend\\.venv\\Scripts\\python.exe scripts\\test_policy_engine.py",
     "check:capability-catalog": "backend\\.venv\\Scripts\\python.exe scripts\\test_capability_catalog.py",
+    "check:capability-discovery-v2": "backend\\.venv\\Scripts\\python.exe scripts\\test_capability_discovery_v2.py",
     "check:native-agent-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_native_agent_runtime.py",
     "check:native-agent-path": "backend\\.venv\\Scripts\\python.exe scripts\\test_native_agent_path.py",
     "check:action-replay": "backend\\.venv\\Scripts\\python.exe scripts\\test_action_replay.py",

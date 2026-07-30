@@ -244,6 +244,7 @@ def run() -> dict[str, int | str]:
         "check:agent-orchestration",
         "check:policy-engine",
         "check:capability-catalog",
+        "check:capability-discovery-v2",
         "check:native-agent-runtime",
         "check:native-agent-path",
         "check:action-replay",

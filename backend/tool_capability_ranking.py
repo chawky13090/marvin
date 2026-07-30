@@ -77,9 +77,15 @@ class CapabilityEntry:
     name_tokens: frozenset[str]
     description_tokens: frozenset[str]
     parameter_tokens: frozenset[str]
+    discovery_tokens: frozenset[str] = frozenset()
+    exclusion_tokens: frozenset[str] = frozenset()
 
 
-def build_catalog(tools_spec: Iterable[dict[str, Any]]) -> tuple[CapabilityEntry, ...]:
+def build_catalog(
+    tools_spec: Iterable[dict[str, Any]],
+    discovery_documents: dict[str, str] | None = None,
+    exclusion_documents: dict[str, str] | None = None,
+) -> tuple[CapabilityEntry, ...]:
     entries: list[CapabilityEntry] = []
     for specification in tools_spec:
         function = specification.get("function")
@@ -94,6 +100,8 @@ def build_catalog(tools_spec: Iterable[dict[str, Any]]) -> tuple[CapabilityEntry
             name_tokens=frozenset(_tokens(name.replace("_", " "))),
             description_tokens=frozenset(_tokens(function.get("description"))),
             parameter_tokens=frozenset(_tokens(_parameter_text(function.get("parameters")))),
+            discovery_tokens=frozenset(_tokens((discovery_documents or {}).get(name, ""))),
+            exclusion_tokens=frozenset(_tokens((exclusion_documents or {}).get(name, ""))),
         ))
     return tuple(entries)
 
@@ -115,11 +123,17 @@ def rank_capabilities(
         name_overlap = query_tokens & entry.name_tokens
         description_overlap = query_tokens & entry.description_tokens
         parameter_overlap = query_tokens & entry.parameter_tokens
+        discovery_overlap = query_tokens & entry.discovery_tokens
+        exclusion_overlap = query_tokens & entry.exclusion_tokens
         score = (
             5.0 * len(name_overlap)
             + 1.5 * len(description_overlap - name_overlap)
-            + 2.0 * len(parameter_overlap - name_overlap)
+            + 0.75 * len(parameter_overlap - name_overlap)
+            + 5.0 * len(discovery_overlap - name_overlap - description_overlap)
+            - 3.0 * len(exclusion_overlap - name_overlap)
         )
+        if len(discovery_overlap) >= 2:
+            score += 4.0
         if entry.normalized_name and entry.normalized_name in query_normalized:
             score += 12.0
         if score >= min_score:

@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.502.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.503.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.502.0)
+## 9. État actuel (v2.503.0)
+
+**v2.503 (Capability Discovery Engine v2)** : `tool_search` dérive désormais de chaque contrat
+une fiche compacte avec titre, résumé, paramètres, alias, cas d'usage, contre-indications et
+outils voisins. Le classement hybride lexical privilégie les intentions positives et pénalise
+les contre-indications sans imposer le choix final au LLM. Le schéma exact reste chargé
+seulement après la découverte. L'index sémantique encode ces fiches et son empreinte SHA-256
+dépend des noms, descriptions, paramètres, profils et version du schéma; toute modification
+le reconstruit. Le corpus initial de 24 formulations françaises mesure 95,8 % de Recall@5 et
+0,747 de MRR, contre 66,7 % et 0,604 pour le catalogue historique. Le réglage
+`MARVIN_TOOL_DISCOVERY_V2=false` ou `tool_discovery_v2_enabled=false` fournit un rollback
+immédiat. Les fiches restent consultatives : `PolicyEngine` et le gateway conservent seuls
+l'autorité d'exécution.
 
 **v2.502 (onglets SearXNG sans point de défaillance unique)** : chaque onglet visible possède
 au moins deux moteurs actifs dans la configuration effective. Musique ajoute Bandcamp, Deezer,

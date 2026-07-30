@@ -11,10 +11,16 @@ Tout est best-effort : si Qdrant ou l'embedding sont indisponibles, on renvoie
 des ensembles vides et l'agent retombe sur le routing par mots-clés (jamais cassé).
 """
 import hashlib
+import json
 import uuid
 
 import vector_store as vs
 import database as db
+from capability_discovery import (
+    DISCOVERY_SCHEMA_VERSION,
+    parameter_text,
+    profile_for,
+)
 
 _TOOL_COLLECTION = "tool_index"
 _FEEDBACK_COLLECTION = "routing_feedback"
@@ -41,21 +47,24 @@ async def ensure_tool_index(tools_spec: list) -> bool:
     client = _ensure_collection(_TOOL_COLLECTION)
     if client is None:
         return False
-    names = sorted(s.get("function", {}).get("name", "") for s in tools_spec)
-    h = hashlib.md5("|".join(names).encode()).hexdigest()
+    index_documents = tool_index_documents(tools_spec)
+    h = tool_index_fingerprint(tools_spec)
     if _indexed and db.get_setting("tool_index_hash") == h:
         return True
     if db.get_setting("tool_index_hash") != h:
         from qdrant_client.models import PointStruct
         points = []
-        for s in tools_spec:
-            fn = s.get("function", {})
-            name = fn.get("name")
-            if not name:
-                continue
-            vec = await vs.embed(f"{name}: {fn.get('description', '')}")
+        for name, document in index_documents:
+            vec = await vs.embed(document)
             if vec:
-                points.append(PointStruct(id=vs._safe_id("tool::" + name), vector=vec, payload={"name": name}))
+                points.append(PointStruct(
+                    id=vs._safe_id("tool::" + name),
+                    vector=vec,
+                    payload={
+                        "name": name,
+                        "discovery_schema": DISCOVERY_SCHEMA_VERSION,
+                    },
+                ))
         if points:
             # upsert par lots de 64
             for i in range(0, len(points), 64):
@@ -63,6 +72,36 @@ async def ensure_tool_index(tools_spec: list) -> bool:
             db.set_setting("tool_index_hash", h)
     _indexed = True
     return True
+
+
+def tool_index_documents(tools_spec: list) -> list[tuple[str, str]]:
+    """Produit les documents indexés sans dépendre de Qdrant."""
+    index_documents: list[tuple[str, str]] = []
+    for specification in tools_spec:
+        function = specification.get("function", {})
+        name = str(function.get("name") or "")
+        if not name:
+            continue
+        summary = " ".join(str(function.get("description") or "").split())
+        profile = profile_for(name)
+        index_documents.append((
+            name,
+            profile.semantic_document(name, summary, parameter_text(function)),
+        ))
+    return index_documents
+
+
+def tool_index_fingerprint(tools_spec: list) -> str:
+    """Invalide l'index si un nom, texte, paramètre ou profil change."""
+    serialized = json.dumps(
+        {
+            "schema": DISCOVERY_SCHEMA_VERSION,
+            "documents": sorted(tool_index_documents(tools_spec)),
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 async def route_tools(

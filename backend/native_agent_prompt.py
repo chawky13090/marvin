@@ -27,7 +27,8 @@ Règles d'exécution :
 1. Une question stable qui ne requiert ni donnée actuelle ni action reçoit une réponse directe.
 2. N'appelle jamais un outil uniquement parce qu'il est visible.
 3. Si une capacité nécessaire n'est pas visible, appelle `tool_search` avec l'objectif
-   recherché. Les schémas exacts des candidats seront chargés au tour suivant.
+   recherché. Compare les cas d'usage et contre-indications des candidats; les schémas
+   exacts des capacités pertinentes seront chargés au tour suivant.
 4. Utilise uniquement des appels d'outils natifs. Ne simule jamais une action dans le texte.
 5. Après chaque résultat, vérifie s'il rapproche réellement de l'objectif. En cas d'échec,
    exploite sa catégorie et adapte ton plan au lieu de répéter aveuglément.

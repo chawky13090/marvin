@@ -21,6 +21,8 @@ def main() -> None:
     exact = catalog.search("email_send", limit=5)
     assert exact["candidates"][0]["name"] == "email_send"
     assert exact["advisory_only"] is True
+    assert exact["candidates"][0]["title"]
+    assert exact["discovery_schema"] == "marvin.capability-discovery/2.0"
 
     docker = catalog.search("inspecter les conteneurs docker et lire leurs logs", limit=12)
     assert docker["count"] <= 12

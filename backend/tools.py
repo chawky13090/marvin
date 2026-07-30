@@ -2817,8 +2817,9 @@ TOOLS_SPEC = [
     _t(
        "tool_search",
        "Découvre les outils Marvin pertinents pour atteindre un objectif. Retourne des "
-       "candidats et leurs paramètres, mais n'exécute rien. À utiliser quand les outils "
-       "actuellement visibles ne suffisent pas ou sont ambigus.",
+       "candidats avec titre, cas d'usage, contre-indications, outils voisins et paramètres, "
+       "mais n'exécute rien. À utiliser quand les outils actuellement visibles ne suffisent "
+       "pas ou sont ambigus.",
        {
            "query": {
                "type": "string",
