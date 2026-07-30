@@ -95,7 +95,13 @@ export function ChatProvider({ children }) {
   const abortRef = useRef(null);
 
   // Send a message — does NOT abort on unmount because it lives in the provider
-  const sendMessage = useCallback(async ({ text, images, cortex }) => {
+  const sendMessage = useCallback(async ({
+    text,
+    images,
+    cortex,
+    internal = false,
+    continuationApprovalId = null,
+  }) => {
     if (!text?.trim() && (!images || images.length === 0)) return;
 
     const textContent = text?.trim() || '';
@@ -120,7 +126,9 @@ export function ChatProvider({ children }) {
       toolInvocations: [],
     };
 
-    setMessages(prev => [...prev, userMsg, assistantMsg]);
+    setMessages(prev => internal
+      ? [...prev, assistantMsg]
+      : [...prev, userMsg, assistantMsg]);
     setStatus('submitted');
     setError(null);
 
@@ -165,9 +173,12 @@ export function ChatProvider({ children }) {
               role: m.role,
               content,
               ...(m.toolInvocations?.length > 0 && m.role === 'assistant' ? {
-                tool_calls: m.toolInvocations.map(inv => ({
+                toolInvocations: m.toolInvocations.map(inv => ({
+                  toolCallId: inv.toolCallId,
                   toolName: inv.toolName,
                   args: inv.args,
+                  state: inv.state,
+                  result: inv.state === 'result' ? inv.result : undefined,
                 }))
               } : {}),
             };
@@ -176,6 +187,7 @@ export function ChatProvider({ children }) {
           requestId: userMsg.id,
           model: activeModelRef.current || null,
           cortex: missionContract,
+          continuationApprovalId: continuationApprovalId || null,
         };
       setStatus('streaming');
       for await (const event of durableChatEvents({
@@ -447,7 +459,7 @@ export function ChatProvider({ children }) {
   }, []);
 
   const addToolResult = useCallback(({ toolCallId, result }) => {
-    setMessages(prev => prev.map(m => {
+    const updatedMessages = messagesRef.current.map(m => {
       if (m.role !== 'assistant') return m;
       const updatedParts = (m.parts || []).map(p => {
         if (p.type === 'tool-invocation' && p.toolInvocation?.toolCallId === toolCallId) {
@@ -459,7 +471,12 @@ export function ChatProvider({ children }) {
         inv.toolCallId === toolCallId ? { ...inv, state: 'result', result } : inv
       );
       return { ...m, parts: updatedParts, toolInvocations: updatedInvocations };
-    }));
+    });
+    // La continuation peut démarrer dans le même tick que le clic d'approbation.
+    // La ref doit donc recevoir le résultat avant le prochain rendu React, sinon
+    // Ollama verrait un tool_call sans message tool correspondant.
+    messagesRef.current = updatedMessages;
+    setMessages(updatedMessages);
   }, []);
 
   const stop = useCallback(() => {

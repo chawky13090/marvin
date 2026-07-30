@@ -196,6 +196,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_tool_approval_flow.py"),
         ),
         Stage(
+            "Reprise UI après approbation",
+            ("node", "scripts/test_approval_continuation.mjs"),
+        ),
+        Stage(
             "Repository des fiches de révision",
             (python, "scripts/test_flashcard_repository.py"),
         ),

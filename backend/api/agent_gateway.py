@@ -84,6 +84,7 @@ class ChatRequest(BaseModel):
         pattern=r"^[A-Za-z0-9._:/-]+$",
     )
     cortex: dict | None = None
+    continuationApprovalId: UUID | None = None
 
     @model_validator(mode="after")
     def validate_payload_size(self) -> "ChatRequest":
@@ -93,6 +94,11 @@ class ChatRequest(BaseModel):
                 "conversationId": self.conversationId,
                 "model": self.model,
                 "cortex": self.cortex,
+                "continuationApprovalId": (
+                    str(self.continuationApprovalId)
+                    if self.continuationApprovalId
+                    else None
+                ),
             }
         ) > MAX_CHAT_PAYLOAD_BYTES:
             raise ValueError("La requête de chat dépasse la limite autorisée.")
@@ -135,6 +141,23 @@ class AutonomyRequest(BaseModel):
 async def chat(request: ChatRequest):
     if request.conversationId and db.get_conversation(request.conversationId) is None:
         raise HTTPException(status_code=404, detail="Conversation introuvable.")
+    internal_continuation = request.continuationApprovalId is not None
+    if internal_continuation:
+        if not request.conversationId or not request.requestId:
+            raise HTTPException(
+                status_code=422,
+                detail="La continuation exige une conversation et un identifiant de requête.",
+            )
+        approval = tool_approvals.claim_continuation(
+            str(request.continuationApprovalId),
+            conversation_id=request.conversationId,
+            request_id=request.requestId,
+        )
+        if approval is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Cette action approuvée a déjà été poursuivie ou ne correspond pas à la conversation.",
+            )
     if not request.requestId:
 
         async def event_stream():
@@ -143,6 +166,7 @@ async def chat(request: ChatRequest):
                 request.conversationId,
                 request.model,
                 request.cortex,
+                internal_continuation=internal_continuation,
             ):
                 yield chunk
 
@@ -153,6 +177,11 @@ async def chat(request: ChatRequest):
                 "conversationId": request.conversationId,
                 "model": request.model,
                 "cortex": request.cortex,
+                "continuationApprovalId": (
+                    str(request.continuationApprovalId)
+                    if request.continuationApprovalId
+                    else None
+                ),
             }
         )
 
@@ -163,6 +192,7 @@ async def chat(request: ChatRequest):
                 request.model,
                 request.cortex,
                 request_id=request.requestId,
+                internal_continuation=internal_continuation,
             )
 
         async def event_stream():

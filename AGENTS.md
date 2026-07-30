@@ -1,4 +1,4 @@
-# Marvin (secretary-ai) — Guide pour Codex
+﻿# Marvin (secretary-ai) — Guide pour Codex
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
@@ -6,7 +6,7 @@
 
 ## 1. Qu'est-ce que Marvin
 
-Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **355 outils**.
+Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **356 outils**.
 
 L'utilisateur veut un Marvin **complet, puissant, qui ne fait pas de compromis**. Travailler de façon **autonome** : décider, innover, vérifier et améliorer les outils, ne pas s'arrêter pour demander à chaque étape.
 
@@ -41,14 +41,14 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.511.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.512.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
 ### Fichiers backend clés (`backend/`)
 - `main.py` — cycle de vie et majorité des endpoints FastAPI historiques (gros fichier ; historique versionné en commentaires `# vX.Y`).
 - `api/` — routeurs FastAPI extraits progressivement : Doctor, conversations, projets, tâches et notes ont leurs modules dédiés.
-- `tools.py` — les **355 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
+- `tools.py` — les **356 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
 - `auto_config.py` — détecte le matériel, choisit le **mode** (eco/balanced/performance/max) et applique les leviers + choisit les modèles Ollama selon la VRAM.
 - `skills.py` — système de **compétences** (fichiers Markdown, voir §5).
@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.511.0)
+## 9. État actuel (v2.512.0)
+
+**v2.512 (continuation après approbation UI)** : lorsqu'une action d'outil est suspendue
+pour confirmation, le clic utilisateur exécute l'appel exact puis relance automatiquement
+la mission dans le même chat. Le résultat d'outil est injecté avant la continuation et
+aucun faux message utilisateur n'est affiché ni persisté. L'approbation ne peut déclencher
+qu'une continuation; seul le même `request_id` peut la relire après une coupure SSE. Pour
+`computer_control`, Marvin reprend par une nouvelle observation et continue la navigation.
+Le clic final qui réserve, achète, publie ou envoie reste obligatoirement `action=commit`
+avec une nouvelle confirmation UI distincte. Aucune migration de schéma. Rollback :
+réversion atomique du commit v2.512.
 
 **v2.511 (historique et lancement d'applications Windows)** : l'interface accepte désormais
 les deux contrats de liste réellement exposés par Marvin (`Conversation[]` direct ou objet

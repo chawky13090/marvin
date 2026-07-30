@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-30 — v2.512.0 — Reprise fiable après approbation dans le chat
+
+### Demande et constats
+
+La dernière mission de réservation avait réellement ouvert le site de la Brasserie de
+l'Archevêché et retrouvé sa fenêtre Chrome. Marvin s'est néanmoins arrêté en affirmant ne
+pas pouvoir cliquer. L'approbation UI exécutait correctement l'appel suspendu, mais le
+frontend ne relançait pas le LLM avec le résultat; le modèle perdait donc la continuité
+Observer/Act/Verify.
+
+### Décisions et modifications
+
+- Après `Oui, autoriser`, le résultat d'outil est placé immédiatement dans le contexte.
+- Une continuation interne relance automatiquement l'agent sans faux message utilisateur.
+- La continuation est liée à l'approbation, à la conversation et au `request_id`.
+- Une approbation ne peut reprendre qu'un seul tour; le rejeu du même flux SSE reste permis.
+- Le clic final engageant reste une nouvelle action `commit` avec confirmation distincte.
+
+### Validation, sécurité, logs et rollback
+
+Les tests couvrent la persistance absente du message interne, le reçu d'outil avant reprise,
+la consommation atomique de l'approbation, le rejeu réseau idempotent et le refus d'un second
+tour. Aucun contenu saisi, secret ou détail de réservation n'est ajouté aux logs. Aucune
+réservation réelle n'a été soumise pendant les tests. Rollback exact : réversion atomique
+du commit v2.512; aucune migration descendante n'est nécessaire.
+
 ## 2026-07-30 — v2.511.0 — Restauration de l'historique et parcours CrystalDiskInfo
 
 ### Demande et constats

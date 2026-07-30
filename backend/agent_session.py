@@ -70,6 +70,7 @@ async def prepare_turn(
     request_id: str | None,
     *,
     background_tasks: set[asyncio.Task] | None = None,
+    persist_user_message: bool = True,
 ) -> PreparedTurn:
     """Crée/reprend une session et persiste son entrée avant l'orchestration LLM."""
     events: list[dict[str, Any]] = []
@@ -83,12 +84,13 @@ async def prepare_turn(
     if not last_message or last_message.get("role") != "user":
         return PreparedTurn(conversation_id=conversation_id, events=events)
 
-    db.create_message(
-        conversation_id,
-        "user",
-        user_query,
-        client_request_id=request_id,
-    )
+    if persist_user_message:
+        db.create_message(
+            conversation_id,
+            "user",
+            user_query,
+            client_request_id=request_id,
+        )
 
     content = last_message.get("content")
     if isinstance(content, list):
@@ -102,7 +104,8 @@ async def prepare_turn(
     try:
         conversation = db.get_conversation(conversation_id)
         if (
-            conversation
+            persist_user_message
+            and conversation
             and conversation.get("title") == "Nouvelle conversation"
             and user_query.strip()
         ):

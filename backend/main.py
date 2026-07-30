@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.512 — reprise agentique automatique après une approbation UI à usage unique
 # v2.511 — historique tolérant aux deux contrats API et applications Winget idempotentes
 # v2.510 — boucle visuelle LLM libre et confirmation des engagements externes
 # v2.509 — Computer Runtime unifié et accès complet persistant révocable
@@ -46,7 +47,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.456 — corrélation HTTP, Runner, outils et preuves persistées
 # v2.455 — découverte dynamique des capacités des modèles locaux
 # v2.454 — apprentissage durable avec SQLite autoritatif
-# v2.453 — cohérence, provenance et conflits du Memory Mesh
 # v2.452 — transitions de confidentialité durables dans Coding Mission
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 

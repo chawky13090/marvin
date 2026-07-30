@@ -141,6 +141,7 @@ async def _run_deterministic_agent(
     request_id: str | None = None,
     *,
     native_decision_mode: bool = False,
+    internal_continuation: bool = False,
 ) -> AsyncIterator[str]:
     """
     Générateur SSE. Yielde des événements de type :
@@ -156,6 +157,7 @@ async def _run_deterministic_agent(
         conversation_id,
         request_id,
         background_tasks=_BG_LEARN_TASKS,
+        persist_user_message=not internal_continuation,
     )
     conversation_id = _prepared_turn.conversation_id
     _user_query = _prepared_turn.user_query
@@ -976,6 +978,7 @@ async def run_agent(
     model: str | None,
     cortex_contract: dict | None = None,
     request_id: str | None = None,
+    internal_continuation: bool = False,
 ) -> AsyncIterator[str]:
     """Point d'entrée stable, commutable sans modifier les routes HTTP."""
 
@@ -986,6 +989,7 @@ async def run_agent(
             model,
             cortex_contract,
             request_id,
+            internal_continuation=internal_continuation,
         )
 
     def native_factory() -> AsyncIterator[str]:
@@ -996,6 +1000,7 @@ async def run_agent(
             cortex_contract,
             request_id,
             native_decision_mode=True,
+            internal_continuation=internal_continuation,
         )
 
     async for event in _dispatch_agent_runtime(

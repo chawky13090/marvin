@@ -100,12 +100,34 @@ async def _exercise_existing_turn() -> None:
     update_title.assert_not_called()
 
 
+async def _exercise_internal_continuation() -> None:
+    with (
+        patch.object(session.db, "create_message") as create_message,
+        patch.object(
+            session.db,
+            "get_conversation",
+            return_value={"id": "conversation-1", "title": "Titre existant"},
+        ),
+        patch.object(session.db, "update_conversation_title") as update_title,
+    ):
+        prepared = await session.prepare_turn(
+            [{"role": "user", "content": "Poursuis après approbation"}],
+            "conversation-1",
+            "continuation-1",
+            persist_user_message=False,
+        )
+    assert prepared.user_query == "Poursuis après approbation"
+    create_message.assert_not_called()
+    update_title.assert_not_called()
+
+
 def main() -> int:
     assert session.extract_user_text(None) == ""
     assert session.extract_user_text({"role": "assistant", "content": "x"}) == ""
     assert session.extract_user_text({"role": "user", "content": "texte"}) == "texte"
     asyncio.run(_exercise_new_turn())
     asyncio.run(_exercise_existing_turn())
+    asyncio.run(_exercise_internal_continuation())
 
     tree = ast.parse((BACKEND / "agent.py").read_text(encoding="utf-8-sig"))
     definitions = {

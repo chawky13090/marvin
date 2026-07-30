@@ -270,13 +270,23 @@ export default function ChatContainer({
         toolCallId,
         result: data.result || data.error || 'Aucun résultat',
       });
+      await sendMessage({
+        text: (
+          "L'action explicitement approuvée vient d'être exécutée. "
+          + "Poursuis maintenant la mission initiale à partir d'une nouvelle observation. "
+          + "N'annonce aucun succès sans preuve et utilise action=commit uniquement "
+          + "pour l'engagement externe final."
+        ),
+        internal: true,
+        continuationApprovalId: approvalId,
+      });
     } catch (err) {
       addToolResult({
         toolCallId,
         result: { error: 'Erreur : ' + err.message },
       });
     }
-  }, [addToolResult]);
+  }, [addToolResult, sendMessage]);
 
   const handleCancelTool = useCallback(async (toolCallId, approvalId) => {
     try {

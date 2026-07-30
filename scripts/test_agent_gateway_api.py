@@ -53,6 +53,73 @@ async def _exercise_routes() -> None:
         else:
             raise AssertionError("Une conversation inconnue doit être refusée avant le SSE.")
 
+    approval_id = agent_gateway.UUID("39d97c47-bf56-4f28-a6cb-bcc6f0102190")
+
+    async def continuation_subscription(**kwargs):
+        async for item in kwargs["producer_factory"]():
+            yield item
+
+    with (
+        patch.object(
+            agent_gateway.db,
+            "get_conversation",
+            return_value={"id": "conversation-1"},
+        ),
+        patch.object(
+            agent_gateway.tool_approvals,
+            "claim_continuation",
+            return_value={"id": str(approval_id), "status": "approved"},
+        ) as claim_continuation,
+        patch.object(agent_gateway, "run_agent", return_value=generated()) as run_agent,
+        patch.object(
+            agent_gateway.chat_turn_runtime,
+            "subscribe",
+            continuation_subscription,
+        ),
+    ):
+        response = await agent_gateway.chat(
+            agent_gateway.ChatRequest(
+                messages=[{"role": "user", "content": "Poursuis"}],
+                conversationId="conversation-1",
+                requestId="continuation-1",
+                continuationApprovalId=approval_id,
+            )
+        )
+        body = await _collect_stream(response)
+    assert '"type":"done"' in body
+    claim_continuation.assert_called_once_with(
+        str(approval_id),
+        conversation_id="conversation-1",
+        request_id="continuation-1",
+    )
+    assert run_agent.call_args.kwargs["internal_continuation"] is True
+
+    with (
+        patch.object(
+            agent_gateway.db,
+            "get_conversation",
+            return_value={"id": "conversation-1"},
+        ),
+        patch.object(
+            agent_gateway.tool_approvals,
+            "claim_continuation",
+            return_value=None,
+        ),
+    ):
+        try:
+            await agent_gateway.chat(
+                agent_gateway.ChatRequest(
+                    messages=[{"role": "user", "content": "Poursuis"}],
+                    conversationId="conversation-1",
+                    requestId="continuation-2",
+                    continuationApprovalId=approval_id,
+                )
+            )
+        except agent_gateway.HTTPException as exc:
+            assert exc.status_code == 409
+        else:
+            raise AssertionError("Une approbation déjà consommée doit être refusée.")
+
     async def rejected_subscription(**_kwargs):
         raise ValueError("secret interne qui ne doit pas sortir")
         yield ""

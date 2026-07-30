@@ -73,6 +73,23 @@ def main() -> int:
         finished = repository.finish(first["id"], approved=True, reason="executed")
         assert finished and finished["status"] == "approved"
         assert finished["arguments"] == {}
+        continuation = repository.claim_continuation(
+            first["id"],
+            conversation_id="conversation-1",
+            request_id="continuation-1",
+        )
+        assert continuation and continuation["decision_reason"] == "continued:continuation-1"
+        continuation_replay = repository.claim_continuation(
+            first["id"],
+            conversation_id="conversation-1",
+            request_id="continuation-1",
+        )
+        assert continuation_replay and continuation_replay["id"] == first["id"]
+        assert repository.claim_continuation(
+            first["id"],
+            conversation_id="conversation-1",
+            request_id="continuation-2",
+        ) is None
         final_replay = repository.claim(first["id"])
         assert final_replay and final_replay["status"] == "approved"
 

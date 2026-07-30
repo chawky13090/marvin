@@ -222,6 +222,43 @@ class ToolApprovalRepository:
             ).fetchone()
         return self._decode(row)
 
+    def claim_continuation(
+        self,
+        approval_id: str,
+        *,
+        conversation_id: str,
+        request_id: str,
+    ) -> dict | None:
+        """Lie une seule continuation agentique à une approbation exécutée.
+
+        Le même ``request_id`` peut rejouer la lecture du flux durable après une
+        coupure réseau, mais un autre tour ne peut pas réutiliser l'approbation.
+        """
+        marker = f"continued:{request_id}"
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            connection.execute(
+                """UPDATE tool_approval_requests
+                   SET decision_reason = ?
+                   WHERE id = ? AND conversation_id = ?
+                     AND status = 'approved'
+                     AND decision_reason = 'executed'""",
+                (marker, approval_id, conversation_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM tool_approval_requests WHERE id = ?",
+                (approval_id,),
+            ).fetchone()
+        result = self._decode(row)
+        if (
+            result is None
+            or result.get("conversation_id") != conversation_id
+            or result.get("status") != "approved"
+            or result.get("decision_reason") != marker
+        ):
+            return None
+        return result
+
 
 repository = ToolApprovalRepository()
 create_or_reuse = repository.create_or_reuse
@@ -229,3 +266,4 @@ get = repository.get
 claim = repository.claim
 finish = repository.finish
 deny = repository.deny
+claim_continuation = repository.claim_continuation
