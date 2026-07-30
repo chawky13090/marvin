@@ -47,11 +47,28 @@ Write-Host "Demon Docker pret." -ForegroundColor Green
 
 # -- 3. Config locale (secret genere au premier lancement, jamais committe) --
 $settingsPath = Join-Path $here "settings.yml"
+$templatePath = Join-Path $here "settings.yml.example"
 if (-not (Test-Path $settingsPath)) {
     Write-Step "Generation de settings.yml (cle secrete locale)..."
-    $template = Get-Content (Join-Path $here "settings.yml.example") -Raw
+    $template = Get-Content $templatePath -Raw
     $secret = -join ((1..32) | ForEach-Object { "{0:x}" -f (Get-Random -Maximum 16) })
     $template.Replace("CHANGE_ME_AUTO_GENERATED", $secret) | Set-Content -Path $settingsPath -Encoding utf8 -NoNewline
+} else {
+    # Le fichier contient un secret local et reste gitignore. Synchroniser les
+    # réglages versionnés sans changer ce secret, avec une sauvegarde atomique
+    # exploitable si le nouveau pool de moteurs doit être annulé.
+    $currentSettings = Get-Content $settingsPath -Raw
+    $secretMatch = [regex]::Match($currentSettings, 'secret_key:\s*"([^"]+)"')
+    if (-not $secretMatch.Success) {
+        throw "settings.yml ne contient pas de secret_key valide; synchronisation refusee."
+    }
+    $template = Get-Content $templatePath -Raw
+    $expectedSettings = $template.Replace("CHANGE_ME_AUTO_GENERATED", $secretMatch.Groups[1].Value)
+    if ($currentSettings -ne $expectedSettings) {
+        Write-Step "Mise a jour controlee de settings.yml (secret conserve)..."
+        Copy-Item -LiteralPath $settingsPath -Destination ($settingsPath + ".bak") -Force
+        $expectedSettings | Set-Content -Path $settingsPath -Encoding utf8 -NoNewline
+    }
 }
 
 # -- 4. docker compose up -d --------------------------------------------------

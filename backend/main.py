@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.498 — audit outils, fiabilité runtime et recherche SearXNG pertinente
 # v2.497 — ouverture Windows, navigation PC et projection PDF fiabilisées
 # v2.486 — Research Engine v3 adaptatif, vérifiable et réversible
 # v2.485 — vocalisation fiable des réponses Cloud answer_final
@@ -42,7 +43,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.453 — cohérence, provenance et conflits du Memory Mesh
 # v2.452 — transitions de confidentialité durables dans Coding Mission
 # v2.451 — provenance générative documents, e-mails et Code Workspace
-# v2.450 — amélioration de prompt vidéo alignée sur le runtime modèles partagé
 # v2.449 — matrice confidentialité/modèles et provenance du profil effectif
 # v2.448 — zéro consommateur direct, outils système conditionnels et Council sous harness
 # v2.447 — contenu et documents sous harness, téléchargement confiné

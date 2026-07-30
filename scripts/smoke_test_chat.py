@@ -6,7 +6,7 @@ Recharge quelques conversations réelles depuis la sidebar et vérifie :
   2. Aucun JSON brut visible par défaut dans une carte de résultat d'outil
      (régression du bug winget_search corrigé en v2.107 — le fallback générique
      de MessageBubble.jsx doit passer par PrettyResult, pas par JSON.stringify).
-  3. La page répond (le titre "Marvin" est visible).
+  3. La page répond (le composeur du chat est visible).
 
 Usage (depuis la racine du projet, frontend déjà lancé sur :3000, PowerShell 5.1) :
     $env:PYTHONIOENCODING='utf-8'; backend\.venv\Scripts\python.exe scripts/smoke_test_chat.py
@@ -107,11 +107,10 @@ async def main() -> int:
         # un contrat de disponibilité et devient aléatoire sous charge. Attendre
         # les éléments métier réellement nécessaires au parcours.
         await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30000)
-        await page.get_by_role("heading", name="Marvin").wait_for(timeout=15000)
+        await page.locator("textarea").first.wait_for(state="visible", timeout=15000)
         await page.locator("[data-conversation-id]").first.wait_for(timeout=15000)
 
-        title_ok = "Marvin" in (await page.locator("body").inner_text())
-        if not title_ok:
+        if await page.locator("textarea:visible").count() == 0:
             print("ÉCHEC : la page d'accueil ne s'est pas chargée correctement.")
             await browser.close()
             return 1
@@ -119,15 +118,22 @@ async def main() -> int:
         # Récupère les titres de conversation visibles dans la sidebar. Les lignes de
         # conversation n'ont pas de className (styles inline, cf. app/page.js) — repérées
         # par leur signature de style (div cliquable avec bordure gauche + son <span> titre).
-        rows = page.locator("[data-conversation-id]:visible")
+        # Lire l'échantillon dans une seule évaluation DOM : la liste peut être
+        # rafraîchie par les pollers pendant une succession de locators.
+        raw_samples = await page.locator(
+            "[data-conversation-id]:visible"
+        ).evaluate_all(
+            """(rows, limit) => rows.slice(0, limit).map(row => ({
+                id: row.dataset.conversationId || '',
+                title: row.querySelector('.conversation-row-main span')?.textContent?.trim() || '',
+            }))""",
+            SAMPLE_SIZE,
+        )
         samples = []
         sampled_ids = set()
-        for index in range(await rows.count()):
-            if len(samples) >= SAMPLE_SIZE:
-                break
-            row = rows.nth(index)
-            conversation_id = await row.get_attribute("data-conversation-id")
-            title = (await row.locator('[role="button"]').first.inner_text()).strip()
+        for sample in raw_samples:
+            conversation_id = sample.get("id")
+            title = sample.get("title")
             if conversation_id and title and conversation_id not in sampled_ids:
                 sampled_ids.add(conversation_id)
                 samples.append((title, conversation_id))
@@ -135,7 +141,7 @@ async def main() -> int:
         results = []
         for title, conversation_id in samples:
             await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30000)
-            await page.get_by_role("heading", name="Marvin").wait_for(timeout=15000)
+            await page.locator("textarea").first.wait_for(state="visible", timeout=15000)
             await page.get_by_role(
                 "button",
                 name=f"Ouvrir la conversation {title}",

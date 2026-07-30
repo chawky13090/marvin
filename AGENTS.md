@@ -196,7 +196,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.497.0)
+## 9. État actuel (v2.498.0)
+
+**v2.498 (fiabilité runtime et recherche réelle)** : l'audit reproductible couvre les 343
+capacités hors Code Workspace, sans trou entre schéma, exécuteur et test automatisé; 45
+sondes sûres s'exécutent réellement. Les résultats métier négatifs de `net_ping` ne sont
+plus comptés comme pannes de l'outil, les chemins localisés de Windows Search sont rendus
+réutilisables et les codes d'erreur structurés restent lisibles sans exposer de contenu.
+Model Market apprend aussi des réponses Cloud réussies et pénalise les réponses terminales
+vides. La recherche SearXNG filtre les mots interrogatifs, équilibre les résultats de chaque
+requête LLM et utilise un pool épinglé Bing/Mwmbl/Yep; un test réel Python 3.14 a retrouvé la
+documentation officielle et produit une synthèse pertinente. Les smokes adaptatifs ne
+dépendent plus de l'ancienne sidebar. La restauration initiale d'un chat ne peut plus écraser
+un clic utilisateur plus récent; les lectures transitoires sont bornées et ne suppriment pas
+le dernier identifiant sauvegardé. Le rollback reste une réversion du commit, complétée
+pour SearXNG par la restauration du fichier local puis `docker compose up -d`.
 
 **v2.497 (intentions fichier et projection PDF)** : la découverte progressive distingue
 désormais « ouvrir/afficher » (`pc_open_file`) de « lire/analyser » (`pdf_read`). Les résultats

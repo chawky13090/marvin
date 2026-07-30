@@ -591,21 +591,40 @@ async def _run_deterministic_agent(
             inject_required_tool_calls=_inject_required_tool_calls,
         )
         tool_calls_found = _prepared_model_step.tool_calls
-        if native_decision_mode and tool_calls_found and _is_cloud_model(active_model):
-            # Un appel natif réellement décodé constitue une preuve de compatibilité
-            # agentique. Il corrige notamment les anciennes observations faussement
-            # négatives produites par le bug tuple/list du collecteur.
+        if _is_cloud_model(active_model) and (
+            full_content.strip() or tool_calls_found
+        ):
+            # Toute réponse Cloud exploitable alimente le marché. Sans les
+            # réponses textuelles positives, les statistiques générales ne
+            # contenaient que des pannes et favorisaient des modèles non éprouvés.
             try:
                 import model_market as _model_market
 
-                _cr.record_model_capability(active_model, "agentic", True)
+                _observed_need = (
+                    "agentic"
+                    if tool_calls_found
+                    else (
+                        _cr.detect_task(_user_query)
+                        or {
+                            "analysis": "reasoning",
+                            "agent": "agentic",
+                            "vision": "vision",
+                        }.get(profile_name, "general")
+                    )
+                )
                 _model_market.record_observation(
                     active_model,
-                    "agentic",
+                    _observed_need,
                     True,
                     int((time.monotonic() - _runner_state.started_at) * 1000),
-                    phase="native_tool_call",
+                    phase=(
+                        "native_tool_call"
+                        if native_decision_mode and tool_calls_found
+                        else "agent_model_step"
+                    ),
                 )
+                if native_decision_mode and tool_calls_found:
+                    _cr.record_model_capability(active_model, "agentic", True)
             except Exception:
                 pass
         # v2.119 — protection mid-boucle : un outil sensible vient d'être demandé alors
@@ -798,6 +817,35 @@ async def _run_deterministic_agent(
 
         elif not full_content.strip():
             _runner_state.stop_reason = "empty_model_response"
+            if _is_cloud_model(active_model):
+                _terminal_empty_need = (
+                    "agentic"
+                    if native_decision_mode and tools_payload
+                    else (
+                        _cr.detect_task(_user_query)
+                        or {
+                            "analysis": "reasoning",
+                            "agent": "agentic",
+                            "vision": "vision",
+                        }.get(profile_name, "general")
+                    )
+                )
+                try:
+                    import model_market as _model_market
+
+                    _model_market.record_observation(
+                        active_model,
+                        _terminal_empty_need,
+                        False,
+                        int(
+                            (time.monotonic() - _runner_state.started_at)
+                            * 1000
+                        ),
+                        phase="empty_agent_response_terminal",
+                        error_type="EmptyModelResponse",
+                    )
+                except Exception:
+                    pass
             _record_empty_model_response(
                 conversation_id=conversation_id,
                 model=active_model,

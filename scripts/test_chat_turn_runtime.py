@@ -52,6 +52,28 @@ async def _exercise(path: Path) -> None:
             assert connection.execute(
                 "SELECT COUNT(*) FROM chat_turn_events WHERE request_id = 'parent-absent'"
             ).fetchone()[0] == 0
+            connection.execute(
+                """INSERT INTO chat_turns
+                   (request_id, payload_hash, conversation_id, status, owner_token)
+                   VALUES ('turn-concurrent', 'hash-concurrent', 'conv-1', 'running', ?)""",
+                (chat_turn_runtime._PROCESS_TOKEN,),
+            )
+        sequences = await asyncio.gather(
+            *(
+                asyncio.to_thread(
+                    chat_turn_runtime._append_event,
+                    "turn-concurrent",
+                    {"type": "text", "text": f"chunk-{index}"},
+                )
+                for index in range(20)
+            )
+        )
+        assert sorted(sequences) == list(range(1, 21))
+        with db(path) as connection:
+            assert connection.execute(
+                """SELECT COUNT(DISTINCT sequence)
+                   FROM chat_turn_events WHERE request_id = 'turn-concurrent'"""
+            ).fetchone()[0] == 20
 
         first_stream = chat_turn_runtime.subscribe(
             request_id="turn-1", fingerprint=fingerprint, conversation_id="conv-1",

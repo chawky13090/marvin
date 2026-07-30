@@ -261,7 +261,6 @@ def _resolve_path(raw: str) -> str:
     return normalized
 
 
-filesystem_domain.configure(resolve_path=_resolve_path)
 git_repository_domain.configure(resolve_path=_resolve_path)
 structured_data_domain.configure(resolve_path=_resolve_path)
 execute_file_list = filesystem_domain.list_entries
@@ -364,6 +363,14 @@ def _normalize_windows_path(path: str) -> str:
 
 
 execute_file_find = filesystem_domain.find
+
+# L'index Windows expose parfois des noms d'affichage localisés (par exemple
+# « Utilisateurs » et « Bureau »). Toutes les opérations filesystem doivent
+# rendre des chemins natifs réutilisables par les appels suivants du LLM.
+filesystem_domain.configure(
+    resolve_path=_resolve_path,
+    normalize_index_path=_normalize_windows_path,
+)
 
 
 async def execute_system_search(args: dict) -> dict:
@@ -3781,7 +3788,7 @@ TOOLS_SPEC = [
         "include_header": {"type": "boolean", "description": "Inclure l'en-tête configuré (défaut oui)"},
         "sign": {"type": "boolean", "description": "Ajouter un bloc signature à la fin"},
         "lieu": {"type": "string", "description": "Lieu pour la signature (« Fait à … »)"}},
-       []),
+       ["text"]),
 
     # ── Documents (RAG) ────────────────────────────────────────────────────────
     _t("document_index", "Indexe un fichier ou un dossier (PDF, Word, Excel, PowerPoint, texte) pour pouvoir l'interroger. Pour « indexe ce document », « apprends ce dossier ».",

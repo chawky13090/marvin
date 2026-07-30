@@ -40,6 +40,26 @@ async def main() -> int:
             "path": "docs", "pattern": "*.txt", "use_index": False
         })
         assert found["method"] == "os.walk" and found["count"] == 1
+        original_index_search = filesystem._windows_index_search
+        try:
+            filesystem.configure(
+                resolve_path=lambda raw: str(base / raw),
+                normalize_index_path=lambda raw: raw.replace(
+                    r"C:\Utilisateurs\Chawb\Bureau",
+                    r"C:\Users\Chawb\Desktop",
+                ),
+            )
+            filesystem._windows_index_search = lambda *_args: [{
+                "name": "rapport.pdf",
+                "path": r"C:\Utilisateurs\Chawb\Bureau\rapport.pdf",
+            }]
+            indexed = await filesystem.find({"pattern": "rapport"})
+            assert indexed["results"][0]["path"] == (
+                r"C:\Users\Chawb\Desktop\rapport.pdf"
+            )
+        finally:
+            filesystem._windows_index_search = original_index_search
+            filesystem.configure(resolve_path=lambda raw: str(base / raw))
         invalid_limit = await filesystem.find({
             "path": "docs", "pattern": "*", "max_results": "many"
         })
@@ -186,7 +206,10 @@ async def main() -> int:
         assert (collision_root / "a-1.txt").is_file()
         assert (collision_root / "a-2.txt").is_file()
 
-    filesystem.configure(resolve_path=tools._resolve_path)
+    filesystem.configure(
+        resolve_path=tools._resolve_path,
+        normalize_index_path=tools._normalize_windows_path,
+    )
     assert tools.execute_file_write is filesystem.write
     assert tools.execute_file_list is filesystem.list_entries
     assert tools.execute_file_info is filesystem.info

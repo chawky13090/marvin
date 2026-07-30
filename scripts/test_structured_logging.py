@@ -27,12 +27,16 @@ def run() -> None:
             "prompt": "contenu personnel",
             "nested": {"authorization": f"Bearer {secret}"},
             "error": f"token={secret}",
+            "error_code": "TOOL_EXECUTION_FAILED",
+            "unsafe_error_code": f"failure-{secret}",
         }
     )
     serialized = json.dumps(cleaned, ensure_ascii=False)
     assert secret not in serialized
     assert cleaned["prompt"]["redacted"] is True
     assert len(cleaned["prompt"]["sha256"]) == 64
+    assert cleaned["error_code"] == "TOOL_EXECUTION_FAILED"
+    assert cleaned["unsafe_error_code"]["redacted"] is True
     runtime_config_source = (ROOT / "backend" / "api" / "runtime_config.py").read_text(
         encoding="utf-8"
     )

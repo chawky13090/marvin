@@ -86,9 +86,24 @@ def frontend_status() -> None:
 
 
 def frontend_settings() -> None:
-    data = fetch_json(f"{FRONTEND}/api/settings")
-    assert data.get("success") is True
-    assert isinstance(data.get("models"), list)
+    # Les routes Next autres que /api/status sont volontairement fermées sans
+    # cookie HttpOnly de jumelage. Le smoke HTTP anonyme doit valider cette
+    # frontière, pas tenter de contourner l'authentification LAN.
+    anonymous_http = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
+    )
+    request = urllib.request.Request(
+        f"{FRONTEND}/api/settings",
+        headers={"Accept": "application/json"},
+    )
+    try:
+        anonymous_http.open(request, timeout=20)
+    except urllib.error.HTTPError as error:
+        assert error.code == 401
+        payload = json.loads(error.read().decode("utf-8"))
+        assert payload.get("detail") == "lan_authentication_required"
+        return
+    raise AssertionError("/api/settings accepte un client sans session")
 
 
 def conversations_contract() -> None:
@@ -408,7 +423,7 @@ TESTS: list[tuple[str, Callable[[], None]]] = [
     ("Contrat OpenAPI", backend_openapi),
     ("Accueil Next.js", lambda: fetch_ok(f"{FRONTEND}/")),
     ("Statut frontend", frontend_status),
-    ("Reglages frontend", frontend_settings),
+    ("Protection des reglages frontend", frontend_settings),
     ("Contrat conversations", conversations_contract),
     ("Contrats projets, taches et notes", organizer_contracts),
     ("Contrats memoires, parametres et sauvegardes", local_data_contracts),

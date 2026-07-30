@@ -6,6 +6,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 
@@ -146,7 +147,9 @@ async def _exercise_compensation() -> None:
 
     engineering_radar.DurableEvidenceStore.append = reject_proof
     try:
-        result = await engineering_radar.refresh(["go"], force=True, fetcher=fetcher)
+        with patch("bug_log.log_bug") as log_bug:
+            result = await engineering_radar.refresh(["go"], force=True, fetcher=fetcher)
+        assert log_bug.call_count == len(source_ids)
     finally:
         engineering_radar.DurableEvidenceStore.append = original_append
     after = json.loads(engineering_radar.STATE_PATH.read_text(encoding="utf-8"))

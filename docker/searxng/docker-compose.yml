@@ -12,7 +12,7 @@
 # est de ne jamais sortir du binding local.
 services:
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:2026.7.14-58e02a01a
     container_name: marvin-searxng
     restart: unless-stopped
     ports:

@@ -176,6 +176,39 @@ async def _run() -> None:
         ],
     )
     assert [item["url"] for item in filtered] == ["https://fire.example"]
+    python_filtered = web._filter_relevant_results(
+        "Quelles sont les principales nouveautés officielles de Python 3.14 ?",
+        [
+            {
+                "title": "Quel, quelle, quelles : règle et exercices",
+                "url": "https://grammar.example/quelles",
+                "snippet": "Grammaire française.",
+            },
+            {
+                "title": "What's New In Python 3.14",
+                "url": "https://docs.python.org/3.14/whatsnew/3.14.html",
+                "snippet": "Python 3.14 release highlights.",
+            },
+        ],
+    )
+    assert [item["url"] for item in python_filtered] == [
+        "https://docs.python.org/3.14/whatsnew/3.14.html"
+    ]
+    interleaved = web._interleave_search_results([
+        {"results": [
+            {"url": "https://generic.example/1"},
+            {"url": "https://generic.example/2"},
+        ]},
+        {"results": [
+            {"url": "https://official.example/1"},
+            {"url": "https://generic.example/1"},
+        ]},
+    ])
+    assert [item["url"] for item in interleaved] == [
+        "https://generic.example/1",
+        "https://official.example/1",
+        "https://generic.example/2",
+    ]
 
     async def priority_search(query: str, max_results: int) -> dict:
         query_id = sum(map(ord, query))

@@ -3,7 +3,14 @@
 # généré localement) et remplace CHANGE_ME_AUTO_GENERATED par une clé aléatoire au
 # premier lancement. Ne pas éditer settings.yml directement si tu veux que ce modèle
 # reste la source de vérité versionnée.
-use_default_settings: true
+use_default_settings:
+  engines:
+    # Pool explicite et reproductible. SearXNG ne chargera pas silencieusement
+    # de nouveaux moteurs lors d'une mise à jour de son image.
+    keep_only:
+      - bing
+      - mwmbl
+      - yep
 
 general:
   instance_name: "Marvin SearXNG"
@@ -20,12 +27,12 @@ server:
   limiter: false   # pas de Redis nécessaire pour un usage local mono-utilisateur
   image_proxy: false
 
-# Marvin n'utilise que SearXNG. Brave et DuckDuckGo sont aussi désactivés dans
-# l'agrégateur ; les autres moteurs SearXNG restent disponibles.
+# Marvin n'utilise que SearXNG. Ce pool exclut complètement Brave,
+# DuckDuckGo et les moteurs observés en CAPTCHA/403.
 engines:
   - name: bing
     disabled: false
-  - name: brave
-    disabled: true
-  - name: duckduckgo
-    disabled: true
+  - name: mwmbl
+    disabled: false
+  - name: yep
+    disabled: false

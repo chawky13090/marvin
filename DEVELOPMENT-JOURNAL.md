@@ -12877,3 +12877,70 @@ complets restent dans le journal métier existant mais ne rejoignent pas les log
 Les journaux d'incident conservent uniquement classe, outil, corrélation et empreinte des
 arguments. Aucun schéma ni donnée n'est migré. Rollback : réverter le commit v2.497 puis
 redémarrer le backend; les conversations historiques restent inchangées.
+
+## 2026-07-30 — v2.498 — Audit fonctionnel, apprentissage runtime et recherche SearXNG
+
+### Périmètre et constats
+
+La tranche reprend les anomalies des deux derniers jours hors Code Workspace. Un inventaire
+statique reproductible relie les 346 capacités à leur schéma, exécuteur, politique et tests :
+343 sont dans le périmètre, trois capacités Workspace sont explicitement différées, aucune
+capacité du périmètre n'est sans test. Le diagnostic réel `system_self_test` exécute 45 sondes
+sûres et les valide toutes.
+
+Les journaux ont révélé quatre causes distinctes :
+
+- `net_ping` enregistrait un hôte injoignable comme panne interne, ce qui créait 84 faux
+  échecs; son processus terminé est désormais un succès avec `reachable=false`;
+- les tests du gateway et de l'Engineering Radar alimentaient les journaux de production
+  avec leurs pannes artificielles; ils mockent maintenant la frontière `bug_log`;
+- Model Market pénalisait les réponses Cloud vides mais n'apprenait pas des réponses texte
+  réussies, et oubliait le second modèle vide terminal;
+- `file_find` rendait parfois les noms d'affichage Windows Search (`Utilisateurs`, `Bureau`)
+  que l'appel suivant ne pouvait pas ouvrir.
+
+### Corrections et recherche Web réelle
+
+Les sorties console Windows utilisent la page de codes OEM détectée, les codes d'erreur
+structurés conformes restent lisibles et les chemins indexés sont normalisés à la frontière
+du domaine filesystem. Le chemin LLM natif enregistre chaque réponse Cloud utile dans Model
+Market sans influencer le choix courant; les appels d'outils enrichissent aussi la matrice
+de capacités. `document_generate` exige désormais le texte source dans son schéma.
+
+Un test réel de `web_research` sur Python 3.14 a d'abord retourné 18 pages de grammaire sur
+« quelles ». La cause était double : les mots interrogatifs participaient au filtre de
+pertinence et la première requête générique monopolisait les vingt résultats. Le filtre
+ignore maintenant ces termes et fusionne les portefeuilles LLM en round-robin. SearXNG
+chargeait en outre les moteurs par défaut : Google CSE et Startpage étaient suspendus, Bing
+réduisait certaines requêtes. Le pool explicite Bing/Mwmbl/Yep, vérifié sur l'instance locale,
+retrouve en première position la documentation officielle Python 3.14. L'image Docker est
+épinglée sur `searxng/searxng:2026.7.14-58e02a01a`, digest observé
+`sha256:af9aec5c8fe88767106e8043004a1232d43cabde22869e6355f3a63d26e41351`.
+
+### Validation, sécurité, logs et rollback
+
+Résultats observés avant gate final : 28/28 contrats API, 41/41 pages, cinq conversations
+réelles rechargées, voix sérialisée pendant navigation, TTS Edge réel HTTP 200 avec 13 392
+octets, Winget installé et mises à jour en lecture, 14 suites ciblées LLM/Web/voix, audit
+343/343 et architecture 346/346. Un tour Cloud Ultra sans outil a répondu `OK` et produit
+une observation Model Market positive. La recherche réparée restitue dix sources, commence
+par `docs.python.org/3.14/whatsnew/3.14.html` et synthétise six nouveautés.
+
+Aucun secret, contenu de conversation ou texte Web n'est ajouté aux logs techniques. Les
+actions mutatrices et les 78 restrictions du gateway restent inchangées. Aucun schéma ni
+donnée n'est migré. Rollback code : réverter le commit v2.498 et redémarrer le backend.
+Le gate consolidé final réussit 214 étapes sur 214 en 435,8 secondes, build Turbopack de
+production inclus. Les erreurs de transport imprimées en fin de sortie sont les scénarios
+négatifs injectés et validés par leurs tests respectifs, pas des incidents du runtime actif.
+Le smoke post-redémarrage a ensuite reproduit une course frontend : la restauration du dernier
+chat, commencée au montage, pouvait terminer après un clic et réafficher l'ancien fil. La
+séquence de navigation applique maintenant « dernière intention gagnante », les lectures du
+proxy ont des délais bornés et une panne transitoire ne supprime plus l'identifiant local.
+Trois parcours consécutifs de cinq conversations réussissent après correction.
+Le lanceur conserve désormais le secret existant, sauvegarde la configuration précédente dans
+`docker/searxng/settings.yml.bak`, puis synchronise le modèle versionné. Rollback SearXNG :
+restaurer ce `.bak`, réverter le compose, puis exécuter `docker compose up -d` dans
+`docker/searxng`. Sur cette machine, la configuration avait été corrigée avant l'ajout de cette
+sauvegarde automatique; le rollback équivalent consiste à rétablir le modèle v2.497 en
+conservant la valeur locale de `secret_key`, puis à recréer le conteneur. Les données métier
+restent intactes.

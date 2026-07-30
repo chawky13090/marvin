@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -19,6 +20,7 @@ from tool_domains import network
 
 
 async def _run() -> None:
+    assert network._console_output_encoding()
     assert network._net_parse_ports("443,80,80,90-88") == [80, 88, 89, 90, 443]
     assert network._net_parse_ports("-5,0,65536") == []
     try:
@@ -53,6 +55,16 @@ async def _run() -> None:
         {"host": "127.0.0.1", "count": "beaucoup"}
     )
     assert "count" in invalid_count["error"]
+    unreachable_process = subprocess.CompletedProcess(
+        ["ping"], 1, stdout=b"Destination host unreachable.", stderr=b""
+    )
+    with patch.object(network.subprocess, "run", return_value=unreachable_process):
+        unreachable = await network.execute_net_ping(
+            {"host": "192.0.2.1", "count": 1}
+        )
+    assert unreachable["success"] is True
+    assert unreachable["reachable"] is False
+    assert unreachable["returncode"] == 1
     invalid_snmp = await network.execute_net_snmp_query(
         {"host": "127.0.0.1", "port": 70000}
     )

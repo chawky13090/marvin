@@ -77,6 +77,8 @@ _SEARCH_STOP_WORDS = {
     "aux", "avec", "ces", "cours", "dans", "de", "dernier", "derniers", "derniere",
     "dernieres", "des", "donne", "du", "en", "et", "etat", "est", "faire", "hui",
     "info", "infos", "la", "le", "les", "leur", "mais", "ou", "pour", "que", "qui",
+    "quel", "quelle", "quelles", "quels", "principal", "principale", "principales",
+    "principaux",
     "nouveaute", "nouveautes", "officiel", "officielle", "officielles",
     "recherche", "son", "sont", "statut", "sur", "un", "une", "verifiable", "web",
 }
@@ -160,6 +162,24 @@ def _filter_relevant_results(query: str, results: list[dict]) -> list[dict]:
         if topic & haystack:
             filtered.append(item)
     return filtered
+
+
+def _interleave_search_results(receipts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fusionne les variantes sans laisser la requête générique monopoliser le top N."""
+    queues = [list(receipt.get("results") or []) for receipt in receipts]
+    merged: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for index in range(max((len(queue) for queue in queues), default=0)):
+        for queue in queues:
+            if index >= len(queue):
+                continue
+            item = queue[index]
+            url = str(item.get("url") or "")
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            merged.append(item)
+    return merged
 
 
 async def _execute_web_search_legacy(args: dict) -> dict:
@@ -871,19 +891,14 @@ async def execute_web_research(args: dict) -> dict:
             model=args.get("model"),
         )
         receipts: list[dict[str, Any]] = []
-        results_by_url: dict[str, dict[str, Any]] = {}
         search_results = await asyncio.gather(
             *(_priority_search(variant, 20) for variant in planned_queries)
         )
         for receipt in search_results:
             receipts.append(receipt)
-            for item in receipt.get("results") or []:
-                url = str(item.get("url") or "")
-                if url and url not in results_by_url:
-                    results_by_url[url] = item
         results = _filter_relevant_results(
             _prepare_searxng_query(query),
-            list(results_by_url.values()),
+            _interleave_search_results(receipts),
         )[:20]
         search_receipt = next(
             (receipt for receipt in receipts if receipt.get("success")),

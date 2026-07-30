@@ -22,6 +22,7 @@ import regex as safe_regex
 
 
 _resolve_path: Callable[[str], str] | None = None
+_normalize_index_path: Callable[[str], str] | None = None
 _MAX_CONTENT = 50_000
 _SEARCH_TEXT_EXTENSIONS = (
     ".txt", ".md", ".pdf", ".docx", ".csv", ".xlsx", ".json",
@@ -29,9 +30,14 @@ _SEARCH_TEXT_EXTENSIONS = (
 )
 
 
-def configure(*, resolve_path: Callable[[str], str]) -> None:
-    global _resolve_path
+def configure(
+    *,
+    resolve_path: Callable[[str], str],
+    normalize_index_path: Callable[[str], str] | None = None,
+) -> None:
+    global _resolve_path, _normalize_index_path
     _resolve_path = resolve_path
+    _normalize_index_path = normalize_index_path
 
 
 def _resolve(raw: str) -> str:
@@ -371,6 +377,11 @@ def _windows_index_search(
                     return default
 
             path_value = field("System.ItemPathDisplay", "")
+            normalized_path = (
+                _normalize_index_path(str(path_value or ""))
+                if _normalize_index_path is not None
+                else str(path_value or "")
+            )
             size_value = field("System.Size", 0)
             try:
                 size_value = int(size_value or 0)
@@ -378,7 +389,7 @@ def _windows_index_search(
                 size_value = 0
             results.append({
                 "name": str(field("System.ItemName", "") or ""),
-                "path": str(path_value or ""),
+                "path": normalized_path,
                 "size": size_value,
                 "modified": str(field("System.DateModified", "") or ""),
                 "type": str(field("System.ItemType", "") or ""),
@@ -443,6 +454,20 @@ def _walk_search(
     return results, scanned
 
 
+def _normalize_index_results(
+    results: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]] | None:
+    if results is None or _normalize_index_path is None:
+        return results
+    return [
+        {
+            **item,
+            "path": _normalize_index_path(str(item.get("path", ""))),
+        }
+        for item in results
+    ]
+
+
 async def find(args: dict[str, Any]) -> dict[str, Any]:
     pattern = str(args.get("pattern", "*")).strip()
     path = str(args.get("path", "")).strip()
@@ -457,9 +482,9 @@ async def find(args: dict[str, Any]) -> dict[str, Any]:
     global_scope = not path or path.casefold() in {"all", "tout", "everywhere", "*"}
 
     if use_index and global_scope:
-        results = await asyncio.to_thread(
+        results = _normalize_index_results(await asyncio.to_thread(
             _windows_index_search, pattern, max_results, None
-        )
+        ))
         if results is not None:
             return {
                 "success": True,
@@ -474,9 +499,9 @@ async def find(args: dict[str, Any]) -> dict[str, Any]:
     if not resolved.exists() or not resolved.is_dir():
         return {"error": f"Dossier introuvable : {resolved}"}
     if use_index:
-        results = await asyncio.to_thread(
+        results = _normalize_index_results(await asyncio.to_thread(
             _windows_index_search, pattern, max_results, str(resolved)
-        )
+        ))
         if results:
             return {
                 "success": True,

@@ -6,6 +6,7 @@ import asyncio
 import sys
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
@@ -265,14 +266,16 @@ async def main() -> None:
     assert confirmed_system_mutation.result["success"]
     assert calls[-1]["confirmed"] is True
 
-    failure = await tool_gateway.execute_tool(
-        tool_gateway.ToolGatewayRequest("broken", {}, "mcp", PERMISSION_STANDARD),
-        registry=registry,
-        specifications=specifications,
-        database=Database,
-        normalizer=normalize,
-        audit_logger=audit,
-    )
+    with patch("bug_log.log_bug") as log_bug:
+        failure = await tool_gateway.execute_tool(
+            tool_gateway.ToolGatewayRequest("broken", {}, "mcp", PERMISSION_STANDARD),
+            registry=registry,
+            specifications=specifications,
+            database=Database,
+            normalizer=normalize,
+            audit_logger=audit,
+        )
+    log_bug.assert_called_once()
     assert "erreur interne" in failure.result["error"]
     assert "secret-interne" not in str(failure.result)
     assert failure.result["normalized"] is True

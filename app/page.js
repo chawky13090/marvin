@@ -14,13 +14,20 @@ import {
 } from '@/lib/chatNavigation.mjs';
 
 async function fetchWithBackendFallback(path, options) {
+  const withTimeout = (timeout) => ({
+    ...(options || {}),
+    signal: options?.signal || AbortSignal.timeout(timeout),
+  });
   try {
-    const localResponse = await fetch(path, options);
-    if (localResponse.ok || localResponse.status !== 404) return localResponse;
+    const localResponse = await fetch(path, withTimeout(8000));
+    if (
+      localResponse.ok
+      || ![404, 502, 503, 504].includes(localResponse.status)
+    ) return localResponse;
   } catch {
-    // Repli direct si le proxy Next n'est momentanément pas joignable.
+    // Repli direct si le proxy Next est momentanément lent ou injoignable.
   }
-  return fetch(`${BACKEND_URL}${path}`, options);
+  return fetch(`${BACKEND_URL}${path}`, withTimeout(12000));
 }
 
 export default function ChatPage() {
@@ -32,6 +39,7 @@ export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = useState(initialSelection.conversationId);
   const [selectionHydrated, setSelectionHydrated] = useState(false);
   const navigationRequestRef = useRef(0);
+  const preserveStoredSelectionRef = useRef(false);
   const [initialMessages, setInitialMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newProjectName, setNewProjectName] = useState('');
@@ -169,19 +177,47 @@ export default function ChatPage() {
 
     let cancelled = false;
     const restore = async () => {
+      const restoreSequence = ++navigationRequestRef.current;
       try {
         const path = `/api/conversations/${savedId}?t=${Date.now()}`;
-        const response = await fetchWithBackendFallback(path);
+        let response;
+        let lastError;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            response = await fetchWithBackendFallback(path);
+            if (response.ok || response.status === 404) break;
+          } catch (error) {
+            lastError = error;
+          }
+          await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+        }
+        if (!response) throw lastError || new Error('Conversation indisponible');
+        if (
+          cancelled
+          || restoreSequence !== navigationRequestRef.current
+        ) return;
         if (!response.ok) {
-          persistLastConversationId(window.localStorage, null);
+          if (response.status === 404) {
+            persistLastConversationId(window.localStorage, null);
+          } else {
+            preserveStoredSelectionRef.current = true;
+          }
           return;
         }
         const data = await response.json();
-        if (cancelled) return;
         setInitialMessages(Array.isArray(data.messages) ? data.messages : []);
         setActiveConversationId(savedId);
       } catch (error) {
-        console.error('Erreur restauration conversation:', error);
+        if (
+          cancelled
+          || restoreSequence !== navigationRequestRef.current
+        ) return;
+        // Une indisponibilité transitoire ne doit jamais effacer le pointeur
+        // vers la dernière conversation. Un prochain rechargement réessaiera.
+        preserveStoredSelectionRef.current = true;
+        console.warn('Restauration conversation différée', {
+          error_type: error?.name || 'FetchUnavailable',
+        });
       } finally {
         if (!cancelled) setSelectionHydrated(true);
       }
@@ -194,6 +230,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!selectionHydrated) return;
+    if (!activeConversationId && preserveStoredSelectionRef.current) {
+      preserveStoredSelectionRef.current = false;
+      return;
+    }
     persistLastConversationId(window.localStorage, activeConversationId);
   }, [activeConversationId, selectionHydrated]);
 

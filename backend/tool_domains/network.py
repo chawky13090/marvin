@@ -33,6 +33,18 @@ def _net_error(exc: Exception, what: str = "la ressource") -> dict[str, Any]:
     return {"error": str(exc)}
 
 
+def _console_output_encoding() -> str:
+    """Encodage des utilitaires console natifs, distinct de l'ANSI sous Windows."""
+    if sys.platform != "win32":
+        return "utf-8"
+    try:
+        import ctypes
+
+        return f"cp{int(ctypes.windll.kernel32.GetOEMCP())}"
+    except (AttributeError, OSError, TypeError, ValueError):
+        return "oem"
+
+
 async def execute_ip_info(args: dict) -> dict:
     """Retourne la géolocalisation d'une IP globale via l'endpoint HTTPS IPWhois."""
     raw_ip = str(args.get("ip") or "").strip()
@@ -110,12 +122,16 @@ async def execute_net_ping(args: dict) -> dict:
             ["ping", flag, str(count), host],
             capture_output=True, timeout=30,
         )
-        enc = "cp1252" if sys.platform == "win32" else "utf-8"
-        output = result.stdout.decode(enc, errors="replace")
+        output = result.stdout.decode(_console_output_encoding(), errors="replace")
         lines = [l for l in output.splitlines() if l.strip()]
         return {
             "host": host,
-            "success": result.returncode == 0,
+            # Le processus ping a bien exécuté le diagnostic même si la cible
+            # ne répond pas. Ne pas comptabiliser un hôte injoignable comme une
+            # panne de l'outil dans la télémétrie de fiabilité.
+            "success": True,
+            "reachable": result.returncode == 0,
+            "returncode": result.returncode,
             "output": output.strip(),
             "summary": lines[-1] if lines else "",
         }

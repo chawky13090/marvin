@@ -29,6 +29,7 @@ _INLINE_SECRET_PATTERNS = (
         r"\s*[:=]\s*([^\s,;]+)"
     ),
 )
+_SAFE_ERROR_CODE = re.compile(r"^[A-Z][A-Z0-9_]{0,79}$")
 
 
 def _bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
@@ -73,6 +74,16 @@ def sanitize(value: Any, *, max_length: int = 2000, depth: int = 0) -> Any:
             lowered = key.lower()
             if any(marker in lowered for marker in _SECRET_MARKERS):
                 result[key] = "***"
+            elif lowered == "error_code":
+                # Métadonnée de diagnostic générée par Marvin. Elle reste
+                # exploitable uniquement sous une forme symbolique stricte;
+                # toute valeur libre est empreintée comme du contenu.
+                candidate = str(item or "")
+                result[key] = (
+                    candidate
+                    if _SAFE_ERROR_CODE.fullmatch(candidate)
+                    else _content_fingerprint(item)
+                )
             elif any(marker in lowered for marker in _CONTENT_MARKERS):
                 result[key] = _content_fingerprint(item)
             else:

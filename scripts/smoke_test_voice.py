@@ -10,6 +10,21 @@ from playwright.async_api import async_playwright
 BASE_URL = "http://localhost:3000"
 
 
+async def navigate_with_marvin_menu(page, label: str, path: str) -> None:
+    """Suit la navigation adaptative sans dépendre de l'ancienne sidebar."""
+    opener = page.get_by_role("button", name="Ouvrir la navigation Marvin")
+    await opener.wait_for(state="visible", timeout=15_000)
+    await opener.click()
+    # Le composition root peut conserver une navigation "full" montée pendant
+    # l'ouverture du tiroir. Cibler explicitement l'overlay évite un locator
+    # ambigu sans affaiblir le test du parcours utilisateur réel.
+    navigation = page.locator('.adaptive-nav--overlay:visible')
+    link = navigation.get_by_role("link", name=label, exact=True)
+    await link.wait_for(state="visible", timeout=10_000)
+    await link.click()
+    await page.wait_for_url(BASE_URL + path, timeout=10_000)
+
+
 async def open_voice_ready_conversation(page) -> bool:
     conversation_id = await page.evaluate(
         """async () => {
@@ -99,12 +114,10 @@ async def main() -> int:
 
         await listen.nth(0).click()
         await page.wait_for_timeout(80)
-        await page.locator('a[href="/jour"]').click()
-        await page.wait_for_url("**/jour", timeout=10_000)
+        await navigate_with_marvin_menu(page, "Mon jour", "/jour")
         await page.wait_for_timeout(80)
         during_navigation = await page.evaluate("window.__marvinAudio")
-        await page.locator('a[href="/"]').click()
-        await page.wait_for_url(BASE_URL + "/", timeout=10_000)
+        await navigate_with_marvin_menu(page, "Chat", "/")
         await page.wait_for_timeout(250)
         listen = page.locator('button[title="\u00c9couter la r\u00e9ponse"]')
         if await listen.count() < 1:
