@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.540 — computer_control : alias query/key->target/text, rapport architecture outils
 # v2.539 — computer_control : alias action/coordonnee, focus resilient (AttachThreadInput)
 # v2.538 — computer_control : touches SendKeys via type, alias browser, message click clair
 # v2.537 — fiabilite des appels d'outils : coercion generique, hwnd, timeout interne
@@ -44,7 +45,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.505 — approbations durables dans le chat et autonomie temporaire visible
 # v2.504 — bandeau conversation unifié et composeur Cortex responsive
 # v2.503 — découverte enrichie et mesurée des capacités
-# v2.502 — onglets SearXNG redondants et vérifiés
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

@@ -5,6 +5,76 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.540.0 — computer_control : quatrième passe + rapport d'architecture
+
+### Demande et constats
+
+« Regarde encore la dernière conversation, ça ne fonctionne pas, et cela depuis que j'ai
+fait de grands travaux avec Codex — il faudrait peut-être voir les outils et comment Marvin
+gère tout cela. Il y a aussi un cœur déterministe qui avait été mis en place, peut-être
+qu'il fonctionne mal ou que c'était une mauvaise idée. Fais-moi un rapport et des
+propositions. » Extraction de la conversation la plus récente
+(`3c2999a3-68d2-41db-b2e0-ed481fd382aa`, « Ouvrir Firefox IT Connect », 20:46-20:49,
+22 messages, 8 erreurs). Deux NOUVEAUX motifs d'alias manquant sur `computer_control` :
+`action="search_app", query="Firefox"` puis `action="open", query="Firefox"` (le champ
+réel est `target`) ; `action="keypress", key="win"` puis `key="enter"` (le champ réel est
+`text`) — ce dernier a bloqué toute la tâche : sans pouvoir envoyer la touche Windows pour
+ouvrir le menu Démarrer, taper "Firefox" au clavier n'avait aucune cible utile, et les clics
+suivants à des coordonnées arbitraires n'ont eu aucun effet.
+
+Investigation du « cœur déterministe » : identifié comme `backend/cortex.py`, un contrat de
+mission qui résout 6 axes (effort, evidence, review, autonomy, privacy, output) par règles
+regex déterministes sur le texte utilisateur — jamais par un appel LLM. Recherche de
+"cortex"/"Cortex" dans les 4 conversations analysées (recherche+contenu complet) : AUCUNE
+occurrence. Conclusion : Cortex n'est impliqué dans aucun des échecs observés ; le problème
+est concentré à 100% sur la surface de `computer_control`.
+
+### Décisions et modifications
+
+- `backend/agent_tool_step.py` : `query` ajouté à la liste d'alias `target` (déjà
+  générique) ; `search_app` ajouté à l'alias d'action `open` ; nouvel alias `key`→`text`
+  (le seul champ réel pour `type`/`keypress`).
+
+### Rapport livré (au-delà du changelog)
+
+- **Sur "depuis les grands travaux Codex"** : les 4 conversations analysées dans cette
+  série de correctifs ne montrent aucune régression causée par un changement Codex
+  spécifique — tous les défauts trouvés sont des lacunes PRÉEXISTANTES dans la couverture
+  d'alias de `computer_control` (jamais couvertes avant, pas cassées récemment). Rien dans
+  les logs n'indique une régression datée du travail Codex.
+- **Sur le "cœur déterministe" (Cortex)** : fonctionne comme conçu, aucune trace dans les
+  échecs. Recommandation : ne pas y toucher sans un symptôme concret à montrer — le
+  supprimer ou le modifier sans preuve d'un problème réel serait risqué pour un bénéfice
+  non démontré.
+- **Sur l'architecture des appels d'outils en général** : le motif de correction établi
+  depuis v2.526 (normaliser les arguments AVANT validation, dans le code, jamais dans le
+  prompt système) est la bonne architecture et reste efficace à chaque incident rejoué.
+  Mais `computer_control` a une surface intrinsèquement fragile (18 actions, 20+
+  paramètres, aucune norme entre modèles cloud pour "cliquer"/"taper"/"lancer" un
+  programme) : chaque modèle cloud apporte ses propres conventions apprises d'autres API
+  (SendKeys, `coordinate:[x,y]`, `key` vs `text`, `query` vs `target`...). C'est un défaut
+  de SURFACE, pas de conception : la correction incrémentale (alias bornés, rejoués sur
+  incident réel, jamais générique/spéculative) reste la bonne réponse.
+- **Piste structurelle proposée, non implémentée** : renforcer `action=open` pour accepter
+  une URL optionnelle et enchaîner nativement "ouvrir le navigateur PUIS y naviguer" en un
+  seul appel fiable (aujourd'hui : deux actions séparées, `open` puis `navigate`, chacune
+  pouvant échouer indépendamment) — réduirait le nombre de séquences clavier/souris
+  manuelles fragiles pour ce cas d'usage très fréquent (constaté dans 3 des 4
+  conversations). À discuter avant implémentation.
+
+### Validation, sécurité, logs et rollback
+
+Les 2 alias testés sur les arguments exacts de la conversation source
+(`{action:"search_app", query:"Firefox"}` et `{action:"open", query:"Firefox"}` →
+`{action:"open", target:"Firefox"}` ; `{action:"keypress", key:"win"}` →
+`{action:"keypress", text:"win"}`, résolu en `{LWIN}` par `_keypress_sequence` déjà étendu
+en v2.538 ; idem pour `key:"enter"` → `{ENTER}`). Suites de régression exécutées et vertes :
+`test_computer_runtime`, `test_agent_tool_step`, `test_stringified_array_repair`,
+`test_agent_tool_batch`, `test_agent_tool_batch_parallel`, `test_agent_tool_dispatch`,
+`test_tool_domain_filesystem`, `test_agent_model_step`, `test_agent_policy`,
+`check_architecture.py`, `test_main_composition.py`. Aucune migration, aucun changement
+d'API cassant. Rollback : réversion du commit v2.540.
+
 ## 2026-07-31 — v2.539.0 — computer_control : troisième passe, après redémarrage confirmé
 
 ### Demande et constats

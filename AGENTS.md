@@ -202,7 +202,29 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.539.0)
+## 9. État actuel (v2.540.0)
+
+**v2.540 (computer_control : quatrième passe + rapport d'architecture outils)** :
+QUATRIÈME conversation réelle consécutive analysée sur demande explicite (« regarde
+encore la dernière conversation, ça ne fonctionne pas [...] il y a aussi un cœur
+déterministe, peut-être qu'il fonctionne mal »). Deux alias supplémentaires ajoutés à
+`agent_tool_step.py` : `query`→`target` (le modèle cherchait à lancer une app par nom flou)
+et `action="search_app"`→`open`, ainsi que `key`→`text` (le modèle envoyait `key="win"`/
+`key="enter"` pour `action=keypress`, le schéma n'a qu'un champ `text`). Investigation du
+« cœur déterministe » évoqué : c'est `backend/cortex.py` (contrat de mission — axes
+effort/evidence/review/autonomy/privacy/output, résolus par règles regex déterministes,
+jamais par le LLM). Aucune trace de Cortex dans les 4 conversations analysées (ni dans les
+tool_calls, ni dans les erreurs) : le problème reste concentré à 100% sur la surface
+`computer_control`, pas sur le routage de mission. Rapport complet livré à l'utilisateur
+(pas seulement un changelog) : la simulation clavier/souris reste le point le plus fragile
+de Marvin par nature (surface libre, aucune norme entre modèles cloud) ; le motif de
+correction établi depuis v2.526 (normaliser AVANT validation, jamais dans le prompt) reste
+la bonne architecture — chaque incident réel est rejoué et corrigé, sans réécriture.
+Piste structurelle proposée pour réduire la fragilité à la source (pas encore implémentée,
+à discuter) : renforcer `action=open`+`action=navigate` pour couvrir nativement
+« ouvrir une appli PUIS naviguer vers une URL » en un seul appel fiable, réduisant le besoin
+de séquences clavier/souris manuelles fragiles pour ce cas d'usage très fréquent. Aucune
+migration. Rollback : réversion du commit v2.540.
 
 **v2.539 (computer_control : troisième passe après redémarrage confirmé)** : nouvelle
 conversation réelle (« Ouvrir IT Connect sur Firefox », rejouée après redémarrage du

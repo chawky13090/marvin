@@ -149,23 +149,29 @@ def prepare_tool_call(
                 arguments[key] = value.strip().casefold() == "true"
         # v2.537 — Incident réel reproduit : le modèle appelle `action="open"` avec
         # `program`/`app`/`app_name` (absents du schéma) au lieu de `target`. v2.539 —
-        # ajout de `url`, utilisé de la même façon pour `action="navigate"`.
+        # ajout de `url`, utilisé de la même façon pour `action="navigate"`. v2.540 —
+        # ajout de `query`, utilisé pour un lancement d'application par nom flou.
         if not arguments.get("target"):
-            for alias in ("program", "app", "app_name", "application", "url"):
+            for alias in ("program", "app", "app_name", "application", "url", "query"):
                 if arguments.get(alias):
                     arguments["target"] = arguments.pop(alias)
                     break
-        # v2.539 — Incident réel reproduit (conversation « Ouvrir IT Connect sur
-        # Firefox », après redémarrage) : le modèle appelle `action="launch"`
-        # (synonyme naturel de "lancer un programme") au lieu de `action="open"`,
-        # le seul reconnu par le schéma.
+        # v2.539/v2.540 — Incident réel reproduit (conversation « Ouvrir IT Connect sur
+        # Firefox », après redémarrage) : le modèle appelle `action="launch"`/
+        # `action="search_app"` (synonymes naturels de "lancer/trouver un programme")
+        # au lieu de `action="open"`, le seul reconnu par le schéma.
         action_alias = {
-            "launch": "open", "start": "open", "run": "open",
+            "launch": "open", "start": "open", "run": "open", "search_app": "open",
             "switch": "focus", "activate": "focus", "switch_to": "focus",
         }
         current_action = str(arguments.get("action") or "").strip().casefold()
         if current_action in action_alias:
             arguments["action"] = action_alias[current_action]
+        # v2.540 — Incident réel reproduit : le modèle envoie `key="win"`/`key="enter"`
+        # pour `action="keypress"` (et parfois `type`) au lieu de `text`, le seul champ
+        # du schéma pour la touche ou le texte à envoyer.
+        if not arguments.get("text") and arguments.get("key"):
+            arguments["text"] = arguments.pop("key")
         # v2.539 — Incident réel reproduit : le modèle envoie un unique paramètre
         # `coordinate` (convention "coordinate: [x, y]" d'autres API de contrôle
         # d'écran) au lieu des champs séparés `x`/`y` du schéma de cet outil.
