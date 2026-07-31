@@ -8,6 +8,7 @@ appels d'outils emis sous forme textuelle. Il ne decide ni du modele ni de la st
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import logging
 import re
@@ -237,3 +238,63 @@ def salvage_text_tool_calls(content: str, allowed_names: set[str]) -> list[dict[
             seen.add(key)
             calls.append({"function": {"name": name, "arguments": arguments}})
     return calls
+
+
+_REVERSIBLE_ARTIFACT_TOOLS = frozenset({"pptx_create"})
+_PRESENTATION_INTENT = re.compile(
+    r"\b(pr[ée]sentation|powerpoint|diaporama|pptx|slide|diapositive)s?\b",
+    re.IGNORECASE,
+)
+_XML_INVOKE = re.compile(
+    r"<(?:[A-Za-z][\w.-]*:)?invoke\s+name=[\"'](?P<name>[A-Za-z_][\w.-]{1,80})[\"']\s*>"
+    r"(?P<body>.*?)</(?:[A-Za-z][\w.-]*:)?invoke\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_XML_PARAMETER = re.compile(
+    r"<(?:[A-Za-z][\w.-]*:)?parameter\s+name=[\"'](?P<name>[A-Za-z_][\w.-]{0,80})[\"']\s*>"
+    r"(?P<value>.*?)</(?:[A-Za-z][\w.-]*:)?parameter\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def salvage_reversible_artifact_calls(
+    content: str,
+    allowed_names: set[str],
+    *,
+    user_query: str,
+) -> list[dict[str, Any]]:
+    """Récupère un appel d'artefact explicite émis en balises par certains modèles."""
+    if (
+        not content
+        or len(content) > 200_000
+        or not _PRESENTATION_INTENT.search(user_query or "")
+    ):
+        return []
+    permitted = set(allowed_names) & set(_REVERSIBLE_ARTIFACT_TOOLS)
+    if not permitted:
+        return []
+
+    calls: list[dict[str, Any]] = []
+    for invoke in _XML_INVOKE.finditer(content):
+        name = invoke.group("name")
+        if name not in permitted:
+            continue
+        arguments: dict[str, Any] = {}
+        invalid = False
+        for parameter in _XML_PARAMETER.finditer(invoke.group("body")):
+            key = parameter.group("name")
+            if key in arguments:
+                invalid = True
+                break
+            raw = html.unescape(parameter.group("value").strip())
+            if len(raw) > 100_000:
+                invalid = True
+                break
+            try:
+                value = json.loads(raw)
+            except json.JSONDecodeError:
+                value = raw
+            arguments[key] = value
+        if not invalid and arguments:
+            calls.append({"function": {"name": name, "arguments": arguments}})
+    return calls[:1]

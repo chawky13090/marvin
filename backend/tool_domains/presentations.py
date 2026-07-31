@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import tempfile
@@ -170,9 +171,22 @@ async def create(args: dict[str, Any]) -> dict[str, Any]:
         return {"error": f"Création PowerPoint échouée : {exc}"}
     return {
         "success": True,
+        "verified": True,
         "path": str(output),
         "destination": str(output),
         "slides": count,
+        "size_bytes": output.stat().st_size,
+        "sha256": await asyncio.to_thread(
+            lambda: hashlib.sha256(output.read_bytes()).hexdigest()
+        ),
+        "artifacts": [
+            {
+                "path": str(output),
+                "type": "presentation",
+                "format": "pptx",
+                "slides": count,
+            }
+        ],
         "message": f"Présentation créée ({count} diapos) → {output}",
     }
 

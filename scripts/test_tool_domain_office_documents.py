@@ -39,7 +39,18 @@ async def run_domain() -> None:
             }
         )
         assert created["success"] is True
+        assert created["verified"] is True
         assert created["slides"] == 3
+        assert created["size_bytes"] == deck.stat().st_size
+        assert len(created["sha256"]) == 64
+        assert created["artifacts"] == [
+            {
+                "path": str(deck),
+                "type": "presentation",
+                "format": "pptx",
+                "slides": 3,
+            }
+        ]
         validate_office_package(
             deck, suffix=".pptx", marker="ppt/presentation.xml"
         )

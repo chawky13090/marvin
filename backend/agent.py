@@ -616,7 +616,15 @@ async def _run_deterministic_agent(
                 successful_results=_runner_state.successful_results,
             ),
             salvage_text_tool_calls=(
-                (lambda _content, _allowed: [])
+                (
+                    lambda _content, _allowed: (
+                        __import__("agent_execution").salvage_reversible_artifact_calls(
+                            _content,
+                            _allowed,
+                            user_query=_user_query,
+                        )
+                    )
+                )
                 if native_decision_mode
                 else _salvage_text_tool_calls
             ),

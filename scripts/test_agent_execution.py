@@ -95,6 +95,34 @@ def main() -> int:
         {"function": {"name": "pc_process_kill", "arguments": {"pid": 42}}},
     ]
 
+    minimax_call = """
+    <invoke name="pptx_create">
+      <parameter name="title">KOIOS</parameter>
+      <parameter name="slides">[{"title":"Services","bullets":["Assistance"]}]</parameter>
+      <parameter name="output_path">C:\\Users\\Public\\KOIOS.pptx</parameter>
+    </invoke>
+    </minimax:tool_call>
+    """
+    assert execution.salvage_reversible_artifact_calls(
+        minimax_call,
+        {"pptx_create", "pc_run_powershell"},
+        user_query="Améliore le design de cette présentation PowerPoint",
+    ) == [{
+        "function": {
+            "name": "pptx_create",
+            "arguments": {
+                "title": "KOIOS",
+                "slides": [{"title": "Services", "bullets": ["Assistance"]}],
+                "output_path": "C:\\Users\\Public\\KOIOS.pptx",
+            },
+        },
+    }]
+    assert execution.salvage_reversible_artifact_calls(
+        minimax_call,
+        {"pptx_create"},
+        user_query="Que penses-tu de KOIOS ?",
+    ) == []
+
     assert execution.is_tooling_failure({"error": "outil inconnu"}) is True
     assert execution.is_tooling_failure({"error": "Accès refusé par l'administrateur"}) is False
     assert execution.is_tooling_failure({"success": False, "stderr": "ParserError: unexpected token"}) is True

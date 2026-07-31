@@ -14247,3 +14247,47 @@ migration descendante n'est nécessaire.
 - navigateur réel : historique et contenu de la conversation courante visibles après
   rechargement, sans redémarrage.
 - `check:quick` : 226/226 étapes réussies, incluant compilation backend et qualité frontend.
+
+## 2026-07-31 — Correction du flux de création PowerPoint
+
+### Demande et diagnostic
+
+La dernière mission de présentation KOIOS a révélé trois défauts distincts : des informations
+commerciales inventées sans source, un appel `pptx_create` émis par MiniMax sous forme de
+balises `<invoke><parameter>` au lieu d'un appel natif, puis l'annonce d'un fichier avant
+preuve de sa création. Le premier fichier contenait notamment des métriques, certifications
+et implantations non établies. Le second fichier annoncé n'existait pas.
+
+### Correction
+
+- `agent_execution.salvage_reversible_artifact_calls` reconnaît strictement la variante XML
+  observée, uniquement si la demande utilisateur mentionne explicitement une présentation ;
+- ce repli est limité à `pptx_create` : aucun outil PC, commande ou action sortante ne peut
+  être récupéré par ce chemin ;
+- l'appel récupéré repasse par le schéma, le registre, les autorisations et le gateway normaux ;
+- `pptx_create` retourne désormais une preuve exploitable : `verified`, taille, SHA-256 et
+  artefact typé ; une remise de commande ne vaut donc plus preuve de fichier ;
+- une présentation KOIOS de sept diapositives a été régénérée depuis les pages officielles,
+  avec provenance dans les notes du présentateur et sans métrique non vérifiée.
+
+### Journalisation, sécurité et rollback
+
+Le parseur borne le contenu à 200 000 caractères, chaque valeur à 100 000 caractères, refuse
+les paramètres dupliqués et n'exécute qu'un appel réversible autorisé. Il ne journalise ni le
+contenu de la présentation ni les sources. Aucun schéma, secret, port ou donnée persistante
+n'est modifié.
+
+Rollback code : réversion atomique du commit de cette tranche. Rollback du livrable : supprimer
+`C:\Users\Chawb\Desktop\Presentation_KOIOS_verifiee.pptx`; le fichier initial est conservé.
+Le chargement dans Marvin nécessite un redémarrage ultérieur explicitement autorisé par
+l'utilisateur.
+
+### Validation réelle
+
+- récupération exacte de la syntaxe MiniMax et refus sans intention PowerPoint ;
+- tests Agent Execution et Office Documents réussis ;
+- compilation Python ciblée réussie ;
+- architecture : Marvin 2.523.0, 357 outils, 378 routes, harness 357/357 ;
+- export PowerPoint : 7 diapositives, package Open XML lisible, rendu individuel généré ;
+- `slides_test.py` : aucune sortie de canevas détectée ;
+- inspection visuelle : hiérarchie, contrastes, alignements et continuité graphique validés.
