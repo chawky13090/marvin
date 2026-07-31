@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.534 — cycle de vie sérialisé, observable, portable et vérifié par résultat
 # v2.533 — port SearXNG dynamique, persistant et compatible Hyper-V/WSL
 # v2.532 — resynchronisation automatique de l'avatar après redémarrage externe
 # v2.531 — arrêt coopératif vérifié et idempotent de FastAPI et Turbopack

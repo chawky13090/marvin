@@ -75,6 +75,36 @@ function Get-MarvinListeners {
     return @($Found)
 }
 
+function Get-MarvinRuntimeProcesses {
+    $Markers = @(
+        'server_supervisor.py',
+        'server_runtime.py',
+        'scripts/start_next_dev.mjs',
+        'node_modules\\next\\dist\\bin\\next dev',
+        'node_modules\\next\\dist\\server\\lib\\start-server.js',
+        'scripts\\start-marvin-https.ps1',
+        'runtime\\https\\caddy.exe',
+        'playwright\\driver\\package\\cli.js run-driver'
+    )
+    $Found = @()
+    foreach ($Process in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
+        if ([int]$Process.ProcessId -eq $PID) { continue }
+        $Identity = "{0} {1}" -f [string]$Process.ExecutablePath, [string]$Process.CommandLine
+        if ($Identity.IndexOf($ProjectRoot, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
+        foreach ($Marker in $Markers) {
+            if ($Identity.IndexOf($Marker, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $Found += [pscustomobject]@{
+                    ProcessId = [int]$Process.ProcessId
+                    Name = [string]$Process.Name
+                    Marker = $Marker
+                }
+                break
+            }
+        }
+    }
+    return @($Found)
+}
+
 function New-ShutdownRequest {
     param([Parameter(Mandatory = $true)][string]$Name)
     New-Item -ItemType Directory -Path $LifecycleRoot -Force | Out-Null
@@ -84,16 +114,52 @@ function New-ShutdownRequest {
     Move-Item -LiteralPath $Temporary -Destination $Destination -Force
 }
 
+function Clear-StopCoordination {
+    Remove-Item -LiteralPath (Join-Path $LifecycleRoot 'stop.requested') -Force -ErrorAction SilentlyContinue
+}
+
+function Release-LifecycleLock {
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+        -File (Join-Path $PSScriptRoot 'marvin-startup-lock.ps1') -Action release | Out-Null
+}
+
+# Prendre le même verrou que start.bat. Si un démarrage le possède déjà,
+# demander son annulation, attendre sa sortie puis prendre le verrou à notre tour.
+$StartupLock = Join-Path $LifecycleRoot 'startup.lock'
+$LockState = @(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+    -File (Join-Path $PSScriptRoot 'marvin-startup-lock.ps1') -Action acquire)
+$LockExitCode = $LASTEXITCODE
+$LockResult = if ($LockState.Count -gt 0) { [string]$LockState[-1] } else { '' }
+if ($LockExitCode -eq 3 -or $LockResult -eq 'busy') {
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+        -File (Join-Path $PSScriptRoot 'marvin-startup-lock.ps1') `
+        -Action signal-stop -WaitSeconds ([math]::Min(120, $TimeoutSeconds + 30)) | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-LifecycleEvent -Action 'shutdown' -Result 'failed' -Context @{ reason = 'startup_lock_timeout' }
+        throw 'Le démarrage Marvin n’a pas libéré son verrou dans le délai autorisé.'
+    }
+    $LockState = @(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+        -File (Join-Path $PSScriptRoot 'marvin-startup-lock.ps1') -Action acquire)
+    $LockExitCode = $LASTEXITCODE
+    $LockResult = if ($LockState.Count -gt 0) { [string]$LockState[-1] } else { '' }
+}
+if ($LockExitCode -ne 0 -or $LockResult -ne 'acquired') {
+    throw 'Impossible d’acquérir le verrou de cycle de vie Marvin.'
+}
+
 $Initial = @(Get-MarvinListeners)
+$InitialRuntime = @(Get-MarvinRuntimeProcesses)
 $Foreign = @($Initial | Where-Object { -not $_.IsMarvin })
 if ($Foreign.Count -gt 0) {
     $Summary = @($Foreign | ForEach-Object { "port $($_.Port), PID $($_.ProcessId)" }) -join '; '
     Write-LifecycleEvent -Action 'shutdown' -Result 'failed' -Context @{ reason = 'foreign_listener'; listeners = $Summary }
+    Clear-StopCoordination
+    Release-LifecycleLock
     Write-Error "Arrêt refusé : un processus étranger occupe un port Marvin ($Summary)."
     exit 2
 }
 
-if ($Initial.Count -eq 0) {
+if ($Initial.Count -eq 0 -and $InitialRuntime.Count -eq 0) {
     $Result = [ordered]@{
         success = $true
         state = 'already_stopped'
@@ -102,11 +168,15 @@ if ($Initial.Count -eq 0) {
         preserved_ollama = $true
     }
     Write-LifecycleEvent -Action 'shutdown' -Result 'success' -Context @{ state = 'already_stopped' }
+    Clear-StopCoordination
+    Release-LifecycleLock
     $Result | ConvertTo-Json -Compress
     exit 0
 }
 
 if (-not $PSCmdlet.ShouldProcess('Marvin (ports 3000, 8005 et 8443)', 'Arrêt coopératif vérifié')) {
+    Clear-StopCoordination
+    Release-LifecycleLock
     exit 0
 }
 
@@ -140,13 +210,16 @@ $Deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 do {
     Start-Sleep -Milliseconds 250
     $Remaining = @(Get-MarvinListeners)
-} while ($Remaining.Count -gt 0 -and (Get-Date) -lt $Deadline)
+    $RemainingRuntime = @(Get-MarvinRuntimeProcesses)
+} while (($Remaining.Count -gt 0 -or $RemainingRuntime.Count -gt 0) -and (Get-Date) -lt $Deadline)
 
 $Forced = @()
-if ($Remaining.Count -gt 0 -and -not $NoForceFallback) {
-    foreach ($Listener in $Remaining) {
-        if (-not $Listener.IsMarvin) { continue }
-        $ProcessId = [int]$Listener.ProcessId
+if (($Remaining.Count -gt 0 -or $RemainingRuntime.Count -gt 0) -and -not $NoForceFallback) {
+    $ForceCandidates = @(
+        @($Remaining | Where-Object IsMarvin | ForEach-Object ProcessId)
+        @($RemainingRuntime | ForEach-Object ProcessId)
+    ) | Sort-Object -Unique
+    foreach ($ProcessId in $ForceCandidates) {
         try {
             Stop-Process -Id $ProcessId -Force -ErrorAction Stop
             $Forced += $ProcessId
@@ -158,13 +231,16 @@ if ($Remaining.Count -gt 0 -and -not $NoForceFallback) {
     do {
         Start-Sleep -Milliseconds 250
         $Remaining = @(Get-MarvinListeners)
-    } while ($Remaining.Count -gt 0 -and (Get-Date) -lt $ForceDeadline)
+        $RemainingRuntime = @(Get-MarvinRuntimeProcesses)
+    } while (($Remaining.Count -gt 0 -or $RemainingRuntime.Count -gt 0) -and (Get-Date) -lt $ForceDeadline)
 }
 
 Remove-Item -LiteralPath (Join-Path $LifecycleRoot 'backend.shutdown') -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath (Join-Path $LifecycleRoot 'frontend.shutdown') -Force -ErrorAction SilentlyContinue
+Clear-StopCoordination
+Release-LifecycleLock
 
-$Success = $Remaining.Count -eq 0
+$Success = $Remaining.Count -eq 0 -and $RemainingRuntime.Count -eq 0
 $Result = [ordered]@{
     success = $Success
     state = if ($Success) { 'stopped' } else { 'failed' }
@@ -172,6 +248,7 @@ $Result = [ordered]@{
     forced_process_ids = @($Forced | Sort-Object -Unique)
     caddy_stop_attempted = $CaddyStopAttempted
     remaining = @($Remaining | ForEach-Object { @{ port = $_.Port; process_id = $_.ProcessId } })
+    remaining_runtime = @($RemainingRuntime | ForEach-Object { @{ process_id = $_.ProcessId; name = $_.Name; marker = $_.Marker } })
     preserved_ollama = $true
     duration_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
 }
@@ -181,6 +258,7 @@ Write-LifecycleEvent -Action 'shutdown' -Result $(if ($Success) { 'success' } el
     forced_process_ids = $Result.forced_process_ids
     caddy_stop_attempted = $CaddyStopAttempted
     remaining = $Result.remaining
+    remaining_runtime = $Result.remaining_runtime
 }
 $Result | ConvertTo-Json -Compress -Depth 6
 if (-not $Success) { exit 1 }

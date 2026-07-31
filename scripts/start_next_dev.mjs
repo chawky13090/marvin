@@ -73,5 +73,7 @@ child.once('error', (error) => {
 child.once('exit', (code, signal) => {
   clearInterval(watcher);
   rmSync(shutdownRequest, { force: true });
-  process.exitCode = code ?? (signal ? 1 : 0);
+  // Une terminaison demandée par stop-marvin.ps1 est un succès opérationnel,
+  // même si Windows représente SIGTERM comme une fin sans code numérique.
+  process.exitCode = stopping ? 0 : (code ?? (signal ? 1 : 0));
 });

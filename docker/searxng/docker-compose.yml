@@ -22,3 +22,4 @@ services:
       - ./settings.yml:/etc/searxng/settings.yml:ro
     environment:
       - SEARXNG_BASE_URL=http://localhost:${SEARXNG_PORT:-8890}/
+      - MARVIN_SETTINGS_SHA256=${MARVIN_SEARXNG_CONFIG_SHA256:-unknown}

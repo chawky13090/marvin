@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import socket
 import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,6 +25,29 @@ class FakeProcess:
         except StopIteration:
             pass
         return self.current
+
+
+class StoppableProcess:
+    def __init__(self, *, cooperative: bool):
+        self.cooperative = cooperative
+        self.terminated = False
+        self.killed = False
+        self.waits = 0
+
+    def poll(self):
+        return None
+
+    def wait(self, timeout):
+        self.waits += 1
+        if not self.cooperative and self.waits == 1:
+            raise server_supervisor.subprocess.TimeoutExpired("backend", timeout)
+        return 0
+
+    def terminate(self):
+        self.terminated = True
+
+    def kill(self):
+        self.killed = True
 
 
 def clock():
@@ -91,6 +115,16 @@ def main() -> int:
     assert reason == "exited"
     assert 3 <= server_supervisor.FAILURE_LIMIT <= 5
     assert server_supervisor.MAX_RESTARTS_PER_WINDOW <= 5
+    with tempfile.TemporaryDirectory(prefix="marvin-supervisor-") as directory:
+        request = Path(directory) / "backend.shutdown"
+        with patch.object(server_supervisor, "SHUTDOWN_REQUEST", request):
+            cooperative = StoppableProcess(cooperative=True)
+            assert server_supervisor.stop_child(cooperative, graceful_timeout=0.1) is True
+            assert not cooperative.terminated and not request.exists()
+
+            fallback = StoppableProcess(cooperative=False)
+            assert server_supervisor.stop_child(fallback, graceful_timeout=0.1) is False
+            assert fallback.terminated and not fallback.killed and not request.exists()
     print("Server Supervisor OK - santé, perte listener, démarrage et budget de relance.")
     return 0
 

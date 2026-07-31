@@ -153,7 +153,10 @@ def test_launcher_forces_reload_and_checks_effective_config() -> None:
     resolver = RESOLVER_PATH.read_text(encoding="utf-8")
 
     assert "Set-StrictMode -Version Latest" in launcher
-    assert "docker compose up -d --force-recreate" in launcher
+    assert "docker compose up -d --remove-orphans" in launcher
+    assert "MARVIN_SEARXNG_CONFIG_SHA256" in launcher
+    assert "MARVIN_SETTINGS_SHA256" in compose
+    assert "--force-recreate" not in launcher
     assert 'Invoke-RestMethod -Uri "http://localhost:$port/config"' in launcher
     assert '$tabCount -lt 2' in launcher
     assert "Onglets sans redondance moteur" in launcher

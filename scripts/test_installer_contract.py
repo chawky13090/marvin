@@ -14,6 +14,7 @@ def main() -> int:
     model_plan = (ROOT / "scripts" / "plan_local_models.py").read_text(encoding="utf-8")
     verifier = (ROOT / "VERIFIER-INSTALLATION.bat").read_text(encoding="utf-8")
     report = (ROOT / "scripts" / "write-install-report.ps1").read_text(encoding="utf-8")
+    autostart = (ROOT / "scripts" / "install-marvin-autostart.ps1").read_text(encoding="utf-8")
     assert "npm ci" in installer
     assert "nomic-embed-text" in installer
     assert "[1/9]" in installer
@@ -35,6 +36,13 @@ def main() -> int:
     assert "Marvin-Debian13-TestForge" in report
     assert "Marvin-Windows11-TestForge" in report
     assert "overall = if ($CoreReady)" in report
+    assert "New-ScheduledTaskTrigger -AtLogOn" in autostart
+    assert "-LogonType Interactive" in autostart
+    assert "-RunLevel Limited" in autostart
+    assert "-RemoteAddress LocalSubnet" in autostart
+    assert "Marvin - Frontend" in autostart and "Remove-NetFirewallRule" in autostart
+    assert "-LocalPort 3000" not in autostart
+    assert "-LocalPort 8005" not in autostart
     print("Installation portable OK - socle, capacités optionnelles, rapport et avatar.")
     return 0
 

@@ -48,5 +48,4 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 .venv\Scripts\python server_supervisor.py
-
-pause
+exit /b %ERRORLEVEL%

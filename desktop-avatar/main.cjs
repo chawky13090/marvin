@@ -30,6 +30,22 @@ let resizeTimer = null;
 let availabilityTimer = null;
 let availabilityCheckRunning = false;
 
+function rotateLog(logPath, maxBytes = 2 * 1024 * 1024, archives = 4) {
+  try {
+    if (!fs.existsSync(logPath) || fs.statSync(logPath).size < maxBytes) return;
+    for (let index = archives; index >= 1; index -= 1) {
+      const source = index === 1 ? logPath : `${logPath}.${index - 1}`;
+      const destination = `${logPath}.${index}`;
+      if (fs.existsSync(source)) {
+        fs.rmSync(destination, { force: true });
+        fs.renameSync(source, destination);
+      }
+    }
+  } catch {
+    // La rotation ne doit jamais empêcher le contrôle du cycle de vie.
+  }
+}
+
 function readWindowState() {
   try { return JSON.parse(fs.readFileSync(PREFERENCES_PATH, 'utf8')); } catch { return {}; }
 }
@@ -76,6 +92,14 @@ function probe(url, timeoutMs = 1200) {
   });
 }
 
+async function probeMarvin() {
+  const [frontend, backend] = await Promise.all([
+    probe(AVATAR_URL),
+    probe('http://127.0.0.1:8005/api/health'),
+  ]);
+  return frontend && backend;
+}
+
 function isAvatarUrl(value) {
   try {
     const parsed = new URL(value);
@@ -105,6 +129,7 @@ function runDetached(command, args, { logPath = null } = {}) {
     try {
       if (logPath) {
         fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        rotateLog(logPath);
         descriptor = fs.openSync(logPath, 'a');
         fs.writeSync(descriptor, `\r\n[${new Date().toISOString()}] ${command} ${args.join(' ')}\r\n`);
         output = ['ignore', descriptor, descriptor];
@@ -147,7 +172,15 @@ function runToCompletion(command, args, { logPath, timeoutMs = 30000 } = {}) {
     child.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8').slice(0, 16000); });
     child.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8').slice(0, 16000); });
     const timer = setTimeout(() => {
-      child.kill();
+      if (process.platform === 'win32' && child.pid) {
+        const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        });
+        killer.unref();
+      } else {
+        child.kill();
+      }
       finish(reject, new Error(`Délai d'arrêt dépassé (${timeoutMs / 1000} s).`));
     }, timeoutMs);
     child.once('error', (error) => {
@@ -158,6 +191,7 @@ function runToCompletion(command, args, { logPath, timeoutMs = 30000 } = {}) {
       clearTimeout(timer);
       if (logPath) {
         fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        rotateLog(logPath);
         fs.appendFileSync(
           logPath,
           `\r\n[${new Date().toISOString()}] exit=${code}\r\n${stdout}${stderr}`,
@@ -183,7 +217,7 @@ function runToCompletion(command, args, { logPath, timeoutMs = 30000 } = {}) {
 async function waitForMarvin(maxMs = 90000) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
-    if (await probe(AVATAR_URL)) return true;
+    if (await probeMarvin()) return true;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;
@@ -207,7 +241,7 @@ async function loadAvailableView({ force = false } = {}) {
   if (availabilityCheckRunning) return;
   availabilityCheckRunning = true;
   try {
-    const available = await probe(AVATAR_URL);
+    const available = await probeMarvin();
     if (!windowRef || windowRef.isDestroyed()) return;
     const current = windowRef.webContents.getURL();
     if (available && (force || !isAvatarUrl(current))) {
@@ -359,10 +393,10 @@ else {
   });
 }
 
-ipcMain.handle('marvin:status', async (event) => trustedSender(event) ? { running: await probe(AVATAR_URL) } : { running: false });
+ipcMain.handle('marvin:status', async (event) => trustedSender(event) ? { running: await probeMarvin() } : { running: false });
 ipcMain.handle('marvin:start', async (event) => {
   if (!trustedSender(event)) return { success: false, error: 'Origine refusée.' };
-  if (!(await probe(AVATAR_URL))) {
+    if (!(await probeMarvin())) {
     try {
       const command = process.env.ComSpec || 'cmd.exe';
       await runDetached(command, ['/d', '/c', 'call', path.join(ROOT, 'start.bat')], { logPath: STARTUP_LOG_PATH });
@@ -389,7 +423,7 @@ ipcMain.handle('marvin:stop', async (event) => {
         '-File',
         path.join(ROOT, 'scripts', 'stop-marvin.ps1'),
       ],
-      { logPath: SHUTDOWN_LOG_PATH },
+      { logPath: SHUTDOWN_LOG_PATH, timeoutMs: 70000 },
     );
     if (!(await waitForMarvinStop())) {
       return {

@@ -9,23 +9,31 @@ echo    SecretaryAI - Demarrage en cours
 echo  ====================================
 echo.
 
+:: Sérialise la phase de démarrage pour empêcher deux piles concurrentes.
+set "START_LOCK_STATE="
+for /f "usebackq delims=" %%L in (`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\marvin-startup-lock.ps1" -Action acquire`) do set "START_LOCK_STATE=%%L"
+if not "%START_LOCK_STATE%"=="acquired" (
+    echo [INFO] Une operation de cycle de vie est en cours. Attente puis reevaluation...
+    powershell -NoProfile -NonInteractive -Command "$p='%~dp0runtime\lifecycle\startup.lock';$d=(Get-Date).AddSeconds(120);while((Test-Path -LiteralPath $p)-and(Get-Date)-lt$d){Start-Sleep -Milliseconds 200};if(Test-Path -LiteralPath $p){exit 1}else{exit 0}"
+    if errorlevel 1 exit /b 1
+    call "%~f0"
+    exit /b %ERRORLEVEL%
+)
+
 :: Preflight reproductible : executables, venv et modules Node natifs.
 echo [0/4] Verification de l'environnement...
 where node >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [ERREUR] Node.js est introuvable. Lancez INSTALLER-NOUVEAU-PC.bat.
-    pause
-    exit /b 1
+    goto :startup_error
 )
 if not exist "%~dp0backend\.venv\Scripts\python.exe" (
     echo [ERREUR] backend\.venv est absent ou incomplet. Lancez INSTALLER-NOUVEAU-PC.bat.
-    pause
-    exit /b 1
+    goto :startup_error
 )
 if not exist "%~dp0node_modules" (
     echo [ERREUR] node_modules est absent. Lancez INSTALLER-NOUVEAU-PC.bat.
-    pause
-    exit /b 1
+    goto :startup_error
 )
 node -e "require('sharp')" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
@@ -35,15 +43,11 @@ if %ERRORLEVEL% NEQ 0 (
     call npm rebuild sharp
     if errorlevel 1 (
         echo [ERREUR] Reconstruction impossible. Lancez INSTALLER-NOUVEAU-PC.bat.
-        pause
-        exit /b 1
+        goto :startup_error
     )
 )
 node scripts\check_runtime.mjs
-if %ERRORLEVEL% NEQ 0 (
-    pause
-    exit /b 1
-)
+if %ERRORLEVEL% NEQ 0 goto :startup_error
 echo       Environnement valide.
 echo.
 
@@ -58,8 +62,7 @@ if not defined OLLAMA_EXE (
 )
 if not defined OLLAMA_EXE (
     echo [ERREUR] Ollama est introuvable. Lancez INSTALLER-NOUVEAU-PC.bat.
-    pause
-    exit /b 1
+    goto :startup_error
 )
 
 :: Docker/Hyper-V peut exclure dynamiquement le port Ollama historique 11434.
@@ -70,8 +73,7 @@ for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass
 if not defined OLLAMA_PORT (
     echo [ERREUR] Aucun port local disponible pour Ollama.
     echo Verifiez les plages TCP exclues avec : netsh interface ipv4 show excludedportrange protocol=tcp
-    pause
-    exit /b 1
+    goto :startup_error
 )
 set "OLLAMA_HOST=127.0.0.1:%OLLAMA_PORT%"
 set "OLLAMA_URL=http://127.0.0.1:%OLLAMA_PORT%"
@@ -88,8 +90,7 @@ if %ERRORLEVEL% NEQ 0 (
     powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 30;$i++){try{$r=Invoke-WebRequest -UseBasicParsing ($env:OLLAMA_URL + '/api/tags') -TimeoutSec 2;if($r.StatusCode -eq 200){$ok=$true;break}}catch{};Start-Sleep -Milliseconds 500};if(-not $ok){exit 1}" >nul 2>&1
     if errorlevel 1 (
         echo [ERREUR] Ollama ne repond pas sur le port %OLLAMA_PORT%.
-        pause
-        exit /b 1
+        goto :startup_error
     )
     echo       Ollama demarre.
 ) else (
@@ -105,8 +106,7 @@ if %ERRORLEVEL% NEQ 0 (
     if errorlevel 1 (
         echo [ERREUR] Le backend ne repond pas sur le port 8005.
         echo Verifiez qu'aucune autre application n'utilise ce port.
-        pause
-        exit /b 1
+        goto :startup_error
     )
     echo       Backend pret sur http://localhost:8005
 ) else (
@@ -123,7 +123,7 @@ if %ERRORLEVEL% EQU 0 (
     echo [3/4] Recherche web auto-hebergee ^(SearXNG^) en arriere-plan...
     start "SecretaryAI - SearXNG" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0docker\searxng\start-searxng.ps1"
 ) else (
-    echo [3/4] Docker non detecte - recherche web via DuckDuckGo ^(voir docker\searxng pour l'ameliorer^)
+    echo [3/4] Docker non detecte - capacite SearXNG indisponible, socle Marvin maintenu.
 )
 
 echo [4/4] Demarrage du frontend Next.js...
@@ -140,27 +140,40 @@ echo  Pour tout arreter proprement : stop.bat
 echo.
 
 if exist "%~dp0runtime\https\caddy.exe" (
-    powershell -NoProfile -Command "$c=Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction SilentlyContinue;if($null -eq $c){exit 1}" >nul 2>&1
+    powershell -NoProfile -Command "try{$null=Invoke-RestMethod 'http://127.0.0.1:2019/config/' -TimeoutSec 2;$c=Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction Stop;if($null-ne$c){exit 0}}catch{};exit 1" >nul 2>&1
     if errorlevel 1 (
         echo       Demarrage de la passerelle HTTPS...
         start "Marvin - HTTPS" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-marvin-https.ps1" -Port 8443
     ) else (
         echo       Passerelle HTTPS deja active.
     )
+    powershell -NoProfile -Command "$ok=$false;for($i=0;$i-lt 60;$i++){try{$null=Invoke-RestMethod 'http://127.0.0.1:2019/config/' -TimeoutSec 2;$c=Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction Stop;if($null-ne$c){$ok=$true;break}}catch{};Start-Sleep -Milliseconds 500};if($ok){exit 0}else{exit 1}" >nul 2>&1
+    if errorlevel 1 echo [ATTENTION] HTTPS indisponible; Marvin reste local, acces LAN degrade.
 )
 
 powershell -NoProfile -Command "try{$d=Invoke-RestMethod 'http://127.0.0.1:3000/api/status' -TimeoutSec 3;if($null -ne $d.ollama -and $null -ne $d.integrations){exit 0};exit 1}catch{exit 1}" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo  Frontend deja actif sur http://localhost:3000
+    call :release_start_lock
     exit /b 0
 )
 powershell -NoProfile -Command "$c=Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue; if($null -ne $c){exit 0}; exit 1" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo [ERREUR] Le port 3000 est occupe par une application qui n'est pas Marvin.
-    pause
-    exit /b 1
+    goto :startup_error
 )
 
+call :release_start_lock
+for /f "usebackq delims=" %%S in (`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\marvin-startup-lock.ps1" -Action stop-requested`) do set "STOP_REQUESTED=%%S"
+if "%STOP_REQUESTED%"=="true" exit /b 0
 call npm run dev
+exit /b %ERRORLEVEL%
 
+:release_start_lock
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\marvin-startup-lock.ps1" -Action release >nul 2>&1
+exit /b 0
+
+:startup_error
+call :release_start_lock
 pause
+exit /b 1

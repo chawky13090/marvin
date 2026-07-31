@@ -30,8 +30,13 @@ assert.match(main, /source === OFFLINE_URL/, 'seule la page hors ligne livrée p
 assert.match(main, /did-fail-load/, 'une panne de Next.js doit ramener vers la page hors ligne contrôlable');
 assert.match(main, /STARTUP_LOG_PATH/, 'un échec de démarrage doit produire un journal exploitable');
 assert.match(main, /SHUTDOWN_LOG_PATH/, 'un échec d’arrêt doit produire un journal exploitable');
+assert.match(main, /function rotateLog/, 'les journaux avatar doivent avoir une rotation bornée');
+assert.match(main, /2 \* 1024 \* 1024/, 'la rotation avatar doit commencer à deux Mio');
 assert.match(main, /runToCompletion/, 'l’arrêt doit attendre le code de sortie du script');
 assert.match(main, /waitForMarvinStop/, 'l’arrêt doit vérifier que frontend et backend ne répondent plus');
+assert.match(main, /async function probeMarvin/, 'le statut doit exiger frontend et backend');
+assert.match(main, /timeoutMs: 70000/, 'le timeout Electron doit dépasser le budget du script d’arrêt');
+assert.match(main, /taskkill\.exe.*\/T.*\/F/s, 'un timeout exceptionnel doit terminer l’arbre PowerShell');
 assert.match(main, /startAvailabilityMonitor/, 'l’avatar doit resynchroniser automatiquement son état avec Marvin');
 assert.match(main, /setInterval\(\(\) => \{\s*loadAvailableView/, 'la reconnexion doit fonctionner même après un démarrage externe');
 assert.match(main, /availabilityCheckRunning/, 'les sondes de disponibilité ne doivent pas se chevaucher');

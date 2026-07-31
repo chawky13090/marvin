@@ -202,7 +202,22 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.533.0)
+## 9. État actuel (v2.534.0)
+
+**v2.534 (cycle de vie sérialisé et portable)** : démarrage, arrêt et redémarrage utilisent
+un verrou atomique commun et une demande d'annulation afin d'empêcher deux piles Marvin
+concurrentes ou une course start/stop. L'arrêt vérifie aussi les processus orphelins du
+backend, de Turbopack, de Caddy et de Playwright, tout en privilégiant la fermeture
+coopérative avant un repli forcé borné. `restart.bat` restitue un état machine lisible et
+`get-marvin-runtime-status.ps1` distingue socle, Ollama, SearXNG, HTTPS, LAN et coordination
+sans exposer de secret. `START-PRODUCTION.bat` devient un alias vers le démarrage Turbopack
+autoritaire. L'autostart cible l'ouverture de session interactive de l'utilisateur, sans
+compte SYSTEM ni ports bruts 3000/8005; seule la passerelle HTTPS peut être autorisée sur
+les profils Domain/Private et le sous-réseau local. SearXNG n'est plus recréé si sa
+configuration est inchangée. Les journaux avatar sont bornés à 2 Mio avec quatre archives.
+Aucune migration. Rollback : réversion atomique du commit v2.534 puis redémarrage avec
+`start.bat`; supprimer la tâche `Marvin - Demarrage automatique` et la règle
+`Marvin HTTPS 8443` uniquement si l'installateur d'autostart a été exécuté après cette version.
 
 **v2.533 (SearXNG résilient aux réservations de ports Windows)** : le port hôte n'est plus
 codé en dur à 8890. `resolve-searxng-port.ps1` teste réellement un bind loopback afin de

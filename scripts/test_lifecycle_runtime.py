@@ -32,6 +32,10 @@ async def test_backend_shutdown_request() -> None:
 def test_contract_files() -> None:
     stop = (ROOT / "scripts" / "stop-marvin.ps1").read_text(encoding="utf-8-sig")
     frontend = (ROOT / "scripts" / "start_next_dev.mjs").read_text(encoding="utf-8")
+    starter = (ROOT / "start.bat").read_text(encoding="utf-8-sig")
+    backend_starter = (ROOT / "backend" / "start.bat").read_text(encoding="utf-8-sig")
+    production = (ROOT / "START-PRODUCTION.bat").read_text(encoding="utf-8-sig")
+    restart = (ROOT / "scripts" / "restart-marvin.ps1").read_text(encoding="utf-8-sig")
     assert "New-ShutdownRequest -Name 'backend.shutdown'" in stop
     assert "New-ShutdownRequest -Name 'frontend.shutdown'" in stop
     assert "Get-MarvinListeners" in stop
@@ -42,6 +46,20 @@ def test_contract_files() -> None:
     assert "$CaddyStop.ExitCode" in stop
     assert "frontend.shutdown" in frontend
     assert "child.kill('SIGTERM')" in frontend
+    assert "stopping ? 0" in frontend
+    assert "marvin-startup-lock.ps1" in starter
+    assert "stop-requested" in starter
+    assert "call npm run dev" in starter
+    assert not starter.rstrip().endswith("pause")
+    assert not backend_starter.rstrip().endswith("pause")
+    assert "call \"%~dp0start.bat\"" in production
+    assert "npm run start" not in production
+    assert "Get-MarvinRuntimeProcesses" in stop
+    assert "signal-stop" in stop
+    assert "stop-marvin.ps1" in restart
+    assert "get-marvin-runtime-status.ps1" in restart
+    assert "startup_timeout_or_exit" in restart
+    assert "dependencies = $Status.dependencies" in restart
 
 
 if __name__ == "__main__":

@@ -14810,3 +14810,38 @@ distants restent dans les logs Docker et sont tolérées tant que l'agrégation 
 résultats. Rollback : réversion atomique du commit v2.533, remise d'un mapping loopback libre
 dans Compose, recréation du conteneur et mise à jour de `searxng_url`. Le secret SearXNG et
 les données Marvin ne sont pas modifiés.
+
+## 2026-07-31 — v2.534 — Audit complet des arrêts et redémarrages
+
+L'audit a couvert les lanceurs racine/backend, Turbopack, le superviseur FastAPI, l'avatar,
+HTTPS/Caddy, SearXNG, l'autostart Windows et les processus résiduels.
+
+### Constats et corrections
+
+- verrou atomique partagé par start/stop et signal d'annulation contre les courses;
+- arrêt coopératif puis repli forcé borné, y compris pour les processus orphelins;
+- nouvel état structuré et nouveau redémarrage vérifié;
+- lanceur production redirigé vers le lanceur Turbopack unique;
+- autostart interactif non élevé, sans exposition de 3000/8005;
+- SearXNG réconcilié sans recréation si sa configuration est inchangée;
+- rotation des journaux avatar à 2 Mio et quatre archives;
+- avatar actif seulement si frontend et backend répondent.
+
+### Validation réellement exécutée avant redémarrage
+
+- parseurs PowerShell, `node --check` et `py_compile` : valides;
+- tests lifecycle, superviseur, installateur, SearXNG et avatar : OK;
+- architecture : 362 outils, 378 routes, 41 pages;
+- runtime supervisor, résilience réseau et ESLint ciblé : OK;
+- état non disruptif prêt, dépendances disponibles, aucun verrou résiduel;
+- second lancement sans changement de PID et second lancement SearXNG sans recréation.
+
+Le redémarrage complet reste différé jusqu'à l'accord explicite de l'utilisateur.
+
+### Sécurité, observabilité et rollback
+
+Le statut ne projette aucun secret ni argument de commande. Le verrou contient uniquement
+PID et horodatage. Ollama et SearXNG restent des dépendances partagées. Aucune migration ni
+mutation de donnée persistante. Rollback : réversion atomique du commit v2.534 puis
+`start.bat`. Si l'autostart a été installé, supprimer la tâche planifiée
+`Marvin - Demarrage automatique` et la règle firewall `Marvin HTTPS 8443`.

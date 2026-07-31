@@ -97,9 +97,12 @@ if (-not (Test-Path $settingsPath)) {
 
 # -- 4. docker compose up -d --------------------------------------------------
 Write-Step "Demarrage du conteneur SearXNG (port $port)..."
+$env:MARVIN_SEARXNG_CONFIG_SHA256 = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash.ToLowerInvariant()
 Push-Location $here
 try {
-    docker compose up -d --force-recreate
+    # Compose recrée seulement si l'image, le port ou l'empreinte des réglages
+    # change. Un start.bat redondant ne coupe donc plus la recherche en cours.
+    docker compose up -d --remove-orphans
     if ($LASTEXITCODE -ne 0) { throw "docker compose up a echoue (code $LASTEXITCODE)" }
 } finally {
     Pop-Location

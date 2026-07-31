@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import collections
+import os
 import socket
 import subprocess
 import sys
@@ -19,6 +20,7 @@ FAILURE_LIMIT = 5
 BUSY_FAILURE_LIMIT = 30
 RESTART_WINDOW_SECONDS = 600.0
 MAX_RESTARTS_PER_WINDOW = 5
+SHUTDOWN_REQUEST = Path(__file__).resolve().parent.parent / "runtime" / "lifecycle" / "backend.shutdown"
 
 
 def probe_health(url: str = HEALTH_URL, timeout: float = 2.0) -> str:
@@ -79,15 +81,28 @@ def monitor_process(
     return "exited"
 
 
-def stop_child(process) -> None:
+def stop_child(process, *, graceful_timeout: float = 10.0) -> bool:
+    """Demande d'abord le shutdown Uvicorn; retourne True si coopératif."""
     if process.poll() is not None:
-        return
+        return True
+    SHUTDOWN_REQUEST.parent.mkdir(parents=True, exist_ok=True)
+    temporary = SHUTDOWN_REQUEST.with_suffix(f".shutdown.{os.getpid()}.tmp")
+    temporary.write_text(str(time.time()), encoding="utf-8")
+    temporary.replace(SHUTDOWN_REQUEST)
+    try:
+        process.wait(timeout=graceful_timeout)
+        return True
+    except subprocess.TimeoutExpired:
+        pass
+    finally:
+        SHUTDOWN_REQUEST.unlink(missing_ok=True)
     process.terminate()
     try:
         process.wait(timeout=10)
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
+    return False
 
 
 def main() -> int:
@@ -98,6 +113,7 @@ def main() -> int:
     ]
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     restarts: collections.deque[float] = collections.deque()
+    child = None
 
     try:
         while True:
