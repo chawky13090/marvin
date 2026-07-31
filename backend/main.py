@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.544 — computer_control : alias duration->duration_ms pour action=wait
 # v2.543 — prompt systeme corrige : preferait le navigateur cache par defaut (contradiction)
 # v2.542 — navigate cible le navigateur visible par defaut, plus headless par defaut
 # v2.541 — open+url combines en un appel (navigate pilotait un headless separe)
@@ -44,7 +45,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.509 — Computer Runtime unifié et accès complet persistant révocable
 # v2.508 — axe de lecture centré et palette anthracite cohérente
 # v2.507 — listes de fichiers paginées sans troncature LLM silencieuse
-# v2.506 — opérations logicielles vérifiées et PowerShell sous preuve UI
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

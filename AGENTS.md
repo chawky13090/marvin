@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.543.0)
+## 9. État actuel (v2.544.0)
+
+**v2.544 (analyse de la conversation « chercher les prix koios.fr » — diagnostic de
+chronologie + alias mineur)** : l'utilisateur a signalé que « chercher les prix sur un
+site » ouvrait encore le navigateur visible. Analyse de la conversation source
+(`de703f48`, 22:12-22:20 le 31/07) : elle date d'AVANT les correctifs v2.541/542/543
+(aucun redémarrage entre-temps) — le modèle y utilisait `action=open` (bureau visible)
+aussi bien pour « ouvre le site » que pour « cherche les prix », exactement le comportement
+que ces trois correctifs règlent. Diagnostic transmis à l'utilisateur : redémarrage
+nécessaire pour tester à nouveau. Un défaut mineur additionnel trouvé au passage :
+`action="wait", duration="3000"` (le schéma attend `duration_ms`) — alias ajouté dans
+`agent_tool_step.py`, avec coercion de la valeur stringifiée vers entier. Aucune migration.
+Rollback : réversion du commit v2.544.
 
 **v2.543 (prompt système corrigé — il contredisait v2.541/542)** : sur clarification de
 l'utilisateur (« si je demande explicitement d'ouvrir le navigateur il doit le faire,

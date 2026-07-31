@@ -5,6 +5,42 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-01 — v2.544.0 — Diagnostic de chronologie + alias duration mineur
+
+### Demande et constats
+
+« Regarde ma dernière conversation, il ouvre très bien les sites mais quand je lui demande
+de chercher les prix sur un site il l'ouvre dans le navigateur visible, cela ne va pas ».
+Extraction de la conversation la plus récente (`de703f48-63ac-4484-a6a8-309dfe260635`,
+« Ouvrir le site IT Connect », 22:12-22:20 le 31/07/2026). Lecture complète : le message
+« ouvre le site it connect » (22:12) ET « cherche tout les prix indiqués sur le site
+koios.fr » (22:13) déclenchent tous deux `computer_control action=open` (Chrome visible) —
+c'est exactement le comportement que les correctifs v2.541 (open+url combinés), v2.542
+(navigate visible par défaut) et v2.543 (prompt corrigé, distinction ouverture/recherche)
+ont réglé. Comme cette conversation est antérieure à ces trois correctifs (aucun
+redémarrage du backend entre-temps), elle montre l'ANCIEN comportement, pas une régression
+des correctifs déjà livrés. Diagnostic transmis à l'utilisateur : redémarrer et retester.
+
+Défaut mineur additionnel trouvé en lisant la conversation : deux appels
+`action="wait", duration="3000"` ont échoué (« le paramètre 'computer_control.duration'
+n'est pas déclaré par le schéma ») — le champ réel est `duration_ms`.
+
+### Décisions et modifications
+
+- `backend/agent_tool_step.py` : alias `duration`→`duration_ms` pour `computer_control`,
+  avec coercion de la valeur stringifiée (`"3000"`) vers entier — même motif que les alias
+  `key`→`text` et `program`/`query`→`target` déjà en place.
+
+### Validation, sécurité, logs et rollback
+
+Testé avec la valeur exacte de la conversation source :
+`{"action": "wait", "duration": "3000"}` → `{"action": "wait", "duration_ms": 3000}`
+(entier, pas chaîne). Suites de régression exécutées et vertes : `test_computer_runtime`,
+`test_agent_tool_step`, `test_stringified_array_repair`, `test_agent_tool_batch`,
+`test_agent_tool_batch_parallel`, `test_agent_tool_dispatch`, `check_architecture.py`,
+`test_main_composition.py`. Aucune migration, aucun changement d'API cassant. Rollback :
+réversion du commit v2.544.
+
 ## 2026-08-01 — v2.543.0 — Prompt système corrigé (contredisait les correctifs v2.541/542)
 
 ### Demande et constats

@@ -172,6 +172,17 @@ def prepare_tool_call(
         # du schéma pour la touche ou le texte à envoyer.
         if not arguments.get("text") and arguments.get("key"):
             arguments["text"] = arguments.pop("key")
+        # v2.544 — Incident réel reproduit (conversation « Ouvrir le site IT Connect ») :
+        # le modèle envoie `duration="3000"` pour `action="wait"` au lieu de
+        # `duration_ms`, le seul champ du schéma pour ce délai.
+        if not arguments.get("duration_ms") and arguments.get("duration"):
+            value = arguments.pop("duration")
+            if isinstance(value, str):
+                try:
+                    value = int(value.strip())
+                except ValueError:
+                    pass
+            arguments["duration_ms"] = value
         # v2.539 — Incident réel reproduit : le modèle envoie un unique paramètre
         # `coordinate` (convention "coordinate: [x, y]" d'autres API de contrôle
         # d'écran) au lieu des champs séparés `x`/`y` du schéma de cet outil.
