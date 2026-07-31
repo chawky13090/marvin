@@ -183,6 +183,40 @@ def main() -> int:
         {"title": "Services", "bullets": ["Assistance informatique", "Sauvegarde"]},
         {"title": "Contact", "bullets": ["Téléphone — 04 89 81 06 59"]},
     ]
+
+    hallucinated = inject_required_tool_calls(
+        required_names={"pptx_create"},
+        executed_names=set(),
+        tool_calls=[{
+            "id": "model-pptx",
+            "function": {
+                "name": "pptx_create",
+                "arguments": {
+                    "title": "KOIOS Lyon",
+                    "slides": [{"title": "Implantation", "bullets": ["Lyon"]}],
+                },
+            },
+        }],
+        step=0,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query="je veux une présentation KOIOS en koios-final.pptx",
+            messages=[
+                {"role": "user", "content": "analyse KOIOS"},
+                {
+                    "role": "assistant",
+                    "content": "# KOIOS\n## Localisation\n- Aix-en-Provence",
+                },
+                {"role": "user", "content": "je veux une présentation KOIOS en koios-final.pptx"},
+            ],
+        ),
+    )
+    assert not hallucinated.injected
+    clean_args = hallucinated.tool_calls[0]["function"]["arguments"]
+    assert "Lyon" not in str(clean_args)
+    assert clean_args["slides"] == [
+        {"title": "Localisation", "bullets": ["Aix-en-Provence"]}
+    ]
     print(
         "Agent Required Tools OK - contrats, autonomie, budget, Workspace et dédoublonnage."
     )

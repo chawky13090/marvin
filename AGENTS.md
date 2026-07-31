@@ -202,7 +202,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.526.0)
+## 9. État actuel (v2.527.0)
+
+**v2.527 (fidélité factuelle des présentations)** : lorsque `pptx_create` est la
+postcondition du tour, le harness rematérialise ses arguments depuis la dernière synthèse
+assistant visible avant l'appel du gateway. Un modèle ne peut donc plus ajouter dans le
+fichier une implantation, un tarif ou une caractéristique absente du contenu présenté à
+l'utilisateur. Le test réel ayant détecté « Lyon » à la place d'Aix-en-Provence est couvert
+par mutation : l'argument halluciné est retiré et la localisation sourcée est conservée.
+Rollback : réversion atomique du commit v2.527 puis redémarrage backend, sans migration.
 
 **v2.526 (contrat de livraison PowerPoint)** : une demande explicite de fichier `.pptx`
 expose prioritairement `pptx_create` et retire Test Forge, Code Forge, Code Python et Code

@@ -14332,6 +14332,25 @@ données n'est nécessaire.
 - tests Planning, Required Tools, Tool Selection, Agent Execution et Office Documents réussis ;
 - architecture : 361 outils synchronisés, 378 routes et harness 361/361.
 
+## 2026-07-31 — v2.527 — Fidélité factuelle du contenu PPTX
+
+Le test live de v2.526 a correctement utilisé uniquement `pptx_create`, avec
+`verified=true`, mais l'inspection du fichier a révélé une nouvelle hallucination : le modèle
+avait ajouté « Lyon » alors que le contexte de test ne contenait aucune implantation. Le
+transport et la preuve du fichier étaient donc corrects, pas sa fidélité métier.
+
+Pour une livraison PPTX contractuelle, les arguments du modèle sont désormais rematérialisés
+depuis la dernière synthèse assistant déjà visible. Titres, listes et tableaux Markdown sont
+normalisés et bornés avant le gateway. Le modèle choisit toujours de produire le livrable,
+mais ne peut plus injecter un fait absent au moment de l'appel.
+
+Sécurité et logs : aucun contenu supplémentaire n'est lu, aucune page Web n'est réinterprétée,
+aucun code généré n'est exécuté et le contenu du document n'est pas journalisé. Rollback :
+réversion atomique du commit v2.527 puis redémarrage backend, sans migration.
+
+Validation : mutation explicite `KOIOS Lyon` remplacée par la section source
+`Aix-en-Provence`; tests Required Tools, Model Step et Planning réussis.
+
 ## 2026-07-31 — v2.524 — Corbeille, résilience réseau, veille catalogue et périphériques
 
 > Tranche réalisée par **Claude Code**, sur les 4 pistes d'un audit précédent

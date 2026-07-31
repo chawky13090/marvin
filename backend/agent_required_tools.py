@@ -215,6 +215,27 @@ def inject_required_tool_calls(
     l'étape courante. Tant que le modèle agit et que le budget n'est pas presque épuisé,
     l'injection est différée pour préserver son autonomie.
     """
+    # Pour un PPTX contractuellement demandé, le contenu provient de la synthèse
+    # déjà visible dans la conversation, jamais de faits ajoutés au dernier moment
+    # dans les arguments du modèle. Le modèle conserve le choix de l'appel ; le
+    # harness rend sa charge utile fidèle et portable avant le gateway.
+    normalized_calls: list[dict[str, Any]] = []
+    for call in tool_calls:
+        if (
+            "pptx_create" in required_names
+            and isinstance(call, dict)
+            and call.get("function", {}).get("name") == "pptx_create"
+        ):
+            call = {
+                **call,
+                "function": {
+                    **call.get("function", {}),
+                    "arguments": _presentation_arguments(context),
+                },
+            }
+        normalized_calls.append(call)
+    tool_calls = normalized_calls
+
     present = {
         call.get("function", {}).get("name", "")
         for call in tool_calls
