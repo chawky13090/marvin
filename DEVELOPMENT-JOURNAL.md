@@ -5,6 +5,57 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.542.0 — navigate cible le navigateur visible par défaut
+
+### Demande et constats
+
+Retour direct : « cette fois il a bien ouvert Firefox mais la page demandée (france
+travail) n'était pas ouverte, et pourtant Marvin a conclu et m'a dit que c'était fait ».
+Extraction de la conversation (`a93084ca-0b73-4d7f-900e-ca772dc01416`, « Ouvrir France
+Travail », 21:43-21:44, 8 messages). Malgré l'avertissement ajouté au schéma en v2.541
+(« ne jamais chaîner navigate après open »), le modèle a de nouveau appelé
+`action="launch", application="firefox"` (aliasé vers `open`, mais SANS le nouveau
+paramètre `url`) PUIS séparément `action="navigate", url="https://www.france-travail.fr"`.
+`navigate` a réussi — mais via le Chromium HEADLESS Playwright (`engine: "playwright"`),
+retournant le vrai titre/contenu de la page France Travail. Marvin, voyant ce succès API,
+a conclu que « la demande est accomplie » sans jamais revérifier la fenêtre Firefox
+visible, qui elle est restée sur la page vierge de démarrage. L'instruction textuelle dans
+le schéma (v2.541) n'a pas suffi à changer le comportement du modèle — confirmation qu'une
+instruction dans une description d'outil est seulement indicative, jamais garantie.
+
+### Décisions et modifications
+
+- `backend/tool_domains/pc_control.py` : `execute_pc_app_launch()` accepte maintenant
+  `app_name` vide si `url` est fournie — ce cas ouvre l'URL via `os.startfile(url)` dans le
+  navigateur par défaut du système (visible), sans vérification par preuve de processus
+  (le navigateur cible n'est pas connu à l'avance).
+- `backend/computer_runtime.py` : `action=navigate` vérifie désormais `surface`. Si
+  `surface="browser"` explicite : comportement inchangé (Chromium headless Playwright,
+  nécessaire pour l'automatisation programmatique multi-étapes d'une page via
+  `element_ref`). Sinon (`surface` absent/"auto"/"desktop", le cas par défaut) : route
+  vers `pc_app_launch` avec `app_name=""` et l'URL — navigateur visible par défaut.
+
+### Validation, sécurité, logs et rollback
+
+Testé en conditions réelles : `execute_pc_app_launch({"app_name": "", "url":
+"https://www.francetravail.fr"})` → succès, puis confirmation par énumération réelle des
+fenêtres Windows 3s après (`"Accueil | France Travail - Google Chrome"` — le navigateur par
+défaut du système, cohérent puisque `navigate` seul ne connaît pas de navigateur cible
+spécifique). Testé aussi via `computer_runtime.execute()` complet : `action=navigate` sans
+`surface` route bien vers `pc_app_launch` (mock vérifié par assertion) ; `action=navigate`
+avec `surface="browser"` explicite continue d'appeler `web_browser.computer_navigate`
+sans changement (mock `AsyncMock` vérifié par `assert_called_once_with`). Suites de
+régression exécutées et vertes : `test_computer_runtime`, `test_agent_tool_step`,
+`test_stringified_array_repair`, `test_agent_tool_batch`, `test_agent_tool_batch_parallel`,
+`test_agent_tool_dispatch`, `test_tool_domain_filesystem`, `test_agent_model_step`,
+`test_agent_policy`, `test_tailscale_runtime`, `test_tool_approval_flow`,
+`check_architecture.py`, `test_main_composition.py`. Aucune migration, aucun changement
+d'API cassant. Point additionnel signalé à l'utilisateur (pas un bug Marvin) : le pop-up
+Windows « définir Firefox par défaut » au premier lancement est un comportement normal de
+Firefox, indépendant de ce correctif — supprimable via une politique Firefox
+(`policies.json`) si l'utilisateur le demande explicitement, non fait sans confirmation.
+Rollback : réversion du commit v2.542.
+
 ## 2026-07-31 — v2.541.0 — open+url combinés (correction de la piste proposée en v2.540)
 
 ### Demande et constats

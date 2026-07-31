@@ -578,13 +578,27 @@ async def _execute_body(args: dict[str, Any]) -> dict[str, Any]:
             },
         )
     elif action == "navigate":
-        try:
-            import web_browser
-            result = await web_browser.computer_navigate(
-                str(resolved_args.get("target") or "").strip()
+        target_url = str(resolved_args.get("target") or "").strip()
+        # v2.542 — Incident réel reproduit (conversation « Ouvrir France Travail ») :
+        # malgré l'avertissement du schéma (v2.541), le modèle a de nouveau enchaîné
+        # open (sans url) puis navigate séparément. navigate pilotait TOUJOURS un
+        # Chromium headless Playwright, quelle que soit `surface` — Marvin a vu la
+        # page se charger dans ce navigateur invisible et a conclu à tort que la
+        # demande était accomplie, sans jamais revérifier la fenêtre desktop visible.
+        # Correctif : navigate cible désormais le navigateur VISIBLE par défaut sauf
+        # si surface="browser" est explicitement demandé (automatisation programmatique
+        # d'une page — clic/remplissage d'éléments via element_ref, qui nécessite bien
+        # le contexte Playwright partagé entre appels).
+        if surface == "browser":
+            try:
+                import web_browser
+                result = await web_browser.computer_navigate(target_url)
+            except Exception as exc:
+                result = {"error": str(exc)}
+        else:
+            result = await _call(
+                "pc_app_launch", {"app_name": "", "url": target_url}
             )
-        except Exception as exc:
-            result = {"error": str(exc)}
     elif action == "focus":
         result = await _call(
             "pc_window_focus",

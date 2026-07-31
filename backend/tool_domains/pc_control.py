@@ -501,6 +501,26 @@ async def execute_pc_app_launch(args: dict) -> dict:
         "obs": "obs64", "obs studio": "obs64",
     }
     if not app_name.strip():
+        if url:
+            # v2.542 — Incident réel reproduit (conversation « Ouvrir France Travail ») :
+            # le modèle enchaîne encore open (sans url) puis navigate séparément malgré
+            # l'avertissement du schéma. Ce cas (aucune application, seulement une URL)
+            # route un navigate-seul vers le navigateur par défaut VISIBLE au lieu du
+            # Chromium headless Playwright. Aucun nom de processus n'est connu à
+            # l'avance (dépend du navigateur par défaut de l'utilisateur) : succès
+            # rapporté sur le lancement lui-même, sans vérification par preuve.
+            try:
+                os.startfile(url)
+            except OSError as exc:
+                return {"error": f"Impossible d'ouvrir l'URL : {exc}"}
+            return {
+                "success": True,
+                "dispatched": True,
+                "verified": False,
+                "needs_repair": False,
+                "message": f"URL ouverte dans le navigateur par défaut : {url}",
+                "method": "startfile_url",
+            }
         return {"error": "Paramètre 'app_name' requis."}
     key = app_name.lower().strip()
     if key in {"tailscale", "tailscale gui", "interface tailscale"}:

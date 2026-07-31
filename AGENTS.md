@@ -202,7 +202,23 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.541.0)
+## 9. État actuel (v2.542.0)
+
+**v2.542 (navigate cible le navigateur visible par défaut)** : après v2.541, une nouvelle
+conversation réelle (« Ouvrir France Travail ») montre que le modèle a de nouveau enchaîné
+`open` (sans le nouveau paramètre `url`) puis `navigate` séparément, malgré l'avertissement
+ajouté au schéma. `navigate` pilotait TOUJOURS le Chromium headless Playwright quelle que
+soit `surface` — Marvin a vu la page se charger dans ce navigateur invisible et a conclu à
+tort que la demande était accomplie, sans jamais revérifier la fenêtre desktop visible.
+Correctif structurel plutôt que dépendre d'une instruction que le modèle peut ignorer :
+`action=navigate` cible désormais le navigateur VISIBLE par défaut (`os.startfile(url)`,
+via un nouveau cas dans `pc_app_launch` : `app_name` vide + `url` seule) sauf si
+`surface="browser"` est explicitement demandé — réservé à l'automatisation programmatique
+d'une page (clic/remplissage d'éléments via `element_ref`, qui nécessite le contexte
+Playwright partagé entre appels). Vérifié en conditions réelles : navigate seul a bien
+ouvert France Travail dans le navigateur par défaut visible (confirmé par énumération des
+fenêtres), et `surface="browser"` explicite continue d'utiliser le Chromium headless sans
+changement. Aucune migration. Rollback : réversion du commit v2.542.
 
 **v2.541 (open+url combinés — correction de la piste structurelle proposée en v2.540)** :
 implémentation de la piste proposée au rapport v2.540, avec une correction importante
