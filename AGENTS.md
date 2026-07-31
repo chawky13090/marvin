@@ -202,7 +202,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.528.0)
+## 9. État actuel (v2.529.0)
+
+**v2.529 (médias Web prouvés et présentations enrichies)** :
+`web_media_extract` inventorie et télécharge les images réelles d'une page ou
+d'un crawl public : `img`, `srcset`, lazy-loading, OpenGraph, favicon et
+arrière-plans CSS. Chaque fichier est validé par MIME et décodage Pillow, borné
+en dimensions/volume/nombre, haché SHA-256 et relié à sa page source dans un
+manifeste JSON. Le transport public existant revalide DNS et redirections pour
+bloquer les destinations non publiques; le repli Playwright en lecture seule
+applique la même frontière à chaque sous-requête. `pptx_create` accepte des
+images locales facultatives sans modifier son repli texte. Le harness conserve
+les arguments PPTX substantiels du LLM, construit son repli depuis les preuves
+du crawl et supprime tout nouvel appel PPTX après un succès dans le même tour.
+Essai réel : page municipale d'Aix, 49 candidats, 8 images vérifiées, PPTX avec
+images rendu sans débordement. Les SVG restent volontairement exclus tant
+qu'une rasterisation isolée n'est pas ajoutée. Aucun schéma ni secret nouveau.
+Rollback : réversion atomique du commit v2.529 puis redémarrage backend, sans
+migration; les artefacts sous `data/web_media/` sont indépendants et supprimables.
 
 **v2.528 (PowerPoint natif professionnel et reprenable)** : l'outil
 `pptx_create` produit désormais par défaut un thème sombre anthracite sobre,

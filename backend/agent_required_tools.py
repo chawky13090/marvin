@@ -22,8 +22,22 @@ def _plain_markdown(value: str) -> str:
 
 
 def _presentation_arguments(context: RequiredToolContext) -> dict[str, Any]:
-    """Construit un repli PPTX borné depuis la synthèse déjà visible du chat."""
+    """Construit un repli PPTX borné depuis les preuves disponibles du chat."""
     previous = _previous_assistant_content(context.messages)
+    crawl = next(
+        (
+            item for item in reversed(context.successful_results or [])
+            if item.get("tool") == "web_site_crawl" and item.get("pages")
+        ),
+        None,
+    )
+    media = next(
+        (
+            item for item in reversed(context.successful_results or [])
+            if item.get("tool") == "web_media_extract" and item.get("images")
+        ),
+        None,
+    )
     requested = re.search(
         r"\b([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.pptx)\b",
         context.user_query,
@@ -66,18 +80,67 @@ def _presentation_arguments(context: RequiredToolContext) -> dict[str, Any]:
         if clean and len(clean) <= 500:
             current_bullets.append(clean)
     flush()
+    if crawl and len(slides) < 2:
+        slides = []
+        seed_url = str(crawl.get("seed_url") or "").strip()
+        if seed_url:
+            title = f"Présentation de {seed_url.split('://', 1)[-1].split('/', 1)[0]}"
+        for page in crawl.get("pages") or []:
+            page_title = _plain_markdown(str(page.get("title") or ""))
+            lines = [
+                _plain_markdown(line)
+                for line in str(page.get("content") or "").splitlines()
+                if 20 <= len(_plain_markdown(line)) <= 220
+            ]
+            bullets = list(dict.fromkeys(line for line in lines if line))[:6]
+            if page_title and bullets:
+                slides.append({
+                    "title": page_title[:160],
+                    "bullets": bullets,
+                    "source_url": str(page.get("url") or "")[:2_000],
+                })
+            if len(slides) >= 10:
+                break
     if not slides:
         slides = [{
             "title": "Demande",
             "bullets": [_plain_markdown(context.user_query)[:500]],
         }]
+    if media:
+        images = list(media.get("images") or [])
+        for index, slide in enumerate(slides):
+            if index >= len(images) or slide.get("image_path"):
+                continue
+            image = images[index]
+            slide["image_path"] = str(image.get("path") or "")
+            slide["image_caption"] = str(image.get("alt") or "")[:300]
+            slide["source_url"] = str(
+                image.get("page_url") or image.get("url") or ""
+            )[:2_000]
     return {
         "title": title,
         "subtitle": "Générée par Marvin à partir du contenu vérifié de la conversation",
         "slides": slides,
         "output_path": f"Bureau/{output_name}",
         "style": "professional_dark",
+        "source_job_id": str(crawl.get("job_id") or "") if crawl else "",
     }
+
+
+def _substantive_presentation_arguments(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    slides = value.get("slides")
+    if not isinstance(slides, list) or len(slides) < 2:
+        return False
+    populated = 0
+    for slide in slides:
+        if not isinstance(slide, dict) or not str(slide.get("title") or "").strip():
+            continue
+        bullets = slide.get("bullets", slide.get("points", []))
+        if isinstance(bullets, list) and any(str(item).strip() for item in bullets):
+            populated += 1
+    return populated >= 2
 
 
 @dataclass(slots=True)
@@ -155,6 +218,33 @@ def _file_delivery_arguments(
     }
 
 
+def _web_media_arguments(context: RequiredToolContext) -> dict[str, Any] | None:
+    crawl = next(
+        (
+            item for item in reversed(context.successful_results or [])
+            if item.get("tool") == "web_site_crawl" and item.get("job_id")
+        ),
+        None,
+    )
+    if crawl:
+        return {"crawl_job_id": str(crawl["job_id"]), "max_files": 50}
+    history = "\n".join(
+        str(item.get("content") or "")
+        for item in (context.messages or [])[-12:]
+        if item.get("role") in {"user", "assistant"}
+    )
+    urls = re.findall(r"https?://[^\s<>\"]+", history)
+    if urls:
+        return {"url": urls[-1].rstrip(".,;)")}
+    domains = re.findall(
+        r"\b(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",
+        history,
+    )
+    if domains:
+        return {"url": f"https://{domains[-1]}"}
+    return None
+
+
 def _arguments_for(
     name: str,
     context: RequiredToolContext,
@@ -189,6 +279,8 @@ def _arguments_for(
         return {"query": context.user_query}
     if name == "web_site_crawl":
         return {"site": context.user_query}
+    if name == "web_media_extract":
+        return _web_media_arguments(context)
     if name == "file_write":
         return _file_delivery_arguments(context)
     if name == "long_task_start":
@@ -227,13 +319,17 @@ def inject_required_tool_calls(
             and isinstance(call, dict)
             and call.get("function", {}).get("name") == "pptx_create"
         ):
-            call = {
-                **call,
-                "function": {
-                    **call.get("function", {}),
-                    "arguments": _presentation_arguments(context),
-                },
-            }
+            if "pptx_create" in executed_names:
+                continue
+            arguments = call.get("function", {}).get("arguments")
+            if not _substantive_presentation_arguments(arguments):
+                call = {
+                    **call,
+                    "function": {
+                        **call.get("function", {}),
+                        "arguments": _presentation_arguments(context),
+                    },
+                }
         normalized_calls.append(call)
     tool_calls = normalized_calls
 

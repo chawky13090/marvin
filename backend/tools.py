@@ -53,6 +53,7 @@ from tool_domains import system_cleanup as system_cleanup_domain
 from tool_domains import billing as billing_domain
 from tool_domains import windows as windows_domain
 from tool_domains import web as web_domain
+from tool_domains import web_media as web_media_domain
 from tool_domains import pc_control as pc_control_domain
 from tool_domains import tailscale as tailscale_domain
 from tool_domains import pc_diagnostics as pc_diagnostics_domain
@@ -282,6 +283,7 @@ execute_file_create_folder = filesystem_domain.create_folder
 
 documents_domain.configure(resolve_path=_resolve_path)
 presentations_domain.configure(resolve_path=_resolve_path)
+web_media_domain.configure(resolve_path=_resolve_path)
 execute_file_create_docx = documents_domain.create_docx
 execute_file_convert_docx_to_pdf = documents_domain.convert_docx_to_pdf
 execute_document_convert_format = documents_domain.convert_format
@@ -2279,6 +2281,7 @@ weather_domain.configure(
 
 execute_web_browse = web_domain.execute_web_browse
 execute_web_site_crawl = web_domain.execute_web_site_crawl
+execute_web_media_extract = web_media_domain.extract
 execute_web_browser_open = web_domain.execute_web_browser_open
 execute_web_deep_research = web_domain.execute_web_deep_research
 execute_web_research = web_domain.execute_web_research
@@ -2503,6 +2506,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "web_search": execute_web_search,
     "web_browse": execute_web_browse,
     "web_site_crawl": execute_web_site_crawl,
+    "web_media_extract": execute_web_media_extract,
     # Documents avancés
     "infographic_create": execute_infographic_create,
     "file_create_xlsx": execute_file_create_xlsx,
@@ -3422,6 +3426,25 @@ TOOLS_SPEC = [
                              "description": "Corpus total maximal renvoyé au LLM; le contenu complet reste dans les artefacts"},
         "job_id": {"type": "string",
                    "description": "Identifiant optionnel pour retrouver les artefacts du crawl"}
+       },
+       []),
+
+    _t(
+       "web_media_extract",
+       "Inventorie, vérifie et télécharge les images réelles d'une page ou d'un crawl Web public. "
+       "Extrait img/srcset/lazy-loading/OpenGraph/favicon et arrière-plans CSS, conserve la page "
+       "source, les dimensions, le MIME et le SHA-256 dans un manifeste. À utiliser pour obtenir "
+       "les visuels d'un site; ne pas employer computer_control ni inventer des URL d'images.",
+       {
+        "url": {"type": "string", "description": "Page Web publique à analyser"},
+        "crawl_job_id": {"type": "string", "description": "Identifiant d'un crawl existant dont les pages doivent être analysées"},
+        "max_pages": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Pages maximales analysées (défaut 25)"},
+        "max_files": {"type": "integer", "minimum": 1, "maximum": 200, "description": "Images maximales téléchargées (défaut 50)"},
+        "max_total_bytes": {"type": "integer", "minimum": 1000000, "maximum": 200000000, "description": "Volume total maximal (défaut 50 Mo)"},
+        "min_width": {"type": "integer", "minimum": 1, "maximum": 20000, "description": "Largeur minimale en pixels (défaut 200)"},
+        "min_height": {"type": "integer", "minimum": 1, "maximum": 20000, "description": "Hauteur minimale en pixels (défaut 120)"},
+        "browser_fallback": {"type": "boolean", "description": "Rendre la page avec Playwright si le HTML contient moins de trois médias (défaut true)"},
+        "output_dir": {"type": "string", "maxLength": 32767, "description": "Dossier de sortie facultatif"}
        },
        []),
 
@@ -4489,11 +4512,17 @@ TOOLS_SPEC = [
                                  "bullets": {"type": "array", "maxItems": 100,
                                              "items": {"type": "string", "maxLength": 10000}},
                                  "points": {"type": "array", "maxItems": 100,
-                                            "items": {"type": "string", "maxLength": 10000}}
+                                            "items": {"type": "string", "maxLength": 10000}},
+                                 "image_path": {"type": "string", "maxLength": 32767,
+                                                "description": "Image locale vérifiée à intégrer dans la diapositive"},
+                                 "image_caption": {"type": "string", "maxLength": 1000},
+                                 "source_url": {"type": "string", "maxLength": 8192,
+                                                "description": "URL de provenance du contenu ou de l'image"}
                              }},
                    "description": "Diapos : [{title, bullets:[...]}, …]"},
         "output_path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx ou dossier de sortie (défaut : Bureau)"},
-        "style": {"type": "string", "enum": ["professional_dark", "office"], "description": "professional_dark (défaut) ou office"}},
+        "style": {"type": "string", "enum": ["professional_dark", "office"], "description": "professional_dark (défaut) ou office"},
+        "source_job_id": {"type": "string", "maxLength": 80, "description": "Identifiant du crawl ayant fondé la présentation"}},
        []),
     _t("pptx_read", "Extrait le texte de toutes les diapos d'un PowerPoint (.pptx).",
        {"path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx"}},

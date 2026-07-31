@@ -88,6 +88,12 @@ def main() -> int:
         ))))
         assert "pptx_create" not in powerpoint_explanation
 
+        web_media = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "extrais les images du site web"}],
+            "agent",
+        ))))
+        assert "web_media_extract" in web_media
+
         local_followup = set(_names(asyncio.run(selection.filter_relevant_tools(
             [
                 {"role": "user", "content": "liste les dossiers présents sur mon bureau"},

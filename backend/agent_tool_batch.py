@@ -29,6 +29,7 @@ _UNTRUSTED_WEB_TOOLS = frozenset({
     "web_browse",
     "web_browser_open",
     "web_site_crawl",
+    "web_media_extract",
     "web_deep_research",
 })
 

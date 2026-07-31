@@ -93,6 +93,28 @@ async def run_domain() -> None:
         assert locked_created["path"] != str(locked_target)
         assert "nouvelle-version" in Path(locked_created["path"]).stem
         assert Path(locked_created["path"]).is_file()
+
+        from PIL import Image
+
+        visual = root / "visual.jpg"
+        Image.new("RGB", (1200, 800), (70, 96, 84)).save(visual)
+        visual_deck = root / "visual-deck.pptx"
+        visual_created = await presentations.create(
+            {
+                "title": "Aix",
+                "slides": [{
+                    "title": "Patrimoine",
+                    "bullets": ["Une ville de culture", "Un territoire vivant"],
+                    "image_path": str(visual),
+                    "image_caption": "Source : site municipal",
+                    "source_url": "https://example.test/visual.jpg",
+                }],
+                "output_path": str(visual_deck),
+            }
+        )
+        assert visual_created["success"] is True
+        with zipfile.ZipFile(visual_deck) as package:
+            assert any(name.startswith("ppt/media/") for name in package.namelist())
         assert "extension .pptx" in (
             await presentations.create(
                 {"title": "x", "output_path": str(root / "bad.txt")}

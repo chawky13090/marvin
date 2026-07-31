@@ -121,6 +121,75 @@ async def computer_navigate(url: str, timeout: int = 30_000) -> dict:
     return await computer_observe()
 
 
+async def extract_media_urls(url: str, timeout: int = 30_000) -> dict:
+    """Extrait en lecture seule les médias réellement résolus par le navigateur."""
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    import outbound_http
+
+    parsed, port = outbound_http._parse_public_url(url)
+    assert parsed.hostname is not None
+    outbound_http._public_addresses(
+        await outbound_http._resolve(parsed.hostname, port)
+    )
+    context = await _new_context()
+    async def guard_public_request(route, request):
+        try:
+            request_parsed, request_port = outbound_http._parse_public_url(request.url)
+            assert request_parsed.hostname is not None
+            outbound_http._public_addresses(
+                await outbound_http._resolve(request_parsed.hostname, request_port)
+            )
+        except (OSError, ValueError):
+            await route.abort()
+            return
+        await route.continue_()
+
+    await context.route("**/*", guard_public_request)
+    page = await context.new_page()
+    try:
+        await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+        await page.wait_for_timeout(750)
+        images = await page.locator("img").evaluate_all(
+            r"""nodes => nodes.slice(0, 2000).flatMap(node => {
+              const values = [];
+              const add = (url, kind) => { if (url) values.push({
+                url, kind, alt: (node.alt || '').slice(0, 500),
+                width: node.naturalWidth || 0, height: node.naturalHeight || 0
+              }); };
+              add(node.currentSrc || node.src, 'image');
+              for (const item of (node.srcset || node.dataset.srcset || '').split(',')) {
+                add(item.trim().split(/\s+/, 1)[0], 'srcset');
+              }
+              add(node.dataset.src || node.dataset.lazySrc || node.dataset.original, 'lazy');
+              return values;
+            })"""
+        )
+        backgrounds = await page.locator("body *").evaluate_all(
+            r"""nodes => nodes.slice(0, 3000).flatMap(node => {
+              const value = getComputedStyle(node).backgroundImage || '';
+              return [...value.matchAll(/url\\(["']?(.*?)["']?\\)/g)]
+                .map(match => ({url: match[1], kind: 'background', alt: ''}));
+            })"""
+        )
+        metadata = await page.locator(
+            'meta[property="og:image"],meta[name="twitter:image"],link[rel~="icon"]'
+        ).evaluate_all(
+            """nodes => nodes.map(node => ({
+              url: node.content || node.href || '',
+              kind: node.tagName.toLowerCase() === 'link' ? 'icon' : 'social',
+              alt: ''
+            }))"""
+        )
+        return {
+            "success": True,
+            "url": page.url,
+            "media": [*images, *backgrounds, *metadata],
+        }
+    finally:
+        await context.close()
+
+
 def _browser_locator(page, *, control_type: str, name: str, match_index: int):
     role = control_type.strip().lower()
     if role:

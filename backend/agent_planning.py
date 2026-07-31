@@ -86,6 +86,18 @@ _SITE_CRAWL_RE = re.compile(
     r".{0,80}\b(?:site|domaine|pages?)\b|"
     r"\b(?:site|domaine)\b.{0,80}\b(?:complet|entier|toutes?\s+les?\s+pages?)\b"
 )
+_WEB_MEDIA_EXTRACT_RE = re.compile(
+    r"\b(?:extrais|extraire|extrait|t[ée]l[ée]charge|r[ée]cup[èe]re)\w*\b"
+    r".{0,100}\b(?:images?|photos?|m[ée]dias?|visuels?)\b.{0,100}\b(?:site|page|web)\b|"
+    r"\b(?:images?|photos?|m[ée]dias?|visuels?)\b.{0,80}\b(?:du|de\s+la|des)\s+(?:site|page)\b",
+    re.IGNORECASE,
+)
+_PPTX_SITE_DESIGN_RE = re.compile(
+    r"(?=.*\b(?:pr[ée]sentation|powerpoint|pptx|diaporama)\b)"
+    r"(?=.*\bsite\b)"
+    r"(?=.*\b(?:inspir[ée]|design|charte|identit[ée]\s+graphique|style)\w*\b)",
+    re.IGNORECASE | re.DOTALL,
+)
 _EXPLICIT_PPTX_DELIVERY_RE = re.compile(
     r"\b(?:cr[ée]e|cr[ée]er|fais|faire|g[ée]n[èe]re|g[ée]n[ée]rer|veux|souhaite)\w*\b"
     r".{0,100}\b(?:powerpoint|pptx|fichier\s+\.pptx)\b|"
@@ -182,6 +194,8 @@ def _deterministic_action_requirements(
         requirements.add("file_write")
     if _SITE_CRAWL_RE.search(text):
         requirements.add("web_site_crawl")
+    if _WEB_MEDIA_EXTRACT_RE.search(text) or _PPTX_SITE_DESIGN_RE.search(text):
+        requirements.add("web_media_extract")
     if (
         (_EXPLICIT_PPTX_DELIVERY_RE.search(text) or _PPTX_REDESIGN_RE.search(text))
         and not _NO_FILE_CREATION_RE.search(text)

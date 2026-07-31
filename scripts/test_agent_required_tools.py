@@ -217,6 +217,77 @@ def main() -> int:
     assert clean_args["slides"] == [
         {"title": "Localisation", "bullets": ["Aix-en-Provence"]}
     ]
+
+    grounded_model = inject_required_tool_calls(
+        required_names={"pptx_create"},
+        executed_names=set(),
+        tool_calls=[{
+            "id": "grounded-pptx",
+            "function": {
+                "name": "pptx_create",
+                "arguments": {
+                    "title": "Ville d'Aix-en-Provence",
+                    "slides": [
+                        {"title": "Actualités", "bullets": ["Les Nuits d'Aix 2026"]},
+                        {"title": "Culture", "bullets": ["Musée Granet"]},
+                    ],
+                    "output_path": "Bureau/aix.pptx",
+                },
+            },
+        }],
+        step=1,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query="crée le powerpoint depuis le crawl",
+            successful_results=[{
+                "tool": "web_site_crawl",
+                "job_id": "crawl-aix-1234",
+                "seed_url": "https://www.aixenprovence.fr/",
+                "pages": [{
+                    "title": "Mairie d'Aix-en-Provence",
+                    "url": "https://www.aixenprovence.fr/",
+                    "content": "Les Nuits d'Aix 2026\nMusée Granet",
+                }],
+            }],
+        ),
+    )
+    assert grounded_model.tool_calls[0]["function"]["arguments"]["title"] == "Ville d'Aix-en-Provence"
+    assert len(grounded_model.tool_calls[0]["function"]["arguments"]["slides"]) == 2
+
+    duplicate_after_success = inject_required_tool_calls(
+        required_names={"pptx_create"},
+        executed_names={"pptx_create"},
+        tool_calls=grounded_model.tool_calls,
+        step=2,
+        max_steps=10,
+        context=RequiredToolContext(user_query="crée le powerpoint"),
+    )
+    assert duplicate_after_success.tool_calls == []
+
+    media_fallback = inject_required_tool_calls(
+        required_names={"pptx_create"},
+        executed_names=set(),
+        tool_calls=[],
+        step=9,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query="crée un powerpoint",
+            messages=[
+                {"role": "assistant", "content": "# Aix\n## Culture\n- Musée Granet\n## Sport\n- Ronde d'Aix"},
+                {"role": "user", "content": "crée un powerpoint"},
+            ],
+            successful_results=[{
+                "tool": "web_media_extract",
+                "images": [
+                    {"path": "C:/media/culture.jpg", "alt": "Culture", "page_url": "https://example.test/culture"},
+                    {"path": "C:/media/sport.jpg", "alt": "Sport", "page_url": "https://example.test/sport"},
+                ],
+            }],
+        ),
+    )
+    media_slides = media_fallback.tool_calls[0]["function"]["arguments"]["slides"]
+    assert media_slides[0]["image_path"] == "C:/media/culture.jpg"
+    assert media_slides[1]["source_url"] == "https://example.test/sport"
     print(
         "Agent Required Tools OK - contrats, autonomie, budget, Workspace et dédoublonnage."
     )

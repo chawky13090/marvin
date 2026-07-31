@@ -84,6 +84,15 @@ def _slides(value: object) -> list[dict[str, Any]]:
                 "bullets": [
                     _text(item, name=f"slides[{index}].bullets") for item in bullets
                 ],
+                "image_path": _text(
+                    slide.get("image_path"), name=f"slides[{index}].image_path", maximum=32_767
+                ),
+                "image_caption": _text(
+                    slide.get("image_caption"), name=f"slides[{index}].image_caption", maximum=1_000
+                ),
+                "source_url": _text(
+                    slide.get("source_url"), name=f"slides[{index}].source_url", maximum=8_192
+                ),
             }
         )
     return normalized
@@ -161,15 +170,45 @@ def _create_presentation(
             prepare(slide)
             add_text(slide, 1.05, 0.72, 10.9, 0.75, definition["title"],
                      size=30, color=foreground, bold=True)
+            image_path = definition.get("image_path", "").strip()
+            resolved_image = None
+            if image_path:
+                candidate = Path(_resolve_path(image_path))
+                if candidate.is_file():
+                    resolved_image = candidate
             bullets = [item for item in definition["bullets"] if item.strip()][:8]
             top = 1.75
             spacing = min(0.64, 4.75 / max(len(bullets), 1))
             for bullet in bullets:
                 add_text(slide, 1.18, top, 0.28, 0.42, "•", size=18,
                          color=accent, bold=True)
-                add_text(slide, 1.58, top, 10.35, max(0.42, spacing), bullet,
+                add_text(slide, 1.58, top, 5.25 if resolved_image else 10.35,
+                         max(0.42, spacing), bullet,
                          size=17, color=foreground)
                 top += spacing
+            if resolved_image:
+                from PIL import Image
+
+                with Image.open(resolved_image) as source_image:
+                    width, height = source_image.size
+                box_width, box_height = 5.25, 4.55
+                ratio = width / max(height, 1)
+                if ratio >= box_width / box_height:
+                    picture_width = box_width
+                    picture_height = box_width / ratio
+                else:
+                    picture_height = box_height
+                    picture_width = box_height * ratio
+                left = 7.25 + (box_width - picture_width) / 2
+                image_top = 1.75 + (box_height - picture_height) / 2
+                slide.shapes.add_picture(
+                    str(resolved_image), Inches(left), Inches(image_top),
+                    width=Inches(picture_width), height=Inches(picture_height),
+                )
+                caption = definition.get("image_caption", "").strip()
+                if caption:
+                    add_text(slide, 7.25, 6.43, 5.25, 0.35, caption,
+                             size=10, color=muted, align=PP_ALIGN.RIGHT)
             add_text(slide, 11.65, 7.05, 0.55, 0.25, str(number), size=9,
                      color=muted, align=PP_ALIGN.RIGHT)
     else:

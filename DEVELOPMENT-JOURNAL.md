@@ -14577,3 +14577,52 @@ accès réseau, ni secret, ni privilège, ni donnée persistante. Elle ne journa
 aucun contenu supplémentaire ; les reçus existants conservent uniquement les
 preuves bornées. Rollback : réversion atomique du commit v2.528 puis
 redémarrage backend, sans migration ni restauration de données.
+## 2026-07-31 — v2.529 — Médias Web prouvés et PPTX enrichis
+
+### Demande et preuves initiales
+
+L'audit de la conversation « Scraper site mairie Aix PowerPoint » a confirmé
+deux réalités : le fichier final de neuf diapositives était exploitable et sans
+débordement, mais le premier tour avait rejoué huit fois le même PPTX de deux
+diapositives parce que le harness remplaçait les arguments du LLM par un repli
+qui ignorait le résultat de `web_site_crawl`. La demande suivante d'extraction
+d'images ne disposait d'aucun outil adapté et dérivait vers `computer_control`.
+
+### Architecture et correction
+
+- Les résultats compacts du Runner conservent désormais jusqu'à 40 preuves de
+  crawl bornées (`title`, `url`, 2 000 caractères de contenu, `job_id`).
+- Un appel `pptx_create` substantiel (au moins deux diapositives renseignées)
+  reste libre; seul un appel vide ou insuffisant est remplacé par le repli
+  déterministe. Après un succès PPTX, tout nouvel appel PPTX du même tour est
+  supprimé afin d'empêcher les boucles sans progression.
+- `web_media_extract` est un domaine séparé : extraction statique, repli
+  Playwright en lecture seule, manifeste, provenance, MIME, dimensions,
+  SHA-256, limites de pages/fichiers/octets et artefacts explicites.
+- `pptx_create` accepte facultativement `image_path`, `image_caption` et
+  `source_url`; l'ancien contrat texte reste inchangé.
+
+### Validation réelle
+
+- Tests unitaires médias : `src`, `srcset`, lazy-loading, OpenGraph, favicon,
+  CSS, filtrage des petites images, manifeste, empreintes et provenance.
+- Tests agentiques : arguments substantiels préservés, repli anti-hallucination
+  conservé, second PPTX supprimé, sélection et obligation du nouvel outil.
+- Test réseau réel sur `https://www.aixenprovence.fr/` : 49 candidats trouvés,
+  8 images vérifiées et téléchargées, 2 116 713 octets, manifeste produit.
+- PPTX réel avec deux images du site : trois diapositives, Open XML valide,
+  rendu complet, aucune sortie de cadre.
+- Architecture : 362 outils, registre et harness 362/362. Tool Runtime et
+  inventaire des consommateurs réussis. ESLint : 0 erreur, 35 avertissements
+  préexistants.
+
+### Sécurité, logs et rollback
+
+Seuls HTTP/HTTPS publics sur 80/443 sont acceptés. Chaque redirection et chaque
+sous-requête Playwright sont résolues et refusées si l'adresse n'est pas
+globale. Les réponses, fichiers et volumes sont bornés; les formats non raster
+ou MIME incohérents sont rejetés. Les contenus Web restent marqués non fiables.
+Les journaux existants ne reçoivent ni binaire, ni secret : le reçu contient
+uniquement compteurs, chemins, provenance et empreintes. Dette bornée : SVG non
+pris en charge. Rollback : réversion atomique du commit v2.529 et redémarrage du
+backend; aucune migration, les artefacts médias sont indépendants.

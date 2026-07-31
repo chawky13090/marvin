@@ -277,6 +277,13 @@ _KEYWORD_TOOLS = {
     ("powerpoint", "pptx", "présentation", "presentation", "diaporama", "diapo",
      "slides", "slide", "deck", "support de présentation"):
         {"pptx_create", "pptx_read"},
+    ("extraire les images", "extrait les images", "images du site", "photos du site",
+     "télécharge les images", "telecharge les images", "récupère les images",
+     "recupere les images", "médias du site", "medias du site"):
+        {"web_media_extract"},
+    ("inspiré de leur design", "inspire de leur design", "identité graphique du site",
+     "identite graphique du site", "charte graphique du site", "design graphique du site"):
+        {"web_media_extract", "pptx_create"},
     # Conversions bureautiques
     ("csv en excel", "csv vers excel", "convertis le csv", "excel en csv", "xlsx en csv",
      "convertis le word", "word en texte", "docx en texte", "extrais le texte du word",

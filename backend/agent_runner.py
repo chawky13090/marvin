@@ -77,15 +77,15 @@ class RunnerState:
                 "args": json.dumps(compact, ensure_ascii=False)[:90] if compact else "",
             })
             if isinstance(result, dict):
-                self.successful_results.append({
+                compact_result = {
                     "tool": tool_name,
                     "answer": str(result.get("answer") or "")[:16_000],
                     "code": str(result.get("code") or "")[:500_000],
                     "language": str(result.get("language") or "")[:40],
                     "artifacts": (
                         result.get("artifacts")
-                        if isinstance(result.get("artifacts"), dict)
-                        else {}
+                        if isinstance(result.get("artifacts"), (dict, list))
+                        else []
                     ),
                     "sources": [
                         {
@@ -109,7 +109,39 @@ class RunnerState:
                         if tool_name == "tool_search"
                         else []
                     ),
-                })
+                }
+                if tool_name == "web_site_crawl":
+                    compact_result.update({
+                        "job_id": str(result.get("job_id") or "")[:80],
+                        "seed_url": str(result.get("seed_url") or "")[:2_000],
+                        "pages": [
+                            {
+                                "title": str(page.get("title") or "")[:300],
+                                "url": str(page.get("url") or "")[:2_000],
+                                "content": str(page.get("content") or "")[:2_000],
+                            }
+                            for page in (result.get("pages") or [])[:40]
+                            if isinstance(page, dict)
+                        ],
+                    })
+                if tool_name == "web_media_extract":
+                    compact_result.update({
+                        "manifest_path": str(result.get("manifest_path") or "")[:32_767],
+                        "images": [
+                            {
+                                "path": str(image.get("path") or "")[:32_767],
+                                "url": str(image.get("url") or "")[:2_000],
+                                "page_url": str(image.get("page_url") or "")[:2_000],
+                                "alt": str(image.get("alt") or "")[:500],
+                                "width": int(image.get("width") or 0),
+                                "height": int(image.get("height") or 0),
+                                "sha256": str(image.get("sha256") or "")[:64],
+                            }
+                            for image in (result.get("images") or [])[:50]
+                            if isinstance(image, dict) and image.get("path")
+                        ],
+                    })
+                self.successful_results.append(compact_result)
         if not self.long_chain_reported and self.tool_count > 8:
             self.long_chain_reported = True
             return True

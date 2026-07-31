@@ -303,6 +303,20 @@ def main() -> int:
     )
     assert "pptx_create" not in pptx_suppressed.required_tool_names
 
+    web_media = planning.compile_turn_plan(
+        [{"role": "user", "content": "extrais les images du site https://example.test"}],
+        "extrais les images du site https://example.test",
+        llm_native=True,
+    )
+    assert "web_media_extract" in web_media.required_tool_names
+
+    branded_deck = planning.compile_turn_plan(
+        [{"role": "user", "content": "aspire le site de la mairie et fais une présentation inspirée de leur design graphique"}],
+        "aspire le site de la mairie et fais une présentation inspirée de leur design graphique",
+        llm_native=True,
+    )
+    assert {"web_site_crawl", "web_media_extract", "pptx_create"} <= branded_deck.required_tool_names
+
     unrelated = planning.compile_turn_plan(
         [
             {"role": "user", "content": "Explique OSPF"},
