@@ -397,12 +397,17 @@ async def _launch_and_verify(
     kind: str,
     target: str,
     expected_names: set[str] | None = None,
+    extra_args: list[str] | None = None,
 ) -> dict:
     expected_names = expected_names or _expected_process_names(kind, target)
     title_hint = app_name if len(app_name.strip()) >= 3 else ""
     before = _application_evidence(expected_names, title_hint)
     try:
-        os.startfile(target)
+        if extra_args:
+            import subprocess
+            subprocess.Popen([target, *extra_args])
+        else:
+            os.startfile(target)
     except OSError as exc:
         return {
             "success": False,
@@ -439,8 +444,12 @@ async def _launch_and_verify(
     }
 
 
+_BROWSER_KEYS = {"chrome", "firefox", "msedge", "brave", "opera"}
+
+
 async def execute_pc_app_launch(args: dict) -> dict:
     app_name = args.get("app_name", "")
+    url = str(args.get("url") or "").strip()
     aliases = {
         # Navigateurs
         "chrome": "chrome", "google chrome": "chrome",
@@ -498,6 +507,23 @@ async def execute_pc_app_launch(args: dict) -> dict:
         from tool_domains import tailscale as tailscale_domain
         return await tailscale_domain.open_ui()
     cmd = aliases.get(key, app_name).strip()
+
+    # v2.541 — Incident réel reproduit (3 conversations consécutives, « ouvre firefox et
+    # va sur X ») : action=open (lance l'appli desktop VISIBLE) et action=navigate
+    # (pilote un Chromium headless Playwright totalement séparé, jamais la fenêtre
+    # ouverte par open) ne peuvent PAS se chaîner pour ce cas d'usage — même avec une
+    # syntaxe parfaite, navigate n'affecte jamais la fenêtre desktop. La solution fiable :
+    # lancer l'exécutable du navigateur directement avec l'URL en argument, en un seul
+    # appel, sans étape de navigation séparée ni simulation clavier/souris.
+    if url and cmd in _BROWSER_KEYS:
+        browser_kind, browser_target = _find_app_target(cmd)
+        if browser_kind == "exe":
+            return await _launch_and_verify(
+                app_name=app_name,
+                kind=browser_kind,
+                target=browser_target,
+                extra_args=[url],
+            )
 
     try:
         # Protocoles / URL Windows (ms-settings:, shell:, http://…)

@@ -3026,8 +3026,9 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin du fichier/dossier à révéler"}},
        ["path"]),
 
-    _t("pc_app_launch", "Lance une application Windows installée par son nom et vérifie le résultat par processus ou fenêtre. Résout via PATH, registre App Paths et menu Démarrer. Pour Tailscale, utilise explicitement l'interface graphique tailscale-ipn.exe.",
-       {"app_name": {"type": "string", "description": "Nom de l'application à lancer"}},
+    _t("pc_app_launch", "Lance une application Windows installée par son nom et vérifie le résultat par processus ou fenêtre. Résout via PATH, registre App Paths et menu Démarrer. Pour Tailscale, utilise explicitement l'interface graphique tailscale-ipn.exe. Pour un navigateur (chrome/firefox/msedge/brave/opera), fournir aussi 'url' ouvre directement cette page dans la fenêtre lancée, en un seul appel.",
+       {"app_name": {"type": "string", "description": "Nom de l'application à lancer"},
+        "url": {"type": "string", "description": "Navigateurs uniquement : URL à charger directement dans la fenêtre lancée"}},
        ["app_name"]),
 
     _t("pc_tailscale_status", "Diagnostique Tailscale sous Windows sans le modifier : installation, service, connexion VPN et interface graphique. À utiliser avant ou après le lancement.",
@@ -3941,7 +3942,10 @@ TOOLS_SPEC = [
        "Observer → Décider → Agir → Vérifier → Corriger. observe renvoie une capture et des "
        "element_ref facultatives. Utilise les coordonnées de frame_id lorsque l'UIA ne suffit "
        "pas. action=commit est obligatoire pour le clic final qui réserve, achète, publie ou "
-       "envoie un formulaire : il demande toujours un clic utilisateur.",
+       "envoie un formulaire : il demande toujours un clic utilisateur. Pour « ouvre [navigateur] "
+       "et va sur [site] » : utilise action=open avec target=navigateur ET url=le site, EN UN SEUL "
+       "APPEL — ne jamais enchaîner action=navigate ensuite, qui pilote un navigateur headless "
+       "séparé et n'affecte jamais la fenêtre visible ouverte par open.",
        {
         "action": {"type": "string", "enum": [
             "observe", "verify", "screenshot", "list_windows", "wait", "open", "focus",
@@ -3951,6 +3955,7 @@ TOOLS_SPEC = [
         "surface": {"type": "string", "enum": ["auto", "desktop", "browser"],
                     "description": "Surface ciblée. Préciser browser pour les éléments Web Playwright."},
         "target": {"type": "string", "description": "Application à ouvrir ou URL à parcourir"},
+        "url": {"type": "string", "description": "Avec action=open sur un navigateur (chrome/firefox/msedge/brave/opera) : URL à charger directement dans la fenêtre lancée, en un seul appel. Ne pas utiliser action=navigate après open pour ce cas — navigate pilote un navigateur headless séparé, jamais la fenêtre visible ouverte par open."},
         "window": {"type": "string", "description": "Sous-chaîne exacte du titre de fenêtre"},
         "hwnd": {"type": "integer", "description": "Identifiant hwnd exact renvoyé par observe/list_windows — cible plus fiable qu'un titre quand plusieurs fenêtres se ressemblent (utilisable avec action=focus)."},
         "control_type": {"type": "string", "description": "Type UIA desktop ou rôle ARIA Web issu de l'observation"},

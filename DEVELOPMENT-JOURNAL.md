@@ -5,6 +5,62 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.541.0 — open+url combinés (correction de la piste proposée en v2.540)
+
+### Demande et constats
+
+Suite au rapport v2.540, l'utilisateur a validé la piste structurelle proposée ("oui,
+vas-y, implémente-le" — chaîner `open` puis `navigate` en un seul appel fiable). En
+implémentant, découverte d'un défaut plus profond que celui proposé : `action=navigate`
+de `computer_control` (`backend/computer_runtime.py`) délègue TOUJOURS à
+`web_browser.computer_navigate()`, qui pilote un Chromium **headless** lancé par Playwright
+(`_get_browser()` : `chromium.launch(channel="chrome", headless=True, ...)`) — un processus
+et un contexte totalement séparés de la fenêtre Firefox/Chrome VISIBLE ouverte par
+`action=open` (qui lance le vrai exécutable desktop via `pc_app_launch`). Conséquence :
+même avec une syntaxe d'appel parfaite, chaîner `open` puis `navigate` n'aurait JAMAIS pu
+faire apparaître la page demandée dans la fenêtre que l'utilisateur voit à l'écran — les
+3 conversations précédentes qui ont toutes échoué sur ce cas d'usage ("ouvre X et va sur Y")
+étaient donc vouées à l'échec indépendamment des problèmes d'alias déjà corrigés.
+
+### Décisions et modifications
+
+- `backend/tool_domains/pc_control.py` :
+  - `_launch_and_verify()` accepte un nouveau paramètre `extra_args: list[str] | None` —
+    quand fourni, lance via `subprocess.Popen([target, *extra_args])` au lieu de
+    `os.startfile(target)` (qui ne transmet aucun argument).
+  - `execute_pc_app_launch()` accepte un nouveau paramètre `url`. Quand l'application
+    cible est un navigateur connu (`_BROWSER_KEYS = {chrome, firefox, msedge, brave,
+    opera}`) et que sa résolution (`_find_app_target`) donne un exécutable direct
+    (`kind == "exe"`), le navigateur est lancé avec l'URL en argument de ligne de
+    commande — la page s'ouvre directement dans la fenêtre visible, sans étape de
+    navigation séparée.
+- `backend/computer_runtime.py` : `action=open` transmet désormais `url` à
+  `pc_app_launch` en plus de `target`.
+- `backend/tools.py` : schéma `computer_control` et `pc_app_launch` documentent `url` ;
+  description générale de `computer_control` avertit explicitement de ne PAS chaîner
+  `navigate` après `open` pour ce cas d'usage (le pousse vers `open` + `url` en un appel).
+
+### Validation, sécurité, logs et rollback
+
+Résolution réelle vérifiée : `_find_app_target("firefox")` →
+`('exe', 'C:\Program Files\Mozilla Firefox\firefox.exe')` sur cette machine.
+`execute_pc_app_launch({"app_name": "firefox", "url": "https://it-connect.fr"})` exécuté
+en conditions réelles → `{"success": true, "verified": true, ...}`, puis confirmation par
+énumération réelle des fenêtres Windows 3 secondes après lancement :
+`"IT-Connect | Actualités Tech, Tutoriels & Cours Informatique — Mozilla Firefox"` — la
+page demandée s'est bien chargée dans la fenêtre visible, en un seul appel, sans
+clavier/souris simulés. Suites de régression exécutées et vertes : `test_computer_runtime`,
+`test_agent_tool_step`, `test_stringified_array_repair`, `test_agent_tool_batch`,
+`test_agent_tool_batch_parallel`, `test_agent_tool_dispatch`, `test_tool_domain_filesystem`,
+`test_agent_model_step`, `test_agent_policy`, `test_tailscale_runtime`,
+`test_tool_approval_flow`, `check_architecture.py`, `test_main_composition.py`. Aucune
+migration, aucun changement d'API cassant (paramètre `url` optionnel, comportement
+inchangé si absent). Cas non couvert, accepté comme limitation raisonnable : si le
+navigateur cible ne se résout PAS en exécutable direct (rare — uniquement des raccourcis
+`.lnk` non résolus par aucune des 4 méthodes de `_find_app_target`), l'application s'ouvre
+quand même mais sans l'URL, sans avertissement explicite dans le message retourné.
+Rollback : réversion du commit v2.541.
+
 ## 2026-07-31 — v2.540.0 — computer_control : quatrième passe + rapport d'architecture
 
 ### Demande et constats

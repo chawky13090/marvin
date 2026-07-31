@@ -572,7 +572,10 @@ async def _execute_body(args: dict[str, Any]) -> dict[str, Any]:
     elif action == "open":
         result = await _call(
             "pc_app_launch",
-            {"app_name": str(resolved_args.get("target") or "").strip()},
+            {
+                "app_name": str(resolved_args.get("target") or "").strip(),
+                "url": str(resolved_args.get("url") or "").strip(),
+            },
         )
     elif action == "navigate":
         try:

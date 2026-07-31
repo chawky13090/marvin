@@ -202,7 +202,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.540.0)
+## 9. État actuel (v2.541.0)
+
+**v2.541 (open+url combinés — correction de la piste structurelle proposée en v2.540)** :
+implémentation de la piste proposée au rapport v2.540, avec une correction importante
+découverte en creusant le code : la chaîne "open puis navigate" envisagée initialement
+était en réalité IMPOSSIBLE à faire fonctionner — `action=navigate` de `computer_control`
+pilote un Chromium **headless** géré par Playwright (`web_browser.py::_get_browser`,
+`chromium.launch(headless=True, ...)`), totalement indépendant de la fenêtre desktop
+VISIBLE ouverte par `action=open`. Même avec une syntaxe parfaite, naviguer après un open
+n'aurait jamais affecté la fenêtre que l'utilisateur voit. La vraie solution : `pc_app_launch`
+(et `computer_control action=open`) acceptent désormais un paramètre `url` optionnel ;
+quand l'application cible est un navigateur connu (chrome/firefox/msedge/brave/opera) et
+que sa résolution donne un exécutable direct, il est lancé via `subprocess.Popen([exe,
+url])` au lieu de `os.startfile` sans argument — la page demandée s'ouvre directement dans
+la fenêtre visible, en un seul appel, sans clavier/souris simulés. Vérifié en conditions
+réelles : Firefox lancé avec `url="https://it-connect.fr"` → fenêtre "IT-Connect | ... —
+Mozilla Firefox" confirmée par énumération des fenêtres 3s après lancement. Aucune
+migration. Rollback : réversion du commit v2.541.
 
 **v2.540 (computer_control : quatrième passe + rapport d'architecture outils)** :
 QUATRIÈME conversation réelle consécutive analysée sur demande explicite (« regarde
