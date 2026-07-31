@@ -5,6 +5,95 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.537.0 — Fiabilité des appels d'outils, à partir d'une vraie conversation
+
+### Demande et constats
+
+Retour direct de l'utilisateur : « je trouve qu'il ne fait pas bien les choses, il est trop
+brouillon, se trompe souvent et je dois le re-prompter pour arriver à des résultats mitigés
+[...] et peut-être revoir comment les outils sont appelés ». Demande explicite d'analyser
+« la dernière conversation » plutôt que de deviner. Extraction complète de la conversation
+la plus récente en base (`9a1f6ac0-f4d1-4b7c-8fee-ff25f16b13c6`, « Liste des éléments du
+bureau », 192 messages, 34 résultats d'erreur) et lecture ligne à ligne. Six défauts
+identifiés, cinq confirmés avec le code exact en cause :
+
+1. **Coercion de types stringifiés bricolée au cas par cas.** `file_find` a échoué 6 fois
+   d'affilée sur la même demande utilisateur : `include_dirs="True"` puis `"true"`
+   (chaîne au lieu de booléen), `max_results="2000"` (chaîne au lieu d'entier).
+   `pc_run_powershell` a échoué 2 fois de plus sur `timeout="120"` et `confirmed="True"`.
+   `agent_tool_step._coerce_stringified_json_fields` (v2.526) ne répare que les
+   `array`/`object` sérialisés en chaîne ; les booléens n'étaient corrigés qu'en dur pour
+   4 clés de `computer_control` et 4 de `web_site_crawl` — aucune couverture générique.
+2. **Aucun garde-fou après une confirmation requise.** `pc_run_powershell` a répondu
+   `CONFIRMATION_REQUIRED` (nécessite un clic dans les boutons du chat, jamais du texte) et
+   le modèle a retenté le MÊME appel 3 fois avec des arguments différents avant d'abandonner
+   — aucune reformulation ne peut jamais lever un blocage attendant un humain.
+3. **`tool_search` classe mal les outils évidents** pour une requête en langage naturel
+   (`file_find` 8ᵉ/10 pour « lister tous les fichiers d'un répertoire », derrière
+   `conversation_list` et `file_create_folder`) — non corrigé dans cette tranche, nécessite
+   un travail de fond sur le ranking (embeddings + heuristiques), noté pour une tranche
+   ultérieure.
+4. **`file_find` n'a pas de mode « premier niveau seulement ».** `pattern="*"` récursait
+   dans tous les sous-dossiers et plafonnait à 500 résultats sans distinguer le contenu
+   direct du dossier demandé de celui de ses sous-dossiers — impossible d'obtenir une liste
+   propre et complète du bureau avec l'outil existant.
+5. **`computer_control` invente des paramètres hors schéma** (`hwnd`, `program`, `window`)
+   pour cibler une fenêtre ou lancer un programme — à deux reprises, à 50 minutes
+   d'intervalle, dans la MÊME conversation. Vrai manque de capacité pour `hwnd` (le modèle
+   veut légitimement cibler par l'identifiant renvoyé par `observe`, pas seulement par un
+   titre approximatif) ; simple alias manquant pour `program`→`target`.
+6. **Un appel `computer_control` a mis 525 secondes** avant d'être annulé par le budget
+   temporel GLOBAL du tour — alors que le code de `pc_window_focus` est synchrone et
+   répond normalement en millisecondes. Cause exacte non identifiée avec certitude
+   (probable aléa Windows sur `SetForegroundWindow`), mais confirmé : aucun timeout
+   interne propre à l'outil n'existe, indépendant du budget du tour.
+
+### Décisions et modifications
+
+- `backend/agent_tool_step.py` : `_coerce_stringified_json_fields` généralisé à tout champ
+  `boolean`/`integer`/`number` déclaré par le schéma (nouveau helper
+  `_coerce_stringified_scalar`), plus les `array`/`object` déjà couverts. Alias
+  `program`/`app`/`app_name`/`application`→`target` ajouté pour `computer_control` quand
+  `action=open`.
+- `backend/agent_tool_batch.py` : nouveau `_needs_human_confirmation()` (détecte
+  `requiresConfirmation` ou `_contract.error_code == "CONFIRMATION_REQUIRED"`) et
+  `_CONFIRMATION_REQUIRED_REMINDER` injecté dans le contexte après un tel résultat, même
+  motif que `_UNTRUSTED_WEB_REMINDER` déjà existant.
+- `backend/tool_domains/filesystem.py` : nouveau paramètre `recursive` sur `find()` (défaut
+  `true`, rétrocompatible) ; `recursive=false` fait un `_shallow_scan()` du dossier demandé
+  uniquement (pas de récursion, pas de troncature ambiguë entre premier niveau et
+  sous-dossiers).
+- `backend/tools.py` : schéma `file_find` documente `recursive` ; schéma `computer_control`
+  et `pc_window_focus` acceptent un `hwnd` (entier) en plus du titre approximatif.
+- `backend/computer_runtime.py` : `execute()` accepte désormais `hwnd` pour `action=focus`
+  (transmis à `pc_window_focus`) ; nouveau timeout interne de 45s
+  (`_INTERNAL_TIMEOUT_SECONDS`), indépendant du budget du tour, encapsulant l'ancien corps
+  de `execute()` renommé `_execute_body()`.
+- `backend/tool_domains/pc_control.py` : `execute_pc_window_focus()` accepte `hwnd` en
+  priorité sur `search` ; erreur claire si ni l'un ni l'autre n'est fourni.
+
+### Validation, sécurité, logs et rollback
+
+Chaque correctif rejoue littéralement l'incident réel de la conversation source et prouve
+le résultat correct : `file_find`/`pc_run_powershell` avec les valeurs stringifiées exactes
+observées → types corrects ; `computer_control action=open program=chrome` → `target=chrome`
+sans `program` résiduel ; `_needs_human_confirmation` sur les deux formes de blocage
+observées ; `computer_runtime.execute` avec un `_observe` simulé lent → annulation propre
+sous le nouveau plafond (testé à 1s) au lieu de continuer ; `pc_window_focus` avec un hwnd
+réel (Program Manager) → focus réussi, avec hwnd invalide/absent → erreurs explicites.
+Suites de régression exécutées et vertes : `test_agent_tool_step`,
+`test_stringified_array_repair`, `test_agent_tool_batch`,
+`test_agent_tool_batch_parallel`, `test_agent_tool_dispatch`, `test_computer_runtime`,
+`test_tool_domain_filesystem`, `test_agent_model_step`, `test_agent_policy`,
+`test_capability_discovery_v2`, `test_tool_capability_ranking`, `audit_tool_coverage.py`
+(inchangé : 4 outils non couverts, pré-existants, sans rapport), `check_architecture.py`,
+`test_main_composition.py`. Aucune migration, aucun changement d'API cassant (nouveaux
+paramètres tous optionnels avec défaut rétrocompatible). Hors périmètre de cette tranche,
+noté pour plus tard : ranking de `tool_search` (point 3), et `MAX_TOOL_STEPS=10` volontairement
+non augmenté — le raisonnement est que la majorité des tours perdus dans la conversation
+source provenaient du bug n°1, pas d'un plafond trop bas ; à réévaluer après observation
+réelle post-correctif. Rollback : réversion du commit v2.537.
+
 ## 2026-07-31 — v2.536.0 — Routage cloud interne aligné sur Model Market (qwen mieux utilisé)
 
 ### Demande et constats

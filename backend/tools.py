@@ -2975,11 +2975,12 @@ TOOLS_SPEC = [
         "extensions": {"type": "array", "items": {"type": "string"}, "description": "Extensions à chercher (.txt, .pdf, .docx...)"},
         "case_sensitive": {"type": "boolean", "description": "Recherche sensible à la casse"}},
        ["directory", "query"]),
-    _t("file_find", "Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (très rapide ~50ms) ou os.walk en fallback. Pour chercher sur TOUT le PC, omettez 'path' ou utilisez path='all'.",
+    _t("file_find", "Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (très rapide ~50ms) ou os.walk en fallback. Pour chercher sur TOUT le PC, omettez 'path' ou utilisez path='all'. Pour lister UNIQUEMENT le contenu direct d'un dossier précis (ex: « qu'y a-t-il sur mon bureau »), utilisez recursive=false — sinon pattern='*' recurse dans tous les sous-dossiers et peut plafonner sans montrer le premier niveau proprement.",
        {"pattern":      {"type": "string",  "description": "Motif : *.pdf, rapport*, *2024*, ou simplement un nom. Supporte * et ?"},
         "path":         {"type": "string",  "description": "Dossier de recherche, ou 'all' pour tout le PC (défaut : tout le PC via l'index Windows)"},
         "max_results":  {"type": "integer", "description": "Limite de résultats (défaut 100)"},
-        "include_dirs": {"type": "boolean", "description": "Inclure les dossiers dans les résultats (défaut false)"}},
+        "include_dirs": {"type": "boolean", "description": "Inclure les dossiers dans les résultats (défaut false)"},
+        "recursive":    {"type": "boolean", "description": "false = uniquement le contenu direct de 'path' (pas les sous-dossiers), sans plafond artificiel de troncature ambiguë. Défaut true."}},
        ["pattern"]),
     _t("system_search", "🚀 RECHERCHE ULTRA-RAPIDE sur tout le PC via l'index Windows Search (~50ms). Utilisez cet outil EN PRIORITÉ quand l'utilisateur cherche un fichier ou dossier dont il ne connaît pas l'emplacement exact.",
        {"query":      {"type": "string", "description": "Mot-clé à chercher dans les noms de fichiers/dossiers (ex: 'abdou', 'rapport', 'photo vacances')"},
@@ -3163,9 +3164,10 @@ TOOLS_SPEC = [
     _t("pc_window_list", "Liste toutes les fenêtres ouvertes sur le bureau.",
        {}, []),
 
-    _t("pc_window_focus", "Met une fenêtre au premier plan par son titre.",
-       {"search": {"type": "string", "description": "Texte à rechercher dans le titre de la fenêtre"}},
-       ["search"]),
+    _t("pc_window_focus", "Met une fenêtre au premier plan par son titre, ou par son hwnd exact (renvoyé par observe/list_windows) si plusieurs fenêtres se ressemblent.",
+       {"search": {"type": "string", "description": "Texte à rechercher dans le titre de la fenêtre"},
+        "hwnd": {"type": "integer", "description": "Identifiant hwnd exact — prioritaire sur 'search' si fourni"}},
+       []),
 
     _t("pc_gui_read", "Lit l'arbre des éléments cliquables (boutons/champs/menus/listes) d'une fenêtre Windows "
                        "via UI Automation — PAS une capture d'écran, une lecture structurée 100% locale. Utilise "
@@ -3950,6 +3952,7 @@ TOOLS_SPEC = [
                     "description": "Surface ciblée. Préciser browser pour les éléments Web Playwright."},
         "target": {"type": "string", "description": "Application à ouvrir ou URL à parcourir"},
         "window": {"type": "string", "description": "Sous-chaîne exacte du titre de fenêtre"},
+        "hwnd": {"type": "integer", "description": "Identifiant hwnd exact renvoyé par observe/list_windows — cible plus fiable qu'un titre quand plusieurs fenêtres se ressemblent (utilisable avec action=focus)."},
         "control_type": {"type": "string", "description": "Type UIA desktop ou rôle ARIA Web issu de l'observation"},
         "name": {"type": "string", "description": "Nom accessible exact issu de l'observation"},
         "automation_id": {"type": "string", "description": "Identifiant UIA issu de l'observation"},

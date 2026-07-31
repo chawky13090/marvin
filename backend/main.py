@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.537 — fiabilite des appels d'outils : coercion generique, hwnd, timeout interne
 # v2.536 — routage cloud interne aligne sur Model Market (qwen mieux utilise en agentique)
 # v2.535 — audit outils : correctifs OCR/reseau/diff/logo/commandes/telechargement
 # v2.534 — cycle de vie sérialisé, observable, portable et vérifié par résultat
@@ -44,7 +45,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.502 — onglets SearXNG redondants et vérifiés
 # v2.501 — recherche Web multi-catégories et verticale
 # v2.500 — SearXNG multi-moteurs et rechargement vérifié
-# v2.499 — projets et conversations pilotables depuis le chat
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

@@ -483,6 +483,30 @@ def _normalize_index_results(
     ]
 
 
+def _shallow_scan(root: str, pattern: str, include_dirs: bool, max_results: int) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    with os.scandir(root) as entries:
+        for entry in entries:
+            if not fnmatch.fnmatch(entry.name.casefold(), pattern.casefold()):
+                continue
+            if entry.is_dir() and not include_dirs:
+                continue
+            try:
+                stat = entry.stat()
+                results.append({
+                    "name": entry.name,
+                    "path": entry.path,
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                    "type": "Directory" if entry.is_dir() else Path(entry.name).suffix or "",
+                })
+            except OSError:
+                results.append({"name": entry.name, "path": entry.path})
+            if len(results) >= max_results:
+                break
+    return results
+
+
 async def find(args: dict[str, Any]) -> dict[str, Any]:
     pattern = str(args.get("pattern", "*")).strip()
     path = str(args.get("path", "")).strip()
@@ -494,7 +518,30 @@ async def find(args: dict[str, Any]) -> dict[str, Any]:
         return {"error": "Paramètre 'max_results' invalide : entier attendu."}
     include_dirs = bool(args.get("include_dirs", False))
     use_index = bool(args.get("use_index", True))
+    recursive = bool(args.get("recursive", True))
     global_scope = not path or path.casefold() in {"all", "tout", "everywhere", "*"}
+
+    # v2.537 — Incident réel reproduit (conversation « Liste des éléments du bureau ») :
+    # `pattern="*"` recursait dans TOUS les sous-dossiers et plafonnait à 500 résultats
+    # sans distinguer le contenu direct du dossier demandé de celui de ses sous-dossiers
+    # — impossible d'obtenir une liste propre et complète du premier niveau. `recursive`
+    # (par défaut `true`, rétrocompatible) permet un scan superficiel non tronqué.
+    if not recursive:
+        resolved = Path(_resolve(path or "~"))
+        if not resolved.exists() or not resolved.is_dir():
+            return {"error": f"Dossier introuvable : {resolved}"}
+        results = await asyncio.to_thread(
+            _shallow_scan, str(resolved), pattern, include_dirs, max_results
+        )
+        return {
+            "success": True,
+            "pattern": pattern,
+            "root": str(resolved),
+            "method": "shallow_scan",
+            "recursive": False,
+            "count": len(results),
+            "results": results,
+        }
 
     if use_index and global_scope:
         results = _normalize_index_results(await asyncio.to_thread(

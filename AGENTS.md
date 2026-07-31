@@ -202,7 +202,30 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.536.0)
+## 9. État actuel (v2.537.0)
+
+**v2.537 (fiabilité des appels d'outils)** : issus de l'analyse ligne à ligne d'une vraie
+conversation Marvin (« Liste des éléments du bureau », 192 messages, 34 erreurs) menée sur
+demande explicite après un retour utilisateur (« il est trop brouillon, se trompe souvent »).
+Cinq défauts confirmés avec le code exact en cause, plus un correctif défensif :
+`agent_tool_step._coerce_stringified_json_fields` ne réparait que les `array`/`object`
+sérialisés en chaîne (patch v2.526), avec des rustines en dur par outil pour quelques
+booléens — généralisé à TOUT champ `boolean`/`integer`/`number` déclaré par le schéma
+(`file_find.include_dirs="true"`, `pc_run_powershell.timeout="120"` échouaient 6 fois
+d'affilée sur la même demande avant ce correctif). Un rappel (`_CONFIRMATION_REQUIRED_REMINDER`,
+même motif que le rappel Web non fiable existant) est injecté après tout résultat
+`CONFIRMATION_REQUIRED` : le modèle retentait auparavant le même outil bloqué avec des
+arguments différents, alors qu'aucune reformulation ne lève un blocage attendant un clic
+humain. `file_find` accepte un nouveau paramètre `recursive` (défaut `true`) : `pattern="*"`
+recursait auparavant dans tous les sous-dossiers et plafonnait à 500 résultats sans
+distinguer le contenu direct d'un dossier de ses sous-dossiers, rendant impossible une
+liste propre du bureau. `computer_control`/`pc_window_focus` acceptent désormais un `hwnd`
+exact (renvoyé par `observe`/`list_windows`) en plus du titre approximatif, et un alias
+`program`/`app`/`app_name`→`target` pour `action=open`. Enfin, `computer_runtime.execute`
+a désormais un timeout interne de 45s indépendant du budget global du tour : un appel
+(observé en réel à 525s) ne peut plus silencieusement consommer tout le temps restant
+avant que le garde-fou de tour, bien plus tardif, ne le coupe. Aucune migration. Rollback :
+réversion du commit v2.537.
 
 **v2.536 (routage cloud interne aligné sur Model Market)** : `agent_model_config.py` (boucle
 de chat principale) mappait déjà chaque profil sur un besoin Model Market (agent→agentic,

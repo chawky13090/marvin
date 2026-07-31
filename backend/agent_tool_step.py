@@ -47,6 +47,41 @@ class PreparedToolCall:
 # champ déclaré `array`/`object` par le schéma, reçu sous forme de chaîne, est
 # décodé UNE fois ; un échec de décodage ou un type décodé incohérent laisse la
 # valeur telle quelle pour que le message d'erreur existant reste exact.
+#
+# v2.537 — Même défaut constaté sur `boolean`/`integer`/`number` (conversation
+# « Liste des éléments du bureau ») : `file_find.include_dirs="true"`,
+# `file_find.max_results="2000"`, `pc_run_powershell.timeout="120"`,
+# `pc_run_powershell.confirmed="True"` — 6 échecs de validation d'affilée sur
+# la MÊME demande utilisateur, alors qu'un correctif équivalent existait déjà
+# mais seulement en dur pour deux clés de `computer_control` et quatre de
+# `web_site_crawl`. Généralisé à TOUT champ scalaire déclaré par le schéma,
+# pour ne plus dépendre d'une liste d'exceptions entretenue outil par outil.
+_TRUE_LITERALS = frozenset({"true", "1", "yes", "oui"})
+_FALSE_LITERALS = frozenset({"false", "0", "no", "non"})
+
+
+def _coerce_stringified_scalar(value: str, expected: str) -> Any:
+    stripped = value.strip()
+    if expected == "boolean":
+        folded = stripped.casefold()
+        if folded in _TRUE_LITERALS:
+            return True
+        if folded in _FALSE_LITERALS:
+            return False
+        return None
+    if expected == "integer":
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    if expected == "number":
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    return None
+
+
 def _coerce_stringified_json_fields(
     arguments: dict[str, Any], schema: Mapping[str, Any] | None
 ) -> dict[str, Any]:
@@ -60,9 +95,16 @@ def _coerce_stringified_json_fields(
         if key not in arguments or not isinstance(field_schema, Mapping):
             continue
         expected = field_schema.get("type")
-        python_type = expected_python_type.get(expected)
         value = arguments[key]
-        if python_type is None or not isinstance(value, str):
+        if not isinstance(value, str):
+            continue
+        if expected in {"boolean", "integer", "number"}:
+            coerced = _coerce_stringified_scalar(value, expected)
+            if coerced is not None:
+                arguments[key] = coerced
+            continue
+        python_type = expected_python_type.get(expected)
+        if python_type is None:
             continue
         stripped = value.strip()
         if not stripped or stripped[0] not in "[{":
@@ -105,6 +147,13 @@ def prepare_tool_call(
             value = arguments.get(key)
             if isinstance(value, str) and value.strip().casefold() in {"true", "false"}:
                 arguments[key] = value.strip().casefold() == "true"
+        # v2.537 — Incident réel reproduit : le modèle appelle `action="open"` avec
+        # `program`/`app`/`app_name` (absents du schéma) au lieu de `target`.
+        if not arguments.get("target"):
+            for alias in ("program", "app", "app_name", "application"):
+                if arguments.get(alias):
+                    arguments["target"] = arguments.pop(alias)
+                    break
 
     if (
         name == "pc_run_powershell"

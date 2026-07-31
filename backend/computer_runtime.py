@@ -414,7 +414,31 @@ async def _desktop_input(action: str, args: dict[str, Any]) -> dict[str, Any]:
         return {"error": str(exc)}
 
 
+# v2.537 — Incident réel reproduit (conversation « Liste des éléments du bureau ») :
+# un seul appel `computer_control` (action focus) a mis 525s avant d'être annulé —
+# non par un timeout propre à l'outil, mais par le budget temporel GLOBAL du tour
+# (agent_tool_batch.py), qui peut être bien plus large. Un plafond interne, propre
+# à cet outil et indépendant du budget du tour, fait échouer vite avec un
+# diagnostic clair plutôt que de silencieusement consommer plusieurs minutes.
+_INTERNAL_TIMEOUT_SECONDS = 45
+
+
 async def execute(args: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return await asyncio.wait_for(_execute_body(args), timeout=_INTERNAL_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        return {
+            "success": False,
+            "error": (
+                f"L'action a dépassé le délai interne de {_INTERNAL_TIMEOUT_SECONDS}s "
+                "et a été annulée proprement."
+            ),
+            "timeout": True,
+            "needs_repair": True,
+        }
+
+
+async def _execute_body(args: dict[str, Any]) -> dict[str, Any]:
     try:
         resolved_args = _resolve_element_ref(args)
     except ValueError as exc:
@@ -510,7 +534,10 @@ async def execute(args: dict[str, Any]) -> dict[str, Any]:
     elif action == "focus":
         result = await _call(
             "pc_window_focus",
-            {"search": window or str(resolved_args.get("target") or "").strip()},
+            {
+                "search": window or str(resolved_args.get("target") or "").strip(),
+                "hwnd": resolved_args.get("hwnd"),
+            },
         )
     elif (
         action in {"click", "type", "commit"}

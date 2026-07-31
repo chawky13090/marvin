@@ -936,9 +936,30 @@ async def execute_pc_window_list(args: dict) -> dict:
 
 async def execute_pc_window_focus(args: dict) -> dict:
     search = str(args.get("search", "") or "").strip()
+    requested_hwnd = args.get("hwnd")
+    if not search and requested_hwnd is None:
+        return {"error": "Paramètre 'search' ou 'hwnd' requis."}
     try:
         import win32gui
         import win32con
+
+        # v2.537 — Incident réel reproduit (conversation « Liste des éléments du
+        # bureau ») : le modèle cible régulièrement une fenêtre par le `hwnd`
+        # renvoyé par observe/list_windows (identifiant exact, sans ambiguïté de
+        # titre) — non supporté jusqu'ici, le paramètre était rejeté par le
+        # schéma. Priorité au hwnd exact quand fourni, sans changer le
+        # comportement existant par titre.
+        if requested_hwnd is not None:
+            try:
+                hwnd = int(requested_hwnd)
+            except (TypeError, ValueError):
+                return {"error": "Paramètre 'hwnd' invalide : entier attendu."}
+            if not win32gui.IsWindow(hwnd):
+                return {"error": f"Aucune fenêtre avec le hwnd {hwnd}"}
+            title = win32gui.GetWindowText(hwnd)
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
+            return {"success": True, "message": f"Fenêtre mise au premier plan : {title}"}
 
         candidates: list[tuple[int, str]] = []
 
