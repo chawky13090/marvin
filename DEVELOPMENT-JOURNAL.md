@@ -5,6 +5,65 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.538.0 — computer_control : touches spéciales SendKeys et alias d'outil
+
+### Demande et constats
+
+Retour direct : « regarde la dernière conversation avec toujours trop de bugs et d'erreurs,
+il faut trouver pourquoi Marvin ne sait plus bien choisir les outils adéquats ». Extraction
+de la conversation la plus récente (`318b7de5-80c3-41d7-b64c-ca24c909a0d9`, « Ouvrir IT
+Connect sur Firefox », 19:37-19:50, 73 messages, 28 erreurs) — survenue APRÈS le commit
+v2.537 mais avant tout redémarrage du backend réel. Plusieurs erreurs observées
+(`computer_control.x doit être de type number`, hang de 465s) sont EXACTEMENT celles déjà
+corrigées en v2.537 : confirmation que le process uvicorn en mémoire garde l'ancien code
+tant qu'il n'est pas redémarré — pas un échec du correctif. Trois défauts NOUVEAUX,
+distincts, identifiés avec le code exact en cause :
+
+1. Le modèle appelle un outil `browser` qui n'existe dans aucun catalogue, avec
+   `{action:"navigate", url:"..."}` — `tool_gateway` répond "Outil « browser » introuvable."
+2. Le modèle envoie des combinaisons de touches via `action=type` (pas `keypress`) en
+   syntaxe SendKeys/AutoHotkey qu'il connaît visiblement par cœur : `text="{Enter}"`,
+   `text="{enter}"`, `text="%{ALT}%{TAB}"`, `text="%{WIN}"` — les QUATRE rejetées par
+   pywinauto avec `Unknown code: Enter/ALT/enter/WIN`. `_keypress_sequence()` (utilisée
+   uniquement par `action=keypress`) attend un format différent (`CTRL+ALT+DELETE`,
+   majuscules) et n'était jamais consultée pour `action=type`.
+3. Le modèle appelle `action=click` avec seulement `window` (aucune coordonnée ni élément),
+   pensant visiblement que faire venir la fenêtre au premier plan suffit à「cliquer dedans」.
+   Le focus automatique a bien lieu, mais le clic échoue ensuite avec le message opaque
+   `x et y sont requis et numériques.`, sans orienter vers la bonne action.
+
+### Décisions et modifications
+
+- `backend/agent_tool_step.py` : alias borné `browser`/`web_browser`/`open_browser`/
+  `navigate` → `web_browser_open` (avec `url`), actif UNIQUEMENT si ce nom n'existe pas déjà
+  dans le catalogue réel des outils (jamais de collision avec un vrai outil futur).
+- `backend/computer_runtime.py` : nouveau `_parse_key_combo()` — détecte par `fullmatch`
+  strict une syntaxe SendKeys/AutoHotkey (`{TOKEN}`, `%`/`^`/`+` comme modificateurs) dans
+  `action=type`, la traduit vers le même format que `_keypress_sequence` (table d'alias
+  étendue avec `WIN`/`LWIN`/`RWIN`/`SUPER`/`RETURN`) et l'envoie comme un vrai raccourci
+  clavier. Un texte littéral contenant des accolades (ex. `"{world}"` isolé, ou toute prose
+  normale) n'est JAMAIS affecté — le `fullmatch` échoue et le texte part tel quel en saisie
+  littérale. `action=click`/`double_click`/`right_click` avec seulement `window` (aucune
+  coordonnée ni élément) renvoie désormais un message explicite orientant vers `action=focus`
+  ou la fourniture de coordonnées/élément, au lieu du message opaque `_frame_point`.
+
+### Validation, sécurité, logs et rollback
+
+Les QUATRE combinaisons exactes de la conversation source (`{Enter}`, `{enter}`,
+`%{ALT}%{TAB}`, `%{WIN}`) sont testées et se résolvent correctement
+(`{ENTER}`, `{ENTER}`, `%{TAB}`, `%{LWIN}`) ; testé aussi que du texte littéral
+(`"hello world"`, `"{world}"` isolé) n'est jamais intercepté. L'alias `browser`→
+`web_browser_open` est testé avec et sans collision de nom réelle. Le nouveau message de
+`click` sans coordonnées est testé via un `computer_runtime.execute()` complet avec
+exécuteurs simulés. Suites de régression exécutées et vertes : `test_computer_runtime`,
+`test_agent_tool_step`, `test_stringified_array_repair`, `test_agent_tool_batch`,
+`test_agent_tool_batch_parallel`, `test_agent_tool_dispatch`, `test_tool_domain_filesystem`,
+`test_agent_model_step`, `test_agent_policy`, `test_capability_discovery_v2`,
+`check_architecture.py`, `test_main_composition.py`. Aucune migration, aucun changement
+d'API cassant. **Point important pour la suite** : ces correctifs (et ceux de v2.537) ne
+prennent effet qu'après un redémarrage du backend — le process uvicorn en cours d'exécution
+garde le code chargé en mémoire au démarrage. Rollback : réversion du commit v2.538.
+
 ## 2026-07-31 — v2.537.0 — Fiabilité des appels d'outils, à partir d'une vraie conversation
 
 ### Demande et constats

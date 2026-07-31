@@ -202,7 +202,25 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.537.0)
+## 9. État actuel (v2.538.0)
+
+**v2.538 (computer_control : touches spéciales, alias, message clair)** : analyse d'une
+DEUXIÈME conversation réelle (« Ouvrir IT Connect sur Firefox », 73 messages, 28 erreurs),
+survenue APRÈS le commit v2.537 mais avant redémarrage du backend — confirmant au passage
+que les correctifs v2.537 nécessitent un redémarrage pour prendre effet (le process en
+mémoire garde l'ancien code). Trois nouveaux défauts, distincts de ceux de v2.537: (1) le
+modèle envoie des combinaisons de touches via `action=type` en syntaxe SendKeys/AutoHotkey
+qu'il connaît par cœur (`{Enter}`, `{enter}`, `%{ALT}%{TAB}`, `%{WIN}`) — TOUJOURS rejetées
+avec `Unknown code: X` car cette syntaxe n'était comprise que par `action=keypress`, en
+majuscules strictes ; `_parse_key_combo()` détecte maintenant cette syntaxe aussi dans
+`action=type` (détection stricte par `fullmatch`, un texte littéral contenant des accolades
+reste tapé tel quel). (2) le modèle a appelé un outil `browser` inexistant avec
+`{action, url}` — alias borné vers `web_browser_open`, actif uniquement si le nom n'existe
+pas déjà dans le catalogue réel. (3) `action=click` avec seulement `window` (le modèle
+pensait que faire venir la fenêtre au premier plan suffisait à cliquer) échouait avec le
+message opaque `x et y sont requis et numériques` — message clair désormais, qui oriente
+vers `action=focus` ou la fourniture de coordonnées/élément. Aucune migration. Rollback :
+réversion du commit v2.538.
 
 **v2.537 (fiabilité des appels d'outils)** : issus de l'analyse ligne à ligne d'une vraie
 conversation Marvin (« Liste des éléments du bureau », 192 messages, 34 erreurs) menée sur

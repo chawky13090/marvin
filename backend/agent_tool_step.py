@@ -155,6 +155,19 @@ def prepare_tool_call(
                     arguments["target"] = arguments.pop(alias)
                     break
 
+    # v2.538 — Incident réel reproduit (conversation « Ouvrir IT Connect sur
+    # Firefox ») : le modèle a appelé un outil "browser" inexistant (aucun outil
+    # du catalogue ne porte ce nom générique) avec {action, url}. Alias borné aux
+    # noms génériques les plus prévisibles, uniquement si le nom n'existe PAS
+    # déjà dans le catalogue réel (jamais de collision avec un vrai outil).
+    if (
+        name in {"browser", "web_browser", "open_browser", "navigate"}
+        and (schemas_by_name is None or name not in schemas_by_name)
+        and (arguments.get("url") or arguments.get("target"))
+    ):
+        arguments = {"url": arguments.get("url") or arguments.get("target")}
+        name = "web_browser_open"
+
     if (
         name == "pc_run_powershell"
         and not arguments.get("script")

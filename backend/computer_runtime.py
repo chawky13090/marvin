@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -315,30 +316,76 @@ def _frame_point(
     return round(x), round(y)
 
 
+_KEY_ALIASES = {
+    "ENTER": "{ENTER}", "RETURN": "{ENTER}", "TAB": "{TAB}", "ESC": "{ESC}",
+    "ESCAPE": "{ESC}", "BACKSPACE": "{BACKSPACE}", "DELETE": "{DELETE}",
+    "SPACE": "{SPACE}", "HOME": "{HOME}", "END": "{END}",
+    "PAGEUP": "{PGUP}", "PAGEDOWN": "{PGDN}",
+    "UP": "{UP}", "DOWN": "{DOWN}", "LEFT": "{LEFT}", "RIGHT": "{RIGHT}",
+    "WIN": "{LWIN}", "LWIN": "{LWIN}", "RWIN": "{RWIN}", "SUPER": "{LWIN}",
+}
+_MODIFIER_NAMES = {"CTRL": "^", "CONTROL": "^", "ALT": "%", "SHIFT": "+"}
+
+
 def _keypress_sequence(text: str) -> str:
     value = str(text or "").strip()
     if not value or len(value) > 80:
         raise ValueError("Combinaison clavier absente ou trop longue.")
-    aliases = {
-        "ENTER": "{ENTER}", "TAB": "{TAB}", "ESC": "{ESC}",
-        "ESCAPE": "{ESC}", "BACKSPACE": "{BACKSPACE}", "DELETE": "{DELETE}",
-        "SPACE": "{SPACE}", "HOME": "{HOME}", "END": "{END}",
-        "PAGEUP": "{PGUP}", "PAGEDOWN": "{PGDN}",
-        "UP": "{UP}", "DOWN": "{DOWN}", "LEFT": "{LEFT}", "RIGHT": "{RIGHT}",
-    }
     parts = [part.strip().upper() for part in value.split("+") if part.strip()]
-    modifiers = {"CTRL": "^", "CONTROL": "^", "ALT": "%", "SHIFT": "+"}
-    prefix = "".join(modifiers[part] for part in parts[:-1] if part in modifiers)
+    prefix = "".join(_MODIFIER_NAMES[part] for part in parts[:-1] if part in _MODIFIER_NAMES)
     key = parts[-1] if parts else ""
-    if any(part not in modifiers for part in parts[:-1]):
+    if any(part not in _MODIFIER_NAMES for part in parts[:-1]):
         raise ValueError("Combinaison clavier non reconnue.")
-    if key in aliases:
-        return prefix + aliases[key]
+    if key in _KEY_ALIASES:
+        return prefix + _KEY_ALIASES[key]
     if len(key) == 1 and key.isalnum():
         return prefix + key.lower()
     if key.startswith("F") and key[1:].isdigit() and 1 <= int(key[1:]) <= 24:
         return prefix + "{" + key + "}"
     raise ValueError("Touche non reconnue.")
+
+
+# v2.538 — Incident réel reproduit (conversation « Ouvrir IT Connect sur Firefox ») :
+# le modèle envoie des combinaisons de touches via action=type (pas keypress) en
+# syntaxe SendKeys/AutoHotkey qu'il connaît par cœur — "{Enter}", "{enter}",
+# "%{ALT}%{TAB}", "%{WIN}" — TOUTES rejetées par pywinauto avec "Unknown code: X"
+# car cette syntaxe n'est interprétée que par action=keypress, en majuscules
+# strictes. Plutôt qu'exiger que le modèle mémorise la bonne action et la bonne
+# casse, on détecte cette syntaxe dans action=type et on la route vers le même
+# normalisateur que keypress — le texte littéral non concerné n'est jamais affecté
+# (fullmatch strict : un vrai texte contenant des accolades reste tapé tel quel).
+_KEY_COMBO_TOKEN = re.compile(r"\{([A-Za-z][A-Za-z0-9]*)\}|([%^+])")
+_KEY_COMBO_FULL = re.compile(r"(?:\{[A-Za-z][A-Za-z0-9]*\}|[%^+])+")
+
+
+def _parse_key_combo(text: str) -> str | None:
+    value = str(text or "").strip()
+    if not value or len(value) > 40 or not _KEY_COMBO_FULL.fullmatch(value):
+        return None
+    modifiers: list[str] = []
+    key_candidates: list[str] = []
+    for bracket, symbol in _KEY_COMBO_TOKEN.findall(value):
+        if symbol:
+            modifiers.append(_MODIFIER_NAMES.get(
+                {"%": "ALT", "^": "CTRL", "+": "SHIFT"}[symbol], symbol
+            ))
+            continue
+        token = bracket.upper()
+        if token in _MODIFIER_NAMES:
+            modifiers.append(_MODIFIER_NAMES[token])
+        else:
+            key_candidates.append(token)
+    if not key_candidates:
+        return None
+    key = key_candidates[-1]
+    prefix = "".join(dict.fromkeys(modifiers))
+    if key in _KEY_ALIASES:
+        return prefix + _KEY_ALIASES[key]
+    if len(key) == 1 and key.isalnum():
+        return prefix + key.lower()
+    if key.startswith("F") and key[1:].isdigit() and 1 <= int(key[1:]) <= 24:
+        return prefix + "{" + key + "}"
+    return None
 
 
 def _desktop_input_sync(action: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -386,6 +433,10 @@ def _desktop_input_sync(action: str, args: dict[str, Any]) -> dict[str, Any]:
         text = str(args.get("text") or "")
         if not text:
             raise ValueError("text est requis.")
+        combo = _parse_key_combo(text)
+        if combo is not None:
+            send_keys(combo, pause=0.03)
+            return {"success": True, "message": "Raccourci clavier envoyé."}
         if len(text) > 20_000:
             raise ValueError("text dépasse la limite de 20 000 caractères.")
         send_keys(
@@ -570,6 +621,29 @@ async def _execute_body(args: dict[str, Any]) -> dict[str, Any]:
             focus_result = await _call("pc_window_focus", {"search": window})
             if focus_result.get("error"):
                 return {"error": focus_result["error"], "needs_repair": True}
+        # v2.538 — Incident réel reproduit (conversation « Ouvrir IT Connect sur
+        # Firefox ») : le modèle appelle action=click avec seulement `window`,
+        # pensant que cela suffit à cliquer dans la fenêtre déjà mise au premier
+        # plan par le focus ci-dessus. Un message clair évite plusieurs allers-
+        # retours avant de comprendre qu'un point ou un élément est nécessaire.
+        if (
+            action in {"click", "double_click", "right_click"}
+            and resolved_args.get("x") is None
+            and resolved_args.get("y") is None
+            and not resolved_args.get("element_ref")
+            and not resolved_args.get("control_type")
+            and not resolved_args.get("automation_id")
+        ):
+            return {
+                "error": (
+                    "La fenêtre a été mise au premier plan, mais cliquer exige "
+                    "aussi x/y (coordonnées de frame_id) ou un élément "
+                    "(element_ref, ou control_type+name) issu d'une observation "
+                    "récente. Utilise action=focus si tu voulais seulement "
+                    "amener la fenêtre au premier plan."
+                ),
+                "needs_repair": True,
+            }
         result = await _desktop_input(action, resolved_args)
     elif action in {
         "click", "double_click", "right_click", "move", "drag",
