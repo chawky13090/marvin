@@ -32,6 +32,37 @@ ALWAYS_CONFIRM_TOOLS = frozenset(
     }
 ) | frozenset(DANGEROUS_TOOLS) | frozenset(CONDITIONAL_TOOL_SAFE_ACTIONS)
 
+
+def is_parallel_batch_eligible(tool_calls: list[dict[str, Any]]) -> bool:
+    """Vrai si un lot d'appels peut s'exécuter en CONCURRENCE sans risque.
+
+    v2.525 — Un lot n'est éligible que si AUCUN de ses appels ne figure dans
+    `ALWAYS_CONFIRM_TOOLS`. Deux raisons impératives, pas une préférence :
+    (1) `tool_gateway` n'autorise qu'UNE seule approbation active par
+    conversation (v2.522) — deux demandes de confirmation concurrentes se
+    supplanteraient l'une l'autre ; (2) `postprocess_tool_result` ne déclenche
+    la relecture indépendante (`critique_action`, un VRAI appel modèle) que
+    pour les outils dangereux — l'exclure garantit qu'aucun appel modèle
+    concurrent supplémentaire n'est introduit par cette tranche.
+
+    Simplification déclarée : les outils listés dans
+    `CONDITIONAL_TOOL_SAFE_ACTIONS` (ex. `computer_control` en lecture) sont
+    exclus par NOM, sans inspecter l'action demandée — un `computer_control`
+    en `action="screenshot"` reste donc séquentiel alors qu'il serait sûr en
+    parallèle. Granularité par action laissée à une évolution ultérieure : le
+    gain principal visé ici (plusieurs lectures indépendantes simultanées)
+    n'en dépend pas.
+    """
+    if len(tool_calls) < 2:
+        return False
+    for call in tool_calls:
+        function = call.get("function") if isinstance(call, dict) else None
+        name = str((function or {}).get("name") or "")
+        if not name or name in ALWAYS_CONFIRM_TOOLS:
+            return False
+    return True
+
+
 Validator = Callable[[str, dict[str, Any]], str | None]
 Executor = Callable[
     [str, dict[str, Any], str, str | None],

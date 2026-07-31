@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.525 — tool-calling parallele borne pour les lots sans confirmation possible
 # v2.524 — corbeille par defaut, resilience Cloud->local, veille catalogue et peripheriques Windows
 # v2.523 — rafraîchissement résilient des conversations et projets
 # v2.522 — approbations historiques fail-closed et obsolescence par conversation

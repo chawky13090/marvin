@@ -202,7 +202,25 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.524.0)
+## 9. État actuel (v2.525.0)
+
+**v2.525 (tool-calling parallèle borné)** — *tranche livrée par Claude Code, backend
+non redémarré à la demande de l'utilisateur.* `agent_tool_dispatch.
+is_parallel_batch_eligible(tool_calls)` : un lot d'appels ne s'exécute en concurrence
+(`_MAX_PARALLEL_TOOLS = 4`) que s'il compte ≥2 appels et qu'AUCUN ne figure dans
+`ALWAYS_CONFIRM_TOOLS` — cette union existante garantit qu'aucun appel parallèle ne
+peut jamais déclencher une approbation (une seule active par conversation, v2.522) ni
+une relecture modèle concurrente (`critique_action`). Contrainte trouvée par lecture du
+transport : les messages `role: tool` renvoyés à Ollama n'ont **aucun identifiant de
+corrélation**, seul l'ORDRE compte — la finalisation (`_finalize_call_result`, extrait
+sans changement de comportement du lot séquentiel existant) respecte donc toujours
+l'ordre DEMANDÉ, jamais l'ordre de complétion réel. Le lot séquentiel existant reste
+intact pour tout appel dangereux ou lot d'un seul appel ; `agent.py` n'a nécessité
+aucune modification. Testé avec de vraies latences qui se chevauchent (concurrence
+réelle prouvée, pas supposée) et par mutation sur la préservation de l'ordre. 15 tests
+de la chaîne agentique réussis, 0 échec. **Simplification déclarée** : les outils
+`CONDITIONAL_TOOL_SAFE_ACTIONS` (ex. `computer_control`) restent exclus par nom entier
+sans granularité par action.
 
 **v2.524 (corbeille, résilience Cloud→local, veille catalogue, périphériques)** — *tranche
 livrée par Claude Code, backend non redémarré à la demande de l'utilisateur.* (1)

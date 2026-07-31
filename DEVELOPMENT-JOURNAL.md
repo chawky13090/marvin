@@ -14388,3 +14388,100 @@ la suppression définitive (dégrade en erreur explicite, jamais en silence) ;
 `model_catalog_watch.MIN_INTERVAL_SECONDS` à une valeur énorme désactive la veille
 sans la retirer ; les quatre outils de périphériques peuvent être retirés
 individuellement du registre sans toucher au reste du domaine Windows.
+
+## 2026-07-31 — v2.525 — Tool-calling parallèle borné
+
+> Tranche réalisée par **Claude Code**, choisie par l'utilisateur parmi deux
+> options restantes d'un audit précédent (l'autre étant la consommation MCP
+> tierce, laissée de côté — nouveau sous-système, pas un correctif). Backend
+> non redémarré à sa demande explicite : cette tranche ne prend effet qu'au
+> prochain redémarrage.
+
+### Constat
+
+`execute_tool_batch` (agent_tool_batch.py) exécutait tout séquentiellement, un
+appel à la fois, même quand le modèle demandait plusieurs lectures manifestement
+indépendantes (plusieurs fichiers, plusieurs recherches). Le gain visé n'est pas
+un débit maximal mais la latence perçue sur l'usage quotidien réel.
+
+### Analyse de sécurité préalable (déterminante avant tout code)
+
+Deux mécanismes rendent la parallélisation dangereuse par défaut, tous deux déjà
+présents dans le projet :
+- `tool_gateway` n'autorise **qu'une seule approbation active par conversation**
+  (v2.522) — deux confirmations concurrentes se supplanteraient l'une l'autre ;
+- `postprocess_tool_result` ne déclenche la relecture indépendante
+  (`critique_action`, un VRAI appel modèle) que pour les outils listés dans
+  `dangerous_tools` — l'exécuter deux fois en parallèle doublerait sans le
+  vouloir la charge modèle.
+
+`agent_tool_dispatch.ALWAYS_CONFIRM_TOOLS` est déjà l'union exacte de tout ce
+qui peut déclencher l'un ou l'autre. `is_parallel_batch_eligible(tool_calls)`
+s'appuie dessus : un lot n'est éligible que s'il contient au moins deux appels
+et qu'AUCUN ne figure dans cette liste. Simplification déclarée : les outils de
+`CONDITIONAL_TOOL_SAFE_ACTIONS` (ex. `computer_control` en lecture) sont exclus
+par NOM entier, sans inspecter l'action — un `computer_control action=screenshot`
+reste séquentiel alors qu'il serait sûr en parallèle ; le gain principal visé
+(plusieurs lectures indépendantes) n'en dépend pas.
+
+Autre contrainte trouvée par lecture du transport (`agent_transport.py`) : les
+messages `role: tool` renvoyés à Ollama ne portent **aucun identifiant de
+corrélation** — seul l'ORDRE d'apparition relie un résultat à son appel. Une
+exécution concurrente peut donc terminer dans le désordre, mais la
+**finalisation** (persistance, historique modèle) doit impérativement respecter
+l'ordre de la demande originale, jamais l'ordre de complétion.
+
+### Décisions et modifications
+
+- `_finalize_call_result` (nouveau) extrait la queue commune (critique, preuve,
+  `tool_end`, persistance, ajout à l'historique modèle, rappels Web/images) hors
+  du corps du lot séquentiel, SANS changer son comportement — vérifié par les
+  tests existants avant tout ajout de code parallèle.
+- `_execute_parallel_group` (nouveau) : lance les appels éligibles en
+  concurrence bornée (`_MAX_PARALLEL_TOOLS = 4`), une file de progression
+  PROPRE à chaque appel (jamais partagée), tous les `tool_start` émis d'un bloc
+  dans l'ordre d'origine avant tout lancement, puis finalisation dans cet ordre
+  quel que soit l'ordre réel de complétion.
+- Le lot séquentiel existant reste **intact et inchangé** pour tout lot
+  contenant un seul appel ou un outil dangereux — c'est le chemin déjà testé et
+  exposé aux outils sensibles ; aucune nouvelle logique n'y a été ajoutée.
+- `agent.py` n'a nécessité AUCUNE modification : le branchement vit entièrement
+  dans `execute_tool_batch`, appelé à l'identique.
+
+### Sécurité, logs et preuves
+
+Aucune capacité retirée, aucun outil dangereux ne peut jamais emprunter le
+chemin parallèle (vérifié par test : la présence d'un seul `file_delete` dans
+le lot le fait rester séquentiel). Le budget temporel du tour
+(`tool_timeout_seconds`) s'applique identiquement aux deux chemins ; toute tâche
+encore active au moment de la sortie de `_execute_parallel_group` est annulée
+explicitement (`asyncio.gather(..., return_exceptions=True)` en `finally`),
+jamais laissée orpheline. Aucun nouveau contenu, secret ou donnée personnelle
+dans les journaux ; les événements SSE conservent exactement la même forme.
+
+### Validation réelle
+
+- `test_agent_tool_batch.py` (existant, 2 scénarios avec un seul appel chacun) :
+  réussi AVANT et APRÈS l'extraction de `_finalize_call_result`, prouvant que
+  cette extraction n'a rien changé au chemin séquentiel.
+- `test_agent_tool_batch_parallel.py` (nouveau) : concurrence RÉELLE prouvée
+  avec de vraies latences qui se chevauchent (3 appels de 0,3 s exécutés en
+  moins de 0,6 s, chevauchement direct mesuré entre débuts/fins) ; ordre de
+  finalisation vérifié préservé même quand l'appel demandé en second termine en
+  premier ; lot contenant un outil dangereux resté strictement séquentiel (temps
+  mesuré) ; timeout de groupe annulant proprement l'appel encore actif.
+- **Test de mutation** : en finalisant dans l'ordre de complétion plutôt que
+  l'ordre d'origine, le test échoue avec le message attendu ; restauré, il repasse.
+- 15 tests de la chaîne agentique complète (transport, dispatch, policy,
+  sécurité, gateway, orchestration…) réussis, 0 échec.
+- `check_architecture.py` : OK — 2.525.0, 361 outils, harness 361/361.
+- ESLint inchangé (0 erreur, 35 avertissements).
+
+### Rollback
+
+Aucune migration de schéma, aucune donnée persistante nouvelle. Rollback
+complet : réversion atomique du commit v2.525 puis redémarrage. Rollback
+partiel sans redéploiement : `is_parallel_batch_eligible` retournant toujours
+`False` (ex. en forçant `_MAX_PARALLEL_TOOLS = 0` ou en vidant
+`ALWAYS_CONFIRM_TOOLS` côté appelant) restaure le comportement strictement
+séquentiel sans toucher au reste du fichier.
