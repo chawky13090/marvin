@@ -142,13 +142,13 @@ async def extract(args: dict) -> dict:
     except (OSError, ValueError) as exc:
         return {"error": f"Erreur lecture image : {exc}"}
 
-    try:
+    async def _call(target_model: str) -> dict:
         data = await _request_json(
             "POST",
             "/api/generate",
             timeout=120,
             payload={
-                "model": model,
+                "model": target_model,
                 "prompt": prompt,
                 "images": [image_b64],
                 "stream": False,
@@ -158,12 +158,25 @@ async def extract(args: dict) -> dict:
         return {
             "success": True,
             "image": str(resolved),
-            "model": model,
+            "model": target_model,
             "text": extracted,
             "char_count": len(extracted),
             "resized_for_speed": resized,
         }
+
+    try:
+        return await _call(model)
     except (httpx.HTTPError, OSError, TypeError, ValueError) as exc:
+        # Un modèle cloud indisponible (crédit épuisé, 402, hors-ligne...) ne doit pas
+        # rendre l'OCR totalement inopérant s'il existe un modèle vision local : on
+        # retente une fois avec le fallback local avant d'abandonner.
+        if cloud_routing.is_cloud_model(model) and model != "llava-phi3":
+            try:
+                result = await _call("llava-phi3")
+                result["fallback_from_cloud"] = model
+                return result
+            except (httpx.HTTPError, OSError, TypeError, ValueError):
+                pass
         return {
             "error": (
                 f"Erreur OCR : {exc}. "

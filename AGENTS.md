@@ -202,7 +202,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.534.0)
+## 9. État actuel (v2.535.0)
+
+**v2.535 (audit outils — 8 correctifs)** : issus d'un audit exhaustif des 362 outils par
+6 agents en parallèle. `billing_market_research`/`billing_find_products`/`billing_product_reviews`
+échouaient à 100 % (`NameError` sur un alias d'import manquant). `net_traceroute` et
+`net_scan_local` décodaient en `cp1252` fixe au lieu du code page OEM réel, corrompant les
+caractères accentués. `diff_text` recollait les lignes sans retour à la ligne quand le texte
+source n'en avait pas. Les logos DOCX/PDF embarquaient le fichier brut (5,4 Mo) au lieu d'une
+version mise en cache et redimensionnée (~120 Ko). `rm -rf /var/log` et assimilés passaient
+au travers de la règle de sécurité (motif racine-only) ; une migration republie le motif
+corrigé même sur une base déjà initialisée. `cmd_extract_from_text` ratait les commandes
+précédées de prose ("Lance : ..."). `pc_pull_ollama_model` (téléchargement de plusieurs Go)
+n'exigeait aucune confirmation, contrairement à `winget_install`. `ocr_extract` n'avait pas de
+repli local si le modèle vision cloud échouait (402/hors-ligne) ; il retente désormais
+`llava-phi3`. Aucune migration de schéma. Rollback : réversion du commit v2.535.
 
 **v2.534 (cycle de vie sérialisé et portable)** : démarrage, arrêt et redémarrage utilisent
 un verrou atomique commun et une demande d'annulation afin d'empêcher deux piles Marvin

@@ -121,6 +121,23 @@ class CommandSafetyRepository:
                         alternative,
                     ),
                 )
+        else:
+            # Un catalogue déjà seedé ne reçoit jamais les correctifs appliqués aux règles
+            # historiques (patterns trop étroits, etc.) : on republie les patterns/explications
+            # des règles "builtin" connues, identifiées par leur ancien pattern figé ci-dessous,
+            # sans toucher aux règles ajoutées par l'utilisateur.
+            _LEGACY_PATTERN_MIGRATIONS = {
+                r"rm\s+-rf\s+/\s*$|rm\s+-rf\s+/\s": DEFAULT_COMMAND_RISK_RULES[0],
+            }
+            for old_pattern, (new_pattern, platform, risk, explanation, alternative) in (
+                _LEGACY_PATTERN_MIGRATIONS.items()
+            ):
+                connection.execute(
+                    """UPDATE command_risk_rules
+                       SET pattern = ?, risk_level = ?, explanation = ?, safer_alternative = ?
+                       WHERE is_builtin = 1 AND pattern = ? AND platform = ?""",
+                    (new_pattern, risk, explanation, alternative, old_pattern, platform),
+                )
 
     def rules_list(self, active_only: bool = True) -> list[dict]:
         sql = "SELECT * FROM command_risk_rules"

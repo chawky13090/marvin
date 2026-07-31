@@ -36,8 +36,10 @@ def main() -> int:
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
+        # v2.535 — rm -rf : le pattern racine-uniquement laissait passer les suppressions
+        # récursives non-racine (ex. rm -rf /var/log), désormais couvertes.
         assert hashlib.sha256(payload).hexdigest() == (
-            "478ae98254ae17f2ff124735d850d7116e9d57782730339a4f4a28c22067a479"
+            "b522c56bd708ed40886f823ca9fcaaf2b6e5ca5ec0b34db5106ca94dba8ee3fd"
         )
 
         with patch(

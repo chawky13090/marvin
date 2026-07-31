@@ -5,6 +5,88 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.535.0 — Correction des 8 bugs confirmés par l'audit exhaustif des 362 outils
+
+### Demande et constats
+
+Un audit complet (6 agents en parallèle testant l'intégralité des 362 outils contre le
+backend réellement lancé) a confirmé 8 bugs réels, distincts des questions de conception
+laissées de côté pour discussion ultérieure. Chacun a été re-testé en direct avant et après
+correctif :
+
+1. `billing_market_research`/`billing_find_products`/`billing_product_reviews` échouaient à
+   100 % : `NameError: name '_re' is not defined` (import `re` non aliasé alors que le fichier
+   utilise partout `_re`).
+2. `ocr_extract` (image sur disque) n'avait aucun repli local quand le modèle vision cloud
+   routé (`kimi-k3:cloud`) échouait (402 crédit épuisé, hors-ligne...) : échec total sans
+   tenter `llava-phi3`.
+3. `net_traceroute` et `net_scan_local` décodaient la sortie de `tracert`/`arp -a` avec un
+   `cp1252` codé en dur au lieu du code page OEM réel de la console — texte accentué corrompu
+   (confirmé en direct : "D‚termination de l'itin‚raire").
+4. `diff_text` recollait les lignes du diff sans retour à la ligne quand le texte source
+   n'en avait pas en fin de ligne (`"".join(chunks)` sur des lignes sans `\n`).
+5. Les documents DOCX/PDF générés embarquaient le logo brut de l'identité (5,4 Mo, jamais
+   redimensionné) pour un rendu affiché à ~1 cm — un document d'1 page pesait 6,3 Mo.
+6. La règle de sécurité `rm -rf` ne couvrait que la racine littérale
+   (`rm\s+-rf\s+/\s*$|rm\s+-rf\s+/\s`) : `rm -rf /var/log` passait comme "safe" (faux négatif
+   confirmé en direct).
+7. `cmd_extract_from_text` n'utilisait que des motifs ancrés en début de ligne (`^...`) :
+   une commande précédée de prose ("Lance : Get-Process | Stop-Process -Force...") donnait
+   `count: 0`.
+8. `pc_pull_ollama_model` (téléchargement de plusieurs Go, écriture disque) n'était présent
+   ni dans `DANGEROUS_TOOLS` ni dans `SECURE_BLOCKED_TOOLS`, contrairement à `winget_install`
+   qui a un profil de risque comparable.
+
+### Décisions et modifications
+
+- `backend/tool_domains/billing.py` : `import re` → `import re as _re`.
+- `backend/tool_domains/ocr.py` : `extract()` retente une fois avec `llava-phi3` si l'appel
+  au modèle résolu (cloud) échoue, avant d'abandonner ; le résultat porte
+  `fallback_from_cloud` pour la traçabilité.
+- `backend/tool_domains/network.py` : les deux occurrences de l'encodage codé en dur
+  utilisent désormais `_console_output_encoding()` (helper déjà correct et déjà utilisé
+  ailleurs dans le même fichier).
+- `backend/tool_domains/text_processing.py` : `_build_diff` normalise chaque ligne
+  (`splitlines(keepends=True)`) pour qu'elle se termine par `\n` avant de la passer à
+  `difflib`, quel que soit le mode (unified/context/ndiff).
+- `backend/tool_domains/documents.py` : nouvelle fonction `_optimized_logo_path()` qui
+  redimensionne (max 400 px de large) et met en cache (basé sur mtime + taille de la source)
+  une version compressée du logo ; utilisée aux deux points d'embarquement DOCX et PDF.
+- `backend/repositories/command_safety_rules.py` : motif `rm -rf` élargi à
+  `rm\s+-rf\s+/(?:\S*)?` (tout chemin absolu, pas seulement la racine).
+- `backend/repositories/command_safety.py` : migration ciblée dans `ensure_schema` qui
+  republie les patterns/explications des règles "builtin" connues (identifiées par leur
+  ancien motif figé) sur une base déjà seedée, sans toucher aux règles ajoutées par
+  l'utilisateur — sinon le correctif n'aurait profité qu'aux nouvelles installations.
+- `backend/tool_domains/command_safety.py` : `cmd_extract_from_text` retente aussi chaque
+  segment obtenu en découpant la ligne sur `:`/`;`, en plus de la ligne entière.
+- `backend/config.py` : `pc_pull_ollama_model` ajouté à `DANGEROUS_TOOLS` et
+  `SECURE_BLOCKED_TOOLS`.
+- `scripts/test_command_safety_repository.py` : hash de verrouillage du catalogue de règles
+  recalculé (le contenu a changé intentionnellement).
+
+### Validation, sécurité, logs et rollback
+
+Chaque correctif a été compilé (`py_compile`) et re-testé en direct contre son comportement
+avant/après (reproduction de l'erreur d'origine puis preuve du correctif : `billing` rejoue
+l'ancien message d'erreur sur le backend non redémarré, `ocr_extract` bascule bien vers
+`llava-phi3` sur échec simulé du modèle cloud, `diff_text` ne recolle plus les lignes,
+`_optimized_logo_path` réduit le logo réel de 5,4 Mo à ~121 Ko et réutilise le cache au second
+appel, `rm -rf /var/log` passe de "safe" à "blocked" y compris sur une base SQLite déjà
+initialisée, `cmd_extract_from_text` extrait la commande précédée de "Lance :"). Suites de
+régression exécutées et vertes : `test_tool_domain_network`, `test_tool_domain_text_processing`,
+`test_tool_domain_documents`, `test_tool_domain_command_safety`,
+`test_command_safety_repository`, `test_tool_domain_billing`, `test_billing_repository`,
+`test_tool_domain_ocr`, `test_tool_domain_screen_ocr`, `test_agent_tool_dispatch`,
+`check_architecture.py`, `test_main_composition.py`. Aucune migration de schéma destructive ;
+la migration `command_risk_rules` est un `UPDATE` ciblé par ancien pattern exact, sans
+suppression. Rollback : réversion du commit v2.535.
+
+Hors périmètre de cette tranche (questions de conception à discuter, pas des bugs) : absence
+de confirmation sur la création/modification d'événements calendrier, double mécanisme de
+confirmation (409+approvalId vs 200 inline), incohérence de statut entre `long_task_start`
+et `vm_lab_install`.
+
 ## 2026-07-30 — v2.512.0 — Reprise fiable après approbation dans le chat
 
 ### Demande et constats

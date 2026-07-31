@@ -236,8 +236,7 @@ async def execute_net_traceroute(args: dict) -> dict:
         else:
             cmd = ["traceroute", "-m", str(max_hops), host]
         result = subprocess.run(cmd, capture_output=True, timeout=60)
-        enc = "cp1252" if sys.platform == "win32" else "utf-8"
-        output = result.stdout.decode(enc, errors="replace")
+        output = result.stdout.decode(_console_output_encoding(), errors="replace")
         return {"host": host, "output": output.strip(), "success": result.returncode == 0}
     try:
         return await asyncio.get_running_loop().run_in_executor(None, _do_trace)
@@ -251,8 +250,7 @@ async def execute_net_scan_local(args: dict) -> dict:
     """Scanne le réseau local pour détecter les appareils connectés (ARP scan via arp -a)."""
     try:
         result = await asyncio.to_thread(subprocess.run, ["arp", "-a"], capture_output=True, timeout=15)
-        enc = "cp1252" if sys.platform == "win32" else "utf-8"
-        output = result.stdout.decode(enc, errors="replace")
+        output = result.stdout.decode(_console_output_encoding(), errors="replace")
 
         # Parse ARP table
         devices = []

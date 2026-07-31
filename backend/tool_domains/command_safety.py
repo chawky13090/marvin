@@ -112,12 +112,20 @@ async def execute_cmd_extract_from_text(args: dict) -> dict:
         line = line.strip()
         if not line:
             continue
-        for pat in command_patterns:
-            m = _re.match(pat, line, _re.IGNORECASE)
-            if m:
-                cmd = m.group(1).strip() if m.lastindex else line
-                if cmd and cmd not in commands:
-                    commands.append(cmd)
+        # Une commande peut être précédée de prose ("Lance: ...", "Exécutez : ...") :
+        # on retente aussi sur les segments après ':' / ';' en plus de la ligne entière.
+        candidates = [line] + [seg.strip() for seg in _re.split(r"[:;]", line) if seg.strip()]
+        matched = False
+        for candidate in candidates:
+            for pat in command_patterns:
+                m = _re.match(pat, candidate, _re.IGNORECASE)
+                if m:
+                    cmd = m.group(1).strip() if m.lastindex else candidate
+                    if cmd and cmd not in commands:
+                        commands.append(cmd)
+                    matched = True
+                    break
+            if matched:
                 break
     return {
         "success": True,

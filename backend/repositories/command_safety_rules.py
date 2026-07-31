@@ -2,10 +2,10 @@
 
 DEFAULT_COMMAND_RISK_RULES = (
     (
-        r"rm\s+-rf\s+/\s*$|rm\s+-rf\s+/\s",
+        r"rm\s+-rf\s+/(?:\S*)?",
         "linux",
         "blocked",
-        "Suppression récursive de la racine du système — destruction totale irréversible.",
+        "Suppression récursive forcée d'un chemin absolu (racine ou sous-dossier système) — destruction potentiellement irréversible.",
         "Ciblez un sous-dossier précis : rm -rf /chemin/precis/. Vérifiez toujours le chemin avant.",
     ),
     (

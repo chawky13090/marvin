@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as _dt
 import json as _json
 import math
-import re
+import re as _re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any

@@ -77,6 +77,37 @@ def _resolve_path(raw: str) -> str:
     return _resolver(raw)
 
 
+_LOGO_CACHE_MAX_WIDTH = 400
+
+
+def _optimized_logo_path(raw_path: str) -> str:
+    """Redimensionne/compresse le logo une fois et réutilise le cache tant que la source ne change pas.
+
+    Un logo brut non compressé (plusieurs Mo) embarqué tel quel dans chaque
+    document généré fait exploser la taille des DOCX/PDF pour un rendu
+    identique (affiché à ~1 cm de haut). On met en cache une version réduite.
+    """
+    try:
+        source = Path(raw_path)
+        stat = source.stat()
+        cache_dir = _documents_output_dir() / ".logo_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = cache_dir / f"{source.stem}_{int(stat.st_mtime)}_{stat.st_size}.png"
+        if cache_path.exists():
+            return str(cache_path)
+        from PIL import Image as _PILLogo
+
+        with _PILLogo.open(source) as img:
+            img = img.convert("RGBA") if img.mode not in ("RGB", "RGBA") else img
+            if img.width > _LOGO_CACHE_MAX_WIDTH:
+                ratio = _LOGO_CACHE_MAX_WIDTH / img.width
+                img = img.resize((_LOGO_CACHE_MAX_WIDTH, max(1, round(img.height * ratio))), _PILLogo.LANCZOS)
+            img.save(cache_path, format="PNG", optimize=True)
+        return str(cache_path)
+    except Exception:
+        return raw_path
+
+
 def _markdown_cell(value: str) -> str:
     return value.replace("\\", "\\\\").replace("|", "\\|").replace("\r", "").replace("\n", "<br>")
 
@@ -246,7 +277,7 @@ async def create_docx(args: dict) -> dict:
                     lp = _resolve_path(logo)
                     if os.path.exists(lp):
                         try:
-                            hp.add_run().add_picture(lp, height=Cm(1.3))
+                            hp.add_run().add_picture(_optimized_logo_path(lp), height=Cm(1.3))
                         except Exception:
                             pass
                 if lh.get("org"):
@@ -939,7 +970,7 @@ async def create_pdf(args: dict) -> dict:
                         lp = _resolve_path(logo)
                         if os.path.exists(lp):
                             try:
-                                self.drawImage(lp, x, y - 0.55 * cm, height=1.1 * cm,
+                                self.drawImage(_optimized_logo_path(lp), x, y - 0.55 * cm, height=1.1 * cm,
                                                 preserveAspectRatio=True, mask="auto")
                                 x += 1.6 * cm
                             except Exception:

@@ -126,6 +126,7 @@ SECURE_BLOCKED_TOOLS: set[str] = {
     "tweak_debloat_remove",
     "system_restore_point",
     "catharsis_clean",
+    "pc_pull_ollama_model",  # télécharge plusieurs Go et écrit sur le disque, sans confirmation jusqu'ici
 }
 
 # ── Outils nécessitant une confirmation manuelle (niveau Standard = 2) ────────
@@ -161,6 +162,7 @@ DANGEROUS_TOOLS: set[str] = {
     "tweak_debloat_remove",
     "system_restore_point",
     "catharsis_clean",
+    "pc_pull_ollama_model",  # télécharge plusieurs Go et écrit sur le disque, sans confirmation jusqu'ici
 }
 
 # Outils mixtes lecture/mutation. Les actions listées restent des lectures sûres; toute

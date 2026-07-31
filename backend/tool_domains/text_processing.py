@@ -136,8 +136,8 @@ def _build_diff(text_a: str, text_b: str, mode: str, context_lines: int) -> dict
             "similarity": percent,
             "message": f"Les textes sont similaires à {round(percent, 1)} %.",
         }
-    lines_a = text_a.splitlines(keepends=True)
-    lines_b = text_b.splitlines(keepends=True)
+    lines_a = [line if line.endswith("\n") else line + "\n" for line in text_a.splitlines(keepends=True)]
+    lines_b = [line if line.endswith("\n") else line + "\n" for line in text_b.splitlines(keepends=True)]
     if mode == "unified":
         iterator = difflib.unified_diff(
             lines_a, lines_b, fromfile="texte_a", tofile="texte_b", n=context_lines
