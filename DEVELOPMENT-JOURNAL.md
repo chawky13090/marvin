@@ -14544,3 +14544,36 @@ partiel sans redéploiement : `is_parallel_batch_eligible` retournant toujours
 `False` (ex. en forçant `_MAX_PARALLEL_TOOLS = 0` ou en vidant
 `ALWAYS_CONFIRM_TOOLS` côté appelant) restaure le comportement strictement
 séquentiel sans toucher au reste du fichier.
+## 2026-07-31 — v2.528 — PowerPoint natif professionnel et reprise sur verrou
+
+### Demande et diagnostic
+
+La dernière conversation a finalement livré `KOIOS-Presentation-v2.pptx`, mais
+après une trajectoire anormale : `output_path="Bureau"` rejeté faute
+d'extension, rendu Office natif jugé trop basique, contournement par
+`code_python`, artefact devenu inaccessible entre deux exécutions isolées,
+puis tentative d'écrasement d'un PPTX ouvert refusée par Windows. Le résultat
+final ne prouvait donc pas la robustesse du flux.
+
+### Correction
+
+- `pptx_create` possède maintenant un thème `professional_dark` par défaut,
+  sobre et lisible, tout en conservant le thème `office` comme repli.
+- Les demandes de redesign PowerPoint sont routées vers `pptx_create` et
+  excluent le générateur Python généraliste.
+- Un chemin désignant le Bureau ou un dossier reçoit automatiquement un nom
+  `.pptx` valide.
+- Un fichier ouvert n'est jamais forcé ni supprimé : une nouvelle version
+  horodatée est produite dans le même dossier.
+- La matérialisation déterministe transmet explicitement le style professionnel.
+
+### Validation, sécurité, logs et rollback
+
+Tests réellement exécutés : compilation Python, domaines Office, planning,
+sélection d'outils, matérialisation des outils et contrôle d'architecture. Tous
+réussissent. Un PPTX réel de 3 diapositives a été créé dans un dossier
+temporaire, validé Open XML, mesuré et haché SHA-256. La correction n'ajoute ni
+accès réseau, ni secret, ni privilège, ni donnée persistante. Elle ne journalise
+aucun contenu supplémentaire ; les reçus existants conservent uniquement les
+preuves bornées. Rollback : réversion atomique du commit v2.528 puis
+redémarrage backend, sans migration ni restauration de données.

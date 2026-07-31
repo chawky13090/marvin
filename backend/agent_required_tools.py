@@ -76,6 +76,7 @@ def _presentation_arguments(context: RequiredToolContext) -> dict[str, Any]:
         "subtitle": "Générée par Marvin à partir du contenu vérifié de la conversation",
         "slides": slides,
         "output_path": f"Bureau/{output_name}",
+        "style": "professional_dark",
     }
 
 

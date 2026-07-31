@@ -7,6 +7,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +42,7 @@ async def run_domain() -> None:
         assert created["success"] is True
         assert created["verified"] is True
         assert created["slides"] == 3
+        assert created["style"] == "professional_dark"
         assert created["size_bytes"] == deck.stat().st_size
         assert len(created["sha256"]) == 64
         assert created["artifacts"] == [
@@ -60,6 +62,37 @@ async def run_domain() -> None:
         assert "Architecture" in read["text"]
         assert "Rollback" in read["text"]
         assert read["truncated"] is False
+        directory_target = root / "exports"
+        directory_target.mkdir()
+        directory_created = await presentations.create(
+            {"title": "Dossier", "output_path": str(directory_target)}
+        )
+        assert directory_created["success"] is True
+        assert Path(directory_created["path"]).name == "Presentation_Marvin.pptx"
+        assert "Style invalide" in (
+            await presentations.create(
+                {"title": "x", "style": "invented", "output_path": str(root / "x.pptx")}
+            )
+        )["error"]
+        locked_target = root / "locked.pptx"
+        original_create = presentations._create_presentation
+        attempts = 0
+
+        def fail_once(**kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise PermissionError("simulated PowerPoint lock")
+            return original_create(**kwargs)
+
+        with patch.object(presentations, "_create_presentation", side_effect=fail_once):
+            locked_created = await presentations.create(
+                {"title": "Verrou", "output_path": str(locked_target)}
+            )
+        assert locked_created["success"] is True
+        assert locked_created["path"] != str(locked_target)
+        assert "nouvelle-version" in Path(locked_created["path"]).stem
+        assert Path(locked_created["path"]).is_file()
         assert "extension .pptx" in (
             await presentations.create(
                 {"title": "x", "output_path": str(root / "bad.txt")}

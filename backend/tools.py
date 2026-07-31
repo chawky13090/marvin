@@ -4479,7 +4479,7 @@ TOOLS_SPEC = [
         "max_files": {"type": "integer", "minimum": 1, "maximum": 500000, "description": "Nombre maximal de fichiers inspectés (défaut 500000)"},
         "confirmed": {"type": "boolean", "description": "Confirmation explicite de suppression"}},
        []),
-    _t("pptx_create", "Crée et vérifie le fichier PowerPoint (.pptx) demandé. Outil exclusif pour livrer une présentation : ne jamais utiliser Test Forge ou Python à sa place. Retourne l'artefact, sa taille et son SHA-256.",
+    _t("pptx_create", "Crée et vérifie un PowerPoint professionnel. Outil exclusif pour créer ou refaire le design d'une présentation : ne jamais utiliser Test Forge ou Python à sa place. Gère un fichier ouvert en livrant automatiquement une nouvelle version. Retourne l'artefact, sa taille et son SHA-256.",
        {"title": {"type": "string", "maxLength": 10000, "description": "Titre de la présentation (diapo de couverture)"},
         "subtitle": {"type": "string", "maxLength": 10000, "description": "Sous-titre de couverture"},
         "slides": {"type": "array", "maxItems": 100,
@@ -4492,7 +4492,8 @@ TOOLS_SPEC = [
                                             "items": {"type": "string", "maxLength": 10000}}
                              }},
                    "description": "Diapos : [{title, bullets:[...]}, …]"},
-        "output_path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx de sortie (défaut : Bureau)"}},
+        "output_path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx ou dossier de sortie (défaut : Bureau)"},
+        "style": {"type": "string", "enum": ["professional_dark", "office"], "description": "professional_dark (défaut) ou office"}},
        []),
     _t("pptx_read", "Extrait le texte de toutes les diapos d'un PowerPoint (.pptx).",
        {"path": {"type": "string", "maxLength": 32767, "description": "Fichier .pptx"}},

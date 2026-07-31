@@ -285,6 +285,17 @@ def main() -> int:
     )
     assert pptx_native.required_tool_names == {"pptx_create"}
 
+    pptx_redesign = planning.compile_turn_plan(
+        [
+            {"role": "user", "content": "je veux une présentation powerpoint"},
+            {"role": "assistant", "content": "Présentation créée."},
+            {"role": "user", "content": "c'est pas joli, refais la présentation avec un beau design"},
+        ],
+        "c'est pas joli, refais la présentation avec un beau design",
+        llm_native=True,
+    )
+    assert pptx_redesign.required_tool_names == {"pptx_create"}
+
     pptx_suppressed = planning.compile_turn_plan(
         [{"role": "user", "content": "explique le format pptx sans créer de fichier"}],
         "explique le format pptx sans créer de fichier",

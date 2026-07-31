@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.527.0)
+## 9. État actuel (v2.528.0)
+
+**v2.528 (PowerPoint natif professionnel et reprenable)** : l'outil
+`pptx_create` produit désormais par défaut un thème sombre anthracite sobre,
+avec hiérarchie typographique, grille 16:9 et densité bornée. Une demande de
+redesign reste attachée à l'outil PowerPoint dédié et ne bascule plus vers
+`code_python`. Une destination `Bureau`, `Desktop` ou un dossier existant est
+normalisée vers un vrai fichier `.pptx`. Si PowerPoint verrouille le fichier
+ouvert, Marvin préserve celui-ci et livre automatiquement une nouvelle version
+voisine au lieu d'enchaîner des copies inter-sandbox impossibles. Les preuves
+Open XML, taille, SHA-256 et chemin final restent obligatoires. Aucun schéma ni
+donnée persistante n'est modifié. Rollback : réversion atomique du commit
+v2.528 puis redémarrage backend, sans migration.
 
 **v2.527 (fidélité factuelle des présentations)** : lorsque `pptx_create` est la
 postcondition du tour, le harness rematérialise ses arguments depuis la dernière synthèse

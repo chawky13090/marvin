@@ -72,6 +72,16 @@ def main() -> int:
         assert not ({
             "ai_test_forge", "ai_code_forge", "code_python", "code_workspace_start"
         } & powerpoint)
+        powerpoint_redesign = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [
+                {"role": "user", "content": "je veux une présentation powerpoint"},
+                {"role": "assistant", "content": "Présentation créée."},
+                {"role": "user", "content": "refais la présentation avec un beau design"},
+            ],
+            "agent",
+        ))))
+        assert "pptx_create" in powerpoint_redesign
+        assert "code_python" not in powerpoint_redesign
         powerpoint_explanation = set(_names(asyncio.run(selection.filter_relevant_tools(
             [{"role": "user", "content": "explique le format pptx sans créer de fichier"}],
             "agent",

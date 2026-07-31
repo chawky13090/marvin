@@ -98,6 +98,13 @@ _NO_FILE_CREATION_RE = re.compile(
     r"n['’]\s*enregistre\s+pas)\b",
     re.IGNORECASE,
 )
+_PPTX_REDESIGN_RE = re.compile(
+    r"\b(?:refais|refaire|am[ée]liore|embellis|redesign|design|plus\s+(?:joli|beau))\w*\b"
+    r".{0,140}\b(?:pr[ée]sentation|powerpoint|pptx|diaporama|cela|ça|ca)\b|"
+    r"\b(?:pr[ée]sentation|powerpoint|pptx|diaporama)\b.{0,140}"
+    r"\b(?:refais|am[ée]liore|embellis|design|joli|beau)\w*\b",
+    re.IGNORECASE,
+)
 _CONTEXT_ONLY_WEB_RE = re.compile(
     r"^\s*(?:cherche|recherche|regarde|fouille|explore)\w*\s+"
     r"(?:uniquement\s+|aussi\s+)?(?:sur\s+)?(?:les?\s+)?"
@@ -176,7 +183,7 @@ def _deterministic_action_requirements(
     if _SITE_CRAWL_RE.search(text):
         requirements.add("web_site_crawl")
     if (
-        _EXPLICIT_PPTX_DELIVERY_RE.search(text)
+        (_EXPLICIT_PPTX_DELIVERY_RE.search(text) or _PPTX_REDESIGN_RE.search(text))
         and not _NO_FILE_CREATION_RE.search(text)
     ):
         requirements.add("pptx_create")

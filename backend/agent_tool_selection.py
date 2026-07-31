@@ -26,6 +26,13 @@ _NO_PPTX_CREATION_RE = re.compile(
     r"n['’]\s*enregistre\s+pas)\b",
     re.IGNORECASE,
 )
+_PPTX_REDESIGN_RE = re.compile(
+    r"\b(?:refais|refaire|am[ée]liore|embellis|redesign|design|plus\s+(?:joli|beau))\w*\b"
+    r".{0,140}\b(?:pr[ée]sentation|powerpoint|pptx|diaporama|cela|ça|ca)\b|"
+    r"\b(?:pr[ée]sentation|powerpoint|pptx|diaporama)\b.{0,140}"
+    r"\b(?:refais|am[ée]liore|embellis|design|joli|beau)\w*\b",
+    re.IGNORECASE,
+)
 
 _ALWAYS_INCLUDE = {
     "pc_get_real_paths",
@@ -641,7 +648,7 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     # Un livrable Office explicite doit passer par son outil documentaire dédié.
     # Test Forge vérifie du code mais n'est pas un moteur de documents.
     if (
-        _EXPLICIT_PPTX_CREATE_RE.search(text_raw)
+        (_EXPLICIT_PPTX_CREATE_RE.search(text_raw) or _PPTX_REDESIGN_RE.search(text_raw))
         and not _NO_PPTX_CREATION_RE.search(text_raw)
     ):
         relevant.add("pptx_create")

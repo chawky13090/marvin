@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.528 — redesign PPTX natif, destinations robustes et fichiers verrouillés
 # v2.527 — fidélité PPTX à la synthèse source avant exécution
 # v2.526 — livrables PPTX garantis par l'outil Office et preuve d'artefact
 # v2.525 — tool-calling parallele borne pour les lots sans confirmation possible
