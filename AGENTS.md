@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.532.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.533.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.532.0)
+## 9. État actuel (v2.533.0)
+
+**v2.533 (SearXNG résilient aux réservations de ports Windows)** : le port hôte n'est plus
+codé en dur à 8890. `resolve-searxng-port.ps1` teste réellement un bind loopback afin de
+détecter aussi WSAEACCES causé par les plages TCP dynamiques Hyper-V/WSL/Docker, privilégie
+le port persistant `runtime/searxng/port.txt`, puis choisit un repli borné. Le compose reçoit
+`SEARXNG_PORT` mais conserve strictement le binding `127.0.0.1`. Une instance Marvin déjà
+active est reconnue par son mapping Docker et `/config`, ce qui empêche les migrations de
+port à chaque relance. Le launcher vérifie 80 moteurs, chaque onglet et une recherche JSON,
+puis met à jour `searxng_url`. Validation réelle : 8890 refusé par Windows, service rétabli
+sur 8391, 64 résultats SearXNG directs et 8 résultats via l'outil Marvin avec
+`provider=SearXNG`. Rollback : réversion du commit v2.533, définition manuelle du port dans
+Compose et restauration de `searxng_url`; aucune migration de données.
 
 **v2.532 (avatar auto-synchronisé)** : l'avatar ne reste plus sur « Démarrer Marvin »
 lorsque Marvin a été relancé par `start.bat`, Codex ou un autre superviseur. Le processus

@@ -10,6 +10,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 SETTINGS_PATH = ROOT / "docker" / "searxng" / "settings.yml.example"
 LAUNCHER_PATH = ROOT / "docker" / "searxng" / "start-searxng.ps1"
+COMPOSE_PATH = ROOT / "docker" / "searxng" / "docker-compose.yml"
+RESOLVER_PATH = ROOT / "scripts" / "resolve-searxng-port.ps1"
 REQUIRED_TAB_COVERAGE = {
     "general": 2,
     "images": 2,
@@ -147,6 +149,8 @@ def test_network_budgets_are_bounded() -> None:
 
 def test_launcher_forces_reload_and_checks_effective_config() -> None:
     launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
+    compose = COMPOSE_PATH.read_text(encoding="utf-8")
+    resolver = RESOLVER_PATH.read_text(encoding="utf-8")
 
     assert "Set-StrictMode -Version Latest" in launcher
     assert "docker compose up -d --force-recreate" in launcher
@@ -154,6 +158,13 @@ def test_launcher_forces_reload_and_checks_effective_config() -> None:
     assert '$tabCount -lt 2' in launcher
     assert "Onglets sans redondance moteur" in launcher
     assert '$settingsPath + ".bak"' in launcher
+    assert "resolve-searxng-port.ps1" in launcher
+    assert "$env:SEARXNG_PORT" in launcher
+    assert "docker port marvin-searxng 8080/tcp" in launcher
+    assert '"http://127.0.0.1:$candidate/config"' in launcher
+    assert "127.0.0.1:${SEARXNG_PORT:-8890}:8080" in compose
+    assert "TcpListener" in resolver
+    assert "runtime\\searxng" in resolver
 
 
 if __name__ == "__main__":

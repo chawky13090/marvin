@@ -8,7 +8,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$port = 8890
 $backendUrl = "http://127.0.0.1:8005"
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
@@ -45,6 +44,30 @@ if (-not $dockerReady) {
     }
 }
 Write-Host "Demon Docker pret." -ForegroundColor Green
+
+# -- 2b. Port loopback libre et non exclu par Hyper-V/WSL --------------------
+Write-Step "Selection d'un port SearXNG local disponible..."
+$port = $null
+$mappedPort = @(& docker port marvin-searxng 8080/tcp 2>$null)
+if ($LASTEXITCODE -eq 0 -and $mappedPort.Count -gt 0) {
+    $mappedMatch = [regex]::Match([string]$mappedPort[-1], ':(\d+)$')
+    if ($mappedMatch.Success) {
+        $candidate = [int]$mappedMatch.Groups[1].Value
+        try {
+            $probe = Invoke-WebRequest "http://127.0.0.1:$candidate/config" -UseBasicParsing -TimeoutSec 3
+            if ($probe.StatusCode -eq 200) { $port = $candidate }
+        } catch {}
+    }
+}
+if ($null -eq $port) {
+    $portOutput = @(& (Join-Path $PSScriptRoot '..\..\scripts\resolve-searxng-port.ps1'))
+    if ($LASTEXITCODE -ne 0 -or $portOutput.Count -eq 0) {
+        throw "Impossible de sélectionner un port local pour SearXNG."
+    }
+    $port = [int]$portOutput[-1]
+}
+$env:SEARXNG_PORT = [string]$port
+Write-Host "Port SearXNG selectionne : $port (loopback uniquement)." -ForegroundColor Green
 
 # -- 3. Config locale (secret genere au premier lancement, jamais committe) --
 $settingsPath = Join-Path $here "settings.yml"

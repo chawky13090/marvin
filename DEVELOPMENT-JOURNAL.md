@@ -14770,3 +14770,43 @@ diffère de l'état observé, afin de ne pas perdre une conversation ou provoque
 Le timer est supprimé dans `before-quit`. Tests Node, ESLint, 41 assertions avatar et contrôle
 d'architecture exécutés. Aucun impact sur le middleware LAN, les cookies, les secrets ou les
 données persistantes. Rollback : réversion atomique du commit v2.532 puis relance de l'avatar.
+## 2026-07-31 — v2.533 — Rétablissement SearXNG et port Windows dynamique
+
+### Incident et cause racine
+
+Docker Desktop 4.82.0 et son moteur 29.6.1 fonctionnaient, mais `marvin-searxng` restait en
+état `Created`. `docker start` échouait avant le lancement : Windows refusait le bind
+`127.0.0.1:8890` avec WSAEACCES. `netsh interface ipv4 show excludedportrange protocol=tcp`
+a confirmé que Hyper-V/WSL avait réservé la plage 8885–8984. Aucun journal applicatif
+SearXNG ne pouvait exister puisque le processus n'avait jamais démarré.
+
+### Correction
+
+- nouveau `scripts/resolve-searxng-port.ps1` : test de bind loopback réel, port persistant,
+  plages de repli bornées et écriture atomique;
+- Compose paramétré par `SEARXNG_PORT`, toujours lié uniquement à `127.0.0.1`;
+- le launcher réutilise le mapping d'un conteneur Marvin qui répond à `/config`, sinon il
+  résout un nouveau port;
+- la nouvelle URL est enregistrée automatiquement dans le coffre de configuration Marvin;
+- le même launcher reste utilisé par `start.bat` et l'installation sur une nouvelle machine.
+
+### Validation réelle
+
+- port 8890 correctement rejeté, port 8390 puis port stable 8391 sélectionné pendant les
+  essais d'idempotence;
+- conteneur `Up`, mapping `127.0.0.1:8391->8080/tcp`;
+- `/config` : 80 moteurs actifs et tous les onglets redondants;
+- recherche directe : 64 résultats pertinents;
+- outil réel `POST /api/tools`, `web_search` : succès, 8 résultats,
+  `provider=SearXNG`;
+- deuxième exécution du launcher : port inchangé;
+- `check:searxng` réussi.
+
+### Sécurité, logs et rollback
+
+La surface réseau reste exclusivement loopback; aucun port LAN ni privilège supplémentaire.
+Le fichier persistant ne contient qu'un numéro de port, aucun secret. Les erreurs de moteurs
+distants restent dans les logs Docker et sont tolérées tant que l'agrégation fournit des
+résultats. Rollback : réversion atomique du commit v2.533, remise d'un mapping loopback libre
+dans Compose, recréation du conteneur et mise à jour de `searxng_url`. Le secret SearXNG et
+les données Marvin ne sont pas modifiés.
