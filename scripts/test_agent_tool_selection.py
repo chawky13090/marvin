@@ -64,6 +64,20 @@ def main() -> int:
         ))))
         assert "web_research" not in stable_explanation
 
+        powerpoint = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "je veux une présentation en .pptx"}],
+            "agent",
+        ))))
+        assert "pptx_create" in powerpoint
+        assert not ({
+            "ai_test_forge", "ai_code_forge", "code_python", "code_workspace_start"
+        } & powerpoint)
+        powerpoint_explanation = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "explique le format pptx sans créer de fichier"}],
+            "agent",
+        ))))
+        assert "pptx_create" not in powerpoint_explanation
+
         local_followup = set(_names(asyncio.run(selection.filter_relevant_tools(
             [
                 {"role": "user", "content": "liste les dossiers présents sur mon bureau"},

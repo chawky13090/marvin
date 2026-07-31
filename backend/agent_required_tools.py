@@ -11,6 +11,72 @@ from typing import Any, Callable, Iterable
 _CONTEXTUAL_WORKSPACE_RE = re.compile(
     r"\b(?:ce|le|la)\s+(?:script|code|programme|projet)\b"
 )
+_MARKDOWN_HEADING_RE = re.compile(r"^#{1,3}\s+(.+?)\s*$")
+_MARKDOWN_LIST_RE = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+?)\s*$")
+
+
+def _plain_markdown(value: str) -> str:
+    value = re.sub(r"[*_`]+", "", value or "")
+    value = re.sub(r"\[([^]]+)]\([^)]+\)", r"\1", value)
+    return " ".join(value.split()).strip(" |#")
+
+
+def _presentation_arguments(context: RequiredToolContext) -> dict[str, Any]:
+    """Construit un repli PPTX borné depuis la synthèse déjà visible du chat."""
+    previous = _previous_assistant_content(context.messages)
+    requested = re.search(
+        r"\b([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.pptx)\b",
+        context.user_query,
+        re.IGNORECASE,
+    )
+    output_name = requested.group(1) if requested else "Presentation_Marvin.pptx"
+    title = "Présentation Marvin"
+    slides: list[dict[str, Any]] = []
+    current_title = "Synthèse"
+    current_bullets: list[str] = []
+
+    def flush() -> None:
+        nonlocal current_bullets
+        if current_bullets and len(slides) < 12:
+            slides.append({
+                "title": current_title[:160],
+                "bullets": current_bullets[:8],
+            })
+        current_bullets = []
+
+    for raw_line in previous.splitlines()[:500]:
+        line = raw_line.strip()
+        heading = _MARKDOWN_HEADING_RE.match(line)
+        if heading:
+            clean = _plain_markdown(heading.group(1))
+            if clean:
+                if title == "Présentation Marvin":
+                    title = clean[:160]
+                flush()
+                current_title = clean
+            continue
+        listed = _MARKDOWN_LIST_RE.match(line)
+        if listed:
+            clean = _plain_markdown(listed.group(1))
+        elif line.startswith("|") and line.count("|") >= 2 and "---" not in line:
+            cells = [_plain_markdown(item) for item in line.strip("|").split("|")]
+            clean = " — ".join(item for item in cells if item)
+        else:
+            clean = ""
+        if clean and len(clean) <= 500:
+            current_bullets.append(clean)
+    flush()
+    if not slides:
+        slides = [{
+            "title": "Demande",
+            "bullets": [_plain_markdown(context.user_query)[:500]],
+        }]
+    return {
+        "title": title,
+        "subtitle": "Générée par Marvin à partir du contenu vérifié de la conversation",
+        "slides": slides,
+        "output_path": f"Bureau/{output_name}",
+    }
 
 
 @dataclass(slots=True)
@@ -128,6 +194,8 @@ def _arguments_for(
         return {"goal": context.user_query}
     if name == "document_generate":
         return {"text": context.user_query, "template": "libre"}
+    if name == "pptx_create":
+        return _presentation_arguments(context)
     return {}
 
 

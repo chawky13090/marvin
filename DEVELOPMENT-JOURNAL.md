@@ -14292,6 +14292,46 @@ l'utilisateur.
 - `slides_test.py` : aucune sortie de canevas détectée ;
 - inspection visuelle : hiérarchie, contrastes, alignements et continuité graphique validés.
 
+## 2026-07-31 — v2.526 — Livraison PPTX garantie dans le Runner natif
+
+### Incident reproduit
+
+Dans la conversation `Analyse site koios.fr`, la demande « je veux une présentation en
+.pptx » a sélectionné `ai_test_forge` au lieu de `pptx_create`. Le premier appel contenait
+`require_online` avec un type invalide, le second a échoué et le troisième a été annulé avec
+968 ms de budget restant. Un script Python de seize diapositives a ainsi été généré trois
+fois sans que le fichier demandé soit livré.
+
+### Correction
+
+- les demandes explicites de création PowerPoint conservent `pptx_create` et excluent les
+  surfaces de code qui ne livrent pas de documents Office ;
+- le plan LLM natif conserve la liberté de stratégie, mais impose le fichier PPTX comme
+  postcondition métier ;
+- si le modèle conclut sans appel valide, le harness transforme la synthèse Markdown du tour
+  précédent en arguments bornés pour `pptx_create` ;
+- un nom `.pptx` demandé est conservé, sinon le chemin portable
+  `Bureau/Presentation_Marvin.pptx` est utilisé ;
+- une demande d'explication explicitement « sans créer » reste sans effet de bord.
+
+### Sécurité, journalisation et rollback
+
+Le repli n'exécute aucun code généré, ne traverse aucun chemin absolu fourni par le contenu
+Web, limite le nom de fichier, les diapositives et les puces, puis repasse par le schéma et le
+gateway standard. Aucun contenu, donnée personnelle ou source Web supplémentaire n'est ajouté
+aux logs. Aucun schéma ni donnée persistante n'est modifié.
+
+Rollback : réversion atomique du commit v2.526 puis redémarrage du backend. Aucun rollback de
+données n'est nécessaire.
+
+### Validation réelle
+
+- routage PowerPoint : outil Office présent et quatre surfaces de code absentes ;
+- plan LLM natif : `pptx_create` obligatoire pour une livraison, absent pour une explication ;
+- matérialisation : titre, sections, tableau, nom et chemin portable reproduits ;
+- tests Planning, Required Tools, Tool Selection, Agent Execution et Office Documents réussis ;
+- architecture : 361 outils synchronisés, 378 routes et harness 361/361.
+
 ## 2026-07-31 — v2.524 — Corbeille, résilience réseau, veille catalogue et périphériques
 
 > Tranche réalisée par **Claude Code**, sur les 4 pistes d'un audit précédent

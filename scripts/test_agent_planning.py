@@ -278,6 +278,20 @@ def main() -> int:
     assert "ai_adaptive_team" not in code_delivery.required_tool_names
     assert "file_write" in code_delivery.required_tool_names
 
+    pptx_native = planning.compile_turn_plan(
+        [{"role": "user", "content": "je veux une présentation en .pptx"}],
+        "je veux une présentation en .pptx",
+        llm_native=True,
+    )
+    assert pptx_native.required_tool_names == {"pptx_create"}
+
+    pptx_suppressed = planning.compile_turn_plan(
+        [{"role": "user", "content": "explique le format pptx sans créer de fichier"}],
+        "explique le format pptx sans créer de fichier",
+        llm_native=True,
+    )
+    assert "pptx_create" not in pptx_suppressed.required_tool_names
+
     unrelated = planning.compile_turn_plan(
         [
             {"role": "user", "content": "Explique OSPF"},

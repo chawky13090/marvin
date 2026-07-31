@@ -4479,7 +4479,7 @@ TOOLS_SPEC = [
         "max_files": {"type": "integer", "minimum": 1, "maximum": 500000, "description": "Nombre maximal de fichiers inspectés (défaut 500000)"},
         "confirmed": {"type": "boolean", "description": "Confirmation explicite de suppression"}},
        []),
-    _t("pptx_create", "Crée une présentation PowerPoint (.pptx) : diapo de titre + diapos à puces.",
+    _t("pptx_create", "Crée et vérifie le fichier PowerPoint (.pptx) demandé. Outil exclusif pour livrer une présentation : ne jamais utiliser Test Forge ou Python à sa place. Retourne l'artefact, sa taille et son SHA-256.",
        {"title": {"type": "string", "maxLength": 10000, "description": "Titre de la présentation (diapo de couverture)"},
         "subtitle": {"type": "string", "maxLength": 10000, "description": "Sous-titre de couverture"},
         "slides": {"type": "array", "maxItems": 100,

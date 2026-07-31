@@ -14,6 +14,18 @@ _TOOL_FOLLOWUP_RE = re.compile(
     r"pourtant|ça\s+ne\s+marche\s+pas|ca\s+ne\s+marche\s+pas)\b",
     re.IGNORECASE,
 )
+_EXPLICIT_PPTX_CREATE_RE = re.compile(
+    r"\b(?:cr[ée]e|cr[ée]er|fais|faire|g[ée]n[èe]re|g[ée]n[ée]rer|veux|souhaite)\w*\b"
+    r".{0,100}\b(?:powerpoint|pptx|fichier\s+\.pptx)\b|"
+    r"\b(?:powerpoint|pptx|fichier\s+\.pptx)\b.{0,100}"
+    r"\b(?:cr[ée]e|fais|g[ée]n[èe]re|veux|souhaite)\w*\b",
+    re.IGNORECASE,
+)
+_NO_PPTX_CREATION_RE = re.compile(
+    r"\b(?:sans\s+(?:cr[ée]er|g[ée]n[ée]rer)|ne\s+cr[ée]e\s+pas|"
+    r"n['’]\s*enregistre\s+pas)\b",
+    re.IGNORECASE,
+)
 
 _ALWAYS_INCLUDE = {
     "pc_get_real_paths",
@@ -625,6 +637,22 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     except Exception:
         pass
     relevant |= semantic
+
+    # Un livrable Office explicite doit passer par son outil documentaire dédié.
+    # Test Forge vérifie du code mais n'est pas un moteur de documents.
+    if (
+        _EXPLICIT_PPTX_CREATE_RE.search(text_raw)
+        and not _NO_PPTX_CREATION_RE.search(text_raw)
+    ):
+        relevant.add("pptx_create")
+        relevant.difference_update({
+            "ai_test_forge",
+            "ai_code_forge",
+            "code_python",
+            "code_workspace_start",
+        })
+    elif _NO_PPTX_CREATION_RE.search(text_raw):
+        relevant.discard("pptx_create")
 
     # 4) Toujours rien de spécifique → repli BORNÉ sur un petit jeu polyvalent.
     #    ⚠️ NE JAMAIS renvoyer les ~245 specs (prompt énorme → réponse très lente).

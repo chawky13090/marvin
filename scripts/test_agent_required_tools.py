@@ -152,6 +152,37 @@ def main() -> int:
         "content": "#!/usr/bin/env bash\nset -Eeuo pipefail\n",
         "overwrite": False,
     }
+
+    pptx = inject_required_tool_calls(
+        required_names={"pptx_create"},
+        executed_names=set(),
+        tool_calls=[],
+        step=0,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query="je veux une présentation KOIOS en koios-final.pptx",
+            messages=[
+                {"role": "user", "content": "analyse KOIOS"},
+                {
+                    "role": "assistant",
+                    "content": (
+                        "# KOIOS\n## Services\n- Assistance informatique\n"
+                        "- Sauvegarde\n## Contact\n| Téléphone | 04 89 81 06 59 |"
+                    ),
+                },
+                {"role": "user", "content": "je veux une présentation KOIOS en koios-final.pptx"},
+            ],
+        ),
+        call_id_factory=lambda: "required-pptx",
+    )
+    assert pptx.injected_names == ("pptx_create",)
+    pptx_args = pptx.tool_calls[0]["function"]["arguments"]
+    assert pptx_args["title"] == "KOIOS"
+    assert pptx_args["output_path"] == "Bureau/koios-final.pptx"
+    assert pptx_args["slides"] == [
+        {"title": "Services", "bullets": ["Assistance informatique", "Sauvegarde"]},
+        {"title": "Contact", "bullets": ["Téléphone — 04 89 81 06 59"]},
+    ]
     print(
         "Agent Required Tools OK - contrats, autonomie, budget, Workspace et dédoublonnage."
     )

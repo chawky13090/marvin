@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.525.0)
+## 9. État actuel (v2.526.0)
+
+**v2.526 (contrat de livraison PowerPoint)** : une demande explicite de fichier `.pptx`
+expose prioritairement `pptx_create` et retire Test Forge, Code Forge, Code Python et Code
+Workspace de ce tour. En mode LLM natif, le choix de stratégie reste libre mais la présence
+du livrable devient une postcondition : si le modèle tente de conclure sans artefact, le
+harness matérialise `pptx_create` à partir de la synthèse structurée déjà visible dans la
+conversation. Le repli est borné à 12 diapositives et 8 puces par diapositive, utilise un
+chemin Bureau portable et attend la preuve `verified`, la taille et le SHA-256. Une demande
+d'explication « sans créer » ne déclenche aucune écriture. Rollback : réversion atomique du
+commit v2.526 puis redémarrage backend, sans migration de données.
 
 **v2.525 (tool-calling parallèle borné)** — *tranche livrée par Claude Code, backend
 non redémarré à la demande de l'utilisateur.* `agent_tool_dispatch.

@@ -86,6 +86,18 @@ _SITE_CRAWL_RE = re.compile(
     r".{0,80}\b(?:site|domaine|pages?)\b|"
     r"\b(?:site|domaine)\b.{0,80}\b(?:complet|entier|toutes?\s+les?\s+pages?)\b"
 )
+_EXPLICIT_PPTX_DELIVERY_RE = re.compile(
+    r"\b(?:cr[ée]e|cr[ée]er|fais|faire|g[ée]n[èe]re|g[ée]n[ée]rer|veux|souhaite)\w*\b"
+    r".{0,100}\b(?:powerpoint|pptx|fichier\s+\.pptx)\b|"
+    r"\b(?:powerpoint|pptx|fichier\s+\.pptx)\b.{0,100}"
+    r"\b(?:cr[ée]e|fais|g[ée]n[èe]re|veux|souhaite)\w*\b",
+    re.IGNORECASE,
+)
+_NO_FILE_CREATION_RE = re.compile(
+    r"\b(?:sans\s+(?:cr[ée]er|g[ée]n[ée]rer)|ne\s+cr[ée]e\s+pas|"
+    r"n['’]\s*enregistre\s+pas)\b",
+    re.IGNORECASE,
+)
 _CONTEXT_ONLY_WEB_RE = re.compile(
     r"^\s*(?:cherche|recherche|regarde|fouille|explore)\w*\s+"
     r"(?:uniquement\s+|aussi\s+)?(?:sur\s+)?(?:les?\s+)?"
@@ -163,6 +175,11 @@ def _deterministic_action_requirements(
         requirements.add("file_write")
     if _SITE_CRAWL_RE.search(text):
         requirements.add("web_site_crawl")
+    if (
+        _EXPLICIT_PPTX_DELIVERY_RE.search(text)
+        and not _NO_FILE_CREATION_RE.search(text)
+    ):
+        requirements.add("pptx_create")
     return requirements
 
 
@@ -290,11 +307,16 @@ def compile_turn_plan(
         # explicites négatives, la confidentialité et les budgets de sûreté.
         cortex_plan = cortex.compile_contract(user_query, cortex_contract)
         execution_budget = cortex_plan["execution_budget"]
+        native_requirements = (
+            set()
+            if tool_suppression
+            else _deterministic_action_requirements(messages, user_query)
+        )
         return TurnPlan(
             explicit_tool_names=set(),
             command_text_only=command_text_only,
             tool_suppression=tool_suppression,
-            required_tool_names=set(),
+            required_tool_names=native_requirements,
             workspace_norm=cloud_routing.strip_accents(
                 (user_query or "").casefold()
             ),
