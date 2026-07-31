@@ -5,6 +5,73 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.539.0 — computer_control : troisième passe, après redémarrage confirmé
+
+### Demande et constats
+
+Retour direct : « j'ai bien redémarré Marvin et regarde la dernière conversation, il faut
+trouver une solution pour que tous les outils de Marvin soient appelés de façon correcte et
+efficace, regarde plus largement comment fonctionnent les appels d'outils de Marvin et s'il
+ne faut pas faire des rectificatifs ». Extraction de la conversation la plus récente
+(`ae9cce94-2bea-4c0c-9e21-0d6dd0a7ef0c`, « Ouvrir IT Connect sur Firefox », 20:29-20:32,
+22 messages, 8 erreurs). Confirmation immédiate que le redémarrage a bien pris effet : plus
+aucune erreur de type stringifié (`x`/`y` envoyés comme `"581"`/`"964"` correctement
+coercés), plus de hang de 8 minutes. Quatre défauts RESTANTS, tous dans `computer_control` :
+
+1. `action="launch", application="firefox"` — "launch" n'est pas dans l'énumération du
+   schéma (seul "open" l'est) ; synonyme naturel non couvert par l'alias `program`/`app`/
+   `app_name`/`application`→`target` de v2.537 (qui ne touchait que le nom du paramètre,
+   pas celui de l'action).
+2. `action="navigate", url="https://itconnect.fr"` — "le paramètre 'computer_control.url'
+   n'est pas déclaré par le schéma." Le champ `target` sert pourtant double emploi
+   (ouverture ET navigation, selon sa description), mais `url` n'était pas dans la liste
+   d'alias v2.537.
+3. `action="click", coordinate="[581, 964]"` — convention `coordinate: [x, y]` d'autres API
+   de contrôle d'écran, non supportée ; le schéma de cet outil attend `x`/`y` séparés.
+4. `action="focus", window="Mozilla Firefox"` → échec RÉEL, pas une invention de paramètre :
+   `(258, 'SetForegroundWindow', 'Dépassement du délai d'attente.')` — protection Windows
+   anti-vol-de-focus. Cet échec a fait échouer TOUTE la mission en aval : sans fenêtre
+   focalisée, impossible de taper l'URL, et la synthèse finale de Marvin l'admet
+   explicitement ("Le site 'it connect' n'a pas été chargé").
+
+### Décisions et modifications
+
+- `backend/agent_tool_step.py` : `url` ajouté à la liste d'alias `program`/`app`/`app_name`/
+  `application`→`target` (déjà générique, un seul ajout). Nouvel alias d'ACTION
+  (`launch`/`start`/`run`→`open`, `switch`/`activate`/`switch_to`→`focus`) appliqué au champ
+  `action` lui-même avant validation. Nouveau décodage de `coordinate` (chaîne JSON `"[x,
+  y]"` ou liste `[x, y]`) vers les champs séparés `x`/`y`, uniquement si `x`/`y` sont absents
+  (jamais de collision avec un appel déjà correct).
+- `backend/tool_domains/pc_control.py` : nouveau `_set_foreground_resilient(hwnd)` —
+  retente `SetForegroundWindow` via la technique standard win32 `AttachThreadInput`
+  (attache temporairement l'input du thread de la fenêtre au premier plan à celui de la
+  fenêtre cible, seule méthode fiable documentée pour contourner la protection anti-vol-de-
+  focus de Windows), utilisé aux deux points d'appel de `execute_pc_window_focus`
+  (ciblage par hwnd et par titre).
+
+### Validation, sécurité, logs et rollback
+
+Les 4 scénarios exacts de la conversation source sont testés et corrigés :
+`{action:"launch", application:"firefox"}` → `{action:"open", target:"firefox"}` ;
+`{action:"navigate", url:"..."}` → `{action:"navigate", target:"..."}` ;
+`{action:"click", coordinate:"[581, 964]"}` et la forme liste `[581, 964]` → `{x:581,
+y:964}` ; `_set_foreground_resilient()` testé avec un hwnd réel (Program Manager) → succès.
+Suites de régression exécutées et vertes : `test_computer_runtime`, `test_agent_tool_step`,
+`test_stringified_array_repair`, `test_agent_tool_batch`, `test_agent_tool_batch_parallel`,
+`test_agent_tool_dispatch`, `test_tool_domain_filesystem`, `test_agent_model_step`,
+`test_agent_policy`, `test_capability_discovery_v2`, `check_architecture.py`,
+`test_main_composition.py`. Aucune migration, aucun changement d'API cassant. Sur la
+question plus large posée (« faut-il revoir plus largement comment les outils sont
+appelés ? ») : le motif observé sur 3 conversations consécutives converge systématiquement
+sur `computer_control` — un outil à la surface large (18 actions, 20+ paramètres) où les
+modèles cloud appliquent naturellement des conventions d'autres API de contrôle d'écran
+(SendKeys, `coordinate: [x,y]`, noms d'action synonymes). La réponse structurelle déjà en
+place depuis v2.526 (normalisation déterministe AVANT validation, dans
+`agent_tool_step.py`/`computer_runtime.py`, jamais dans le prompt) reste la bonne
+architecture : chaque incident réel rejoué ajoute une règle bornée et testée, sans
+réécriture. Aucun signe d'un défaut de conception plus profond nécessitant une refonte.
+Rollback : réversion du commit v2.539.
+
 ## 2026-07-31 — v2.538.0 — computer_control : touches spéciales SendKeys et alias d'outil
 
 ### Demande et constats

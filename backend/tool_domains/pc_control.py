@@ -934,6 +934,44 @@ async def execute_pc_window_list(args: dict) -> dict:
         return {"error": str(e)}
 
 
+# v2.539 — Incident réel reproduit (conversation « Ouvrir IT Connect sur Firefox »,
+# après redémarrage) : `SetForegroundWindow` a échoué avec `(258, 'SetForegroundWindow',
+# 'Dépassement du délai d'attente.')` — Windows refuse de céder le focus à un process
+# qui n'a pas l'entrée utilisateur la plus récente (anti-vol de focus). Contournement
+# standard win32 : attacher temporairement l'input du thread de la fenêtre au premier
+# plan à celui de la fenêtre cible le temps de l'appel, ce qui autorise le transfert.
+def _set_foreground_resilient(hwnd: int) -> None:
+    import win32gui
+    import win32process
+    import win32api
+    import win32con
+
+    try:
+        win32gui.SetForegroundWindow(hwnd)
+        return
+    except Exception:
+        pass
+    current = win32gui.GetForegroundWindow()
+    current_thread = win32process.GetWindowThreadProcessId(current)[0] if current else 0
+    target_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
+    this_thread = win32api.GetCurrentThreadId()
+    attached_current = attached_target = False
+    try:
+        if current_thread and current_thread != this_thread:
+            win32process.AttachThreadInput(this_thread, current_thread, True)
+            attached_current = True
+        if target_thread and target_thread != this_thread:
+            win32process.AttachThreadInput(this_thread, target_thread, True)
+            attached_target = True
+        win32gui.BringWindowToTop(hwnd)
+        win32gui.SetForegroundWindow(hwnd)
+    finally:
+        if attached_current:
+            win32process.AttachThreadInput(this_thread, current_thread, False)
+        if attached_target:
+            win32process.AttachThreadInput(this_thread, target_thread, False)
+
+
 async def execute_pc_window_focus(args: dict) -> dict:
     search = str(args.get("search", "") or "").strip()
     requested_hwnd = args.get("hwnd")
@@ -958,7 +996,7 @@ async def execute_pc_window_focus(args: dict) -> dict:
                 return {"error": f"Aucune fenêtre avec le hwnd {hwnd}"}
             title = win32gui.GetWindowText(hwnd)
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            win32gui.SetForegroundWindow(hwnd)
+            _set_foreground_resilient(hwnd)
             return {"success": True, "message": f"Fenêtre mise au premier plan : {title}"}
 
         candidates: list[tuple[int, str]] = []
@@ -974,7 +1012,7 @@ async def execute_pc_window_focus(args: dict) -> dict:
         if target:
             hwnd, title = target
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            win32gui.SetForegroundWindow(hwnd)
+            _set_foreground_resilient(hwnd)
             return {"success": True, "message": f"Fenêtre mise au premier plan : {title}"}
         return {"error": f"Aucune fenêtre contenant « {search} » trouvée"}
     except Exception as e:

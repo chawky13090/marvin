@@ -148,12 +148,44 @@ def prepare_tool_call(
             if isinstance(value, str) and value.strip().casefold() in {"true", "false"}:
                 arguments[key] = value.strip().casefold() == "true"
         # v2.537 — Incident réel reproduit : le modèle appelle `action="open"` avec
-        # `program`/`app`/`app_name` (absents du schéma) au lieu de `target`.
+        # `program`/`app`/`app_name` (absents du schéma) au lieu de `target`. v2.539 —
+        # ajout de `url`, utilisé de la même façon pour `action="navigate"`.
         if not arguments.get("target"):
-            for alias in ("program", "app", "app_name", "application"):
+            for alias in ("program", "app", "app_name", "application", "url"):
                 if arguments.get(alias):
                     arguments["target"] = arguments.pop(alias)
                     break
+        # v2.539 — Incident réel reproduit (conversation « Ouvrir IT Connect sur
+        # Firefox », après redémarrage) : le modèle appelle `action="launch"`
+        # (synonyme naturel de "lancer un programme") au lieu de `action="open"`,
+        # le seul reconnu par le schéma.
+        action_alias = {
+            "launch": "open", "start": "open", "run": "open",
+            "switch": "focus", "activate": "focus", "switch_to": "focus",
+        }
+        current_action = str(arguments.get("action") or "").strip().casefold()
+        if current_action in action_alias:
+            arguments["action"] = action_alias[current_action]
+        # v2.539 — Incident réel reproduit : le modèle envoie un unique paramètre
+        # `coordinate` (convention "coordinate: [x, y]" d'autres API de contrôle
+        # d'écran) au lieu des champs séparés `x`/`y` du schéma de cet outil.
+        if (
+            arguments.get("x") is None
+            and arguments.get("y") is None
+            and "coordinate" in arguments
+        ):
+            raw_coordinate = arguments.pop("coordinate")
+            if isinstance(raw_coordinate, str):
+                try:
+                    raw_coordinate = json.loads(raw_coordinate)
+                except (json.JSONDecodeError, TypeError):
+                    raw_coordinate = None
+            if (
+                isinstance(raw_coordinate, (list, tuple))
+                and len(raw_coordinate) == 2
+                and all(isinstance(part, (int, float)) for part in raw_coordinate)
+            ):
+                arguments["x"], arguments["y"] = raw_coordinate
 
     # v2.538 — Incident réel reproduit (conversation « Ouvrir IT Connect sur
     # Firefox ») : le modèle a appelé un outil "browser" inexistant (aucun outil

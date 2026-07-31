@@ -202,7 +202,23 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.538.0)
+## 9. État actuel (v2.539.0)
+
+**v2.539 (computer_control : troisième passe après redémarrage confirmé)** : nouvelle
+conversation réelle (« Ouvrir IT Connect sur Firefox », rejouée après redémarrage du
+backend — confirme que v2.537/v2.538 sont bien actifs : plus de type stringifié, plus de
+hang de 8 minutes). Quatre défauts restants, tous dans `computer_control` : `action="launch"`
+(synonyme naturel de "lancer", non reconnu — alias vers `open`) ; `action="navigate"` avec
+`url` au lieu de `target` (le champ sert pourtant double emploi ouverture/navigation — `url`
+ajouté à la liste d'alias déjà existante `program`/`app`/`app_name`/`application`) ;
+`action="click"` avec un unique `coordinate: "[x, y]"` (convention d'autres API de contrôle
+d'écran) au lieu des champs séparés `x`/`y` — désormais décomposé automatiquement ; et un
+échec RÉEL de `SetForegroundWindow` (`(258, 'SetForegroundWindow', 'Dépassement du délai
+d'attente.')`, protection anti-vol-de-focus de Windows) qui a fait échouer toute la mission
+en aval (impossible de taper l'URL sans fenêtre focalisée). Contournement standard win32
+ajouté : `_set_foreground_resilient()` retente via `AttachThreadInput` (attache
+temporairement l'input du thread au premier plan à celui de la fenêtre cible, seule méthode
+fiable pour forcer ce transfert). Aucune migration. Rollback : réversion du commit v2.539.
 
 **v2.538 (computer_control : touches spéciales, alias, message clair)** : analyse d'une
 DEUXIÈME conversation réelle (« Ouvrir IT Connect sur Firefox », 73 messages, 28 erreurs),
