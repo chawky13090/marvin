@@ -202,7 +202,25 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.542.0)
+## 9. État actuel (v2.543.0)
+
+**v2.543 (prompt système corrigé — il contredisait v2.541/542)** : sur clarification de
+l'utilisateur (« si je demande explicitement d'ouvrir le navigateur il doit le faire,
+sinon le navigateur caché me va très bien »), recherche de la cause pour laquelle le
+modèle continuait à préférer le contexte caché malgré les correctifs techniques déjà
+livrés. Trouvé : la règle #15 d'`agent_prompt.py` (et son équivalent dans
+`native_agent_prompt.py`) disait explicitement « pour une mission Web avec une URL connue,
+préfère `surface=browser` [...] N'utilise le bureau Windows que si l'utilisateur demande
+explicitement son navigateur déjà ouvert » — l'INVERSE du comportement souhaité, et en
+contradiction directe avec les correctifs techniques de v2.541/542. Réécrit pour distinguer
+clairement les deux intentions : « ouvre X et va sur Y »/« montre-moi X » → `action=open`
+avec `target` ET `url` en un seul appel (visible), jamais suivi de `navigate` séparé ; une
+simple recherche/vérification d'information → `web_search`/`web_research`/`web_browse`
+(caché, comportement inchangé) ; `surface=browser`+`navigate` réservé à l'automatisation
+interactive multi-étapes d'une page déjà ouverte, jamais comme repli par défaut. Les deux
+tests qui épinglaient l'ancien texte littéral (`test_agent_prompt.py`,
+`test_native_agent_path.py`) ont été mis à jour sur le nouveau texte. Aucune migration.
+Rollback : réversion du commit v2.543.
 
 **v2.542 (navigate cible le navigateur visible par défaut)** : après v2.541, une nouvelle
 conversation réelle (« Ouvrir France Travail ») montre que le modèle a de nouveau enchaîné

@@ -5,6 +5,57 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-01 — v2.543.0 — Prompt système corrigé (contredisait les correctifs v2.541/542)
+
+### Demande et constats
+
+Suite aux correctifs v2.541/542, l'utilisateur a exprimé un besoin de fond : « il faut que
+Marvin me pose les bonnes questions [...] si je veux pas que Marvin automatise des choses
+via le navigateur caché ». Après discussion, clarification décisive : « je ne m'inquiète
+pas de la confidentialité, je voulais juste être sûr que quand je demande qu'il ouvre un
+navigateur [...] qu'il le fasse réellement. Si je demande une recherche, qu'il continue
+avec le navigateur caché [...] et qu'il comprenne ce que je veux dire » — donc pas un
+réglage ni une question à poser, mais une correction de la compréhension d'intention.
+
+En cherchant pourquoi le modèle continuait à privilégier le contexte caché malgré les
+correctifs techniques (v2.541 : `open`+`url` combinés ; v2.542 : `navigate` par défaut
+visible), trouvé la cause réelle : `backend/agent_prompt.py` (règle #15) contenait
+l'instruction « Pour une mission Web avec une URL connue, préfère `surface=browser` et
+`action=navigate/observe/click/type` [...] N'utilise le bureau Windows que si
+l'utilisateur demande explicitement son navigateur déjà ouvert [...] » — l'INVERSE exact
+du comportement voulu, écrit pour un cas d'usage différent (missions de recherche/lecture
+programmatique) mais s'appliquant de fait à TOUTE mission Web, y compris « ouvre X et va
+sur Y ». Le même texte existait, formulé différemment, dans `native_agent_prompt.py`
+(chemin de prompt alternatif pour un autre mode de modèle).
+
+### Décisions et modifications
+
+- `backend/agent_prompt.py` (règle #15, second paragraphe) : réécrit pour distinguer
+  explicitement les deux intentions avec le contexte de l'incident réel qui a motivé le
+  changement : (1) l'utilisateur veut voir/utiliser un navigateur lui-même → `open` avec
+  `target` ET `url` en un seul appel, jamais suivi de `navigate` séparé ; (2) l'utilisateur
+  veut une information du Web sans avoir besoin d'une fenêtre → `web_search`/
+  `web_research`/`web_browse`, jamais `computer_control` ; (3) `surface=browser`+
+  `navigate` réservé à l'automatisation interactive multi-étapes d'une page déjà ouverte,
+  jamais comme repli par défaut pour « ouvrir une page ».
+- `backend/native_agent_prompt.py` : même correction, formulation plus compacte cohérente
+  avec le style existant de ce fichier.
+- `scripts/test_agent_prompt.py` et `scripts/test_native_agent_path.py` : les assertions
+  qui épinglaient l'ancien texte littéral (« Pour une mission Web avec une URL connue... »)
+  mises à jour sur le nouveau texte — changement de contenu intentionnel, pas une
+  régression.
+
+### Validation, sécurité, logs et rollback
+
+Suites de régression exécutées et vertes après mise à jour des assertions :
+`test_agent_prompt`, `test_native_agent_path`, `check_architecture.py`,
+`test_main_composition.py`. Aucune migration, aucun changement d'API. Ce correctif est
+d'une nature différente des précédents (v2.537-542, tous des corrections de code
+déterministe) : c'est une correction de PROMPT — son effet dépend du comportement du
+modèle et ne peut pas être prouvé par un test unitaire de la même façon qu'un alias de
+paramètre ; seule une nouvelle conversation réelle confirmera l'effet. Rollback :
+réversion du commit v2.543.
+
 ## 2026-07-31 — v2.542.0 — navigate cible le navigateur visible par défaut
 
 ### Demande et constats

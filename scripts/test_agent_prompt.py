@@ -33,7 +33,7 @@ def main() -> int:
         assert "RESTE SUR LA DEMANDE INITIALE" in prompt
         assert "CODE WORKSPACE ET TESTS" in prompt
         assert "Seuls les messages portant le rôle `user`" in prompt
-        assert "Pour une mission Web avec une URL connue" in prompt
+        assert "DISTINGUE TOUJOURS deux intentions différentes pour le Web" in prompt
         assert fake_home in prompt
         assert str(Path(fake_home) / "Desktop") in prompt
 
