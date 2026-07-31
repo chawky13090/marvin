@@ -14709,3 +14709,47 @@ Aucune migration de schéma, aucune donnée persistante. Rollback complet :
 réversion atomique du commit v2.530 puis redémarrage. Rollback partiel sans
 redéploiement : revenir à `prepare_tool_call as _prepare_tool_call` (import nu)
 dans `agent.py` désactive la réparation sans toucher au reste du fichier.
+## 2026-07-31 — v2.531 — Fermeture et réouverture coopératives de Marvin
+
+### Demande et diagnostic
+
+L'arrêt présenté comme « propre » appelait directement `Stop-Process -Force` sur les
+listeners 3000/8005/8443. Les ports finissaient par disparaître, mais FastAPI ne pouvait pas
+garantir l'exécution du `lifespan shutdown` (workers, missions, navigateur et pools HTTP),
+Turbopack n'avait aucun contrat explicite de terminaison, et le script retournait toujours
+`success=true` sans vérifier l'état final. Le premier prototype a ensuite prouvé que Caddy
+restait seul actif jusqu'au timeout. Un second test a identifié que sa sortie informative sur
+stderr était interprétée comme une exception PowerShell.
+
+### Solution
+
+- `backend/server_runtime.py` surveille une requête locale atomique et positionne
+  `uvicorn.Server.should_exit`, ce qui exécute le shutdown applicatif réel.
+- `scripts/start_next_dev.mjs` supervise Turbopack, traite la requête frontend et libère son
+  verrou avec un repli interne borné à huit secondes.
+- `scripts/stop-marvin.ps1` vérifie l'appartenance de chaque PID à Marvin, refuse les listeners
+  étrangers, ferme Caddy avec son API locale, attend les ports et n'emploie `-Force` qu'après
+  timeout sur un PID Marvin vérifié. Un arrêt déjà réalisé reste un succès idempotent.
+- Ollama et SearXNG sont conservés : ils sont des dépendances partagées, pas des processus de
+  session Marvin. La sécurité LAN et ses secrets persistants ne sont ni supprimés ni réécrits.
+- Journal structuré `runtime/logs/lifecycle.jsonl`, sans arguments, jetons, cookies, codes de
+  jumelage ou données personnelles; rotation à 2 Mio, quatre archives.
+
+### Validation réelle
+
+- syntaxe Python, Node et PowerShell : valide;
+- `check:lifecycle-runtime`, `check:runtime-supervisor`, `check:avatar` : réussis;
+- `check:lan-access` : sessions signées, CSRF, origines, expiration, rate limit, jumelage,
+  cookies, garde HTTP, WebSocket et OpenAPI réussis;
+- migration depuis l'ancien runtime : repli forcé attendu, ports libérés, Ollama conservé;
+- nouveau runtime : backend 2.531.0, frontend HTTP 200 et HTTPS/Caddy disponibles;
+- arrêt coopératif : 5,07 s, `graceful=true`, zéro PID forcé, ports libérés;
+- second arrêt : 2,02 s, `state=already_stopped`, Ollama toujours joignable.
+
+### Sécurité et rollback
+
+Les fichiers de demande ne contiennent qu'un horodatage, restent sous la racine locale du
+projet et ne sont jamais exposés par HTTP. L'arrêt Caddy utilise uniquement l'API admin liée à
+`127.0.0.1:2019`. Le script ne tue aucun PID non attribuable au projet. Aucune migration de
+schéma ni mutation de donnée. Rollback : réversion atomique du commit v2.531 puis redémarrage
+avec `start.bat`; les fichiers de requête résiduels sont supprimés au prochain démarrage.

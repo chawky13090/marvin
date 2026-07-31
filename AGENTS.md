@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.523.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.531.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.530.0)
+## 9. État actuel (v2.531.0)
+
+**v2.531 (cycle de vie Windows coopératif et vérifié)** : `stop-marvin.ps1`
+n'utilise plus immédiatement `Stop-Process -Force`. Il dépose deux demandes locales et
+atomiques dans `runtime/lifecycle/` : Uvicorn exécute alors son `lifespan shutdown` complet,
+et le superviseur Turbopack termine son enfant puis libère `.next/dev/lock`. Caddy est arrêté
+par son API d'administration locale avec `caddy stop --config`. Le script refuse de toucher
+un listener qui n'appartient pas à l'arborescence Marvin, attend réellement la libération des
+ports 3000/8005/8443, puis n'utilise un repli forcé que sur un PID Marvin après expiration du
+délai. L'arrêt est idempotent, conserve Ollama et journalise sans secret dans
+`runtime/logs/lifecycle.jsonl`, rotation 2 Mio et quatre archives. Validation réelle : arrêt
+coopératif complet en 5,07 s, zéro PID forcé; second arrêt en 2,02 s; tests LAN (session signée,
+CSRF, origine, expiration, limitation et WebSocket) inchangés. Rollback : réversion atomique
+du commit v2.531 et redémarrage; aucune migration ni donnée persistante.
 
 **v2.530 (réparation des paramètres array/object sérialisés en chaîne)** — *tranche
 livrée par Claude Code, backend non redémarré à la demande de l'utilisateur.*

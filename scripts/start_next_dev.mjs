@@ -1,11 +1,13 @@
 import { closeSync, constants, existsSync, openSync, rmSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const devRoot = join(projectRoot, '.next', 'dev');
 const devLock = join(devRoot, 'lock');
+const lifecycleRoot = join(projectRoot, 'runtime', 'lifecycle');
+const shutdownRequest = join(lifecycleRoot, 'frontend.shutdown');
 
 function activeDevLock(lockPath) {
   if (!existsSync(lockPath)) return false;
@@ -37,11 +39,39 @@ for (const relativePath of [
 }
 
 const nextCli = join(projectRoot, 'node_modules', 'next', 'dist', 'bin', 'next');
-const result = spawnSync(process.execPath, [nextCli, 'dev', '-H', '127.0.0.1'], {
+rmSync(shutdownRequest, { force: true });
+const child = spawn(process.execPath, [nextCli, 'dev', '-H', '127.0.0.1'], {
   cwd: projectRoot,
   env: process.env,
   stdio: 'inherit',
 });
 
-if (result.error) throw result.error;
-process.exit(result.status ?? 1);
+let stopping = false;
+const stopChild = () => {
+  if (stopping || child.exitCode !== null) return;
+  stopping = true;
+  child.kill('SIGTERM');
+  setTimeout(() => {
+    if (child.exitCode === null) child.kill('SIGKILL');
+  }, 8000).unref();
+};
+
+const watcher = setInterval(() => {
+  if (existsSync(shutdownRequest)) stopChild();
+}, 250);
+watcher.unref();
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, stopChild);
+}
+
+child.once('error', (error) => {
+  clearInterval(watcher);
+  console.error(`[ERREUR] Turbopack n'a pas démarré : ${error.message}`);
+  process.exitCode = 1;
+});
+child.once('exit', (code, signal) => {
+  clearInterval(watcher);
+  rmSync(shutdownRequest, { force: true });
+  process.exitCode = code ?? (signal ? 1 : 0);
+});
