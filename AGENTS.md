@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.531.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.532.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.531.0)
+## 9. État actuel (v2.532.0)
+
+**v2.532 (avatar auto-synchronisé)** : l'avatar ne reste plus sur « Démarrer Marvin »
+lorsque Marvin a été relancé par `start.bat`, Codex ou un autre superviseur. Le processus
+Electron sonde `/avatar` toutes les deux secondes, sans chevauchement, et ne recharge la vue
+que lors d'une transition réelle hors-ligne/en-ligne. Le timer est détruit à la fermeture de
+l'avatar. Aucun état LAN, cookie, code de jumelage ou secret n'est modifié. Rollback :
+réversion atomique du commit v2.532 puis relance de l'avatar; aucune migration.
 
 **v2.531 (cycle de vie Windows coopératif et vérifié)** : `stop-marvin.ps1`
 n'utilise plus immédiatement `Stop-Process -Force`. Il dépose deux demandes locales et

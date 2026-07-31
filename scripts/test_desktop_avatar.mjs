@@ -32,6 +32,9 @@ assert.match(main, /STARTUP_LOG_PATH/, 'un échec de démarrage doit produire un
 assert.match(main, /SHUTDOWN_LOG_PATH/, 'un échec d’arrêt doit produire un journal exploitable');
 assert.match(main, /runToCompletion/, 'l’arrêt doit attendre le code de sortie du script');
 assert.match(main, /waitForMarvinStop/, 'l’arrêt doit vérifier que frontend et backend ne répondent plus');
+assert.match(main, /startAvailabilityMonitor/, 'l’avatar doit resynchroniser automatiquement son état avec Marvin');
+assert.match(main, /setInterval\(\(\) => \{\s*loadAvailableView/, 'la reconnexion doit fonctionner même après un démarrage externe');
+assert.match(main, /availabilityCheckRunning/, 'les sondes de disponibilité ne doivent pas se chevaucher');
 assert.match(main, /'-ExecutionPolicy',\s*'Bypass'/, 'le script d’arrêt doit fonctionner avec la politique PowerShell du poste');
 assert.match(main, /\['\/d', '\/c', 'call', path\.join\(ROOT, 'start\.bat'\)\]/, 'le batch doit être invoqué par des arguments cmd séparés et portables');
 assert.match(preload, /Object\.freeze/, 'la passerelle IPC doit être minimale et immuable');
@@ -52,4 +55,4 @@ assert.match(livingAvatar, /Regard asymétrique/, 'le robot doit conserver un re
 assert.match(stopScript, /Test-MarvinProcess/, 'l’arrêt doit vérifier l’appartenance des processus');
 assert.match(stopScript, /preserved_ollama = \$true/, 'arrêter Marvin ne doit pas tuer Ollama');
 
-console.log('Desktop avatar: 38 assertions réussies.');
+console.log('Desktop avatar: 41 assertions réussies.');

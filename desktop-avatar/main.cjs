@@ -27,6 +27,8 @@ let windowRef = null;
 let saveTimer = null;
 let resizeState = null;
 let resizeTimer = null;
+let availabilityTimer = null;
+let availabilityCheckRunning = false;
 
 function readWindowState() {
   try { return JSON.parse(fs.readFileSync(PREFERENCES_PATH, 'utf8')); } catch { return {}; }
@@ -200,10 +202,29 @@ async function waitForMarvinStop(maxMs = 20000) {
   return false;
 }
 
-async function loadAvailableView() {
+async function loadAvailableView({ force = false } = {}) {
   if (!windowRef || windowRef.isDestroyed()) return;
-  if (await probe(AVATAR_URL)) await windowRef.loadURL(AVATAR_URL);
-  else await windowRef.loadFile(OFFLINE_PATH);
+  if (availabilityCheckRunning) return;
+  availabilityCheckRunning = true;
+  try {
+    const available = await probe(AVATAR_URL);
+    if (!windowRef || windowRef.isDestroyed()) return;
+    const current = windowRef.webContents.getURL();
+    if (available && (force || !isAvatarUrl(current))) {
+      await windowRef.loadURL(AVATAR_URL);
+    } else if (!available && (force || current !== OFFLINE_URL)) {
+      await windowRef.loadFile(OFFLINE_PATH);
+    }
+  } finally {
+    availabilityCheckRunning = false;
+  }
+}
+
+function startAvailabilityMonitor() {
+  if (availabilityTimer) clearInterval(availabilityTimer);
+  availabilityTimer = setInterval(() => {
+    loadAvailableView().catch(() => {});
+  }, 2000);
 }
 
 function createWindow() {
@@ -248,7 +269,8 @@ function createWindow() {
   });
   windowRef.on('move', scheduleWindowStateSave);
   windowRef.on('resize', scheduleWindowStateSave);
-  loadAvailableView();
+  loadAvailableView({ force: true });
+  startAvailabilityMonitor();
 }
 
 function stopResize() {
@@ -413,6 +435,8 @@ ipcMain.handle('marvin:quit-avatar', (event) => {
 
 app.on('before-quit', () => {
   stopResize();
+  if (availabilityTimer) clearInterval(availabilityTimer);
+  availabilityTimer = null;
   if (saveTimer) clearTimeout(saveTimer);
   saveWindowState();
   globalShortcut.unregisterAll();

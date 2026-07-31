@@ -14753,3 +14753,20 @@ projet et ne sont jamais exposés par HTTP. L'arrêt Caddy utilise uniquement l'
 `127.0.0.1:2019`. Le script ne tue aucun PID non attribuable au projet. Aucune migration de
 schéma ni mutation de donnée. Rollback : réversion atomique du commit v2.531 puis redémarrage
 avec `start.bat`; les fichiers de requête résiduels sont supprimés au prochain démarrage.
+## 2026-07-31 — v2.532 — Resynchronisation automatique de l'avatar
+
+### Incident
+
+Après un arrêt puis un redémarrage externe de Marvin, le backend 2.531.0, le frontend et
+`/avatar` répondaient tous en HTTP 200, mais Electron conservait `offline.html` et affichait
+« Démarrer Marvin ». `loadAvailableView()` n'était appelé qu'à la création de la fenêtre ou
+après une action démarrer/arrêter initiée depuis l'avatar.
+
+### Correction et validation
+
+`desktop-avatar/main.cjs` possède désormais un moniteur de disponibilité toutes les deux
+secondes. Une garde interdit les sondes concurrentes et la vue n'est rechargée que si son état
+diffère de l'état observé, afin de ne pas perdre une conversation ou provoquer un clignotement.
+Le timer est supprimé dans `before-quit`. Tests Node, ESLint, 41 assertions avatar et contrôle
+d'architecture exécutés. Aucun impact sur le middleware LAN, les cookies, les secrets ou les
+données persistantes. Rollback : réversion atomique du commit v2.532 puis relance de l'avatar.
