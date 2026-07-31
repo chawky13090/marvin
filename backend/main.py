@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.530 — reparation des parametres array/object serialises en chaine avant validation
 # v2.529 — médias Web vérifiés et composition PPTX fondée sur les preuves du crawl
 # v2.528 — redesign PPTX natif, destinations robustes et fichiers verrouillés
 # v2.527 — fidélité PPTX à la synthèse source avant exécution

@@ -265,6 +265,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Lot d'outils parallele (concurrence bornee)",
             (python, "scripts/test_agent_tool_batch_parallel.py"),
         ),
+        Stage(
+            "Reparation des parametres array/object serialises en chaine",
+            (python, "scripts/test_stringified_array_repair.py"),
+        ),
         Stage("Catalogue dynamique des capacités", (python, "scripts/test_capability_catalog.py")),
         Stage("Découverte enrichie des capacités", (python, "scripts/test_capability_discovery_v2.py")),
         Stage("Boucle agentique LLM native", (python, "scripts/test_native_agent_runtime.py")),

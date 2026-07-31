@@ -202,7 +202,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.529.0)
+## 9. État actuel (v2.530.0)
+
+**v2.530 (réparation des paramètres array/object sérialisés en chaîne)** — *tranche
+livrée par Claude Code, backend non redémarré à la demande de l'utilisateur.*
+Incident réel rejoué (conversation « PowerPoint article Windows RDP », 2.529.0) :
+le modèle a appelé `pptx_create` avec `slides` comme CHAÎNE JSON au lieu d'un
+tableau, rejeté 9 fois d'affilée à l'identique sans jamais s'adapter — l'utilisateur
+n'a jamais obtenu ses images. `agent_tool_step._coerce_stringified_json_fields`
+répare, pour tout outil et tout champ déclaré `array`/`object` par son schéma, une
+valeur reçue en chaîne JSON équivalente ; `prepare_tool_call_for(TOOLS_SPEC)` lie les
+schémas par nom exactement comme `agent_safety.validator_for` (même patron
+délibérément). Une chaîne non-JSON ou un type décodé incohérent reste une erreur
+claire, inchangée — pas de réparation silencieuse à moitié faite. `agent.py`
+construit `_prepare_tool_call` via cette factory ; `prepare_tool_call` reste
+utilisable sans schémas liés pour tous les appels historiques (vérifié). Incident
+exact rejoué et corrigé ; validé par mutation ; 18 tests de la chaîne agentique
+réussis. Aucun conflit avec les tranches PPTX v2.527–v2.529 de Codex : défaut
+différent et postérieur (chemin/thème/verrouillage) sur une autre conversation.
 
 **v2.529 (médias Web prouvés et présentations enrichies)** :
 `web_media_extract` inventorie et télécharge les images réelles d'une page ou

@@ -14626,3 +14626,86 @@ Les journaux existants ne reçoivent ni binaire, ni secret : le reçu contient
 uniquement compteurs, chemins, provenance et empreintes. Dette bornée : SVG non
 pris en charge. Rollback : réversion atomique du commit v2.529 et redémarrage du
 backend; aucune migration, les artefacts médias sont indépendants.
+
+## 2026-07-31 — v2.530 — Réparation des paramètres array/object sérialisés en chaîne
+
+> Tranche réalisée par **Claude Code**, à la demande de l'utilisateur (« regarde
+> la dernière conversation et dis-moi ce qui ne va pas »). Backend non
+> redémarré à sa demande explicite : cette tranche ne prend effet qu'au
+> prochain redémarrage.
+
+### Incident réel reproduit
+
+Conversation « PowerPoint article Windows RDP » (backend 2.529.0). Après
+l'aspiration réussie de l'article et de ses images, l'utilisateur signale
+« je ne vois pas d'image dans le pptx ». Le modèle tente alors de recréer le
+fichier : `pptx_create` est appelé avec `slides` comme **CHAÎNE contenant du
+JSON** (`"[{...}]"`) plutôt qu'un tableau. `validate_tool_args` rejette
+l'appel — à raison, le schéma déclare bien `slides` comme `array`. Le modèle
+retente **9 fois d'affilée**, à l'identique, sur 9 tours de conversation,
+sans jamais s'adapter au message d'erreur explicite, avant d'abandonner avec
+un résumé de ce qui a « fonctionné ». L'utilisateur n'a jamais obtenu ses
+images.
+
+### Analyse
+
+Le point d'entrée `prepare_tool_call` (agent_tool_step.py) normalise déjà
+plusieurs variantes réellement émises par les modèles (chaîne JSON pour
+l'ensemble des arguments, alias de paramètres, booléens sérialisés) — mais
+aucune réparation n'existait pour un CHAMP individuel sérialisé en chaîne
+alors que le schéma en attend un tableau ou un objet. Ce n'est pas spécifique
+à `pptx_create` : tout paramètre `array`/`object` d'un outil quelconque est
+exposé au même risque selon le modèle actif.
+
+### Décisions et modifications
+
+- `_coerce_stringified_json_fields` (agent_tool_step.py) : pour chaque champ
+  déclaré `array`/`object` par le schéma de l'outil, si la valeur reçue est
+  une chaîne dont le premier caractère est `[` ou `{`, tente un décodage JSON
+  unique ; n'applique le résultat que si le type décodé correspond exactement
+  à celui attendu. Un échec de décodage ou un type incohérent laisse la
+  valeur inchangée — le message d'erreur existant reste donc exact plutôt que
+  d'être remplacé par une réparation silencieuse à moitié faite.
+- `prepare_tool_call_for(TOOLS_SPEC)` (nouveau) : lie tous les schémas par nom,
+  exactement comme `agent_safety.validator_for` le fait déjà pour la
+  validation — même patron, même fichier, cohérence délibérée.
+- `agent.py` construit désormais `_prepare_tool_call` via cette factory au
+  lieu d'importer la fonction nue ; aucun autre site d'appel ne change.
+- `prepare_tool_call` reste utilisable sans schémas liés (paramètre optionnel) :
+  tous les appels historiques, y compris ceux des tests existants, continuent
+  de fonctionner à l'identique — vérifié explicitement.
+
+### Sécurité, logs et preuves
+
+Aucune capacité ajoutée : la réparation ne fait qu'accepter une forme
+d'argument déjà valide sémantiquement mais mal encodée — elle n'élargit ni le
+schéma ni les valeurs acceptées in fine, seulement leur représentation
+d'entrée. Un outil inconnu du registre ou un décodage ambigu ne provoque
+jamais d'exception (testé explicitement). Aucun contenu supplémentaire dans
+les journaux.
+
+### Validation réelle
+
+- **Incident rejoué avec l'argument exact reçu par le backend réel** :
+  réparé en tableau, puis validé sans erreur bout en bout (`prepare` →
+  `validate`).
+- Chaîne qui n'est pas du JSON, et JSON valide mais de mauvais type décodé :
+  les deux restent des erreurs claires, inchangées.
+- Outil absent du registre : aucune réparation tentée, aucune exception.
+- Rétrocompatibilité : `prepare_tool_call` appelé sans schémas liés (tous les
+  sites historiques) ne répare rien, comportement identique à avant.
+- **Test de mutation** : réparation désactivée → l'incident rejoué échoue à
+  l'assertion attendue ; restaurée, le test repasse.
+- 18 tests de la chaîne agentique complète réussis, 0 échec.
+- `check_architecture.py` : OK — 2.530.0, 362 outils, harness 362/362.
+- Aucun conflit avec les tranches PPTX v2.527–v2.529 livrées en parallèle par
+  Codex : elles corrigent un défaut différent et postérieur (chemin de
+  sortie, thème, fichier verrouillé) sur une autre conversation ; celle-ci
+  corrige la coercition d'arguments en amont de tout appel d'outil.
+
+### Rollback
+
+Aucune migration de schéma, aucune donnée persistante. Rollback complet :
+réversion atomique du commit v2.530 puis redémarrage. Rollback partiel sans
+redéploiement : revenir à `prepare_tool_call as _prepare_tool_call` (import nu)
+dans `agent.py` désactive la réparation sans toucher au reste du fichier.

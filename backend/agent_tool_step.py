@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 
 _CRITICAL_RESULT_FIELDS = frozenset(
@@ -38,7 +38,50 @@ class PreparedToolCall:
     read_signature: str = ""
 
 
-def prepare_tool_call(name: str, raw_arguments: Any) -> PreparedToolCall:
+# v2.526 — Incident réel reproduit (conversation « PowerPoint article Windows
+# RDP ») : le modèle a appelé `pptx_create` avec `slides` comme CHAÎNE contenant
+# du JSON (`"[{...}]"`) au lieu d'un tableau — rejeté par le validateur, IDENTIQUE
+# 9 fois d'affilée, sans jamais s'adapter au message d'erreur. Ce n'est pas
+# spécifique à `pptx_create` : tout paramètre `array`/`object` risque la même
+# sérialisation excessive selon le modèle. Réparation générique et bornée : un
+# champ déclaré `array`/`object` par le schéma, reçu sous forme de chaîne, est
+# décodé UNE fois ; un échec de décodage ou un type décodé incohérent laisse la
+# valeur telle quelle pour que le message d'erreur existant reste exact.
+def _coerce_stringified_json_fields(
+    arguments: dict[str, Any], schema: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    if not schema:
+        return arguments
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping):
+        return arguments
+    expected_python_type = {"array": list, "object": dict}
+    for key, field_schema in properties.items():
+        if key not in arguments or not isinstance(field_schema, Mapping):
+            continue
+        expected = field_schema.get("type")
+        python_type = expected_python_type.get(expected)
+        value = arguments[key]
+        if python_type is None or not isinstance(value, str):
+            continue
+        stripped = value.strip()
+        if not stripped or stripped[0] not in "[{":
+            continue
+        try:
+            decoded = json.loads(stripped)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(decoded, python_type):
+            arguments[key] = decoded
+    return arguments
+
+
+def prepare_tool_call(
+    name: str,
+    raw_arguments: Any,
+    *,
+    schemas_by_name: Mapping[str, Mapping[str, Any]] | None = None,
+) -> PreparedToolCall:
     """Normalise les variantes réellement émises par les modèles."""
     arguments = raw_arguments
     if isinstance(arguments, str):
@@ -50,6 +93,9 @@ def prepare_tool_call(name: str, raw_arguments: Any) -> PreparedToolCall:
         arguments = {}
     else:
         arguments = dict(arguments)
+        arguments = _coerce_stringified_json_fields(
+            arguments, (schemas_by_name or {}).get(name)
+        )
 
     # Certains modèles compatibles OpenAI sérialisent encore les booléens JSON
     # en chaînes. La coercition reste volontairement limitée aux champs booléens
@@ -98,6 +144,22 @@ def prepare_tool_call(name: str, raw_arguments: Any) -> PreparedToolCall:
         name=name,
         arguments=arguments,
         read_signature=read_signature,
+    )
+
+
+def prepare_tool_call_for(specifications):
+    """Lie `prepare_tool_call` aux schémas déclarés, comme `agent_safety.validator_for`.
+
+    Ainsi la réparation des champs `array`/`object` sérialisés en chaîne connaît
+    le schéma exact de CHAQUE outil sans que les appelants n'aient à le passer.
+    """
+    from functools import partial
+
+    from agent_safety import build_tool_schemas
+
+    return partial(
+        prepare_tool_call,
+        schemas_by_name=build_tool_schemas(specifications),
     )
 
 

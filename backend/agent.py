@@ -66,7 +66,7 @@ from agent_required_tools import (
 from agent_tool_step import (
     compact_tool_result as _compact_tool_result,
     inject_internal_context as _inject_internal_tool_context,
-    prepare_tool_call as _prepare_tool_call,
+    prepare_tool_call_for as _prepare_tool_call_for,
 )
 from agent_tool_dispatch import (
     ALWAYS_CONFIRM_TOOLS as _ALWAYS_CONFIRM_TOOLS,
@@ -131,6 +131,9 @@ from config import (
 from tools import TOOLS_REGISTRY, TOOLS_SPEC
 
 _validate_tool_args = validator_for(TOOLS_SPEC)
+# v2.526 — répare les champs array/object reçus sérialisés en chaîne JSON avant
+# la validation, avec le schéma exact de chaque outil (voir agent_tool_step.py).
+_prepare_tool_call = _prepare_tool_call_for(TOOLS_SPEC)
 
 # Conserve les références des tâches d'apprentissage en arrière-plan (anti-GC).
 _BG_LEARN_TASKS: set = set()
