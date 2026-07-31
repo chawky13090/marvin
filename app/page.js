@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
 import { createConversationAudit, conversationAuditToMarkdown } from '@/lib/chatPresentation.mjs';
 import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
+import { fetchWorkspaceSnapshot } from '@/lib/workspaceRefresh.mjs';
 import {
   canSwitchConversation,
   initialChatSelection,
@@ -42,8 +43,10 @@ export default function ChatPage() {
   const [selectionHydrated, setSelectionHydrated] = useState(false);
   const navigationRequestRef = useRef(0);
   const preserveStoredSelectionRef = useRef(false);
+  const workspaceRefreshRef = useRef(null);
   const [initialMessages, setInitialMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [conversationAvailability, setConversationAvailability] = useState('loading');
   const [newProjectName, setNewProjectName] = useState('');
   const [showProjectInput, setShowProjectInput] = useState(false);
   const [showConv, setShowConv] = useState(false);   // tiroir des conversations (mobile)
@@ -123,28 +126,32 @@ export default function ChatPage() {
   const [pullStatus, setPullStatus] = useState(null);
 
   const fetchData = useCallback(async () => {
-    try {
-      const [convRes, projRes] = await Promise.all([
-        fetchWithBackendFallback('/api/conversations?t=' + Date.now()),
-        fetchWithBackendFallback('/api/projects?t=' + Date.now())
-      ]);
-      if (convRes.ok) {
-        const data = await convRes.json();
-        setConversations(conversationListFromPayload(data));
+    if (workspaceRefreshRef.current) return workspaceRefreshRef.current;
+    const refresh = (async () => {
+      const snapshot = await fetchWorkspaceSnapshot(fetchWithBackendFallback);
+      if (snapshot.conversations.ok) {
+        setConversations(snapshot.conversations.value);
+        setConversationAvailability('ready');
+      } else {
+        // Une panne ne doit jamais être projetée comme une liste réellement vide.
+        setConversationAvailability('unavailable');
+        console.warn('[ChatPage] Conversations temporairement indisponibles', {
+          error_type: snapshot.conversations.reason,
+        });
       }
-      if (projRes.ok) {
-        const data = await projRes.json();
-        setProjects(data || []);
+      if (snapshot.projects.ok) {
+        setProjects(snapshot.projects.value);
+      } else {
+        console.warn('[ChatPage] Projets temporairement indisponibles', {
+          error_type: snapshot.projects.reason,
+        });
       }
-    } catch (err) {
-      // Une brève indisponibilité du proxy Next pendant un redémarrage est récupérable :
-      // conserver l'état affiché et laisser le prochain rafraîchissement réessayer.
-      console.warn('[ChatPage] Données temporairement indisponibles', {
-        error_type: err?.name || 'FetchUnavailable',
-      });
-    } finally {
       setLoading(false);
-    }
+    })().finally(() => {
+      workspaceRefreshRef.current = null;
+    });
+    workspaceRefreshRef.current = refresh;
+    return refresh;
   }, []);
 
   const fetchStatus = useCallback(async () => {
@@ -167,7 +174,15 @@ export default function ChatPage() {
     fetchStatus();
     const interval = setInterval(fetchData, 10000);
     const statusInterval = setInterval(fetchStatus, 15000);
-    return () => { clearInterval(interval); clearInterval(statusInterval); };
+    const resume = () => fetchData();
+    window.addEventListener('focus', resume);
+    window.addEventListener('online', resume);
+    return () => {
+      clearInterval(interval);
+      clearInterval(statusInterval);
+      window.removeEventListener('focus', resume);
+      window.removeEventListener('online', resume);
+    };
   }, [fetchData, fetchStatus]);
 
   // Restaurer le dernier fil après un rechargement complet. Seul son identifiant
@@ -877,6 +892,10 @@ export default function ChatPage() {
           <div>
             {loading ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '8px' }}>Chargement...</div>
+            ) : conversationAvailability === 'unavailable' && conversations.length === 0 ? (
+              <div role="status" style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.45, padding: '8px' }}>
+                Historique temporairement indisponible. Marvin réessaie automatiquement ; aucune conversation n’a été supprimée.
+              </div>
             ) : unassignedF.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '8px' }}>{convSearch ? 'Aucun résultat.' : 'Aucune conversation'}</div>
             ) : (

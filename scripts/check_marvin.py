@@ -281,6 +281,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
         Stage("Reprise des lectures backend frontend", ("node", "scripts/test_backend_read.mjs")),
         Stage("Normalisation des listes de conversations", ("node", "scripts/test_conversation_payload.mjs")),
+        Stage("Résilience du rafraîchissement des conversations", ("node", "scripts/test_workspace_refresh.mjs")),
         Stage("Domaine d'outils Fichiers", (python, "scripts/test_tool_domain_filesystem.py")),
         Stage("Formatage documentaire partagé", (python, "scripts/test_document_formatting.py")),
         Stage("Profil et modèles documentaires", (python, "scripts/test_document_profile.py")),

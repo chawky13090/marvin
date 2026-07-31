@@ -14199,3 +14199,51 @@ finales, ce qui est le comportement sûr.
 - conversation réelle de la capture rechargée dans le navigateur : zéro bouton
   `Oui, autoriser`, anciennes cartes non cliquables et état final lisible.
 - `check:quick` : 225/225 étapes réussies, incluant compilation backend et qualité frontend.
+
+## 2026-07-31 — v2.523 — Historique résilient aux indisponibilités
+
+### Demande et diagnostic
+
+Les conversations ont disparu temporairement le 30 juillet au soir puis sont revenues après
+redémarrage. SQLite contient 212 conversations et 3 082 messages, son `quick_check` retourne
+`ok` et le journal est en mode WAL : aucune perte de données n'est observée. Les journaux HTTP
+montrent simultanément une forte saturation du backend, avec des requêtes de plusieurs dizaines
+de secondes et certaines supérieures à deux minutes.
+
+La cause applicative est dans `app/page.js` : conversations et projets étaient chargés dans le
+même `Promise.all`. Une seule panne ou lenteur rejetait les deux résultats. Lors d'un premier
+chargement, l'état initial vide était ensuite présenté comme « Aucune conversation », alors que
+la source SQLite restait intacte. Le polling de dix secondes pouvait aussi empiler des lectures
+dont le timeout total était supérieur à cette période.
+
+### Correction
+
+- les conversations et les projets sont lus indépendamment par `workspaceRefresh.mjs` ;
+- un résultat valide reste exploité même si l'autre domaine échoue ;
+- un HTTP non réussi ou un JSON au contrat invalide ne remplace jamais le dernier état valide ;
+- au démarrage sans résultat valide, l'interface annonce une indisponibilité temporaire et
+  précise qu'aucune conversation n'a été supprimée ;
+- une seule actualisation peut être active, ce qui supprime l'accumulation du polling ;
+- retour au premier plan et reconnexion réseau déclenchent une reprise immédiate.
+
+### Journalisation, sécurité et rollback
+
+Les avertissements ne contiennent ni titre, ni message, ni identifiant : uniquement le type
+d'erreur borné. Aucun cache persistant du contenu ou des titres n'est ajouté au navigateur.
+Il n'y a ni nouveau secret, ni accès réseau, ni mutation de schéma ou de données.
+
+Rollback : réversion atomique du commit v2.523 puis redémarrage frontend/backend. Aucune
+migration descendante n'est nécessaire.
+
+### Validation réelle
+
+- SQLite : 212 conversations, 3 082 messages, 8 projets, `PRAGMA quick_check=ok`, WAL actif ;
+- résilience frontend : 8 assertions, incluant panne des projets avec conversations valides,
+  contrat conversations invalide et liste vide réellement valide ;
+- repository conversations : CRUD, recherche, cascade et rollback réussis ;
+- hygiène SQLite : connexions bornées, effacement sécurisé et schéma non fiable réussis ;
+- ESLint ciblé : aucune erreur ;
+- architecture : Marvin 2.523.0, 357 outils, 376 routes, 41 pages, harness 357/357 ;
+- navigateur réel : historique et contenu de la conversation courante visibles après
+  rechargement, sans redémarrage.
+- `check:quick` : 226/226 étapes réussies, incluant compilation backend et qualité frontend.
