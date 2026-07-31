@@ -94,6 +94,27 @@ async def run_diagnostics() -> dict:
     except Exception as e:
         add("skills_tools", "Compétences", "info", f"Non vérifié : {str(e)[:80]}")
 
+    # ── 3bis. Veille du catalogue de modèles Cloud (v2.524) ─────────────────────
+    # Lecture seule : ne déclenche JAMAIS de vérification réseau ici, le Doctor
+    # doit rester instantané et déterministe. `model_catalog_watch.status()` lit
+    # uniquement le dernier état déjà persisté par le worker de fond.
+    try:
+        import model_catalog_watch
+        watch = model_catalog_watch.status()
+        new_models = watch.get("new_models") or []
+        if not watch.get("checked"):
+            add("model_catalog_watch", "Veille modèles Cloud", "info",
+                "Aucune veille effectuée pour le moment (worker pas encore passé).")
+        elif new_models:
+            names = ", ".join(m["name"] for m in new_models[:5])
+            add("model_catalog_watch", "Veille modèles Cloud", "info",
+                f"{len(new_models)} modèle(s) Cloud non répertorié(s) détecté(s) : {names}")
+        else:
+            add("model_catalog_watch", "Veille modèles Cloud", "ok",
+                "Catalogue à jour, aucune nouveauté non répertoriée.")
+    except Exception as e:
+        add("model_catalog_watch", "Veille modèles Cloud", "info", f"Non vérifié : {str(e)[:80]}")
+
     # ── 4. Documents indexés présents sur le disque ────────────────────────────
     try:
         docs = _t._indexed_docs()

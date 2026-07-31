@@ -202,7 +202,26 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.523.0)
+## 9. État actuel (v2.524.0)
+
+**v2.524 (corbeille, résilience Cloud→local, veille catalogue, périphériques)** — *tranche
+livrée par Claude Code, backend non redémarré à la demande de l'utilisateur.* (1)
+`file_delete` envoie à la Corbeille par défaut (`send2trash`) ; `permanent=true` reste
+disponible, aucun repli silencieux si la Corbeille échoue. (2) `agent_loop_policy.
+connectivity_local_fallback` : repli local de CONTINUITÉ sur panne Cloud totale, distinct
+du repli de confidentialité existant (`sensitive_tool_model_switch`) — bug de câblage
+trouvé et corrigé en développant (le repli était imbriqué sous la garde du compteur
+cloud-à-cloud, qui l'empêchait de se déclencher une fois les alternatives épuisées).
+`Ultra cloud-only` jamais contourné. (3) `model_catalog_watch.py` interroge
+`https://ollama.com/api/tags` (endpoint public officiel) et **signale uniquement** les
+nouveaux modèles Cloud — jamais d'installation automatique ; a détecté en conditions
+réelles `glm-5.1`, `gpt-oss:20b`, `nemotron-3-nano:30b`, `gemma4:31b`, `kimi-k3` absents
+du catalogue codé en dur. Worker `model-catalog-watch`, endpoints
+`/api/model-market/catalog-watch(/refresh)`, signal dans Doctor (lecture seule). (4)
+`tool_domains/windows_devices.py` : `pc_printer_list`, `pc_printer_set_default`,
+`pc_usb_list`, `pc_bluetooth_status` — même patron que `windows_settings.py`, testé en
+conditions réelles (vraies imprimantes, 24 périphériques USB, Bluetooth réel). 361 outils,
+harness 361/361. 12 tests ciblés, 0 échec.
 
 **v2.523 (historique résilient aux pannes transitoires)** : les lectures des conversations
 et des projets sont indépendantes ; une panne de l'une ne masque plus le résultat valide de

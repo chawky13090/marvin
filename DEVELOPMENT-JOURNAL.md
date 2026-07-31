@@ -14291,3 +14291,100 @@ l'utilisateur.
 - export PowerPoint : 7 diapositives, package Open XML lisible, rendu individuel généré ;
 - `slides_test.py` : aucune sortie de canevas détectée ;
 - inspection visuelle : hiérarchie, contrastes, alignements et continuité graphique validés.
+
+## 2026-07-31 — v2.524 — Corbeille, résilience réseau, veille catalogue et périphériques
+
+> Tranche réalisée par **Claude Code**, sur les 4 pistes d'un audit précédent
+> (capacités PC, fraîcheur des outils, fiabilité). Le backend n'a volontairement PAS
+> été redémarré à la demande de l'utilisateur (session Codex en cours) : ces
+> correctifs ne prendront effet qu'au prochain redémarrage.
+
+### 1. `file_delete` envoie à la Corbeille par défaut
+
+`filesystem.delete` appelait `shutil.rmtree`/`unlink` inconditionnellement : une
+confirmation de chat produisait une suppression définitive et irrécupérable.
+Comportement par défaut désormais : Corbeille Windows (`send2trash`, nouvelle
+dépendance `requirements.txt`). `permanent=true` reste disponible, avec un message
+de confirmation qui le dit sans ambiguïté (« définitivement » vs « vers la
+Corbeille »). Une Corbeille indisponible (dépendance absente, chemin réseau qui la
+refuse) renvoie une erreur explicite — **jamais** un repli silencieux vers la
+suppression définitive.
+
+### 2. Repli local de continuité sur panne Cloud, distinct du repli de confidentialité
+
+Le seul « repli local » existant (`sensitive_tool_model_switch`) se déclenche sur le
+contenu (donnée sensible), jamais sur une panne. Un essaim de modèles Cloud tous
+injoignables épuisait ses deux tentatives cloud-à-cloud puis renvoyait une erreur
+brute — aucun repli de continuité n'existait. `agent_loop_policy.connectivity_local_fallback`
+comble ce trou ; **bug trouvé en développant** : le premier branchement était imbriqué
+sous la même garde que le retry cloud-à-cloud (`len(_failed_cloud_models) < 2`), qui
+l'empêchait justement de se déclencher une fois les alternatives épuisées — le cas où
+il devient nécessaire. Restructuré en `_cloud_retry_eligible` couvrant toute la fenêtre.
+`Ultra cloud-only` reste un contrat explicite, jamais contourné : la panne y reste
+visible plutôt que masquée par un modèle local.
+
+### 3. Veille du catalogue de modèles Ollama Cloud
+
+`model_market.RECOMMENDED_CLOUD_MODELS`/`DISCOVERABLE_CLOUD_MODELS` sont codés en dur
+et ne se mettent jamais à jour seuls. `model_catalog_watch.py` interroge
+`https://ollama.com/api/tags` (endpoint public officiel, vérifié 200/JSON sans
+authentification) via `outbound_http.fetch_public` (même transport anti-SSRF que le
+reste du projet). **Découverte réelle en testant** : `glm-5.1`, `gpt-oss:20b`,
+`nemotron-3-nano:30b`, `gemma4:31b` et `kimi-k3` (déjà installé localement) étaient
+déjà disponibles côté Ollama sans figurer dans notre catalogue. Le module **signale
+uniquement** — aucune fonction d'installation n'y est référencée (vérifié par test).
+Throttle 24 h, dégradation propre sur panne réseau/HTTP/changement de schéma distant
+(testé sur les quatre cas). Worker de fond enregistré (`model-catalog-watch`),
+endpoints `GET/POST /api/model-market/catalog-watch(/refresh)`, signal visible dans
+Marvin Doctor en lecture seule (aucun appel réseau depuis le Doctor lui-même).
+
+### 4. Périphériques Windows : imprimantes, USB, Bluetooth
+
+Constat d'audit : 0 outil de ce type dans tout le projet. `tool_domains/windows_devices.py`
+suit exactement le patron de `windows_settings.py` (lecture sans confirmation, mutation
+confirmée) : `pc_printer_list`, `pc_printer_set_default`, `pc_usb_list`,
+`pc_bluetooth_status`. Aucune nouvelle dépendance — PowerShell/WMI suffit. Testé en
+conditions réelles sur la machine de développement : imprimantes réelles listées
+(Brother MFC-L3750CDW, Microsoft Print to PDF…), 24 périphériques USB réels, radio
+Bluetooth Intel détecté. Un nom malveillant (`x'; Remove-Item C:\*; '`) est rejeté par
+une regex **avant** tout appel PowerShell — vérifié qu'aucun script n'est exécuté dans
+ce cas.
+
+### Sécurité, logs et preuves
+
+Aucune capacité retirée. `send2trash` et le module de périphériques n'ouvrent aucune
+nouvelle surface d'exécution de code arbitraire — mêmes garanties de validation de nom
+que le reste du domaine fichiers/Windows. La veille de catalogue est un GET public
+borné (2 Mo, 15 s), jamais un POST, jamais d'installation. Aucun contenu de commande,
+secret ou donnée personnelle dans les nouveaux journaux. Aucune migration de schéma,
+aucune nouvelle classe de rétention (`data/model_catalog_watch.json` suit le motif
+existant des états de worker, ignoré par git).
+
+### Validation réelle
+
+- Suppression : 5 scénarios réels (corbeille, définitif, message de confirmation par
+  mode, chemin inexistant, module absent simulé sans repli silencieux).
+- Résilience réseau : panne simulée via `httpx.MockTransport` (mécanisme standard,
+  sans toucher la connexion réelle) — `ConnectError`/`ReadTimeout` classifiés
+  correctement ; 6 scénarios de décision (panne normale, Ultra préservé, anti-boucle,
+  déjà local, pas de repli configuré, repli lui-même Cloud) ; régression du bug de
+  câblage reproduite puis corrigée, testée par mutation.
+- Veille catalogue : appel réel contre `ollama.com`, 17 modèles distants, 5 nouveautés
+  détectées ; 4 scénarios de panne (réseau, HTTP 503, schéma inconnu, JSON invalide)
+  tous dégradés proprement ; throttle 24 h vérifié.
+- Périphériques : 4 tools testés avec PowerShell réel (pas seulement mocké) puis avec
+  mocks pour la suite automatisée ; injection rejetée avant exécution ; cohérence du
+  registre vérifiée outil par outil.
+- `check_architecture.py` : OK — 2.524.0, 361 outils, harness 361/361.
+- `test_main_composition.py` : `EXPECTED_WORKERS` mis à jour (`model-catalog-watch`
+  ajouté), main.py repasse à 339 lignes (limite 350).
+- 12 tests ciblés réussis, 0 échec. ESLint : 0 erreur, 35 avertissements inchangés.
+
+### Rollback
+
+Aucune migration de schéma. Rollback complet : réversion atomique du commit v2.524
+puis redémarrage. Rollback partiel : retirer `send2trash` du script d'appel restaure
+la suppression définitive (dégrade en erreur explicite, jamais en silence) ;
+`model_catalog_watch.MIN_INTERVAL_SECONDS` à une valeur énorme désactive la veille
+sans la retirer ; les quatre outils de périphériques peuvent être retirés
+individuellement du registre sans toucher au reste du domaine Windows.

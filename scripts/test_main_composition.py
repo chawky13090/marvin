@@ -35,6 +35,7 @@ EXPECTED_WORKERS = {
     "memory-consolidation",
     "health-trend",
     "cloud-model-fleet",
+    "model-catalog-watch",
     "engineering-radar",
 }
 

@@ -84,3 +84,7 @@ langdetect==1.0.9
 
 # --- MCP (Model Context Protocol) : Marvin en serveur MCP (v2.103) ---
 mcp==1.28.1
+
+# --- Corbeille Windows (v2.524) : file_delete envoie vers la Corbeille au lieu ---
+# --- d'une suppression definitive, sauf demande explicite --------------------
+send2trash==2.1.0

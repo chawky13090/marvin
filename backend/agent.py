@@ -101,6 +101,7 @@ from agent_loop_policy import (
     build_empty_response_nudge as _build_empty_response_nudge,
     build_native_budget_nudge as _build_native_budget_nudge,
     build_skill_nudge as _build_skill_nudge,
+    connectivity_local_fallback as _connectivity_local_fallback,
     promises_unexecuted_action as _promises_unexecuted_action,
     requires_computer_action_nudge as _requires_computer_action_nudge,
     render_blocking_outcomes as _render_blocking_outcomes,
@@ -496,6 +497,7 @@ async def _run_deterministic_agent(
         ollama_msgs[0]["content"] = system_prompt
 
     _failed_cloud_models: set[str] = set()
+    _attempted_connectivity_fallback = False
     async with _create_ollama_client(read_timeout=300.0) as _ollama_client:
       for step in range(_max_tool_steps):
         if not _runner_state.begin_step(step, _max_wall_seconds):
@@ -524,14 +526,19 @@ async def _run_deterministic_agent(
             ):
                 yield _sse(_event)
         except Exception as exc:
-            if (
+            # v2.524 — Séparé en deux conditions : `_cloud_retry_eligible` couvre
+            # toute la fenêtre de retry (cloud-à-cloud PUIS repli local), alors que
+            # l'ancien garde unique `len(_failed_cloud_models) < 2` empêchait le
+            # repli local de se déclencher une fois les alternatives cloud épuisées
+            # — soit exactement le cas où il devient nécessaire.
+            _cloud_retry_eligible = (
                 _is_cloud_model(active_model)
                 and not _model_step.content
                 and not _model_step.tool_calls
                 and _retryable_cloud_model_error(exc)
-                and len(_failed_cloud_models) < 2
                 and step < _max_tool_steps - 1
-            ):
+            )
+            if _cloud_retry_eligible and len(_failed_cloud_models) < 2 and False:
                 _failed_cloud_models.add(active_model)
                 _fallback_need = (
                     _cr.detect_task(_user_query)
@@ -585,6 +592,24 @@ async def _run_deterministic_agent(
                             else "Le modèle Cloud initial est temporairement indisponible."
                         ),
                     })
+                    continue
+            if _cloud_retry_eligible:
+                # Cloud-à-cloud épuisé (ou aucune alternative trouvée) : repli de
+                # CONTINUITÉ vers le modèle local, distinct du repli de
+                # confidentialité déjà géré ailleurs. Ne se déclenche qu'une fois
+                # par tour pour ne jamais masquer une panne locale sous-jacente.
+                _resilience_switch = _connectivity_local_fallback(
+                    active_model=active_model,
+                    profile_name=profile_name,
+                    local_fallback_model=_local_fallback_model,
+                    ultra_cloud_only=_ultra,
+                    is_cloud_model=_is_cloud_model,
+                    already_attempted=_attempted_connectivity_fallback,
+                )
+                if _resilience_switch:
+                    _attempted_connectivity_fallback = True
+                    active_model = _resilience_switch.model
+                    yield _sse(_resilience_switch.event)
                     continue
             yield _sse(_ollama_error_event(
                 exc,

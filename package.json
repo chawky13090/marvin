@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.523.0",
+  "version": "2.524.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -130,6 +130,10 @@
     "check:untrusted-web": "backend\\.venv\\Scripts\\python.exe scripts\\test_untrusted_web_and_autonomy.py",
     "check:consolidation-guards": "backend\\.venv\\Scripts\\python.exe scripts\\test_skill_consolidation_guards.py",
     "check:sensitive-commands": "backend\\.venv\\Scripts\\python.exe scripts\\test_sensitive_command_confirmation.py",
+    "check:file-delete-trash": "backend\\.venv\\Scripts\\python.exe scripts\\test_file_delete_trash.py",
+    "check:connectivity-resilience": "backend\\.venv\\Scripts\\python.exe scripts\\test_connectivity_resilience.py",
+    "check:model-catalog-watch": "backend\\.venv\\Scripts\\python.exe scripts\\test_model_catalog_watch.py",
+    "check:windows-devices": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_domain_windows_devices.py",
     "check:evolution": "backend\\.venv\\Scripts\\python.exe scripts\\test_evolution_canvas.py",
     "check:missions": "backend\\.venv\\Scripts\\python.exe scripts\\test_mission_os.py",
     "check:knowledge": "backend\\.venv\\Scripts\\python.exe scripts\\test_knowledge_mesh.py",

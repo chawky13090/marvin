@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+import model_catalog_watch
 import model_market
 import research_swarm
 import swarm_jobs
@@ -96,6 +97,19 @@ async def cloud_fleet_status():
 @router.post("/fleet/sync")
 async def cloud_fleet_sync():
     return await model_market.sync_recommended_cloud_models()
+
+
+@router.get("/catalog-watch")
+async def cloud_catalog_watch_status():
+    """État de la dernière veille — lecture seule, ne déclenche jamais de vérification."""
+    return model_catalog_watch.status()
+
+
+@router.post("/catalog-watch/refresh")
+async def cloud_catalog_watch_refresh():
+    """Force une vérification immédiate du catalogue Cloud réel. Ne pull jamais un modèle :
+    signale uniquement les nouveautés pour une décision humaine ultérieure."""
+    return await model_catalog_watch.refresh(force=True)
 
 
 @router.post("/fleet/pull")

@@ -71,6 +71,50 @@ def retryable_cloud_model_error(exc: Exception) -> bool:
     }
 
 
+def connectivity_local_fallback(
+    *,
+    active_model: str,
+    profile_name: str,
+    local_fallback_model: str,
+    ultra_cloud_only: bool,
+    is_cloud_model: Callable[[str], bool],
+    already_attempted: bool,
+) -> ModelSwitch | None:
+    """Repli local de CONTINUITÉ quand tout le Cloud est devenu inaccessible.
+
+    v2.524 — Distinct du repli de confidentialité (`sensitive_tool_model_switch`) :
+    celui-ci se déclenche sur le CONTENU (donnée sensible), pas sur une panne.
+    Avant cette fonction, un essaim de modèles Cloud tous injoignables (panne
+    réseau, incident fournisseur) épuisait ses tentatives puis renvoyait une
+    erreur brute — aucun repli automatique n'existait pour la continuité. `Ultra
+    cloud-only` reste un contrat explicite du propriétaire : il n'est jamais
+    contourné, la panne y reste visible plutôt que masquée par un modèle local.
+    """
+    if ultra_cloud_only or already_attempted:
+        return None
+    if not is_cloud_model(active_model):
+        return None
+    if not local_fallback_model or is_cloud_model(local_fallback_model):
+        return None
+    if local_fallback_model == active_model:
+        return None
+    return ModelSwitch(
+        model=local_fallback_model,
+        event={
+            "type": "model_info",
+            "profile": profile_name,
+            "model": local_fallback_model,
+            "label": f"🔌 Repli local · {local_fallback_model}",
+            "provider": "ollama_local",
+            "switchReason": "cloud_connectivity_unavailable",
+            "switchMessage": (
+                "Connexion au Cloud indisponible après plusieurs tentatives : "
+                "poursuite avec le modèle local pour ne pas interrompre la conversation."
+            ),
+        },
+    )
+
+
 def sensitive_tool_model_switch(
     *,
     tool_calls: list[dict[str, Any]],

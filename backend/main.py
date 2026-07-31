@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.524 — corbeille par defaut, resilience Cloud->local, veille catalogue et peripheriques Windows
 # v2.523 — rafraîchissement résilient des conversations et projets
 # v2.522 — approbations historiques fail-closed et obsolescence par conversation
 # v2.521 — lancement Windows vérifié et adaptateur Tailscale
@@ -162,6 +163,7 @@ async def lifespan(app_instance: FastAPI):
 
     import coding_jobs
     import engineering_radar
+    import model_catalog_watch
     import model_market
 
     supervisor = RuntimeSupervisor()
@@ -182,6 +184,7 @@ async def lifespan(app_instance: FastAPI):
         supervisor.start("memory-consolidation", _memory_consolidation_worker)
         supervisor.start("health-trend", _health_trend_worker)
         supervisor.start("cloud-model-fleet", model_market.sync_recommended_cloud_models)
+        supervisor.start("model-catalog-watch", model_catalog_watch.background_worker)
         supervisor.start("engineering-radar", engineering_radar.background_worker)
         try:
             coding_jobs.start_pending()

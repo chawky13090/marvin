@@ -63,6 +63,7 @@ from tool_domains import client_health as client_health_domain
 from tool_domains import workspace_organization as workspace_organization_domain
 from tool_domains import winget as winget_domain
 from tool_domains import windows_settings as windows_settings_domain
+from tool_domains import windows_devices as windows_devices_domain
 from tool_domains import windows_registry as windows_registry_domain
 from tool_domains import windows_tweaks as windows_tweaks_domain
 from tool_domains import catharsis as catharsis_domain
@@ -2235,6 +2236,12 @@ execute_os_firewall = windows_settings_domain.execute_os_firewall
 execute_os_network_adapters = windows_settings_domain.execute_os_network_adapters
 execute_os_hibernation = windows_settings_domain.execute_os_hibernation
 
+windows_devices_domain.configure(run_powershell=execute_pc_run_powershell)
+execute_pc_printer_list = windows_devices_domain.execute_pc_printer_list
+execute_pc_printer_set_default = windows_devices_domain.execute_pc_printer_set_default
+execute_pc_usb_list = windows_devices_domain.execute_pc_usb_list
+execute_pc_bluetooth_status = windows_devices_domain.execute_pc_bluetooth_status
+
 network_domain.configure(win_network_config=execute_win_network_config)
 
 execute_net_ping = network_domain.execute_net_ping
@@ -2449,6 +2456,10 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "os_firewall":            execute_os_firewall,
     "os_network_adapters":    execute_os_network_adapters,
     "os_hibernation":         execute_os_hibernation,
+    "pc_printer_list":        execute_pc_printer_list,
+    "pc_printer_set_default": execute_pc_printer_set_default,
+    "pc_usb_list":            execute_pc_usb_list,
+    "pc_bluetooth_status":    execute_pc_bluetooth_status,
     "pc_system_info": execute_pc_system_info,
     "pc_screenshot": execute_pc_screenshot,
     "pc_window_list": execute_pc_window_list,
@@ -2860,9 +2871,15 @@ TOOLS_SPEC = [
         "mode": {"type": "string", "enum": ["overwrite", "append"], "description": "Mode d'écriture : 'overwrite' (défaut) ou 'append'"}},
        ["path", "content"]),
 
-    _t("file_delete", "Supprime un fichier ou un dossier (demande confirmation).",
+    _t("file_delete",
+       "Envoie un fichier ou un dossier à la Corbeille (récupérable), demande confirmation. "
+       "N'utiliser permanent=true QUE si l'utilisateur demande explicitement une suppression "
+       "définitive (« supprime définitivement », « vide la corbeille de ce fichier »).",
        {"path": {"type": "string", "description": "Chemin à supprimer"},
-        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"},
+        "permanent": {"type": "boolean",
+                      "description": "true = suppression définitive au lieu de la Corbeille "
+                                     "(demandé explicitement uniquement)"}},
        ["path"]),
 
     _t("file_rename", "Renomme un fichier ou un dossier.",
@@ -3111,6 +3128,16 @@ TOOLS_SPEC = [
     _t("os_hibernation", "Statut / activation / désactivation de l'hibernation (libère hiberfil.sys).",
        {"action":    {"type": "string", "enum": ["status", "on", "off"]},
         "confirmed": {"type": "boolean", "description": "Requis pour on/off"}}, ["action"]),
+
+    _t("pc_printer_list", "Liste les imprimantes installées (nom, statut, pilote, si c'est la défaut, partagée).",
+       {}, []),
+    _t("pc_printer_set_default", "Définit l'imprimante par défaut (demande confirmation).",
+       {"name":      {"type": "string", "description": "Nom exact de l'imprimante (voir pc_printer_list)"},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur"}}, ["name"]),
+    _t("pc_usb_list", "Liste les périphériques USB actuellement connectés (nom, classe, statut).",
+       {}, []),
+    _t("pc_bluetooth_status", "Statut du Bluetooth : radio disponible/activé et périphériques appairés.",
+       {}, []),
 
     _t("csv_analyze", "Analyse un fichier CSV : aperçu, statistiques par colonne, valeurs uniques.",
        {"path":      {"type": "string", "maxLength": 32767, "description": "Chemin du fichier CSV"},

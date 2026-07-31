@@ -245,6 +245,22 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Commandes sensibles confirmees malgre l autonomie",
             (python, "scripts/test_sensitive_command_confirmation.py"),
         ),
+        Stage(
+            "Suppression de fichier vers la Corbeille",
+            (python, "scripts/test_file_delete_trash.py"),
+        ),
+        Stage(
+            "Repli local de continuite sur panne Cloud",
+            (python, "scripts/test_connectivity_resilience.py"),
+        ),
+        Stage(
+            "Veille du catalogue de modeles Cloud",
+            (python, "scripts/test_model_catalog_watch.py"),
+        ),
+        Stage(
+            "Peripheriques Windows (imprimantes, USB, Bluetooth)",
+            (python, "scripts/test_tool_domain_windows_devices.py"),
+        ),
         Stage("Catalogue dynamique des capacités", (python, "scripts/test_capability_catalog.py")),
         Stage("Découverte enrichie des capacités", (python, "scripts/test_capability_discovery_v2.py")),
         Stage("Boucle agentique LLM native", (python, "scripts/test_native_agent_runtime.py")),

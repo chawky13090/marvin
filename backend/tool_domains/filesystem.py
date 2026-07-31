@@ -663,18 +663,46 @@ async def write(args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def delete(args: dict[str, Any]) -> dict[str, Any]:
+    # v2.524 — Par défaut, "supprimer" envoie vers la Corbeille Windows : une
+    # confirmation de chat ne devrait jamais être irréversible quand un repli
+    # existe. `permanent=True` (demandé explicitement) garde l'ancien
+    # comportement, avec un message de confirmation qui le dit sans ambiguïté.
+    permanent = bool(args.get("permanent"))
     if not args.get("confirmed"):
+        verb = "définitivement" if permanent else "vers la Corbeille"
         return {
             "requiresConfirmation": True,
-            "message": f"Supprimer définitivement : {args.get('path', '')} ?",
+            "message": f"Supprimer {verb} : {args.get('path', '')} ?",
         }
     path = _resolve(str(args.get("path", "")))
+    target = Path(path)
+    if not target.exists():
+        return {"error": f"Introuvable : {path}"}
+    if not permanent:
+        try:
+            import send2trash
+            await asyncio.to_thread(send2trash.send2trash, str(target))
+            return {
+                "success": True,
+                "message": f"Envoyé à la Corbeille : {path}",
+                "permanent": False,
+            }
+        except ModuleNotFoundError:
+            return {
+                "error": "Corbeille indisponible (dépendance 'send2trash' absente). "
+                         "Relancer avec permanent=true pour une suppression définitive.",
+            }
+        except Exception as exc:
+            # Un chemin réseau/amovible peut refuser la Corbeille (pas de bac local).
+            # On NE bascule PAS silencieusement en suppression définitive : on
+            # informe et on laisse l'appelant redemander avec permanent=True.
+            return {
+                "error": f"Envoi à la Corbeille impossible ({exc}). "
+                         "Relancer avec permanent=true pour une suppression définitive.",
+            }
     try:
-        target = Path(path)
-        if not target.exists():
-            return {"error": f"Introuvable : {path}"}
         shutil.rmtree(target) if target.is_dir() else target.unlink()
-        return {"success": True, "message": f"Supprimé : {path}"}
+        return {"success": True, "message": f"Supprimé définitivement : {path}", "permanent": True}
     except Exception as exc:
         return {"error": str(exc)}
 
