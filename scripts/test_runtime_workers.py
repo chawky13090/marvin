@@ -42,6 +42,7 @@ EXPECTED_RUNTIME_TASKS = {
     "memory-consolidation",
     "health-trend",
     "cloud-model-fleet",
+    "model-catalog-watch",
     "engineering-radar",
 }
 
@@ -141,7 +142,7 @@ def main() -> int:
     _check_main_contract()
     asyncio.run(_check_prewarm_deduplication())
     asyncio.run(_check_tool_index())
-    print("Runtime Workers OK - facade main, 15 taches, prewarm deduplique et index outils.")
+    print("Runtime Workers OK - facade main, 16 taches, prewarm deduplique et index outils.")
     return 0
 
 
