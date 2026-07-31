@@ -491,6 +491,23 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
             picked = pick_best_cloud_model(task)
             if picked:
                 return picked
+        # v2.536 — même doctrine que agent_model_config.resolve_model_config (boucle de
+        # chat principale) : sans signal de tâche explicite, le PROFIL est mappé sur un
+        # besoin Model Market (agent→agentic, analysis→reasoning, vision→vision) et le
+        # meilleur modèle QUALIFIÉ gagne sur l'override figé, qui redevient un simple repli.
+        # Avant ce correctif, cette fonction (appels LLM internes aux outils : génération de
+        # documents, e-mails, résumés...) ignorait Model Market et utilisait toujours
+        # l'override statique — laissant par exemple qwen3.5:397b-cloud (100/100 pour
+        # "agentic", score le plus élevé mesuré sur cette installation) sous-utilisé alors
+        # que la boucle de chat principale le sélectionnait déjà correctement.
+        need = {
+            "analysis": "reasoning",
+            "agent": "agentic",
+            "vision": "vision",
+        }.get(profile, "general")
+        picked = pick_best_cloud_model(need)
+        if picked:
+            return picked
         if profile in overrides:
             configured = overrides[profile]
             # Un override peut rester en base après le retrait/renommage d'un modèle cloud.

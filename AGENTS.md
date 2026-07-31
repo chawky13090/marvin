@@ -202,7 +202,23 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.535.0)
+## 9. État actuel (v2.536.0)
+
+**v2.536 (routage cloud interne aligné sur Model Market)** : `agent_model_config.py` (boucle
+de chat principale) mappait déjà chaque profil sur un besoin Model Market (agent→agentic,
+analysis→reasoning, vision→vision) et laissait le modèle le mieux qualifié gagner sur
+l'override statique. `cloud_routing.resolve_model()` — utilisé par TOUS les appels LLM
+internes aux outils (document_generate, email_*, text_summarize, upgrade_skill, ocr...) —
+n'avait jamais reçu ce même correctif : sans mot-clé de tâche détecté dans le texte, il
+retombait directement sur l'override de profil figé en base (`deepseek-v4-pro:cloud` pour
+agent/chat/analysis), sans jamais consulter Model Market. Résultat mesuré en réel :
+`qwen3.5:397b-cloud`, qui obtient 100/100 pour le besoin "agentic" sur cette installation
+(capacité agentique apprise `ok:true`, prior officiel le plus élevé du catalogue), était
+sous-utilisé alors que le profil `agent` (quasi tous les appels avec outils) aurait dû le
+choisir. `resolve_model()` fait désormais le même mapping profil→besoin et consulte
+`pick_best_cloud_model(need)` avant l'override, qui redevient un simple repli si Model
+Market ne retourne rien. Aucune migration, aucun changement d'API. Rollback : réversion du
+commit v2.536.
 
 **v2.535 (audit outils — 8 correctifs)** : issus d'un audit exhaustif des 362 outils par
 6 agents en parallèle. `billing_market_research`/`billing_find_products`/`billing_product_reviews`

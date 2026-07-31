@@ -5,6 +5,55 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-07-31 — v2.536.0 — Routage cloud interne aligné sur Model Market (qwen mieux utilisé)
+
+### Demande et constats
+
+Demande directe : « je voudrais que qwen cloud soit plus utilisé et que les meilleurs
+modèles selon le contexte soient bien utilisés avec le routage des modèles cloud ». Analyse
+en direct de `cloud_routing.py`/`model_market.py`/`agent_model_config.py` :
+
+- `model_market.catalog("agentic")` donne `qwen3.5:397b-cloud` en tête avec un score de
+  100/100 (prior officiel le plus élevé du catalogue pour l'agentique + capacité apprise
+  `ok:true` sur cette installation), loin devant les autres modèles installés.
+- La boucle de chat principale (`agent_model_config.resolve_model_config`) mappe déjà
+  chaque profil sur un besoin Model Market (`agent`→`agentic`, `analysis`→`reasoning`,
+  `vision`→`vision`) et laisse le modèle le mieux qualifié gagner sur l'override de profil
+  figé en base — commentaire du code : « le Model Market qualifié gagne; l'override reste
+  un repli ».
+- `cloud_routing.resolve_model()`, utilisé par TOUS les appels LLM internes aux outils
+  (document_generate, email_*, text_summarize, upgrade_skill, ocr_extract...), n'avait
+  jamais reçu ce même correctif : sans mot-clé de tâche détecté dans le texte (les listes
+  `_CODE_TASK_KEYWORDS`/`_AGENTIC_TASK_KEYWORDS`/etc. sont volontairement étroites), la
+  fonction retombait directement sur l'override statique en base
+  (`{'agent': 'deepseek-v4-pro:cloud', 'chat': 'deepseek-v4-pro:cloud', 'analysis':
+  'deepseek-v4-pro:cloud'}` mesuré en direct sur cette installation), sans jamais consulter
+  Model Market. Confirmé par test direct : `resolve_model(None, profile="agent", ...)`
+  retournait `deepseek-v4-pro:cloud` avant correctif.
+
+### Décisions et modifications
+
+- `backend/cloud_routing.py` (`resolve_model`) : après la détection de tâche (inchangée),
+  ajout du même mapping profil→besoin que `agent_model_config.py`
+  (`agent`→`agentic`, `analysis`→`reasoning`, `vision`→`vision`, sinon `general`), puis appel
+  à `pick_best_cloud_model(need)` AVANT de lire l'override de profil. L'override figé en base
+  redevient un simple repli si Model Market ne retourne rien (modèle non installé, etc.), au
+  lieu d'être la source de vérité par défaut.
+
+### Validation, sécurité, logs et rollback
+
+Test direct après correctif : `resolve_model(None, profile="agent", ...)` retourne
+désormais `qwen3.5:397b-cloud` (au lieu de `deepseek-v4-pro:cloud`) ; `profile="analysis"`
+retourne toujours `deepseek-v4-pro:cloud` (légitimement le meilleur score pour
+"reasoning" — le correctif ne force pas qwen partout, il fait gagner le meilleur modèle
+PAR BESOIN). Suites de régression exécutées et vertes : `test_agent_model_config`,
+`test_cloud_only_routing`, `test_model_market`, `test_model_data_policy`,
+`test_privacy_model_matrix`, `test_generation_runtime`, `check_architecture.py`,
+`test_main_composition.py`. Aucune migration, aucun changement d'API, aucun changement de
+comportement pour le mode Hyper local (coupe-circuit inchangé, vérifié en premier) ni pour
+le mode Ultra débridé (chemin `require_cloud_model` inchangé). Rollback : réversion du
+commit v2.536.
+
 ## 2026-07-31 — v2.535.0 — Correction des 8 bugs confirmés par l'audit exhaustif des 362 outils
 
 ### Demande et constats
