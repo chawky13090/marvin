@@ -1306,6 +1306,7 @@ img { max-width: 100%; display: block; }
 }
 
 .marvin-chat-input-shell:not(.marvin-chat-input-shell--welcome) {
+  container-type: inline-size;
   width: min(calc(100% - 32px), 1120px);
   margin: 0 auto 16px;
   padding: 12px !important;

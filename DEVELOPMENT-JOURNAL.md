@@ -15516,3 +15516,25 @@ secret. Journalisation : aucune nouvelle donnée métier; seuls les événements
 déjà reçus sont rendus. Sécurité : les panneaux sont passifs hors boutons locaux Détails et
 Arrêter; aucune nouvelle entrée exécutable. Rollback : réversion atomique du commit v2.548
 et redémarrage de Marvin.
+## 2026-08-01 — v2.549 — Robot interactif dans un composeur unique
+
+Demande : abandonner les panneaux latéraux mal calibrés, créer un seul rectangle avec le
+robot à droite de la barre de conversation, changer son apparence quand Marvin réfléchit,
+permettre l'arrêt par clic sur sa tête et tenir compte de l'ouverture/fermeture de la sidebar
+des anciennes conversations.
+
+Réalisation : l'activité est déplacée dans `ChatInput`; `ChatContainer` transmet l'état réel
+de l'invocation au composeur. Un `ResizeObserver` mesure le conteneur utile et sélectionne
+`wide` (>=1050 px), `normal` (>=760 px) ou `compact`, complété par `container-type:inline-size`.
+Le robot devient un bouton natif accessible relié à `stop()`, avec indication « Arrêter » au
+survol/focus et état graphique exposé par `data-robot-state`. Une variante thinking a été
+générée avec l'outil image intégré à partir de l'identité Marvin, détourée localement puis
+optimisée en PNG 256 px (22,9 Ko). Le panneau de détails reste borné et s'ouvre vers le haut.
+
+Validation réelle : sidebar ouverte -> densité `normal`; sidebar fermée -> `wide`; génération
+affichée dans le rectangle unique; clic sur la tête -> composant d'activité retiré et champ
+réactivé. Contrats chat 14/14 et UX 85/85 réussis; ESLint ciblé sans erreur (un avertissement
+préexistant sur une prévisualisation `<img>` de pièce jointe). Sécurité : aucun nouvel appel
+système; le bouton ne fait qu'annuler l'invocation courante; nom accessible et focus clavier.
+Journalisation : réutilise uniquement les événements de progression existants, sans secret ni
+nouvelle persistance. Rollback : réversion atomique du commit v2.549 et redémarrage Marvin.

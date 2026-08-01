@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import { useChat } from '@/lib/contexts/ChatContext';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-import TypingIndicator from '@/components/chat/TypingIndicator';
 import LivingAvatar from '@/components/avatar/LivingAvatar';
 import QuietWelcome from '@/components/chat/QuietWelcome';
 import ConversationViewToolbar from '@/components/chat/ConversationViewToolbar';
@@ -498,17 +497,6 @@ export default function ChatContainer({
         </div>
       </div>
 
-      {isLoading && (
-        <TypingIndicator
-          status={activeTool ? 'tool' : status === 'streaming' ? 'streaming' : 'submitted'}
-          toolName={activeTool}
-          progress={activeInvocation?.progress}
-          progressEvents={activeInvocation?.progressEvents}
-          startedAt={activeInvocation?.startedAt}
-          onStop={stop}
-        />
-      )}
-
       {/* Central sur une nouvelle conversation, ancré en bas après le premier message. */}
       {messages.length > 0 && (
         <ChatInput
@@ -519,6 +507,13 @@ export default function ChatContainer({
           onStop={stop}
           onImageAttach={handleImageAttach}
           messages={messages}
+          activity={{
+            status: activeTool ? 'tool' : status === 'streaming' ? 'streaming' : 'submitted',
+            toolName: activeTool,
+            progress: activeInvocation?.progress,
+            progressEvents: activeInvocation?.progressEvents,
+            startedAt: activeInvocation?.startedAt,
+          }}
         />
       )}
     </div>

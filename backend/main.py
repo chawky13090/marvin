@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.549 — robot d'activité interactif intégré au composeur et adaptatif à la sidebar
 # v2.548 — activité latérale : robot à gauche, informations à droite, centre libéré
 # v2.547 — carte d'activité robotisée sans chevauchement du composeur
 # v2.546 — délai coopératif d'arrêt aligné sur l'avatar et les services lents

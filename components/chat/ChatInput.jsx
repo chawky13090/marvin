@@ -5,8 +5,9 @@ import { openMicStream, createRecorder, startVAD as startVADShared } from '@/lib
 import { BACKEND_URL } from '@/lib/backend';
 import AutonomyControl from '@/components/chat/AutonomyControl';
 import CortexControl from '@/components/chat/CortexControl';
+import TypingIndicator from '@/components/chat/TypingIndicator';
 
-export default function ChatInput({ input = '', setInput, handleInputChange, handleSubmit, isLoading, onStop, onImageAttach, messages = [], variant = 'dock' }) {
+export default function ChatInput({ input = '', setInput, handleInputChange, handleSubmit, isLoading, onStop, onImageAttach, messages = [], variant = 'dock', activity = null }) {
   // Voice context (TTS + voice mode)
   const chatCtx = useOptionalChat();
   const voiceCtx = chatCtx?.voice;
@@ -20,9 +21,24 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
     || invocation?.result !== undefined
   )).length;
   const textareaRef = useRef(null);
+  const shellRef = useRef(null);
+  const [composerDensity, setComposerDensity] = useState('wide');
   const fileInputRef = useRef(null);
   const [attachedImages, setAttachedImages] = useState([]);
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell || typeof ResizeObserver === 'undefined') return undefined;
+    const updateDensity = ([entry]) => {
+      const width = entry?.contentRect?.width || shell.getBoundingClientRect().width;
+      setComposerDensity(width >= 1050 ? 'wide' : width >= 760 ? 'normal' : 'compact');
+    };
+    const observer = new ResizeObserver(updateDensity);
+    observer.observe(shell);
+    updateDensity([{ contentRect: shell.getBoundingClientRect() }]);
+    return () => observer.disconnect();
+  }, []);
 
   // ── Joindre un ou plusieurs documents (PDF/Word/Excel/texte) — Marvin lit leur contenu ─────
   // v2.140 — pièces jointes MULTIPLES (glisser-déposer demandé explicitement) : était limité à
@@ -363,7 +379,9 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
 
   return (
     <form
+      ref={shellRef}
       className={`marvin-chat-input-shell${variant === 'welcome' ? ' marvin-chat-input-shell--welcome' : ''}`}
+      data-composer-density={composerDensity}
       onSubmit={doSubmit}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
@@ -888,22 +906,11 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           }}
         />
         {isLoading ? (
-          <button
-            type="button"
-            onClick={onStop}
-            title="Arrêter la génération"
-            style={{
-              width: '42px', height: '42px', borderRadius: '12px',
-              background: 'var(--danger-bg)', border: '1px solid var(--danger)',
-              color: 'var(--danger)', fontSize: '1rem', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s ease', flexShrink: 0,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            ⏹
-          </button>
+          <TypingIndicator
+            {...(activity || {})}
+            onStop={onStop}
+            density={composerDensity}
+          />
         ) : (
           <button
             type="submit"

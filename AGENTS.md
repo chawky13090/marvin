@@ -202,7 +202,22 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.548.0)
+## 9. État actuel (v2.549.0)
+
+**v2.549 (robot d'activité intégré et adaptatif)** : remplacement des deux panneaux flottants
+de v2.548 par un module unique inclus dans le rectangle du composeur. `ChatInput` mesure sa
+largeur réelle avec `ResizeObserver` et expose les densités `wide`, `normal` et `compact` :
+l'ouverture de la sidebar des anciennes conversations fait passer le chat de `wide` à
+`normal` sans dépendre de la largeur de l'écran ni d'une constante liée à la sidebar. Le
+statut, la durée et la progression restent près du robot à droite; les détails s'ouvrent
+au-dessus. Une variante graphique transparente `marvin-thinking.png`, dérivée du robot
+validé, est utilisée pour la réflexion; les autres phases gardent le robot actif et leurs
+animations dédiées. La tête est un bouton HTML natif nommé « Arrêter la tâche de Marvin » :
+survol/focus affiche « Arrêter » et le clic appelle le même `stop()` que l'ancien bouton.
+Validation réelle : sidebar ouverte=`normal`, fermée=`wide`, génération visible sans
+recouvrement, arrêt par la tête libérant le champ; ESLint, contrats chat/UX et build. Aucun
+schéma ni donnée persistante modifié. Rollback : réversion atomique du commit v2.549 puis
+redémarrage de Marvin.
 
 **v2.548 (activité réellement latérale)** : correction du premier rendu v2.547 qui restait
 une carte horizontale au-dessus du composeur. Dans le chat principal, `TypingIndicator` est

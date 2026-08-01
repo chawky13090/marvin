@@ -47,6 +47,7 @@ export default function TypingIndicator({
   startedAt = null,
   onStop = null,
   compact = false,
+  density = 'wide',
 }) {
   const [clock, setClock] = useState({ now: 0, mountedAt: 0 });
   const [expanded, setExpanded] = useState(false);
@@ -109,44 +110,56 @@ export default function TypingIndicator({
             : status === 'streaming' ? 'writing'
               : 'thinking';
 
+  const isThinking = robotMode === 'thinking' || robotMode === 'waiting';
+  const robotSrc = isThinking ? '/assets/marvin-thinking.png' : '/assets/marvin-activity-robot.png';
+
   return (
     <div
-      className={`${styles.beacon} ${compact ? styles.compact : ''} ${styles[`robot_${robotMode}`]}`}
-      aria-live="polite"
+      className={`${styles.activityDock} ${compact ? styles.standalone : ''} ${styles[`density_${density}`]} ${styles[`robot_${robotMode}`]}`}
       aria-label="Activité de Marvin"
-      data-layout={compact ? 'compact' : 'lateral'}
+      data-layout={compact ? 'standalone' : 'composer'}
+      data-robot-state={robotMode}
     >
-      <div className={styles.robotPanel} aria-hidden="true">
-        <span className={styles.robotAura} />
-        <Image className={styles.robot} src="/assets/marvin-activity-robot.png" width={150} height={150} alt="" priority />
-        <span className={styles.robotScanner} />
-        <span className={styles.robotCaption}>Marvin travaille</span>
-      </div>
-
-      <section className={styles.infoPanel}>
-        <div className={styles.infoTopline}>
-          <div className={styles.activityBody}>
-            <div className={styles.activityHeader}>
-              <strong>{title}</strong>
-              <time>{formatElapsed(elapsed)}</time>
-            </div>
-            <div className={styles.label}>{compactLabel}</div>
-          </div>
-          <div className={styles.actions}>
-            {hasDetails && (
-              <button type="button" className={styles.more} onClick={() => setExpanded(value => !value)} aria-label={expanded ? 'Masquer les détails' : "Voir l'activité détaillée"}>
-                {expanded ? '▲' : '⋯'}
-              </button>
-            )}
-            {onStop && <button type="button" className={styles.stop} onClick={onStop} aria-label="Arrêter">✕</button>}
-          </div>
-        </div>
-        <div className={styles.progressTrack} aria-hidden="true">
+      <span className={styles.liveStatus} role="status" aria-live="polite">
+        {title}. {compactLabel}.
+      </span>
+      <button
+        type="button"
+        className={styles.activitySummary}
+        onClick={() => hasDetails && setExpanded(value => !value)}
+        aria-expanded={hasDetails ? expanded : undefined}
+        title={hasDetails ? "Afficher l'activité détaillée" : title}
+      >
+        <span className={styles.activityText}>
+          <strong>{title}</strong>
+          <span>{compactLabel}</span>
+        </span>
+        <time>{formatElapsed(elapsed)}</time>
+        <span className={styles.progressTrack} aria-hidden="true">
           <span className={hasMeasuredProgress ? styles.progressValue : styles.progressIndeterminate} style={ringStyle} />
-        </div>
+        </span>
+      </button>
 
-        {expanded && hasDetails && (
-          <div className={styles.details}>
+      <button
+        type="button"
+        className={styles.robotButton}
+        onClick={onStop}
+        disabled={!onStop}
+        aria-label="Arrêter la tâche de Marvin"
+        title="Arrêter la tâche de Marvin"
+      >
+        <span className={styles.robotAura} aria-hidden="true" />
+        <Image className={styles.robot} src={robotSrc} width={82} height={82} alt="" priority />
+        <span className={styles.robotScanner} aria-hidden="true" />
+        <span className={styles.stopOverlay} aria-hidden="true">Arrêter</span>
+      </button>
+
+      {expanded && hasDetails && (
+        <section className={styles.details} aria-label="Détails de l'activité">
+          <div className={styles.detailsHeader}>
+            <strong>Activité de Marvin</strong>
+            <button type="button" onClick={() => setExpanded(false)} aria-label="Fermer les détails">×</button>
+          </div>
           {progress?.detail && <div className={styles.detail}>{progress.detail}</div>}
           {metrics.length > 0 && (
             <div className={styles.facts}>
@@ -169,9 +182,8 @@ export default function TypingIndicator({
               ))}
             </ol>
           )}
-          </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }
