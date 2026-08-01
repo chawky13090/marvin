@@ -95,16 +95,23 @@ def _parse_analysis(text: str) -> tuple[str, str]:
 
 async def analyze(resolved_path: str) -> dict:
     """Analyse une capture avec les candidats vision permis par le profil actif."""
+    from config import MODEL_PROFILES
+
     try:
         image_b64, _ = encode_image(Path(resolved_path))
     except (OSError, ValueError) as exc:
         return {"caption": "", "ocr_text": "", "model": None, "error": str(exc)}
 
+    local_vision = str(MODEL_PROFILES.get("vision", {}).get("model") or "qwen3.5:2b")
     candidates: list[str] = []
     try:
         lockdown = cloud_routing.is_local_only_lockdown()
         cloud_enabled, _ = cloud_routing.get_cloud_config()
-        if cloud_enabled and not lockdown:
+        if (
+            cloud_enabled
+            and not lockdown
+            and cloud_routing.get_privacy_preset() in {"cloud_max", "ultra"}
+        ):
             candidates = list(cloud_routing.list_vision_candidates())
     except (OSError, RuntimeError, TypeError, ValueError):
         pass
@@ -113,8 +120,8 @@ async def analyze(resolved_path: str) -> dict:
     except (OSError, RuntimeError, TypeError, ValueError):
         cloud_only = False
     if not cloud_only:
-        if "llava-phi3" not in candidates:
-            candidates.append("llava-phi3")
+        if local_vision not in candidates:
+            candidates.append(local_vision)
     elif not candidates:
         return {
             "caption": "",
@@ -143,14 +150,14 @@ async def analyze(resolved_path: str) -> dict:
             caption, ocr_text = _parse_analysis(
                 str(data.get("response") or "").strip()
             )
-            if model != "llava-phi3":
+            if cloud_routing.is_cloud_model(model):
                 try:
                     cloud_routing.record_model_capability(model, "vision", True)
                 except (OSError, RuntimeError, TypeError, ValueError):
                     pass
             return {"caption": caption, "ocr_text": ocr_text, "model": model}
         except (httpx.HTTPError, OSError, RuntimeError, TypeError, ValueError) as exc:
-            if model != "llava-phi3":
+            if cloud_routing.is_cloud_model(model):
                 status = getattr(getattr(exc, "response", None), "status_code", None)
                 if status is not None and 400 <= status < 500:
                     try:

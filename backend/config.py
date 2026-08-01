@@ -52,7 +52,7 @@ MODEL_PROFILES: dict = {
         "description": "Analyse approfondie, rédaction longue, documents",
     },
     "vision": {
-        "model":       "llava-phi3",
+        "model":       "qwen3.5:2b",
         "temperature": 0.3,
         "label":       "👁️ Vision",
         "tools":       False,

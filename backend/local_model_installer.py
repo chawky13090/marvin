@@ -63,10 +63,31 @@ async def _pull_one(client: httpx.AsyncClient, model: str, state: dict[str, Any]
             _write(state)
 
 
+async def _validate_one(client: httpx.AsyncClient, model: str) -> dict[str, Any]:
+    response = await client.post(
+        f"{OLLAMA_URL}/api/show", json={"model": model, "verbose": False},
+    )
+    response.raise_for_status()
+    payload = response.json()
+    capabilities = sorted({
+        str(item).strip().casefold()
+        for item in payload.get("capabilities") or []
+        if str(item).strip()
+    })
+    if not capabilities:
+        raise RuntimeError("Le modèle téléchargé n'expose aucune capacité vérifiable.")
+    return {
+        "model": model,
+        "capabilities": capabilities,
+        "validated": True,
+        "validated_at": _now(),
+    }
+
+
 async def _run(models: list[str]) -> None:
     state = {
         "status": "running", "models": models, "installed": [],
-        "failed": [], "started_at": _now(), "updated_at": _now(),
+        "validated": [], "failed": [], "started_at": _now(), "updated_at": _now(),
     }
     _write(state)
     async with _LOCK:
@@ -76,7 +97,9 @@ async def _run(models: list[str]) -> None:
             for model in models:
                 try:
                     await _pull_one(client, model, state)
+                    validation = await _validate_one(client, model)
                     state["installed"].append(model)
+                    state["validated"].append(validation)
                 except (httpx.HTTPError, json.JSONDecodeError, OSError, RuntimeError, ValueError) as exc:
                     state["failed"].append({
                         "model": model,
@@ -89,6 +112,28 @@ async def _run(models: list[str]) -> None:
         "current": None, "finished_at": _now(), "updated_at": _now(),
     })
     _write(state)
+    if state["installed"]:
+        try:
+            import auto_config
+            await auto_config.apply_auto_config(force=True)
+        except Exception as exc:
+            state["activation_warning"] = type(exc).__name__
+            _write(state)
+    try:
+        import audit
+
+        audit.log_action(
+            "local_model_portfolio_download",
+            {"requested_count": len(models)},
+            {
+                "status": state["status"],
+                "installed_count": len(state["installed"]),
+                "failed_count": len(state["failed"]),
+            },
+            source="system",
+        )
+    except Exception:
+        pass
 
 
 def start(models: list[str], *, confirmed: bool) -> dict[str, Any]:

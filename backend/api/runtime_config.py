@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 import database as db
 import tools as tool_module
+import audit
 
 
 router = APIRouter(tags=["runtime-config"])
@@ -76,6 +77,15 @@ class LocalModelInstallBody(BaseModel):
     confirmed: bool = False
 
 
+class LocalPortfolioPolicyBody(BaseModel):
+    enabled: bool = True
+    auto_download: bool = True
+    download_network: Literal["unmetered", "any", "manual"] = "unmetered"
+    max_disk_gb: int = Field(default=25, ge=5, le=500)
+    min_free_disk_gb: int = Field(default=10, ge=5, le=200)
+    maintained_roles: list[str] = Field(default_factory=list, max_length=10)
+
+
 @router.post("/api/learning/fact")
 async def learning_add_fact(body: TeachBody):
     import learning
@@ -119,6 +129,57 @@ async def local_model_download(body: LocalModelInstallBody):
         return local_model_installer.start(body.models, confirmed=body.confirmed)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/api/auto-config/models/policy")
+async def local_model_policy_status():
+    import auto_config
+    import local_model_policy
+    import local_model_portfolio
+
+    installed = await auto_config._installed_models()
+    recommendation = local_model_policy.recommend(
+        auto_config.detect_hardware(), installed,
+    )
+    return local_model_portfolio.evaluate(recommendation)
+
+
+@router.put("/api/auto-config/models/policy")
+async def update_local_model_policy(body: LocalPortfolioPolicyBody):
+    import auto_config
+    import local_model_installer
+    import local_model_policy
+    import local_model_portfolio
+
+    previous = local_model_portfolio.get_policy()
+    policy = local_model_portfolio.save_policy(body.model_dump())
+    try:
+        installed = await auto_config._installed_models()
+        recommendation = local_model_policy.recommend(auto_config.detect_hardware(), installed)
+        evaluation = local_model_portfolio.evaluate(recommendation, policy)
+        queue = evaluation["auto_download_queue"]
+        download = None
+        # Cette écriture est la confirmation explicite de la politique autonome.
+        if queue and policy["download_network"] != "manual":
+            download = local_model_installer.start(queue, confirmed=True)
+        audit.log_action(
+            "local_model_portfolio_policy_change",
+            {
+                "previous_auto_download": bool(previous.get("auto_download")),
+                "requested_auto_download": bool(policy.get("auto_download")),
+                "maintained_roles": list(policy.get("maintained_roles") or []),
+            },
+            {
+                "success": True,
+                "queued_models": len(queue),
+                "network_cost": evaluation.get("network_cost"),
+            },
+            source="ui",
+        )
+        return {**evaluation, "download": download}
+    except Exception:
+        local_model_portfolio.save_policy(previous)
+        raise
 
 
 @router.get("/api/perf-modes")

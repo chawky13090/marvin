@@ -226,6 +226,8 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Transport HTTP et JSONL Ollama", (python, "scripts/test_agent_transport.py")),
         Stage("Runtime partagé des générations", (python, "scripts/test_generation_runtime.py")),
         Stage("Politique dynamique des modèles locaux", (python, "scripts/test_local_model_policy.py")),
+        Stage("Portefeuille autonome des modèles locaux", (python, "scripts/test_local_model_portfolio.py")),
+        Stage("API du portefeuille autonome", (python, "scripts/test_local_model_portfolio_api.py")),
         Stage("Installation contrôlée des modèles locaux", (python, "scripts/test_local_model_installer.py")),
         Stage("Plan modèles locaux de l'installateur", (python, "scripts/test_install_model_plan.py")),
         Stage("Routage des profils et modeles", (python, "scripts/test_agent_routing.py")),

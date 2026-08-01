@@ -97,8 +97,15 @@ def _check_context_boundary_reminder() -> None:
     assert len(reminder) <= 400
 
     source = (BACKEND / "agent_tool_batch.py").read_text(encoding="utf-8-sig")
-    assert "_UNTRUSTED_WEB_TOOLS" in source.split("def execute_tool_batch", 1)[1], (
-        "Le rappel doit etre emis dans la boucle d'execution, pas seulement declare."
+    finalize_source = source.split("async def _finalize_call_result", 1)[1].split(
+        "async def _execute_parallel_group", 1
+    )[0]
+    execute_source = source.split("async def execute_tool_batch", 1)[1]
+    assert "_UNTRUSTED_WEB_TOOLS" in finalize_source
+    assert "_UNTRUSTED_WEB_REMINDER" in finalize_source
+    assert "_finalize_call_result(" in execute_source, (
+        "La boucle d'execution doit finaliser chaque resultat via la frontiere qui "
+        "reinjecte le rappel Web."
     )
 
 

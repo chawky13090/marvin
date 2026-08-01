@@ -47,8 +47,9 @@ def main() -> int:
 
         with patch.object(routing.httpx, "AsyncClient", _Client):
             inventory = asyncio.run(routing.refresh_model_cache())
-        assert inventory == {"qwen2.5:14b", "qwen2.5", "glm-5:cloud", "glm-5"}
+        assert inventory == {"qwen2.5:14b", "glm-5:cloud"}
         assert routing.is_model_available("qwen2.5:14b")
+        assert not routing.is_model_available("qwen2.5:7b")
         assert routing.is_model_available("glm-5:cloud")
         assert routing.pick_available("absent:1b", ["qwen2.5:14b"]) == "qwen2.5:14b"
 

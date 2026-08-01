@@ -67,6 +67,39 @@ async def run_diagnostics() -> dict:
                 "« nomic-embed-text » manquant → mémoire/skills/recherche dégradés.", fix="pull:nomic-embed-text")
 
     # ── 3. Compétences → outils cohérents ──────────────────────────────────────
+    if ok:
+        try:
+            import auto_config
+            import local_model_policy
+            import local_model_portfolio
+
+            detailed_models = await auto_config._installed_models()
+            recommendation = local_model_policy.recommend(
+                auto_config.detect_hardware(), detailed_models,
+            )
+            portfolio = local_model_portfolio.evaluate(recommendation)
+            missing_roles = portfolio.get("missing_roles") or []
+            if missing_roles:
+                add(
+                    "local_portfolio", "Portefeuille local", "warning",
+                    "Rôle(s) sans modèle local compatible : " + ", ".join(missing_roles),
+                )
+            else:
+                selected = [
+                    item.get("selected")
+                    for item in recommendation.get("portfolio", {}).values()
+                    if item and item.get("selected")
+                ]
+                add(
+                    "local_portfolio", "Portefeuille local", "ok",
+                    f"{len(selected)} rôle(s) couverts par des modèles installés et compatibles.",
+                )
+        except Exception as exc:
+            add(
+                "local_portfolio", "Portefeuille local", "warning",
+                f"Couverture des rôles non vérifiable : {type(exc).__name__}.",
+            )
+
     try:
         import skills
         # v2.517 — seules les compétences ACTIVES peuvent être sélectionnées par le

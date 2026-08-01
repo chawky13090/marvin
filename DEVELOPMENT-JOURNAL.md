@@ -15628,3 +15628,62 @@ préexistant sur une prévisualisation `<img>` de pièce jointe). Sécurité : a
 système; le bouton ne fait qu'annuler l'invocation courante; nom accessible et focus clavier.
 Journalisation : réutilise uniquement les événements de progression existants, sans secret ni
 nouvelle persistance. Rollback : réversion atomique du commit v2.549 et redémarrage Marvin.
+## 2026-08-01 — v2.551 — Portefeuille local autonome et routage confidentiel
+
+### Demande et décision
+
+Après suppression de plusieurs modèles locaux, audit du repli hors ligne et sensible, puis
+validation par l'utilisateur de l'option B : Marvin maintient automatiquement un portefeuille
+local adapté à la machine. Aucun modèle n'est supprimé automatiquement. Ultra reste cloud
+strict, autonome et sans protection de confidentialité ; les protections d'intégrité système
+et contre les instructions issues d'un contenu observé restent indépendantes.
+
+### Constats corrigés
+
+- les quatre profils locaux convergeaient sur `qwen3.5:2b`, sans spécialiste code ;
+- OCR, PDF et captures conservaient `llava-phi3` comme repli absent ;
+- un tag de même famille pouvait être considéré présent à tort ;
+- une capture pouvait partir au Cloud en mode Normal sans classifier ses pixels ;
+- Doctor ne vérifiait pas la couverture locale par rôle.
+
+### Implémentation
+
+- politique persistante couvrant chat, agent, analyse, vision, code, OCR et embedding ;
+- budgets mémoire/disque, réserve minimale et détection Windows du réseau limité ;
+- téléchargement allowlisté avec progression, validation `/api/show` et activation après
+  validation ;
+- sélection exacte des tags et repli vision dynamique ;
+- images locales en Normal/Hyper, cloud permis en Tout cloud/Ultra ;
+- routes API et contrôle visible dans Paramètres ;
+- feuille de route consolidée dans `docs/LOCAL-MODEL-PORTFOLIO-ROADMAP.md`.
+
+### Sécurité, logs et rollback
+
+Les événements d'audit ne contiennent que le nombre de modèles, les rôles, l'état réseau et
+le résultat ; aucun prompt, secret, image ou contenu utilisateur. Les noms téléchargés sont
+validés par le catalogue versionné. Un échec conserve le modèle précédent. Rollback :
+réversion atomique du commit v2.551 et redémarrage ; désactivation de `auto_download` pour
+arrêter les futurs téléchargements. Les modèles déjà téléchargés sont conservés jusqu'à une
+suppression manuelle explicitement confirmée.
+
+### Validation réelle et état livré
+
+- téléchargements réellement exécutés et validés par Ollama : `qwen3:4b` (conversation,
+  outils, analyse) et `qwen2.5-coder:3b` (code) ; aucun modèle supprimé ;
+- portefeuille appliqué : vision `qwen3.5:2b`, OCR `glm-ocr`, embedding
+  `nomic-embed-text` ; sept rôles couverts, file d'installation vide ;
+- appel d'outil natif validé avec `qwen3:4b` sur `datetime_info` ; génération Python
+  élémentaire validée avec `qwen2.5-coder:3b` ;
+- tests ciblés portefeuille, installateur, routage, confidentialité, OCR, PDF, captures,
+  API, architecture et lint réussis ; build Next.js 16.2.12/Turbopack réussi ;
+- contrôle fonctionnel et visuel réel de `/settings` : politique active, Ultra cloud
+  strict affiché, aucune erreur ni alerte console ; Doctor à 98/100 et contrôle du
+  portefeuille conforme (`7 rôles couverts`) ;
+- `start.bat` avait été converti en LF dans l'arbre de travail, ce qui provoquait un
+  démarrage `cmd.exe` incohérent. Le fichier a été remis en CRLF et `.gitattributes`
+  impose désormais CRLF aux fichiers `.bat`/`.cmd` sur toute future installation Windows.
+
+Limite observée hors périmètre du portefeuille : l'arrêt a bien libéré tous les processus,
+mais a nécessité le repli forcé après expiration de l'arrêt gracieux. Cette dette de cycle
+de vie reste observable dans le rapport de `stop-marvin.ps1` et ne remet pas en cause le
+redémarrage final, backend et frontend HTTP 200.

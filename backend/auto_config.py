@@ -14,6 +14,7 @@ import subprocess
 
 import database as db
 import local_model_policy
+import local_model_portfolio
 from config import MODEL_PROFILES, OLLAMA_URL
 
 # ── Modes de performance : règlent plusieurs leviers d'un coup, selon la machine ───────
@@ -291,6 +292,7 @@ async def apply_auto_config(force: bool = False) -> dict:
     recommendations = [
         item for item in rec["downloads"] if item.get("disk_ready") is True
     ]
+    portfolio_policy = local_model_portfolio.evaluate(rec)
     summary = {"enabled": True, "hardware": hw, "applied": rec["chosen"],
                "portfolio": rec["portfolio"],
                "recommended_to_install": [item["model"] for item in recommendations],
@@ -299,6 +301,7 @@ async def apply_auto_config(force: bool = False) -> dict:
                "model_memory_budget_gb": rec["memory_budget_gb"],
                "catalog_schema": rec["catalog_schema"],
                "catalog_updated_at": rec["catalog_updated_at"],
+               "local_portfolio": portfolio_policy,
                "mode": mode, "mode_label": mcfg["label"], "mode_desc": mcfg["desc"],
                "auto_mode": auto_mode, "is_override": bool(override in _MODES),
                "levers": {"max_tools": mcfg["max_tools"], "whisper": mcfg["whisper"],

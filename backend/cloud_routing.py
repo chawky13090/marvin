@@ -487,7 +487,7 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
         if requested_model and not is_cloud_model(requested_model):
             return requested_model  # choix local explicite — toujours respecté
         cloud_enabled, _ = get_cloud_config()
-        if cloud_enabled and not sensitive:
+        if cloud_enabled and get_privacy_preset() == "cloud_max" and not sensitive:
             picked = pick_best_cloud_model("vision")
             if picked:
                 return picked

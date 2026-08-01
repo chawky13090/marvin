@@ -7,16 +7,13 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.551 — portefeuille local autonome, replis exacts et vision sensible locale
 # v2.550 — audit puissance : contexte Ollama, filtre cloud, vision, budgets d'execution
 # v2.549 — robot d'activité interactif intégré au composeur et adaptatif à la sidebar
 # v2.548 — activité latérale : robot à gauche, informations à droite, centre libéré
 # v2.547 — carte d'activité robotisée sans chevauchement du composeur
 # v2.546 — délai coopératif d'arrêt aligné sur l'avatar et les services lents
 # v2.545 — cycle de redémarrage stable et détection du frontend existant
-# v2.544 — computer_control : alias duration->duration_ms pour action=wait
-# v2.543 — prompt systeme corrige : preferait le navigateur cache par defaut (contradiction)
-# v2.542 — navigate cible le navigateur visible par defaut, plus headless par defaut
-# v2.541 — open+url combines en un appel (navigate pilotait un headless separe)
 # v2.540 — computer_control : alias query/key->target/text, rapport architecture outils
 # v2.539 — computer_control : alias action/coordonnee, focus resilient (AttachThreadInput)
 # v2.538 — computer_control : touches SendKeys via type, alias browser, message click clair
@@ -161,6 +158,9 @@ async def lifespan(app_instance: FastAPI):
             print(
                 "[Marvin] Auto-config : "
                 f"{hardware['gpu']} ({hardware['vram_gb']} Go) -> {auto_result['applied']}"
+            )
+            auto_config.local_model_portfolio.schedule_download(
+                auto_result.get("local_portfolio") or {}
             )
     except Exception as exc:
         bug_log.log_bug(

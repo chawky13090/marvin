@@ -93,13 +93,17 @@ def encode_image(path: Path) -> tuple[str, bool]:
 
 async def extract(args: dict) -> dict:
     """Extrait le texte d'une image avec routage local/cloud conforme au mode actif."""
+    from config import MODEL_PROFILES
+
     image_raw = str(args.get("image_path") or "").strip()
     prompt = str(
         args.get("prompt")
         or "Extrais tout le texte présent dans cette image. "
         "Retourne uniquement le texte brut, sans commentaire."
     ).strip()
-    requested_model = str(args.get("model") or "llava-phi3").strip()
+    requested_raw = str(args.get("model") or "").strip()
+    requested_model = requested_raw or None
+    local_vision = str(MODEL_PROFILES.get("vision", {}).get("model") or "qwen3.5:2b")
     if not image_raw:
         return {"error": "Paramètre 'image_path' requis."}
     if not prompt:
@@ -109,14 +113,14 @@ async def extract(args: dict) -> dict:
         model = cloud_routing.resolve_model(
             requested_model,
             profile="vision",
-            local_fallback="llava-phi3",
+            local_fallback=local_vision,
             text_for_sensitivity=prompt,
             has_images=True,
         )
     except cloud_routing.CloudOnlyModelUnavailable as exc:
         return {"error": str(exc), "cloud_only": True}
 
-    if not cloud_routing.is_cloud_model(model) and model != "llava-phi3":
+    if not cloud_routing.is_cloud_model(model):
         try:
             tags = await _request_json("GET", "/api/tags", timeout=5)
             installed = {
@@ -130,7 +134,7 @@ async def extract(args: dict) -> dict:
                 if name.endswith(":latest")
             }
             if model not in installed:
-                model = "llava-phi3"
+                model = local_vision
         except (httpx.HTTPError, OSError, TypeError, ValueError):
             pass
 
@@ -170,9 +174,9 @@ async def extract(args: dict) -> dict:
         # Un modèle cloud indisponible (crédit épuisé, 402, hors-ligne...) ne doit pas
         # rendre l'OCR totalement inopérant s'il existe un modèle vision local : on
         # retente une fois avec le fallback local avant d'abandonner.
-        if cloud_routing.is_cloud_model(model) and model != "llava-phi3":
+        if cloud_routing.is_cloud_model(model):
             try:
-                result = await _call("llava-phi3")
+                result = await _call(local_vision)
                 result["fallback_from_cloud"] = model
                 return result
             except (httpx.HTTPError, OSError, TypeError, ValueError):

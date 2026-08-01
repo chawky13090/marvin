@@ -61,7 +61,7 @@ async def _run() -> None:
                 }
             )
         assert result.get("success") is True, result
-        assert result["model"] == "llava-phi3"
+        assert result["model"] == "qwen3.5:2b"
         assert result["text"] == "Texte extrait"
         assert result["resized_for_speed"] is True
         generate_payload = next(

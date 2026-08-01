@@ -9,7 +9,7 @@ from typing import Any
 
 CATALOG_PATH = Path(__file__).with_name("resources") / "local_model_catalog.json"
 RUNTIME_ROLES = ("chat", "agent", "analysis", "vision")
-PORTFOLIO_ROLES = (*RUNTIME_ROLES, "coding")
+PORTFOLIO_ROLES = (*RUNTIME_ROLES, "coding", "ocr", "embedding")
 GIB = 1024 ** 3
 MODEL_NAME_RE = re.compile(
     r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$"
@@ -83,6 +83,12 @@ def _supports_dynamic_role(item: dict[str, Any], role: str) -> bool:
         str(capability).casefold()
         for capability in item.get("capabilities") or []
     }
+    if role == "embedding":
+        return "embedding" in capabilities or "embed" in name
+    if role == "ocr":
+        return "vision" in capabilities and any(
+            marker in name for marker in ("ocr", "vision", "qwen3.5", "gemma")
+        )
     if "embedding" in capabilities or "embed" in name:
         return False
     if role == "vision":
@@ -223,6 +229,33 @@ def recommend(
         "disk_free_bytes": disk_free,
         "disk_reserve_bytes": disk_reserve,
     }
+
+
+def exact_installed_model(
+    model: str,
+    installed_models: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Retourne uniquement le tag local exact, avec équivalence bornée ``:latest``.
+
+    Deux tags d'une même famille ne sont pas interchangeables : ``qwen3.5:2b`` ne
+    prouve jamais que ``qwen3.5:4b`` existe. Cette primitive est la référence commune
+    des routeurs et évite les replis vers un tag supprimé.
+    """
+    return _installed_map(installed_models).get(canonical_name(model))
+
+
+def best_installed_for_role(
+    role: str,
+    hardware: dict[str, Any],
+    installed_models: list[dict[str, Any]],
+) -> str | None:
+    """Résout un modèle réellement installé et compatible avec le rôle demandé."""
+    if role not in PORTFOLIO_ROLES:
+        raise ValueError(f"Rôle local inconnu : {role}")
+    result = recommend(hardware, installed_models)
+    item = result["portfolio"].get(role) or {}
+    selected = item.get("selected")
+    return str(selected) if selected else None
 
 
 def override_allowed(

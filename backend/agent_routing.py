@@ -126,8 +126,10 @@ async def refresh_model_cache() -> set[str]:
                 data = r.json()
                 names: set[str] = {m["name"] for m in data.get("models", [])}
                 # Ajouter aussi les noms de base sans tag (ex: "qwen2.5:7b" → "qwen2.5")
-                bases: set[str] = {n.split(":")[0] for n in names}
-                _available_models_cache = names | bases
+                latest_aliases = {
+                    n.removesuffix(":latest") for n in names if n.endswith(":latest")
+                }
+                _available_models_cache = names | latest_aliases
     except Exception:
         pass
     return _available_models_cache
@@ -137,7 +139,8 @@ def is_model_available(name: str) -> bool:
     """Vérifie si un modèle est dans le cache (vrai si cache vide → on suppose dispo)."""
     if not _available_models_cache:
         return True
-    return name in _available_models_cache or name.split(":")[0] in _available_models_cache
+    canonical = name.removesuffix(":latest")
+    return canonical in _available_models_cache or f"{canonical}:latest" in _available_models_cache
 
 
 def pick_available(preferred: str, fallbacks: list[str]) -> str:

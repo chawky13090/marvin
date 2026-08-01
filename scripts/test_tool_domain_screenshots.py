@@ -129,6 +129,11 @@ async def _run() -> None:
             ),
             patch.object(
                 screenshots.cloud_routing,
+                "get_privacy_preset",
+                return_value="cloud_max",
+            ),
+            patch.object(
+                screenshots.cloud_routing,
                 "list_vision_candidates",
                 return_value=["vision-cloud:cloud"],
             ),
@@ -150,6 +155,15 @@ async def _run() -> None:
         }
         record.assert_called_once_with("vision-cloud:cloud", "vision", True)
         assert requests[-1]["options"]["temperature"] == 0.1
+
+        with (
+            patch.object(screenshots.cloud_routing, "is_local_only_lockdown", return_value=False),
+            patch.object(screenshots.cloud_routing, "get_cloud_config", return_value=(True, {})),
+            patch.object(screenshots.cloud_routing, "get_privacy_preset", return_value="normal"),
+            patch.object(screenshots.cloud_routing, "is_cloud_only_mode", return_value=False),
+        ):
+            normal = await screenshots.analyze(str(image_path))
+        assert normal["model"] == "qwen3.5:2b"
 
         with (
             patch.object(

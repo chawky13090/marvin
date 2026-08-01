@@ -3764,10 +3764,10 @@ TOOLS_SPEC = [
        ["id"]),
 
     # ── OCR ───────────────────────────────────────────────────────────────────
-    _t("ocr_extract", "Extrait le texte visible dans une image (OCR par IA, utilise llava-phi3).",
+    _t("ocr_extract", "Extrait le texte visible dans une image avec le meilleur modèle vision local compatible.",
        {"image_path": {"type": "string", "description": "Chemin vers le fichier image (PNG, JPG, etc.)"},
         "prompt": {"type": "string", "description": "Instruction personnalisée pour l'extraction (optionnel)"},
-        "model": {"type": "string", "description": "Modèle vision Ollama à utiliser (défaut : llava-phi3)"}},
+        "model": {"type": "string", "description": "Modèle vision Ollama optionnel ; sélection locale dynamique par défaut."}},
        ["image_path"]),
 
     # ── Archives ─────────────────────────────────────────────────────────────

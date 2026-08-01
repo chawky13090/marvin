@@ -93,6 +93,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('permissions');
   const [status, setStatus] = useState(null);
   const [autoConfig, setAutoConfig] = useState(null);
+  const [portfolioPolicy, setPortfolioPolicy] = useState(null);
+  const [portfolioSaving, setPortfolioSaving] = useState(false);
   const [ollamaUrl, setOllamaUrl] = useState('http://127.0.0.1:11434');
   const [savedMsg, setSavedMsg] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
@@ -355,12 +357,44 @@ export default function SettingsPage() {
 
   async function fetchAutoConfig() {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auto-config`, { cache: 'no-store' });
+      const [res, policyRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/auto-config`, { cache: 'no-store' }),
+        fetch(`${BACKEND_URL}/api/auto-config/models/policy`, { cache: 'no-store' }),
+      ]);
       const data = await res.json();
       setAutoConfig(data);
+      if (policyRes.ok) setPortfolioPolicy(await policyRes.json());
       const first = (data?.recommended_to_install || [])[0];
       if (first) setPullModelName(current => current || first);
     } catch { }
+  }
+
+  async function savePortfolioPolicy(next) {
+    const current = portfolioPolicy?.policy || {};
+    setPortfolioSaving(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/auto-config/models/policy`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: true,
+          auto_download: Boolean(next.auto_download),
+          download_network: next.download_network || 'unmetered',
+          max_disk_gb: Number(next.max_disk_gb || 25),
+          min_free_disk_gb: Number(next.min_free_disk_gb || 10),
+          maintained_roles: next.maintained_roles || current.maintained_roles || [],
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Politique locale refusée');
+      setPortfolioPolicy(data);
+      showNotification(data.download ? 'Portefeuille autonome activé, téléchargement contrôlé planifié.' : 'Politique du portefeuille local enregistrée.');
+      await fetchAutoConfig();
+    } catch (err) {
+      showNotification(`Erreur : ${err.message}`);
+    } finally {
+      setPortfolioSaving(false);
+    }
   }
 
   // ── Ollama Cloud ──────────────────────────────────────────────────────────
@@ -801,6 +835,48 @@ export default function SettingsPage() {
                 background: 'var(--bg-tertiary)', padding: '16px',
                 borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
               }}>
+                {portfolioPolicy?.policy && (
+                  <div style={{
+                    marginBottom: 14, padding: 14, borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Portefeuille local autonome</div>
+                        <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>
+                          Maintient les rôles conversation, outils, analyse, vision, code, OCR et mémoire.
+                          Aucun modèle n’est supprimé automatiquement.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={portfolioSaving}
+                        onClick={() => savePortfolioPolicy({
+                          ...portfolioPolicy.policy,
+                          auto_download: !portfolioPolicy.policy.auto_download,
+                        })}
+                        style={{
+                          padding: '8px 14px', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+                          border: '1px solid var(--border)', fontWeight: 700,
+                          background: portfolioPolicy.policy.auto_download ? 'var(--success-bg)' : 'var(--bg-tertiary)',
+                          color: portfolioPolicy.policy.auto_download ? 'var(--success)' : 'var(--text-secondary)',
+                        }}
+                      >
+                        {portfolioPolicy.policy.auto_download ? 'Automatique actif' : 'Activer'}
+                      </button>
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 'var(--font-xs)', color: 'var(--text-secondary)' }}>
+                      Réseau : <strong>{portfolioPolicy.network_cost || 'inconnu'}</strong>
+                      {' · '}Budget disque : <strong>{portfolioPolicy.policy.max_disk_gb} Go</strong>
+                      {' · '}À installer : <strong>{(portfolioPolicy.auto_download_queue || []).join(', ') || 'rien'}</strong>
+                    </div>
+                    {(portfolioPolicy.missing_roles || []).length > 0 && (
+                      <div style={{ color: 'var(--warning)', marginTop: 6, fontSize: 'var(--font-xs)' }}>
+                        Couverture manquante : {portfolioPolicy.missing_roles.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {autoConfig && (
                   <div style={{
                     marginBottom: 14, padding: 12, borderRadius: 'var(--radius-md)',

@@ -202,7 +202,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.550.0)
+## 9. État actuel (v2.551.0)
+
+**v2.551 (portefeuille local autonome et replis confidentiels)** : la politique locale
+maintient désormais sept rôles (`chat`, `agent`, `analysis`, `vision`, `coding`, `ocr`,
+`embedding`) selon la VRAM/RAM, l'espace disque et le coût réseau Windows. Les téléchargements
+sont allowlistés, progressifs, validés par `/api/show`, activés après validation et ne
+suppriment jamais de modèle. Le choix est exact par tag : la présence d'une famille ne valide
+plus un tag supprimé. OCR, PDF et captures utilisent le profil vision dynamique au lieu de
+`llava-phi3` codé en dur. En Normal et Hyper, les images restent locales car leur sensibilité
+ne peut pas être déduite du prompt ; Tout cloud et Ultra conservent leur autorisation cloud,
+et Ultra reste cloud strict sans protection de confidentialité ni repli local. Doctor expose
+la couverture réelle des rôles. Routes de politique dans `/api/auto-config/models/policy`,
+interface dans Paramètres et feuille de route dans `docs/LOCAL-MODEL-PORTFOLIO-ROADMAP.md`.
+Rollback : réversion atomique du commit v2.551 ; désactiver `auto_download` stoppe les futurs
+téléchargements, tandis que toute suppression de modèle reste manuelle.
 
 **v2.550 (audit puissance : contexte, filtre cloud, vision, budgets)** : sur demande directe
 (« fait un audit de Marvin et de ces outils et comment les rendre plus puissant »), audit de

@@ -39,6 +39,19 @@ class FakeClient:
         assert json == {"model": "qwen3:4b", "stream": True}
         return FakeStream()
 
+    async def post(self, method_url, json):
+        assert method_url.endswith("/api/show")
+        assert json == {"model": "qwen3:4b", "verbose": False}
+        return FakeShowResponse()
+
+
+class FakeShowResponse:
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {"capabilities": ["completion", "tools", "thinking"]}
+
 
 async def scenario() -> None:
     settings = {}
@@ -50,6 +63,9 @@ async def scenario() -> None:
         await local_model_installer._pull_one(FakeClient(), "qwen3:4b", state)
         assert state["completed_bytes"] == 100
         assert settings["local_model_download_status"]["phase"] == "success"
+        validation = await local_model_installer._validate_one(FakeClient(), "qwen3:4b")
+        assert validation["validated"] is True
+        assert "tools" in validation["capabilities"]
 
         confirmation = local_model_installer.start(["qwen3:4b"], confirmed=False)
         assert confirmation["requiresConfirmation"] is True

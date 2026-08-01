@@ -345,7 +345,13 @@ async def ocr(args: dict) -> dict:
         targets = parse_pages(args.get("pages"), total)[:max_pages]
         if not targets:
             return {"error": "La sélection ne contient aucune page valide."}
-        model = str(args.get("model") or "llava-phi3")
+        from config import MODEL_PROFILES
+
+        model = str(
+            args.get("model")
+            or MODEL_PROFILES.get("vision", {}).get("model")
+            or "qwen3.5:2b"
+        )
         document = await asyncio.to_thread(pdfium.PdfDocument, str(source))
         output_pages: list[str] = []
         ocr_count = 0

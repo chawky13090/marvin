@@ -89,6 +89,22 @@
       "roles": {"vision": 62},
       "capabilities": ["text", "vision"],
       "source_url": "https://ollama.com/library/llava-phi3"
+    },
+    {
+      "name": "glm-ocr",
+      "size_bytes": 2200000000,
+      "context_tokens": 131072,
+      "roles": {"ocr": 92, "vision": 72},
+      "capabilities": ["text", "vision", "tools", "ocr"],
+      "source_url": "https://ollama.com/library/glm-ocr"
+    },
+    {
+      "name": "nomic-embed-text",
+      "size_bytes": 274000000,
+      "context_tokens": 2048,
+      "roles": {"embedding": 88},
+      "capabilities": ["embedding"],
+      "source_url": "https://ollama.com/library/nomic-embed-text"
     }
   ]
 }
