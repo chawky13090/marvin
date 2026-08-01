@@ -2876,9 +2876,9 @@ TOOLS_SPEC = [
         "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Éléments par page (défaut 100)"}},
        ["path"]),
 
-    _t("file_info", "Retourne les métadonnées détaillées d'un fichier ou dossier (taille, dates, hash MD5 optionnel).",
+    _t("file_info", "Retourne les métadonnées d'un chemin exact. Avec hash=true, calcule MD5 ET SHA-256. Pour vérifier un fichier dont le chemin est déjà connu, utiliser cet outil et jamais file_search_text.",
        {"path": {"type": "string", "description": "Chemin du fichier ou dossier"},
-        "hash": {"type": "boolean", "description": "Calculer le MD5 du fichier (défaut : false)"}},
+        "hash": {"type": "boolean", "description": "Calculer MD5 et SHA-256 (défaut : false)"}},
        ["path"]),
 
     _t("file_read", "Lit le contenu d'un fichier (TXT, PDF, Word DOCX, Excel XLSX, CSV, Markdown, code source...).",
@@ -3829,7 +3829,7 @@ TOOLS_SPEC = [
         "cc": {"type": "string", "description": "Adresse email en copie (optionnel)"},
         "account": {"type": "string", "description": "Adresse de la boîte EXPÉDITRICE (multi-comptes ; sinon la 1ère)"},
         "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant envoi)"},
-        "attachments": {"type": "array", "description": "Pieces jointes generees par Marvin : [{path, sha256}]", "items": {"type": "object", "properties": {"path": {"type": "string"}, "sha256": {"type": "string"}}, "required": ["path", "sha256"]}}},
+        "attachments": {"type": "array", "description": "Pièces jointes : [{path, sha256}]. Le sha256 est recommandé depuis l'outil de création mais le harnais le calcule avant confirmation s'il manque.", "items": {"type": "object", "properties": {"path": {"type": "string"}, "sha256": {"type": "string"}}, "required": ["path"]}}},
        ["to", "subject", "body"]),
 
     _t("conversation_export", "Exporte une conversation persistante en Markdown, DOCX, PDF ou JSON. Utiliser ensuite email_send avec le path et le sha256 retournes pour la partager.",

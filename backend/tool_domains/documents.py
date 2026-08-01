@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import re as _re
 import tempfile
@@ -444,7 +445,7 @@ async def create_docx(args: dict) -> dict:
             p = p.with_suffix(".docx")
         p.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(p))
-        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p)}
+        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}
 
@@ -1006,6 +1007,6 @@ async def create_pdf(args: dict) -> dict:
                 Path(_p).unlink(missing_ok=True)
             except Exception:
                 pass
-        return {"success": True, "message": f"PDF créé : {out}", "path": str(out)}
+        return {"success": True, "message": f"PDF créé : {out}", "path": str(out), "size_bytes": out.stat().st_size, "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}

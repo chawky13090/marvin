@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from storage_layout import roots
+from platform_paths import PATHS
 
 MAX_FILES = 10
 MAX_TOTAL_BYTES = 18 * 1024 * 1024
@@ -27,13 +28,16 @@ def validate_attachments(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list) or len(raw) > MAX_FILES:
         raise ValueError(f"Les pieces jointes doivent former une liste de {MAX_FILES} fichiers maximum.")
     _, export_root = roots()
-    allowed_root = export_root.resolve()
+    allowed_roots = [
+        export_root.resolve(),
+        *(Path(PATHS[name]).resolve() for name in ("desktop", "documents", "downloads")),
+    ]
     result, total = [], 0
     for item in raw:
         original = item.get("path") if isinstance(item, dict) else item
         path = Path(str(original or "")).expanduser().resolve(strict=True)
-        if not _inside(path, allowed_root):
-            raise ValueError("Une piece jointe doit provenir du dossier d'exports Marvin.")
+        if not any(_inside(path, root) for root in allowed_roots):
+            raise ValueError("Une piece jointe doit provenir des exports Marvin, du Bureau, de Documents ou de Telechargements.")
         if not path.is_file() or path.is_symlink() or path.suffix.lower() not in ALLOWED_SUFFIXES:
             raise ValueError(f"Piece jointe invalide ou interdite : {path.name}")
         content = path.read_bytes()

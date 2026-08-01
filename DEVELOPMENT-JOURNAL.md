@@ -15736,3 +15736,25 @@ Validation réelle : quatre formats générés depuis la conversation `249882e8.
 tests unitaires réussis (structure, masquage, traversée de chemin, altération); architecture
 363/363 et lint sans erreur. Aucun e-mail réel n'a été envoyé. Rollback : réversion atomique
 du commit v2.553 et redémarrage ; aucune migration de schéma ou de données.
+
+## 2026-08-01 — v2.554 — PDF joint et confirmation véridique
+
+Audit de la conversation `249882e8` : le PDF avait bien été créé sur le Bureau, mais la
+politique de pièces jointes n'acceptait que la racine d'exports Marvin. Le résultat de
+création ne fournissait pas de SHA-256, plusieurs formes d'arguments produites par le modèle
+étaient rejetées, puis Marvin a lancé à tort une recherche textuelle de 5 511 fichiers avant
+d'omettre la pièce jointe. L'envoi était seulement bloqué en attente de confirmation, alors
+que la réponse terminale annonçait à tort un succès.
+
+Correction : racines Windows portables Bureau/Documents/Téléchargements admises ; SHA-256 et
+taille rendus par les créations PDF/DOCX ; normalisation et empreinte avant validation et
+avant création de l'autorisation ; suivi déterministe des confirmations en attente et
+réconciliation terminale empêchant tout faux « envoyé ». La politique reste fail-closed :
+limites de nombre/taille, type de fichier, racines autorisées et empreinte sont conservées.
+Aucun contenu de document, destinataire ou secret supplémentaire n'est journalisé.
+
+Validation réelle : 8 tests unitaires réussis ; compilation Python réussie ; le PDF réel
+`le_dernier_temoin_du_big_bang.pdf` est accepté avec 178 665 octets et SHA-256
+`db5c516a4354e47f33e019f0c61921705fd74fce02e3e192f4d286783bfa2d69` ; l'appel s'arrête
+bien à `requiresConfirmation=true` avec une pièce jointe, sans envoi. Rollback : réversion
+atomique du commit v2.554 puis redémarrage ; aucune migration de schéma ou de données.

@@ -20,6 +20,7 @@ class RunnerState:
     attempted_calls: list[str] = field(default_factory=list)
     successful_calls: list[dict[str, str]] = field(default_factory=list)
     successful_results: list[dict[str, Any]] = field(default_factory=list)
+    pending_confirmations: list[dict[str, str]] = field(default_factory=list)
     blocking_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
     long_chain_reported: bool = False
     nudged: bool = False
@@ -59,6 +60,17 @@ class RunnerState:
         """Enregistre un résultat et signale une seule fois une chaîne supérieure à 8."""
         self.attempted_calls.append(tool_name)
         self.executed_tool_names.add(tool_name)
+        if isinstance(result, dict) and (
+            result.get("requiresConfirmation")
+            or (
+                isinstance(result.get("_contract"), dict)
+                and result["_contract"].get("error_code") == "CONFIRMATION_REQUIRED"
+            )
+        ):
+            self.pending_confirmations.append({
+                "tool": tool_name,
+                "message": str(result.get("message") or "Action en attente de confirmation")[:500],
+            })
         if tooling_failure:
             self.failed_tools += 1
             error = (

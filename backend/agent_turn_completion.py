@@ -69,6 +69,21 @@ def _reconcile_successful_web_result(
     return rendered
 
 
+def _reconcile_pending_confirmation(content: str, runner_state: Any) -> str:
+    """Empêche une annonce de succès lorsqu'une action attend encore le clic humain."""
+    pending = getattr(runner_state, "pending_confirmations", []) or []
+    if not pending:
+        return content
+    latest = pending[-1]
+    tool_name = str(latest.get("tool") or "action")
+    message = str(latest.get("message") or "Action en attente de confirmation").strip()
+    return (
+        f"Action en attente de confirmation : `{tool_name}` n'a pas encore été exécuté. "
+        "Utilise les boutons Oui/Non affichés dans le chat.\n\n"
+        f"{message}"
+    )
+
+
 async def complete_turn(
     *,
     user_query: str,
@@ -111,6 +126,16 @@ async def complete_turn(
         runner_state,
         conversation_id,
     )
+    reconciled_confirmation = _reconcile_pending_confirmation(final_content, runner_state)
+    if reconciled_confirmation != final_content:
+        bug_log.log_bug(
+            "pending_confirmation_contradiction",
+            "Réponse terminale remplacée car une action attendait encore une confirmation humaine.",
+            context={"tool": str(runner_state.pending_confirmations[-1].get("tool") or "")[:80]},
+            conversation_id=conversation_id,
+            tool_name=str(runner_state.pending_confirmations[-1].get("tool") or "")[:80],
+        )
+        final_content = reconciled_confirmation
     events = [encode_sse(event) for event in finalized.events]
     if final_content != finalized.content:
         events.append(encode_sse({

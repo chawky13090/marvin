@@ -55,7 +55,7 @@ class ConversationExportTests(unittest.TestCase):
         path = self.root / "outside.pdf"
         path.write_bytes(b"%PDF")
         with patch("email_attachments.roots", return_value=(self.root / "machine", self.root / "exports")):
-            with self.assertRaisesRegex(ValueError, "dossier d'exports"):
+            with self.assertRaisesRegex(ValueError, "exports Marvin"):
                 validate_attachments([str(path)])
 
     def test_attachment_hash_prevents_tampering(self):

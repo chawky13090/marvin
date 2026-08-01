@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from email_attachments import validate_attachments
+
 
 _CRITICAL_RESULT_FIELDS = frozenset(
     {
@@ -142,6 +144,21 @@ def prepare_tool_call(
     # Certains modèles compatibles OpenAI sérialisent encore les booléens JSON
     # en chaînes. La coercition reste volontairement limitée aux champs booléens
     # documentés de Computer Runtime et aux deux littéraux JSON exacts.
+    if name == "email_send" and arguments.get("attachments"):
+        raw_attachments = arguments["attachments"]
+        if isinstance(raw_attachments, dict):
+            raw_attachments = [raw_attachments.get("path") or raw_attachments.get("item")]
+        if isinstance(raw_attachments, str):
+            try:
+                decoded = json.loads(raw_attachments)
+                raw_attachments = decoded if isinstance(decoded, list) else [raw_attachments]
+            except (json.JSONDecodeError, TypeError):
+                raw_attachments = [raw_attachments]
+        try:
+            arguments["attachments"] = validate_attachments(raw_attachments)
+        except (OSError, ValueError):
+            arguments["attachments"] = raw_attachments
+
     if name == "computer_control":
         for key in ("visual", "capture_before", "embed", "confirmed"):
             value = arguments.get(key)

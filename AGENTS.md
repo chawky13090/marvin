@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.553.0)
+## 9. État actuel (v2.554.0)
+
+**v2.554 (PDF vers e-mail et vérité des confirmations)** : correction issue du rejeu de la
+conversation `249882e8`. Les documents créés dans les dossiers Windows portables Bureau,
+Documents et Téléchargements sont désormais admissibles comme pièces jointes, en plus de la
+racine d'exports Marvin. `file_create_pdf` et `file_create_docx` rendent taille et SHA-256 ;
+le harnais normalise avant validation et politique les variantes usuelles émises par les
+modèles (chemin seul, `{item: path}`, liste JSON), puis calcule et lie l'empreinte à la
+demande d'autorisation. Une confirmation en attente est enregistrée dans l'état du Runner et
+la finalisation remplace déterministement toute fausse annonce de succès par un état en
+attente. Un chemin déjà connu doit être réutilisé directement, jamais recherché par contenu.
+Aucun envoi réel pendant les tests. Aucune migration. Rollback : réversion atomique du
+commit v2.554 puis redémarrage.
 
 **v2.553 (export et partage de conversations)** : source canonique serveur avec trois
 modes (`lecture`, `technique`, `audit`) et quatre formats (`md`, `json`, `docx`, `pdf`).
