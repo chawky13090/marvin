@@ -73,6 +73,10 @@ def main() -> int:
         port=8005,
         reload=False,
         access_log=True,
+        # Les flux SSE sont volontairement longs et peuvent rester connectés pendant
+        # toute une session UI. Sans budget Uvicorn, ils retardaient indéfiniment le
+        # lifespan et forçaient stop-marvin.ps1 à tuer le backend après 60 secondes.
+        timeout_graceful_shutdown=10,
     )
     server = uvicorn.Server(config)
     runner = asyncio.Runner(loop_factory=loop_factory)

@@ -136,6 +136,8 @@ async def _run() -> None:
     assert priority["categories"] == ["general", "social media"]
     assert priority["results"][0]["engines"] == ["bing", "google cse"]
     assert priority["unresponsive_engines"] == [["blocked", "access denied"]]
+    assert priority["degraded"] is True
+    assert "snippets" in priority["evidence_notice"]
     ordered = web._filter_relevant_results(
         "site officiel France Travail",
         [
@@ -157,6 +159,31 @@ async def _run() -> None:
     assert priority["provider_attempts"] == [
         {"provider": "SearXNG", "status": "succeeded"}
     ]
+
+    class EmptySearxResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": [], "unresponsive_engines": [["qwant", "CAPTCHA"]]}
+
+    empty_cache: dict[object, object] = {}
+    empty_client = SimpleNamespace(get=AsyncMock(return_value=EmptySearxResponse()))
+    with patch("credentials_manager.get_credential", return_value="http://127.0.0.1:8080"):
+        web.configure(
+            generate=fake_generate,
+            get_setting=lambda _key: 3,
+            get_http_client=lambda: empty_client,
+            cache_get=empty_cache.get,
+            cache_set=empty_cache.__setitem__,
+            net_error=lambda exc, what: {"error": str(exc), "resource": what},
+        )
+        empty = await web.execute_web_search({"query": "requête sans résultat unique"})
+        cached_empty = await web.execute_web_search({"query": "requête sans résultat unique"})
+    assert empty["success"] is True and empty["empty"] is True and empty["count"] == 0
+    assert "error" not in empty and "warning" in empty
+    assert cached_empty["cached"] is True
+    assert empty_client.get.await_count == 1
     assert web._prepare_searxng_query(
         "Quel est le statut des feux de foret en France ?"
     ) == "feux de foret en France aujourd'hui en cours actualités"

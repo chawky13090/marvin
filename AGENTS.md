@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.560.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.561.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,33 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.560.0)
+## 9. État actuel (v2.561.0)
+
+**v2.561 (incident recherche de personne et SearXNG dégradé)** : l'audit de la conversation
+`8580ab47` a distingué les pannes de moteurs de la panne du méta-moteur. SearXNG répondait en
+HTTP 200, mais chaque rafale affichait 6 à 13 moteurs suspendus (CAPTCHA, 403, déconnexion
+HTTP/2). Les recherches Web conservent toute la concurrence globale de Marvin, actuellement
+quatre appels simultanés ; HTTP/2 est désactivé dans le pool hétérogène SearXNG. Une
+réponse JSON valide sans résultat devient un succès vide (`empty=true`) avec avertissement,
+et elle est mise en cache au lieu de provoquer des retries et des cartes d'erreur. Les reçus
+précisent qu'un snippet est une piste : une identité, adresse, date ou parenté ne peut être
+annoncée comme vérifiée sans ouverture de la source. Le rappel est présent dans les deux
+prompts agentiques. Le pool conserve 80 moteurs et tous les onglets redondants. Rollback :
+réversion atomique du commit v2.561, restauration automatique de `settings.yml.bak`, puis
+relance de `docker/searxng/start-searxng.ps1` ; aucune migration de données.
+
+Le même diagnostic a isolé un défaut distinct de cycle de vie : les connexions SSE longues
+retardaient l'entrée dans le lifespan Uvicorn et forçaient l'arrêt après 60 secondes. Uvicorn
+0.48.0 applique désormais un délai de grâce de 10 secondes avant de fermer ces flux ; le
+frontend les reconnecte après redémarrage et les composants backend conservent ensuite leurs
+budgets de fermeture indépendants.
+
+Validation réelle après chargement de v2.561 : arrêt gracieux en 29,2 secondes, aucun PID
+forcé ; backend, frontend, HTTPS, Ollama et SearXNG prêts. Quatre recherches Web concurrentes
+via `/api/tools` ont toutes réussi en 6,92 secondes. Depuis le passage HTTP/1.1, aucun
+`RemoteProtocolError` n'a été observé ; certains moteurs tiers continuent légitimement à
+renvoyer CAPTCHA/403 et sont signalés comme dégradés sans transformer la recherche en panne.
+La suite locale complète `check:quick` passe 235/235 après correction du rappel Web borné.
 
 **v2.560 (audit local borné après arrêt du scan profond)** : le scan Codex Security
 multi-agent a été annulé à la demande de l'utilisateur en raison de son coût et des alertes

@@ -50,6 +50,7 @@ def test_contract_files() -> None:
     assert "stopping ? 0" in frontend
     assert "POST_SHUTDOWN_DRAIN_SECONDS" in backend_runtime
     assert "threading.Timer" in backend_runtime
+    assert "timeout_graceful_shutdown=10" in backend_runtime
     assert "marvin-startup-lock.ps1" in starter
     assert "stop-requested" in starter
     assert "call npm run dev" in starter

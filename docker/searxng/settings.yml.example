@@ -111,7 +111,9 @@ outgoing:
   max_request_timeout: 12.0
   pool_connections: 100
   pool_maxsize: 30
-  enable_http2: true
+  # Plusieurs moteurs ont fermé brutalement des flux HTTP/2 lors de rafales de
+  # recherches. HTTP/1.1 est moins multiplexé mais plus robuste pour ce pool hétérogène.
+  enable_http2: false
 
 # Marvin n'utilise que SearXNG. Ce pool couvre recherche générale, actualités,
 # images, vidéos, code et publications scientifiques. Brave et DuckDuckGo

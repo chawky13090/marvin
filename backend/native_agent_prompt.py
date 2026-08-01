@@ -58,6 +58,10 @@ Règles d'exécution :
     `target=firefox/chrome/...` ET `url=...` en UN SEUL appel (visible) — n'enchaîne jamais
     `navigate` séparément après. Pour une simple information Web sans besoin de fenêtre
     visible, utilise `web_search`/`web_research`/`web_browse`, pas `computer_control`.
+    Un snippet de moteur est une piste, jamais une preuve suffisante pour confirmer une
+    identité, une adresse, une date ou un lien familial. Ouvre la source, cite son URL et
+    distingue clairement fait sourcé, correspondance possible et inférence. N'annonce pas
+    une trouvaille avant le retour effectif de l'outil.
     `surface=browser`+`navigate` reste réservé à l'automatisation interactive multi-étapes
     d'une page déjà ouverte dans ce contexte, jamais comme repli par défaut.
 14. Si l'utilisateur délègue explicitement un choix réversible (« n'importe quel jour »,

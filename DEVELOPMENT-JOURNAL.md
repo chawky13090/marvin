@@ -15866,3 +15866,42 @@ Résultats observés : `check:quick` 235/235, smoke API 28/28, pages 41/41, arch
 redémarrage contrôlé ; les sources sont en v2.560. Aucun redémarrage n'a été imposé pendant la
 session. Les fichiers non suivis existants ont été préservés. Rollback : réversion atomique
 du commit v2.560 puis redémarrage ; aucune migration.
+
+## 2026-08-01 — v2.561 — SearXNG résilient et preuves Web explicites
+
+La conversation `8580ab47-10da-47f0-a2e9-a9cb3b5579d7` a été relue avant redémarrage. Les
+appels SearXNG aboutissaient, mais rapportaient 6 à 13 moteurs suspendus par requête. Les logs
+du conteneur prouvaient des CAPTCHA, HTTP 403 et `RemoteProtocolError: Server disconnected`
+sur HTTP/2. Marvin traitait aussi un résultat vide comme une panne d'outil et présentait
+parfois une identité ou une parenté comme confirmée à partir d'un simple snippet.
+
+La correction conserve tous les moteurs et toute la concurrence globale de Marvin (quatre
+appels simultanés) : HTTP/1.1 pour le pool hétérogène, succès vide explicite et mis en cache, état dégradé séparé,
+et contrat de preuve imposant l'ouverture de la source avant toute affirmation personnelle.
+SearXNG a été reprovisionné sur son port dynamique 8391 avec secret inchangé : 80 moteurs
+actifs, tous les onglets avec au moins deux moteurs. Le premier redémarrage Marvin a chargé
+v2.560 mais a nécessité le repli forcé après 68,6 secondes parce que l'ancienne instance
+n'était pas sous le superviseur coopératif actuel ; la nouvelle arborescence de processus
+est bien `server_supervisor.py -> server_runtime.py` et sera revalidée après v2.561.
+
+Rollback : réversion atomique du commit v2.561, copie de
+`docker/searxng/settings.yml.bak` vers `settings.yml`, relance du script SearXNG et
+redémarrage Marvin. Aucune migration ou suppression de donnée.
+
+Le second redémarrage a reproduit le repli forcé avec uniquement les trois PID de la chaîne
+backend supervisée ; frontend et Caddy étaient déjà arrêtés. La cause est l'attente Uvicorn
+non bornée des flux SSE avant le lifespan. `server_runtime.py` fixe maintenant
+`timeout_graceful_shutdown=10` (Uvicorn 0.48.0), puis laisse les budgets de fermeture v2.552
+s'appliquer. Les clients SSE savent déjà se reconnecter après redémarrage.
+
+Après chargement de v2.561, le redémarrage de validation a terminé en 88,1 secondes dont un
+arrêt coopératif de 29,2 secondes, sans aucun PID forcé. Les dépendances finales sont prêtes :
+Ollama 11434, SearXNG 8391 et HTTPS. Une requête SearXNG directe a produit 57 résultats. Quatre
+appels `web_search` concurrents à travers le gateway `/api/tools` ont tous réussi en 6,92
+secondes. Aucun `RemoteProtocolError` n'est apparu depuis le passage HTTP/1.1 ; les CAPTCHA et
+403 de moteurs tiers restent visibles comme dégradation, pas comme panne globale.
+
+Validation finale : `check:quick` 235/235, smoke API 28/28, tests Web, SearXNG,
+concurrence d'outils, prompts, cycle de vie et superviseur réussis. Le rappel Web a d'abord
+dépassé sa limite contractuelle de 400 caractères ; il a été compacté puis le test causal et
+la suite complète ont été rejoués avec succès.

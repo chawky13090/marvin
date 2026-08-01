@@ -655,8 +655,13 @@ async def execute_web_search(args: dict) -> dict:
             if item.get("url")
         ]
         results = _filter_relevant_results(search_query, raw_results)
+        unresponsive_engines = list(payload.get("unresponsive_engines") or [])
         receipt = {
-            "success": bool(results),
+            # Une réponse HTTP/JSON valide avec zéro résultat est une recherche terminée,
+            # pas une panne d'outil. Cette distinction évite les cartes d'erreur et les
+            # retries agressifs qui surchargeaient les moteurs SearXNG suspendus.
+            "success": True,
+            "empty": not bool(results),
             "provider": "SearXNG",
             "query": query,
             "search_query": search_query,
@@ -665,18 +670,23 @@ async def execute_web_search(args: dict) -> dict:
             "categories": list(categories),
             "count": len(results),
             "results": results,
-            "unresponsive_engines": list(payload.get("unresponsive_engines") or []),
+            "unresponsive_engines": unresponsive_engines,
+            "degraded": bool(unresponsive_engines),
+            "evidence_notice": (
+                "Les snippets de recherche sont des pistes de découverte, pas des preuves. "
+                "Ouvrir et lire la source avant d'affirmer une identité, une adresse, une "
+                "date ou un lien familial comme vérifié."
+            ),
             "provider_attempts": [{
                 "provider": "SearXNG",
-                "status": "succeeded" if results else "failed",
+                "status": "succeeded",
             }],
             "fallback_used": False,
             "provider_priority": "SearXNG",
         }
         if not results:
-            receipt["error"] = "SearXNG n'a retourné aucun résultat."
-        else:
-            _wcache_set(cache_key, receipt)
+            receipt["warning"] = "SearXNG n'a retourné aucun résultat pertinent."
+        _wcache_set(cache_key, receipt)
         return receipt
     except Exception as exc:
         return {
