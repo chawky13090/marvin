@@ -14,6 +14,7 @@ echo  Ce script installe TOUT le necessaire :
 echo    - Python (backend) + dependances
 echo    - Node.js (frontend) + dependances
 echo    - Ollama + modeles IA locaux de confidentialite
+echo    - LibreOffice pour valider visuellement les documents Word
 echo.
 echo  ATTENTION : il recree les environnements (.venv, .next) car
 echo  ceux copies de l'autre PC contiennent des chemins invalides.
@@ -168,6 +169,17 @@ if errorlevel 1 (
             echo   [OK] Images Test Forge pretes.
         )
     )
+)
+echo.
+
+:: ====================================================== [4bis/9] LibreOffice
+echo [4bis/9] Validation documentaire LibreOffice...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\manage-libreoffice.ps1" -Action Ensure
+if errorlevel 1 (
+    echo   [DEGRADE] LibreOffice n a pas pu etre installe ou verifie.
+    echo   Marvin reste utilisable, mais la validation visuelle DOCX sera structurelle seulement.
+) else (
+    echo   [OK] LibreOffice headless disponible pour la validation DOCX.
 )
 echo.
 

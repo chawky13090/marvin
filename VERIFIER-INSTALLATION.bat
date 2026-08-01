@@ -50,6 +50,8 @@ echo.
 :: ===================================================== 2. BACKEND PYTHON
 echo [2] Backend Python
 if exist "backend\.venv\Scripts\python.exe" ( echo    [OK] Environnement .venv present ) else ( echo    [X] .venv manquant -^> lancez INSTALLER-NOUVEAU-PC.bat & set /a PROBLEMS+=1 )
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\manage-libreoffice.ps1" -Action Verify >nul 2>&1
+if errorlevel 1 ( echo    [!] LibreOffice absent ou invalide - validation DOCX degradee ) else ( echo    [OK] LibreOffice headless operationnel )
 if exist "backend\.venv\Scripts\python.exe" (
     backend\.venv\Scripts\python -m pip check >nul 2>&1 && ( echo    [OK] Dependances Python coherentes ) || ( echo    [X] Dependances Python incoherentes & set /a PROBLEMS+=1 )
     backend\.venv\Scripts\python scripts\check_architecture.py || ( echo    [X] Invariants d'architecture invalides & set /a PROBLEMS+=1 )

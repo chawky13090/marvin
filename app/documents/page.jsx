@@ -5,8 +5,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/Toast';
 
 import { BACKEND_URL as BACKEND } from '@/lib/backend';
+import LayerCanvas from '@/components/documents/LayerCanvas';
 
 export function DocumentsView() {
+  const [section, setSection] = useState('studio');
   const [docs, setDocs] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [pathInput, setPathInput] = useState('');
@@ -70,7 +72,9 @@ export function DocumentsView() {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'transparent', color: 'var(--text-primary)', padding: '28px 32px' }}>
-      <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      <div style={{ maxWidth: section === 'studio' ? 1480 : 860, margin: '0 auto', height: section === 'studio' ? 'calc(100vh - 150px)' : 'auto' }}>
+        <div style={{display:'flex',gap:6,marginBottom:14}}><button className="btn btn-ghost" onClick={()=>setSection('studio')} aria-pressed={section==='studio'}>Studio visuel</button><button className="btn btn-ghost" onClick={()=>setSection('library')} aria-pressed={section==='library'}>Bibliothèque & recherche</button></div>
+        {section === 'studio' ? <LayerCanvas /> : <>
         <h1 style={{ margin: 0, fontSize: '1.6rem', color: '#60a5fa' }}>📄 Mes documents</h1>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
           Pose des questions à tes PDF, Word, Excel, PowerPoint… Marvin répond en citant les passages. 100 % local et privé.
@@ -137,6 +141,7 @@ export function DocumentsView() {
             )}
           </div>
         )}
+        </>}
       </div>
     </div>
   );

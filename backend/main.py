@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.558 — studio documentaire à calques, exports Office et validation LibreOffice
 # v2.552 — arrêt backend borné par composant et drain post-lifespan contrôlé
 # v2.551 — portefeuille local autonome, replis exacts et vision sensible locale
 # v2.550 — audit puissance : contexte Ollama, filtre cloud, vision, budgets d'execution

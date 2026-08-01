@@ -10,6 +10,8 @@ import database as db
 import tool_runtime
 import tools as tool_module
 from storage_layout import roots
+import libreoffice_runtime
+import document_canvas
 
 
 router = APIRouter(tags=["documents"])
@@ -39,6 +41,81 @@ async def list_documents():
 @router.get("/api/documents/templates")
 async def document_templates():
     return {"templates": tool_module._doc_templates_list()}
+
+
+@router.get("/api/documents/runtime")
+async def document_runtime():
+    import asyncio
+    return {"libreoffice": await asyncio.to_thread(libreoffice_runtime.capability)}
+
+
+@router.post("/api/documents/validate-render")
+async def validate_document_render(body: dict = Body(...)):
+    import asyncio
+    target = os.path.abspath(str(body.get("path") or "").strip())
+    allowed = os.path.abspath(_documents_dir())
+    try:
+        contained = os.path.commonpath((allowed, target)) == allowed
+    except ValueError:
+        contained = False
+    if not contained or not os.path.isfile(target) or not target.casefold().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="DOCX Marvin valide requis")
+    return await asyncio.to_thread(libreoffice_runtime.validate_docx_render, target)
+
+
+@router.get("/api/documents/canvas")
+async def list_canvas_designs():
+    return {"designs": document_canvas.list_designs()}
+
+
+@router.get("/api/documents/canvas/{design_id}")
+async def load_canvas_design(design_id: str):
+    try:
+        return document_canvas.load(design_id)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail="Design introuvable") from exc
+
+
+@router.post("/api/documents/canvas")
+async def save_canvas_design(body: dict = Body(...)):
+    try:
+        return document_canvas.save(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/documents/canvas/from-prompt")
+async def canvas_from_prompt(body: dict = Body(...)):
+    try:
+        return document_canvas.manifest_from_prompt(body.get("prompt", ""), body.get("title", ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/documents/canvas/export/pdf")
+async def export_canvas_pdf(body: dict = Body(...)):
+    try:
+        path = document_canvas.export_pdf(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return FileResponse(path, filename=f"{body.get('title') or 'design'}.pdf", media_type="application/pdf")
+
+
+@router.post("/api/documents/canvas/export/{format_name}")
+async def export_canvas_office(format_name: str, body: dict = Body(...)):
+    exporters = {"docx": document_canvas.export_docx, "pptx": document_canvas.export_pptx}
+    exporter = exporters.get(format_name)
+    if exporter is None:
+        raise HTTPException(status_code=404, detail="Format non pris en charge")
+    try:
+        path = exporter(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    media = {
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }[format_name]
+    return FileResponse(path, filename=f"{body.get('title') or 'design'}.{format_name}", media_type=media)
 
 
 @router.post("/api/documents/generate")

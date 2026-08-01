@@ -148,7 +148,20 @@ async def run_diagnostics() -> dict:
     except Exception as e:
         add("model_catalog_watch", "Veille modèles Cloud", "info", f"Non vérifié : {str(e)[:80]}")
 
-    # ── 4. Documents indexés présents sur le disque ────────────────────────────
+    # ── 4. Rendu documentaire LibreOffice ──────────────────────────────────────
+    try:
+        import libreoffice_runtime
+        office = libreoffice_runtime.capability()
+        if office.get("available"):
+            add("libreoffice", "Validation DOCX", "ok", f"LibreOffice headless disponible : {office.get('detail', '')}")
+        elif office.get("status") == "degraded":
+            add("libreoffice", "Validation DOCX", "warning", office.get("detail", "LibreOffice dégradé."))
+        else:
+            add("libreoffice", "Validation DOCX", "warning", "LibreOffice absent : rendu DOCX non certifié.")
+    except Exception as exc:
+        add("libreoffice", "Validation DOCX", "warning", f"Diagnostic impossible : {type(exc).__name__}.")
+
+    # ── 5. Documents indexés présents sur le disque ────────────────────────────
     try:
         docs = _t._indexed_docs()
         missing = [d for d in docs if not os.path.exists(d.get("path", ""))]

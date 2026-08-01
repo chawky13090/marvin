@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.557.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.558.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.557.0)
+## 9. État actuel (v2.558.0)
+
+**v2.558 (Studio documentaire à calques + LibreOffice géré)** : l'onglet Documents intègre
+un canevas libre enregistrable : texte, formes, lignes et images sont des calques ordonnés,
+déplaçables, verrouillables et éditables. Le manifeste est validé et borné côté serveur,
+stocké atomiquement dans la racine portable des exports, puis exporté en PDF. L'adaptateur
+PPTX conserve les objets éditables et leurs positions ; l'adaptateur DOCX réordonne le
+contenu en flux éditable, Word ne garantissant pas la mise en page libre du canevas.
+LibreOffice 26.2.5.2 est un composant optionnel épinglé, installé et vérifié via WinGet ;
+chaque DOCX généré est converti dans un profil LibreOffice isolé puis inspecté. Son absence
+dégrade uniquement la validation visuelle, jamais le socle Marvin. Rollback applicatif :
+réversion atomique du commit v2.558. Rollback du composant :
+`scripts\manage-libreoffice.ps1 -Action Uninstall`.
 
 **v2.557 (moteur de direction artistique premium)** : `premium_document_design.py`
 transforme désormais un brief visuel libre (`design_prompt`) en manifeste borné : palette,

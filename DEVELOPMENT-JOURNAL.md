@@ -15810,3 +15810,20 @@ le second rendu inspecté est lisible, sans chevauchement ni glyphe manquant. Le
 validé structurellement car LibreOffice n'est pas installé sur cette machine. Aucun contenu
 documentaire ou donnée personnelle n'est ajouté aux logs. Rollback : réversion atomique du
 commit v2.557 et redémarrage ; aucune migration persistante.
+## 2026-08-01 — v2.558 — Studio documentaire à calques et LibreOffice portable
+
+Le flux validé « prompt → manifeste → calques → exports » dispose maintenant de son premier
+éditeur concret dans Documents. Les calques texte, forme, ligne et image sont sélectionnables,
+déplaçables, ordonnables, verrouillables et persistés atomiquement dans la racine d'exports
+portable. Les entrées sont revalidées côté serveur. Le PDF conserve la composition ; le PPTX
+conserve les objets éditables ; le DOCX produit une adaptation éditable en flux.
+
+LibreOffice 26.2.5.2 est un composant optionnel épinglé et géré par WinGet. Chaque DOCX produit
+passe par une conversion headless avec profil temporaire isolé, timeout borné et inspection
+des pages. Son absence dégrade la validation sans bloquer Marvin. Aucun contenu documentaire
+n'est écrit dans les logs de capacité.
+
+Validation réelle : LibreOffice installé et vérifié, DOCX premium converti et inspecté, tests
+unitaires PDF/DOCX/PPTX, compilation Python, contrat d'installeur et ESLint. Rollback :
+réversion atomique du commit v2.558 ; composant système :
+`scripts\manage-libreoffice.ps1 -Action Uninstall`.

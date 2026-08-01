@@ -41,6 +41,19 @@ $NodeModules = Join-Path $ProjectRoot 'node_modules'
 $ElectronPath = Join-Path $ProjectRoot 'node_modules\electron\dist\electron.exe'
 $Desktop = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
 $AvatarShortcut = Join-Path $Desktop 'Marvin Avatar.lnk'
+$LibreOfficeCandidates = @(
+    (Join-Path $env:ProgramFiles 'LibreOffice\program\soffice.com'),
+    $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'LibreOffice\program\soffice.com' })
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+$LibreOfficePath = [string]($LibreOfficeCandidates | Select-Object -First 1)
+$LibreOfficeVerified = $false
+$LibreOfficeVersion = ''
+if ($LibreOfficePath) {
+    try {
+        $LibreOfficeVersion = ((& $LibreOfficePath --headless --version 2>$null | Select-Object -First 1) -as [string]).Trim()
+        $LibreOfficeVerified = $LASTEXITCODE -eq 0
+    } catch {}
+}
 
 $Core = [ordered]@{
     backend_venv = if (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
@@ -83,6 +96,13 @@ if ($HyperVModule) {
 }
 
 $Optional = [ordered]@{
+    libreoffice_document_validation = if ($LibreOfficeVerified) {
+        New-Capability 'available' ($LibreOfficeVersion + ' — rendu DOCX headless vérifié.')
+    } elseif ($LibreOfficePath) {
+        New-Capability 'degraded' 'LibreOffice détecté mais le mode headless ne répond pas.' 'Exécuter scripts\manage-libreoffice.ps1 -Action Verify.'
+    } else {
+        New-Capability 'unavailable' 'LibreOffice absent : validation DOCX structurelle uniquement.' 'Exécuter scripts\manage-libreoffice.ps1 -Action Ensure.'
+    }
     desktop_avatar = if ((Test-Path -LiteralPath $ElectronPath -PathType Leaf) -and (Test-Path -LiteralPath $AvatarShortcut -PathType Leaf)) {
         New-Capability 'available' 'Runtime Electron et raccourci Bureau présents.'
     } elseif (Test-Path -LiteralPath $ElectronPath -PathType Leaf) {

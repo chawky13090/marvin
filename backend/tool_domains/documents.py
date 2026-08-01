@@ -481,7 +481,9 @@ async def create_docx(args: dict) -> dict:
             p = p.with_suffix(".docx")
         p.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(p))
-        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "theme": theme_name, "design_manifest": design.public(), "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+        import libreoffice_runtime
+        render_validation = await asyncio.to_thread(libreoffice_runtime.validate_docx_render, p)
+        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "theme": theme_name, "design_manifest": design.public(), "render_validation": render_validation, "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}
 
