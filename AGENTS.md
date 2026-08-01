@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.533.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.556.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,22 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.555.0)
+## 9. État actuel (v2.556.0)
+
+**v2.556 (confirmation immédiate, résilience cloud et design documentaire)** : l'audit de
+la conversation `249882e8` a isolé deux causes distinctes. Le résultat
+`requiresConfirmation` attendait inutilement une seconde critique LLM synchrone avant
+d'être diffusé, ce qui retardait le bouton d'environ 12 secondes alors que la politique
+déterministe avait déjà rendu sa décision fail-closed. Cette critique bloquante est retirée :
+la confirmation est désormais diffusée immédiatement sans modifier les autorisations. Un
+`and False` résiduel neutralisait par ailleurs le repli cloud-vers-cloud sur erreur
+transitoire Ollama HTTP 500 ; ce repli est restauré, tandis que le mode Ultra reste
+strictement cloud et ne bascule jamais silencieusement en local. Les générateurs PDF et
+DOCX proposent cinq thèmes déterministes (`professional`, `executive`, `minimal`,
+`technical`, `galactic`), une position de logo explicite et des polices Unicode embarquées
+pour les PDF. Les thèmes structurent couverture, hiérarchie, tableaux et code au lieu de
+changer une seule couleur. Aucun envoi réel, aucune migration ou donnée persistante.
+Rollback : réversion atomique du commit v2.556 puis redémarrage backend/frontend.
 
 **v2.555 (classement des fichiers créés)** : les créations PDF, DOCX et les documents
 générés sans destination explicite utilisent désormais la racine portable

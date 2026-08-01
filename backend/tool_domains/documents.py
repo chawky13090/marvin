@@ -26,6 +26,40 @@ _resolver: Callable[[str], str] | None = None
 _text_generator: Callable[..., Awaitable[object]] | None = None
 _generated_dir: Path | None = None
 
+_DOCUMENT_THEMES = {
+    "professional": {
+        "accent": "#334155", "text": "#172033", "muted": "#64748b",
+        "surface": "#f8fafc", "cover": "#eef2f6", "cover_text": "#172033", "font": "Aptos",
+    },
+    "executive": {
+        "accent": "#9a7b3f", "text": "#202020", "muted": "#686868",
+        "surface": "#f7f4ed", "cover": "#eee8db", "cover_text": "#202020", "font": "Aptos",
+    },
+    "minimal": {
+        "accent": "#444444", "text": "#202020", "muted": "#737373",
+        "surface": "#fafafa", "cover": "#f2f2f2", "cover_text": "#202020", "font": "Aptos",
+    },
+    "technical": {
+        "accent": "#176b87", "text": "#16252d", "muted": "#52656f",
+        "surface": "#eef6f8", "cover": "#dceef2", "cover_text": "#16252d", "font": "Aptos",
+    },
+    "galactic": {
+        "accent": "#8b5cf6", "text": "#24223a", "muted": "#68658a",
+        "surface": "#f4f2ff", "cover": "#0b1026", "cover_text": "#f4f2ff", "font": "Aptos",
+    },
+}
+
+
+def _document_theme(args: dict) -> tuple[str, dict[str, str]]:
+    name = str(args.get("theme") or "professional").strip().casefold()
+    if name not in _DOCUMENT_THEMES:
+        name = "professional"
+    theme = dict(_DOCUMENT_THEMES[name])
+    if args.get("accent"):
+        raw = str(args["accent"]).strip()
+        theme["accent"] = raw if raw.startswith("#") else f"#{raw}"
+    return name, theme
+
 
 def configure(*, resolve_path: Callable[[str], str]) -> None:
     global _resolver
@@ -239,7 +273,8 @@ async def create_docx(args: dict) -> dict:
     content = args.get("content", "")
     _identity = _document_identity()
     author = args.get("author") or _identity.get("author") or "Marvin"
-    accent = args.get("accent", "#c9a84c").lstrip("#")
+    theme_name, theme = _document_theme(args)
+    accent = theme["accent"].lstrip("#")
     footer_text = args.get("footer_text") or _identity.get("footer_text") or ""
     confidentiality = args.get("confidentiality") or _identity.get("confidentiality") or ""
     want_toc = bool(args.get("toc"))
@@ -259,7 +294,7 @@ async def create_docx(args: dict) -> dict:
         doc = Document()
         # Police par défaut professionnelle
         normal = doc.styles["Normal"]
-        normal.font.name = "Calibri"
+        normal.font.name = theme["font"]
         normal.font.size = Pt(11)
         doc.core_properties.author = author
         doc.core_properties.title = title
@@ -282,7 +317,11 @@ async def create_docx(args: dict) -> dict:
             try:
                 hdr = doc.sections[0].header
                 hp = hdr.paragraphs[0]
-                hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                logo_position = str(args.get("logo_position") or "left").casefold()
+                hp.alignment = {
+                    "center": WD_ALIGN_PARAGRAPH.CENTER,
+                    "right": WD_ALIGN_PARAGRAPH.RIGHT,
+                }.get(logo_position, WD_ALIGN_PARAGRAPH.LEFT)
                 logo = lh.get("logo")
                 if logo:
                     lp = _resolve_path(logo)
@@ -292,7 +331,10 @@ async def create_docx(args: dict) -> dict:
                         except Exception:
                             pass
                 if lh.get("org"):
-                    r = hp.add_run(("   " if hp.runs else "") + lh["org"])
+                    # Ligne distincte : aucune superposition possible avec un logo large.
+                    org_p = hdr.add_paragraph()
+                    org_p.alignment = hp.alignment
+                    r = org_p.add_run(lh["org"])
                     r.bold = True; r.font.size = Pt(12); r.font.color.rgb = ACCENT
                 info = "  ·  ".join(x for x in [lh.get("address"), lh.get("phone"), lh.get("email"), lh.get("website")] if x)
                 if info:
@@ -304,6 +346,12 @@ async def create_docx(args: dict) -> dict:
         # ── Page de titre soignée ────────────────────────────────────────────
         h = doc.add_heading(title, level=0)
         h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if theme_name in {"galactic", "technical", "executive"}:
+            shading = OxmlElement("w:shd")
+            shading.set(qn("w:fill"), theme["cover"].lstrip("#"))
+            h._p.get_or_add_pPr().append(shading)
+            h.paragraph_format.space_before = Pt(18)
+            h.paragraph_format.space_after = Pt(18)
         for run in h.runs:
             run.font.color.rgb = ACCENT
             run.font.size = Pt(26)
@@ -455,7 +503,7 @@ async def create_docx(args: dict) -> dict:
             p = p.with_suffix(".docx")
         p.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(p))
-        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "theme": theme_name, "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}
 
@@ -662,7 +710,10 @@ async def generate(args: dict) -> dict:
     )
     r = await create_docx({"path": out_path, "title": title, "subtitle": tpl["name"],
                                         "content": content, "author": author,
-                                        "letterhead": letterhead, "references": references, "signature": signature})
+                                        "letterhead": letterhead, "references": references,
+                                        "signature": signature, "theme": args.get("theme"),
+                                        "accent": args.get("accent"),
+                                        "logo_position": args.get("logo_position")})
     if r.get("error"):
         return {"error": f"Rendu Word échoué : {r['error']}"}
     docx_path = r.get("path", out_path)
@@ -701,6 +752,7 @@ async def create_pdf(args: dict) -> dict:
     content = args.get("content", "")
     _identity = _document_identity()
     author = args.get("author") or _identity.get("author") or "Marvin"
+    theme_name, theme = _document_theme(args)
     header = args.get("header") or {k: _identity[k] for k in
                                       ("org", "address", "phone", "email", "website", "logo")
                                       if _identity.get(k)}
@@ -717,10 +769,48 @@ async def create_pdf(args: dict) -> dict:
         from reportlab.platypus.tableofcontents import TableOfContents
         from reportlab.pdfgen import canvas as _canvas_mod
         from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
 
-        GOLD_COLOR = colors.HexColor("#c9a84c")
-        TEXT_COLOR = colors.HexColor("#1a1a1a")
-        LIGHT_COLOR = colors.HexColor("#555555")
+        font_root = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
+        font_candidates = {
+            "MarvinSans": (font_root / "arial.ttf",),
+            "MarvinSansBold": (font_root / "arialbd.ttf",),
+            "MarvinSansItalic": (font_root / "ariali.ttf",),
+            "MarvinMono": (font_root / "consola.ttf", font_root / "cour.ttf"),
+        }
+        registered_fonts: dict[str, str] = {}
+        for font_name, candidates in font_candidates.items():
+            candidate = next((item for item in candidates if item.is_file()), None)
+            if candidate is None:
+                continue
+            try:
+                pdfmetrics.registerFont(TTFont(font_name, str(candidate)))
+                registered_fonts[font_name] = font_name
+            except Exception:
+                continue
+        sans = registered_fonts.get("MarvinSans", "Helvetica")
+        sans_bold = registered_fonts.get("MarvinSansBold", "Helvetica-Bold")
+        sans_italic = registered_fonts.get("MarvinSansItalic", "Helvetica-Oblique")
+        mono = registered_fonts.get("MarvinMono", "Courier")
+        if sans == "MarvinSans":
+            try:
+                pdfmetrics.registerFontFamily(
+                    "MarvinSans",
+                    normal=sans,
+                    bold=sans_bold,
+                    italic=sans_italic,
+                    boldItalic=sans_bold,
+                )
+            except Exception:
+                pass
+
+        GOLD_COLOR = colors.HexColor(theme["accent"])
+        TEXT_COLOR = colors.HexColor(theme["text"])
+        LIGHT_COLOR = colors.HexColor(theme["muted"])
+        SURFACE_COLOR = colors.HexColor(theme["surface"])
+        COVER_COLOR = colors.HexColor(theme["cover"])
+        COVER_TEXT_COLOR = colors.HexColor(theme["cover_text"])
 
         out = Path(path)
         if not out.suffix:
@@ -764,26 +854,22 @@ async def create_pdf(args: dict) -> dict:
 
         from reportlab.platypus import Table, TableStyle, ListFlowable, ListItem
         from datetime import datetime as _dt
-        accent = args.get("accent")
-        if accent:
-            try: GOLD_COLOR = colors.HexColor(accent if accent.startswith("#") else "#" + accent)
-            except Exception: pass
         subtitle = args.get("subtitle", "")
 
         styles = getSampleStyleSheet()
         story = []
 
         # Styles personnalisés
-        h0_style = ParagraphStyle("h0", parent=styles["Title"], textColor=GOLD_COLOR, fontSize=24, spaceAfter=6, alignment=TA_CENTER)
-        sub_style = ParagraphStyle("sub", parent=styles["Normal"], textColor=LIGHT_COLOR, fontSize=12, alignment=TA_CENTER, spaceAfter=2)
-        meta_style = ParagraphStyle("meta", parent=styles["Normal"], textColor=colors.HexColor("#999999"), fontSize=9, alignment=TA_CENTER, spaceAfter=12)
-        h1_style = ParagraphStyle("h1", parent=styles["Heading1"], textColor=GOLD_COLOR, fontSize=16, spaceAfter=6, spaceBefore=16)
-        h2_style = ParagraphStyle("h2", parent=styles["Heading2"], textColor=GOLD_COLOR, fontSize=13, spaceAfter=5, spaceBefore=12)
-        h3_style = ParagraphStyle("h3", parent=styles["Heading3"], textColor=TEXT_COLOR, fontSize=11, spaceAfter=4, spaceBefore=8)
-        body_style = ParagraphStyle("body", parent=styles["Normal"], textColor=TEXT_COLOR, fontSize=10.5, leading=15, spaceAfter=5)
+        h0_style = ParagraphStyle("h0", parent=styles["Title"], fontName=sans_bold, textColor=GOLD_COLOR, fontSize=25, leading=31, alignment=TA_CENTER)
+        sub_style = ParagraphStyle("sub", parent=styles["Normal"], fontName=sans, textColor=COVER_TEXT_COLOR, fontSize=12, leading=17, alignment=TA_CENTER)
+        meta_style = ParagraphStyle("meta", parent=styles["Normal"], fontName=sans, textColor=COVER_TEXT_COLOR, fontSize=9, alignment=TA_CENTER)
+        h1_style = ParagraphStyle("h1", parent=styles["Heading1"], fontName=sans_bold, textColor=GOLD_COLOR, fontSize=16, spaceAfter=6, spaceBefore=16)
+        h2_style = ParagraphStyle("h2", parent=styles["Heading2"], fontName=sans_bold, textColor=GOLD_COLOR, fontSize=13, spaceAfter=5, spaceBefore=12)
+        h3_style = ParagraphStyle("h3", parent=styles["Heading3"], fontName=sans_bold, textColor=TEXT_COLOR, fontSize=11, spaceAfter=4, spaceBefore=8)
+        body_style = ParagraphStyle("body", parent=styles["Normal"], fontName=sans, textColor=TEXT_COLOR, fontSize=10.5, leading=15, spaceAfter=5)
         bullet_style = ParagraphStyle("bullet", parent=body_style, leftIndent=16, spaceAfter=2)
-        quote_style = ParagraphStyle("quote", parent=body_style, leftIndent=16, textColor=LIGHT_COLOR, fontName="Helvetica-Oblique", borderPadding=4)
-        code_style = ParagraphStyle("code", parent=styles["Code"], fontSize=9, backColor=colors.HexColor("#f5f5f5"), borderPadding=6, leading=12)
+        quote_style = ParagraphStyle("quote", parent=body_style, leftIndent=16, textColor=LIGHT_COLOR, fontName=sans_italic, borderPadding=4)
+        code_style = ParagraphStyle("code", parent=styles["Code"], fontName=mono, fontSize=9, backColor=SURFACE_COLOR, borderPadding=6, leading=12)
         hmap = {"h1": h1_style, "h2": h2_style, "h3": h3_style}
 
         # ── Bloc de titre ────────────────────────────────────────────────────
@@ -795,11 +881,22 @@ async def create_pdf(args: dict) -> dict:
         # suffisant pour ne plus lire comme une page de contenu à moitié vide. Sans `toc`, le
         # titre enchaîne directement sur le corps du document (pas de page dédiée) -> inutile.
         if want_toc:
-            story.append(Spacer(1, 8*cm))
-        story.append(Paragraph(title, h0_style))
+            story.append(Spacer(1, 4.5*cm))
+        cover_rows = [[Paragraph(title, h0_style)]]
         if subtitle:
-            story.append(Paragraph(_md_inline_to_rl(subtitle), sub_style))
-        story.append(Paragraph(f"{author} &nbsp;·&nbsp; {_dt.now().strftime('%d/%m/%Y')}", meta_style))
+            cover_rows.append([Paragraph(_md_inline_to_rl(subtitle), sub_style)])
+        cover_rows.append([Paragraph(f"{author} &nbsp;·&nbsp; {_dt.now().strftime('%d/%m/%Y')}", meta_style)])
+        cover = Table(cover_rows, colWidths=[doc.width], hAlign="CENTER")
+        cover.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), COVER_COLOR),
+            ("BOX", (0, 0), (-1, -1), 1.2, GOLD_COLOR),
+            ("LEFTPADDING", (0, 0), (-1, -1), 22),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 22),
+            ("TOPPADDING", (0, 0), (-1, 0), 24),
+            ("BOTTOMPADDING", (0, -1), (-1, -1), 24),
+        ]))
+        story.append(cover)
+        story.append(Spacer(1, 12))
         story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD_COLOR, spaceAfter=14))
 
         # ── Sommaire (rempli automatiquement via afterFlowable ci-dessus, résolu par le
@@ -809,9 +906,9 @@ async def create_pdf(args: dict) -> dict:
             story.append(Paragraph("Sommaire", h1_style))
             toc = TableOfContents()
             toc.levelStyles = [
-                ParagraphStyle("TOCH1", fontName="Helvetica-Bold", fontSize=11, leftIndent=0,
+                ParagraphStyle("TOCH1", fontName=sans_bold, fontSize=11, leftIndent=0,
                                firstLineIndent=0, spaceBefore=8, leading=16, textColor=TEXT_COLOR),
-                ParagraphStyle("TOCH2", fontName="Helvetica", fontSize=9.5, leftIndent=16,
+                ParagraphStyle("TOCH2", fontName=sans, fontSize=9.5, leftIndent=16,
                                firstLineIndent=0, spaceBefore=2, leading=13, textColor=LIGHT_COLOR),
             ]
             story.append(toc)
@@ -943,7 +1040,7 @@ async def create_pdf(args: dict) -> dict:
                 t = Table(data, hAlign="LEFT")
                 t.setStyle(TableStyle([
                     ("BACKGROUND", (0, 0), (-1, 0), GOLD_COLOR),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#faf8f2")]),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, SURFACE_COLOR]),
                     ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dddddd")),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
@@ -981,29 +1078,47 @@ async def create_pdf(args: dict) -> dict:
                 if header:
                     x, y = 2.5 * cm, A4[1] - 1.3 * cm
                     logo = header.get("logo")
+                    logo_position = str(args.get("logo_position") or "left").casefold()
+                    org_x = x
                     if logo:
                         lp = _resolve_path(logo)
                         if os.path.exists(lp):
                             try:
-                                self.drawImage(_optimized_logo_path(lp), x, y - 0.55 * cm, height=1.1 * cm,
-                                                preserveAspectRatio=True, mask="auto")
-                                x += 1.6 * cm
+                                optimized = _optimized_logo_path(lp)
+                                from PIL import Image as _LogoImage
+                                with _LogoImage.open(optimized) as image:
+                                    iw, ih = image.size
+                                logo_h = 1.1 * cm
+                                logo_w = min(3.2 * cm, logo_h * (iw / max(1, ih)))
+                                logo_x = {
+                                    "center": (A4[0] - logo_w) / 2,
+                                    "right": A4[0] - 2.5 * cm - logo_w,
+                                }.get(logo_position, x)
+                                self.drawImage(optimized, logo_x, y - 0.55 * cm,
+                                               width=logo_w, height=logo_h, mask="auto")
+                                if logo_position == "left":
+                                    org_x = logo_x + logo_w + 0.3 * cm
                             except Exception:
                                 pass
                     if header.get("org"):
-                        self.setFont("Helvetica-Bold", 11)
+                        self.setFont(sans_bold, 11)
                         self.setFillColor(GOLD_COLOR)
-                        self.drawString(x, y, header["org"])
+                        if logo_position == "center":
+                            self.drawCentredString(A4[0] / 2, y - 0.95 * cm, header["org"])
+                        elif logo_position == "right":
+                            self.drawRightString(A4[0] - 2.5 * cm, y - 0.95 * cm, header["org"])
+                        else:
+                            self.drawString(org_x, y, header["org"])
                     info = "  ·  ".join(v for v in [header.get("address"), header.get("phone"),
                                                      header.get("email"), header.get("website")] if v)
                     if info:
-                        self.setFont("Helvetica", 7)
+                        self.setFont(sans, 7)
                         self.setFillColor(colors.HexColor("#888888"))
                         self.drawString(x, y - 0.4 * cm, info)
                     self.setStrokeColor(GOLD_COLOR)
                     self.setLineWidth(0.8)
                     self.line(2.5 * cm, A4[1] - 2.9 * cm, A4[0] - 2.5 * cm, A4[1] - 2.9 * cm)
-                self.setFont("Helvetica", 8)
+                self.setFont(sans, 8)
                 self.setFillColor(colors.HexColor("#999999"))
                 foot_line = "  ·  ".join(v for v in [footer_text, confidentiality] if v)
                 if foot_line:
@@ -1021,6 +1136,6 @@ async def create_pdf(args: dict) -> dict:
                 Path(_p).unlink(missing_ok=True)
             except Exception:
                 pass
-        return {"success": True, "message": f"PDF créé : {out}", "path": str(out), "size_bytes": out.stat().st_size, "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
+        return {"success": True, "message": f"PDF créé : {out}", "path": str(out), "theme": theme_name, "size_bytes": out.stat().st_size, "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}

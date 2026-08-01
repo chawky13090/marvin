@@ -47,26 +47,9 @@ async def postprocess_tool_result(
         except Exception:
             pass
 
-    if (
-        isinstance(result, dict)
-        and result.get("requiresConfirmation")
-        and tool_name in dangerous_tools
-        and user_query
-    ):
-        try:
-            concern = await critique_action(
-                user_query,
-                tool_name,
-                arguments,
-                model=active_model,
-            )
-            if concern:
-                result["message"] = (
-                    result.get("message", "")
-                    + f"\n\n⚠️ Vérification de Marvin : {concern}"
-                )
-        except Exception:
-            pass
+    # La politique déterministe a déjà évalué le risque avant ce point. Une critique LLM
+    # synchrone retardait l'apparition des boutons de 10 à 30 secondes et ne pouvait pas
+    # modifier la décision fail-closed. Le bouton doit être diffusé immédiatement.
 
     if (
         tool_name in DOCUMENT_TOOLS

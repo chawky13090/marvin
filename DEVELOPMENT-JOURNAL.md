@@ -15772,3 +15772,22 @@ Validation : tests réels d'un PDF classé automatiquement et d'un PDF écrit ve
 explicite distinct, six tests ciblés réussis, compilation Python et architecture vérifiées.
 Les journaux ne reçoivent aucun contenu documentaire supplémentaire. Rollback : réversion
 atomique du commit v2.555 et redémarrage ; aucune migration persistante.
+
+## 2026-08-01 — v2.556 — Confirmation immédiate et thèmes documentaires
+
+L'audit de la conversation `249882e8` a établi que le bouton d'autorisation d'e-mail
+apparaissait environ douze secondes après l'appel outil : le post-traitement attendait une
+critique LLM synchrone alors que la politique déterministe avait déjà classé l'action. La
+critique bloquante a été retirée ; la décision fail-closed et le clic humain restent
+inchangés. L'incident `d237b4be00b3494bae7ea704e2077f4e` correspondait à une réponse
+Ollama Cloud HTTP 500. Le repli vers un autre modèle cloud était neutralisé par une condition
+résiduelle ; il est restauré sans autoriser de repli local en mode Ultra.
+
+Les moteurs PDF et DOCX disposent maintenant de cinq thèmes déterministes, d'une position
+de logo explicite et de compositions structurées. Le PDF embarque des polices Windows
+Unicode pour conserver les accents. Validation réelle : tests unitaires de thème PDF/DOCX,
+test de diffusion non bloquante, extraction de texte accentué et inspection visuelle du PDF.
+Le rendu DOCX a été validé structurellement ; le moteur LibreOffice est absent et Word COM
+s'est bloqué pendant l'export de contrôle, donc cette limite de rendu automatisé reste
+explicitement documentée. Aucun contenu documentaire supplémentaire n'est journalisé.
+Rollback : réversion atomique du commit v2.556 et redémarrage ; aucune migration.

@@ -541,7 +541,7 @@ async def _run_deterministic_agent(
                 and _retryable_cloud_model_error(exc)
                 and step < _max_tool_steps - 1
             )
-            if _cloud_retry_eligible and len(_failed_cloud_models) < 2 and False:
+            if _cloud_retry_eligible and len(_failed_cloud_models) < 2:
                 _failed_cloud_models.add(active_model)
                 _fallback_need = (
                     _cr.detect_task(_user_query)

@@ -10,6 +10,7 @@ from unittest.mock import patch
 from agent_tool_step import prepare_tool_call
 from agent_runner import RunnerState
 from agent_turn_completion import _reconcile_pending_confirmation
+from agent_tool_postprocess import postprocess_tool_result
 from tool_domains import documents as documents_domain
 
 
@@ -94,6 +95,61 @@ class EmailAttachmentContractTests(unittest.TestCase):
         self.assertNotIn("error", result)
         self.assertEqual(Path(result["path"]), explicit)
         self.assertTrue(explicit.is_file())
+
+    def test_galactic_theme_is_applied_by_pdf_engine(self):
+        explicit = self.desktop / "galactic.pdf"
+        with patch.object(documents_domain, "_resolver", lambda value: str(Path(value).resolve())):
+            result = asyncio.run(documents_domain.create_pdf({
+                "path": str(explicit),
+                "title": "Exploration galactique — Témoin",
+                "subtitle": "Rapport visuel synthétique",
+                "theme": "galactic",
+                "content": "# Contexte\n\nContenu professionnel.\n\n| Axe | État |\n|---|---|\n| Design | Validé |",
+            }))
+        self.assertEqual(result.get("theme"), "galactic")
+        self.assertGreater(result.get("size_bytes", 0), 5_000)
+        from pypdf import PdfReader
+        extracted = "\n".join(page.extract_text() or "" for page in PdfReader(explicit).pages)
+        self.assertIn("Témoin", extracted)
+        self.assertIn("synthétique", extracted)
+
+    def test_galactic_theme_is_applied_by_docx_engine(self):
+        explicit = self.desktop / "galactic.docx"
+        with patch.object(documents_domain, "_resolver", lambda value: str(Path(value).resolve())):
+            result = asyncio.run(documents_domain.create_docx({
+                "path": str(explicit),
+                "title": "Exploration galactique",
+                "subtitle": "Rapport professionnel",
+                "theme": "galactic",
+                "logo_position": "right",
+                "content": "# Synthèse\n\nDocument structuré et lisible.",
+            }))
+        self.assertEqual(result.get("theme"), "galactic")
+        self.assertGreater(result.get("size_bytes", 0), 10_000)
+        from docx import Document
+        rendered = Document(explicit)
+        self.assertIn("Exploration galactique", "\n".join(p.text for p in rendered.paragraphs))
+
+    def test_confirmation_does_not_wait_for_llm_critique(self):
+        calls = []
+
+        async def critique(*args, **kwargs):
+            calls.append((args, kwargs))
+            return "ne doit pas être appelé"
+
+        result = asyncio.run(postprocess_tool_result(
+            tool_name="email_send",
+            arguments={"to": "recipient@example.invalid"},
+            result={"requiresConfirmation": True, "message": "Confirmer"},
+            duration_ms=1,
+            user_query="envoie le document",
+            active_model="cloud-model",
+            dangerous_tools={"email_send"},
+            critique_action=critique,
+            scan_document=lambda *args, **kwargs: [],
+        ))
+        self.assertTrue(result["requiresConfirmation"])
+        self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":
