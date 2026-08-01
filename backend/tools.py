@@ -32,6 +32,7 @@ import web_runtime
 import proactive_briefing
 import generation_runtime
 import computer_runtime
+from conversation_exports import export_conversation
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
 from tool_domains import productivity as productivity_domain
@@ -2398,6 +2399,22 @@ execute_conversation_move_many = workspace_organization_domain.execute_conversat
 execute_conversation_update = workspace_organization_domain.execute_conversation_update
 
 
+async def execute_conversation_export(args: dict[str, Any]) -> dict[str, Any]:
+    """Exporte une conversation depuis sa representation persistante canonique."""
+    conversation_id = str(args.get("conversation_id") or args.get("_conversation_id") or "").strip()
+    if not conversation_id:
+        return {"needsClarification": True, "message": "Quelle conversation dois-je exporter ?"}
+    try:
+        return await asyncio.to_thread(
+            export_conversation,
+            conversation_id,
+            str(args.get("format") or "md"),
+            str(args.get("mode") or "lecture"),
+        )
+    except (OSError, ValueError, RuntimeError) as error:
+        return {"error": str(error)}
+
+
 # REGISTRE DES OUTILS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -2407,6 +2424,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "quiz_answer":   execute_quiz_answer,
     "quiz_stats":    execute_quiz_stats,
     "system_self_test": execute_system_self_test,
+    "conversation_export": execute_conversation_export,
     "tool_search": execute_tool_search,
     "file_list": execute_file_list,
     "file_info": execute_file_info,
@@ -3810,8 +3828,15 @@ TOOLS_SPEC = [
         "body": {"type": "string", "description": "Corps du message (texte ou markdown)"},
         "cc": {"type": "string", "description": "Adresse email en copie (optionnel)"},
         "account": {"type": "string", "description": "Adresse de la boîte EXPÉDITRICE (multi-comptes ; sinon la 1ère)"},
-        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant envoi)"}},
+        "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant envoi)"},
+        "attachments": {"type": "array", "description": "Pieces jointes generees par Marvin : [{path, sha256}]", "items": {"type": "object", "properties": {"path": {"type": "string"}, "sha256": {"type": "string"}}, "required": ["path", "sha256"]}}},
        ["to", "subject", "body"]),
+
+    _t("conversation_export", "Exporte une conversation persistante en Markdown, DOCX, PDF ou JSON. Utiliser ensuite email_send avec le path et le sha256 retournes pour la partager.",
+       {"conversation_id": {"type": "string", "description": "Identifiant UUID de la conversation"},
+        "format": {"type": "string", "enum": ["md", "docx", "pdf", "json"]},
+        "mode": {"type": "string", "enum": ["lecture", "technique", "audit"]}},
+       []),
 
     _t("email_draft_reply", "Rédige par IA la meilleure réponse à un email, en français impeccable (sans fautes). Génère un brouillon — n'envoie PAS.",
        {"uid": {"type": "string", "description": "UID de l'email auquel répondre (sera lu automatiquement)"},

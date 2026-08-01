@@ -46,6 +46,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.512 — reprise agentique automatique après une approbation UI à usage unique
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
+# v2.553 - exports de conversation, pieces jointes et reprise d'approbation
 from __future__ import annotations
 
 import sys

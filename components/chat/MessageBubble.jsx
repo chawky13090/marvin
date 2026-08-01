@@ -215,7 +215,7 @@ function safeHtml(raw) {
   }
 }
 
-export default function MessageBubble({ message, viewMode = 'reading', showMissionTracker = true, onConfirmTool, onCancelTool }) {
+export default function MessageBubble({ message, viewMode = 'reading', showMissionTracker = true, onConfirmTool, onCancelTool, onRetryTool }) {
   const isUser = message.role === 'user';
   const isToolResult = message.role === 'tool';
   const [showReasoning, setShowReasoning] = useState(false);
@@ -392,6 +392,7 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
                 viewMode={viewMode}
                 onConfirm={onConfirmTool}
                 onCancel={onCancelTool}
+                onRetry={onRetryTool}
                 showMissionTracker={false}
               />
             ))}
@@ -1379,7 +1380,7 @@ function renderToolResult(toolName, result) {
   return <PrettyResult result={result} />;
 }
 
-function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracker = true }) {
+function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMissionTracker = true }) {
   // v2.148 — chrono en direct pendant l'exécution (voir ChatContext.jsx::tool_start pour
   // l'horodatage `startedAt`). Hook appelé INCONDITIONNELLEMENT avant le early-return
   // `if (!tool)` ci-dessous (règle des hooks React) — la garde se fait à l'intérieur.
@@ -1746,6 +1747,18 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, showMissionTracke
       )}
 
       {/* Résultat structuré */}
+      {hasPendingResultConfirmation
+        && !approvalIsActive
+        && ['expired', 'superseded', 'failed'].includes(approvalDisplayStatus) && (
+        <button
+          type="button"
+          onClick={() => onRetry?.(toolName, tool.args)}
+          style={{ marginTop: 8, padding: '7px 11px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-glass)', color: 'var(--text-primary)', cursor: 'pointer' }}
+        >
+          Creer une nouvelle demande
+        </button>
+      )}
+
       {tool.result !== undefined && !isCodingMissionTool && (
         <div style={{ marginTop: '8px' }}>
           <button

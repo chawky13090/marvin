@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import database as db
 import chat_turn_runtime
+from conversation_exports import ConversationExportError, export_conversation
+from storage_layout import roots
 
 
 router = APIRouter(tags=["conversations"])
+
+
+class ConversationExportRequest(BaseModel):
+    format: str = "md"
+    mode: str = "lecture"
 
 
 @router.get("/api/conversations")
@@ -111,6 +120,33 @@ async def get_conversation(cid: str):
                     invocation.update(state)
 
     return {"conversation": conv, "messages": formatted}
+
+
+@router.post("/api/conversations/{cid}/exports")
+async def create_conversation_export(cid: str, body: ConversationExportRequest):
+    """Produit un artefact serveur portable, sans dependre de l'etat du navigateur."""
+    try:
+        return await __import__("asyncio").to_thread(
+            export_conversation, cid, body.format, body.mode
+        )
+    except ConversationExportError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/api/conversations/{cid}/exports/download")
+async def download_conversation_export(cid: str, path: str):
+    candidate = Path(path).expanduser().resolve()
+    _, export_root = roots()
+    allowed = (export_root / "documents" / "conversations").resolve()
+    try:
+        candidate.relative_to(allowed)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail="Export introuvable") from error
+    if not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Export introuvable")
+    if not candidate.name.startswith(f"{cid}-"):
+        raise HTTPException(status_code=404, detail="Export introuvable")
+    return FileResponse(candidate, filename=candidate.name)
 
 
 @router.delete("/api/conversations/{cid}")

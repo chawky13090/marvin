@@ -7,6 +7,8 @@ import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from email_attachments import validate_attachments
+
 
 GetAccount = Callable[[str | None], dict[str, Any] | None]
 ListAccounts = Callable[[], list[dict[str, Any]]]
@@ -227,9 +229,17 @@ async def send(args: dict[str, Any]) -> dict[str, Any]:
         return {"needsClarification": True, "message": "Quel doit être l'objet de ce mail ?"}
     if not body:
         return {"needsClarification": True, "message": "Que dois-je écrire dans le corps du mail ?"}
+    try:
+        attachments = validate_attachments(args.get("attachments"))
+    except (OSError, ValueError) as error:
+        return {"error": str(error)}
     if not args.get("confirmed"):
         return {
             "requiresConfirmation": True,
+            "attachments": [
+                {key: item[key] for key in ("name", "size_bytes", "sha256")}
+                for item in attachments
+            ],
             "message": f"Envoyer l'email à {to} — Objet : {subject} ?\n\n{body[:300]}",
         }
     try:
@@ -247,6 +257,7 @@ async def send(args: dict[str, Any]) -> dict[str, Any]:
             in_reply_to=_text(args.get("in_reply_to"), 1_000),
             references=_text(args.get("references"), 4_000),
             auto_submitted=bool(args.get("auto_submitted", False)),
+            attachments=attachments,
         )
         return {"success": True, "message": f"Email envoyé à {to}", "detail": result}
     except Exception as error:

@@ -6,7 +6,6 @@ import ConversationRow from '@/components/chat/sidebar/ConversationRow';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
-import { createConversationAudit, conversationAuditToMarkdown } from '@/lib/chatPresentation.mjs';
 import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
 import { fetchWorkspaceSnapshot } from '@/lib/workspaceRefresh.mjs';
 import {
@@ -460,23 +459,26 @@ export default function ChatPage() {
 
   const exportConversation = async (conversation, format) => {
     try {
-      const response = await fetch(`/api/conversations/${conversation.id}?t=${Date.now()}`);
+      const selectedFormat = format === 'markdown' ? 'md' : format;
+      const response = await fetchWithBackendFallback(`/api/conversations/${conversation.id}/exports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: selectedFormat, mode: 'lecture' }),
+      });
       if (!response.ok) throw new Error(`Export HTTP ${response.status}`);
       const payload = await response.json();
-      const audit = createConversationAudit(payload.messages || []);
-      const json = format === 'json';
-      const content = json
-        ? `${JSON.stringify({ conversation: payload.conversation, ...audit }, null, 2)}\n`
-        : `# ${payload.conversation?.title || 'Conversation Marvin'}\n\n${conversationAuditToMarkdown(audit)}`;
-      const blob = new Blob([content], { type: json ? 'application/json;charset=utf-8' : 'text/markdown;charset=utf-8' });
+      const download = await fetchWithBackendFallback(
+        `/api/conversations/${conversation.id}/exports/download?path=${encodeURIComponent(payload.path)}`,
+      );
+      if (!download.ok) throw new Error(`Telechargement HTTP ${download.status}`);
+      const blob = await download.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const safeTitle = String(payload.conversation?.title || 'conversation')
-        .normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').slice(0, 80);
       link.href = url;
-      link.download = `${safeTitle || 'conversation-marvin'}.${json ? 'json' : 'md'}`;
+      link.download = payload.name;
       link.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Export prÃªt', `${payload.name} a Ã©tÃ© gÃ©nÃ©rÃ© et vÃ©rifiÃ©.`);
     } catch {
       toast.error('Export impossible', 'La conversation n’a pas été téléchargée.');
     }

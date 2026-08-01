@@ -15718,3 +15718,21 @@ Limite observée hors périmètre du portefeuille : l'arrêt a bien libéré tou
 mais a nécessité le repli forcé après expiration de l'arrêt gracieux. Cette dette de cycle
 de vie reste observable dans le rapport de `stop-marvin.ps1` et ne remet pas en cause le
 redémarrage final, backend et frontend HTTP 200.
+## 2026-08-01 — v2.553 — Export et partage vérifiable des conversations
+
+La dernière conversation montrait une confirmation e-mail absente pendant plusieurs
+redémarrages planifiés et une incapacité à produire puis joindre un PDF. Une demande a
+expiré pendant l'indisponibilité backend ; l'ancienne UI ne proposait aucun renouvellement
+et l'export Markdown/JSON vivait uniquement dans le navigateur.
+
+Implémentation : source canonique backend avec modes lecture, technique et audit ; masquage
+des secrets ; exports atomiques Markdown, JSON, DOCX et PDF dans la racine portable avec
+SHA-256 ; outil `conversation_export` ; pièces jointes SMTP limitées à 10 fichiers et 18 Mio,
+typées, bornées et protégées par empreinte ; menu Word/PDF/Markdown/JSON ; nouvelle demande
+explicite après expiration ; arrêt protégé en présence d'un tour ou d'une confirmation
+active, avec override de maintenance explicite. Aucun contenu confidentiel nouveau n'est journalisé.
+
+Validation réelle : quatre formats générés depuis la conversation `249882e8...`; quatre
+tests unitaires réussis (structure, masquage, traversée de chemin, altération); architecture
+363/363 et lint sans erreur. Aucun e-mail réel n'a été envoyé. Rollback : réversion atomique
+du commit v2.553 et redémarrage ; aucune migration de schéma ou de données.

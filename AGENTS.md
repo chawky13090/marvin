@@ -202,7 +202,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.552.0)
+## 9. État actuel (v2.553.0)
+
+**v2.553 (export et partage de conversations)** : source canonique serveur avec trois
+modes (`lecture`, `technique`, `audit`) et quatre formats (`md`, `json`, `docx`, `pdf`).
+Les artefacts sont stockés sous la racine d'exports portable, contrôlés par SHA-256 et
+téléchargeables depuis le menu de chaque conversation. `email_send` accepte désormais
+des pièces jointes issues exclusivement de cette racine, limitées à 10 fichiers et 18 Mio,
+avec extension autorisée et empreinte obligatoire pour détecter un remplacement après
+validation. Une autorisation expirée reste inactive mais propose une nouvelle demande
+explicite. L'arrêt planifié refuse aussi d'interrompre un tour ou une autorisation active,
+sauf override de maintenance explicite. Aucun envoi réel n'est effectué pendant les tests. Rollback : réversion du
+commit v2.553 ; aucune migration de schéma ou de données.
 
 **v2.552 (fermeture backend bornée et reproductible)** : l'arrêt intermittent de 60 secondes
 provenait du backend après fermeture du listener Uvicorn : une coroutine de composant ou un

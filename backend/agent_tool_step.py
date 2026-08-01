@@ -289,7 +289,7 @@ def inject_internal_context(
     ):
         enriched["_conversation_id"] = conversation_id
     if (
-        name in {"conversation_move", "conversation_update"}
+        name in {"conversation_move", "conversation_update", "conversation_export"}
         and "conversation_id" not in enriched
         and "conversation_title" not in enriched
         and "title" not in enriched

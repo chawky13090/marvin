@@ -134,6 +134,12 @@ export default function ConversationRow({
               <button type="button" onClick={() => run(() => onExport(conv, 'json'))}>
                 <Download size={15} /> Exporter en JSON
               </button>
+              <button type="button" onClick={() => run(() => onExport(conv, 'docx'))}>
+                <Download size={15} /> Exporter en Word
+              </button>
+              <button type="button" onClick={() => run(() => onExport(conv, 'pdf'))}>
+                <Download size={15} /> Exporter en PDF
+              </button>
               {conv.archived_at ? (
                 <button type="button" onClick={() => run(() => onRestore(conv.id))}>
                   <Archive size={15} /> Restaurer

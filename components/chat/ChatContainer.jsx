@@ -336,6 +336,14 @@ export default function ChatContainer({
     }
   }, [addToolResult]);
 
+  const handleRetryTool = useCallback(async (toolName, args) => {
+    stickToBottomOnSend();
+    await sendMessage({
+      text: `L'utilisateur demande explicitement une nouvelle tentative de l'action expiree. Relance l'outil ${toolName} avec ces parametres, puis affiche une nouvelle confirmation : ${JSON.stringify(args || {})}`,
+      internal: true,
+    });
+  }, [sendMessage, stickToBottomOnSend]);
+
   // Images en attente pour le prochain message
   const [pendingImages, setPendingImages] = useState([]);
 
@@ -416,6 +424,7 @@ export default function ChatContainer({
               showMissionTracker={index === lastCodingMissionMessageIndex}
               onConfirmTool={handleConfirmTool}
               onCancelTool={handleCancelTool}
+              onRetryTool={handleRetryTool}
             />
           ))
         )}

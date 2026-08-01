@@ -2,7 +2,8 @@
 param(
     [ValidateRange(5, 120)]
     [int]$TimeoutSeconds = 60,
-    [switch]$NoForceFallback
+    [switch]$NoForceFallback,
+    [switch]$AllowActiveWorkInterruption
 )
 
 Set-StrictMode -Version Latest
@@ -172,6 +173,31 @@ if ($Initial.Count -eq 0 -and $InitialRuntime.Count -eq 0) {
     Release-LifecycleLock
     $Result | ConvertTo-Json -Compress
     exit 0
+}
+
+if (-not $AllowActiveWorkInterruption) {
+    $Python = Join-Path $ProjectRoot 'backend\.venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $Python)) {
+        Clear-StopCoordination
+        Release-LifecycleLock
+        Write-Error 'Arrêt refusé : le vérificateur des travaux actifs est indisponible.'
+        exit 4
+    }
+    $Activity = @(& $Python (Join-Path $PSScriptRoot 'check-active-work.py'))
+    $ActivityExitCode = $LASTEXITCODE
+    if ($ActivityExitCode -eq 3) {
+        Write-LifecycleEvent -Action 'shutdown' -Result 'failed' -Context @{ reason = 'active_work'; activity = ($Activity -join '') }
+        Clear-StopCoordination
+        Release-LifecycleLock
+        Write-Error 'Arrêt protégé : un tour de chat ou une autorisation est encore actif. Terminez-le, ou relancez explicitement avec -AllowActiveWorkInterruption.'
+        exit 3
+    }
+    if ($ActivityExitCode -ne 0) {
+        Clear-StopCoordination
+        Release-LifecycleLock
+        Write-Error 'Arrêt refusé : l’état des travaux actifs ne peut pas être vérifié.'
+        exit 4
+    }
 }
 
 if (-not $PSCmdlet.ShouldProcess('Marvin (ports 3000, 8005 et 8443)', 'Arrêt coopératif vérifié')) {

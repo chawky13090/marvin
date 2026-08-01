@@ -9,12 +9,15 @@ import email.header
 import email.utils
 import email.mime.text
 import email.mime.multipart
+import email.mime.base
+import email.encoders
 import ssl
 import asyncio
 import html
 import re
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 
 # ── Presets fournisseurs populaires ─────────────────────────────────────────
 
@@ -371,9 +374,10 @@ def send_email(smtp_host: str, smtp_port: int, username: str, password: str,
                to: str, subject: str, body: str,
                cc: str = "", reply_to: str = "",
                html_body: str = "", in_reply_to: str = "", references: str = "",
-               auto_submitted: bool = False) -> dict:
+               auto_submitted: bool = False,
+               attachments: list[dict] | None = None) -> dict:
     """Envoie un email via SMTP (STARTTLS)."""
-    msg = email.mime.multipart.MIMEMultipart("alternative")
+    msg = email.mime.multipart.MIMEMultipart("mixed")
     msg["From"] = username
     msg["To"] = to
     msg["Subject"] = subject
@@ -389,9 +393,18 @@ def send_email(smtp_host: str, smtp_port: int, username: str, password: str,
         msg["Auto-Submitted"] = "auto-replied"
         msg["X-Auto-Response-Suppress"] = "All"
 
-    msg.attach(email.mime.text.MIMEText(body, "plain", "utf-8"))
+    alternative = email.mime.multipart.MIMEMultipart("alternative")
+    alternative.attach(email.mime.text.MIMEText(body, "plain", "utf-8"))
     if html_body:
-        msg.attach(email.mime.text.MIMEText(html_body, "html", "utf-8"))
+        alternative.attach(email.mime.text.MIMEText(html_body, "html", "utf-8"))
+    msg.attach(alternative)
+    for attachment in attachments or []:
+        maintype, _, subtype = str(attachment.get("mime_type") or "application/octet-stream").partition("/")
+        part = email.mime.base.MIMEBase(maintype or "application", subtype or "octet-stream")
+        part.set_payload(Path(attachment["path"]).read_bytes())
+        email.encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=attachment["name"])
+        msg.attach(part)
 
     recipients = [to] + ([cc] if cc else [])
 
@@ -416,7 +429,7 @@ def send_email(smtp_host: str, smtp_port: int, username: str, password: str,
                 server.login(username, password)
             server.sendmail(username, recipients, msg.as_string())
 
-    return {"success": True, "to": to, "subject": subject}
+    return {"success": True, "to": to, "subject": subject, "attachment_count": len(attachments or [])}
 
 
 def test_connection(imap_host: str, imap_port: int, smtp_host: str, smtp_port: int,
