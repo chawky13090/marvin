@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.550 — audit puissance : contexte Ollama, filtre cloud, vision, budgets d'execution
 # v2.549 — robot d'activité interactif intégré au composeur et adaptatif à la sidebar
 # v2.548 — activité latérale : robot à gauche, informations à droite, centre libéré
 # v2.547 — carte d'activité robotisée sans chevauchement du composeur
@@ -45,11 +46,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.514 — reprise contextuelle PC et routage Cloud fondé sur les résultats
 # v2.513 — reprise d'approbation sensible au résultat et focus Windows tolérant
 # v2.512 — reprise agentique automatique après une approbation UI à usage unique
-# v2.511 — historique tolérant aux deux contrats API et applications Winget idempotentes
-# v2.510 — boucle visuelle LLM libre et confirmation des engagements externes
-# v2.509 — Computer Runtime unifié et accès complet persistant révocable
-# v2.508 — axe de lecture centré et palette anthracite cohérente
-# v2.507 — listes de fichiers paginées sans troncature LLM silencieuse
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
 from __future__ import annotations

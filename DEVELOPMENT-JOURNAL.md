@@ -5,6 +5,96 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-01 — v2.550.0 — Audit puissance : contexte, filtre cloud, vision, budgets
+
+### Demande et constats
+
+« Fait un audit de Marvin et de ces outils et comment les rendre plus puissant. » Distinct
+des séries de correctifs v2.535-544 (bugs d'appel d'outils) : ici, pas de bug, des LIMITES
+qui bornent la puissance réelle de Marvin. Audit délégué à un agent en lecture seule sur
+`backend/tool_domains/`, `tools.py`, `config.py`, `cloud_routing.py`, `model_market.py`,
+`cortex.py`. Dix axes identifiés et priorisés par rapport effort/impact ; l'utilisateur a
+validé l'implémentation des 5 premiers.
+
+**Constat le plus significatif** : `num_ctx` n'était JAMAIS fixé — Ollama tournait au
+défaut (4096 tokens). Le prompt système + jusqu'à ~90 schémas d'outils + l'historique
+saturent cette fenêtre, et Ollama tronque **par le début** (le prompt système et les règles
+de sécurité partent en premier). Hypothèse crédible : cause racine d'une partie des
+symptômes déjà rustinés au fil des versions (« le modèle ignore la règle X », « invente un
+outil »). Le code documentait déjà pourquoi un `num_ctx` fixé PAR APPEL cause un rechargement
+du modèle (Ollama indexe par (modèle, num_ctx)), sans en tirer la bonne conclusion : fixer
+la valeur GLOBALEMENT sur le service, pas par appel.
+
+Autre constat majeur : `SENSITIVE_KEYWORDS` (filtre déclenchant le repli local) contenait
+des mots THÉMATIQUES (« client », « facture », « devis », « ssh », « serveur distant ») —
+l'utilisateur étant technicien IT indépendant, ces mots apparaissent dans la quasi-totalité
+de ses messages, neutralisant en pratique tout le routage cloud déjà livré (v2.141 à
+v2.542) presque en permanence.
+
+**Point de vigilance découvert en testant** : `db.set_setting("cloud_enabled", ...)` appelé
+par erreur dans un test manuel a écrit directement dans la base de PRODUCTION (`cloud_enabled`
+était réellement `True` ; temporairement mis à `False` puis restauré immédiatement). Leçon
+retenue : toujours mocker `cloud_routing.get_cloud_config`/`is_ultra_unrestricted` via
+`unittest.mock.patch.object`, jamais appeler `database.set_setting` directement pour un test
+ad hoc sur cette installation.
+
+**Coordination avec Codex** : au moment de committer, `git log` a révélé 5 commits Codex
+faits EN PARALLÈLE de ce travail (v2.545-549 : robot d'activité du chat + stabilité du
+cycle de redémarrage), portant la version à 2.549 — mes brouillons de commentaires
+référençaient encore « v2.545 », déjà pris. Renumérotés en v2.550 avant tout commit
+(`sed` sur les 4 fichiers concernés). Fichiers disjoints, aucun conflit réel.
+
+### Décisions et modifications
+
+- `start.bat` : `OLLAMA_CONTEXT_LENGTH=32768` fixé avant le lancement du service Ollama
+  (`if not defined ... set`, ne force rien si déjà positionné par l'environnement).
+- `backend/cloud_routing.py` : `SENSITIVE_KEYWORDS` réduit aux signaux credential/secret
+  réels (email, mot de passe, identifiant, clé API/privée, token, jeton, secret) ; le motif
+  de chemin `[A-Z]:\Users\|/home/` retiré de `_SENSITIVE_VALUE_PATTERNS` (trop large,
+  déclenchait sur la simple mention d'un chemin). `resolve_model()` : le bloc `has_images`
+  n'exclut plus systématiquement le cloud — si `cloud_enabled` et texte non sensible, tente
+  `pick_best_cloud_model("vision")` avant le repli local ; un modèle local explicitement
+  demandé reste toujours respecté.
+- `backend/cortex.py` : `_EFFORT_BUDGETS["standard"]` 10→20 étapes / 600→900s ;
+  `["deep"]` 16→35 étapes / 1800→2400s ; `["mission"]` étapes 24→45 (pour rester au-dessus de
+  `deep`, sinon la hiérarchie s'inversait).
+- `scripts/test_cortex.py`, `scripts/test_model_data_policy.py` : assertions mises à jour
+  sur les nouvelles valeurs/le nouveau comportement intentionnels (chemins Windows/Linux ne
+  sont plus dans les échantillons « sensibles »).
+- `backend/main.py` : en-tête de version retaillé (dépassait 350 lignes à cause des 5
+  commits Codex ci-dessus, pas des miens) — 5 entrées les plus anciennes retirées.
+
+### Ce qui n'a PAS été fait (décision explicite)
+
+- Modèles locaux qwen2.5→qwen3 : `local_model_catalog.json` référence déjà `qwen3:4b`/
+  `qwen3:8b` (installés, zéro téléchargement), mais un réglage explicite
+  `model_overrides={"chat":"qwen2.5:14b","agent":"qwen2.5:14b","analysis":"qwen2.5:14b"}`
+  pinne déjà tous les profils sur le plus gros modèle installé — choix délibéré (probablement
+  motivé par des tests réels antérieurs). L'écraser sans A/B test serait une supposition non
+  vérifiée sur un réglage déjà réglé ; non fait.
+- Bascule `llava-phi3`→`qwen2.5vl:7b` (vision locale) : `qwen2.5vl` n'est pas installé sur
+  cette machine ; le télécharger silencieusement (plusieurs Go) sans confirmation explicite
+  sort du périmètre autorisé. Le routage cloud vision (ci-dessus) couvre déjà une grande
+  partie du besoin quand le cloud est activé.
+- Domaines d'outils manquants (AD, PowerShell distant, M365, sauvegarde, Defender/BitLocker,
+  virtualisation), `tool_search` obligatoire + `max_tools` lié au contexte, parallélisme par
+  action, reprise sur erreur pour les balayages longs : identifiés dans le rapport, non
+  implémentés dans cette tranche (effort plus élevé, nécessitent une discussion préalable).
+
+### Validation, sécurité, logs et rollback
+
+Suites de régression exécutées et vertes : `test_cortex`, `test_cortex_search`,
+`test_agent_model_config`, `test_cloud_only_routing`, `test_model_data_policy`,
+`test_privacy_model_matrix`, `test_generation_runtime`, `test_council`, `test_model_council`,
+`test_model_market`, `test_model_proactive_api`, `test_runtime_workers`,
+`test_tool_domain_ocr`, `test_tool_domain_screen_ocr`, `check_architecture.py`,
+`test_main_composition.py`. Vision testée avec `unittest.mock.patch.object` isolant
+`is_local_only_lockdown`/`is_ultra_unrestricted`/`get_cloud_config` (le compte réel de
+l'utilisateur est en Ultra débridé, ce qui aurait masqué le comportement testé sans cet
+isolement). Aucune migration. `start.bat` ne prend effet qu'après un redémarrage du SERVICE
+OLLAMA lui-même (pas seulement le backend/frontend Marvin). Rollback : réversion du commit
+v2.550.
+
 ## 2026-08-01 — v2.544.0 — Diagnostic de chronologie + alias duration mineur
 
 ### Demande et constats

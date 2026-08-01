@@ -27,11 +27,18 @@ AXES = {
 }
 
 DEFAULT_CONTRACT = {axis: "auto" for axis in AXES}
+# v2.550 — Audit puissance : "standard" (le défaut) épuisait son budget de 10 étapes
+# AVANT même de commencer l'analyse pour un diagnostic réaliste (ex: pc_system_info +
+# pc_hardware_specs + pc_hardware_temps + pc_process_list + pc_disk_smart_health +
+# pc_event_log_errors + win_startup_programs + pc_gpu_status + pc_driver_check = déjà
+# 9 appels de lecture). Relevé ; le vrai garde-fou reste stop_when_satisfied (l'agent
+# s'arrête dès que la mission est jugée accomplie, pas seulement quand le budget est
+# épuisé) et la confirmation obligatoire des outils sensibles, inchangés par ce relevage.
 _EFFORT_BUDGETS = {
     "instant": (3, 120),
-    "standard": (10, 600),
-    "deep": (16, 1800),
-    "mission": (24, 3600),
+    "standard": (20, 900),
+    "deep": (35, 2400),
+    "mission": (45, 3600),
 }
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _RECIPES_PATH = _DATA_DIR / "cortex_recipes.json"

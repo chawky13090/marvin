@@ -27,13 +27,19 @@ def strip_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c))
 
 
+# v2.550 — Audit puissance : la liste incluait des mots-clés THÉMATIQUES ("client",
+# "facture", "devis", "ssh", "serveur distant") qui déclenchent sur le SUJET d'une
+# phrase, pas sur une donnée réelle exposée — or l'utilisateur est technicien IT
+# indépendant : ces mots apparaissent dans la quasi-totalité de ses messages, ce qui
+# neutralisait en pratique tout le routage cloud (v2.141/179/180/536-542) presque en
+# permanence. Retirés ; ne restent que les mots-clés liés à une CREDENTIAL/un secret
+# potentiel, où le risque de fuite justifie un repli prudent même sans motif de valeur
+# structuré détecté juste en dessous.
 SENSITIVE_KEYWORDS = (
     "email", "e-mail", "mail", "gmail", "outlook", "courriel",
-    "ssh", "connexion ssh", "serveur distant",
     "mot de passe", "mots de passe", "password", "identifiant", "identifiants",
     "credential", "credentials", "cle api", "clé api", "api key",
     "cle privee", "clé privée", "private key", "token", "jeton", "secret",
-    "facture", "devis", "client",
 )
 
 # Signaux structurés usuels qui peuvent être collés sans aucun mot-clé explicite.
@@ -45,7 +51,6 @@ _SENSITIVE_VALUE_PATTERNS = (
     re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"),
     re.compile(r"(?i)\b(?:password|passwd|pwd|token|api[_ -]?key|secret)\s*[:=]\s*\S{4,}"),
     re.compile(r"(?i)\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b"),
-    re.compile(r"(?i)(?:[A-Z]:\\Users\\|/home/)[^\\/\s]{1,128}"),
 )
 class ToolDataClass(StrEnum):
     """Classification du résultat réinjecté au modèle après un appel d'outil."""
@@ -441,9 +446,10 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
     (document_generate, email_*, text_summarize, upgrade_skill...), en appliquant
     les mêmes règles que la boucle de chat principale (agent.py::run_agent) :
     - Hyper sécurisé : jamais de cloud, quel que soit le reste.
-    - Un appel avec IMAGES (OCR/vision) reste TOUJOURS local — pas de garantie que
-      les modèles cloud installés supportent le multimodal, et ce type de contenu
-      (scans de documents, captures d'écran) est justement le plus sensible.
+    - Un appel avec IMAGES (OCR/vision) reste local par défaut (contenu souvent
+      personnel/sensible). Le cloud vision n'est utilisé que si explicitement activé
+      ET le texte non sensible (v2.550 — un benchmark réel a mesuré le modèle local
+      hallucinant là où des modèles cloud extrayaient correctement les détails).
     - Si l'appelant a déjà demandé un modèle LOCAL précis : respecté tel quel.
     - Sinon, un modèle cloud (demandé explicitement OU choisi automatiquement via
       cloud_overrides) n'est utilisé que si Ultra débridé est actif OU si le texte
@@ -467,11 +473,25 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
         }.get(profile, "general"))
         return require_cloud_model(task, requested_model=requested_model)
 
-    if has_images:
-        return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback
-
     ultra = is_ultra_unrestricted()
     sensitive = (not ultra) and is_sensitive_text(text_for_sensitivity)
+
+    # v2.550 — Audit puissance : une image était TOUJOURS forcée en local, y compris
+    # avec le cloud explicitement activé et le texte non sensible, alors qu'un
+    # benchmark réel mené dans ce projet (v2.175) a mesuré llava-phi3 local hallucinant
+    # sur des détails d'image que les modèles cloud extrayaient correctement. Une
+    # capture d'écran/photo reste sensible par défaut (documents personnels,
+    # informations client visibles) — seul un cloud explicitement activé ET un texte
+    # non sensible autorisent le cloud vision, jamais par défaut.
+    if has_images:
+        if requested_model and not is_cloud_model(requested_model):
+            return requested_model  # choix local explicite — toujours respecté
+        cloud_enabled, _ = get_cloud_config()
+        if cloud_enabled and not sensitive:
+            picked = pick_best_cloud_model("vision")
+            if picked:
+                return picked
+        return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback
 
     if requested_model:
         if not is_cloud_model(requested_model):

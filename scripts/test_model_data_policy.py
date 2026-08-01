@@ -101,12 +101,17 @@ def test_structured_sensitive_values_are_detected_without_labels() -> None:
         "-----BEGIN PRIVATE KEY-----",
         "api_key=super-secret-value",
         "FR7630006000011234567890189",
-        r"C:\Users\Alice\Documents\contrat.txt",
-        "/home/alice/.ssh/config",
     )
     for sample in sensitive_samples:
         assert cloud_routing.is_sensitive_text(sample), sample
-    for public in ("météo à Paris", "2 + 2", "documentation Python officielle"):
+    # v2.550 — Audit puissance : un simple chemin Windows/Linux mentionné dans le texte
+    # n'est plus traité comme sensible (trop large pour un technicien IT : ça bloquait le
+    # cloud dans la quasi-totalité des messages de dépannage). Seule une donnée réellement
+    # exposée (email, jeton, clé...) déclenche encore le repli local.
+    for public in (
+        "météo à Paris", "2 + 2", "documentation Python officielle",
+        r"C:\Users\Alice\Documents\contrat.txt", "/home/alice/.ssh/config",
+    ):
         assert cloud_routing.is_sensitive_text(public) is False
 
 

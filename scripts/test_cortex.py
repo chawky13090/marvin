@@ -17,14 +17,14 @@ def main() -> None:
     clean = cortex.compile_contract("Bonjour, explique-moi simplement ce concept")
     check(clean["forced_tools"] == [], "Auto ne doit forcer aucun outil")
     check(clean["resolved"]["autonomy"] == "advise", "Une explication reste en conseil")
-    check(clean["execution_budget"]["max_tool_steps"] == 10, "Budget standard")
+    check(clean["execution_budget"]["max_tool_steps"] == 20, "Budget standard")
 
     instant = cortex.compile_contract("Réponds vite", {"effort": "instant"})
     deep = cortex.compile_contract("Analyse complète", {"effort": "deep"})
     mission = cortex.compile_contract("Poursuis cette mission", {"autonomy": "mission"})
     check(instant["execution_budget"]["max_tool_steps"] == 3, "Budget instant")
-    check(deep["execution_budget"]["max_tool_steps"] == 16, "Budget approfondi")
-    check(mission["execution_budget"]["max_tool_steps"] == 24, "Budget mission")
+    check(deep["execution_budget"]["max_tool_steps"] == 35, "Budget approfondi")
+    check(mission["execution_budget"]["max_tool_steps"] == 45, "Budget mission")
     check(
         instant["execution_budget"]["max_wall_seconds"]
         < deep["execution_budget"]["max_wall_seconds"]

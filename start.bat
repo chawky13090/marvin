@@ -79,7 +79,12 @@ set "OLLAMA_HOST=127.0.0.1:%OLLAMA_PORT%"
 set "OLLAMA_URL=http://127.0.0.1:%OLLAMA_PORT%"
 set "OLLAMA_BASE_URL=http://127.0.0.1:%OLLAMA_PORT%/v1"
 set "NEXT_PUBLIC_OLLAMA_PORT=%OLLAMA_PORT%"
-echo       Ollama configure sur %OLLAMA_HOST%.
+:: v2.550 - Fenetre de contexte fixee GLOBALEMENT sur le service (pas par appel Python) :
+:: prewarm, professeur et agent partagent alors tous la meme instance chargee (meme cle
+:: modele+num_ctx) au lieu de se disputer le defaut 4096 tokens d'Ollama, qui tronquait le
+:: prompt systeme et les schemas d'outils avant meme le message de l'utilisateur.
+if not defined OLLAMA_CONTEXT_LENGTH set "OLLAMA_CONTEXT_LENGTH=32768"
+echo       Ollama configure sur %OLLAMA_HOST% (contexte %OLLAMA_CONTEXT_LENGTH%).
 
 :: Verifier le service par HTTP : tasklist peut masquer un processus lance avec un autre
 :: niveau de privileges alors que l'API Ollama fonctionne parfaitement.

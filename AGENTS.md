@@ -202,7 +202,34 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.549.0)
+## 9. État actuel (v2.550.0)
+
+**v2.550 (audit puissance : contexte, filtre cloud, vision, budgets)** : sur demande directe
+(« fait un audit de Marvin et de ces outils et comment les rendre plus puissant »), audit de
+fond distinct des séries de correctifs précédentes (pas de bugs, des LIMITES). Cinq axes
+implémentés, priorisés par rapport effort/impact :
+`start.bat` fixe désormais `OLLAMA_CONTEXT_LENGTH=32768` globalement sur le service (pas par
+appel Python) — prewarm/professeur/agent partageaient déjà la même instance mais au défaut
+Ollama de 4096 tokens, qui tronquait le prompt système et les schémas d'outils avant même le
+message utilisateur (cause racine probable d'une partie des symptômes déjà rustinés en
+v2.14x-v2.54x). `cloud_routing.SENSITIVE_KEYWORDS` retire les mots-clés THÉMATIQUES
+(`client`, `facture`, `devis`, `ssh`, `serveur distant`) et le motif de chemin Windows/Linux :
+l'utilisateur est technicien IT indépendant, ces mots apparaissaient dans la quasi-totalité
+de ses messages et neutralisaient en pratique tout le routage cloud déjà livré (v2.141-542) ;
+ne restent que les signaux de credential/secret réel. `resolve_model()` n'exclut plus le
+cloud vision par défaut quand il est explicitement activé et le texte non sensible (un
+benchmark réel du projet, v2.175, avait mesuré le modèle local hallucinant là où le cloud
+extrayait correctement les détails) — une image reste néanmoins locale par défaut, jamais
+automatiquement envoyée au cloud. `cortex._EFFORT_BUDGETS` relève `standard` (10→20 étapes,
+600→900s) et `deep` (16→35, 1800→2400s) : un diagnostic réaliste consomme déjà 9 lectures
+avant toute analyse ; `mission` relevé à 45 étapes pour rester au-dessus de `deep`. Le point
+« modèles locaux qwen2.5→qwen3 » de l'audit n'a PAS été appliqué : un réglage explicite
+(`model_overrides`) pinne déjà agent/chat/analysis sur qwen2.5:14b, un choix délibéré qu'il
+serait irresponsable d'écraser sans A/B test réel. **Coordination Codex** : ce travail s'est
+déroulé EN PARALLÈLE de 5 commits Codex (v2.545-549, robot d'activité + stabilité du cycle de
+redémarrage) sur des fichiers disjoints — aucun conflit, numérotation vérifiée avant commit
+(`git log` consulté pour repartir du bon numéro). Aucune migration. Rollback : réversion du
+commit v2.550.
 
 **v2.549 (robot d'activité intégré et adaptatif)** : remplacement des deux panneaux flottants
 de v2.548 par un module unique inclus dans le rectangle du composeur. `ChatInput` mesure sa
