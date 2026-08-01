@@ -95,7 +95,84 @@ async def _run() -> None:
             ) as fetch:
                 path, media_type = await metadata.cache_preview(page_response.url)
             assert path.is_file() and media_type == "image/webp"
-            assert fetch.await_count == 2
+            # Page HTML + image OpenGraph + favicon d'origine lancés en parallèle.
+            assert fetch.await_count == 3
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
+
+    blocked_image_response = outbound_http.PublicResponse(
+        url="https://cdn.example/blocked.jpg",
+        status_code=403,
+        headers={"content-type": "image/jpeg"},
+        content=b"",
+        elapsed_ms=5,
+    )
+    favicon_response = outbound_http.PublicResponse(
+        url="https://news.example/favicon.png",
+        status_code=200,
+        headers={"content-type": "image/png"},
+        content=source_image.getvalue(),
+        elapsed_ms=5,
+    )
+    fallback_page_response = outbound_http.PublicResponse(
+        url="https://news.example/fallback",
+        status_code=200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        content=(
+            b'<html><head><meta property="og:image" content="https://cdn.example/blocked.jpg">'
+            b'<link rel="icon" href="/favicon.png"></head></html>'
+        ),
+        elapsed_ms=5,
+    )
+
+    async def fetch_with_fallback(url: str, **_kwargs):
+        responses = {
+            fallback_page_response.url: fallback_page_response,
+            blocked_image_response.url: blocked_image_response,
+            favicon_response.url: favicon_response,
+            "https://news.example/favicon.ico": blocked_image_response,
+        }
+        return responses[url]
+
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-") as directory:
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
+        try:
+            with patch.object(metadata.outbound_http, "fetch_public", new=fetch_with_fallback):
+                path, media_type = await metadata.cache_preview(fallback_page_response.url)
+            assert path.is_file() and media_type == "image/webp"
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
+
+    forbidden_page_response = outbound_http.PublicResponse(
+        url="https://private.example/article",
+        status_code=403,
+        headers={"content-type": "text/html"},
+        content=b"",
+        elapsed_ms=5,
+    )
+    origin_favicon_response = outbound_http.PublicResponse(
+        url="https://private.example/favicon.ico",
+        status_code=200,
+        headers={"content-type": "image/x-icon"},
+        content=source_image.getvalue(),
+        elapsed_ms=5,
+    )
+
+    async def fetch_origin_favicon(url: str, **_kwargs):
+        if url == forbidden_page_response.url:
+            return forbidden_page_response
+        if url == origin_favicon_response.url:
+            return origin_favicon_response
+        raise AssertionError(f"URL inattendue: {url}")
+
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-") as directory:
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
+        try:
+            with patch.object(metadata.outbound_http, "fetch_public", new=fetch_origin_favicon):
+                path, media_type = await metadata.cache_preview(forbidden_page_response.url)
+            assert path.is_file() and media_type == "image/webp"
         finally:
             metadata.PREVIEW_CACHE_DIR = old_cache
 

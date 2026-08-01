@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.564.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.565.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.564.0)
+## 9. État actuel (v2.565.0)
+
+**v2.565 (aperçus progressifs et replis visuels garantis)** : chaque carte de source affiche
+immédiatement un monogramme et un balayage de chargement, puis remplace cet état par l'image
+ou par la mention explicite « Aperçu indisponible ». Les quatre cartes visibles sont chargées
+en priorité. Après lecture de la page, OpenGraph, favicon déclaré et favicon d'origine sont
+testés concurremment ; la première image raster valide est adoptée et les requêtes restantes
+sont annulées. Une image principale refusée ou une page HTTP 403 peut donc encore produire
+un aperçu sûr via son favicon, sans cookie et sans accès direct du navigateur au site tiers.
+Les prompts classique et natif savent désormais que ces cartes existent et n'affirment plus
+à tort que Marvin ne peut pas afficher d'images. Le collecteur conserve aussi l'URL principale
+d'une page lue lorsqu'un outil renvoie en parallèle une liste `sources` vide ; le compteur et
+le badge de preuve ne rétrogradent donc plus la page en simple aperçu moteur. Aucune migration. Rollback : réversion
+atomique du commit v2.565, suppression facultative de `data/cache/web-source-previews`, puis
+redémarrage backend/frontend.
 
 **v2.564 (miniatures des sources et Lecture réellement épurée)** : les cartes SearXNG sans
 miniature explicite demandent maintenant au proxy privé de résoudre l’image OpenGraph ou le

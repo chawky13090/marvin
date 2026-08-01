@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { BACKEND_URL } from '@/lib/backend';
 import styles from './SourceGallery.module.css';
 
@@ -22,16 +22,17 @@ function displayText(value) {
 
 function normalizeSource(source, index) {
   const url = String(source?.url || source?.requested_url || '');
-  const evidence = EVIDENCE[source?.evidence_level] ? source.evidence_level : 'snippet_only';
+  const rawEvidence = source?.evidence_level || source?.evidence;
+  const evidence = EVIDENCE[rawEvidence] ? rawEvidence : 'snippet_only';
   return {
     id: source?.id || source?.citation || `${url}-${index}`,
     title: displayText(source?.title || url || 'Source Web'),
     url,
     domain: String(source?.domain || domainOf(url)),
     publisher: displayText(source?.publisher || source?.domain || domainOf(url)),
-    publishedAt: String(source?.published_at || ''),
-    imageUrl: String(source?.image_url || source?.thumbnail || ''),
-    faviconUrl: String(source?.favicon_url || ''),
+    publishedAt: String(source?.published_at || source?.publishedAt || ''),
+    imageUrl: String(source?.image_url || source?.thumbnail || source?.imageUrl || ''),
+    faviconUrl: String(source?.favicon_url || source?.faviconUrl || ''),
     evidence,
   };
 }
@@ -47,6 +48,32 @@ function formatDate(value) {
   return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function SourcePreview({ source, index }) {
+  const [state, setState] = useState('loading');
+  const label = (source.publisher || source.domain || 'Web').slice(0, 1).toUpperCase();
+  const sourceUrl = previewUrl(source.imageUrl || source.url);
+
+  return (
+    <>
+      <span className={styles.visualFallback} aria-hidden="true">{label}</span>
+      {state === 'loading' && <span className={styles.visualLoading} aria-hidden="true" />}
+      {state === 'failed' && (
+        <span className={styles.visualUnavailable}>Aperçu indisponible</span>
+      )}
+      <img
+        className={state === 'loaded' ? styles.visualImageLoaded : styles.visualImagePending}
+        src={sourceUrl}
+        alt=""
+        loading={index < 4 ? 'eager' : 'lazy'}
+        fetchPriority={index < 2 ? 'high' : 'auto'}
+        decoding="async"
+        onLoad={() => setState('loaded')}
+        onError={() => setState('failed')}
+      />
+    </>
+  );
+}
+
 export function collectWebSources(toolInvocations = []) {
   const candidates = [];
   for (const tool of toolInvocations) {
@@ -55,9 +82,10 @@ export function collectWebSources(toolInvocations = []) {
     if (result?.type === 'json' && result.value !== undefined) result = result.value;
     if (!result || typeof result !== 'object') continue;
     if (Array.isArray(result.sources)) candidates.push(...result.sources);
-    else if (Array.isArray(result.results)) {
+    if (Array.isArray(result.results)) {
       candidates.push(...result.results.map(source => ({ ...source, evidence_level: 'snippet_only' })));
-    } else if (result.url || result.requested_url) {
+    }
+    if (result.url || result.requested_url) {
       candidates.push({
         ...result,
         url: result.requested_url || result.url,
@@ -113,7 +141,7 @@ export default function SourceGallery({ sources = [] }) {
             >
               <div className={styles.visual}>
                 {source.evidence !== 'access_restricted' && (
-                  <img src={previewUrl(source.imageUrl || source.url)} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                  <SourcePreview source={source} index={index} />
                 )}
                 <span className={styles.sourceNumber}>[{index + 1}]</span>
                 <span className={styles.evidence}>{evidence.label}</span>

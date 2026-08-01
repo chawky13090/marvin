@@ -124,9 +124,9 @@ async def _fetch_preview_resource(url: str, *, accept: str) -> Any:
         return await outbound_http.fetch_public(
             url,
             max_bytes=MAX_PREVIEW_BYTES,
-            timeout=12.0,
+            timeout=7.0,
             headers={
-                "User-Agent": "Mozilla/5.0 (compatible; MarvinSourcePreview/2.564)",
+                "User-Agent": "Mozilla/5.0 (compatible; MarvinSourcePreview/2.565)",
                 "Accept": accept,
             },
         )
@@ -134,6 +134,43 @@ async def _fetch_preview_resource(url: str, *, accept: str) -> Any:
         raise
     except Exception as exc:
         raise ValueError("Aperçu distant indisponible.") from exc
+
+
+def _origin_favicon(url: str) -> str:
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+
+
+async def _resolve_image_candidate(urls: list[str]) -> Any:
+    unique_urls = list(dict.fromkeys(url for url in urls if url))[:3]
+
+    async def fetch_candidate(url: str) -> Any:
+        try:
+            response = await _fetch_preview_resource(
+                url,
+                accept="image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.8",
+            )
+        except ValueError:
+            return None
+        media_type = str(response.headers.get("content-type") or "").split(";", 1)[0].casefold()
+        if response.status_code >= 400 or media_type not in ALLOWED_IMAGE_TYPES or not response.content:
+            return None
+        return response
+
+    tasks = [asyncio.create_task(fetch_candidate(url)) for url in unique_urls]
+    try:
+        for task in asyncio.as_completed(tasks):
+            response = await task
+            if response is not None:
+                return response
+        return None
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def cache_preview(image_url: str) -> tuple[Path, str]:
@@ -151,23 +188,25 @@ async def cache_preview(image_url: str) -> tuple[Path, str]:
         normalized_url,
         accept="image/avif,image/webp,image/png,image/jpeg,image/gif,text/html;q=0.7",
     )
-    if response.status_code >= 400:
-        raise ValueError(f"Aperçu distant indisponible (HTTP {response.status_code}).")
     media_type = str(response.headers.get("content-type") or "").split(";", 1)[0].casefold()
-    if media_type in ALLOWED_PAGE_TYPES:
+    if media_type == "image/svg+xml":
+        raise ValueError("Type d’image non autorisé.")
+    if response.status_code >= 400 or media_type in ALLOWED_PAGE_TYPES:
         from bs4 import BeautifulSoup
 
-        soup = BeautifulSoup(response.content.decode("utf-8", errors="replace"), "lxml")
-        metadata = extract_soup_metadata(soup, response.url)
-        resolved_image_url = metadata.get("image_url") or metadata.get("favicon_url")
-        if not resolved_image_url or resolved_image_url == normalized_url:
-            raise ValueError("Cette page ne publie aucun aperçu visuel exploitable.")
-        response = await _fetch_preview_resource(
-            resolved_image_url,
-            accept="image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.8",
+        metadata = {}
+        if response.status_code < 400:
+            soup = BeautifulSoup(response.content.decode("utf-8", errors="replace"), "lxml")
+            metadata = extract_soup_metadata(soup, response.url)
+        response = await _resolve_image_candidate(
+            [
+                str(metadata.get("image_url") or ""),
+                str(metadata.get("favicon_url") or ""),
+                _origin_favicon(response.url),
+            ]
         )
-        if response.status_code >= 400:
-            raise ValueError(f"Aperçu distant indisponible (HTTP {response.status_code}).")
+        if response is None:
+            raise ValueError("Cette page ne publie aucun aperçu visuel exploitable.")
         media_type = str(response.headers.get("content-type") or "").split(";", 1)[0].casefold()
     if media_type not in ALLOWED_IMAGE_TYPES or not response.content:
         raise ValueError("Type d’image non autorisé.")

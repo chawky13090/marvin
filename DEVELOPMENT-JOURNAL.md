@@ -15982,3 +15982,46 @@ La suite globale `check:quick` passe 235/235 avec 363 outils, 391 routes et le h
 363/363. Le premier passage a détecté `main.py` à 351 lignes ; une ancienne ligne d’historique
 déjà présente dans ce journal a été retirée, puis le test causal et la suite complète ont été
 rejoués avec succès.
+
+## 2026-08-02 — v2.565 — Chargement progressif et repli fiable des aperçus Web
+
+La nouvelle capture utilisateur a confirmé que le premier correctif restait insuffisant :
+une miniature pouvait apparaître tandis que les cartes voisines restaient de grands aplats
+vides pendant une requête lente ou après le refus du média OpenGraph. Le modèle terminait en
+outre par « je ne peux pas afficher directement des images », en contradiction avec la
+galerie effectivement rendue dans le même tour.
+
+Le frontend affiche maintenant immédiatement un monogramme stable avec un balayage de
+chargement. Les quatre cartes visibles utilisent un chargement prioritaire ; un échec devient
+« Aperçu indisponible » au lieu de laisser un espace vide. Le backend réduit le délai unitaire
+à sept secondes et lance en concurrence l'image OpenGraph, le favicon déclaré et le favicon
+racine. Il conserve la première réponse raster valide puis annule les autres tâches. Les
+contrôles anti-SSRF, la limite de 4 Mio, le refus SVG, la validation Pillow, le réencodage WebP
+et le cache borné restent inchangés. Les deux prompts agentiques indiquent désormais au LLM
+que ces cartes visuelles existent et qu'une demande de photos doit inclure la catégorie
+SearXNG `images` puis vérifier les pages sources.
+
+La validation visuelle de la conversation réelle a également révélé deux défauts adjacents :
+la mention de repli chevauchait le badge de preuve, et le compteur affichait « 0 page lue »
+malgré deux `web_browse` réussis. Le libellé est déplacé en haut de l'image. Le collecteur ne
+traite plus `sources: []`, `results` et l'URL principale comme des formes mutuellement
+exclusives ; il collecte toutes les preuves puis laisse la déduplication garder la plus forte.
+La validation suivante a révélé une seconde normalisation dans le composant de rendu : elle
+relisait uniquement `evidence_level` alors que le collecteur avait déjà produit `evidence`.
+Le normaliseur accepte maintenant les deux formes, ce qui conserve effectivement « Page lue »
+et rend le compteur conforme aux appels `web_browse` observés.
+La même compatibilité est appliquée à `imageUrl`, `faviconUrl` et `publishedAt` afin qu'une
+seconde normalisation ne perde jamais un média déjà extrait par `web_browse`.
+
+Tests causaux ajoutés : image OpenGraph bloquée avec favicon déclaré valide, page HTTP 403
+avec favicon d'origine valide, chargement prioritaire, état de repli et contrat des deux
+prompts. Rollback : réversion atomique du commit v2.565, suppression facultative de
+`data/cache/web-source-previews`, puis redémarrage backend/frontend. Aucune migration ni
+donnée métier.
+
+Validation finale : la suite `check:quick` passe 235/235 avec 363 outils, 391 routes et un
+harnais 363/363 ; le build Next.js 16.2.12/Turbopack réussit puis Marvin redémarre prêt en
+v2.565. Dans la recherche « feux de forêt », sept des neuf médias sont déjà chargés et aucun
+repli d'erreur n'est rendu, ce qui confirme l'absence de régression sur la galerie qui
+fonctionnait. Dans la recherche « punaises de lit », quatre médias sont chargés, trois sources
+visibles utilisent le repli explicite et le compteur affiche correctement deux pages lues.
