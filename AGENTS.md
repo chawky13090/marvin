@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.554.0)
+## 9. État actuel (v2.555.0)
+
+**v2.555 (classement des fichiers créés)** : les créations PDF, DOCX et les documents
+générés sans destination explicite utilisent désormais la racine portable
+`<export_root>/documents` (`Documents/Marvin/documents` par défaut), au lieu du Bureau ou
+de `data/documents_generes`. Un `path` ou `output_path` explicitement demandé reste
+prioritaire et doit être respecté exactement ; une erreur d'accès est rendue sans repli
+silencieux. La route de téléchargement accepte la nouvelle racine et conserve l'ancienne en
+lecture pour la compatibilité. Les logos documentaires suivent aussi la nouvelle racine.
+Aucun fichier historique n'est déplacé. Rollback : réversion atomique du commit v2.555 puis
+redémarrage ; aucune migration de schéma ou de données.
 
 **v2.554 (PDF vers e-mail et vérité des confirmations)** : correction issue du rejeu de la
 conversation `249882e8`. Les documents créés dans les dossiers Windows portables Bureau,

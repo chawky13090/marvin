@@ -32,6 +32,7 @@ import web_runtime
 import proactive_briefing
 import generation_runtime
 import computer_runtime
+from storage_layout import roots as storage_roots
 from conversation_exports import export_conversation
 from tool_domains import quiz as quiz_domain
 from tool_domains import it_knowledge as it_knowledge_domain
@@ -1612,7 +1613,7 @@ execute_translate = translation_domain.translate
 
 documents_domain.configure_generation(
     text_generator=_ollama_generate,
-    generated_dir=Path(__file__).resolve().parent.parent / "data" / "documents_generes",
+    generated_dir=storage_roots()[1] / "documents",
 )
 execute_document_generate = documents_domain.generate
 pdf_advanced_domain.configure(
@@ -1636,7 +1637,7 @@ document_knowledge_domain.configure(
     text_generator=_ollama_generate,
     create_docx=execute_file_create_docx,
     vector_store=vector_store_runtime,
-    generated_dir=Path(__file__).resolve().parent.parent / "data" / "documents_generes",
+    generated_dir=storage_roots()[1] / "documents",
 )
 execute_document_index = document_knowledge_domain.index
 execute_document_ask = document_knowledge_domain.ask
@@ -2958,7 +2959,7 @@ TOOLS_SPEC = [
        []),
 
     _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, en-tête/pied de page personnalisables, sommaire auto, bloc signature. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
-       {"path": {"type": "string", "description": "Chemin du fichier Word à créer (.docx)"},
+       {"path": {"type": "string", "description": "Chemin explicite du fichier Word. Si absent, Marvin le classe dans sa racine portable documents."},
         "title": {"type": "string", "description": "Titre principal du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
         "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, ``` code, ![légende](chemin) pour embarquer une vraie image (ex. une capture d'écran)"},
@@ -2975,7 +2976,7 @@ TOOLS_SPEC = [
             "client": {"type": "string"}, "reference": {"type": "string"}}},
         "signature": {"type": "object", "description": "Bloc signature en fin de document", "properties": {
             "lieu": {"type": "string"}, "name": {"type": "string"}, "title": {"type": "string"}}}},
-       ["path", "title", "content"]),
+       ["title", "content"]),
 
     _t("file_convert_docx_to_pdf", "Convertit un document Word (.docx/.doc) en PDF.",
        {"path": {"type": "string", "description": "Chemin du fichier Word"},
@@ -3491,7 +3492,7 @@ TOOLS_SPEC = [
        ["headers", "rows"]),
 
     _t("file_create_pdf", "Crée un PDF PROFESSIONNEL (sans Word) : page de titre, **gras**/*italique*/`code`, tableaux markdown stylés, citations, blocs de code, liens, en-tête/pied de page personnalisables, sommaire auto. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
-       {"path": {"type": "string", "description": "Chemin du PDF à créer"},
+       {"path": {"type": "string", "description": "Chemin explicite du PDF. Si absent, Marvin le classe dans sa racine portable documents."},
         "title": {"type": "string", "description": "Titre du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
         "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, [lien](url), ![légende](chemin) pour embarquer une vraie image (ex. une capture d'écran)"},
@@ -3950,6 +3951,7 @@ TOOLS_SPEC = [
        {"text": {"type": "string", "description": "Les notes / éléments bruts à mettre en forme"},
         "template": {"type": "string", "description": "Modèle : rapport_intervention, dossier_pro, procedure, cahier_charges, compte_rendu, doc_technique, libre"},
         "title": {"type": "string", "description": "Titre du document"},
+        "output_path": {"type": "string", "description": "Chemin explicite du DOCX. Si absent, classement automatique dans la racine portable documents."},
         "author": {"type": "string", "description": "Auteur (sinon déduit ou « Marvin »)"},
         "pdf": {"type": "boolean", "description": "Aussi exporter en PDF"},
         "mode": {"type": "string", "description": "rapide (1 passe, défaut) ou detaille (section par section, plus complet mais plus lent)"},

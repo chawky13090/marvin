@@ -7,6 +7,7 @@ import hashlib
 import os
 import re as _re
 import tempfile
+import time
 from pathlib import Path
 from typing import Awaitable, Callable
 
@@ -18,7 +19,7 @@ from document_formatting import (
 from document_profile import get_identity as _document_identity
 from document_profile import TEMPLATES
 import database as db
-from platform_paths import PATHS as _SYSTEM_PATHS
+from storage_layout import roots
 
 
 _resolver: Callable[[str], str] | None = None
@@ -66,10 +67,18 @@ async def _generate_with_provenance(*args, **kwargs) -> tuple[str, dict]:
 
 
 def _documents_output_dir() -> Path:
-    if _generated_dir is None:
-        raise RuntimeError("Le dossier documentaire n'est pas configuré")
-    _generated_dir.mkdir(parents=True, exist_ok=True)
-    return _generated_dir
+    directory = _generated_dir
+    if directory is None:
+        _, export_root = roots()
+        directory = export_root / "documents"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _default_document_path(title: str, suffix: str) -> Path:
+    safe = _re.sub(r"[^\w\- ]", "", str(title or "document"), flags=_re.UNICODE)
+    safe = (safe[:70].strip() or "document").replace(" ", "_")
+    return _documents_output_dir() / f"{safe}_{int(time.time())}{suffix}"
 
 
 def _resolve_path(raw: str) -> str:
@@ -223,8 +232,9 @@ async def extract_docx_text(args: dict) -> dict:
 
 
 async def create_docx(args: dict) -> dict:
-    path = _resolve_path(args.get("path", ""))
     title = args.get("title", "Document")
+    raw_path = str(args.get("path") or "").strip()
+    path = _resolve_path(raw_path) if raw_path else str(_default_document_path(title, ".docx"))
     subtitle = args.get("subtitle", "")
     content = args.get("content", "")
     _identity = _document_identity()
@@ -644,8 +654,12 @@ async def generate(args: dict) -> dict:
                      "lieu": (args.get("lieu") or "").strip()}
 
     safe = (_re.sub(r"[^\w\- ]", "", title)[:50].strip() or "document").replace(" ", "_")
-    out_dir = _documents_output_dir()
-    out_path = str(out_dir / f"{safe}.docx")
+    explicit_output = str(args.get("output_path") or "").strip()
+    out_path = (
+        _resolve_path(explicit_output)
+        if explicit_output
+        else str(_documents_output_dir() / f"{safe}_{int(time.time())}.docx")
+    )
     r = await create_docx({"path": out_path, "title": title, "subtitle": tpl["name"],
                                         "content": content, "author": author,
                                         "letterhead": letterhead, "references": references, "signature": signature})
@@ -681,9 +695,9 @@ async def generate(args: dict) -> dict:
     return result
 async def create_pdf(args: dict) -> dict:
     """Crée un fichier PDF avec du texte formaté (sans Word requis)."""
-    _path_raw = args.get("path", "")
-    path = _resolve_path(_path_raw) if _path_raw else str(Path(_SYSTEM_PATHS["desktop"]) / f"document_{int(time.time())}.pdf")
     title = args.get("title", "Document")
+    _path_raw = str(args.get("path") or "").strip()
+    path = _resolve_path(_path_raw) if _path_raw else str(_default_document_path(title, ".pdf"))
     content = args.get("content", "")
     _identity = _document_identity()
     author = args.get("author") or _identity.get("author") or "Marvin"

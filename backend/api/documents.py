@@ -9,10 +9,15 @@ from pydantic import BaseModel
 import database as db
 import tool_runtime
 import tools as tool_module
+from storage_layout import roots
 
 
 router = APIRouter(tags=["documents"])
 _DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(tool_module.__file__), "..", "data"))
+
+
+def _documents_dir() -> str:
+    return str(roots()[1] / "documents")
 
 
 async def _document_tool(name: str, arguments: dict, *, confirmed_by_ui: bool = False):
@@ -46,12 +51,16 @@ async def generate_document(body: dict = Body(...)):
 
 @router.get("/api/documents/download")
 async def download_document(path: str):
-    base = os.path.join(_DATA_DIR, "documents_generes")
+    bases = (_documents_dir(), os.path.join(_DATA_DIR, "documents_generes"))
     target = os.path.abspath(path)
-    try:
-        contained = os.path.commonpath((base, target)) == os.path.abspath(base)
-    except ValueError:
-        contained = False
+    contained = False
+    for base in bases:
+        try:
+            if os.path.commonpath((base, target)) == os.path.abspath(base):
+                contained = True
+                break
+        except ValueError:
+            continue
     if not contained or not os.path.isfile(target):
         raise HTTPException(status_code=404, detail="Fichier introuvable")
     return FileResponse(
@@ -75,7 +84,7 @@ async def save_letterhead(body: dict = Body(...)):
 
 @router.post("/api/documents/logo")
 async def upload_logo(file: UploadFile = File(...)):
-    documents_dir = os.path.join(_DATA_DIR, "documents_generes")
+    documents_dir = _documents_dir()
     os.makedirs(documents_dir, exist_ok=True)
     extension = (os.path.splitext(file.filename or "logo.png")[1] or ".png").lower()
     destination = os.path.join(documents_dir, "letterhead_logo" + extension)

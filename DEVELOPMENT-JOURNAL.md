@@ -15758,3 +15758,17 @@ Validation réelle : 8 tests unitaires réussis ; compilation Python réussie ; 
 `db5c516a4354e47f33e019f0c61921705fd74fce02e3e192f4d286783bfa2d69` ; l'appel s'arrête
 bien à `requiresConfirmation=true` avec une pièce jointe, sans envoi. Rollback : réversion
 atomique du commit v2.554 puis redémarrage ; aucune migration de schéma ou de données.
+
+## 2026-08-01 — v2.555 — Classement portable des documents créés
+
+Les générateurs historiques n'appliquaient pas uniformément l'arborescence déjà définie par
+`storage_layout.py` : un PDF sans chemin allait sur le Bureau et les documents complets dans
+`data/documents_generes`. Le contrat est désormais uniforme : destination absente vers
+`<export_root>/documents`, destination explicite prioritaire et exacte, erreur claire sans
+repli silencieux. Les téléchargements gardent une lecture compatible de l'ancien dossier ;
+aucun fichier existant n'est déplacé et aucune donnée n'est supprimée.
+
+Validation : tests réels d'un PDF classé automatiquement et d'un PDF écrit vers un chemin
+explicite distinct, six tests ciblés réussis, compilation Python et architecture vérifiées.
+Les journaux ne reçoivent aucun contenu documentaire supplémentaire. Rollback : réversion
+atomique du commit v2.555 et redémarrage ; aucune migration persistante.
