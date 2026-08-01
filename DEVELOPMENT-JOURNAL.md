@@ -15494,3 +15494,25 @@ build Next.js 16.2.12/Turbopack réussi. Le redémarrage a brièvement produit u
 `stopped_or_failed` malgré `success=true`; le contrat de `restart-marvin.ps1` a été corrigé
 pour attendre un état `ready`/`degraded` et retourner un code non nul sinon. Aucune migration
 ni secret. Rollback : réversion atomique du commit v2.547 et redémarrage de Marvin.
+## 2026-08-01 — v2.548 — Activité latérale conforme au cadrage utilisateur
+
+Demande : corriger v2.547, dont la carte restait au-dessus de la barre de chat, pour placer
+le robot et les informations dans deux rectangles séparés de chaque côté de la fenêtre de
+conversation et libérer la hauteur centrale.
+
+Décision : `TypingIndicator` est désormais une couche positionnée relativement à
+`marvin-chat-container`. Le panneau robot occupe la gouttière gauche avec une illustration
+150 px animée; le panneau d'activité occupe la gouttière droite avec titre, durée,
+progression, détails et arrêt. La colonne centrale est explicitement réservée à la
+conversation. `ChatWindow` active le mode compact car ce composant secondaire ne dispose
+pas des gouttières du chat principal. Deux paliers responsives conservent les commandes sans
+débordement sur les petits écrans.
+
+Validation observée : ESLint ciblé réussi; `npm run check:chat-presentation` réussi
+(14 assertions); test fonctionnel réel dans Marvin avec une nouvelle demande, état
+`Travail en cours`, robot visible à gauche et informations visibles à droite sans bandeau
+horizontal dans le flux. Aucun changement de persistance, de réseau, d'autorisation ou de
+secret. Journalisation : aucune nouvelle donnée métier; seuls les événements d'activité
+déjà reçus sont rendus. Sécurité : les panneaux sont passifs hors boutons locaux Détails et
+Arrêter; aucune nouvelle entrée exécutable. Rollback : réversion atomique du commit v2.548
+et redémarrage de Marvin.

@@ -1,228 +1,127 @@
 .beacon {
-  position: relative;
+  position: absolute;
+  z-index: 18;
+  right: 0;
+  bottom: 112px;
+  left: 0;
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  width: calc(100% - 44px);
-  max-width: 720px;
-  margin: 0 auto 14px;
-  padding: 8px 9px;
-  border: 1px solid #383a40;
-  border-radius: 12px;
-  background: linear-gradient(145deg, rgba(30, 31, 35, .97), rgba(20, 21, 24, .97));
-  box-shadow: 0 7px 24px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .025);
+  grid-template-columns: minmax(132px, 1fr) minmax(640px, 1120px) minmax(238px, 1fr);
+  align-items: end;
+  pointer-events: none;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   animation: fadeIn .2s ease;
 }
 
-.robotCell {
+.robotPanel,
+.infoPanel {
+  pointer-events: auto;
+  border: 1px solid #383a40;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(30, 31, 35, .97), rgba(20, 21, 24, .97));
+  box-shadow: 0 9px 30px rgba(0, 0, 0, .3), inset 0 1px rgba(255, 255, 255, .025);
+}
+
+.robotPanel {
   position: relative;
+  grid-column: 1;
+  justify-self: end;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: min(172px, calc(100% - 14px));
+  min-width: 118px;
+  height: 168px;
+  margin-right: 12px;
   overflow: hidden;
-  border: 1px solid #40434a;
-  border-radius: 10px;
-  background: radial-gradient(circle at 50% 38%, rgba(87, 205, 220, .12), transparent 62%), #101114;
+  background: radial-gradient(circle at 50% 39%, rgba(87, 205, 220, .13), transparent 61%), #111215;
   transform: translateZ(0);
 }
 
 .robot {
   position: relative;
   z-index: 2;
-  width: 50px;
-  height: 50px;
+  width: 150px;
+  height: 150px;
   object-fit: contain;
-  object-position: center 22%;
-  filter: drop-shadow(0 4px 7px rgba(0, 0, 0, .35));
+  object-position: center 30%;
+  filter: drop-shadow(0 7px 12px rgba(0, 0, 0, .42));
   transform-origin: 50% 70%;
+}
+
+.robotCaption {
+  position: absolute;
+  z-index: 4;
+  right: 10px;
+  bottom: 8px;
+  left: 10px;
+  color: #bfc2c8;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .04em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .robotAura {
   position: absolute;
-  inset: 8px;
+  inset: 28px;
   z-index: 1;
   border-radius: 50%;
   background: rgba(96, 210, 222, .12);
-  filter: blur(8px);
+  filter: blur(13px);
   animation: auraPulse 2.4s ease-in-out infinite;
 }
 
 .robotScanner {
   position: absolute;
-  left: 7px;
-  right: 7px;
-  top: 15px;
   z-index: 3;
+  top: 39px;
+  right: 22px;
+  left: 22px;
   height: 1px;
   opacity: 0;
   background: #7ce4eb;
-  box-shadow: 0 0 6px #52cad5;
+  box-shadow: 0 0 7px #52cad5;
 }
 
-.activityBody {
-  min-width: 0;
+.infoPanel {
+  grid-column: 3;
+  justify-self: start;
+  width: min(314px, calc(100% - 14px));
+  min-width: 224px;
+  margin-left: 12px;
+  padding: 14px;
 }
 
-.activityHeader {
+.infoTopline {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 8px;
 }
 
-.activityHeader strong {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.activityHeader time {
-  flex: 0 0 auto;
-  color: var(--text-secondary);
-  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-
-.label {
-  margin-top: 3px;
-  overflow: hidden;
-  color: var(--text-muted);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.progressTrack {
-  height: 3px;
-  margin-top: 7px;
-  overflow: hidden;
-  border-radius: 99px;
-  background: #303238;
-}
-
-.progressValue,
-.progressIndeterminate {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #6aaeb5, #8fd8de);
-}
-
-.progressValue {
-  width: var(--ring-percent, 0%);
-  transition: width .25s ease;
-}
-
-.progressIndeterminate {
-  width: 38%;
-  animation: progressTravel 1.55s ease-in-out infinite;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.more,
-.stop {
-  flex: 0 0 auto;
-  min-width: 20px;
-  min-height: 20px;
-  padding: 0 5px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.more:hover,
-.stop:hover {
-  background: rgba(255, 255, 255, .08);
-  color: var(--text-primary);
-}
-
-.stop {
-  color: #fb7185;
-}
-
-.details {
-  grid-column: 1 / -1;
-  padding: 9px 4px 2px 66px;
-  width: auto;
-  min-width: 0;
-  border-top: 1px solid #33353a;
-}
-
-.detail {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 6px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.facts > span {
-  text-transform: lowercase;
-}
-
-.timeline {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.timeline li {
-  position: relative;
-  display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
-  gap: 7px;
-  padding-top: 7px;
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-
-.timeline li > i {
-  width: 6px;
-  height: 6px;
-  margin-top: 4px;
-  border-radius: 50%;
-  background: #2dd4bf;
-  box-shadow: 0 0 8px rgba(45, 212, 191, .4);
-}
-
-.timeline li div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.timeline li strong {
-  font-weight: 650;
-  color: var(--text-secondary);
-}
-
-.timeline li span,
-.timeline li small {
-  color: var(--text-muted);
-  font-weight: 400;
-}
+.activityBody { min-width: 0; flex: 1; }
+.activityHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.activityHeader strong { min-width: 0; overflow: hidden; color: var(--text-secondary); font-size: 13px; font-weight: 680; white-space: nowrap; text-overflow: ellipsis; }
+.activityHeader time { flex: 0 0 auto; color: var(--text-secondary); font: 600 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.label { margin-top: 5px; overflow: hidden; color: var(--text-muted); line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
+.progressTrack { height: 4px; margin-top: 11px; overflow: hidden; border-radius: 99px; background: #303238; }
+.progressValue, .progressIndeterminate { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6aaeb5, #8fd8de); }
+.progressValue { width: var(--ring-percent, 0%); transition: width .25s ease; }
+.progressIndeterminate { width: 38%; animation: progressTravel 1.55s ease-in-out infinite; }
+.actions { display: flex; align-items: center; gap: 2px; }
+.more, .stop { min-width: 24px; min-height: 24px; padding: 0 6px; border: none; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; line-height: 1; cursor: pointer; }
+.more:hover, .stop:hover { background: rgba(255, 255, 255, .08); color: var(--text-primary); }
+.stop { color: #d98b96; }
+.details { margin-top: 11px; padding-top: 10px; min-width: 0; border-top: 1px solid #33353a; }
+.detail { color: var(--text-muted); font-size: 11px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; color: var(--text-muted); font-size: 10px; }
+.facts > span { text-transform: lowercase; }
+.timeline { margin: 7px 0 0; padding: 0; max-height: 180px; overflow-y: auto; list-style: none; }
+.timeline li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 7px; padding-top: 7px; color: var(--text-secondary); font-size: 11px; }
+.timeline li > i { width: 6px; height: 6px; margin-top: 4px; border-radius: 50%; background: #78aca8; box-shadow: 0 0 7px rgba(120, 172, 168, .3); }
+.timeline li div { display: flex; flex-direction: column; gap: 2px; }
+.timeline li strong { color: var(--text-secondary); font-weight: 650; }
+.timeline li span, .timeline li small { color: var(--text-muted); font-weight: 400; }
 
 .robot_thinking .robot { animation: robotFloat 2.2s ease-in-out infinite; }
 .robot_writing .robot { animation: robotNod 1.45s ease-in-out infinite; }
@@ -235,80 +134,40 @@
 .robot_repairing .robotAura { background: rgba(214, 183, 122, .18); }
 .robot_waiting .robot { animation: robotWait 3.2s ease-in-out infinite; }
 
-@keyframes robotFloat {
-  0%, 100% { transform: translateY(1px) rotate(-1deg); }
-  50% { transform: translateY(-2px) rotate(1deg); }
+.compact { position: relative; inset: auto; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; margin: 8px 0; }
+.compact .robotPanel { grid-column: 1; width: 56px; min-width: 56px; height: 56px; margin: 0; border-radius: 10px; }
+.compact .robot { width: 54px; height: 54px; }
+.compact .robotCaption { display: none; }
+.compact .infoPanel { grid-column: 2; width: 100%; min-width: 0; margin: 0; padding: 10px; }
+
+@keyframes robotFloat { 0%, 100% { transform: translateY(1px) rotate(-1deg); } 50% { transform: translateY(-3px) rotate(1deg); } }
+@keyframes robotNod { 0%, 100% { transform: rotateX(0deg) translateY(0); } 45% { transform: rotateX(8deg) translateY(2px); } }
+@keyframes robotLook { 0%, 100% { transform: translateX(-2px) rotate(-1deg); } 50% { transform: translateX(3px) rotate(1deg); } }
+@keyframes robotRead { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+@keyframes robotCheck { 0%, 100% { transform: scale(.98); } 50% { transform: scale(1.025); filter: drop-shadow(0 0 7px rgba(143, 216, 222, .28)); } }
+@keyframes robotRepair { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-2px) rotate(-1deg); } 65% { transform: translateX(2px) rotate(1deg); } }
+@keyframes robotWait { 0%, 100% { transform: translateY(1px); opacity: .82; } 50% { transform: translateY(-1px); opacity: 1; } }
+@keyframes scannerTravel { 0%, 100% { transform: translateY(0); opacity: .2; } 50% { transform: translateY(70px); opacity: .85; } }
+@keyframes auraPulse { 0%, 100% { transform: scale(.9); opacity: .45; } 50% { transform: scale(1.12); opacity: .9; } }
+@keyframes progressTravel { 0% { transform: translateX(-115%); } 55%, 100% { transform: translateX(265%); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 1180px) {
+  .beacon:not(.compact) { grid-template-columns: 116px minmax(480px, 1fr) 220px; }
+  .beacon:not(.compact) .robotPanel { width: 104px; min-width: 104px; height: 118px; margin-right: 6px; }
+  .beacon:not(.compact) .robot { width: 108px; height: 108px; }
+  .beacon:not(.compact) .infoPanel { width: 214px; min-width: 214px; margin-left: 6px; padding: 11px; }
 }
 
-@keyframes robotNod {
-  0%, 100% { transform: rotateX(0deg) translateY(0); }
-  45% { transform: rotateX(8deg) translateY(1px); }
-}
-
-@keyframes robotLook {
-  0%, 100% { transform: translateX(-1px) rotate(-1deg); }
-  50% { transform: translateX(2px) rotate(1deg); }
-}
-
-@keyframes robotRead {
-  0%, 100% { transform: rotate(-1.5deg); }
-  50% { transform: rotate(1.5deg); }
-}
-
-@keyframes robotCheck {
-  0%, 100% { transform: scale(.98); filter: drop-shadow(0 4px 7px rgba(0, 0, 0, .35)); }
-  50% { transform: scale(1.025); filter: drop-shadow(0 0 6px rgba(143, 216, 222, .28)); }
-}
-
-@keyframes robotRepair {
-  0%, 100% { transform: translateX(0) rotate(0); }
-  35% { transform: translateX(-1px) rotate(-1deg); }
-  65% { transform: translateX(1px) rotate(1deg); }
-}
-
-@keyframes robotWait {
-  0%, 100% { transform: translateY(1px); opacity: .82; }
-  50% { transform: translateY(-1px); opacity: 1; }
-}
-
-@keyframes scannerTravel {
-  0%, 100% { transform: translateY(0); opacity: .2; }
-  50% { transform: translateY(20px); opacity: .85; }
-}
-
-@keyframes auraPulse {
-  0%, 100% { transform: scale(.9); opacity: .45; }
-  50% { transform: scale(1.12); opacity: .9; }
-}
-
-@keyframes progressTravel {
-  0% { transform: translateX(-115%); }
-  55%, 100% { transform: translateX(265%); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@media (max-width: 720px) {
-  .beacon {
-    grid-template-columns: 46px minmax(0, 1fr) auto;
-    gap: 8px;
-    width: calc(100% - 24px);
-    margin-bottom: 10px;
-  }
-  .robotCell { width: 44px; height: 44px; }
-  .robot { width: 43px; height: 43px; }
-  .details { padding-left: 54px; }
+@media (max-width: 860px) {
+  .beacon:not(.compact) { right: 8px; bottom: 96px; left: 8px; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; }
+  .beacon:not(.compact) .robotPanel { grid-column: 1; width: 74px; min-width: 74px; height: 82px; margin: 0; }
+  .beacon:not(.compact) .robot { width: 78px; height: 78px; }
+  .beacon:not(.compact) .robotCaption { display: none; }
+  .beacon:not(.compact) .infoPanel { grid-column: 2; width: min(300px, 100%); min-width: 0; margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .robot,
-  .robotAura,
-  .robotScanner,
-  .progressIndeterminate {
-    animation: none !important;
-  }
+  .robot, .robotAura, .robotScanner, .progressIndeterminate { animation: none !important; }
   .progressIndeterminate { width: 70%; opacity: .72; }
 }

@@ -365,7 +365,7 @@ export default function ChatContainer({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="marvin-chat-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {messages.length > 0 && toolbarHost && createPortal(
         <ConversationViewToolbar
           mode={viewMode}

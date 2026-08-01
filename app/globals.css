@@ -1285,6 +1285,11 @@ img { max-width: 100%; display: block; }
   scrollbar-gutter: stable;
 }
 
+.marvin-chat-container {
+  position: relative;
+  isolation: isolate;
+}
+
 .marvin-chat-stream {
   width: min(100%, 1120px);
   min-height: 100%;

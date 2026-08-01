@@ -202,7 +202,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.547.0)
+## 9. État actuel (v2.548.0)
+
+**v2.548 (activité réellement latérale)** : correction du premier rendu v2.547 qui restait
+une carte horizontale au-dessus du composeur. Dans le chat principal, `TypingIndicator` est
+désormais retiré du flux vertical et ancré dans deux surfaces indépendantes : grand panneau
+robot animé à gauche, panneau d'état/progression/détails/arrêt à droite, avec la colonne
+centrale réservée à la conversation et au composeur. Le composant annonce son implantation
+par `data-layout="lateral"`; `ChatWindow`, qui ne possède pas les mêmes gouttières, demande
+explicitement le repli `compact`. Le conteneur du chat fournit l'ancrage positionné et un
+repli responsive conserve l'accès à l'état et à l'arrêt sur écran étroit. Validation réelle
+dans Marvin pendant une génération, ESLint et contrat `check:chat-presentation`. Aucun
+schéma, donnée, secret ou journal métier modifié. Rollback : réversion atomique du commit
+v2.548 puis redémarrage frontend/backend.
 
 **v2.547 (carte d'activité robotisée)** : la barre d'activité conçue avec Claude devient une
 carte rectangulaire intégrée au flux, avec marge dédiée au-dessus du composeur. Un dérivé

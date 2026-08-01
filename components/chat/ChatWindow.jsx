@@ -70,7 +70,7 @@ export default function ChatWindow({
                 index={index}
               />
             ))}
-            {isLoading && <TypingIndicator />}
+            {isLoading && <TypingIndicator compact />}
           </>
         )}
         <div ref={scrollRef} className={styles.scrollAnchor} />

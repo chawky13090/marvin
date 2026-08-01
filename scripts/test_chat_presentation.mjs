@@ -72,8 +72,10 @@ assert.match(
 );
 assert.match(typingIndicatorSource, /marvin-activity-robot\.png/, 'la carte d’activité doit afficher le robot Marvin');
 assert.match(typingIndicatorSource, /robotMode/, 'le robot doit réagir à l’étape réelle de la mission');
-assert.match(typingIndicatorCss, /grid-template-columns: 56px minmax\(0, 1fr\) auto/, 'la carte doit réserver une cellule carrée au robot');
-assert.match(typingIndicatorCss, /grid-column: 1 \/ -1/, 'les détails doivent rester dans le flux sans recouvrir le composeur');
+assert.match(typingIndicatorSource, /data-layout=\{compact \? 'compact' : 'lateral'\}/, 'le composant doit annoncer explicitement son implantation latérale');
+assert.match(typingIndicatorCss, /position: absolute;[\s\S]*grid-template-columns: minmax\(132px, 1fr\) minmax\(640px, 1120px\) minmax\(238px, 1fr\)/, 'l’activité principale doit réserver le centre à la conversation');
+assert.match(typingIndicatorCss, /\.robotPanel[\s\S]*grid-column: 1/, 'le robot doit occuper un panneau indépendant à gauche');
+assert.match(typingIndicatorCss, /\.infoPanel[\s\S]*grid-column: 3/, 'les informations doivent occuper un panneau indépendant à droite');
 assert.match(
   messageBubbleSource,
   /tool\.result !== undefined && isCodingMissionTool[\s\S]*?<CodingMissionTracker result=\{tool\.result\}/,

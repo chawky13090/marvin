@@ -46,6 +46,7 @@ export default function TypingIndicator({
   progressEvents = [],
   startedAt = null,
   onStop = null,
+  compact = false,
 }) {
   const [clock, setClock] = useState({ now: 0, mountedAt: 0 });
   const [expanded, setExpanded] = useState(false);
@@ -109,35 +110,43 @@ export default function TypingIndicator({
               : 'thinking';
 
   return (
-    <div className={`${styles.beacon} ${styles[`robot_${robotMode}`]}`} aria-live="polite" aria-label="Activité de Marvin">
-      <div className={styles.robotCell} aria-hidden="true">
+    <div
+      className={`${styles.beacon} ${compact ? styles.compact : ''} ${styles[`robot_${robotMode}`]}`}
+      aria-live="polite"
+      aria-label="Activité de Marvin"
+      data-layout={compact ? 'compact' : 'lateral'}
+    >
+      <div className={styles.robotPanel} aria-hidden="true">
         <span className={styles.robotAura} />
-        <Image className={styles.robot} src="/assets/marvin-activity-robot.png" width={52} height={52} alt="" priority />
+        <Image className={styles.robot} src="/assets/marvin-activity-robot.png" width={150} height={150} alt="" priority />
         <span className={styles.robotScanner} />
+        <span className={styles.robotCaption}>Marvin travaille</span>
       </div>
 
-      <div className={styles.activityBody}>
-        <div className={styles.activityHeader}>
-          <strong>{title}</strong>
-          <time>{formatElapsed(elapsed)}</time>
+      <section className={styles.infoPanel}>
+        <div className={styles.infoTopline}>
+          <div className={styles.activityBody}>
+            <div className={styles.activityHeader}>
+              <strong>{title}</strong>
+              <time>{formatElapsed(elapsed)}</time>
+            </div>
+            <div className={styles.label}>{compactLabel}</div>
+          </div>
+          <div className={styles.actions}>
+            {hasDetails && (
+              <button type="button" className={styles.more} onClick={() => setExpanded(value => !value)} aria-label={expanded ? 'Masquer les détails' : "Voir l'activité détaillée"}>
+                {expanded ? '▲' : '⋯'}
+              </button>
+            )}
+            {onStop && <button type="button" className={styles.stop} onClick={onStop} aria-label="Arrêter">✕</button>}
+          </div>
         </div>
-        <div className={styles.label}>{compactLabel}</div>
         <div className={styles.progressTrack} aria-hidden="true">
           <span className={hasMeasuredProgress ? styles.progressValue : styles.progressIndeterminate} style={ringStyle} />
         </div>
-      </div>
 
-      <div className={styles.actions}>
-        {hasDetails && (
-          <button type="button" className={styles.more} onClick={() => setExpanded(value => !value)} aria-label={expanded ? 'Masquer les détails' : "Voir l'activité détaillée"}>
-            {expanded ? '▲' : '⋯'}
-          </button>
-        )}
-        {onStop && <button type="button" className={styles.stop} onClick={onStop} aria-label="Arrêter">✕</button>}
-      </div>
-
-      {expanded && hasDetails && (
-        <div className={styles.details}>
+        {expanded && hasDetails && (
+          <div className={styles.details}>
           {progress?.detail && <div className={styles.detail}>{progress.detail}</div>}
           {metrics.length > 0 && (
             <div className={styles.facts}>
@@ -160,8 +169,9 @@ export default function TypingIndicator({
               ))}
             </ol>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
