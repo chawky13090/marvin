@@ -15478,3 +15478,19 @@ est porté à 60 secondes et le délai d'attente IPC de l'avatar à 90 secondes;
 reste actif et borné. Les fichiers non committés de Claude (`TypingIndicator.jsx` et son CSS)
 ont été conservés sans modification. Validation à rejouer après le prochain redémarrage :
 arrêt direct depuis l'avatar, `graceful=true`, ports libérés, puis redémarrage stable.
+
+## 2026-08-01 — v2.547 — Carte d'activité robotisée Codex/Claude
+
+La logique d'activité de Claude (étape, durée, métriques, événements et arrêt) est conservée.
+Codex a remplacé la présentation en pilule par une carte rectangulaire en grille, située dans
+le flux entre la conversation et le composeur. Les détails ne sont plus absolus et repoussent
+la carte sans recouvrir la saisie. Le robot fourni par l'utilisateur a servi de référence à un
+dérivé tête/buste transparent enregistré sous `public/assets/marvin-activity-robot.png`.
+Ses animations CSS dépendent de l'étape réelle et sont neutralisées avec
+`prefers-reduced-motion`.
+
+Validation réelle : ESLint ciblé, tests présentation, UX, lifecycle et architecture réussis;
+build Next.js 16.2.12/Turbopack réussi. Le redémarrage a brièvement produit un statut final
+`stopped_or_failed` malgré `success=true`; le contrat de `restart-marvin.ps1` a été corrigé
+pour attendre un état `ready`/`degraded` et retourner un code non nul sinon. Aucune migration
+ni secret. Rollback : réversion atomique du commit v2.547 et redémarrage de Marvin.

@@ -86,75 +86,82 @@ export default function TypingIndicator({
   );
   const visibleEvents = (progressEvents || []).slice(-8);
 
+  const hasDetails = visibleEvents.length > 0
+    || metrics.length > 0
+    || Boolean(progress?.detail);
+
+  const compactLabel = hasMeasuredProgress
+    ? `${activity} · ${progress.current}/${progress.total}`
+    : silentSeconds >= 20
+      ? `${activity} · ${silentSeconds}s sans nouvel évènement`
+      : activity;
+
+  const ringStyle = hasMeasuredProgress
+    ? { '--ring-percent': `${percent}%` }
+    : undefined;
+
+  const robotMode = progress?.stage === 'searching' ? 'searching'
+    : progress?.stage === 'reading' ? 'reading'
+      : progress?.stage === 'checking' || progress?.stage === 'testing' ? 'checking'
+        : progress?.stage === 'repairing' ? 'repairing'
+          : progress?.stage === 'waiting' ? 'waiting'
+            : status === 'streaming' ? 'writing'
+              : 'thinking';
+
   return (
-    <section className={styles.beacon} aria-live="polite" aria-label="Activité de Marvin">
-      <div className={styles.summary}>
-        <div className={styles.avatar} aria-hidden="true">
-          <Image src="/marvin-logo.svg" alt="" width={34} height={34} priority />
+    <div className={`${styles.beacon} ${styles[`robot_${robotMode}`]}`} aria-live="polite" aria-label="Activité de Marvin">
+      <div className={styles.robotCell} aria-hidden="true">
+        <span className={styles.robotAura} />
+        <Image className={styles.robot} src="/assets/marvin-activity-robot.png" width={52} height={52} alt="" priority />
+        <span className={styles.robotScanner} />
+      </div>
+
+      <div className={styles.activityBody}>
+        <div className={styles.activityHeader}>
+          <strong>{title}</strong>
+          <time>{formatElapsed(elapsed)}</time>
         </div>
-        <div className={styles.main}>
-          <div className={styles.titleRow}>
-            <strong>{title}</strong>
-            <span className={styles.live}><i /> En cours</span>
-            <time>{formatElapsed(elapsed)}</time>
-          </div>
-          <div className={styles.activity}>
-            <span>{activity}</span>
-            {progress?.detail && <span className={styles.detail}>· {progress.detail}</span>}
-          </div>
-          {hasMeasuredProgress && (
-            <div
-              className={styles.progressTrack}
-              role="progressbar"
-              aria-valuemin="0"
-              aria-valuemax={progress.total}
-              aria-valuenow={progress.current}
-              aria-label={activity}
-            >
-              <div className={styles.progressFill} style={{ width: `${percent}%` }} />
-            </div>
-          )}
-          <div className={styles.facts}>
-            {hasMeasuredProgress && (
-              <span>{progress.current}/{progress.total}</span>
-            )}
-            {metrics.map(([key, value]) => (
-              <span key={key}>{value} {metricLabel(key)}</span>
-            ))}
-            {silentSeconds >= 20 && (
-              <span className={styles.waiting}>
-                Aucun nouvel événement depuis {silentSeconds} s · processus toujours surveillé
-              </span>
-            )}
-          </div>
-        </div>
-        <div className={styles.actions}>
-          {visibleEvents.length > 0 && (
-            <button type="button" onClick={() => setExpanded(value => !value)}>
-              {expanded ? 'Masquer' : 'Activité'}
-            </button>
-          )}
-          {onStop && (
-            <button type="button" className={styles.stop} onClick={onStop}>
-              Arrêter
-            </button>
-          )}
+        <div className={styles.label}>{compactLabel}</div>
+        <div className={styles.progressTrack} aria-hidden="true">
+          <span className={hasMeasuredProgress ? styles.progressValue : styles.progressIndeterminate} style={ringStyle} />
         </div>
       </div>
-      {expanded && visibleEvents.length > 0 && (
-        <ol className={styles.timeline}>
-          {visibleEvents.map((event, index) => (
-            <li key={`${event.receivedAt || index}-${index}`}>
-              <i aria-hidden="true" />
-              <div>
-                <strong>{event.label || STAGE_LABELS[event.stage] || 'Étape en cours'}</strong>
-                {event.detail && <span>{event.detail}</span>}
-              </div>
-              {event.total > 0 && <small>{event.current}/{event.total}</small>}
-            </li>
-          ))}
-        </ol>
+
+      <div className={styles.actions}>
+        {hasDetails && (
+          <button type="button" className={styles.more} onClick={() => setExpanded(value => !value)} aria-label={expanded ? 'Masquer les détails' : "Voir l'activité détaillée"}>
+            {expanded ? '▲' : '⋯'}
+          </button>
+        )}
+        {onStop && <button type="button" className={styles.stop} onClick={onStop} aria-label="Arrêter">✕</button>}
+      </div>
+
+      {expanded && hasDetails && (
+        <div className={styles.details}>
+          {progress?.detail && <div className={styles.detail}>{progress.detail}</div>}
+          {metrics.length > 0 && (
+            <div className={styles.facts}>
+              {metrics.map(([key, value]) => (
+                <span key={key}>{value} {metricLabel(key)}</span>
+              ))}
+            </div>
+          )}
+          {visibleEvents.length > 0 && (
+            <ol className={styles.timeline}>
+              {visibleEvents.map((event, index) => (
+                <li key={`${event.receivedAt || index}-${index}`}>
+                  <i aria-hidden="true" />
+                  <div>
+                    <strong>{event.label || STAGE_LABELS[event.stage] || 'Étape en cours'}</strong>
+                    {event.detail && <span>{event.detail}</span>}
+                  </div>
+                  {event.total > 0 && <small>{event.current}/{event.total}</small>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       )}
-    </section>
+    </div>
   );
 }

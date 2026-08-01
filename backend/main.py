@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.547 — carte d'activité robotisée sans chevauchement du composeur
 # v2.546 — délai coopératif d'arrêt aligné sur l'avatar et les services lents
 # v2.545 — cycle de redémarrage stable et détection du frontend existant
 # v2.544 — computer_control : alias duration->duration_ms pour action=wait

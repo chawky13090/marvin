@@ -50,15 +50,24 @@ if ($null -eq $Backend -or -not $FrontendReady) {
     exit 1
 }
 
-$StatusJson = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot 'get-marvin-runtime-status.ps1')
-$Status = $StatusJson | ConvertFrom-Json
+$Status = $null
+$StatusDeadline = (Get-Date).AddSeconds(15)
+do {
+    $StatusJson = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+        -File (Join-Path $PSScriptRoot 'get-marvin-runtime-status.ps1')
+    $Status = $StatusJson | ConvertFrom-Json
+    if ($Status.overall -in @('ready', 'degraded')) { break }
+    Start-Sleep -Seconds 1
+} while ((Get-Date) -lt $StatusDeadline)
+
+$FinalSuccess = $null -ne $Status -and $Status.overall -in @('ready', 'degraded')
 [pscustomobject]@{
-    success = $true
-    state = $Status.overall
+    success = $FinalSuccess
+    state = if ($null -ne $Status) { $Status.overall } else { 'failed' }
     version = [string]$Backend.version
     tools = [int]$Backend.tools_count
     dependencies = $Status.dependencies
     lan = $Status.lan
     duration_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
 } | ConvertTo-Json -Compress -Depth 6
+if (-not $FinalSuccess) { exit 1 }

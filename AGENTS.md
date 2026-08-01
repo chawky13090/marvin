@@ -202,7 +202,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.546.0)
+## 9. État actuel (v2.547.0)
+
+**v2.547 (carte d'activité robotisée)** : la barre d'activité conçue avec Claude devient une
+carte rectangulaire intégrée au flux, avec marge dédiée au-dessus du composeur. Un dérivé
+transparent du robot fourni par l'utilisateur occupe une cellule carrée et réagit aux étapes
+réelles (analyse, recherche, lecture, rédaction, vérification, réparation, attente). Les
+détails se déplient dans la grille et ne peuvent plus recouvrir la saisie. Les animations
+respectent `prefers-reduced-motion`. Le redémarrage refuse aussi désormais `success=true` si
+son diagnostic final reste `stopped_or_failed`. Aucune migration. Rollback : réversion
+atomique du commit v2.547 puis redémarrage frontend/backend.
 
 **v2.546 (fermeture coopérative bornée)** : après un arrêt réel ayant nécessité le repli
 forcé à l'expiration de 35 secondes, la fenêtre coopérative de `stop-marvin.ps1` est portée

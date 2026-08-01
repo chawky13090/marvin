@@ -58,6 +58,8 @@ assert.equal(audit.messages[0].toolInvocations[0].args.path, 'C:/safe', 'les don
 const markdownAudit = conversationAuditToMarkdown(audit);
 const messageBubbleSource = fs.readFileSync(new URL('../components/chat/MessageBubble.jsx', import.meta.url), 'utf8');
 const fileExplorerSource = fs.readFileSync(new URL('../components/chat/FileExplorerCard.jsx', import.meta.url), 'utf8');
+const typingIndicatorSource = fs.readFileSync(new URL('../components/chat/TypingIndicator.jsx', import.meta.url), 'utf8');
+const typingIndicatorCss = fs.readFileSync(new URL('../components/chat/TypingIndicator.module.css', import.meta.url), 'utf8');
 assert.match(
   messageBubbleSource,
   /nextOffset=\{result\.has_more \? result\.next_offset : null\}/,
@@ -68,6 +70,10 @@ assert.match(
   /remainingOffset[\s\S]*Afficher la suite/,
   'le navigateur de fichiers doit pouvoir charger toutes les pages',
 );
+assert.match(typingIndicatorSource, /marvin-activity-robot\.png/, 'la carte d’activité doit afficher le robot Marvin');
+assert.match(typingIndicatorSource, /robotMode/, 'le robot doit réagir à l’étape réelle de la mission');
+assert.match(typingIndicatorCss, /grid-template-columns: 56px minmax\(0, 1fr\) auto/, 'la carte doit réserver une cellule carrée au robot');
+assert.match(typingIndicatorCss, /grid-column: 1 \/ -1/, 'les détails doivent rester dans le flux sans recouvrir le composeur');
 assert.match(
   messageBubbleSource,
   /tool\.result !== undefined && isCodingMissionTool[\s\S]*?<CodingMissionTracker result=\{tool\.result\}/,

@@ -60,6 +60,8 @@ def test_contract_files() -> None:
     assert "get-marvin-runtime-status.ps1" in restart
     assert "startup_timeout_or_exit" in restart
     assert "dependencies = $Status.dependencies" in restart
+    assert "$FinalSuccess" in restart
+    assert "if (-not $FinalSuccess) { exit 1 }" in restart
 
 
 if __name__ == "__main__":
