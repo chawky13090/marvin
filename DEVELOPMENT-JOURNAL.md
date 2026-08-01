@@ -15926,3 +15926,28 @@ Validation chargée : build Next.js 16.2.12/Turbopack réussi hors exécution, r
 vérifié en v2.562 avec 363 outils, Ollama et SearXNG prêts. Le rejeu du lien Facebook à
 travers `/api/tools` rend `AUTHENTICATION_REQUIRED`, `retryable=false`, statut HTTP observé
 400, URL finale `/login/?next=...` et contenu de longueur zéro.
+
+## 2026-08-01 — v2.563 — Galerie premium des sources Web
+
+À partir du rendu de référence fourni par l’utilisateur, la liste technique de sources est
+complétée par une galerie horizontale intégrée au tour de chat. Les cartes affichent image,
+éditeur, titre, date, domaine, lien direct et niveau de preuve. Les pages lues passent avant
+les aperçus SearXNG ; les accès protégés sont atténués et identifiés, les sources rejetées ne
+sont pas promues. Les anciennes listes techniques restent disponibles pour l’audit.
+
+Le contrat source transporte dorénavant les métadonnées de bout en bout, y compris dans
+l’état compact du Runner et la restauration des conversations. Les métadonnées OpenGraph
+sont extraites avant nettoyage de la page. Les aperçus passent par `/api/web/source-preview` :
+transport anti-SSRF, aucune session distante, limite 4 Mio, formats raster autorisés,
+dimensions maximales 25 mégapixels, première frame uniquement, réencodage WebP statique sans
+métadonnées, cache privé 7 jours/250 Mio et écriture atomique concurrente. SVG reste refusé.
+
+Tests ciblés exécutés : métadonnées/cache, domaine Web, Research Swarm, Research Engine v3,
+réconciliation de fin de tour, présentation du chat, compilation Python et ESLint sans
+erreur. La suite `check:quick` passe 235/235 avec 363 outils, 391 routes et un harnais
+363/363. Le build Next.js 16.2.12/Turbopack est réussi. Après redémarrage propre en v2.563,
+le proxy a servi un favicon public en WebP (HTTP 200) et refusé une cible loopback (HTTP 404).
+Le contrôle visuel réel a trouvé trois galeries dans une conversation existante, 20 liens
+directs dans la première et une navigation horizontale fonctionnelle. Rollback : réversion
+atomique du commit v2.563, suppression facultative de `data/cache/web-source-previews`, puis
+redémarrage ; aucune migration ni donnée métier.

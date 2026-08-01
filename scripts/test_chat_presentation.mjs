@@ -57,9 +57,16 @@ assert.equal(audit.messages[0].toolInvocations[0].result.nested.password, '[MASQ
 assert.equal(audit.messages[0].toolInvocations[0].args.path, 'C:/safe', 'les données non sensibles doivent être conservées');
 const markdownAudit = conversationAuditToMarkdown(audit);
 const messageBubbleSource = fs.readFileSync(new URL('../components/chat/MessageBubble.jsx', import.meta.url), 'utf8');
+const sourceGallerySource = fs.readFileSync(new URL('../components/chat/SourceGallery.jsx', import.meta.url), 'utf8');
+const sourceGalleryCss = fs.readFileSync(new URL('../components/chat/SourceGallery.module.css', import.meta.url), 'utf8');
 assert.ok(messageBubbleSource.includes("accessLimited ? 'Accès restreint'"));
 assert.ok(messageBubbleSource.includes("result.access_limited === true"));
 assert.ok(messageBubbleSource.includes('Ouvrir dans votre navigateur connecté'));
+assert.ok(messageBubbleSource.includes('<SourceGallery sources={webSources} />'));
+assert.ok(sourceGallerySource.includes("page_read: { label: 'Page lue'"));
+assert.ok(sourceGallerySource.includes("access_restricted: { label: 'Connexion requise'"));
+assert.ok(sourceGallerySource.includes('/api/web/source-preview?url='));
+assert.ok(sourceGalleryCss.includes('scroll-snap-type: inline mandatory'));
 const fileExplorerSource = fs.readFileSync(new URL('../components/chat/FileExplorerCard.jsx', import.meta.url), 'utf8');
 const typingIndicatorSource = fs.readFileSync(new URL('../components/chat/TypingIndicator.jsx', import.meta.url), 'utf8');
 const typingIndicatorCss = fs.readFileSync(new URL('../components/chat/TypingIndicator.module.css', import.meta.url), 'utf8');

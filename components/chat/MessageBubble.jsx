@@ -7,6 +7,7 @@ import SpeakButton from './SpeakButton';
 import PrettyResult from './PrettyResult';
 import CortexTrace from './CortexTrace';
 import CodingMissionTracker from './CodingMissionTracker';
+import SourceGallery, { collectWebSources } from './SourceGallery';
 import { CircleGauge, BarRow, StatCard } from '@/components/ui/DashboardKit';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
@@ -248,6 +249,7 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
   const toolInvocations = (message.toolInvocations && message.toolInvocations.length > 0)
     ? message.toolInvocations
     : toolInvocationsFromParts;
+  const webSources = useMemo(() => collectWebSources(toolInvocations), [toolInvocations]);
 
   const htmlContent = useMemo(() => safeHtml(marked.parse(textContent || '')), [textContent]);
 
@@ -355,6 +357,7 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
             <ReadableContent html={htmlContent} text={textContent} viewMode={viewMode} />
           </BubbleWrapper>
         )}
+        <SourceGallery sources={webSources} />
         <div className={styles.responseMetaRow}>
           {shouldCollapse && (
             <button

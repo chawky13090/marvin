@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.562.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.563.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.562.0)
+## 9. État actuel (v2.563.0)
+
+**v2.563 (galerie visuelle de sources vérifiables)** : les réponses utilisant un outil Web
+affichent désormais sous leur texte un carrousel responsive de sources avec image, éditeur,
+domaine, date, lien direct et niveau de preuve. `page_read`, `snippet_only`,
+`access_restricted` et `rejected` restent distincts de la collecte jusqu’au frontend ; une
+tuile ne peut donc pas transformer un résultat SearXNG en page prétendument consultée.
+Playwright et Research Swarm extraient les métadonnées OpenGraph éditoriales. Les images ne
+sont jamais chargées directement par le navigateur utilisateur : une route backend
+authentifiée les récupère sans cookie via le transport anti-SSRF, limite la réponse à 4 Mio,
+refuse SVG, borne les dimensions à 25 mégapixels, produit une image WebP statique sans
+métadonnées et conserve un cache privé de 7 jours plafonné à 250 Mio. Le carrousel possède
+navigation clavier, défilement horizontal, boutons précédent/suivant, repli mobile et respect
+de `prefers-reduced-motion`. Aucune migration. Rollback : réversion atomique du commit
+v2.563, suppression facultative de `data/cache/web-source-previews`, puis redémarrage.
 
 **v2.562 (pages Web exigeant une session)** : l’URL d’un groupe Facebook redirigeait
 Marvin vers `/login/?next=...`, puis apparaissait comme une erreur HTTP 400 générique et

@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.563 — galerie visuelle des sources réellement lues et aperçus privés durcis
 # v2.562 — murs d’authentification Web explicites et sources protégées non revendiquées
 # v2.561 — recherche SearXNG résiliente, résultats vides non fautifs et preuves explicites
 # v2.560 — audit local borné : test de post-validation aligné sur la confirmation immédiate
@@ -119,6 +120,7 @@ from api.templates import router as templates_router
 from api.video_editing import router as video_editing_router
 from api.video_local import router as video_local_router
 from api.video_remote import router as video_remote_router
+from api.web_sources import router as web_sources_router
 from api.vm_lab import router as vm_lab_router
 from api.voice import prewarm_whisper
 from api.voice import router as voice_router
@@ -318,6 +320,7 @@ app.include_router(health_router)
 app.include_router(agent_gateway_router)
 app.include_router(model_selection_router)
 app.include_router(proactive_router)
+app.include_router(web_sources_router)
 install_access_contract(app)
 
 

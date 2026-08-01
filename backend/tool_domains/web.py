@@ -11,6 +11,7 @@ import evidence_fabric
 import outbound_http
 import site_crawler
 import tool_activity
+from web_source_metadata import extract_soup_metadata, normalize_source
 
 Generator = Callable[..., Awaitable[str]]
 GetSetting = Callable[[str], Any]
@@ -645,6 +646,8 @@ async def execute_web_search(args: dict) -> dict:
                 "title": str(item.get("title") or ""),
                 "url": str(item.get("url") or ""),
                 "snippet": str(item.get("content") or ""),
+                "thumbnail": str(item.get("thumbnail") or item.get("img_src") or ""),
+                "published_at": str(item.get("publishedDate") or item.get("published_at") or ""),
                 "engines": [
                     str(engine)
                     for engine in (item.get("engines") or [item.get("engine")])
@@ -836,6 +839,7 @@ async def execute_web_browse(args: dict) -> dict:
         meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
         if meta_desc:
             description = meta_desc.get("content", "").strip()
+        source_metadata = extract_soup_metadata(soup, final_url)
 
         access_wall = detect_authentication_wall(
             final_url,
@@ -878,6 +882,8 @@ async def execute_web_browse(args: dict) -> dict:
             "content": cleaned,
             "length": len(cleaned),
             "truncated": len(cleaned) >= max_chars,
+            "evidence_level": "page_read",
+            **source_metadata,
             "content_guard": guard_web_content(cleaned),
         }
     except Exception as e:
@@ -1165,11 +1171,11 @@ async def execute_web_research(args: dict) -> dict:
                 "Marvin n’a pas lu leur contenu et n’a produit aucune synthèse."
             ),
             "sources": [
-                {
+                normalize_source({
                     "title": res.get("title", ""),
                     "url": res.get("url", ""),
                     "evidence_level": "access_restricted",
-                }
+                })
                 for res, _p in restricted_pages
             ],
             "provider": search_receipt.get("provider"),
@@ -1216,7 +1222,23 @@ async def execute_web_research(args: dict) -> dict:
         "success": True,
         "answer": answer,
         "sources": [
-            {
+            normalize_source({
+                **r,
+                **next(
+                    (
+                        {
+                            key: value
+                            for key, value in (p or {}).items()
+                            if key in {
+                                "title", "url", "image_url", "favicon_url",
+                                "publisher", "published_at",
+                            } and value
+                        }
+                        for res, p in readable_pages
+                        if res.get("url") == r["url"]
+                    ),
+                    {},
+                ),
                 "title": r.get("title", ""),
                 "url": r["url"],
                 "evidence_level": (
@@ -1229,7 +1251,7 @@ async def execute_web_research(args: dict) -> dict:
                     )
                     else "snippet_only"
                 ),
-            }
+            })
             for r in results[:20]
         ],
         "provider": search_receipt.get("provider"),

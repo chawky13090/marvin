@@ -269,7 +269,15 @@ async def computer_act(
 async def fetch_text(url: str, timeout: int = 25000, max_chars: int = 8000) -> dict:
     """Ouvre une URL dans un vrai navigateur et renvoie son texte lisible."""
     data = await fetch_page(url, timeout=timeout, max_chars=max_chars)
-    return {"title": data["title"], "text": data["text"], "url": data["url"]}
+    return {
+        key: data.get(key, "")
+        for key in (
+            "title", "text", "url", "image_url", "favicon_url", "publisher",
+            "published_at", "evidence_level", "access_limited",
+            "authentication_required", "retryable", "error_code", "message",
+        )
+        if key in data
+    }
 
 
 async def fetch_page(url: str, timeout: int = 25000, max_chars: int = 100000) -> dict:
@@ -282,11 +290,25 @@ async def fetch_page(url: str, timeout: int = 25000, max_chars: int = 100000) ->
         data = await page.evaluate(
             """() => {
                 const links = [...document.querySelectorAll('a[href]')].map(a => a.href);
+                const meta = (...selectors) => {
+                    for (const selector of selectors) {
+                        const value = document.querySelector(selector)?.getAttribute('content');
+                        if (value) return value;
+                    }
+                    return '';
+                };
+                const icon = [...document.querySelectorAll('link[rel][href]')].find(link =>
+                    (link.getAttribute('rel') || '').toLowerCase().includes('icon')
+                );
                 document.querySelectorAll('script,style,nav,footer,header,noscript,svg,iframe').forEach(e=>e.remove());
                 return {
                     title: document.title || '',
                     text: (document.body && document.body.innerText) || '',
-                    links
+                    links,
+                    image_url: meta('meta[property="og:image"]', 'meta[name="twitter:image"]', 'meta[property="twitter:image"]'),
+                    favicon_url: icon?.href || '',
+                    publisher: meta('meta[property="og:site_name"]', 'meta[name="application-name"]'),
+                    published_at: meta('meta[property="article:published_time"]', 'meta[name="date"]', 'meta[name="datePublished"]')
                 };
             }"""
         )
@@ -295,6 +317,11 @@ async def fetch_page(url: str, timeout: int = 25000, max_chars: int = 100000) ->
             "text": (data.get("text") or "").strip()[:max_chars],
             "url": page.url,
             "links": list(dict.fromkeys(data.get("links") or []))[:10000],
+            "image_url": str(data.get("image_url") or "")[:4_096],
+            "favicon_url": str(data.get("favicon_url") or "")[:4_096],
+            "publisher": str(data.get("publisher") or "")[:160],
+            "published_at": str(data.get("published_at") or "")[:80],
+            "evidence_level": "page_read",
         }
         from web_access import detect_authentication_wall
         access_wall = detect_authentication_wall(

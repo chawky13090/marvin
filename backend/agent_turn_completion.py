@@ -59,9 +59,16 @@ def _reconcile_successful_web_result(
     ]
     if sources:
         rendered += (
-            f"\n\n### Sources Web consultées ({len(sources)})\n\n"
+            f"\n\n### Sources Web ({len(sources)})\n\n"
             + "\n".join(
             f"- [{source['title'] or source['url']}]({source['url']})"
+            + (
+                " — page lue"
+                if source.get("evidence_level") == "page_read"
+                else " — connexion requise"
+                if source.get("evidence_level") == "access_restricted"
+                else " — aperçu du moteur"
+            )
             for source in sources
             if source.get("url")
         )

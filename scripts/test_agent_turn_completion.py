@@ -175,7 +175,7 @@ async def main() -> int:
         log_bug.assert_called_once()
     assert reconciled.content.startswith("Deux incendies")
     assert "Source officielle" in reconciled.content
-    assert "Sources Web consultées (1)" in reconciled.content
+    assert "Sources Web (1)" in reconciled.content
     assert reconciled_messages[0][0][2] == reconciled.content
     assert json.loads(reconciled.events[0]) == {
         "type": "answer_final",

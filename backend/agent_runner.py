@@ -103,6 +103,13 @@ class RunnerState:
                         {
                             "title": str(source.get("title") or "")[:300],
                             "url": str(source.get("url") or "")[:2_000],
+                            "domain": str(source.get("domain") or "")[:255],
+                            "publisher": str(source.get("publisher") or "")[:160],
+                            "published_at": str(source.get("published_at") or "")[:80],
+                            "image_url": str(source.get("image_url") or "")[:4_096],
+                            "favicon_url": str(source.get("favicon_url") or "")[:4_096],
+                            "evidence_level": str(source.get("evidence_level") or "snippet_only")[:40],
+                            "source_type": str(source.get("source_type") or "")[:80],
                         }
                         for source in (result.get("sources") or [])[:50]
                         if isinstance(source, dict)

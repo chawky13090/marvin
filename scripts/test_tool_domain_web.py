@@ -347,6 +347,10 @@ async def _run() -> None:
     html = (
         b"<html><head><title> Marvin Test </title>"
         b'<meta content="Description fiable" name="description">'
+        b'<meta content="Marvin Labs" property="og:site_name">'
+        b'<meta content="/preview.png" property="og:image">'
+        b'<meta content="2026-08-01" property="article:published_time">'
+        b'<link href="/favicon.ico" rel="icon">'
         b'<link href="https://example.com/canonical" rel="canonical">'
         b"</head><body><main>Contenu public</main></body></html>"
     )
@@ -370,6 +374,11 @@ async def _run() -> None:
     assert analyzed["description"] == "Description fiable"
     assert analyzed["canonical"] == "https://example.com/canonical"
     assert browsed["content"] == "Contenu public"
+    assert browsed["evidence_level"] == "page_read"
+    assert browsed["publisher"] == "Marvin Labs"
+    assert browsed["image_url"] == "https://example.com/preview.png"
+    assert browsed["favicon_url"] == "https://example.com/favicon.ico"
+    assert browsed["published_at"] == "2026-08-01"
     assert tools.execute_url_analyze is web.execute_url_analyze
 
     facebook_login = outbound_http.PublicResponse(

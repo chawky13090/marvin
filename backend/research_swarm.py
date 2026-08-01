@@ -24,6 +24,7 @@ from tool_domains.web import execute_web_search
 import tool_activity
 from config import DATA_DIR, OLLAMA_URL
 from durable_evidence_store import DurableEvidenceStore
+from web_source_metadata import extract_soup_metadata, normalize_source
 
 
 RUNS_PATH = Path(DATA_DIR) / "research_swarm_runs.jsonl"
@@ -152,6 +153,7 @@ async def _fetch_public_source(url: str, *, max_chars: int = 3500) -> dict[str, 
     decoded = response.content.decode("utf-8", errors="replace")
     if "html" in content_type or "<html" in decoded[:1000].casefold():
         soup = BeautifulSoup(decoded, "lxml")
+        metadata = extract_soup_metadata(soup, response.url)
         title = (
             " ".join(soup.title.get_text(" ", strip=True).split())[:300]
             if soup.title
@@ -164,6 +166,7 @@ async def _fetch_public_source(url: str, *, max_chars: int = 3500) -> dict[str, 
         root = soup.find("article") or soup.find("main") or soup.find("body") or soup
         text = root.get_text(separator="\n", strip=True)
     else:
+        metadata = {}
         title = ""
         text = decoded
     cleaned = "\n".join(line.strip() for line in text.splitlines() if line.strip())
@@ -171,6 +174,8 @@ async def _fetch_public_source(url: str, *, max_chars: int = 3500) -> dict[str, 
         "title": title,
         "url": response.url,
         "text": cleaned[:normalized_limit],
+        **metadata,
+        "evidence_level": "page_read",
     }
 
 
@@ -337,6 +342,11 @@ async def execute_v2(
                         "title": str(page.get("title") or hit.get("title") or "")[:300],
                         "url": str(page.get("url") or ""),
                         "text": text[:3500],
+                        "image_url": str(page.get("image_url") or hit.get("thumbnail") or "")[:4_096],
+                        "favicon_url": str(page.get("favicon_url") or "")[:4_096],
+                        "publisher": str(page.get("publisher") or "")[:160],
+                        "published_at": str(page.get("published_at") or hit.get("published_at") or "")[:80],
+                        "evidence_level": "page_read",
                     })
             if not sources:
                 return {**cell, "ok": False, "error": "Aucune source exploitable.", "sources": []}
@@ -379,12 +389,18 @@ async def execute_v2(
                 if existing:
                     existing["citations"].append(source["citation"])
                     continue
-                public_source = {
+                public_source = normalize_source({
                     "title": source["title"],
                     "url": source["url"],
                     "citation": source["citation"],
                     "citations": [source["citation"]],
-                }
+                    "image_url": source.get("image_url"),
+                    "favicon_url": source.get("favicon_url"),
+                    "publisher": source.get("publisher"),
+                    "published_at": source.get("published_at"),
+                    "evidence_level": "page_read",
+                })
+                public_source["citations"] = [source["citation"]]
                 sources_by_url[source["url"]] = public_source
                 unique_sources.append(public_source)
         reports = "\n\n".join(

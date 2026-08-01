@@ -288,11 +288,11 @@ def main() -> int:
                     source = await research_swarm._fetch_public_source(
                         "https://docs.example.org/guide"
                     )
-                assert source == {
-                    "title": "Official",
-                    "url": "https://docs.example.org/guide",
-                    "text": "Useful text",
-                }
+                assert source["title"] == "Official"
+                assert source["url"] == "https://docs.example.org/guide"
+                assert source["text"] == "Useful text"
+                assert source["publisher"] == "docs.example.org"
+                assert source["evidence_level"] == "page_read"
                 assert fetch_public.await_args.kwargs["max_bytes"] == 1_000_000
 
                 binary_page = SimpleNamespace(
