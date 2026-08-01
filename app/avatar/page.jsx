@@ -76,6 +76,14 @@ export default function DesktopAvatarPage() {
     noticeTimerRef.current = setTimeout(() => setNotice(null), 3500);
   };
 
+  const lifecycleUi = useMemo(() => {
+    if (desktopStatus === 'stopping') return { label: 'Arrêt coopératif en cours', detail: 'Marvin ferme ses services proprement et vérifie les ports.', progress: 62, tone: '#d6b77a', active: true };
+    if (desktopStatus === 'opening') return { label: 'Démarrage en cours', detail: 'Vérification du backend, du frontend et des dépendances.', progress: 48, tone: '#b8c3d6', active: true };
+    if (desktopStatus === 'stopped') return { label: 'Marvin arrêté proprement', detail: 'Les dépendances partagées restent disponibles.', progress: 100, tone: '#9aa4b2', active: false };
+    if (desktopStatus && desktopStatus !== 'ready') return { label: 'Cycle interrompu', detail: String(desktopStatus), progress: 100, tone: '#cf8f8f', active: false };
+    return { label: 'Marvin prêt', detail: 'Aucune opération de cycle de vie en cours.', progress: 100, tone: '#a9b4a5', active: false };
+  }, [desktopStatus]);
+
   const startNewConversation = () => {
     if (!canSwitchConversation({ isLoading, liveConversationId: conversationId, targetConversationId: null })) {
       showNotice('Réponse en cours — attends la fin avant de repartir à zéro.');
@@ -208,6 +216,17 @@ export default function DesktopAvatarPage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div role="status" aria-live="polite" style={{ marginBottom: 8, padding: '8px 10px', border: `1px solid ${lifecycleUi.tone}55`, borderRadius: 9, background: 'rgba(28,29,33,.82)', color: lifecycleUi.tone, boxShadow: lifecycleUi.active ? '0 0 18px rgba(214,183,122,.08)' : 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 10.5, fontWeight: 750 }}>
+          <span>{lifecycleUi.active ? '● ' : '○ '}{lifecycleUi.label}</span>
+          <span style={{ fontVariantNumeric: 'tabular-nums', opacity: .8 }}>{lifecycleUi.progress}%</span>
+        </div>
+        <div style={{ height: 4, marginTop: 6, overflow: 'hidden', borderRadius: 99, background: '#292b30' }}>
+          <div style={{ width: `${lifecycleUi.progress}%`, height: '100%', borderRadius: 99, background: lifecycleUi.tone, transition: 'width .35s ease' }} />
+        </div>
+        <div style={{ marginTop: 5, color: 'var(--text-secondary)', fontSize: 9.5 }}>{lifecycleUi.detail}</div>
       </div>
 
       {notice && (

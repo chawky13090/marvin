@@ -202,7 +202,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.544.0)
+## 9. État actuel (v2.545.0)
+
+**v2.545 (redémarrage stable et frontend déjà actif)** : le lanceur ne démarre plus un
+second Turbopack lorsque le port 3000 appartient déjà à un processus Marvin mais que son API
+est momentanément indisponible pendant le retour du backend. `restart-marvin.ps1` exige trois
+sondes consécutives backend/frontend avant de déclarer le redémarrage réussi. Aucune migration.
+Rollback : réversion atomique du commit v2.545 puis relance de `restart.bat`.
 
 **v2.544 (analyse de la conversation « chercher les prix koios.fr » — diagnostic de
 chronologie + alias mineur)** : l'utilisateur a signalé que « chercher les prix sur un

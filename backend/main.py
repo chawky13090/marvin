@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.545 — cycle de redémarrage stable et détection du frontend existant
 # v2.544 — computer_control : alias duration->duration_ms pour action=wait
 # v2.543 — prompt systeme corrige : preferait le navigateur cache par defaut (contradiction)
 # v2.542 — navigate cible le navigateur visible par defaut, plus headless par defaut

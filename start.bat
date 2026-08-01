@@ -157,6 +157,12 @@ if %ERRORLEVEL% EQU 0 (
     call :release_start_lock
     exit /b 0
 )
+powershell -NoProfile -Command "$c=Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue; if($null -eq $c){exit 1}; foreach($x in @($c)){ $p=Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $x.OwningProcess) -ErrorAction SilentlyContinue; $i=('{0} {1}' -f $p.ExecutablePath,$p.CommandLine); if($i.IndexOf('%~dp0',[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $i -match '(?i)next|start_next_dev'){exit 0} }; exit 1" >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo  Frontend Marvin deja en ecoute; conservation du processus existant.
+    call :release_start_lock
+    exit /b 0
+)
 powershell -NoProfile -Command "$c=Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue; if($null -ne $c){exit 0}; exit 1" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo [ERREUR] Le port 3000 est occupe par une application qui n'est pas Marvin.

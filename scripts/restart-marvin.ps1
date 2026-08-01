@@ -23,14 +23,20 @@ $StartProcess = Start-Process -FilePath $env:ComSpec `
 $Deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 $Backend = $null
 $FrontendReady = $false
+$StableChecks = 0
 do {
     try { $Backend = Invoke-RestMethod 'http://127.0.0.1:8005/api/health' -TimeoutSec 3 } catch { $Backend = $null }
     try {
         $FrontendReady = (Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:3000/api/status' -TimeoutSec 3).StatusCode -eq 200
     } catch { $FrontendReady = $false }
-    if ($null -ne $Backend -and $FrontendReady) { break }
+    if ($null -ne $Backend -and $FrontendReady) {
+        $StableChecks++
+        if ($StableChecks -ge 3) { break }
+    } else {
+        $StableChecks = 0
+    }
     if ($StartProcess.HasExited -and $StartProcess.ExitCode -ne 0) { break }
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 1000
 } while ((Get-Date) -lt $Deadline)
 
 if ($null -eq $Backend -or -not $FrontendReady) {

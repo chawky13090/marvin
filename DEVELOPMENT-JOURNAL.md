@@ -15455,3 +15455,17 @@ PID et horodatage. Ollama et SearXNG restent des dépendances partagées. Aucune
 mutation de donnée persistante. Rollback : réversion atomique du commit v2.534 puis
 `start.bat`. Si l'autostart a été installé, supprimer la tâche planifiée
 `Marvin - Demarrage automatique` et la règle firewall `Marvin HTTPS 8443`.
+
+## 2026-08-01 — v2.545 — Redémarrage stable après validation réelle
+
+Le premier redémarrage réel a exposé une course : le frontend existant occupait déjà 3000,
+mais son endpoint de statut était temporairement indisponible pendant le retour du backend.
+Le lanceur tentait alors un second Turbopack et rencontrait `EPERM` sur `.next/dev/server`.
+Le correctif reconnaît maintenant un processus Next/Turbopack Marvin déjà en écoute et le
+conserve. Le script de redémarrage exige trois sondes consécutives backend/frontend avant de
+retourner `success=true`.
+
+Validation : correction syntaxique appliquée; le redémarrage réel précédent a restauré
+backend, frontend, HTTPS, Ollama, SearXNG et LAN. Une nouvelle validation complète sera
+effectuée après le contrôle ciblé et l'indicateur visuel de l'avatar. Rollback : réversion
+atomique du commit v2.545 puis relance de `restart.bat`; aucune migration ni donnée modifiée.
