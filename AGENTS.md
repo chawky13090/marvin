@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.563.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.564.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.563.0)
+## 9. État actuel (v2.564.0)
+
+**v2.564 (miniatures des sources et Lecture réellement épurée)** : les cartes SearXNG sans
+miniature explicite demandent maintenant au proxy privé de résoudre l’image OpenGraph ou le
+favicon de la page. Cette lecture de métadonnées ne transforme pas le snippet en preuve : le
+badge reste « Aperçu moteur ». Le navigateur ne contacte toujours jamais directement le site
+tiers, le transport anti-SSRF, les limites, le réencodage WebP et le cache de v2.563 restent
+applicables. En mode Lecture, les cartes techniques terminées et leurs erreurs sont désormais
+impossibles à déplier ; seul un résumé compact reste visible, tandis qu’une confirmation
+requise demeure toujours interactive. Les détails complets restent dans Technique et Audit.
+Le Runner normalise enfin `limit`, `count` et `num_results` vers `web_search.max_results`
+avant validation, y compris lorsqu’un modèle sérialise l’entier en chaîne. Aucune migration.
+Rollback : réversion atomique du commit v2.564, suppression facultative du cache des aperçus,
+puis redémarrage backend/frontend.
 
 **v2.563 (galerie visuelle de sources vérifiables)** : les réponses utilisant un outil Web
 affichent désormais sous leur texte un carrousel responsive de sources avec image, éditeur,

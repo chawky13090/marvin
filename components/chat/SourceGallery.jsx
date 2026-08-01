@@ -16,15 +16,19 @@ function domainOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
 }
 
+function displayText(value) {
+  return String(value || '').replace(/\uFFFD+/g, '…').replace(/\s+/g, ' ').trim();
+}
+
 function normalizeSource(source, index) {
   const url = String(source?.url || source?.requested_url || '');
   const evidence = EVIDENCE[source?.evidence_level] ? source.evidence_level : 'snippet_only';
   return {
     id: source?.id || source?.citation || `${url}-${index}`,
-    title: String(source?.title || url || 'Source Web'),
+    title: displayText(source?.title || url || 'Source Web'),
     url,
     domain: String(source?.domain || domainOf(url)),
-    publisher: String(source?.publisher || source?.domain || domainOf(url)),
+    publisher: displayText(source?.publisher || source?.domain || domainOf(url)),
     publishedAt: String(source?.published_at || ''),
     imageUrl: String(source?.image_url || source?.thumbnail || ''),
     faviconUrl: String(source?.favicon_url || ''),
@@ -108,8 +112,8 @@ export default function SourceGallery({ sources = [] }) {
               aria-label={`Ouvrir la source ${index + 1} : ${source.title}`}
             >
               <div className={styles.visual}>
-                {source.imageUrl && source.evidence === 'page_read' && (
-                  <img src={previewUrl(source.imageUrl)} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                {source.evidence !== 'access_restricted' && (
+                  <img src={previewUrl(source.imageUrl || source.url)} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
                 )}
                 <span className={styles.sourceNumber}>[{index + 1}]</span>
                 <span className={styles.evidence}>{evidence.label}</span>

@@ -56,6 +56,15 @@ def main() -> int:
     assert crawl.arguments["max_pages"] == 5
     assert crawl.arguments["max_depth"] == 2
 
+    web_search = prepare_tool_call(
+        "web_search",
+        {"query": "actualité France", "limit": "20"},
+    )
+    assert web_search.arguments == {
+        "query": "actualité France",
+        "max_results": 20,
+    }
+
     status = prepare_tool_call(
         "code_workspace_status", {"mission_id": "mission-1"}
     )

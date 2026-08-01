@@ -141,6 +141,24 @@ def prepare_tool_call(
             arguments, (schemas_by_name or {}).get(name)
         )
 
+    # Les API de recherche courantes nomment ce plafond `limit` ou `count`.
+    # Le contrat Marvin expose `max_results`; normaliser ces synonymes empêche
+    # un appel pourtant non ambigu d'échouer avant même d'atteindre SearXNG.
+    if name == "web_search":
+        if arguments.get("max_results") is None:
+            for alias in ("limit", "count", "num_results"):
+                if arguments.get(alias) is not None:
+                    arguments["max_results"] = arguments[alias]
+                    break
+        for alias in ("limit", "count", "num_results"):
+            arguments.pop(alias, None)
+        max_results = arguments.get("max_results")
+        if isinstance(max_results, str):
+            try:
+                arguments["max_results"] = int(max_results.strip())
+            except ValueError:
+                pass
+
     # Certains modèles compatibles OpenAI sérialisent encore les booléens JSON
     # en chaînes. La coercition reste volontairement limitée aux champs booléens
     # documentés de Computer Runtime et aux deux littéraux JSON exacts.

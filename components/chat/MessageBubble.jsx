@@ -348,6 +348,9 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
     // Une confirmation critique reste toujours ouverte afin de ne masquer aucune décision.
     const anyNeedsAttention = toolInvocations.some(toolNeedsAttention);
     const shouldCollapse = !anyNeedsAttention && finishedCount === toolInvocations.length;
+    const showToolDetails = anyNeedsAttention || (
+      viewMode !== 'reading' && (!shouldCollapse || !stepsCollapsed)
+    );
     return (
       <div className={`${styles.wrapper} ${styles.wrapperAssistant}`} style={{ flexDirection: 'column', gap: '8px', opacity: 1, maxWidth: '100%' }}>
         <TurnModeBadge mode={turnMode} />
@@ -359,7 +362,19 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
         )}
         <SourceGallery sources={webSources} />
         <div className={styles.responseMetaRow}>
-          {shouldCollapse && (
+          {shouldCollapse && viewMode === 'reading' && (
+            <div className={`${styles.activityToggle} ${styles.activityStatic}`}>
+              <span aria-hidden="true">{errorTools.length > 0 ? '!' : '✓'}</span>
+              <span>
+                {toolInvocations.length} action{toolInvocations.length > 1 ? 's' : ''}
+                {errorTools.length > 0
+                  ? ` · ${errorTools.length} en erreur`
+                  : ` · terminée${toolInvocations.length > 1 ? 's' : ''}`}
+              </span>
+              <span className={styles.activityToggleAction}>Détails en mode Technique</span>
+            </div>
+          )}
+          {shouldCollapse && viewMode !== 'reading' && (
             <button
               type="button"
               className={styles.activityToggle}
@@ -386,7 +401,7 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
             <CodingMissionTracker result={codingMissionTool.result} />
           </div>
         )}
-        {(!shouldCollapse || !stepsCollapsed) && (
+        {showToolDetails && (
           <div className={styles.toolCalls}>
             {toolInvocations.map((tool, i) => (
               <ToolCallInline

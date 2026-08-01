@@ -15951,3 +15951,34 @@ Le contrôle visuel réel a trouvé trois galeries dans une conversation existan
 directs dans la première et une navigation horizontale fonctionnelle. Rollback : réversion
 atomique du commit v2.563, suppression facultative de `data/cache/web-source-previews`, puis
 redémarrage ; aucune migration ni donnée métier.
+
+## 2026-08-02 — v2.564 — Miniatures Web, Lecture épurée et alias `web_search.limit`
+
+Les captures utilisateur ont confirmé trois défauts du premier rendu : les résultats SearXNG
+sans champ `thumbnail` produisaient de grands aplats vides ; le mode Lecture pouvait encore
+afficher les cartes techniques lorsqu’un état local avait été déplié ; un modèle cloud a
+émis `web_search.limit`, synonyme non déclaré de `max_results`, causant trois rejets avant
+exécution. Le texte provenant de certains moteurs contenait aussi le caractère Unicode de
+remplacement, désormais rendu par une ellipse neutre plutôt que par un glyphe cassé.
+
+Le proxy d’aperçu accepte maintenant une URL de page, lit uniquement ses métadonnées sans
+cookie, résout OpenGraph puis favicon et applique au média final les mêmes contrôles
+anti-SSRF, taille, type raster, dimensions et réencodage WebP que v2.563. `loading=lazy`
+conserve le chargement aux cartes proches de la zone visible. Lecture ne rend plus les
+résultats techniques terminés ; les confirmations requises restent visibles par sécurité.
+Technique et Audit conservent les cartes détaillées. La préparation déterministe des appels
+normalise les trois alias usuels du plafond de recherche avant la validation du schéma.
+
+Rollback : réversion atomique du commit v2.564, suppression facultative de
+`data/cache/web-source-previews`, puis redémarrage. Aucune migration ou donnée métier.
+
+Validation réelle : tests causaux métadonnées/cache, préparation d’outil, domaine Web,
+présentation du chat, compilation Python et architecture réussis. Build Next.js
+16.2.12/Turbopack réussi. Après chargement de v2.564, une URL de page sans miniature
+explicite a produit un WebP via son favicon. Dans la conversation « Feux de forêt en
+France », Lecture masque l’erreur `web_search.limit`, conserve uniquement le résumé compact
+et affiche neuf cartes dont les aperçus France 24, Le Figaro et Wikinews ont été résolus.
+La suite globale `check:quick` passe 235/235 avec 363 outils, 391 routes et le harnais
+363/363. Le premier passage a détecté `main.py` à 351 lignes ; une ancienne ligne d’historique
+déjà présente dans ce journal a été retirée, puis le test causal et la suite complète ont été
+rejoués avec succès.

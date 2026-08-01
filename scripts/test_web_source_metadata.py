@@ -77,6 +77,28 @@ async def _run() -> None:
         finally:
             metadata.PREVIEW_CACHE_DIR = old_cache
 
+    page_response = outbound_http.PublicResponse(
+        url="https://news.example/article",
+        status_code=200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        content=b'<html><head><meta property="og:image" content="https://cdn.example/preview.png"></head></html>',
+        elapsed_ms=5,
+    )
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-") as directory:
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
+        try:
+            with patch.object(
+                metadata.outbound_http,
+                "fetch_public",
+                new=AsyncMock(side_effect=[page_response, image_response]),
+            ) as fetch:
+                path, media_type = await metadata.cache_preview(page_response.url)
+            assert path.is_file() and media_type == "image/webp"
+            assert fetch.await_count == 2
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
+
     svg_response = outbound_http.PublicResponse(
         url="https://cdn.example/vector.svg",
         status_code=200,

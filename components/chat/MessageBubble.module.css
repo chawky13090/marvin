@@ -204,6 +204,12 @@
   color: var(--text-primary);
 }
 
+.activityStatic { cursor: default; }
+.activityStatic:hover {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
 .activityToggleAction {
   color: var(--accent-secondary);
   font-weight: 600;

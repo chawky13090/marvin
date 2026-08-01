@@ -27,6 +27,7 @@ ALLOWED_IMAGE_TYPES = {
     "image/x-icon",
     "image/vnd.microsoft.icon",
 }
+ALLOWED_PAGE_TYPES = {"text/html", "application/xhtml+xml"}
 _CACHE_WRITE_LOCK = asyncio.Lock()
 
 
@@ -118,8 +119,25 @@ def _prune_cache() -> None:
         total -= size
 
 
+async def _fetch_preview_resource(url: str, *, accept: str) -> Any:
+    try:
+        return await outbound_http.fetch_public(
+            url,
+            max_bytes=MAX_PREVIEW_BYTES,
+            timeout=12.0,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; MarvinSourcePreview/2.564)",
+                "Accept": accept,
+            },
+        )
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError("Aperçu distant indisponible.") from exc
+
+
 async def cache_preview(image_url: str) -> tuple[Path, str]:
-    """Télécharge sans cookie une image publique validée par le transport anti-SSRF."""
+    """Résout puis met en cache l’image d’une source publique, sans cookie ni SVG."""
     normalized_url = _public_url(image_url, image_url)
     if not normalized_url:
         raise ValueError("URL d’aperçu invalide.")
@@ -129,23 +147,28 @@ async def cache_preview(image_url: str) -> tuple[Path, str]:
     if candidate.is_file() and time.time() - candidate.stat().st_mtime <= CACHE_TTL_SECONDS:
         return candidate, "image/webp"
 
-    try:
-        response = await outbound_http.fetch_public(
-            normalized_url,
-            max_bytes=MAX_PREVIEW_BYTES,
-            timeout=12.0,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; MarvinSourcePreview/2.563)",
-                "Accept": "image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.8",
-            },
-        )
-    except ValueError:
-        raise
-    except Exception as exc:
-        raise ValueError("Aperçu distant indisponible.") from exc
+    response = await _fetch_preview_resource(
+        normalized_url,
+        accept="image/avif,image/webp,image/png,image/jpeg,image/gif,text/html;q=0.7",
+    )
     if response.status_code >= 400:
         raise ValueError(f"Aperçu distant indisponible (HTTP {response.status_code}).")
     media_type = str(response.headers.get("content-type") or "").split(";", 1)[0].casefold()
+    if media_type in ALLOWED_PAGE_TYPES:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(response.content.decode("utf-8", errors="replace"), "lxml")
+        metadata = extract_soup_metadata(soup, response.url)
+        resolved_image_url = metadata.get("image_url") or metadata.get("favicon_url")
+        if not resolved_image_url or resolved_image_url == normalized_url:
+            raise ValueError("Cette page ne publie aucun aperçu visuel exploitable.")
+        response = await _fetch_preview_resource(
+            resolved_image_url,
+            accept="image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.8",
+        )
+        if response.status_code >= 400:
+            raise ValueError(f"Aperçu distant indisponible (HTTP {response.status_code}).")
+        media_type = str(response.headers.get("content-type") or "").split(";", 1)[0].casefold()
     if media_type not in ALLOWED_IMAGE_TYPES or not response.content:
         raise ValueError("Type d’image non autorisé.")
 

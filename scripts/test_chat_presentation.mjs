@@ -66,7 +66,11 @@ assert.ok(messageBubbleSource.includes('<SourceGallery sources={webSources} />')
 assert.ok(sourceGallerySource.includes("page_read: { label: 'Page lue'"));
 assert.ok(sourceGallerySource.includes("access_restricted: { label: 'Connexion requise'"));
 assert.ok(sourceGallerySource.includes('/api/web/source-preview?url='));
+assert.ok(sourceGallerySource.includes('source.imageUrl || source.url'));
+assert.ok(sourceGallerySource.includes("replace(/\\uFFFD+/g, '…')"));
 assert.ok(sourceGalleryCss.includes('scroll-snap-type: inline mandatory'));
+assert.ok(messageBubbleSource.includes("viewMode !== 'reading' && (!shouldCollapse || !stepsCollapsed)"));
+assert.ok(messageBubbleSource.includes('Détails en mode Technique'));
 const fileExplorerSource = fs.readFileSync(new URL('../components/chat/FileExplorerCard.jsx', import.meta.url), 'utf8');
 const typingIndicatorSource = fs.readFileSync(new URL('../components/chat/TypingIndicator.jsx', import.meta.url), 'utf8');
 const typingIndicatorCss = fs.readFileSync(new URL('../components/chat/TypingIndicator.module.css', import.meta.url), 'utf8');
