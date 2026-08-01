@@ -41,9 +41,9 @@ async def main() -> int:
         normalize_result=normalize,
     )
     assert processed["_contract"]["duration_ms"] == 42
-    assert "action à confirmer" in processed["message"]
+    assert processed["message"] == "Prêt"
     assert "secret potentiel" in processed["security_warning"]
-    assert [call[0] for call in calls] == ["normalize", "critique", "scan"]
+    assert [call[0] for call in calls] == ["normalize", "scan"]
 
     async def broken_critique(*args, **kwargs):
         raise RuntimeError("indisponible")

@@ -15844,3 +15844,25 @@ interdit compétences inventées et champs factices pour une lettre de motivatio
 
 Validation : trois tests de régression, compilation Python et architecture 363/363 réussis.
 Rollback : réversion atomique du commit v2.559 et redémarrage ; aucune migration de données.
+
+## 2026-08-01 — v2.560 — Arrêt du scan profond et audit local borné
+
+À la demande de l'utilisateur, le scan Codex Security profond a été annulé pour stopper sa
+consommation de crédits et les alertes heuristiques Bitdefender provoquées par les workers
+PowerShell parallèles. Le scan n'a pas produit de manifeste terminal et ne constitue pas une
+validation sécurité. Ses identifiants, la cause `spawn EPERM`, la correction locale
+`CODEX_CLI_PATH` et les limites de reprise sont consignés dans
+`docs/AUDIT-LOCAL-BORNE-2026-08-01.md`.
+
+Un audit local séquentiel, sans agent de découverte ni appel LLM payant, a ensuite été mené.
+SearXNG est fonctionnel sur son port dynamique `8391` : conteneur actif, accueil et recherche
+JSON HTTP 200. Trois tests obsolètes ont été alignés sur les contrats applicatifs déjà en
+production : confirmation immédiate sans critique LLM bloquante, fermeture via
+`shutdown_runtime.run`, et politique Model Market `documented_priors_plus_real_outcomes`.
+Aucun comportement métier, schéma ou donnée persistante n'a changé.
+
+Résultats observés : `check:quick` 235/235, smoke API 28/28, pages 41/41, architecture
+363/363 outils et runtime Node natif valide. Le backend actif reste en v2.559 jusqu'au prochain
+redémarrage contrôlé ; les sources sont en v2.560. Aucun redémarrage n'a été imposé pendant la
+session. Les fichiers non suivis existants ont été préservés. Rollback : réversion atomique
+du commit v2.560 puis redémarrage ; aucune migration.

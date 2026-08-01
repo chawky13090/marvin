@@ -348,7 +348,7 @@ def model_market_contracts() -> None:
     jobs = fetch_json(f"{BACKEND}/api/model-market/swarm/jobs?limit=1")
     evolution = fetch_json(f"{BACKEND}/api/evolution/experiments?limit=1")
     missions = fetch_json(f"{BACKEND}/api/missions?limit=1")
-    assert catalog.get("policy") == "passive_real_calls_only"
+    assert catalog.get("policy") == "documented_priors_plus_real_outcomes"
     assert isinstance(catalog.get("models"), list)
     assert isinstance(recommendations.get("recommendations"), list)
     assert isinstance(runs.get("runs"), list)

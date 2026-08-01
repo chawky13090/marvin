@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.559.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.560.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.559.0)
+## 9. État actuel (v2.560.0)
+
+**v2.560 (audit local borné après arrêt du scan profond)** : le scan Codex Security
+multi-agent a été annulé à la demande de l'utilisateur en raison de son coût et des alertes
+heuristiques Bitdefender provoquées par ses recherches PowerShell en parallèle. Aucun constat
+de sécurité n'est déduit de ce scan incomplet. Le contrôle local `check:quick` a validé les
+premières tranches puis révélé un test obsolète : il attendait encore la critique LLM
+synchrone retirée en v2.556. Le test vérifie désormais le contrat réel : diffusion immédiate
+de la confirmation, sans appel de critique, tout en conservant la normalisation et le scan
+documentaire. SearXNG est confirmé sur son port dynamique `8391` et non sur l'ancien port
+`8890`. Un second test obsolète cherchait les anciens appels directs de fermeture ; il vérifie
+désormais l'ordre réel des composants à travers `shutdown_runtime.run`, sans affaiblir le
+contrat de fermeture. Rollback : réversion atomique du commit v2.560 ; aucune migration ni
+donnée modifiée.
+
+Le smoke test API de Model Market est également aligné sur la politique active
+`documented_priors_plus_real_outcomes`, déjà couverte par son test unitaire ; l'ancienne
+valeur `passive_real_calls_only` n'était plus le contrat du moteur.
 
 **v2.559 (incident lettre Ynov : FileZilla et composition inadaptée)** : la conversation
 réelle a prouvé que `computer_control(action=open,target=file,url=<docx>)` résolvait le mot

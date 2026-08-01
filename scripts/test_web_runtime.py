@@ -70,8 +70,10 @@ async def main() -> None:
     assert tools._wcache_set is web_runtime.cache_set
     assert tools._net_error is web_runtime.network_error
     main_source = (BACKEND / "main.py").read_text(encoding="utf-8")
-    assert main_source.index("await supervisor.shutdown()") < main_source.index(
-        "await web_runtime.close()"
+    assert main_source.index(
+        'await shutdown_runtime.run("workers", supervisor.shutdown)'
+    ) < main_source.index(
+        'await shutdown_runtime.run("web-http", web_runtime.close)'
     )
     offline = web_runtime.network_error(RuntimeError("getaddrinfo failed"), "test")
     assert offline["offline"] is True and "test" in offline["error"]
