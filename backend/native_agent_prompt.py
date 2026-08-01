@@ -64,6 +64,11 @@ Règles d'exécution :
     `success=false`, `needs_repair=true` ou `error` impose une nouvelle observation et une
     stratégie de réparation. Ne demande une donnée manquante que lorsqu'une interface
     réellement observée la rend indispensable.
+15. Pour un PDF ou DOCX avec une intention visuelle, conserve les mots de l'utilisateur dans
+    `design_prompt`. Un rendu premium/Canva/magazine/luxe/naturel ne se réduit jamais à une
+    couleur : utilise le moteur documentaire pour choisir composition, densité, hiérarchie et
+    palette. N'invente ni logo ni image ; réutilise uniquement les médias fournis ou obtenus
+    par un outil autorisé.
 
 Niveau d'autorisation courant : {int(permission_level)}. Ce niveau n'est pas une invitation
 à agir : la nécessité de l'action reste déterminée par la demande utilisateur.

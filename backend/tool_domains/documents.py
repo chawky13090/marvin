@@ -20,45 +20,20 @@ from document_profile import get_identity as _document_identity
 from document_profile import TEMPLATES
 import database as db
 from storage_layout import roots
+from premium_document_design import resolve_design
 
 
 _resolver: Callable[[str], str] | None = None
 _text_generator: Callable[..., Awaitable[object]] | None = None
 _generated_dir: Path | None = None
 
-_DOCUMENT_THEMES = {
-    "professional": {
-        "accent": "#334155", "text": "#172033", "muted": "#64748b",
-        "surface": "#f8fafc", "cover": "#eef2f6", "cover_text": "#172033", "font": "Aptos",
-    },
-    "executive": {
-        "accent": "#9a7b3f", "text": "#202020", "muted": "#686868",
-        "surface": "#f7f4ed", "cover": "#eee8db", "cover_text": "#202020", "font": "Aptos",
-    },
-    "minimal": {
-        "accent": "#444444", "text": "#202020", "muted": "#737373",
-        "surface": "#fafafa", "cover": "#f2f2f2", "cover_text": "#202020", "font": "Aptos",
-    },
-    "technical": {
-        "accent": "#176b87", "text": "#16252d", "muted": "#52656f",
-        "surface": "#eef6f8", "cover": "#dceef2", "cover_text": "#16252d", "font": "Aptos",
-    },
-    "galactic": {
-        "accent": "#8b5cf6", "text": "#24223a", "muted": "#68658a",
-        "surface": "#f4f2ff", "cover": "#0b1026", "cover_text": "#f4f2ff", "font": "Aptos",
-    },
-}
-
-
 def _document_theme(args: dict) -> tuple[str, dict[str, str]]:
-    name = str(args.get("theme") or "professional").strip().casefold()
-    if name not in _DOCUMENT_THEMES:
-        name = "professional"
-    theme = dict(_DOCUMENT_THEMES[name])
-    if args.get("accent"):
-        raw = str(args["accent"]).strip()
-        theme["accent"] = raw if raw.startswith("#") else f"#{raw}"
-    return name, theme
+    manifest = resolve_design(args)
+    theme = dict(manifest.palette)
+    theme["font"] = manifest.font
+    theme["layout"] = manifest.layout
+    theme["density"] = manifest.density
+    return manifest.name, theme
 
 
 def configure(*, resolve_path: Callable[[str], str]) -> None:
@@ -273,6 +248,7 @@ async def create_docx(args: dict) -> dict:
     content = args.get("content", "")
     _identity = _document_identity()
     author = args.get("author") or _identity.get("author") or "Marvin"
+    design = resolve_design(args)
     theme_name, theme = _document_theme(args)
     accent = theme["accent"].lstrip("#")
     footer_text = args.get("footer_text") or _identity.get("footer_text") or ""
@@ -296,6 +272,8 @@ async def create_docx(args: dict) -> dict:
         normal = doc.styles["Normal"]
         normal.font.name = theme["font"]
         normal.font.size = Pt(11)
+        normal.paragraph_format.space_after = Pt({"airy": 9, "balanced": 6, "compact": 3}[design.density])
+        normal.paragraph_format.line_spacing = {"airy": 1.25, "balanced": 1.15, "compact": 1.05}[design.density]
         doc.core_properties.author = author
         doc.core_properties.title = title
         if want_toc:
@@ -345,8 +323,8 @@ async def create_docx(args: dict) -> dict:
 
         # ── Page de titre soignée ────────────────────────────────────────────
         h = doc.add_heading(title, level=0)
-        h.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if theme_name in {"galactic", "technical", "executive"}:
+        h.alignment = WD_ALIGN_PARAGRAPH.LEFT if design.layout in {"masthead", "customer_pack"} else WD_ALIGN_PARAGRAPH.CENTER
+        if design.layout in {"immersive", "proposal", "editorial"}:
             shading = OxmlElement("w:shd")
             shading.set(qn("w:fill"), theme["cover"].lstrip("#"))
             h._p.get_or_add_pPr().append(shading)
@@ -354,7 +332,7 @@ async def create_docx(args: dict) -> dict:
             h.paragraph_format.space_after = Pt(18)
         for run in h.runs:
             run.font.color.rgb = ACCENT
-            run.font.size = Pt(26)
+            run.font.size = Pt(30 if design.layout in {"immersive", "editorial"} else 26)
         if subtitle:
             sp = doc.add_paragraph(subtitle); sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             sp.runs[0].font.size = Pt(13); sp.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
@@ -503,7 +481,7 @@ async def create_docx(args: dict) -> dict:
             p = p.with_suffix(".docx")
         p.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(p))
-        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "theme": theme_name, "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+        return {"success": True, "message": f"Document Word créé : {p}", "path": str(p), "theme": theme_name, "design_manifest": design.public(), "size_bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}
 
@@ -713,7 +691,11 @@ async def generate(args: dict) -> dict:
                                         "letterhead": letterhead, "references": references,
                                         "signature": signature, "theme": args.get("theme"),
                                         "accent": args.get("accent"),
-                                        "logo_position": args.get("logo_position")})
+                                        "logo_position": args.get("logo_position"),
+                                        "design_prompt": args.get("design_prompt"),
+                                        "layout": args.get("layout"),
+                                        "density": args.get("density"),
+                                        "design_system": args.get("design_system")})
     if r.get("error"):
         return {"error": f"Rendu Word échoué : {r['error']}"}
     docx_path = r.get("path", out_path)
@@ -752,6 +734,7 @@ async def create_pdf(args: dict) -> dict:
     content = args.get("content", "")
     _identity = _document_identity()
     author = args.get("author") or _identity.get("author") or "Marvin"
+    design = resolve_design(args)
     theme_name, theme = _document_theme(args)
     header = args.get("header") or {k: _identity[k] for k in
                                       ("org", "address", "phone", "email", "website", "logo")
@@ -860,13 +843,17 @@ async def create_pdf(args: dict) -> dict:
         story = []
 
         # Styles personnalisés
-        h0_style = ParagraphStyle("h0", parent=styles["Title"], fontName=sans_bold, textColor=GOLD_COLOR, fontSize=25, leading=31, alignment=TA_CENTER)
+        title_alignment = TA_LEFT if design.layout in {"masthead", "customer_pack"} else TA_CENTER
+        title_size = 30 if design.layout in {"immersive", "editorial"} else 25
+        h0_style = ParagraphStyle("h0", parent=styles["Title"], fontName=sans_bold, textColor=COVER_TEXT_COLOR, fontSize=title_size, leading=title_size + 6, alignment=title_alignment)
         sub_style = ParagraphStyle("sub", parent=styles["Normal"], fontName=sans, textColor=COVER_TEXT_COLOR, fontSize=12, leading=17, alignment=TA_CENTER)
         meta_style = ParagraphStyle("meta", parent=styles["Normal"], fontName=sans, textColor=COVER_TEXT_COLOR, fontSize=9, alignment=TA_CENTER)
         h1_style = ParagraphStyle("h1", parent=styles["Heading1"], fontName=sans_bold, textColor=GOLD_COLOR, fontSize=16, spaceAfter=6, spaceBefore=16)
         h2_style = ParagraphStyle("h2", parent=styles["Heading2"], fontName=sans_bold, textColor=GOLD_COLOR, fontSize=13, spaceAfter=5, spaceBefore=12)
         h3_style = ParagraphStyle("h3", parent=styles["Heading3"], fontName=sans_bold, textColor=TEXT_COLOR, fontSize=11, spaceAfter=4, spaceBefore=8)
-        body_style = ParagraphStyle("body", parent=styles["Normal"], fontName=sans, textColor=TEXT_COLOR, fontSize=10.5, leading=15, spaceAfter=5)
+        body_leading = {"airy": 17, "balanced": 15, "compact": 13}[design.density]
+        body_after = {"airy": 8, "balanced": 5, "compact": 3}[design.density]
+        body_style = ParagraphStyle("body", parent=styles["Normal"], fontName=sans, textColor=TEXT_COLOR, fontSize=10.5, leading=body_leading, spaceAfter=body_after)
         bullet_style = ParagraphStyle("bullet", parent=body_style, leftIndent=16, spaceAfter=2)
         quote_style = ParagraphStyle("quote", parent=body_style, leftIndent=16, textColor=LIGHT_COLOR, fontName=sans_italic, borderPadding=4)
         code_style = ParagraphStyle("code", parent=styles["Code"], fontName=mono, fontSize=9, backColor=SURFACE_COLOR, borderPadding=6, leading=12)
@@ -882,7 +869,11 @@ async def create_pdf(args: dict) -> dict:
         # titre enchaîne directement sur le corps du document (pas de page dédiée) -> inutile.
         if want_toc:
             story.append(Spacer(1, 4.5*cm))
-        cover_rows = [[Paragraph(title, h0_style)]]
+        cover_rows = []
+        if design.layout in {"editorial", "customer_pack"}:
+            label = str(args.get("document_label") or ("ÉDITION PREMIUM" if design.layout == "editorial" else "DOSSIER"))
+            cover_rows.append([Paragraph(label.upper(), ParagraphStyle("kicker", parent=meta_style, fontName=sans_bold, textColor=GOLD_COLOR, alignment=title_alignment, spaceAfter=8))])
+        cover_rows.append([Paragraph(title, h0_style)])
         if subtitle:
             cover_rows.append([Paragraph(_md_inline_to_rl(subtitle), sub_style)])
         cover_rows.append([Paragraph(f"{author} &nbsp;·&nbsp; {_dt.now().strftime('%d/%m/%Y')}", meta_style)])
@@ -1136,6 +1127,6 @@ async def create_pdf(args: dict) -> dict:
                 Path(_p).unlink(missing_ok=True)
             except Exception:
                 pass
-        return {"success": True, "message": f"PDF créé : {out}", "path": str(out), "theme": theme_name, "size_bytes": out.stat().st_size, "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
+        return {"success": True, "message": f"PDF créé : {out}", "path": str(out), "theme": theme_name, "design_manifest": design.public(), "size_bytes": out.stat().st_size, "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
     except Exception as e:
         return {"error": str(e)}

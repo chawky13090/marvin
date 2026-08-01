@@ -12,6 +12,7 @@ from agent_runner import RunnerState
 from agent_turn_completion import _reconcile_pending_confirmation
 from agent_tool_postprocess import postprocess_tool_result
 from tool_domains import documents as documents_domain
+from premium_document_design import resolve_design
 
 
 class EmailAttachmentContractTests(unittest.TestCase):
@@ -129,6 +130,24 @@ class EmailAttachmentContractTests(unittest.TestCase):
         from docx import Document
         rendered = Document(explicit)
         self.assertIn("Exploration galactique", "\n".join(p.text for p in rendered.paragraphs))
+
+    def test_free_form_design_brief_drives_premium_manifest(self):
+        manifest = resolve_design({
+            "design_prompt": "Une brochure nature luxueuse, très aérée et élégante",
+            "density": "airy",
+        })
+        self.assertEqual(manifest.name, "luxury")
+        self.assertEqual(manifest.layout, "customer_pack")
+        self.assertEqual(manifest.density, "airy")
+        self.assertEqual(manifest.source, "design_prompt")
+
+    def test_invalid_custom_palette_is_rejected_deterministically(self):
+        manifest = resolve_design({
+            "theme": "ocean",
+            "design_system": {"accent": "url(javascript:bad)", "cover": "#123456"},
+        })
+        self.assertEqual(manifest.palette["accent"], "#136f8a")
+        self.assertEqual(manifest.palette["cover"], "#123456")
 
     def test_confirmation_does_not_wait_for_llm_critique(self):
         calls = []

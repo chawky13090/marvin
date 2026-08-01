@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.556.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.557.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.556.0)
+## 9. État actuel (v2.557.0)
+
+**v2.557 (moteur de direction artistique premium)** : `premium_document_design.py`
+transforme désormais un brief visuel libre (`design_prompt`) en manifeste borné : palette,
+composition, densité, typographie et provenance. Dix familles visuelles sont disponibles et
+les demandes non prédéfinies peuvent fournir une palette `design_system` dont chaque couleur
+est validée au format hexadécimal. Les compositions `masthead`, `editorial`, `proposal`,
+`customer_pack`, `immersive` et `minimal` modifient réellement la couverture ; la densité
+pilote le rythme typographique. Les outils PDF/DOCX et `document_generate` exposent ce
+contrat, et les deux prompts agentiques conservent les mots visuels de l'utilisateur au lieu
+de les réduire à une couleur. Le manifeste est rendu avec chaque artefact pour audit et
+reproductibilité. Validation : 15 tests ciblés, architecture 363/363, génération et inspection
+visuelle d'une brochure premium nature, correction de contraste après le premier rendu.
+Aucune API Canva payante n'est requise. Rollback : réversion atomique du commit v2.557 puis
+redémarrage backend/frontend ; aucune migration persistante.
 
 **v2.556 (confirmation immédiate, résilience cloud et design documentaire)** : l'audit de
 la conversation `249882e8` a isolé deux causes distinctes. Le résultat

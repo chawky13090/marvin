@@ -15791,3 +15791,22 @@ Le rendu DOCX a été validé structurellement ; le moteur LibreOffice est absen
 s'est bloqué pendant l'export de contrôle, donc cette limite de rendu automatisé reste
 explicitement documentée. Aucun contenu documentaire supplémentaire n'est journalisé.
 Rollback : réversion atomique du commit v2.556 et redémarrage ; aucune migration.
+
+## 2026-08-01 — v2.557 — Direction artistique premium pilotée par la demande
+
+Le moteur documentaire précédent savait appliquer cinq thèmes mais ne possédait pas de
+représentation intermédiaire de l'intention visuelle. `premium_document_design.py` introduit
+un manifeste déterministe inspiré des architectures de design éditable : direction
+artistique, palette, composition, densité, typographie et provenance. Le brief libre de
+l'utilisateur reste transmis par les LLM ; les valeurs finales sont bornées avant rendu.
+Dix familles visuelles et six compositions couvrent rapports, brochures, propositions,
+mémos, magazines et couvertures immersives. Les palettes personnalisées refusent toute
+valeur autre qu'une couleur hexadécimale sûre.
+
+Validation réelle : 15 tests ciblés réussis, architecture 363/363, compilation Python,
+brochure nature premium générée puis rendue en PNG. Le premier contrôle visuel a détecté un
+contraste insuffisant du titre sur couverture sombre ; le moteur générique a été corrigé et
+le second rendu inspecté est lisible, sans chevauchement ni glyphe manquant. Le DOCX reste
+validé structurellement car LibreOffice n'est pas installé sur cette machine. Aucun contenu
+documentaire ou donnée personnelle n'est ajouté aux logs. Rollback : réversion atomique du
+commit v2.557 et redémarrage ; aucune migration persistante.

@@ -46,6 +46,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.512 — reprise agentique automatique après une approbation UI à usage unique
 # Les versions antérieures restent documentées dans Git et DEVELOPMENT-JOURNAL.md.
 
+# v2.557 - direction artistique premium pilotée par brief pour PDF et DOCX
 # v2.556 - confirmations immediates, repli cloud et themes PDF/DOCX professionnels
 # v2.555 - classement documentaire portable avec destination utilisateur prioritaire
 # v2.554 - contrat PDF vers piece jointe et verite des confirmations
