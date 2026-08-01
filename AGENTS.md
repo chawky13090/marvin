@@ -202,7 +202,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.545.0)
+## 9. État actuel (v2.546.0)
+
+**v2.546 (fermeture coopérative bornée)** : après un arrêt réel ayant nécessité le repli
+forcé à l'expiration de 35 secondes, la fenêtre coopérative de `stop-marvin.ps1` est portée
+à 60 secondes et celle de l'avatar à 90 secondes. Le repli forcé reste actif, attribuable
+aux seuls processus Marvin et limité dans le temps. Les modifications Claude non commitées
+dans `components/chat/TypingIndicator.*` sont conservées. Aucune migration. Rollback :
+réversion atomique du commit v2.546 puis relance de `restart.bat`.
 
 **v2.545 (redémarrage stable et frontend déjà actif)** : le lanceur ne démarre plus un
 second Turbopack lorsque le port 3000 appartient déjà à un processus Marvin mais que son API

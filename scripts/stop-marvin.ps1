@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
     [ValidateRange(5, 120)]
-    [int]$TimeoutSeconds = 35,
+    [int]$TimeoutSeconds = 60,
     [switch]$NoForceFallback
 )
 

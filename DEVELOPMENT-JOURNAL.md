@@ -15469,3 +15469,12 @@ Validation : correction syntaxique appliquée; le redémarrage réel précédent
 backend, frontend, HTTPS, Ollama, SearXNG et LAN. Une nouvelle validation complète sera
 effectuée après le contrôle ciblé et l'indicateur visuel de l'avatar. Rollback : réversion
 atomique du commit v2.545 puis relance de `restart.bat`; aucune migration ni donnée modifiée.
+
+## 2026-08-01 — correctif partagé Codex/Claude — arrêt coopératif borné
+
+Le premier arrêt direct après redémarrage a réussi sans processus résiduel mais a utilisé le
+repli forcé après 35 secondes (`graceful=false`). Le délai coopératif de `stop-marvin.ps1`
+est porté à 60 secondes et le délai d'attente IPC de l'avatar à 90 secondes; le repli forcé
+reste actif et borné. Les fichiers non committés de Claude (`TypingIndicator.jsx` et son CSS)
+ont été conservés sans modification. Validation à rejouer après le prochain redémarrage :
+arrêt direct depuis l'avatar, `graceful=true`, ports libérés, puis redémarrage stable.
