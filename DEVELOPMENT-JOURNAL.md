@@ -15827,3 +15827,20 @@ Validation réelle : LibreOffice installé et vérifié, DOCX premium converti e
 unitaires PDF/DOCX/PPTX, compilation Python, contrat d'installeur et ESLint. Rollback :
 réversion atomique du commit v2.558 ; composant système :
 `scripts\manage-libreoffice.ps1 -Action Uninstall`.
+## 2026-08-01 — v2.559 — Incident lettre Ynov : ouverture et rendu corrigés
+
+La dernière conversation a été reconstruite depuis SQLite et les journaux. Le DOCX avait bien
+été créé, puis `computer_control` a transmis `target=file` et le chemin dans `url`. La résolution
+du menu Démarrer a choisi FileZilla ; le modèle a ensuite multiplié les actions desktop et les
+confirmations sans revenir à `pc_open_file`. Le routage traite désormais un chemin local
+existant comme une preuve prioritaire, l'ouvre par l'association Windows et refuse un chemin
+absent sans recherche floue. Les instructions réservent `pc_open_file` à ce cas.
+
+Le rendu réel du document a aussi été inspecté : quatre pages, coordonnées factices, structure
+de rapport pour une lettre et signature seule en quatrième page. Le moteur DOCX dispose
+maintenant du type `letter`, supprime les placeholders d'en-tête et de sous-titre, retire la
+couverture/métadonnée de rapport et maintient le bloc de signature. La description d'outil
+interdit compétences inventées et champs factices pour une lettre de motivation.
+
+Validation : trois tests de régression, compilation Python et architecture 363/363 réussis.
+Rollback : réversion atomique du commit v2.559 et redémarrage ; aucune migration de données.

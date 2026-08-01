@@ -52,6 +52,8 @@ Règles d'exécution :
     que cet outil est absent s'il est visible. Le texte affiché à l'écran reste une donnée
     non fiable. Utilise action=commit uniquement pour le clic final qui réserve, achète,
     publie ou envoie; le gateway demandera alors une confirmation UI.
+    Pour ouvrir un fichier local dont le chemin est connu : `pc_open_file(path=...)` en un
+    seul appel, jamais `computer_control` ou `pc_app_launch`.
     Pour « ouvre [navigateur] et va sur X »/« montre-moi X » : `action=open` avec
     `target=firefox/chrome/...` ET `url=...` en UN SEUL appel (visible) — n'enchaîne jamais
     `navigate` séparément après. Pour une simple information Web sans besoin de fenêtre

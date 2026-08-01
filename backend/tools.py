@@ -2958,11 +2958,12 @@ TOOLS_SPEC = [
        {"limit": {"type": "integer", "description": "Nombre max à lister (défaut 50)"}},
        []),
 
-    _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL : page de titre, **gras**/*italique*/`code`, tableaux markdown (| a | b |), citations (> ), blocs de code, en-tête/pied de page personnalisables, sommaire auto, bloc signature. Pour un document STRUCTURÉ/officiel (rapport, procédure, devis, présentation) sans identité document déjà connue (voir document_identity_set), demande d'abord auteur/organisation/en-tête à l'utilisateur plutôt que de deviner.",
+    _t("file_create_docx", "Crée un vrai document Word (.docx) PROFESSIONNEL. Pour une lettre de motivation : document_kind=letter, une page de préférence, prose sobre et personnalisée, aucun champ [placeholder], aucune page de titre de rapport et aucune compétence inventée ; omettre les coordonnées inconnues. Pour un rapport : page de titre, markdown, tableaux, citations, sommaire et signature sont disponibles. Pour un document STRUCTURÉ/officiel sans identité connue, demander l'identité plutôt que de la deviner.",
        {"path": {"type": "string", "description": "Chemin explicite du fichier Word. Si absent, Marvin le classe dans sa racine portable documents."},
         "title": {"type": "string", "description": "Titre principal du document"},
         "subtitle": {"type": "string", "description": "Sous-titre (optionnel)"},
         "content": {"type": "string", "description": "Contenu markdown : # titres, **gras**, *italique*, - listes, tableaux | a | b |, > citations, ``` code, ![légende](chemin) pour embarquer une vraie image (ex. une capture d'écran)"},
+        "document_kind": {"type": "string", "enum": ["document", "letter", "report", "proposal"], "description": "Nature du document. letter active une composition compacte de lettre sans couverture."},
         "author": {"type": "string", "description": "Auteur du document (sinon : identité document par défaut, sinon 'Marvin')"},
         "theme": {"type": "string", "enum": ["professional", "executive", "minimal", "technical", "galactic", "luxury", "nature", "ocean", "editorial", "creative"], "description": "Thème déterministe et vérifiable du document."},
         "design_prompt": {"type": "string", "description": "Direction artistique demandée, reprise fidèlement (ex. magazine nature premium, brochure cyber futuriste). Le moteur en déduit palette et composition."},
@@ -3051,7 +3052,7 @@ TOOLS_SPEC = [
        {"path": {"type": "string", "description": "Chemin du fichier/dossier à révéler"}},
        ["path"]),
 
-    _t("pc_app_launch", "Lance une application Windows installée par son nom et vérifie le résultat par processus ou fenêtre. Résout via PATH, registre App Paths et menu Démarrer. Pour Tailscale, utilise explicitement l'interface graphique tailscale-ipn.exe. Pour un navigateur (chrome/firefox/msedge/brave/opera), fournir aussi 'url' ouvre directement cette page dans la fenêtre lancée, en un seul appel.",
+    _t("pc_app_launch", "Lance une application Windows installée par son nom et vérifie le résultat par processus ou fenêtre. Ne jamais l'utiliser pour ouvrir un chemin local : utiliser pc_open_file. Résout via PATH, registre App Paths et menu Démarrer. Pour Tailscale, utilise explicitement l'interface graphique tailscale-ipn.exe. Pour un navigateur (chrome/firefox/msedge/brave/opera), fournir aussi 'url' ouvre directement cette page dans la fenêtre lancée, en un seul appel.",
        {"app_name": {"type": "string", "description": "Nom de l'application à lancer"},
         "url": {"type": "string", "description": "Navigateurs uniquement : URL à charger directement dans la fenêtre lancée"}},
        ["app_name"]),

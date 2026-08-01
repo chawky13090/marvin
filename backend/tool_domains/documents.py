@@ -249,6 +249,8 @@ async def create_docx(args: dict) -> dict:
     _identity = _document_identity()
     author = args.get("author") or _identity.get("author") or "Marvin"
     design = resolve_design(args)
+    document_kind = str(args.get("document_kind") or "").strip().casefold()
+    is_letter = document_kind == "letter" or "lettre" in str(title).casefold()
     theme_name, theme = _document_theme(args)
     accent = theme["accent"].lstrip("#")
     footer_text = args.get("footer_text") or _identity.get("footer_text") or ""
@@ -274,6 +276,10 @@ async def create_docx(args: dict) -> dict:
         normal.font.size = Pt(11)
         normal.paragraph_format.space_after = Pt({"airy": 9, "balanced": 6, "compact": 3}[design.density])
         normal.paragraph_format.line_spacing = {"airy": 1.25, "balanced": 1.15, "compact": 1.05}[design.density]
+        if is_letter:
+            normal.font.size = Pt(10.5)
+            normal.paragraph_format.space_after = Pt(5)
+            normal.paragraph_format.line_spacing = 1.08
         doc.core_properties.author = author
         doc.core_properties.title = title
         if want_toc:
@@ -291,6 +297,10 @@ async def create_docx(args: dict) -> dict:
         lh = args.get("letterhead") or {k: _identity[k] for k in
                                          ("org", "address", "phone", "email", "website", "logo")
                                          if _identity.get(k)}
+        if isinstance(lh, dict):
+            # Les marqueurs de modèle ne sont pas des coordonnées réelles et ne doivent
+            # jamais être imprimés comme si le document était finalisé.
+            lh = {key: value for key, value in lh.items() if "[" not in str(value) and "]" not in str(value)}
         if any(lh.get(k) for k in ("org", "address", "phone", "email", "website", "logo")):
             try:
                 hdr = doc.sections[0].header
@@ -322,9 +332,9 @@ async def create_docx(args: dict) -> dict:
                 pass
 
         # ── Page de titre soignée ────────────────────────────────────────────
-        h = doc.add_heading(title, level=0)
+        h = doc.add_heading(title, level=1 if is_letter else 0)
         h.alignment = WD_ALIGN_PARAGRAPH.LEFT if design.layout in {"masthead", "customer_pack"} else WD_ALIGN_PARAGRAPH.CENTER
-        if design.layout in {"immersive", "proposal", "editorial"}:
+        if not is_letter and design.layout in {"immersive", "proposal", "editorial"}:
             shading = OxmlElement("w:shd")
             shading.set(qn("w:fill"), theme["cover"].lstrip("#"))
             h._p.get_or_add_pPr().append(shading)
@@ -332,13 +342,14 @@ async def create_docx(args: dict) -> dict:
             h.paragraph_format.space_after = Pt(18)
         for run in h.runs:
             run.font.color.rgb = ACCENT
-            run.font.size = Pt(30 if design.layout in {"immersive", "editorial"} else 26)
-        if subtitle:
+            run.font.size = Pt(16 if is_letter else (30 if design.layout in {"immersive", "editorial"} else 26))
+        if subtitle and "[" not in str(subtitle) and "]" not in str(subtitle):
             sp = doc.add_paragraph(subtitle); sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             sp.runs[0].font.size = Pt(13); sp.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
-        meta = doc.add_paragraph(f"{author}  ·  {_dt.now().strftime('%d/%m/%Y')}")
-        meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        meta.runs[0].font.size = Pt(9); meta.runs[0].font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+        if not is_letter:
+            meta = doc.add_paragraph(f"{author}  ·  {_dt.now().strftime('%d/%m/%Y')}")
+            meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            meta.runs[0].font.size = Pt(9); meta.runs[0].font.color.rgb = RGBColor(0x99, 0x99, 0x99)
 
         # ── Références du document (client, référence) — choisies par le rédacteur ──
         refs = args.get("references") or {}
@@ -443,10 +454,12 @@ async def create_docx(args: dict) -> dict:
             if sig.get("lieu"):
                 lp = doc.add_paragraph(f"Fait à {sig['lieu']}, le {_dt.now().strftime('%d/%m/%Y')}.")
                 lp.alignment = WD_ALIGN_PARAGRAPH.RIGHT; lp.runs[0].font.size = Pt(10)
+                lp.paragraph_format.keep_with_next = True
             if sig.get("name"):
                 doc.add_paragraph("")
                 np = doc.add_paragraph(sig["name"]); np.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 np.runs[0].bold = True
+                np.paragraph_format.keep_with_next = bool(sig.get("title"))
                 if sig.get("title"):
                     tp = doc.add_paragraph(sig["title"]); tp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                     tp.runs[0].font.size = Pt(9); tp.runs[0].font.color.rgb = RGBColor(0x77, 0x77, 0x77)

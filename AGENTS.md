@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.558.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.559.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.558.0)
+## 9. État actuel (v2.559.0)
+
+**v2.559 (incident lettre Ynov : FileZilla et composition inadaptée)** : la conversation
+réelle a prouvé que `computer_control(action=open,target=file,url=<docx>)` résolvait le mot
+« file » comme une application et ouvrait FileZilla. `pc_app_launch` détecte maintenant ce
+contrat de fichier générique, exige un chemin local existant et utilise directement
+l'association Windows ; un chemin absent échoue sans lancer une application homonyme. Les
+prompts et descriptions imposent `pc_open_file` en priorité pour tout fichier connu.
+`file_create_docx` reconnaît également `document_kind=letter` : composition compacte sans
+couverture de rapport ni métadonnée redondante, suppression des coordonnées placeholders et
+bloc signature maintenu ensemble. Rollback : réversion atomique du commit v2.559.
 
 **v2.558 (Studio documentaire à calques + LibreOffice géré)** : l'onglet Documents intègre
 un canevas libre enregistrable : texte, formes, lignes et images sont des calques ordonnés,

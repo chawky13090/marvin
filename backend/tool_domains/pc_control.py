@@ -523,6 +523,31 @@ async def execute_pc_app_launch(args: dict) -> dict:
             }
         return {"error": "Paramètre 'app_name' requis."}
     key = app_name.lower().strip()
+    # v2.559 — Incident réel : le modèle a envoyé target="file" avec le chemin
+    # DOCX dans `url`. La résolution floue du menu Démarrer a alors choisi FileZilla.
+    # Un chemin local existant est une preuve plus forte qu'un nom d'application
+    # générique : on le route vers l'association Windows, sans heuristique de nom.
+    generic_file_targets = {"file", "fichier", "document", "open file", "ouvrir fichier"}
+    if key in generic_file_targets and url:
+        local_path = _resolve_path(url)
+        if os.path.exists(local_path):
+            result = await execute_pc_open_file({"path": local_path})
+            if result.get("success"):
+                result.update({
+                    "verified": True,
+                    "needs_repair": False,
+                    "method": "windows_file_association",
+                    "resolved": local_path,
+                })
+            return result
+        return {
+            "success": False,
+            "verified": False,
+            "needs_repair": True,
+            "error": f"Fichier local introuvable : {local_path}",
+            "method": "windows_file_association",
+            "resolved": local_path,
+        }
     if key in {"tailscale", "tailscale gui", "interface tailscale"}:
         from tool_domains import tailscale as tailscale_domain
         return await tailscale_domain.open_ui()
