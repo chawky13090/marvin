@@ -338,6 +338,7 @@ async def _run() -> None:
         })
     assert normal["provider"] == "SearXNG"
     assert len(normal["sources"]) == 20
+    assert normal["sources"][0]["evidence_level"] == "page_read"
     assert deep["engine_version"] == "v3"
     assert deep["source_coverage"]["queries_executed"] == 100
     assert deep_execute.await_args.kwargs["engine_version"] == "v3"
@@ -370,6 +371,73 @@ async def _run() -> None:
     assert analyzed["canonical"] == "https://example.com/canonical"
     assert browsed["content"] == "Contenu public"
     assert tools.execute_url_analyze is web.execute_url_analyze
+
+    facebook_login = outbound_http.PublicResponse(
+        url=(
+            "https://www.facebook.com/login/?next="
+            "https%3A%2F%2Fwww.facebook.com%2Fgroups%2F373264892856568%2F"
+        ),
+        status_code=400,
+        headers={"content-type": "text/html"},
+        content=b"",
+        elapsed_ms=20,
+    )
+    with patch.object(
+        outbound_http,
+        "fetch_public",
+        new=AsyncMock(return_value=facebook_login),
+    ):
+        restricted = await web.execute_web_browse(
+            {"url": "https://www.facebook.com/groups/373264892856568/"}
+        )
+    assert restricted["authentication_required"] is True
+    assert restricted["access_limited"] is True
+    assert restricted["retryable"] is False
+    assert restricted["error_code"] == "AUTHENTICATION_REQUIRED"
+    assert restricted["content"] == ""
+    assert "n’a pas lu" in restricted["message"]
+
+    restricted_browser_module = SimpleNamespace(
+        fetch_text=AsyncMock(return_value={
+            "success": False,
+            "authentication_required": True,
+            "access_limited": True,
+            "retryable": False,
+            "error_code": "AUTHENTICATION_REQUIRED",
+            "message": "Facebook exige une session connectée. Marvin n’a pas lu le contenu de cette page.",
+            "url": facebook_login.url,
+            "title": "Log in to Facebook",
+            "text": "",
+        })
+    )
+    with patch.dict(sys.modules, {"web_browser": restricted_browser_module}):
+        browser_restricted = await web.execute_web_browser_open({
+            "url": "https://www.facebook.com/groups/373264892856568/"
+        })
+    assert browser_restricted["authentication_required"] is True
+    assert browser_restricted["text"] == ""
+
+    restricted_discovery = {
+        "success": True,
+        "provider": "SearXNG",
+        "fallback_used": False,
+        "provider_attempts": [{"provider": "SearXNG", "status": "succeeded"}],
+        "results": [{
+            "title": "Groupe Facebook",
+            "url": "https://www.facebook.com/groups/373264892856568/",
+            "snippet": "Extrait non vérifié",
+        }],
+    }
+    with (
+        patch.object(web, "_priority_search", AsyncMock(return_value=restricted_discovery)),
+        patch.object(web, "_plan_research_queries", AsyncMock(return_value=("groupe",))),
+        patch.dict(sys.modules, {"web_browser": restricted_browser_module}),
+    ):
+        restricted_research = await web.execute_web_research({"query": "groupe"})
+    assert restricted_research["success"] is False
+    assert restricted_research["authentication_required"] is True
+    assert restricted_research["answer"] == ""
+    assert restricted_research["sources"][0]["evidence_level"] == "access_restricted"
 
     names = [
         name.removeprefix("execute_")

@@ -603,6 +603,11 @@ function toolHasFailed(tool) {
     && (result.success === false || result.ok === false || result.error));
 }
 
+function toolAccessIsLimited(tool) {
+  const result = unwrapToolResult(tool?.result);
+  return !!(result && typeof result === 'object' && result.access_limited === true);
+}
+
 function summarizeToolResult(toolName = '', rawResult) {
   const result = unwrapToolResult(rawResult);
   if (typeof result === 'string') return compactText(result) || 'Résultat disponible';
@@ -1453,13 +1458,16 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMiss
   const isCritical = CRITICAL_TOOLS.includes(toolName);
   const state = tool.state || (tool.result !== undefined ? 'result' : 'pending');
   const resultFailed = toolHasFailed(tool);
-  const visualState = resultFailed ? 'error' : state;
+  const accessLimited = toolAccessIsLimited(tool);
+  const limitedResult = accessLimited ? unwrapToolResult(tool.result) : null;
+  const visualState = accessLimited ? 'limited' : resultFailed ? 'error' : state;
 
   const statusColors = {
     pending: 'var(--warning)',
     running: 'var(--info)',
     result: 'var(--success)',
     error: 'var(--danger)',
+    limited: 'var(--warning)',
     'partial-call': 'var(--info)',
     call: 'var(--info)',
   };
@@ -1609,6 +1617,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMiss
 
   const statusLabel = approvalIsActive ? '⏳ En attente de votre confirmation'
     : approvalDisplayStatus ? approvalFinalLabels[approvalDisplayStatus] || 'Autorisation terminée'
+    : accessLimited ? 'Accès restreint'
     : resultFailed ? '✕ Erreur'
     : state === 'result' ? '✓ Terminé'
     : state === 'error' ? '✗ Erreur'
@@ -1624,6 +1633,7 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMiss
   const statusBadgeClass = approvalIsActive ? 'warning'
     : approvalDisplayStatus === 'approved' ? 'success'
     : approvalDisplayStatus ? 'info'
+    : accessLimited ? 'warning'
     : resultFailed ? 'danger'
     : state === 'result' ? 'success'
     : state === 'error' ? 'danger'
@@ -1653,8 +1663,22 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMiss
       </div>
 
       {tool.result !== undefined && (
-        <div className={resultFailed ? styles.toolSummaryError : styles.toolSummary}>
+        <div className={resultFailed && !accessLimited ? styles.toolSummaryError : styles.toolSummary}>
           {summarizeToolResult(toolName, tool.result)}
+        </div>
+      )}
+
+      {accessLimited && limitedResult && (
+        <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
+          <div>Le contenu protégé n’a pas été utilisé comme source.</div>
+          <a
+            href={limitedResult.requested_url || limitedResult.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'inline-block', marginTop: 6, color: 'var(--text-primary)', textDecoration: 'underline' }}
+          >
+            Ouvrir dans votre navigateur connecté
+          </a>
         </div>
       )}
 

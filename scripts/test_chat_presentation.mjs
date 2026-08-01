@@ -57,6 +57,9 @@ assert.equal(audit.messages[0].toolInvocations[0].result.nested.password, '[MASQ
 assert.equal(audit.messages[0].toolInvocations[0].args.path, 'C:/safe', 'les données non sensibles doivent être conservées');
 const markdownAudit = conversationAuditToMarkdown(audit);
 const messageBubbleSource = fs.readFileSync(new URL('../components/chat/MessageBubble.jsx', import.meta.url), 'utf8');
+assert.ok(messageBubbleSource.includes("accessLimited ? 'Accès restreint'"));
+assert.ok(messageBubbleSource.includes("result.access_limited === true"));
+assert.ok(messageBubbleSource.includes('Ouvrir dans votre navigateur connecté'));
 const fileExplorerSource = fs.readFileSync(new URL('../components/chat/FileExplorerCard.jsx', import.meta.url), 'utf8');
 const typingIndicatorSource = fs.readFileSync(new URL('../components/chat/TypingIndicator.jsx', import.meta.url), 'utf8');
 const typingIndicatorCss = fs.readFileSync(new URL('../components/chat/TypingIndicator.module.css', import.meta.url), 'utf8');

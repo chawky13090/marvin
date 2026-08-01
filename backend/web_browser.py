@@ -290,12 +290,21 @@ async def fetch_page(url: str, timeout: int = 25000, max_chars: int = 100000) ->
                 };
             }"""
         )
-        return {
+        result = {
             "title": data.get("title", ""),
             "text": (data.get("text") or "").strip()[:max_chars],
             "url": page.url,
             "links": list(dict.fromkeys(data.get("links") or []))[:10000],
         }
+        from web_access import detect_authentication_wall
+        access_wall = detect_authentication_wall(
+            result["url"], title=result["title"], text=result["text"]
+        )
+        if access_wall:
+            result.update(access_wall)
+            result["text"] = ""
+            result["links"] = []
+        return result
     finally:
         await ctx.close()
 

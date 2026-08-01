@@ -806,6 +806,16 @@ async def execute_web_browse(args: dict) -> dict:
             headers=headers,
         )
         final_url = response.url
+        from web_access import detect_authentication_wall
+        access_wall = detect_authentication_wall(final_url)
+        if access_wall:
+            return {
+                **access_wall,
+                "requested_url": url,
+                "url": final_url,
+                "status": response.status_code,
+                "content": "",
+            }
         # Don't raise_for_status — instead report the status in the result
         if response.status_code >= 400:
             return {
@@ -826,6 +836,21 @@ async def execute_web_browse(args: dict) -> dict:
         meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
         if meta_desc:
             description = meta_desc.get("content", "").strip()
+
+        access_wall = detect_authentication_wall(
+            final_url,
+            title=title,
+            text=soup.get_text(separator="\n", strip=True),
+        )
+        if access_wall:
+            return {
+                **access_wall,
+                "requested_url": url,
+                "url": final_url,
+                "status": response.status_code,
+                "title": title,
+                "content": "",
+            }
 
         # Supprimer les éléments non-contenu
         for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form",
@@ -1038,6 +1063,8 @@ async def execute_web_browser_open(args: dict) -> dict:
     try:
         import web_browser as wb
         r = await wb.fetch_text(url)
+        if r.get("authentication_required"):
+            return {**r, "requested_url": url, "text": ""}
         text = r.get("text") or "(page vide ou non textuelle)"
         return {"success": True, "title": r.get("title", ""), "url": r.get("url", url),
                 "text": text, "content_guard": guard_web_content(text)}
@@ -1105,6 +1132,8 @@ async def execute_web_research(args: dict) -> dict:
     for page_index, res in enumerate(results[:web_depth], start=1):
         try:
             p = await wb.fetch_text(res["url"], max_chars=2800)
+            if p.get("authentication_required"):
+                p = {"authentication_required": True}
         except Exception:
             p = None
         pages.append((res, p))
@@ -1115,7 +1144,43 @@ async def execute_web_research(args: dict) -> dict:
             total=web_depth,
             metrics={"sources_trouvees": len(results), "pages_lues": page_index},
         )
-    if any(p for _, p in pages):
+    readable_pages = [
+        (res, p) for res, p in pages
+        if not (p or {}).get("authentication_required")
+    ]
+    restricted_pages = [
+        (res, p) for res, p in pages
+        if (p or {}).get("authentication_required")
+    ]
+    if restricted_pages and not readable_pages:
+        return {
+            "success": False,
+            "access_limited": True,
+            "authentication_required": True,
+            "retryable": False,
+            "error_code": "AUTHENTICATION_REQUIRED",
+            "answer": "",
+            "message": (
+                "Les pages trouvées exigent une session connectée. "
+                "Marvin n’a pas lu leur contenu et n’a produit aucune synthèse."
+            ),
+            "sources": [
+                {
+                    "title": res.get("title", ""),
+                    "url": res.get("url", ""),
+                    "evidence_level": "access_restricted",
+                }
+                for res, _p in restricted_pages
+            ],
+            "provider": search_receipt.get("provider"),
+            "provider_attempts": search_receipt.get("provider_attempts", []),
+            "fallback_used": bool(search_receipt.get("fallback_used", False)),
+            "query_variants": list(planned_queries),
+            "next_actions": [
+                "Ouvrir le lien dans le navigateur où l’utilisateur est déjà connecté."
+            ],
+        }
+    if any(p for _, p in readable_pages):
         context = "\n\n".join(
             f"[{i+1}] "
             + wrap_untrusted_web(
@@ -1123,12 +1188,12 @@ async def execute_web_research(args: dict) -> dict:
                 url=res.get("url", ""),
                 title=res.get("title", ""),
             )
-            for i, (res, p) in enumerate(pages))
+            for i, (res, p) in enumerate(readable_pages))
     else:
         context = "\n".join(
             f"- {r.get('title', '')} : "
             + wrap_untrusted_web(r.get("snippet", ""), url=r.get("url", ""))
-            for r in results)
+            for r, _p in readable_pages)
     prompt = (
         "En te basant UNIQUEMENT sur ces résultats web, réponds à la question en français, "
         "concis et factuel. Indique la source (domaine) si pertinent. Si l'info n'y est pas, dis-le.\n"
@@ -1151,7 +1216,20 @@ async def execute_web_research(args: dict) -> dict:
         "success": True,
         "answer": answer,
         "sources": [
-            {"title": r.get("title", ""), "url": r["url"]}
+            {
+                "title": r.get("title", ""),
+                "url": r["url"],
+                "evidence_level": (
+                    "access_restricted"
+                    if any(res.get("url") == r["url"] for res, _p in restricted_pages)
+                    else "page_read"
+                    if any(
+                        res.get("url") == r["url"] and bool((p or {}).get("text"))
+                        for res, p in readable_pages
+                    )
+                    else "snippet_only"
+                ),
+            }
             for r in results[:20]
         ],
         "provider": search_receipt.get("provider"),
@@ -1159,8 +1237,10 @@ async def execute_web_research(args: dict) -> dict:
         "fallback_used": bool(search_receipt.get("fallback_used", False)),
         "query_variants": list(planned_queries),
         "message": (
-            f"Réponse trouvée via {search_receipt.get('provider') or 'le Web'} "
-            f"avec {len(results[:20])} source(s) et mémorisée."
+            f"Réponse préparée via {search_receipt.get('provider') or 'le Web'} : "
+            f"{len(results[:20])} résultat(s) découvert(s), "
+            f"{sum(bool((p or {}).get('text')) for _res, p in readable_pages)} page(s) lue(s), "
+            f"{len(restricted_pages)} accès restreint(s)."
         ),
         "query": query,
         "search_query": search_receipt.get("search_query") or query,
@@ -1271,6 +1351,8 @@ async def _execute_web_deep_research_legacy(args: dict) -> dict:
             seen_urls.add(url)
             try:
                 p = await wb.fetch_text(url, max_chars=3000)
+                if p.get("authentication_required"):
+                    continue
             except Exception:
                 p = None
             text = ((p or {}).get("text") or res.get("snippet", "") or "").strip()

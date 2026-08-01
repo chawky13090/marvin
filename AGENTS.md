@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.561.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.562.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.561.0)
+## 9. État actuel (v2.562.0)
+
+**v2.562 (pages Web exigeant une session)** : l’URL d’un groupe Facebook redirigeait
+Marvin vers `/login/?next=...`, puis apparaissait comme une erreur HTTP 400 générique et
+réessayable. `web_access.py` distingue désormais un mur d’authentification d’une panne à
+partir de l’URL finale et, pour Facebook, des signaux visibles de la page. Les lecteurs HTTP
+et Playwright rendent `AUTHENTICATION_REQUIRED`, non réessayable, déclarent explicitement
+que le contenu n’a pas été lu et n’en exposent ni texte ni liens. Les recherches standard et
+multi-passes excluent ces pages de leur corpus au lieu de transformer l’extrait SearXNG en
+preuve. Dans le chat, la carte est présentée comme « Accès restreint », pas comme une erreur
+technique brute. Aucun cookie ni identifiant n’est collecté ou journalisé. Rollback :
+réversion atomique du commit v2.562 puis redémarrage backend/frontend ; aucune migration.
 
 **v2.561 (incident recherche de personne et SearXNG dégradé)** : l'audit de la conversation
 `8580ab47` a distingué les pannes de moteurs de la panne du méta-moteur. SearXNG répondait en

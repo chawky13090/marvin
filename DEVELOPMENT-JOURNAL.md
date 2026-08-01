@@ -15905,3 +15905,24 @@ Validation finale : `check:quick` 235/235, smoke API 28/28, tests Web, SearXNG,
 concurrence d'outils, prompts, cycle de vie et superviseur réussis. Le rappel Web a d'abord
 dépassé sa limite contractuelle de 400 caractères ; il a été compacté puis le test causal et
 la suite complète ont été rejoués avec succès.
+
+## 2026-08-01 — v2.562 — Facebook : authentification requise, pas erreur HTTP brute
+
+La visite réelle du groupe Facebook fourni par l’utilisateur redirige vers
+`facebook.com/login/?next=...` puis répond HTTP 400. Marvin affichait ce statut brut comme
+une panne réessayable, sans dire que le contenu n’avait pas été lu. Un classificateur commun
+aux lecteurs HTTP et Playwright reconnaît maintenant les chemins d’authentification et les
+signaux de connexion Facebook. Le résultat est borné : `AUTHENTICATION_REQUIRED`, non
+réessayable, aucun texte ou lien protégé restitué, aucune affirmation tirée du snippet
+SearXNG. Les boucles de recherche excluent ces pages de leur corpus.
+
+L’interface présente l’état « Accès restreint » avec une explication humaine et les actions
+suivantes, au lieu du badge rouge « Erreur ». Aucun mécanisme de contournement, cookie,
+session ou secret n’a été ajouté. Tests exécutés : domaine Web, contrat d’exécution,
+présentation du chat, compilation Python et ESLint ciblé sans erreur. Rollback : réversion
+atomique du commit v2.562 et redémarrage ; aucune donnée persistante ni migration.
+
+Validation chargée : build Next.js 16.2.12/Turbopack réussi hors exécution, redémarrage
+vérifié en v2.562 avec 363 outils, Ollama et SearXNG prêts. Le rejeu du lien Facebook à
+travers `/api/tools` rend `AUTHENTICATION_REQUIRED`, `retryable=false`, statut HTTP observé
+400, URL finale `/login/?next=...` et contenu de longueur zéro.

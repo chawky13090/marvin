@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.562 — murs d’authentification Web explicites et sources protégées non revendiquées
 # v2.561 — recherche SearXNG résiliente, résultats vides non fautifs et preuves explicites
 # v2.560 — audit local borné : test de post-validation aligné sur la confirmation immédiate
 # v2.559 — ouverture fiable des fichiers locaux et composition DOCX de type lettre
