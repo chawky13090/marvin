@@ -5,6 +5,37 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-01 — v2.552.0 — Arrêt backend borné et réellement gracieux
+
+### Diagnostic
+
+Les logs de cycle de vie montraient deux comportements : arrêt sain en 7 à 8 secondes, ou
+expiration systématique à 60 secondes suivie de `Stop-Process -Force`. L'isolation réelle a
+confirmé que le frontend répondait à `frontend.shutdown` en 1,6 seconde. Le backend fermait
+également son listener 8005 en 1,7 seconde, mais ses processus Python restaient vivants : le
+blocage se situait donc après la fermeture réseau, dans une coroutine de fin de lifespan ou
+le drain d'un thread d'exécuteur par `asyncio.Runner.close()`.
+
+### Correction
+
+- nouveau `backend/shutdown_runtime.py` : chaque composant est arrêté séparément avec un
+  budget de 5 secondes ; une coroutine récalcitrante est annulée sans empêcher la fermeture
+  des composants suivants ; l'incident est expurgé et journalisé ;
+- `backend/main.py` utilise cette frontière pour les tours de chat, Coding Jobs,
+  téléchargements de modèles, workers, navigateur et clients HTTP ;
+- `backend/server_runtime.py` arme un drain borné de huit secondes seulement après le retour
+  de `server.serve()`. À ce stade le lifespan est terminé et les ressources applicatives sont
+  fermées ; le repli code 0 ne concerne que des threads natifs résiduels ;
+- tests unitaires et contrat de lifecycle ajoutés à la barrière globale.
+
+### Validation, sécurité, logs et rollback
+
+Tests ciblés `shutdown_runtime`, lifecycle, composition FastAPI et superviseur : réussis.
+Deux cycles réels arrêt/redémarrage successifs : `graceful=true`, aucun PID forcé, aucun
+processus restant, Ollama préservé ; durées 11 697 ms et 19 241 ms. Aucun secret ou contenu
+utilisateur n'est journalisé, uniquement le composant et le type d'échec. Aucune donnée ni
+configuration persistante migrée. Rollback : `git revert <commit-v2.552>` puis redémarrage.
+
 ## 2026-08-01 — v2.550.0 — Audit puissance : contexte, filtre cloud, vision, budgets
 
 ### Demande et constats

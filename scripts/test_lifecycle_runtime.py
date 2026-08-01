@@ -34,6 +34,7 @@ def test_contract_files() -> None:
     frontend = (ROOT / "scripts" / "start_next_dev.mjs").read_text(encoding="utf-8")
     starter = (ROOT / "start.bat").read_text(encoding="utf-8-sig")
     backend_starter = (ROOT / "backend" / "start.bat").read_text(encoding="utf-8-sig")
+    backend_runtime = (ROOT / "backend" / "server_runtime.py").read_text(encoding="utf-8-sig")
     production = (ROOT / "START-PRODUCTION.bat").read_text(encoding="utf-8-sig")
     restart = (ROOT / "scripts" / "restart-marvin.ps1").read_text(encoding="utf-8-sig")
     assert "New-ShutdownRequest -Name 'backend.shutdown'" in stop
@@ -47,6 +48,8 @@ def test_contract_files() -> None:
     assert "frontend.shutdown" in frontend
     assert "child.kill('SIGTERM')" in frontend
     assert "stopping ? 0" in frontend
+    assert "POST_SHUTDOWN_DRAIN_SECONDS" in backend_runtime
+    assert "threading.Timer" in backend_runtime
     assert "marvin-startup-lock.ps1" in starter
     assert "stop-requested" in starter
     assert "call npm run dev" in starter

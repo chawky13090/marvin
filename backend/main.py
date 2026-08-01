@@ -7,6 +7,7 @@ Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changement
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
 
+# v2.552 — arrêt backend borné par composant et drain post-lifespan contrôlé
 # v2.551 — portefeuille local autonome, replis exacts et vision sensible locale
 # v2.550 — audit puissance : contexte Ollama, filtre cloud, vision, budgets d'execution
 # v2.549 — robot d'activité interactif intégré au composeur et adaptatif à la sidebar
@@ -61,6 +62,7 @@ from api_contract_schema import install_access_contract
 import chat_turn_runtime
 import generation_runtime
 import web_runtime
+import shutdown_runtime
 from agent import _refresh_model_cache
 from api.agent_gateway import router as agent_gateway_router
 from api.avatar import router as avatar_router
@@ -218,32 +220,17 @@ async def lifespan(app_instance: FastAPI):
             )
         yield
     finally:
-        await chat_turn_runtime.shutdown()
+        await shutdown_runtime.run("chat-turns", chat_turn_runtime.shutdown)
         if coding_jobs_started:
-            await coding_jobs.shutdown()
-        try:
-            import local_model_installer
+            await shutdown_runtime.run("coding-jobs", coding_jobs.shutdown)
+        import local_model_installer
+        import web_browser
 
-            await local_model_installer.shutdown()
-        except Exception as exc:
-            bug_log.log_bug(
-                "shutdown_local_model_installer",
-                type(exc).__name__,
-                context={"exception_type": type(exc).__name__},
-            )
-        await supervisor.shutdown()
-        try:
-            import web_browser
-
-            await web_browser.close()
-        except Exception as exc:
-            bug_log.log_bug(
-                "shutdown_web_browser",
-                type(exc).__name__,
-                context={"exception_type": type(exc).__name__},
-            )
-        await generation_runtime.close()
-        await web_runtime.close()
+        await shutdown_runtime.run("local-model-installer", local_model_installer.shutdown)
+        await shutdown_runtime.run("workers", supervisor.shutdown)
+        await shutdown_runtime.run("web-browser", web_browser.close)
+        await shutdown_runtime.run("generation-http", generation_runtime.close)
+        await shutdown_runtime.run("web-http", web_runtime.close)
 
 
 app = FastAPI(

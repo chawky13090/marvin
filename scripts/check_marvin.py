@@ -89,6 +89,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
     result = [
         Stage("Runtime Node et modules natifs", ("node", "scripts/check_runtime.mjs")),
         Stage("Superviseur du backend Windows", (python, "scripts/test_server_supervisor.py")),
+        Stage("Arrêt borné du backend", (python, "scripts/test_shutdown_runtime.py")),
         Stage("Boucle réseau résiliente du backend Windows", (python, "scripts/test_windows_event_loop.py")),
         Stage("Installation Windows portable", (python, "scripts/test_installer_contract.py")),
         Stage("Activation locale de l'avatar", (python, "scripts/test_avatar_api.py")),

@@ -202,7 +202,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.551.0)
+## 9. État actuel (v2.552.0)
+
+**v2.552 (fermeture backend bornée et reproductible)** : l'arrêt intermittent de 60 secondes
+provenait du backend après fermeture du listener Uvicorn : une coroutine de composant ou un
+thread d'exécuteur pouvait retenir la fin du lifespan ou `asyncio.Runner.close()`. Chaque
+composant est désormais fermé par `shutdown_runtime.run()` avec une limite indépendante de
+5 secondes, incident structuré et poursuite des autres fermetures. Après le retour confirmé
+de `server.serve()` — donc uniquement une fois sockets, bases, clients et lifespan fermés —
+un garde de drain de 8 secondes termine avec code 0 les seuls threads natifs résiduels qui
+refuseraient encore de sortir. Deux cycles réels arrêt/redémarrage ont terminé gracieusement,
+sans PID forcé, en 11,7 puis 19,2 secondes. Rollback : réversion atomique du commit v2.552.
 
 **v2.551 (portefeuille local autonome et replis confidentiels)** : la politique locale
 maintient désormais sept rôles (`chat`, `agent`, `analysis`, `vision`, `coding`, `ocr`,

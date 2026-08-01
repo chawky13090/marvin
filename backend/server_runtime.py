@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import sys
+import threading
 from pathlib import Path
 
 import uvicorn
@@ -13,6 +15,25 @@ from windows_event_loop import ResilientProactorEventLoop
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SHUTDOWN_REQUEST = PROJECT_ROOT / "runtime" / "lifecycle" / "backend.shutdown"
+POST_SHUTDOWN_DRAIN_SECONDS = 8.0
+
+
+def _exit_after_clean_shutdown_timeout() -> None:
+    """Termine uniquement après la fin confirmée du lifespan FastAPI.
+
+    Python peut sinon attendre indéfiniment un thread d'exécuteur déjà détaché alors
+    que les sockets, bases et clients de Marvin sont fermés. Ce repli ne peut jamais
+    interrompre une requête : il n'est armé qu'après ``server.serve()``.
+    """
+    try:
+        sys.stderr.write(
+            "[Marvin] Drain des threads résiduels expiré après arrêt propre; "
+            "fin bornée du processus.\n"
+        )
+        sys.stderr.flush()
+        sys.stdout.flush()
+    finally:
+        os._exit(0)
 
 
 def loop_factory():
@@ -54,8 +75,18 @@ def main() -> int:
         access_log=True,
     )
     server = uvicorn.Server(config)
-    with asyncio.Runner(loop_factory=loop_factory) as runner:
-        runner.run(_serve(server))
+    runner = asyncio.Runner(loop_factory=loop_factory)
+    runner.run(_serve(server))
+    drain_guard = threading.Timer(
+        POST_SHUTDOWN_DRAIN_SECONDS,
+        _exit_after_clean_shutdown_timeout,
+    )
+    drain_guard.daemon = True
+    drain_guard.start()
+    try:
+        runner.close()
+    finally:
+        drain_guard.cancel()
     return 0
 
 
