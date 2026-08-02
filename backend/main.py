@@ -6,6 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
+# v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement
 # v2.580 — compte de service Google migré du JSON en clair vers DPAPI avec rollback réel
 # v2.579 — HTTPS Windows géré sur 443, service LocalService et rollback vérifié
 # v2.578 — assistant multi-boîtes extrait et dette frontend massive fermée
@@ -32,7 +33,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.533 — port SearXNG dynamique, persistant et compatible Hyper-V/WSL
 # v2.532 — resynchronisation automatique de l'avatar après redémarrage externe
 # v2.531 — arrêt coopératif vérifié et idempotent de FastAPI et Turbopack
-# v2.530 — reparation des parametres array/object serialises en chaine avant validation
 # v2.528 — redesign PPTX natif, destinations robustes et fichiers verrouillés
 # v2.527 — fidélité PPTX à la synthèse source avant exécution
 # v2.526 — livrables PPTX garantis par l'outil Office et preuve d'artefact

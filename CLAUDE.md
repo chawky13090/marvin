@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.580.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.581.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -88,6 +88,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\stop-marvin.ps1 -Tim
 Ne pas utiliser `uvicorn --reload`, qui coupe les flux SSE. Ne jamais copier `.venv`,
 `node_modules` ou `.next` vers une autre machine. Le runtime Python doit être officiel,
 persistant et vérifié par `scripts/test_python_runtime.py`.
+
+La maintenance SQLite est strictement hors ligne : arrêter Marvin puis exécuter
+`backend\.venv\Scripts\python.exe scripts\manage-sqlite-maintenance.py run`. Chaque passe
+crée une sauvegarde DPAPI vérifiée et rend le nom nécessaire au rollback.
 
 Gate rapide :
 

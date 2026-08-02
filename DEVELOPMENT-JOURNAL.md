@@ -5,6 +5,47 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.581.0 — Maintenance SQLite offline et rollback réel
+
+### Constat et choix
+
+SEC-006 restait `MITIGATED` : les nouvelles suppressions étaient sûres, mais les pages
+historiques de la base active et du WAL n'avaient jamais subi la maintenance complète prévue.
+Une commande `VACUUM` isolée aurait été insuffisante car elle ne prouve ni sauvegarde, ni
+arrêt réel, ni intégrité, ni reprise. La solution retenue réutilise le service de sauvegarde
+DPAPI existant et ajoute un orchestrateur hors ligne compensable.
+
+### Implémentation
+
+`sqlite_maintenance.py` refuse les ports 3000/8005 actifs, vérifie l'espace libre, sérialise
+les processus, crée une sauvegarde chiffrée vérifiée, checkpoint le WAL, contrôle intégrité
+complète et clés étrangères, exécute `VACUUM`, re-checkpoint et revalide. Toute panne après
+la sauvegarde tente automatiquement la restauration. Le CLI offre aussi un rollback explicite.
+Les rapports JSON atomiques sont retenus 365 jours et 32 exemplaires maximum; le dossier
+`data/maintenance` est désormais autoritatif dans le bundle global chiffré.
+
+### Preuves réelles
+
+Préflight : base 410 947 584 octets, 43,1 Go libres pour 1,77 Go requis, aucun travail actif.
+Première maintenance : 20,9 s, intégrité/FK OK, 100 329 vers 99 711 pages. Rollback réel :
+sauvegarde vérifiée, zéro violation, taille originale exacte. Deuxième maintenance : 19,8 s,
+retour à 408 416 256 octets. Une dernière passe avec verrou et rétention finaux a été
+idempotente à 408 416 256 octets, WAL vide. Les tests injectent aussi un échec après `VACUUM`
+et prouvent la compensation, ainsi que l'inclusion du rapport dans une restauration globale.
+Le gate final exécute 250/250 étapes en 525,2 s et le build Next.js 16.2.12/Turbopack compile
+en 4,2 s. Après redémarrage : backend v2.581, 363 outils, frontend/HTTPS/SearXNG HTTP 200,
+Google sans erreur et 50 conversations. L'activité normale après démarrage a ajouté six pages
+SQLite; le dernier rapport offline reste la preuve canonique de l'état post-maintenance.
+
+Le gate a également exposé un avertissement non fatal du destructeur `QdrantClient` à la fin
+d'un processus de test, après validation réussie. Il ne touche pas le runtime réel mais n'est
+pas masqué : il rejoint TD-008 pour fermeture explicite des clients de test.
+
+Rollback : Marvin arrêté, exécuter
+`backend\.venv\Scripts\python.exe scripts\manage-sqlite-maintenance.py rollback --backup <nom>`.
+La restauration crée une sauvegarde préalable, contrôle l'intégrité et reste elle-même
+réversible. SEC-006 passe à `VERIFIED`.
+
 ## 2026-08-02 — v2.580.0 — Compte de service Google sous DPAPI
 
 ### Demande et constat

@@ -39,6 +39,9 @@ def test_roundtrip_and_inventory_gate() -> None:
         skill = data / "skills" / "network.md"
         skill.parent.mkdir()
         skill.write_text("# Network", encoding="utf-8")
+        maintenance = data / "maintenance" / "sqlite-maintenance-proof.json"
+        maintenance.parent.mkdir()
+        maintenance.write_text('{"integrity":"ok"}\n', encoding="utf-8")
         (data / "qdrant").mkdir()
         (data / "qdrant" / "cache.bin").write_bytes(b"rebuildable")
         with (
@@ -63,6 +66,7 @@ def test_roundtrip_and_inventory_gate() -> None:
             assert recovery["success"] is True
             assert (restored / "skills" / "network.md").read_text(encoding="utf-8") == "# Network"
             assert (restored / "truth_ledger.jsonl").read_text(encoding="utf-8") == '{"proof":true}\n'
+            assert (restored / "maintenance" / maintenance.name).is_file()
             assert not (restored / "qdrant").exists()
             connection = sqlite3.connect(restored / "secretary.db")
             try:

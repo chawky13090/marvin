@@ -55,6 +55,7 @@ AUTHORITATIVE_DIRECTORIES = frozenset({
     "documents_generes",
     "engineering_radar",
     "logos",
+    "maintenance",
     "screenshots",
     "skills",
     "webapps",

@@ -209,6 +209,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Migrations SQLite transactionnelles", (python, "scripts/test_db_migrations.py")),
         Stage("Composition déterministe de SQLite", (python, "scripts/test_database_bootstrap.py")),
         Stage(
+            "Maintenance SQLite hors ligne et compensable",
+            (python, "scripts/test_sqlite_maintenance.py"),
+        ),
+        Stage(
             "Frontière de persistance unique FastAPI",
             ("node", "--no-warnings", "scripts/test_frontend_persistence_boundary.mjs"),
         ),
