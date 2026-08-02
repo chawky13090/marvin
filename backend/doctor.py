@@ -206,7 +206,9 @@ async def run_diagnostics() -> dict:
 
     # ── 6. Google Agenda : cohérence de configuration ──────────────────────────
     try:
-        sa = os.path.exists(_t._GOOGLE_SA_PATH)
+        import google_service_account_vault
+
+        sa = google_service_account_vault.configured()
         cal_id = db.get_setting("google_calendar_id")
         if sa and not cal_id:
             add("google", "Google Agenda", "warning",

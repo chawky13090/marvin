@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.579.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.580.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.579.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.580.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -167,7 +167,10 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ## 7. Intégration Google Calendar (état)
 
-- Supporté en **double** : **compte de service** (lecture + écriture ; clé JSON dans `data/`) **et** OAuth utilisateur **et** iCal. Le compte de service est prioritaire (`_get_google_calendar_service` SA-first).
+- Supporté en **double** : **compte de service** (lecture + écriture ; contenu protégé par
+  DPAPI utilisateur) **et** OAuth utilisateur **et** iCal. Le compte de service est prioritaire
+  (`_get_google_calendar_service` SA-first). Le fichier JSON d'origine est validé puis supprimé
+  après relecture du coffre; il ne reste admissible que pendant un rollback explicite et borné.
 - `event_create/update/delete` routent vers Google quand connecté (les events `source='google'`).
 - Pièges réglés : datetime RFC3339 **avec secondes** (`_norm_google_dt`) ; à l'update d'un horaire, **préserver la durée** d'origine (sinon fin<début → 400) ; OAuth en « test mode » → 403 access_denied (d'où le pivot compte de service).
 
@@ -205,7 +208,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.579.0)
+## 9. État actuel (v2.580.0)
+
+**v2.580 (compte de service Google protégé)** : l'upload ne persiste plus la clé privée dans
+`backend/data/google_service_account.json`. Un coffre dédié valide la structure Google, le
+point OAuth, l'identité du compte et une clé RSA d'au moins 2048 bits, puis conserve le JSON
+canonique sous DPAPI utilisateur. Calendar construit ses credentials depuis la mémoire et
+OAuth/iCal restent disponibles. La migration réelle a relu le secret chiffré avant de retirer
+le fichier historique; rollback réel avec ACL utilisateur+SYSTEM puis remigration ont été
+validés. Le gate couvre validation, corruption, panne du coffre, suppression compensée, API
+et absence de lecture par chemin. Rollback applicatif : réversion du commit v2.580 après
+`scripts/manage-google-service-account-vault.py rollback --acknowledge-plaintext-risk`; cette
+commande réintroduit temporairement du clair et doit être suivie d'une remigration.
 
 **v2.579 (HTTPS Windows géré et réversible)** : Caddy 2.11.4 fonctionne désormais comme
 service Windows automatique `MarvinHttpsGateway` sous `NT AUTHORITY\LocalService`, sur le

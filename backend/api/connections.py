@@ -1,7 +1,5 @@
 """Identifiants masqués et flux OAuth Google/Microsoft."""
 
-import json
-import os
 import urllib.parse
 import secrets
 import time
@@ -16,6 +14,7 @@ from secret_vault import SecretVaultError
 import database as db
 import tools as tool_module
 import email_accounts
+import google_service_account_vault
 from config import BACKEND_PORT
 
 
@@ -303,24 +302,18 @@ async def google_oauth_status():
 
 @router.post("/api/oauth/google/service-account")
 async def upload_google_service_account(file: UploadFile = File(...)):
-    raw = await file.read()
+    raw = await file.read(google_service_account_vault.MAX_BYTES + 1)
     try:
-        data = json.loads(raw.decode("utf-8"))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Fichier JSON invalide.")
-    if data.get("type") != "service_account" or not data.get("client_email"):
-        raise HTTPException(
-            status_code=400,
-            detail="Ce n'est pas une clé de compte de service Google valide.",
-        )
-    os.makedirs(os.path.dirname(tool_module._GOOGLE_SA_PATH), exist_ok=True)
-    with open(tool_module._GOOGLE_SA_PATH, "wb") as output:
-        output.write(raw)
+        result = google_service_account_vault.store(raw)
+    except google_service_account_vault.GoogleServiceAccountVaultError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    client_email = result["client_email"]
     return {
         "success": True,
-        "client_email": data["client_email"],
+        "client_email": client_email,
+        "storage": "windows_dpapi_current_user",
         "share_hint": (
-            f"Partage maintenant ton Google Agenda avec {data['client_email']} "
+            f"Partage maintenant ton Google Agenda avec {client_email} "
             "(droit « Modifier les événements »), puis définis ton email comme agenda cible."
         ),
     }
@@ -329,10 +322,10 @@ async def upload_google_service_account(file: UploadFile = File(...)):
 @router.delete("/api/oauth/google/service-account")
 async def delete_google_service_account():
     try:
-        os.remove(tool_module._GOOGLE_SA_PATH)
-    except Exception:
-        pass
-    return {"success": True}
+        google_service_account_vault.delete()
+    except google_service_account_vault.GoogleServiceAccountVaultError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"success": True, "storage": "windows_dpapi_current_user"}
 
 
 class CalendarIdBody(BaseModel):

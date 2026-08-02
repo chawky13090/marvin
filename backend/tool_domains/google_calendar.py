@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -25,19 +24,17 @@ def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
 
 
 def service_account_email() -> str | None:
-    try:
-        payload = json.loads(SERVICE_ACCOUNT_PATH.read_text(encoding="utf-8"))
-        email = payload.get("client_email")
-        return str(email) if email else None
-    except (OSError, ValueError, TypeError):
-        return None
+    import google_service_account_vault
+
+    return google_service_account_vault.client_email()
 
 
 def resolve_calendar_id(requested: Any) -> str:
     import database
+    import google_service_account_vault
 
     calendar_id = str(requested or "primary").strip() or "primary"
-    if calendar_id == "primary" and SERVICE_ACCOUNT_PATH.is_file():
+    if calendar_id == "primary" and google_service_account_vault.configured():
         configured = database.get_setting("google_calendar_id")
         if configured:
             return str(configured).strip()
@@ -57,9 +54,10 @@ def normalize_datetime(value: Any) -> str:
 def is_ready() -> bool:
     import credentials_manager
     import database
+    import google_service_account_vault
 
     try:
-        if SERVICE_ACCOUNT_PATH.is_file() and database.get_setting(
+        if google_service_account_vault.configured() and database.get_setting(
             "google_calendar_id"
         ):
             return True
@@ -74,14 +72,15 @@ def is_ready() -> bool:
 
 def build_service(prefer_oauth: bool = False) -> Any:
     import credentials_manager
-    import database
+    import google_service_account_vault
     from google.oauth2.credentials import Credentials
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
-    if SERVICE_ACCOUNT_PATH.is_file() and not prefer_oauth:
-        credentials = service_account.Credentials.from_service_account_file(
-            str(SERVICE_ACCOUNT_PATH), scopes=[_CALENDAR_SCOPE]
+    account_info = google_service_account_vault.load() if not prefer_oauth else None
+    if account_info is not None:
+        credentials = service_account.Credentials.from_service_account_info(
+            account_info, scopes=[_CALENDAR_SCOPE]
         )
         return build(
             "calendar", "v3", credentials=credentials, cache_discovery=False

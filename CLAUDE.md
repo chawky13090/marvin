@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.579.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.580.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -70,6 +70,8 @@ prioritaire. Pour l'AI SDK v6 côté JavaScript, utiliser `ollamaProvider.chat(m
 - Qdrant est mono-processus : l'interroger via l'API du backend, jamais en important la base
   depuis un script concurrent.
 - Conserver les connexions Google par compte de service, OAuth et iCal.
+- Le compte de service Google est stocké sous DPAPI utilisateur. Le JSON historique ne doit
+  jamais être recréé hors du rollback explicite `manage-google-service-account-vault.py`.
 
 ## Démarrage, arrêt et validation
 

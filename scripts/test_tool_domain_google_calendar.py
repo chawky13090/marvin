@@ -6,6 +6,7 @@ import asyncio
 import sys
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -160,6 +161,37 @@ async def main() -> None:
 
     assert tools._google_sa_email is google_calendar.service_account_email
     assert tools._get_google_calendar_service is google_calendar.build_service
+
+    with patch(
+        "google_service_account_vault.client_email",
+        side_effect=RuntimeError("vault-corrupt"),
+    ):
+        try:
+            google_calendar.service_account_email()
+        except RuntimeError as exc:
+            assert str(exc) == "vault-corrupt"
+        else:
+            raise AssertionError("Une corruption du coffre Google ne doit pas être masquée.")
+
+    account_info = {"type": "service_account", "client_email": "test@example.invalid"}
+    with (
+        patch("google_service_account_vault.load", return_value=account_info),
+        patch(
+            "google.oauth2.service_account.Credentials.from_service_account_info",
+            return_value=object(),
+        ) as from_info,
+        patch(
+            "google.oauth2.service_account.Credentials.from_service_account_file"
+        ) as from_file,
+        patch("googleapiclient.discovery.build", return_value="service") as discovery,
+    ):
+        assert google_calendar.build_service() == "service"
+        from_info.assert_called_once_with(
+            account_info, scopes=["https://www.googleapis.com/auth/calendar"]
+        )
+        from_file.assert_not_called()
+        discovery.assert_called_once()
+
     assert tools.TOOLS_REGISTRY["calendar_list"] is tools.execute_calendar_list
     assert tools.TOOLS_REGISTRY["calendar_create"] is tools.execute_calendar_create
     assert tools.TOOLS_REGISTRY["calendar_update"] is tools.execute_calendar_update

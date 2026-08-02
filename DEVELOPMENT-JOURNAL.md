@@ -5,6 +5,43 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.580.0 — Compte de service Google sous DPAPI
+
+### Demande et constat
+
+La poursuite de TD-007 a révélé un secret réel encore stocké dans
+`backend/data/google_service_account.json`. L'ancien endpoint validait seulement deux champs,
+écrivait directement le fichier et annonçait toujours la suppression comme réussie. Google
+Calendar relisait ensuite la clé privée depuis ce chemin.
+
+### Décision et réalisation
+
+`google_service_account_vault.py` impose 16 Kio maximum, JSON UTF-8, type Google exact,
+`token_uri` officiel, adresse de service et clé RSA d'au moins 2048 bits. Le contenu canonique
+est écrit dans le coffre DPAPI utilisateur, relu avant effacement de la copie historique et
+jamais inscrit dans les logs. Upload et suppression échouent fermés. Calendar construit les
+credentials depuis les informations déchiffrées en mémoire; OAuth et iCal sont inchangés.
+
+Le rollback de données est explicite : il restaure temporairement le JSON avec héritage ACL
+retiré et droits limités à l'utilisateur courant et SYSTEM, sans supprimer la copie DPAPI.
+Une divergence entre clair et coffre bloque toute suppression automatique.
+
+### Validation réelle et sécurité
+
+Les contrats coffre, API, domaine Calendar, composition et architecture passent. Marvin a été
+arrêté gracieusement, la clé réelle migrée, le rollback réel exécuté, puis la clé remigrée.
+État final observé : coffre DPAPI protégé, aucun JSON historique, mode Google
+`service_account`, aucune erreur Google, frontend HTTP 200 et 363 outils. Aucun contenu de clé,
+e-mail ou jeton n'a été affiché ou journalisé. Deux gates finaux ont exécuté 249/249 étapes
+sans échec (529,7 s puis 532,9 s). Le build Next.js 16.2.12/Turbopack a compilé en 3,9 s.
+Après rechargement : backend v2.580, frontend HTTP 200, HTTPS 200, SearXNG 200 et 50
+conversations. SEC-008 passe à `VERIFIED`.
+
+Rollback : arrêter Marvin, exécuter
+`backend\.venv\Scripts\python.exe scripts\manage-google-service-account-vault.py rollback --acknowledge-plaintext-risk`,
+puis réverter le commit v2.580. La restauration en clair est un downgrade temporaire; remigrer
+immédiatement si le rollback applicatif n'est pas conservé.
+
 ## 2026-08-02 — v2.579.0 — HTTPS Windows géré sur 443
 
 ### Demande et diagnostic
