@@ -274,6 +274,14 @@ echo.
 
 :: ============================================================ [9/9] Config
 echo [9/9] Configuration...
+if not exist "data" mkdir "data"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\manage-data-acl.ps1" -Action Apply -NoConfirm
+if errorlevel 1 (
+    echo   [ERREUR] Les ACL du dossier data n ont pas pu etre securisees.
+    echo   Consultez runtime\security\data-acl-result.json puis relancez l installeur.
+    popd & pause & exit /b 1
+)
+echo   [OK] Donnees Marvin limitees a l utilisateur, SYSTEM et Administrateurs.
 if not exist ".env.local" if exist ".env.local.example" (
     copy ".env.local.example" ".env.local" >nul
     echo   [OK] .env.local cree ^(modifiez-le pour vos comptes Google/Outlook si besoin^).

@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.582.0 — ACL Windows data, rollback et installateur
+
+### Constat et conception
+
+SEC-009 était confirmé sur la machine réelle : `data`, la base, le coffre DPAPI, les
+sauvegardes et les rapports héritaient de trois identités supplémentaires avec droit de
+modification. Le propriétaire était bien Chawb, la racine non protégée, 2 244 éléments ne
+contenaient aucun reparse point et les zones sensibles n'avaient aucun grant explicite.
+
+Une première tentative de rollback `icacls /restore` a échoué avec le code Windows 1300 : un
+token non élevé ne peut pas réassigner les anciens SID hérités. Ce résultat n'a pas été masqué.
+Le contrat final n'applique le durcissement que sur un arbre entièrement hérité, conserve le
+SDDL d'accès du parent et restaure par réactivation d'héritage uniquement si ce SDDL est
+inchangé. Une racine explicite ou un enfant explicite impose une intervention manuelle.
+
+### Réalisation et preuves
+
+`manage-data-acl.ps1` fournit Audit, Apply et Restore, sauvegarde DACL, SHA-256 et métadonnées,
+refuse les reparse points, applique Chawb/SYSTEM/Administrateurs et contrôle récursivement
+tous les enfants ainsi que les zones sensibles. Un échec d'audit final restaure l'héritage
+initial sans réutiliser le mécanisme Windows qui avait échoué. Le rollback refuse aussi tout
+snapshot dont l'empreinte diffère. Le test réel temporaire couvre audit, sauvegarde,
+altération refusée, durcissement et rollback. `INSTALLER-NOUVEAU-PC.bat` applique désormais
+ce contrat et refuse de terminer si les données ne peuvent pas être sécurisées.
+
+Sur l'arbre réel, Apply a retiré trois grants, Restore a reproduit l'ancien état, puis Apply
+a rétabli l'état sécurisé. Une troisième passe a rendu `already_compliant=true`. Les ACL
+observées de `secretary.db` et `windows_secrets.dpapi.json` ne contiennent plus que Chawb,
+SYSTEM et Administrateurs. Rollback :
+`scripts\manage-data-acl.ps1 -Action Restore -BackupPath <snapshot> -NoConfirm`.
+
+### Validation finale observée
+
+La revue avant gate a détecté et corrigé deux défauts du premier jet : l'audit ne parcourait
+pas encore tous les descendants et la compensation interne réutilisait encore `icacls
+/restore`. Le contrat final audite récursivement, refuse un snapshot altéré par contrôle
+SHA-256 et compense par réactivation de l'héritage. Les tests ciblés ACL, installateur,
+documentation, architecture et runner passent. `npm run check:quick` passe **251/251** en
+527,3 secondes et le build Next.js 16.2.12/Turbopack passe en 9,2 secondes. Après démarrage
+par `start.bat`, FastAPI expose 2.582.0 et 363/363 outils, le frontend et HTTPS rendent 200,
+SearXNG rend `/config` 200 et 80 résultats réels, 50 conversations sont relues et Google
+Calendar reste connecté par compte de service sans erreur. L'audit ACL vivant reste conforme,
+sans grant racine ou enfant parasite. L'avertissement de fermeture Qdrant déjà déclaré TD-008
+reste visible; il ne provoque aucun échec et n'est pas présenté comme résolu dans cette tranche.
+
 ## 2026-08-02 — v2.581.0 — Maintenance SQLite offline et rollback réel
 
 ### Constat et choix

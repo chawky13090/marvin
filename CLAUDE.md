@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.581.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.582.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -92,6 +92,10 @@ persistant et vérifié par `scripts/test_python_runtime.py`.
 La maintenance SQLite est strictement hors ligne : arrêter Marvin puis exécuter
 `backend\.venv\Scripts\python.exe scripts\manage-sqlite-maintenance.py run`. Chaque passe
 crée une sauvegarde DPAPI vérifiée et rend le nom nécessaire au rollback.
+
+`data` doit conserver une ACL protégée limitée à l'utilisateur Windows courant, SYSTEM et
+Administrateurs. Auditer ou réparer avec `scripts\manage-data-acl.ps1`; l'installeur applique
+ce contrat et refuse de terminer si le durcissement échoue.
 
 Gate rapide :
 
