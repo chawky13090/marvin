@@ -1,0 +1,32 @@
+{
+  "schema": "marvin.ollama-context-evidence/1.0",
+  "captured_at": "2026-08-02T22:59:08.983919+00:00",
+  "git_commit": "d5dbbb30ede9cdfb3eac8f245b08134304f3d61b",
+  "benchmark_contract": "windows-operator/v1",
+  "evidence": {
+    "status": "verified",
+    "minimum_tokens": 32768,
+    "recommended_tokens": 65536,
+    "launcher_requested_tokens": 0,
+    "ollama_version": "0.32.5",
+    "models": [
+      {
+        "model": "qwen3.5:397b-cloud",
+        "provider": "cloud",
+        "status": "verified",
+        "evidence": "ollama_cloud_full_context",
+        "loaded": false,
+        "allocated_context_tokens": null,
+        "max_context_tokens": 262144,
+        "effective_context_tokens": 262144,
+        "meets_minimum": true,
+        "meets_recommended": true,
+        "digest": null
+      }
+    ],
+    "documentation": {
+      "context": "https://docs.ollama.com/context-length",
+      "runtime": "https://docs.ollama.com/api/ps"
+    }
+  }
+}
