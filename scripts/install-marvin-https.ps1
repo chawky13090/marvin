@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [ValidateRange(1024, 65535)]
+    [ValidateRange(443, 65535)]
     [int]$Port = 8443,
     [switch]$Start
 )

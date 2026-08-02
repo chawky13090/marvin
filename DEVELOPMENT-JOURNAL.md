@@ -5,6 +5,44 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.579.0 — HTTPS Windows géré sur 443
+
+### Demande et diagnostic
+
+Après la fermeture de la dette frontend massive, la tranche prioritaire SEC-001 devait
+remplacer la passerelle 8443 lancée comme processus interactif par un fonctionnement Windows
+maintenable. L'état réel montrait : Caddy actif sur 8443, racine approuvée pour l'utilisateur,
+port 443 libre, aucun service Windows et rollback supprimant les fichiers sans suivre la
+confiance. `start.bat`, l'arrêt et le diagnostic supposaient tous 8443.
+
+### Correction
+
+- service automatique `MarvinHttpsGateway` sous `NT AUTHORITY\LocalService`, configuration
+  et données bornées au runtime HTTPS, précontrôle du port et repli 8443 uniquement explicite;
+- règle pare-feu limitée à Domaine/Privé et au binaire Caddy épinglé;
+- confiance suivie atomiquement par empreinte exacte, révocation exacte et confirmation
+  Windows conservée; la tentative de suppression silencieuse a été abandonnée après preuve
+  que Windows 11 impose sa boîte de confirmation pour une racine utilisateur;
+- journal `https-security.jsonl` sans contenu, rotation 10 Mio, rétention 90 jours et
+  30 archives;
+- démarrage, arrêt et diagnostic rendus dynamiques. Un service HTTPS installé reste actif
+  pendant l'arrêt applicatif et ne peut plus être confondu avec un processus Marvin orphelin.
+
+### Validation, sécurité, logs et rollback
+
+Caractérisation rouge avant implémentation, parsing PowerShell des scripts, contrat HTTPS,
+contrat lifecycle et smoke TLS réel : réussis. Installation réelle : service `Running`,
+`LocalService`, TCP/443, aucun listener 8443, pare-feu `Domain, Private`, santé HTTPS `ok`.
+Un cycle arrêt/redémarrage Marvin a terminé gracieusement en 9,2 secondes sans PID forcé et
+est revenu `ready` avec 363 outils, Ollama et SearXNG 8391. Le rollback du service a été testé
+par désinstallation puis réinstallation réelle dans une seule élévation. La racine est restée
+approuvée et aucune donnée métier n'a été touchée. SEC-001 reste honnêtement `MITIGATED` tant
+que les parcours Android, iOS, macOS et Linux ne sont pas automatisés.
+
+Rollback applicatif : réversion atomique du commit v2.579. Rollback opérationnel du service :
+`.\scripts\manage-marvin-https-service.ps1 -Action Uninstall`; rollback complet :
+`.\scripts\rollback-marvin-https.ps1` avec confirmation Windows explicite de révocation.
+
 ## 2026-08-01 — v2.552.0 — Arrêt backend borné et réellement gracieux
 
 ### Diagnostic

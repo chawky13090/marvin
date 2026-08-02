@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.578.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.579.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.578.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.579.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -205,7 +205,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.578.0)
+## 9. État actuel (v2.579.0)
+
+**v2.579 (HTTPS Windows géré et réversible)** : Caddy 2.11.4 fonctionne désormais comme
+service Windows automatique `MarvinHttpsGateway` sous `NT AUTHORITY\LocalService`, sur le
+port standard 443 après précontrôle d'occupation. La règle entrante est limitée aux profils
+Domaine et Privé et au binaire épinglé. `start.bat`, l'état runtime et l'arrêt gracieux lisent
+le port dynamique; le service HTTPS reste indépendant des arrêts frontend/backend. La
+confiance est liée à l'empreinte exacte, suivie dans un état atomique et journalisée sans
+secret. Windows conserve volontairement sa confirmation système lors d'une révocation de
+racine. Désinstallation/réinstallation du service, cycle complet Marvin et santé HTTPS 443
+ont été validés. Rollback applicatif : réversion du commit v2.579; rollback opérationnel :
+`manage-marvin-https-service.ps1 -Action Uninstall`, puis révocation explicitement confirmée.
 
 **v2.578 (aucune exception frontend massive)** : l'assistant de connexion multi-boîtes vit
 dans `components/email/EmailSetupPanel.jsx`; les styles de formulaire partagés vivent dans

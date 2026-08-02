@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
@@ -147,24 +148,17 @@ echo  Frontend : http://localhost:3000
 echo  Backend  : http://localhost:8005
 echo  API docs : http://localhost:8005/docs
 if exist "%~dp0runtime\https\caddy.exe" (
-    echo  HTTPS    : https://localhost:8443
+    for /f "usebackq delims=" %%H in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\ensure-marvin-https.ps1" 2^>nul`) do set "MARVIN_HTTPS_URL=%%H"
+    if defined MARVIN_HTTPS_URL (
+        echo  HTTPS    : !MARVIN_HTTPS_URL!
+    ) else (
+        echo  HTTPS    : indisponible ^(socle local maintenu^)
+    )
 )
 echo.
 echo  Appuyez sur Ctrl+C pour arreter le frontend.
 echo  Pour tout arreter proprement : stop.bat
 echo.
-
-if exist "%~dp0runtime\https\caddy.exe" (
-    powershell -NoProfile -Command "try{$null=Invoke-RestMethod 'http://127.0.0.1:2019/config/' -TimeoutSec 2;$c=Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction Stop;if($null-ne$c){exit 0}}catch{};exit 1" >nul 2>&1
-    if errorlevel 1 (
-        echo       Demarrage de la passerelle HTTPS...
-        start "Marvin - HTTPS" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-marvin-https.ps1" -Port 8443
-    ) else (
-        echo       Passerelle HTTPS deja active.
-    )
-    powershell -NoProfile -Command "$ok=$false;for($i=0;$i-lt 60;$i++){try{$null=Invoke-RestMethod 'http://127.0.0.1:2019/config/' -TimeoutSec 2;$c=Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction Stop;if($null-ne$c){$ok=$true;break}}catch{};Start-Sleep -Milliseconds 500};if($ok){exit 0}else{exit 1}" >nul 2>&1
-    if errorlevel 1 echo [ATTENTION] HTTPS indisponible; Marvin reste local, acces LAN degrade.
-)
 
 powershell -NoProfile -Command "try{$d=Invoke-RestMethod 'http://127.0.0.1:3000/api/status' -TimeoutSec 3;if($null -ne $d.ollama -and $null -ne $d.integrations){exit 0};exit 1}catch{exit 1}" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (

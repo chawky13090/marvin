@@ -17,14 +17,19 @@ function Invoke-SafeJsonProbe {
 $Health = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:8005/api/health'
 $Lan = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:8005/api/auth/lan/status'
 $Frontend = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:3000/api/status'
+$HttpsPort = 8443
+$HttpsStatePath = Join-Path $Root 'runtime\https\state.json'
+if (Test-Path -LiteralPath $HttpsStatePath -PathType Leaf) {
+    try { $HttpsPort = [int](Get-Content -Raw -LiteralPath $HttpsStatePath | ConvertFrom-Json).port } catch { $HttpsPort = 8443 }
+}
 $Https = $false
 try {
-    $Https = (Invoke-WebRequest -UseBasicParsing -Uri 'https://127.0.0.1:8443/' `
+    $Https = (Invoke-WebRequest -UseBasicParsing -Uri "https://127.0.0.1:$HttpsPort/" `
         -TimeoutSec 4 -SkipCertificateCheck).StatusCode -eq 200
 } catch {
     # Windows PowerShell 5.1 ne possède pas SkipCertificateCheck. La présence
     # du listener et de l'admin Caddy reste vérifiée sans désactiver TLS globalement.
-    $Https = $null -ne (Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
+    $Https = $null -ne (Get-NetTCPConnection -LocalPort $HttpsPort -State Listen -ErrorAction SilentlyContinue)
 }
 
 $OllamaPort = 0
@@ -65,6 +70,7 @@ $Overall = if (-not $CoreReady) { 'stopped_or_failed' } elseif ($Degraded) { 'de
         searxng = $Searxng
         searxng_port = $SearxngPort
         https = $Https
+        https_port = $HttpsPort
     }
     lan = [ordered]@{
         authenticated = $null -ne $Lan -and $Lan.authenticated -eq $true

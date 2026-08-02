@@ -6,6 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
+# v2.579 — HTTPS Windows géré sur 443, service LocalService et rollback vérifié
 # v2.578 — assistant multi-boîtes extrait et dette frontend massive fermée
 # v2.565 — aperçus Web progressifs, replis concurrents et vérité visuelle du modèle
 # v2.564 — miniatures Web résolues et mode Lecture strictement épuré
@@ -20,7 +21,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.550 — audit puissance : contexte Ollama, filtre cloud, vision, budgets d'execution
 # v2.549 — robot d'activité interactif intégré au composeur et adaptatif à la sidebar
 # v2.548 — activité latérale : robot à gauche, informations à droite, centre libéré
-# v2.546 — délai coopératif d'arrêt aligné sur l'avatar et les services lents
 # v2.540 — computer_control : alias query/key->target/text, rapport architecture outils
 # v2.539 — computer_control : alias action/coordonnee, focus resilient (AttachThreadInput)
 # v2.538 — computer_control : touches SendKeys via type, alias browser, message click clair

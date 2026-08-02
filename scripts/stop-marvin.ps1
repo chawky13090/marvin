@@ -13,7 +13,13 @@ $ProjectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $LifecycleRoot = Join-Path $ProjectRoot 'runtime\lifecycle'
 $LogRoot = Join-Path $ProjectRoot 'runtime\logs'
 $LogPath = Join-Path $LogRoot 'lifecycle.jsonl'
-$Ports = @(3000, 8005, 8443)
+$HttpsService = Get-Service -Name 'MarvinHttpsGateway' -ErrorAction SilentlyContinue
+$HttpsStatePath = Join-Path $ProjectRoot 'runtime\https\state.json'
+$HttpsPort = 8443
+if (Test-Path -LiteralPath $HttpsStatePath -PathType Leaf) {
+    try { $HttpsPort = [int](Get-Content -Raw -LiteralPath $HttpsStatePath | ConvertFrom-Json).port } catch { $HttpsPort = 8443 }
+}
+$Ports = if ($null -ne $HttpsService) { @(3000, 8005) } else { @(3000, 8005, $HttpsPort) }
 $StartedAt = Get-Date
 
 function Rotate-LifecycleLog {
@@ -84,9 +90,9 @@ function Get-MarvinRuntimeProcesses {
         'node_modules\\next\\dist\\bin\\next dev',
         'node_modules\\next\\dist\\server\\lib\\start-server.js',
         'scripts\\start-marvin-https.ps1',
-        'runtime\\https\\caddy.exe',
         'playwright\\driver\\package\\cli.js run-driver'
     )
+    if ($null -eq $HttpsService) { $Markers += 'runtime\\https\\caddy.exe' }
     $Found = @()
     foreach ($Process in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
         if ([int]$Process.ProcessId -eq $PID) { continue }
@@ -200,7 +206,7 @@ if (-not $AllowActiveWorkInterruption) {
     }
 }
 
-if (-not $PSCmdlet.ShouldProcess('Marvin (ports 3000, 8005 et 8443)', 'Arrêt coopératif vérifié')) {
+if (-not $PSCmdlet.ShouldProcess('Marvin (frontend et backend; service HTTPS conservé)', 'Arrêt coopératif vérifié')) {
     Clear-StopCoordination
     Release-LifecycleLock
     exit 0
@@ -215,8 +221,8 @@ New-ShutdownRequest -Name 'frontend.shutdown'
 $Caddy = Join-Path $ProjectRoot 'runtime\https\caddy.exe'
 $CaddyConfig = Join-Path $ProjectRoot 'runtime\https\caddy.json'
 $CaddyStopAttempted = $false
-if ((Test-Path -LiteralPath $Caddy) -and (Test-Path -LiteralPath $CaddyConfig)) {
-    $HttpsListener = @($Initial | Where-Object { $_.Port -eq 8443 })
+if ($null -eq $HttpsService -and (Test-Path -LiteralPath $Caddy) -and (Test-Path -LiteralPath $CaddyConfig)) {
+    $HttpsListener = @($Initial | Where-Object { $_.Port -eq $HttpsPort })
     if ($HttpsListener.Count -gt 0) {
         $CaddyStopAttempted = $true
         try {

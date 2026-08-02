@@ -37,6 +37,9 @@ def test_contract_files() -> None:
     backend_runtime = (ROOT / "backend" / "server_runtime.py").read_text(encoding="utf-8-sig")
     production = (ROOT / "START-PRODUCTION.bat").read_text(encoding="utf-8-sig")
     restart = (ROOT / "scripts" / "restart-marvin.ps1").read_text(encoding="utf-8-sig")
+    status = (ROOT / "scripts" / "get-marvin-runtime-status.ps1").read_text(
+        encoding="utf-8-sig"
+    )
     assert "New-ShutdownRequest -Name 'backend.shutdown'" in stop
     assert "New-ShutdownRequest -Name 'frontend.shutdown'" in stop
     assert "Get-MarvinListeners" in stop
@@ -45,6 +48,9 @@ def test_contract_files() -> None:
     assert "preserved_ollama = $true" in stop
     assert "caddy.exe" in stop and "Start-Process -FilePath $Caddy" in stop
     assert "$CaddyStop.ExitCode" in stop
+    assert "MarvinHttpsGateway" in stop
+    assert "$null -eq $HttpsService" in stop
+    assert "https_port" in status
     assert "frontend.shutdown" in frontend
     assert "child.kill('SIGTERM')" in frontend
     assert "stopping ? 0" in frontend
