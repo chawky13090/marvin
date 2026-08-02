@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.571.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.572.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -36,7 +36,7 @@ l'objectif utilisateur a été atteint.
 | Persistance | SQLite propriétaire du seul backend, Qdrant embarqué | aucune ouverture directe frontend |
 
 `backend/main.py` contient la composition, le lifespan, le montage des routeurs et le handler
-global. Il ne contient aucune route métier et reste borné à 400 lignes par test. Les routes
+global. Il ne contient aucune route métier et reste borné à 350 lignes par test. Les routes
 sont réparties dans 50 modules `backend/api/*.py`. `TOOLS_REGISTRY` et `TOOLS_SPEC` doivent
 rester strictement égaux ; chaque outil passe par le gateway, sa politique, son résultat et
 ses preuves.

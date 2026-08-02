@@ -32,7 +32,7 @@ def main() -> int:
     assert len(specs) == len(set(specs)), "TOOLS_SPEC contient un doublon"
     assert set(registry) == set(specs), "registre et schémas d'outils divergent"
     assert package_version == version
-    assert main_lines <= 400, f"main.py redevient monolithique: {main_lines} lignes"
+    assert main_lines <= 350, f"main.py redevient monolithique: {main_lines} lignes"
 
     agents = read("AGENTS.md")
     claude = read("CLAUDE.md")

@@ -5,7 +5,6 @@
   "legacyLargeFiles": {
     "app/devis/page.jsx": 1383,
     "app/emails/page.jsx": 1321,
-    "app/outils/page.jsx": 1562,
     "app/settings/page.jsx": 1568,
     "app/video/page.jsx": 1918,
     "components/chat/MessageBubble.jsx": 1864

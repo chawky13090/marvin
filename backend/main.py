@@ -6,10 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.571 — catalogue Outils découpé par domaine avec ordre caractérisé
-# v2.570 — baseline frontend, budget de dette et frontières d'extraction
-# v2.569 — documentation canonique, dette explicite et métriques anti-dérive
-# v2.568 — runner exhaustif, rapport atomique et frontière unique des scans statiques
+# v2.572 — rendu des résultats Outils extrait et page sous le plafond frontend
 # v2.565 — aperçus Web progressifs, replis concurrents et vérité visuelle du modèle
 # v2.564 — miniatures Web résolues et mode Lecture strictement épuré
 # v2.563 — galerie visuelle des sources réellement lues et aperçus privés durcis

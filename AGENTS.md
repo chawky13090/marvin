@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.571.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.572.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,12 +44,12 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.571.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.572.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
 ### Fichiers backend clés (`backend/`)
-- `main.py` — composition FastAPI, lifespan, montage des routeurs et handler global ; aucune route métier, plafond automatisé de 400 lignes.
+- `main.py` — composition FastAPI, lifespan, montage des routeurs et handler global ; aucune route métier, plafond automatisé de 350 lignes.
 - `api/` — 50 modules de routes FastAPI répartis par domaine.
 - `tools.py` — les **363 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
@@ -185,7 +185,7 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
   dépend d'un artefact local non versionné doit être redessinée avant livraison.
 - App Router : un dossier préfixé `_` est **privé** (404) → nommer normalement les pages de test.
 - Canal `voiceText` dans `ChatContainer.handleSend` : `const text = (voiceText ?? localInput).trim()` — réutilisé pour **injecter** du contenu dans un message (ex. contenu d'un fichier joint, insertion de compétence).
-- Historique de version : ajouter un commentaire `# vX.Y — description` dans `main.py` et modifier uniquement `APP_VERSION` dans `backend/app_version.py` ; `scripts/check_architecture.py` contrôle les métadonnées npm.
+- Version : remplacer uniquement le marqueur courant `# vX.Y — description` en tête de `main.py`, conserver l'historique détaillé dans `DEVELOPMENT-JOURNAL.md`, et modifier `APP_VERSION` dans `backend/app_version.py` ; `scripts/check_architecture.py` contrôle les métadonnées npm.
 - Mémoire de session de Codex (les notes `# vX.Y` détaillées) : elle est **locale à la machine** (`~/.Codex/...`). Ce `AGENTS.md` est la source de vérité **portable** — le tenir à jour quand l'archi change.
 - Journal partagé Codex/Claude : après toute évolution importante, ajouter une entrée datée dans
   `DEVELOPMENT-JOURNAL.md` avec la demande, les constats, les décisions, les fichiers modifiés et
@@ -205,7 +205,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.571.0)
+## 9. État actuel (v2.572.0)
+
+**v2.572 (page Outils sous le plafond)** : `ResultPanel` quitte la page Outils avec toutes ses
+branches historiques (erreur, fichier, Web, image, ports, réseau, traduction, shell et JSON)
+dans `components/tools/ResultPanel.jsx`. Les actions de fichier partagées deviennent
+`FileAction.jsx` et l'appel d'outil commun `lib/tools/api.js`; aucune politique d'autorisation
+n'est déplacée côté client. La caractérisation a détecté deux dépendances implicites
+(`FileAction`, `callBackendTool`) avant build; elles ont été rendues explicites. La page passe
+de 1 562 à 963 lignes et sort définitivement des exceptions de plus de 1 200 lignes; il ne
+reste que cinq exceptions frontend. Baseline 110 sources, 37/37 avertissements, zéro erreur.
+Rollback : réversion atomique du commit v2.572; aucune migration persistante.
 
 **v2.571 (première extraction frontend caractérisée)** : les 1 855 lignes du catalogue
 statique quittent `app/outils/page.jsx` sans être déplacées vers un nouveau monolithe. Les 17

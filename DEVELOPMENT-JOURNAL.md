@@ -16231,3 +16231,44 @@ ou schéma d'outil n'est ajouté. Le catalogue dynamique continue de compléter 
 backend et les 363 contrats restent inchangés. Tests exigés avant commit : caractérisation du
 catalogue, baseline frontend, architecture 363/363, documentation, build Turbopack et smoke
 visuel `/outils`. Rollback : réversion atomique du commit v2.571; aucune migration.
+
+## 2026-08-02 — v2.572 — Rendu Outils extrait et dette abaissée
+
+### Extraction et défaut détecté
+
+`test_tools_result_panel.mjs` a d'abord caractérisé dans la page existante les branches
+erreur, fichiers, Web, image, réseau, traduction, shell et fallback JSON. Après le déplacement
+de `ResultPanel`, le test ESLint a trouvé trois références `FileAction` non définies; la
+fonction dépendait aussi implicitement de `callBackendTool`. Au lieu de dupliquer ces helpers,
+ils ont reçu des propriétaires partagés : `components/tools/FileAction.jsx` et
+`lib/tools/api.js`.
+
+`app/outils/page.jsx` descend de 1 562 à 963 lignes et quitte le registre des exceptions. Le
+frontend compte 110 sources, cinq exceptions au-dessus de 1 200 lignes, zéro erreur et le
+même budget de 37 avertissements. Le plafond supprimé ne peut plus être réintroduit sans faire
+échouer la baseline.
+
+### Sécurité, logs, validation et rollback
+
+Le client HTTP partagé reproduit le contrat existant et ne prend aucune décision
+d'autorisation; le backend reste l'autorité. Aucun nouveau log, stockage, secret, outil ou
+appel externe. Tests exigés avant commit : deux caractérisations Outils, baseline frontend,
+documentation, architecture, build Turbopack, santé HTTP et smoke navigateur 41/41.
+Rollback : réversion atomique du commit v2.572; aucune migration persistante.
+
+Le gate exhaustif live a ensuite exécuté 244 étapes et isolé une seule régression : les quatre
+marqueurs de versions ajoutés depuis v2.568 avaient porté `main.py` à 354 lignes, au-dessus du
+contrat existant de 350. Les détails vivant déjà dans ce journal et Git, ces quatre marqueurs
+intermédiaires ont été retirés et la convention impose désormais de remplacer le seul marqueur
+courant. Le test documentaire est aligné sur 350 au lieu d'un plafond contradictoire de 400.
+
+Le premier rejeu exhaustif après cette correction a exécuté les 244 étapes mais le smoke du
+chat a rencontré une course intermittente HTTP 401 pendant deux changements de conversation.
+Le test ciblé a ensuite réussi cinq fois consécutivement, puis la séquence réelle `41 pages →
+5 conversations` a également réussi. Le smoke consigne désormais les URL et statuts HTTP en
+erreur afin qu'une récidive fournisse sa preuve causale au lieu du seul message console.
+
+Validation finale observée le 2 août 2026 : rapport atomique `success=true`, 244/244 étapes,
+363/363 outils avec harnais, 391 routes, 41/41 pages, rendu des cinq conversations réelles et
+voix navigateur réussis. Durée du gate final : 643,5 secondes. Aucun redémarrage, aucune
+mutation de schéma et aucun effet externe réel pendant cette tranche.

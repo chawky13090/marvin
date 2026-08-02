@@ -96,12 +96,19 @@ async def check_conversation(page, title_snippet: str, conversation_id: str) -> 
 
 async def main() -> int:
     console_errors: list[str] = []
+    http_errors: list[str] = []
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome")
         page = await browser.new_page(viewport={"width": 1280, "height": 1400})
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
         page.on("pageerror", lambda exc: console_errors.append(str(exc)))
+        page.on(
+            "response",
+            lambda response: http_errors.append(
+                f"HTTP {response.status} {response.url}"
+            ) if response.status >= 400 else None,
+        )
 
         # La page possède des pollers à 10/15 s : `networkidle` n'est donc pas
         # un contrat de disponibilité et devient aléatoire sous charge. Attendre
@@ -164,6 +171,10 @@ async def main() -> int:
         print(f"\nErreurs console navigateur ({len(console_errors)}) :")
         for e in console_errors[:10]:
             print(f"  - {e[:200]}")
+    if http_errors:
+        print(f"\nRéponses HTTP en erreur ({len(http_errors)}) :")
+        for error in http_errors[:20]:
+            print(f"  - {error[:300]}")
 
     ok = not failed and not console_errors
     print(f"\nRésultat global : {'OK' if ok else 'ECHEC'}")

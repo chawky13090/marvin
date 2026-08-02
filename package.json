@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.571.0",
+  "version": "2.572.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -14,6 +14,7 @@
     "check:documentation-baseline": "backend\\.venv\\Scripts\\python.exe scripts\\test_documentation_baseline.py",
     "check:frontend-baseline": "node scripts/check_frontend_baseline.mjs",
     "check:tools-catalog": "node --no-warnings scripts/test_tools_catalog.mjs",
+    "check:tools-result-panel": "node scripts/test_tools_result_panel.mjs",
     "check:computer-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_computer_runtime.py",
     "check:tailscale-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_tailscale_runtime.py",
     "check:generation-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_generation_runtime.py",

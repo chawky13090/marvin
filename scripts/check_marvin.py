@@ -489,6 +489,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Notifications Telegram bornées", (python, "scripts/test_tool_domain_telegram.py")),
         Stage("Mini-applications Web atomiques", (python, "scripts/test_tool_domain_webapp.py")),
         Stage("Catalogue frontend des outils", ("node", "--no-warnings", "scripts/test_tools_catalog.mjs")),
+        Stage("Rendu frontend des résultats d'outils", ("node", "scripts/test_tools_result_panel.mjs")),
         Stage("Logos locaux atomiques", (python, "scripts/test_tool_domain_logos.py")),
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),
