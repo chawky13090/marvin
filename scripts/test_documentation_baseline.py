@@ -54,6 +54,7 @@ def main() -> int:
     assert "aucune route métier" in architecture
     assert "TD-001" in debt and "TD-007" in debt
     assert "TECHNICAL-DEBT.md" in readme
+    assert "FRONTEND-ARCHITECTURE.md" in readme
 
     print(
         "Documentation baseline OK - "

@@ -1,13 +1,13 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-02 pour Marvin 2.569.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-02 pour Marvin 2.570.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 
 | ID | Sévérité | Domaine | Preuve actuelle | Risque | Traitement et critère de fermeture |
 |---|---|---|---|---|---|
-| TD-001 | Élevée | Frontend | 6 fichiers JSX dépassent 1 300 lignes; `app/outils/page.jsx` atteint 3 406 lignes | revue difficile, collisions Claude/Codex, régressions d'état | tests de caractérisation puis extraction par domaine; aucun fichier applicatif au-dessus de 1 200 lignes sans dérogation documentée |
-| TD-002 | Moyenne | Qualité frontend | ESLint passe avec 37 avertissements préexistants | signaux faibles noyés et effets React fragiles | établir un budget par catégorie, empêcher toute hausse, corriger progressivement jusqu'à zéro |
+| TD-001 | Élevée | Frontend | 6 fichiers JSX dépassent 1 300 lignes; `app/outils/page.jsx` atteint 3 406 lignes | revue difficile, collisions Claude/Codex, régressions d'état | baseline bloquante livrée en v2.570; tests de caractérisation puis extraction par domaine jusqu'à aucun fichier au-dessus de 1 200 lignes sans dérogation documentée |
+| TD-002 | Moyenne | Qualité frontend | ESLint passe avec 37 avertissements préexistants | signaux faibles noyés et effets React fragiles | budget bloquant 37 livré en v2.570; corriger progressivement jusqu'à zéro sans jamais relever le plafond |
 | TD-003 | Moyenne | Documentation | `CLAUDE.md` contenait encore des faits v2.80 (261 outils) alors que le produit est en v2.569 | décisions prises sur une architecture inexistante | guide courant court, `ARCHITECTURE.md` canonique et test automatique de cohérence livrés en v2.569 |
 | TD-004 | Moyenne | Validation | le runner historique s'arrêtait au premier échec | résultats non exécutés présentés implicitement comme couverts | fermé en v2.568 : 237/237 étapes exécutées, rapport atomique et mode `--fail-fast` explicite |
 | TD-005 | Faible | Gouvernance | version et journal touchent de nombreux commits | bruit de diff et conflits entre agents | conserver un commit atomique par tranche; étudier une note de version générée sans retirer la traçabilité actuelle |

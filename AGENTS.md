@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.569.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.570.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.569.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.570.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -205,7 +205,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.569.0)
+## 9. État actuel (v2.570.0)
+
+**v2.570 (baseline frontend anti-régression)** : avant toute extraction, la dette UI devient
+mesurable. `check_frontend_baseline.mjs` analyse les 102 sources JavaScript/JSX avec l'API
+ESLint et refuse toute erreur, tout dépassement du budget actuel de 37 avertissements, tout
+nouveau fichier au-dessus de 1 200 lignes et toute croissance des six exceptions historiques.
+`config/frontend-baseline.json` rend ces plafonds explicites; ils ne peuvent que baisser.
+`docs/FRONTEND-ARCHITECTURE.md` définit les responsabilités de page, composants, hooks,
+transports et primitives UI, ainsi que l'ordre d'extraction fondé sur le risque. Le runner
+complet utilise ce gate à la place d'un lint qui ne mesurait pas la dette. Aucun composant,
+comportement, outil, route, donnée ou permission n'est modifié. Rollback : réversion atomique
+du commit v2.570; aucune migration persistante.
 
 **v2.569 (documentation canonique et dette mesurable)** : l'audit a confirmé que le début de
 `CLAUDE.md` décrivait encore v2.80, 261 outils et un `main.py` propriétaire de toutes les

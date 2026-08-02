@@ -16183,3 +16183,28 @@ dans la partie active du guide Claude. Il rejoint le runner exhaustif. La tranch
 n'écrit aucune donnée utilisateur, ne journalise rien au runtime et ne modifie aucune
 autorisation. Tests ciblés, architecture, lint, build et smoke HTTP sont exigés avant commit.
 Rollback : réversion atomique du commit v2.569; aucune migration ou restauration de données.
+
+## 2026-08-02 — v2.570 — Baseline frontend avant extraction
+
+### Mesure et décision
+
+Le frontend contient 102 sources JavaScript/JSX. Six exceptions dépassent le plafond cible de
+1 200 lignes : `app/outils/page.jsx` (3 406), `app/video/page.jsx` (1 918),
+`components/chat/MessageBubble.jsx` (1 864), `app/settings/page.jsx` (1 568),
+`app/devis/page.jsx` (1 383) et `app/emails/page.jsx` (1 321). ESLint produit zéro erreur et
+37 avertissements. Ces chiffres deviennent des budgets bloquants, pas une justification pour
+une réécriture globale risquée.
+
+`config/frontend-baseline.json` conserve les plafonds. `check_frontend_baseline.mjs` utilise
+l'API ESLint, refuse une hausse des avertissements, la croissance d'une exception ou un
+nouveau fichier massif. `docs/FRONTEND-ARCHITECTURE.md` définit les frontières et l'ordre
+d'extraction. Le premier test a révélé une divergence de comptage liée au saut de ligne final;
+la métrique est maintenant normalisée de façon identique à PowerShell.
+
+### Sécurité, logs, validation et rollback
+
+Cette tranche ne modifie aucun runtime UI et n'accède à aucune donnée utilisateur. Le gate ne
+stocke ni source, ni sortie ESLint, ni secret. Résultat ciblé observé : 102 sources, 37/37
+avertissements et six exceptions historiques, zéro erreur. Architecture, documentation,
+build et smoke HTTP sont requis avant commit. Rollback : réversion atomique du commit v2.570;
+aucune migration persistante.

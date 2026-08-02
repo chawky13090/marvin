@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.569.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.570.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -8,6 +8,7 @@ Ce fichier est le point d'entrée court et portable. Les sources de vérité dé
 - `ARCHITECTURE.md` pour les frontières et invariants du code ;
 - `MARVIN-FRONTIER-CONSOLIDATION.md` pour le plan global et les niveaux de preuve ;
 - `docs/TECHNICAL-DEBT.md` pour la dette ouverte, sans masquer les limites ;
+- `docs/FRONTEND-ARCHITECTURE.md` pour les frontières UI et les budgets anti-régression ;
 - `MARVIN-LOGGING-POLICY.md` pour les événements, données interdites et rétentions ;
 - `DEVELOPMENT-JOURNAL.md` pour la coordination factuelle Claude/Codex ;
 - Git pour l'historique complet et chaque rollback atomique.

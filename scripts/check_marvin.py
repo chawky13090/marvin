@@ -491,7 +491,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Logos locaux atomiques", (python, "scripts/test_tool_domain_logos.py")),
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),
-        Stage("Qualite du frontend", (npm, "run", "lint")),
+        Stage("Baseline et qualite du frontend", (npm, "run", "check:frontend-baseline")),
     ]
     if not quick and not live:
         result.append(Stage("Build de production Next.js", (npm, "run", "build")))
