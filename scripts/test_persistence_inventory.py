@@ -23,7 +23,10 @@ ALLOWED_STATES = {"structured", "pending"}
 # Ce module référence les registres pour les copier, mais ne les crée ni ne les
 # écrit. Le comptabiliser comme propriétaire du même chemin produirait un faux
 # doublon et diluerait l'unicité d'autorité contrôlée par ce gate.
-READ_ONLY_JSONL_CONSUMERS = {"backend/full_backup.py"}
+READ_ONLY_JSONL_CONSUMERS = {
+    "backend/full_backup.py",
+    "backend/privacy_inventory.py",
+}
 
 
 def discovered_jsonl() -> set[tuple[str, str]]:

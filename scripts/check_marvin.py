@@ -175,6 +175,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Corrélation et métriques HTTP", (python, "scripts/test_api_observability.py")),
         Stage("SLO roulant et budget d'erreur", (python, "scripts/test_runtime_slo.py")),
         Stage("Inventaire des consommateurs d'outils", (python, "scripts/test_tool_consumer_inventory.py")),
+        Stage("Inventaire des données personnelles", (python, "scripts/test_privacy_inventory.py")),
         Stage("Runtime commun des outils", (python, "scripts/test_tool_runtime.py")),
         Stage("Gateway des routes agenda", (python, "scripts/test_calendar_gateway_api.py")),
         Stage("Gateway des orchestrateurs", (python, "scripts/test_orchestration_tool_gateway.py")),

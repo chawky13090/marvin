@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.586.0 — Inventaire des droits sur les données
+
+Demande : continuer la consolidation de la sécurité et de la persistance sans invalider les
+preuves métier ni masquer la dette restante.
+
+Constat : les quatorze flux étaient classés par finalité, mais leurs champs de texte libre,
+sélecteurs d'une personne ou d'un objet, possibilités d'export et modalités d'effacement
+n'étaient pas décrits par un contrat exécutable. Les flux réels Mission OS, Arena, Research
+Swarm et Truth Ledger contiennent effectivement des prompts, réponses ou résultats libres.
+
+Décision : `privacy_inventory.py` devient l'inventaire autoritaire et son test le croise avec
+les 14 entrées de persistance. Les références CNIL imposent de préciser les données visées et
+de permettre accès/effacement, sous réserve des motifs légaux applicables. Un tombstone seul
+est rejeté car il laisse le contenu initial; une réécriture silencieuse est rejetée car elle
+brise la preuve. La cible compensée est documentée dans `docs/PRIVACY-DATA-RIGHTS.md`.
+
+Sécurité et logs : aucune preuve réelle n'est lue par le runtime, exportée ou modifiée dans
+cette tranche. L'inventaire ne contient que schémas et noms de champs. SEC-010 reste
+`MITIGATED`. Rollback : réversion atomique du commit v2.586; aucune migration.
+
+Validation ciblée : inventaire 14/14, persistance, architecture, documentation et compilation.
+
 ## 2026-08-02 — v2.585.0 — Cycle de vie Qdrant explicite
 
 Demande : poursuivre la consolidation avec tests réels, rollback et absence de régression.

@@ -54,7 +54,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.555 - classement documentaire portable avec destination utilisateur prioritaire
 # v2.554 - contrat PDF vers piece jointe et verite des confirmations
 # v2.553 - exports de conversation, pieces jointes et reprise d'approbation
-# v2.585 - fermeture explicite du client Qdrant dans le lifecycle supervise
+# v2.586 - inventaire vie privee; v2.585 - fermeture explicite du client Qdrant
 from __future__ import annotations
 
 import sys
