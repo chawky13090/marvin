@@ -6,6 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
+# v2.569 — documentation canonique, dette explicite et métriques anti-dérive
 # v2.568 — runner exhaustif, rapport atomique et frontière unique des scans statiques
 # v2.565 — aperçus Web progressifs, replis concurrents et vérité visuelle du modèle
 # v2.564 — miniatures Web résolues et mode Lecture strictement épuré

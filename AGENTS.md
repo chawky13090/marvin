@@ -2,6 +2,9 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
+> **État courant : v2.569.0, 363 outils, 391 routes.** Architecture dans
+> `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
+
 ---
 
 ## 1. Qu'est-ce que Marvin
@@ -41,13 +44,13 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.566.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.569.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
 ### Fichiers backend clés (`backend/`)
-- `main.py` — cycle de vie et majorité des endpoints FastAPI historiques (gros fichier ; historique versionné en commentaires `# vX.Y`).
-- `api/` — routeurs FastAPI extraits progressivement : Doctor, conversations, projets, tâches et notes ont leurs modules dédiés.
+- `main.py` — composition FastAPI, lifespan, montage des routeurs et handler global ; aucune route métier, plafond automatisé de 400 lignes.
+- `api/` — 50 modules de routes FastAPI répartis par domaine.
 - `tools.py` — les **363 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
 - `auto_config.py` — détecte le matériel, choisit le **mode** (eco/balanced/performance/max) et applique les leviers + choisit les modèles Ollama selon la VRAM.
@@ -202,7 +205,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.568.0)
+## 9. État actuel (v2.569.0)
+
+**v2.569 (documentation canonique et dette mesurable)** : l'audit a confirmé que le début de
+`CLAUDE.md` décrivait encore v2.80, 261 outils et un `main.py` propriétaire de toutes les
+routes. Le guide a été remplacé par une reprise opérationnelle courte pointant vers les
+sources de vérité actuelles; l'ancien contenu reste intégralement disponible dans Git.
+`ARCHITECTURE.md` décrit désormais 363 outils et le composition root réel.
+`docs/TECHNICAL-DEBT.md` inventorie explicitement sept dettes avec preuve, risque et critère
+de fermeture, notamment six fichiers frontend de plus de 1 300 lignes et 37 avertissements
+ESLint. `test_documentation_baseline.py` recalcule version, outils, routes et taille de
+`main.py`, refuse les faits périmés et exige le registre dans les deux guides agents. Aucune
+capacité, route, outil, donnée, configuration ou journal runtime n'est modifié. Rollback :
+réversion atomique du commit v2.569; aucune migration persistante.
 
 **v2.568 (barrière exhaustive et reproductible)** : `check_marvin.py` n'abandonne plus au
 premier échec; il exécute toutes les étapes par défaut, conserve `--fail-fast` comme choix

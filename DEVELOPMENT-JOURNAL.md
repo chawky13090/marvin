@@ -16157,3 +16157,29 @@ Seconde suite : **237/237 étapes réussies en 507,8 secondes**, rapport atomiqu
 frontend préexistants. Le rapport est ignoré par Git et ne contient aucune donnée utilisateur.
 Aucune migration ni modification de donnée. Rollback : réversion atomique du commit v2.568;
 suppression facultative du rapport local, sans impact sur Marvin.
+
+## 2026-08-02 — v2.569 — Documentation canonique et dette mesurable
+
+### Constat et décision
+
+La revue croisée de Claude signalait une bonne décomposition backend mais un guide Claude
+très périmé et une dette frontend sous-estimée. Les mesures confirment 350 lignes dans
+`backend/main.py`, 50 modules `backend/api/*.py`, 363 outils, 391 routes, six fichiers JSX de
+plus de 1 300 lignes et 37 avertissements ESLint. Le début de `CLAUDE.md` annonçait encore
+v2.80, 261 outils et toutes les routes dans `main.py`; conserver ces assertions dans une zone
+dite opérationnelle était plus risqué que de conserver un long historique.
+
+`CLAUDE.md` devient un guide de reprise court et courant; l'historique supprimé du fichier
+reste disponible dans Git. `ARCHITECTURE.md` est réaligné sur le composition root sans route
+métier et sur les 363 contrats d'outils. `docs/TECHNICAL-DEBT.md` enregistre sept dettes avec
+preuves et critères de fermeture. La dette n'est donc plus déclarée « quasi nulle » sans
+preuve : backend décomposé ne signifie pas frontend ou produit sans dette.
+
+### Validation, sécurité, logs et rollback
+
+`scripts/test_documentation_baseline.py` recalcule la version, les outils, les routes et la
+taille de `main.py`, vérifie les liens vers le registre et refuse le retour des faits v2.80
+dans la partie active du guide Claude. Il rejoint le runner exhaustif. La tranche ne lit ni
+n'écrit aucune donnée utilisateur, ne journalise rien au runtime et ne modifie aucune
+autorisation. Tests ciblés, architecture, lint, build et smoke HTTP sont exigés avant commit.
+Rollback : réversion atomique du commit v2.569; aucune migration ou restauration de données.

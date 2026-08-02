@@ -10,7 +10,7 @@ flowchart LR
     UI["Next.js / React"] -->|"SSE / REST"| API["FastAPI"]
     API --> AGENT["Boucle agentique"]
     AGENT --> ROUTER["Routage outils et compétences"]
-    ROUTER --> TOOLS["345 outils"]
+    ROUTER --> TOOLS["363 outils"]
     AGENT --> OLLAMA["Ollama local / confidentialité"]
     AGENT --> CLOUD["Ollama Cloud / puissance"]
     API --> SQLITE["SQLite"]
@@ -21,7 +21,7 @@ flowchart LR
 
 | Module | Responsabilité |
 |---|---|
-| `main.py` | Composition FastAPI, endpoints historiques et déclaration des workers |
+| `main.py` | Composition FastAPI, lifespan, montage des routeurs et handler global ; aucune route métier |
 | `runtime_supervisor.py` | Propriété, déduplication, observation et arrêt idempotent des workers FastAPI |
 | `runtime_workers.py` | Préchauffage et workers transverses de maintenance, sans dépendance à FastAPI |
 | `communication_workers.py` | Boucles e-mail et agenda, réglages persistants et appels d'outils historiques |
@@ -142,7 +142,7 @@ de ne pas exposer accidentellement des données dans une réponse HTTP.
 19. l'état du Runner : progression, arrêt, preuves d'outils, blocages Forge et provenance.
 20. l'observabilité du Runner : une panne de métrique, preuve ou apprentissage ne peut pas invalider une action exécutée.
 21. le transport Ollama : payload, timeouts, JSONL et erreurs restent indépendants du Runner et du SSE frontend.
-22. les domaines d'outils : chaque extraction préserve l'identité des fonctions du registre et l'égalité stricte des 344 implémentations/spécifications.
+22. les domaines d'outils : chaque extraction préserve l'identité des fonctions du registre et l'égalité stricte des 363 implémentations/spécifications.
 23. le routeur SSH : toutes les routes HTTP, SSE, WebSocket et SFTP appartiennent exclusivement à `api/ssh.py`; aucune copie de fonction ne subsiste dans `main.py`.
 24. les comptes e-mail : configuration, liste, ajout, retrait et test appartiennent à `api/email_accounts.py`; la résolution OAuth/mot de passe passe par un service partagé.
 25. la boîte e-mail : lecture/recherche/dossiers, envoi audité, mutations et pièces jointes appartiennent à `api/email_mailbox.py` et utilisent la même résolution multi-comptes.
@@ -209,8 +209,8 @@ génération de mots de passe, empreintes, Base64, JSON et statistiques textuell
 profondeur, complexité, sorties et opérations coûteuses sont bornées; aucun `eval` n'est utilisé.
 74. le gateway d'outils : `tool_gateway.py` applique le même cœur déterministe aux appels du
 chat, de l'interface et de MCP. Le catalogue `/api/tools/list` expose couverture, écarts,
-    couches et restrictions; `check_architecture.py` interdit une couverture inférieure à 345/345.
-75. les contrats d'outils fermés : les 344 schémas racine déclarent
+    couches et restrictions; `check_architecture.py` interdit une couverture inférieure à 363/363.
+75. les contrats d'outils fermés : les 363 schémas racine déclarent
 `additionalProperties=false`. Un champ halluciné ou mal orthographié est refusé avant
 permission, confirmation et effet de bord.
 76. la date et l'heure : `tool_domains/datetime_tools.py` possède horloge, parsing ISO,

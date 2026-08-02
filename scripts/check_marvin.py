@@ -243,6 +243,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_documentation_repository.py"),
         ),
         Stage(
+            "Documentation canonique et dette explicite",
+            (python, "scripts/test_documentation_baseline.py"),
+        ),
+        Stage(
             "Repository de santé client",
             (python, "scripts/test_client_health_repository.py"),
         ),
