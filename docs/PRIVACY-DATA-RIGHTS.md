@@ -23,6 +23,26 @@ propriétaire privilégient la suppression confirmée de l'objet complet. L'effa
 reste désactivé tant que le mécanisme compensé ci-dessus n'est pas livré et testé; SEC-010
 reste donc `MITIGATED`, pas `VERIFIED`.
 
+## Export d'accès disponible
+
+Huit registres racine (`mission_os`, `forge`, les trois flux `arena_*`, `model_market`,
+`research_swarm`, `truth_ledger`) acceptent uniquement les sélecteurs exacts déclarés par
+l'inventaire. Le contenu libre n'est jamais un sélecteur.
+
+```text
+# Target: Windows 11, Marvin 2.587+
+# Shell/CLI: PowerShell 5.1 ou PowerShell 7
+# Privileges: utilisateur propriétaire des données Marvin
+# Objective: exporter les preuves d'une conversation dans un bundle chiffré
+
+backend\.venv\Scripts\python.exe scripts\export-privacy-data.py truth_ledger conversation_id <identifiant> C:\chemin\export.mrvprivacy
+```
+
+La phrase secrète est demandée deux fois par saisie masquée. Elle n'est jamais placée dans la
+ligne de commande, l'environnement ou l'audit. Le fichier n'est publié qu'après déchiffrement
+de contrôle et comparaison exacte. Le résultat public contient uniquement registre,
+sélecteur, compteurs, taille et empreinte; jamais la valeur sélectionnée.
+
 Références : [articles 15 à 19 du RGPD publiés par la CNIL](https://www.cnil.fr/fr/reglement-europeen-protection-donnees/chapitre3),
 [guide CNIL du droit à l'effacement](https://www.cnil.fr/fr/comprendre-mes-droits/le-droit-leffacement-supprimer-vos-donnees-en-ligne)
 et [modèle Event Sourcing de Microsoft](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing). Un motif légal de conservation doit être décidé par
@@ -30,4 +50,4 @@ le responsable du traitement, jamais inventé automatiquement par Marvin.
 
 ## Rollback
 
-Cette tranche n'altère aucune donnée. Son rollback est la réversion atomique du commit v2.586.
+Cette tranche n'altère aucune donnée. Son rollback est la réversion atomique du commit v2.587.

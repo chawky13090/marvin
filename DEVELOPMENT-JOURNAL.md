@@ -5,6 +5,23 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.587.0 — Export personnel sélectif et chiffré
+
+Demande : poursuivre SEC-010 sans exposer ni altérer les chaînes de preuves existantes.
+
+Décision : huit registres racine sont accessibles par un identifiant exact appartenant à une
+liste blanche. `privacy_rights.py` vérifie l'intégrité, sélectionne sous verrou, crée un JSON
+temporaire, le chiffre par AES-256-GCM/scrypt puis le déchiffre et le compare avant publication
+atomique en `.mrvprivacy`. La phrase secrète est saisie deux fois avec `getpass`.
+
+Sécurité et logs : le texte libre ne peut jamais servir de sélecteur. La valeur de sélection,
+la phrase secrète et le contenu exporté sont absents du résultat public et de l'audit. Les
+fichiers temporaires sont supprimés dans tous les chemins. La source reste inchangée.
+
+Validation : sélection imbriquée exacte, refus d'un champ libre, déchiffrement de contrôle,
+absence de valeur dans les événements, deux preuves sources intactes, inventaires 14/14.
+Rollback : réversion atomique du commit v2.587; aucune migration.
+
 ## 2026-08-02 — v2.586.0 — Inventaire des droits sur les données
 
 Demande : continuer la consolidation de la sécurité et de la persistance sans invalider les
