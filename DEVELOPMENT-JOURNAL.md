@@ -5,6 +5,52 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-03 — v2.589.0 — Contexte Ollama prouvé et contrat Forge Windows figé
+
+Demande : commencer la feuille de route validée par Chaouki, Claude et Codex sans ajouter
+`windows_task` avant une baseline interprétable; garantir que les modèles Ollama Cloud gardent
+toujours leur capacité maximale et que Marvin ne perde pas en intelligence.
+
+Constat réel : `start.bat` plaçait `OLLAMA_CONTEXT_LENGTH=32768` uniquement dans son processus.
+Ollama Desktop 0.32.5, déjà actif, ne pouvait pas en hériter et son journal annonçait un défaut
+à 4096. Une première sonde locale a chargé `qwen3.5:2b` à 262 144 tokens en 137,4 s. Le profil
+principal `qwen3:4b` a ensuite tenté la même allocation, demandé environ 36 Gio de cache KV et
+échoué en mémoire. Après persistance utilisateur officielle de 32 768 et redémarrage du seul
+service Ollama, `qwen3:4b` a chargé en 11,3 s; `/api/ps` expose exactement 32 768. Le modèle
+Cloud épinglé `qwen3.5:397b-cloud` annonce 262 144 via `/api/show` et reste à ce maximum. Sources
+officielles : https://docs.ollama.com/context-length et https://docs.ollama.com/api/ps.
+
+Décision : `ollama_context_runtime.py` sépare capacité, allocation et garantie Cloud. Doctor
+reste passif : il ne charge aucun modèle et rend `deferred` si un modèle local n'est pas en
+mémoire. Le script de capture Forge écrit atomiquement une preuve sous la racine bornée des
+campagnes et échoue si le contexte n'est pas vérifié. L'installeur persiste 32K comme minimum
+local; ce seuil ne plafonne jamais un modèle Cloud. Le contrat Forge v1 pré-enregistre les trois
+issues, seuils, répétitions, holdout, couches routage/opérateur/bout-en-bout, oracles externes et
+setup/teardown de code obligatoire. Le corpus reste explicitement `pending`; aucun résultat
+futur n'est présenté comme baseline et aucun outil Windows n'est encore créé ou masqué.
+Le garde de préservation de l'intelligence impose en plus zéro régression sur le holdout :
+qualité vérifiée, réussite d'une capacité déjà acquise, aptitude du modèle sélectionné, cinq
+familles Council, catalogue d'outils et contexte Cloud maximal. Un gain Windows ne peut donc
+pas compenser une baisse du raisonnement ou d'une autre capacité de Marvin.
+
+Sécurité et logs : les sondes n'envoient aucun prompt utilisateur, ne journalisent aucun secret
+et n'exécutent aucune commande provenant d'un manifeste. Les futurs scénarios référenceront des
+fixtures et oracles enregistrés par identifiant, jamais du PowerShell arbitraire. Les preuves ne
+contiennent que modèle, version, capacité, allocation, digest public et commit. Aucun nouveau
+journal métier ni donnée personnelle; rétention des campagnes à définir avant leur première
+exécution. L'échec local OOM n'est pas masqué et n'a supprimé aucun modèle.
+
+Validation observée : contrats contexte, Forge et installateur réussis; compilation Python,
+architecture 363/363, 391 routes, composition acyclique et documentation réussies. La gate
+rapide complète passe 261/261 en 591,7 secondes. Après activation, backend v2.589, frontend,
+Ollama, SearXNG et HTTPS sont `ready`; Doctor rend honnêtement `deferred` pour les modèles locaux
+non chargés, tandis que la capture Cloud post-redémarrage vérifie encore 262 144. Le premier
+frontend Turbopack écoutait sans répondre; un arrêt coopératif ciblé puis un redémarrage avec
+sorties capturées l'a rendu prêt en 715 ms, pages et API HTTP 200. Rollback code : réversion
+atomique du commit v2.589. Rollback machine : supprimer la variable utilisateur
+`OLLAMA_CONTEXT_LENGTH`, arrêter puis redémarrer Ollama; aucun modèle ou fichier de données n'est
+modifié par ce rollback.
+
 ## 2026-08-02 — v2.588.0 — Effacement de preuves compensé
 
 Demande : poursuivre SEC-010 jusqu'à un effacement sélectif réel sans casser les chaînes.

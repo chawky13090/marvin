@@ -33,10 +33,12 @@ async def run_diagnostics() -> dict:
     import tools as _t
     checks = []
 
-    def add(cid, label, level, message, fix=None):
+    def add(cid, label, level, message, fix=None, details=None):
         c = {"id": cid, "label": label, "level": level, "message": message}
         if fix:
             c["fix"] = fix
+        if details is not None:
+            c["details"] = details
         checks.append(c)
 
     toolnames = set(_t.TOOLS_REGISTRY)
@@ -84,6 +86,60 @@ async def run_diagnostics() -> dict:
         if "nomic-embed-text" not in installed:
             add("model_embed", "Embeddings", "warning",
                 "« nomic-embed-text » manquant → mémoire/skills/recherche dégradés.", fix="pull:nomic-embed-text")
+
+        # La variable du lanceur n'est pas une preuve : un Ollama Desktop déjà actif
+        # ne peut pas hériter rétroactivement de son environnement. Les modèles locaux
+        # doivent apparaître dans /api/ps; Ollama Cloud est contrôlé sur la capacité du
+        # tag exact et la garantie fournisseur de contexte maximal.
+        try:
+            import ollama_context_runtime
+
+            selected_models = [
+                MODEL_PROFILES.get(profile, {}).get("model")
+                for profile in ("chat", "agent", "analysis", "vision")
+            ]
+            context = await ollama_context_runtime.inspect_context_runtime(selected_models)
+            context_status = context.get("status")
+            if context_status == "verified":
+                verified = [
+                    f"{item['model']}={item.get('effective_context_tokens')}"
+                    for item in context.get("models", [])
+                ]
+                add(
+                    "ollama_context_runtime", "Contexte Ollama", "ok",
+                    "Contexte runtime vérifié : " + ", ".join(verified),
+                    details=context,
+                )
+            elif context_status == "deferred":
+                pending = [
+                    item["model"]
+                    for item in context.get("models", [])
+                    if item.get("status") == "deferred"
+                ]
+                add(
+                    "ollama_context_runtime", "Contexte Ollama", "info",
+                    "Preuve différée pour modèle(s) local(aux) non chargé(s) : "
+                    + ", ".join(pending)
+                    + ". Forge devra les préchauffer puis capturer /api/ps.",
+                    details=context,
+                )
+            else:
+                failed = [
+                    item["model"]
+                    for item in context.get("models", [])
+                    if item.get("status") == "failed"
+                ]
+                add(
+                    "ollama_context_runtime", "Contexte Ollama", "warning",
+                    "Contexte minimal de 32768 tokens non prouvé pour : "
+                    + (", ".join(failed) or "inspection Ollama"),
+                    details=context,
+                )
+        except Exception as exc:
+            add(
+                "ollama_context_runtime", "Contexte Ollama", "warning",
+                f"Preuve runtime indisponible : {type(exc).__name__}.",
+            )
 
     # ── 3. Compétences → outils cohérents ──────────────────────────────────────
     if ok:

@@ -95,7 +95,8 @@ set "NEXT_PUBLIC_OLLAMA_PORT=%OLLAMA_PORT%"
 :: modele+num_ctx) au lieu de se disputer le defaut 4096 tokens d'Ollama, qui tronquait le
 :: prompt systeme et les schemas d'outils avant meme le message de l'utilisateur.
 if not defined OLLAMA_CONTEXT_LENGTH set "OLLAMA_CONTEXT_LENGTH=32768"
-echo       Ollama configure sur %OLLAMA_HOST% (contexte %OLLAMA_CONTEXT_LENGTH%).
+echo       Ollama demande sur %OLLAMA_HOST% (contexte local minimal %OLLAMA_CONTEXT_LENGTH%).
+echo       Doctor verifiera l'allocation reelle; les modeles Cloud gardent leur contexte maximal.
 
 :: Verifier le service par HTTP : tasklist peut masquer un processus lance avec un autre
 :: niveau de privileges alors que l'API Ollama fonctionne parfaitement.

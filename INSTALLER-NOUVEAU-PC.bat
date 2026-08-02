@@ -120,6 +120,17 @@ echo.
 
 :: ============================================================ [3/9] Ollama
 echo [3/9] Verification d'Ollama...
+:: Ollama Desktop Windows peut demarrer avant Marvin. Persister le contexte local
+:: AVANT l'installation garantit que les prochains processus Ollama en heritent.
+:: Les modeles Ollama Cloud conservent leur contexte maximal gere par le fournisseur.
+set "OLLAMA_CONTEXT_LENGTH=32768"
+powershell -NoProfile -Command "try { [Environment]::SetEnvironmentVariable('OLLAMA_CONTEXT_LENGTH','32768','User'); exit 0 } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+    echo   [DEGRADE] Le contexte Ollama local n'a pas pu etre persiste pour cet utilisateur.
+    echo   Doctor devra le verifier apres redemarrage d'Ollama.
+) else (
+    echo   [OK] Contexte Ollama local minimal persiste a 32768 tokens.
+)
 set "OLLAMA=ollama"
 where ollama >nul 2>&1
 if errorlevel 1 (

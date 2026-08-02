@@ -388,6 +388,11 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Compilation du plan de tour", (python, "scripts/test_agent_planning.py")),
         Stage("Matérialisation des outils obligatoires", (python, "scripts/test_agent_required_tools.py")),
         Stage("Configuration modèle et confidentialité", (python, "scripts/test_agent_model_config.py")),
+        Stage("Contexte Ollama réellement prouvé", (python, "scripts/test_ollama_context_runtime.py")),
+        Stage(
+            "Contrat Forge Windows Operator",
+            (python, "scripts/test_windows_operator_benchmark_contract.py"),
+        ),
         Stage(
             "Matrice des profils de confidentialité",
             (python, "scripts/test_privacy_model_matrix.py"),

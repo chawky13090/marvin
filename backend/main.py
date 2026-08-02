@@ -6,6 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
+# v2.589 — preuve contexte Ollama runtime et contrat Forge Windows pré-enregistré
 # v2.584 — sauvegarde portable chiffrée, inventaire réel fermé et restauration isolée
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement
@@ -38,7 +39,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.523 — rafraîchissement résilient des conversations et projets
 # v2.522 — approbations historiques fail-closed et obsolescence par conversation
 # v2.521 — lancement Windows vérifié et adaptateur Tailscale
-# v2.518 — poste principal DHCP et panne backend distinguée du jumelage
 # v2.519 — filtrage fail-closed, dédup sémantique et commandes sensibles confirmées
 # v2.520 — arrêt de l’avatar attendu, journalisé et vérifié
 # v2.517 — garde-fous de la consolidation automatique des compétences

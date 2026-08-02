@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.588.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.589.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.588.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.589.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -208,7 +208,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.588.0)
+## 9. État actuel (v2.589.0)
+
+**v2.589 (contexte Ollama prouvé et Forge Windows pré-enregistré)** : Doctor distingue
+désormais la capacité maximale déclarée par `/api/show`, l'allocation locale réellement
+observée par `/api/ps` et le contexte maximal garanti par Ollama Cloud. Une variable du
+lanceur ne vaut jamais preuve. Sur cette machine, `qwen3.5:397b-cloud` est vérifié à 262 144
+tokens. La sonde locale a découvert que `qwen3:4b` tentait 262 144 tokens et échouait sur un
+cache KV d'environ 36 Gio; après persistance officielle de `OLLAMA_CONTEXT_LENGTH=32768` et
+redémarrage d'Ollama, le même tag charge en 11,3 s avec exactement 32 768 tokens. L'installeur
+persiste ce minimum pour les modèles locaux; les modèles Cloud restent toujours à leur
+capacité maximale. Forge Windows possède avant baseline une politique d'acceptation à trois
+issues, 120 intentions, 15 scénarios répétés cinq fois, holdout gelé, trois couches de mesure,
+oracles indépendants et setup/teardown obligatoire. Aucun `windows_task` n'est encore ajouté.
+Rollback code : réversion atomique du commit v2.589. Rollback machine : retirer la variable
+utilisateur `OLLAMA_CONTEXT_LENGTH`, puis redémarrer Ollama.
 
 **v2.588 (effacement de preuves compensé)** : l'opération hors ligne exige confirmation,
 sélecteur exact masqué et backend arrêté. Elle chiffre et vérifie d'abord le registre complet,

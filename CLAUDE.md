@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.588.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-03 : **v2.589.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -18,6 +18,11 @@ Ce fichier est le point d'entrée court et portable. Les sources de vérité dé
 Marvin est un assistant IA Windows-first, cloud-first via Ollama Cloud sur l'installation
 principale, avec modèles Ollama locaux pour la confidentialité et la continuité hors ligne.
 Il combine Next.js 16, FastAPI, SQLite, Qdrant et un catalogue de 363 outils. Il doit rester
+puissant sans confondre configuration et preuve : depuis v2.589, Doctor lit `/api/ps` pour
+l'allocation locale réelle et conserve le contexte maximal des modèles Cloud. Le contrat
+pré-enregistré du futur opérateur Windows est dans `benchmarks/windows-operator/v1/`; ne pas
+ajouter `windows_task` avant la baseline et ne jamais exposer simultanément cet outil et
+`computer_control` hors d'une campagne d'ablation isolée.
 installable sur d'autres Windows 11 sans dépendre des caches privés d'un agent ou de chemins
 liés à la machine de développement.
 

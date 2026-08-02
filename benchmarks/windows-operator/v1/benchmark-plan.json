@@ -1,0 +1,62 @@
+{
+  "schema": "marvin.windows-operator-benchmark-plan/1.0",
+  "status": "contract_locked_corpus_pending",
+  "intent_corpus": {
+    "total": 120,
+    "development": 80,
+    "holdout": 40,
+    "runs_per_intent": 3
+  },
+  "live_scenarios": {
+    "total": 15,
+    "development": 10,
+    "holdout": 5,
+    "runs_per_scenario": 5,
+    "generalization_target": 30
+  },
+  "layers": [
+    {
+      "id": "routing",
+      "description": "Mesure la sélection sans exécuter d'effet Windows.",
+      "side_effects_allowed": false
+    },
+    {
+      "id": "operator",
+      "description": "Appelle directement le contrat opérateur et contourne la sélection LLM.",
+      "side_effects_allowed": true
+    },
+    {
+      "id": "end_to_end",
+      "description": "Mesure demande naturelle, routage, plan, exécution, vérification et compte rendu.",
+      "side_effects_allowed": true
+    }
+  ],
+  "state_isolation": {
+    "automated_setup_required_before_every_run": true,
+    "independent_oracle_required_after_every_run": true,
+    "teardown_required_in_finally": true,
+    "cleanup_on_interruption_required": true,
+    "manual_setup_allowed": false,
+    "manual_oracle_allowed": false,
+    "discard_interrupted_run": true
+  },
+  "catalog_policy": {
+    "baseline": "current_catalog",
+    "candidate": "windows_task_visible_computer_control_internal",
+    "both_visible_in_production": false,
+    "both_visible_in_isolated_ablation": true
+  },
+  "model_policy": {
+    "exact_model_required": true,
+    "dynamic_routing_allowed": false,
+    "temperature_and_seed_recorded_when_supported": true,
+    "ollama_context_evidence_required": true,
+    "cloud_context_policy": "provider_maximum",
+    "quality_and_capability_regression_suite_required": true
+  },
+  "holdout_policy": {
+    "used_for_tuning": false,
+    "results_opened_only_at_gate": true,
+    "corpus_change_requires_new_version": true
+  }
+}
