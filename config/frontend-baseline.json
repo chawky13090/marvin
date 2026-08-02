@@ -4,7 +4,6 @@
   "largeFileThreshold": 1200,
   "legacyLargeFiles": {
     "app/devis/page.jsx": 1383,
-    "app/emails/page.jsx": 1321,
-    "app/settings/page.jsx": 1568
+    "app/emails/page.jsx": 1321
   }
 }

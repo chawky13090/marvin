@@ -16375,3 +16375,36 @@ Next.js 16.2.12 Turbopack réussi, redémarrage backend/frontend en v2.575.0 et 
 HTTP 200. Le rapport atomique confirme `success=true`, 248/248 étapes réussies et zéro échec
 en 687 secondes : 363/363 outils avec harnais, 391 routes, 41/41 pages, cinq conversations
 réelles et voix navigateur sérialisée. Aucun effet externe ni migration.
+
+## 2026-08-02 — v2.576 — Panneaux Paramètres modularisés
+
+### Caractérisation et extraction
+
+`test_settings_panels.mjs` a figé avant déplacement le choix et le téléchargement de modèle,
+le portefeuille local dynamique, les quatre profils de confidentialité, les overrides cloud,
+le masquage des secrets ainsi que les actions de sauvegarde et suppression d'identifiants.
+Le panneau Modèles/Cloud devient `components/settings/ModelSettingsPanel.jsx` et le composant
+d'identifiants devient `components/settings/CredentialGroup.jsx`. La page passe de 1 568 à
+1 126 lignes; la baseline tombe à deux exceptions, 117 sources, zéro erreur et 37 avertissements.
+
+### Sécurité, logs, validation et rollback
+
+Les valeurs d'identifiants restent dans l'état parent et ne sont ni lues ni écrites par les
+tests. Les champs secrets restent masqués, les confirmations Ultra et suppression restent
+inchangées, et le backend demeure l'autorité. Aucun nouvel événement n'est nécessaire : aucun
+secret, modèle ou état de confidentialité ne doit entrer dans les logs. Validation exigée :
+caractérisation, ESLint/baseline, architecture/documentation, build Turbopack, smokes pages,
+chat et voix, puis gate exhaustif live. Rollback : réversion atomique du commit v2.576 puis
+redémarrage de Marvin; aucune migration persistante.
+
+Le premier gate a exécuté les 249 étapes et en a refusé une :
+`test_privacy_model_matrix.py` cherchait encore la preuve `: privacyPreset;` uniquement dans
+la page historique. Le test lit désormais la page et `ModelSettingsPanel.jsx` tout en conservant
+les mêmes assertions de transition et de provenance. Le test causal est repassé avant la
+relance globale; aucun comportement produit n'a été modifié pour satisfaire le test.
+
+Validation finale observée : arrêt gracieux en 9,4 secondes sans processus forcé, build
+Next.js 16.2.12 Turbopack réussi, backend/frontend en v2.576.0 et `/settings` en HTTP 200.
+Le second rapport atomique confirme `success=true`, 249/249 étapes réussies, zéro échec en
+642,4 secondes, 363/363 outils avec harnais, 391 routes, 41/41 pages, cinq conversations
+réelles et voix navigateur sérialisée. Aucun effet externe ni migration.

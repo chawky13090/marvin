@@ -156,7 +156,13 @@ def test_provenance_and_transition() -> None:
 
 
 def test_frontend_contract() -> None:
-    settings_source = (ROOT / "app" / "settings" / "page.jsx").read_text(encoding="utf-8")
+    settings_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            ROOT / "app" / "settings" / "page.jsx",
+            ROOT / "components" / "settings" / "ModelSettingsPanel.jsx",
+        )
+    )
     assert "setPrivacyPreset" in settings_source
     assert ": privacyPreset;" in settings_source
     for path in (

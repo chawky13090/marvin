@@ -16,7 +16,7 @@ mode vocal, les confirmations, l'état des conversations et l'accès aux 363 out
 
 ## Baseline et budget
 
-`config/frontend-baseline.json` ne conserve plus que trois exceptions historiques au plafond de 1 200
+`config/frontend-baseline.json` ne conserve plus que deux exceptions historiques au plafond de 1 200
 lignes. `scripts/check_frontend_baseline.mjs` échoue si une exception grossit, si un nouveau
 fichier franchit ce plafond, si ESLint produit une erreur ou si les 37 avertissements actuels
 augmentent. Une extraction réussie abaisse le plafond correspondant; le budget ne remonte
@@ -27,7 +27,7 @@ jamais pour faire passer un changement.
 1. `app/outils/page.jsx` : terminé en v2.571-v2.572, catalogue et rendu extraits.
 2. `components/chat/MessageBubble.jsx` : terminé en v2.573-v2.574, fichiers et résultats extraits.
 3. `app/video/page.jsx` : terminé en v2.575, primitives et onglets locaux extraits.
-4. `app/settings/page.jsx` : prochaine tranche, séparer données, formulaires et vues.
+4. `app/settings/page.jsx` : terminé en v2.576, modèles/cloud et identifiants extraits.
 5. `app/devis/page.jsx` et `app/emails/page.jsx` : extraire les sous-domaines avec leurs tests
    de parcours et leurs états d'erreur.
 

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.575.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.576.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.575.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.576.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -205,7 +205,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.575.0)
+## 9. État actuel (v2.576.0)
+
+**v2.576 (page Paramètres sous le plafond)** : le panneau Modèles/Ollama Cloud et ses quatre
+profils de confidentialité vivent dans `components/settings/ModelSettingsPanel.jsx`; le groupe
+d'identifiants réutilisable vit dans `components/settings/CredentialGroup.jsx`. Les handlers
+réseau, décisions de permission, confirmations Ultra, secrets masqués et routes restent dans
+leurs contrats antérieurs. `app/settings/page.jsx` passe de 1 568 à 1 126 lignes et quitte les
+exceptions frontend. Le test de caractérisation couvre routage modèle, portefeuille local,
+profils Normal/Hyper/Tout cloud/Ultra et gestion des identifiants. Aucun secret n'est lu dans
+les tests et aucune donnée persistante n'est modifiée. Rollback : réversion atomique du commit
+v2.576 puis redémarrage de Marvin.
 
 **v2.575 (page Vidéo sous le plafond)** : les primitives visuelles et comportements partagés
 de la vidéo vivent dans `components/video/VideoShared.jsx`; les générations IA locales et
