@@ -151,6 +151,19 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Boucle réseau résiliente du backend Windows", (python, "scripts/test_windows_event_loop.py")),
         Stage("Installation Windows portable", (python, "scripts/test_installer_contract.py")),
         Stage("ACL Windows des données Marvin", (python, "scripts/test_data_acl.py")),
+        Stage("Sauvegarde globale chiffrée", (python, "scripts/test_full_backup.py")),
+        Stage(
+            "Restauration globale compensée",
+            (python, "scripts/test_full_backup_recovery.py"),
+        ),
+        Stage(
+            "Réplication vérifiée des sauvegardes",
+            (python, "scripts/test_backup_replication.py"),
+        ),
+        Stage(
+            "Sauvegarde portable sans secrets DPAPI",
+            (python, "scripts/test_portable_backup.py"),
+        ),
         Stage("Activation locale de l'avatar", (python, "scripts/test_avatar_api.py")),
         Stage("Invariants d'architecture", (python, "scripts/check_architecture.py")),
         Stage(

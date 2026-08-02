@@ -5,6 +5,59 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.584.0 — Sauvegarde portable et inventaire réel fermé
+
+### Constat et décision
+
+Le nouveau registre `windows_secrets.metadata.json` n'était pas classé dans le bundle global :
+une sauvegarde réelle aurait donc échoué fermée. Le premier test réel du format portable a
+ensuite révélé douze autres persistances non classées. Elles ont été examinées individuellement
+au lieu d'être ignorées : jobs Research Swarm, crawls, documents et sauvegardes horodatées de
+skills sont autoritatifs; caches, médias Web et veille modèles sont reconstructibles;
+diagnostics d'installation et LibreOffice sont liés à la machine. Les documents utilisateurs
+PDF/DOCX/XLSX/PPTX/Markdown/TXT déposés historiquement à la racine sont reconnus par une règle
+bornée et portable, jamais par un nom propre à cette installation.
+
+Deux formats complémentaires sont retenus. `.mrvfull` reste DPAPI et compatible à l'identique.
+`.mrvportable` utilise AES-256-GCM en flux, nonce aléatoire 96 bits, tag complet et en-tête
+authentifié; la clé est dérivée par scrypt avec `N=2^17`, `r=8`, `p=1`, conformément au minimum
+OWASP actuel. Les secrets DPAPI et leur registre compagnon sont exclus et le manifeste impose
+`reauthentication_required=true`. Références : OWASP Password Storage Cheat Sheet et
+documentation officielle pyca/cryptography sur scrypt et AES-GCM.
+
+### Sécurité, observabilité et rollback
+
+La phrase secrète est saisie par `getpass`, jamais placée dans les arguments, l'environnement,
+le bundle ou les logs. Création et vérification journalisent uniquement succès, volumétrie et
+classe d'erreur. Les limites de taille/nombre existantes, l'inventaire fermé, les chemins
+relatifs sûrs et les empreintes SHA-256 sont réutilisés. Mauvaise phrase, ciphertext altéré,
+paramètres KDF changés, tentative d'écrasement du manifeste, destination occupée et sortie de
+racine échouent fermés. La restauration reste isolée et ne remplace jamais `data`.
+
+Rollback : réversion atomique du commit v2.584. Aucun schéma, secret, bundle historique ou
+donnée active n'est transformé. Un fichier `.mrvportable` déjà créé reste autonome. SEC-024 et
+TD-006 restent `MITIGATED` tant qu'une copie/restauration sur support physiquement distinct ou
+immuable et un second Windows ne sont pas démontrées.
+
+### Validations observées
+
+Compilation Python réussie. Les contrats sauvegarde locale, restauration compensée et portable
+passent. Le test portable couvre succès, phrase trop courte, mauvaise phrase, altération,
+destination occupée, exclusion DPAPI et métadonnée de manifeste réservée. Sur les données
+réelles, l'aller-retour crée, déchiffre et vérifie 1 733 fichiers pour 618 281 759 octets en
+81 secondes, avec `dpapi_secrets_included=false` et `reauthentication_required=true`; le bundle
+et sa restauration temporaires sont ensuite supprimés. Ces quatre contrats de sauvegarde sont
+désormais des étapes obligatoires du gate exhaustif, et non plus seulement des scripts isolés.
+
+Le gate final passe **256/256** en 521,5 secondes. Les scénarios négatifs MCP, Ollama,
+persistance d'audit et logs indisponibles produisent leurs incidents opaques attendus sans
+faire échouer une étape. L'arrêt officiel termine gracieusement en 9,2 secondes, sans PID forcé
+et en préservant Ollama. Le build Next.js 16.2.12/Turbopack passe en 8,7 secondes. Après
+redémarrage par `start.bat`, FastAPI expose 2.584.0 et 363/363 outils, 16 workers, frontend et
+HTTPS répondent 200, Doctor rend 98 et l'API n'a aucune erreur 5xx. SearXNG est résolu sur son
+port dynamique 8391 : `/config` expose 80 moteurs et 22 catégories; une recherche réelle rend
+54 résultats avec la documentation officielle FastAPI en première position.
+
 ## 2026-08-02 — v2.583.0 — Cycle de vie et portabilité des secrets DPAPI
 
 ### Décision et références

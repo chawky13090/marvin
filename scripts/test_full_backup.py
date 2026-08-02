@@ -36,6 +36,11 @@ def test_roundtrip_and_inventory_gate() -> None:
         database = data / "secretary.db"
         _database(database)
         (data / "truth_ledger.jsonl").write_text('{"proof":true}\n', encoding="utf-8")
+        lifecycle = data / "windows_secrets.metadata.json"
+        lifecycle.write_text(
+            '{"schema":1,"secrets":{}}\n',
+            encoding="utf-8",
+        )
         skill = data / "skills" / "network.md"
         skill.parent.mkdir()
         skill.write_text("# Network", encoding="utf-8")
@@ -44,6 +49,15 @@ def test_roundtrip_and_inventory_gate() -> None:
         maintenance.write_text('{"integrity":"ok"}\n', encoding="utf-8")
         (data / "qdrant").mkdir()
         (data / "qdrant" / "cache.bin").write_bytes(b"rebuildable")
+        (data / "cache").mkdir()
+        (data / "cache" / "preview.bin").write_bytes(b"rebuildable")
+        (data / "install").mkdir()
+        (data / "install" / "runtime.json").write_text("{}", encoding="utf-8")
+        (data / "model_catalog_watch.json").write_text("{}", encoding="utf-8")
+        (data / "user-deliverable.pptx").write_bytes(b"portable-user-artifact")
+        skill_backup = data / "skills_backup_20260802-120000" / "network.md"
+        skill_backup.parent.mkdir()
+        skill_backup.write_text("# Previous Network", encoding="utf-8")
         with (
             patch.object(full_backup, "DATA_DIR", data),
             patch.object(full_backup, "DB_PATH", str(database)),
@@ -66,8 +80,16 @@ def test_roundtrip_and_inventory_gate() -> None:
             assert recovery["success"] is True
             assert (restored / "skills" / "network.md").read_text(encoding="utf-8") == "# Network"
             assert (restored / "truth_ledger.jsonl").read_text(encoding="utf-8") == '{"proof":true}\n'
+            assert (restored / lifecycle.name).read_text(encoding="utf-8") == (
+                '{"schema":1,"secrets":{}}\n'
+            )
             assert (restored / "maintenance" / maintenance.name).is_file()
+            assert (restored / "skills_backup_20260802-120000" / "network.md").is_file()
+            assert (restored / "user-deliverable.pptx").read_bytes() == b"portable-user-artifact"
             assert not (restored / "qdrant").exists()
+            assert not (restored / "cache").exists()
+            assert not (restored / "install").exists()
+            assert not (restored / "model_catalog_watch.json").exists()
             connection = sqlite3.connect(restored / "secretary.db")
             try:
                 assert connection.execute("SELECT value FROM proof").fetchone()[0] == "verified"
@@ -85,6 +107,18 @@ def test_roundtrip_and_inventory_gate() -> None:
             else:
                 raise AssertionError(
                     "Un fichier absent du manifeste doit invalider le bundle."
+                )
+
+            try:
+                full_backup._build_plain_archive(
+                    root / "reserved-metadata.zip",
+                    manifest_metadata={"entries": []},
+                )
+            except full_backup.FullBackupError as exc:
+                assert "écraser le manifeste" in str(exc)
+            else:
+                raise AssertionError(
+                    "Une métadonnée ne doit pas pouvoir écraser le manifeste."
                 )
 
             (data / "unknown_state.json").write_text("{}", encoding="utf-8")

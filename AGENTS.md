@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.583.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.584.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.583.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.584.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -208,7 +208,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.583.0)
+## 9. État actuel (v2.584.0)
+
+**v2.584 (sauvegarde portable et inventaire réel fermé)** : le bundle local DPAPI reste
+inchangé pour la restauration sur la même identité Windows. Un second format explicite
+`.mrvportable` chiffre en flux par AES-256-GCM avec phrase secrète dérivée par scrypt
+(`N=2^17`, `r=8`, `p=1`) et authentifie son en-tête. Les ciphertexts DPAPI et leur registre
+compagnon sont exclus : toute nouvelle machine doit réauthentifier OAuth, e-mails, SSH et
+autres identifiants. La création relit immédiatement le bundle; mauvaise phrase, altération,
+paramètres KDF modifiés, manifeste détourné, destination occupée et traversée de chemin
+échouent fermés. L'inventaire réel classe désormais les jobs Research Swarm, crawls,
+documents et sauvegardes de skills comme autoritatifs, et sépare caches, médias régénérables
+et diagnostics machine. Un aller-retour réel a vérifié 1 733 fichiers et 618 281 759 octets.
+La restauration reste volontairement isolée; l'exercice sur second support physique/immuable
+reste ouvert. Rollback : réversion atomique du commit v2.584; aucun format historique, schéma
+ou donnée active n'est modifié, et les éventuels `.mrvportable` restent autonomes.
 
 **v2.583 (cycle de vie et portabilité des secrets)** : le ciphertext DPAPI historique reste
 inchangé et reçoit un registre compagnon non sensible, atomique et borné : création, rotation,

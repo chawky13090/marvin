@@ -41,10 +41,12 @@ AUTHORITATIVE_ROOT_FILES = frozenset({
     "mission_events.jsonl",
     "model_market_observations.jsonl",
     "research_swarm_runs.jsonl",
+    "research_swarm_jobs.json",
     "skills_learning_log.json",
     "skills_stats.json",
     "truth_ledger.jsonl",
     "windows_secrets.dpapi.json",
+    "windows_secrets.metadata.json",
 })
 AUTHORITATIVE_DIRECTORIES = frozenset({
     "chat_uploads",
@@ -53,21 +55,32 @@ AUTHORITATIVE_DIRECTORIES = frozenset({
     "coding_workspaces",
     "documents",
     "documents_generes",
+    "generated_docs",
     "engineering_radar",
     "logos",
     "maintenance",
     "screenshots",
     "skills",
+    "site_crawls",
     "webapps",
 })
 REBUILDABLE_OR_TRANSIENT = frozenset({
     "backups",
+    "cache",
     "hyperv-store-backup",
     "logs",
     "qdrant",
     "reranker_cache",
     "validation",
     "vm_lab_jobs",
+    "web_media",
+})
+REBUILDABLE_ROOT_FILES = frozenset({
+    "marvin.db",
+    "model_catalog_watch.json",
+})
+MACHINE_LOCAL_DIRECTORIES = frozenset({
+    "install",
 })
 MACHINE_LOCAL_ROOT_FILES = frozenset({
     "debian-vm-install-result.json",
@@ -78,6 +91,7 @@ MACHINE_LOCAL_ROOT_FILES = frozenset({
     "hyperv-store-audit.json",
     "hyperv_test_forge.json",
     "install-capabilities.json",
+    "libreoffice-capability.json",
     "linux_test_forge_session.json",
     "memory_mesh.json",
     "vm_lab_install_job.json",
@@ -85,6 +99,12 @@ MACHINE_LOCAL_ROOT_FILES = frozenset({
     "windows-vm-install-result.json",
     "windows-vm-provision-result.json",
 })
+AUTHORITATIVE_DIRECTORY_PATTERNS = (
+    re.compile(r"^skills_backup_\d{8}-\d{6}$"),
+)
+AUTHORITATIVE_ROOT_FILE_PATTERNS = (
+    re.compile(r'^[^\\/:*?"<>|]{1,200}\.(?:pdf|docx|xlsx|pptx|md|txt)$', re.IGNORECASE),
+)
 _LOCK = threading.RLock()
 KEEP_LAST = 3
 
@@ -148,14 +168,31 @@ def _snapshot_sqlite(destination: Path) -> None:
         source.close()
 
 
-def _inventory() -> list[tuple[str, Path]]:
+def _inventory(
+    *,
+    excluded_root_files: frozenset[str] = frozenset(),
+) -> list[tuple[str, Path]]:
     data_dir = Path(DATA_DIR)
+    patterned_directories = {
+        item.name
+        for item in data_dir.iterdir()
+        if item.is_dir()
+        and any(pattern.fullmatch(item.name) for pattern in AUTHORITATIVE_DIRECTORY_PATTERNS)
+    }
+    patterned_root_files = {
+        item.name
+        for item in data_dir.iterdir()
+        if item.is_file()
+        and any(pattern.fullmatch(item.name) for pattern in AUTHORITATIVE_ROOT_FILE_PATTERNS)
+    }
     unknown_directories = {
         item.name
         for item in data_dir.iterdir()
         if item.is_dir()
         and item.name not in AUTHORITATIVE_DIRECTORIES
         and item.name not in REBUILDABLE_OR_TRANSIENT
+        and item.name not in MACHINE_LOCAL_DIRECTORIES
+        and item.name not in patterned_directories
     }
     unknown_files = {
         item.name
@@ -164,6 +201,8 @@ def _inventory() -> list[tuple[str, Path]]:
         and item.name != Path(DB_PATH).name
         and item.name not in AUTHORITATIVE_ROOT_FILES
         and item.name not in MACHINE_LOCAL_ROOT_FILES
+        and item.name not in REBUILDABLE_ROOT_FILES
+        and item.name not in patterned_root_files
         and not item.name.endswith((".lock", ".tmp", ".partial"))
         and not item.name.startswith(("audit.", "bug_log.", "skills_match_log."))
         and item.name not in {"audit.jsonl", "bug_log.jsonl", "skills_match_log.jsonl"}
@@ -175,10 +214,14 @@ def _inventory() -> list[tuple[str, Path]]:
         )
     selected: list[tuple[str, Path]] = []
     for name in sorted(AUTHORITATIVE_ROOT_FILES):
+        if name in excluded_root_files:
+            continue
         source = data_dir / name
         if source.is_file():
             selected.append((name, source))
-    for directory in sorted(AUTHORITATIVE_DIRECTORIES):
+    for name in sorted(patterned_root_files):
+        selected.append((name, data_dir / name))
+    for directory in sorted(AUTHORITATIVE_DIRECTORIES | patterned_directories):
         root = data_dir / directory
         if not root.exists():
             continue
@@ -203,7 +246,23 @@ def _copy_bounded(source: Path, destination: Path) -> int:
     return size
 
 
-def _build_plain_archive(destination: Path) -> dict[str, Any]:
+def _build_plain_archive(
+    destination: Path,
+    *,
+    excluded_root_files: frozenset[str] = frozenset(),
+    manifest_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    reserved_manifest_keys = {
+        "schema_version",
+        "created_at",
+        "marvin_version",
+        "files",
+        "total_bytes",
+        "entries",
+        "excluded_rebuildable",
+    }
+    if manifest_metadata and reserved_manifest_keys.intersection(manifest_metadata):
+        raise FullBackupError("Une métadonnée tente d'écraser le manifeste du bundle.")
     with tempfile.TemporaryDirectory(prefix="marvin-full-stage-") as directory:
         stage = Path(directory)
         payload = stage / "payload"
@@ -212,7 +271,10 @@ def _build_plain_archive(destination: Path) -> dict[str, Any]:
         _snapshot_sqlite(sqlite_path)
         entries: list[dict[str, Any]] = []
         total = 0
-        sources = [("secretary.db", sqlite_path), *_inventory()]
+        sources = [
+            ("secretary.db", sqlite_path),
+            *_inventory(excluded_root_files=excluded_root_files),
+        ]
         for relative, source in sources:
             safe = _safe_relative(relative)
             staged = payload / Path(*PurePosixPath(safe).parts)
@@ -236,6 +298,8 @@ def _build_plain_archive(destination: Path) -> dict[str, Any]:
             "entries": entries,
             "excluded_rebuildable": sorted(REBUILDABLE_OR_TRANSIENT),
         }
+        if manifest_metadata:
+            manifest.update(manifest_metadata)
         (stage / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             encoding="utf-8",
