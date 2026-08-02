@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.582.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.583.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.582.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.583.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -208,7 +208,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.582.0)
+## 9. État actuel (v2.583.0)
+
+**v2.583 (cycle de vie et portabilité des secrets)** : le ciphertext DPAPI historique reste
+inchangé et reçoit un registre compagnon non sensible, atomique et borné : création, rotation,
+révision, révocation, expiration, catégorie et échéance de revue. Une rotation ou révocation
+compense la modification du coffre si les métadonnées échouent; une expiration échoue fermée.
+Les événements d'audit ne contiennent que catégorie et révision. Doctor et le rapport
+installateur vérifient le déchiffrement sans retourner de clé ni de valeur; un coffre copié
+depuis un autre compte Windows devient `reauthentication_required` avec procédure explicite.
+L'installateur annonce systématiquement que DPAPI `CurrentUser` n'est pas un export portable.
+Les 10 secrets réels sont lisibles, non expirés, sans revue due; la migration est idempotente
+et le fichier de métadonnées hérite des trois ACL attendues. Rollback : réversion atomique du
+commit v2.583; l'ancienne version ignore le compagnon, qui peut être archivé puis supprimé.
 
 **v2.582 (ACL Windows des données)** : `manage-data-acl.ps1` audite et protège récursivement
 `data` pour l'utilisateur Windows courant, SYSTEM et Administrateurs uniquement. Il refuse

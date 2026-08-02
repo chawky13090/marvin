@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.582.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.583.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -96,6 +96,12 @@ crée une sauvegarde DPAPI vérifiée et rend le nom nécessaire au rollback.
 `data` doit conserver une ACL protégée limitée à l'utilisateur Windows courant, SYSTEM et
 Administrateurs. Auditer ou réparer avec `scripts\manage-data-acl.ps1`; l'installeur applique
 ce contrat et refuse de terminer si le durcissement échoue.
+
+Les secrets sont chiffrés par DPAPI `CurrentUser` et ne migrent pas avec `data`. Le registre
+compagnon `windows_secrets.metadata.json` ne contient que création, rotation, révocation,
+expiration, catégorie et révision. Vérifier la portabilité sans exposer de valeur avec
+`backend\.venv\Scripts\python.exe scripts\inspect-secret-lifecycle.py --verify`; sur un autre
+PC ou compte Windows, reconnecter les comptes et réenregistrer les identifiants.
 
 Gate rapide :
 

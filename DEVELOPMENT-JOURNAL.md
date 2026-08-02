@@ -5,6 +5,54 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.583.0 — Cycle de vie et portabilité des secrets DPAPI
+
+### Décision et références
+
+Microsoft documente que `CryptProtectData` lie normalement le déchiffrement aux mêmes
+identifiants de connexion et, en général, au même ordinateur. OWASP recommande de suivre
+création, rotation, révocation, expiration, usage et métadonnées sans journaliser les valeurs.
+Le choix retenu conserve donc DPAPI `CurrentUser`; aucun export faussement portable ou secret
+de déchiffrement supplémentaire n'est introduit. Sources consultées : documentation Microsoft
+`CryptProtectData` et OWASP Secrets Management Cheat Sheet, sections cycle de vie et metadata.
+
+### Implémentation, sécurité et rollback
+
+`secret_lifecycle.py` maintient à côté du ciphertext un registre JSON atomique, borné à 4 096
+entrées et à 365 jours de tombstones révoqués. Il ne contient que catégorie, état, dates,
+révision, expiration et échéance de revue. `dpapi_secret_store` migre paresseusement les
+coffres historiques, compense les deux fichiers en cas d'échec, refuse expiration ou
+métadonnées corrompues et journalise seulement catégorie/révision. Doctor et
+`inspect-secret-lifecycle.py --verify` testent le déchiffrement sans retourner aucune valeur.
+Le rapport installateur publie la capacité et la procédure de réauthentification; la console
+annonce toujours que les secrets ne migrent pas avec `data`.
+
+Le rollback applicatif est la réversion atomique du commit v2.583 : l'ancien runtime ignore le
+fichier compagnon et continue à lire exactement le même ciphertext. Le compagnon peut être
+archivé puis supprimé après cette réversion; aucune conversion du secret n'est nécessaire.
+
+### Validations intermédiaires observées
+
+Les tests cycle de vie, identifiants globaux, trois comptes e-mail, deux connexions SSH,
+compte de service Google, OAuth et contrat installateur passent. Le rapport installateur réel
+reste `available` et expose 10 secrets DPAPI lisibles, zéro réauthentification requise. Deux
+inspections successives produisent la même empreinte; zéro secret est expiré ou à réviser.
+Le registre réel hérite de trois règles ACL et ne possède aucune règle explicite. Une simulation
+de ciphertext non déchiffrable demande la réauthentification, et les tests prouvent qu'aucune
+valeur simulée n'atteint l'audit.
+
+### Validation finale observée
+
+`npm run check:quick` passe **252/252** en 519,8 secondes. Le build a d'abord été correctement
+bloqué tant que Turbopack tournait, évitant la corruption connue des manifests; l'arrêt officiel
+a ensuite terminé gracieusement en 9,0 secondes, sans PID forcé et en préservant Ollama. Le build
+Next.js 16.2.12/Turbopack passe en 10,2 secondes. Après démarrage par `start.bat`, FastAPI expose
+2.583.0 et 363/363 outils, frontend et HTTPS rendent 200, Doctor rend le cycle DPAPI `ok`, Google
+reste connecté par compte de service et 50 conversations sont relues. SearXNG rend `/config` 200
+et 67 résultats réels. Deux inspections vivantes restent idempotentes : 10 actifs, zéro expiré,
+zéro revue due, zéro illisible; le compagnon conserve zéro ACL explicite. Le gate final n'a pas
+reproduit l'avertissement Qdrant, mais TD-008 reste ouvert faute de preuve suffisante de fermeture.
+
 ## 2026-08-02 — v2.582.0 — ACL Windows data, rollback et installateur
 
 ### Constat et conception

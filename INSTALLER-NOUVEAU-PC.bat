@@ -282,6 +282,8 @@ if errorlevel 1 (
     popd & pause & exit /b 1
 )
 echo   [OK] Donnees Marvin limitees a l utilisateur, SYSTEM et Administrateurs.
+echo   [INFO] Les secrets DPAPI restent lies au compte Windows qui les a crees.
+echo   [INFO] Apres copie de data sur un autre PC, reconnectez comptes et identifiants.
 if not exist ".env.local" if exist ".env.local.example" (
     copy ".env.local.example" ".env.local" >nul
     echo   [OK] .env.local cree ^(modifiez-le pour vos comptes Google/Outlook si besoin^).

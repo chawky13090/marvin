@@ -16,9 +16,11 @@ from ctypes import wintypes
 from pathlib import Path
 
 from config import DATA_DIR
+import secret_lifecycle
 
 
-PATH = Path(DATA_DIR) / "windows_secrets.dpapi.json"
+_DEFAULT_PATH = Path(DATA_DIR) / "windows_secrets.dpapi.json"
+PATH = _DEFAULT_PATH
 _LOCK = threading.RLock()
 _KEY = re.compile(r"^[a-z][a-z0-9_.-]{1,80}$")
 _DESCRIPTION = "Marvin Test Forge"
@@ -184,7 +186,32 @@ def _write_unlocked(value: dict[str, str]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def set_secret(key: str, value: str) -> None:
+def _metadata_with_legacy_entries(rows: dict[str, str]) -> dict:
+    metadata = secret_lifecycle.load(PATH)
+    inferred_at = PATH.stat().st_mtime if PATH.exists() else time.time()
+    if secret_lifecycle.ensure_entries(metadata, set(rows), inferred_at=inferred_at):
+        secret_lifecycle.write(PATH, metadata)
+    return metadata
+
+
+def _audit_lifecycle(action: str, key: str, revision: int) -> None:
+    """Journalise uniquement la catégorie et la révision, jamais l'identité ni le secret."""
+    if PATH.resolve() != _DEFAULT_PATH.resolve():
+        return
+    try:
+        import audit
+
+        audit.log_action(
+            f"secret_{action}",
+            {"category": secret_lifecycle.category(key), "revision": revision},
+            {"success": True},
+            source="credentials",
+        )
+    except Exception:
+        pass
+
+
+def set_secret(key: str, value: str, *, expires_at: str | None = None) -> None:
     if not _KEY.fullmatch(key):
         raise SecretStoreError("Nom de secret invalide.")
     if not value or len(value) > 16_384:
@@ -192,17 +219,36 @@ def set_secret(key: str, value: str) -> None:
     encrypted = base64.b64encode(_crypt(value.encode("utf-8"), protect=True)).decode("ascii")
     with _LOCK, _interprocess_lock():
         rows = _load_unlocked()
+        previous_rows = dict(rows)
+        metadata = _metadata_with_legacy_entries(rows)
+        previous_metadata = json.loads(json.dumps(metadata))
         rows[key] = encrypted
-        _write_unlocked(rows)
+        secret_lifecycle.record_set(metadata, key, expires_at=expires_at)
+        try:
+            _write_unlocked(rows)
+            secret_lifecycle.write(PATH, metadata)
+        except Exception:
+            _write_unlocked(previous_rows)
+            secret_lifecycle.write(PATH, previous_metadata)
+            raise
+        revision = int(metadata["entries"][key]["revision"])
+    _audit_lifecycle("rotated" if revision > 1 else "created", key, revision)
 
 
 def get_secret(key: str) -> str | None:
     if not _KEY.fullmatch(key):
         raise SecretStoreError("Nom de secret invalide.")
     with _LOCK, _interprocess_lock():
-        encoded = _load_unlocked().get(key)
-    if not encoded:
-        return None
+        rows = _load_unlocked()
+        metadata = _metadata_with_legacy_entries(rows)
+        encoded = rows.get(key)
+        if not encoded:
+            return None
+        entry = metadata["entries"].get(key)
+        if entry and entry.get("state") != "active":
+            raise SecretStoreError("Le secret DPAPI a été révoqué.")
+        if entry and secret_lifecycle.is_expired(entry):
+            raise SecretStoreError("Le secret DPAPI a expiré et doit être renouvelé.")
     try:
         return _crypt(base64.b64decode(encoded, validate=True), protect=False).decode("utf-8")
     except (ValueError, UnicodeDecodeError) as exc:
@@ -213,7 +259,10 @@ def has_secret(key: str) -> bool:
     if not _KEY.fullmatch(key):
         raise SecretStoreError("Nom de secret invalide.")
     with _LOCK, _interprocess_lock():
-        return key in _load_unlocked()
+        rows = _load_unlocked()
+        metadata = _metadata_with_legacy_entries(rows)
+        entry = metadata["entries"].get(key)
+        return key in rows and bool(entry) and entry.get("state") == "active" and not secret_lifecycle.is_expired(entry)
 
 
 def delete_secret(key: str) -> None:
@@ -221,5 +270,37 @@ def delete_secret(key: str) -> None:
         raise SecretStoreError("Nom de secret invalide.")
     with _LOCK, _interprocess_lock():
         rows = _load_unlocked()
+        if key not in rows:
+            return
+        previous_rows = dict(rows)
+        metadata = _metadata_with_legacy_entries(rows)
+        previous_metadata = json.loads(json.dumps(metadata))
         rows.pop(key, None)
-        _write_unlocked(rows)
+        secret_lifecycle.record_revocation(metadata, key)
+        try:
+            _write_unlocked(rows)
+            secret_lifecycle.write(PATH, metadata)
+        except Exception:
+            _write_unlocked(previous_rows)
+            secret_lifecycle.write(PATH, previous_metadata)
+            raise
+        revision = int(metadata["entries"][key]["revision"])
+    _audit_lifecycle("revoked", key, revision)
+
+
+def lifecycle_status(*, verify_decryption: bool = False) -> dict:
+    """Retourne uniquement des compteurs et catégories, jamais les secrets ni leurs clés."""
+    with _LOCK, _interprocess_lock():
+        rows = _load_unlocked()
+        metadata = _metadata_with_legacy_entries(rows)
+        result = secret_lifecycle.summarize(metadata, set(rows))
+        if verify_decryption:
+            unreadable = 0
+            for encoded in rows.values():
+                try:
+                    _crypt(base64.b64decode(encoded, validate=True), protect=False)
+                except Exception:
+                    unreadable += 1
+            result["unreadable"] = unreadable
+            result["reauthentication_required"] = unreadable > 0
+        return result

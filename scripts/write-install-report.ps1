@@ -38,6 +38,7 @@ $Computer = Get-CimInstance Win32_ComputerSystem
 
 $PythonPath = Join-Path $ProjectRoot 'backend\.venv\Scripts\python.exe'
 $PythonRuntime = $null
+$SecretLifecycle = $null
 if (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
     Push-Location (Join-Path $ProjectRoot 'backend')
     try {
@@ -49,6 +50,15 @@ if (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
         $PythonRuntime = $null
     } finally {
         Pop-Location
+    }
+    try {
+        $SecretInspector = Join-Path $ProjectRoot 'scripts\inspect-secret-lifecycle.py'
+        $SecretJson = & $PythonPath $SecretInspector --verify 2>$null
+        if (-not [string]::IsNullOrWhiteSpace(($SecretJson -join ''))) {
+            $SecretLifecycle = ($SecretJson -join '') | ConvertFrom-Json
+        }
+    } catch {
+        $SecretLifecycle = $null
     }
 }
 $NodeModules = Join-Path $ProjectRoot 'node_modules'
@@ -113,6 +123,19 @@ if ($HyperVModule) {
 }
 
 $Optional = [ordered]@{
+    secret_portability = if ($SecretLifecycle -and $SecretLifecycle.reauthentication_required) {
+        New-Capability 'degraded' (
+            [string]$SecretLifecycle.unreadable +
+            ' secret(s) DPAPI illisible(s) pour ce compte Windows; réauthentification requise.'
+        ) 'Reconnecter les comptes et réenregistrer les identifiants sur ce PC.'
+    } elseif ($SecretLifecycle) {
+        New-Capability 'available' (
+            [string]$SecretLifecycle.active +
+            ' secret(s) DPAPI lisible(s). Ils restent liés à ce compte Windows et ne sont pas exportés.'
+        )
+    } else {
+        New-Capability 'degraded' 'Cycle de vie DPAPI non vérifiable.' 'Exécuter scripts\inspect-secret-lifecycle.py --verify.'
+    }
     libreoffice_document_validation = if ($LibreOfficeVerified) {
         New-Capability 'available' ($LibreOfficeVersion + ' — rendu DOCX headless vérifié.')
     } elseif ($LibreOfficePath) {
@@ -159,6 +182,9 @@ $Report = [ordered]@{
     overall = if ($CoreReady) { 'available' } else { 'unavailable' }
     core = $Core
     optional = $Optional
+    secret_portability = if ($SecretLifecycle) { $SecretLifecycle } else {
+        [ordered]@{ portable = $false; status = 'unknown'; reauthentication_required = $true }
+    }
 }
 
 $Directory = Split-Path -Parent $OutputPath

@@ -31,6 +31,7 @@ def main() -> int:
     assert "qwen2.5:7b" not in installer
     assert "llava-phi3" not in installer
     assert "write-install-report.ps1" in installer
+    assert "secrets DPAPI restent lies au compte Windows" in installer
     assert "manage-libreoffice.ps1" in installer
     assert "-Action Ensure" in installer
     assert "INSTALLER-NOUVEAU-PC.bat" in legacy_installer
@@ -42,6 +43,9 @@ def main() -> int:
     assert "write-install-report.ps1" in verifier
     assert "install-capabilities.json" in report
     assert "libreoffice_document_validation" in report
+    assert "inspect-secret-lifecycle.py" in report
+    assert "secret_portability" in report
+    assert "reauthentication_required" in report
     assert "LibreOffice\\program\\soffice.com" in report
     assert "TheDocumentFoundation.LibreOffice" in libreoffice_manifest
     assert "--version" in libreoffice and "--silent" in libreoffice

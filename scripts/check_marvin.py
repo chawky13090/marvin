@@ -172,6 +172,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Registre durable de preuves métier", (python, "scripts/test_durable_evidence_store.py")),
         Stage("Intégrité des preuves Marvin Forge", (python, "scripts/test_forge_evidence.py")),
         Stage("Coffre DPAPI des identifiants globaux", (python, "scripts/test_credentials_vault.py")),
+        Stage("Cycle de vie et portabilité des secrets", (python, "scripts/test_secret_lifecycle.py")),
         Stage(
             "Coffre DPAPI du compte de service Google",
             (python, "scripts/test_google_service_account_vault.py"),

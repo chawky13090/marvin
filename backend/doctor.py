@@ -218,6 +218,37 @@ async def run_diagnostics() -> dict:
     except Exception:
         pass
 
+    # Cycle de vie et portabilité des secrets DPAPI : compteurs uniquement.
+    try:
+        import dpapi_secret_store
+
+        lifecycle = dpapi_secret_store.lifecycle_status(verify_decryption=True)
+        if lifecycle["reauthentication_required"]:
+            add(
+                "secret_lifecycle", "Secrets Windows", "error",
+                f"{lifecycle['unreadable']} secret(s) illisible(s) pour ce compte Windows; reconnecter les comptes.",
+            )
+        elif lifecycle["expired"]:
+            add(
+                "secret_lifecycle", "Secrets Windows", "warning",
+                f"{lifecycle['expired']} secret(s) expiré(s) à renouveler.",
+            )
+        elif lifecycle["review_due"]:
+            add(
+                "secret_lifecycle", "Secrets Windows", "warning",
+                f"{lifecycle['review_due']} secret(s) ancien(s) à réviser ou renouveler selon leur fournisseur.",
+            )
+        else:
+            add(
+                "secret_lifecycle", "Secrets Windows", "ok",
+                f"{lifecycle['active']} secret(s) DPAPI lisible(s); réauthentification requise après migration vers un autre PC.",
+            )
+    except Exception as exc:
+        add(
+            "secret_lifecycle", "Secrets Windows", "error",
+            f"Cycle de vie des secrets indisponible : {type(exc).__name__}.",
+        )
+
     # ── 7. Telegram : cohérence ────────────────────────────────────────────────
     try:
         tg = db.get_setting("telegram_config") or {}

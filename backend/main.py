@@ -6,6 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
+# v2.583 — cycle de vie DPAPI et réauthentification portable sans export de secrets
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement
 # v2.580 — compte de service Google migré du JSON en clair vers DPAPI avec rollback réel
@@ -33,7 +34,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.534 — cycle de vie sérialisé, observable, portable et vérifié par résultat
 # v2.533 — port SearXNG dynamique, persistant et compatible Hyper-V/WSL
 # v2.532 — resynchronisation automatique de l'avatar après redémarrage externe
-# v2.528 — redesign PPTX natif, destinations robustes et fichiers verrouillés
 # v2.527 — fidélité PPTX à la synthèse source avant exécution
 # v2.526 — livrables PPTX garantis par l'outil Office et preuve d'artefact
 # v2.525 — tool-calling parallele borne pour les lots sans confirmation possible
