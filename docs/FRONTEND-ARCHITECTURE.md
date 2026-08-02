@@ -16,8 +16,8 @@ mode vocal, les confirmations, l'état des conversations et l'accès aux 363 out
 
 ## Baseline et budget
 
-`config/frontend-baseline.json` ne conserve plus qu'une exception historique au plafond de 1 200
-lignes. `scripts/check_frontend_baseline.mjs` échoue si une exception grossit, si un nouveau
+`config/frontend-baseline.json` ne conserve plus aucune exception historique au plafond de 1 200
+lignes. `scripts/check_frontend_baseline.mjs` échoue si un nouveau
 fichier franchit ce plafond, si ESLint produit une erreur ou si les 37 avertissements actuels
 augmentent. Une extraction réussie abaisse le plafond correspondant; le budget ne remonte
 jamais pour faire passer un changement.
@@ -29,8 +29,11 @@ jamais pour faire passer un changement.
 3. `app/video/page.jsx` : terminé en v2.575, primitives et onglets locaux extraits.
 4. `app/settings/page.jsx` : terminé en v2.576, modèles/cloud et identifiants extraits.
 5. `app/devis/page.jsx` : terminé en v2.577, connaissances IT et facturation extraites.
-6. `app/emails/page.jsx` : extraire les sous-domaines avec leurs tests de parcours et leurs
-   états d'erreur.
+6. `app/emails/page.jsx` : terminé en v2.578, assistant de connexion multi-boîtes extrait.
+
+La séquence initiale est terminée : aucun fichier source frontend ne dépasse 1 200 lignes.
+Les futures extractions doivent viser la cohésion et la réduction des avertissements, pas un
+découpage artificiel de composants déjà lisibles.
 
 Chaque étape commence par un test de caractérisation, déplace une seule responsabilité,
 exécute baseline, lint, build et smoke ciblé, puis possède un commit de rollback autonome.

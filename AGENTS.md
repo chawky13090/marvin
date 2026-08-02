@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.577.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.578.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.577.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.578.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -205,7 +205,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.577.0)
+## 9. État actuel (v2.578.0)
+
+**v2.578 (aucune exception frontend massive)** : l'assistant de connexion multi-boîtes vit
+dans `components/email/EmailSetupPanel.jsx`; les styles de formulaire partagés vivent dans
+`components/email/emailStyles.js`. OAuth Google, IMAP/SMTP, mot de passe masqué, comptes,
+boîte unifiée, composition, automatisation et surveillance gardent leurs contrats antérieurs.
+`app/emails/page.jsx` passe de 1 321 à 1 181 lignes. La baseline couvre 121 sources, conserve
+37/37 avertissements et ne contient plus aucune exception au plafond de 1 200 lignes. Le test
+de caractérisation couvre setup multi-comptes, inbox, lecture, composition, automatisation et
+watch. Aucun endpoint, outil, autorisation, secret, donnée ou log n'est modifié. Rollback :
+réversion atomique du commit v2.578 puis redémarrage de Marvin.
 
 **v2.577 (page Devis sous le plafond)** : les vues autonomes Base de connaissances IT et
 Factures/encaissements vivent dans `components/devis/DevisOperationsViews.jsx`; leurs

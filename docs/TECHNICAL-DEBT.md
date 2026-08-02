@@ -1,12 +1,12 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-02 pour Marvin 2.577.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-02 pour Marvin 2.578.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 
 | ID | Sévérité | Domaine | Preuve actuelle | Risque | Traitement et critère de fermeture |
 |---|---|---|---|---|---|
-| TD-001 | Élevée | Frontend | 1 fichier JSX dépasse 1 200 lignes; `app/outils/page.jsx` est passé de 3 406 à 963 lignes, `MessageBubble.jsx` de 1 864 à 947 lignes, `app/video/page.jsx` de 1 918 à 848 lignes, `app/settings/page.jsx` de 1 568 à 1 126 lignes et `app/devis/page.jsx` de 1 383 à 1 146 lignes | revue difficile, collisions Claude/Codex, régressions d'état | extraire `app/emails/page.jsx` avec caractérisation, puis fermer uniquement après une baseline sans exception |
+| TD-001 | Fermée | Frontend | zéro fichier JavaScript/JSX au-dessus de 1 200 lignes en v2.578; `app/emails/page.jsx` est passé de 1 321 à 1 181 lignes après les cinq extractions précédentes | risque historique de revue difficile et collisions Claude/Codex | fermé par caractérisations préalables, baseline 121 sources sans exception, builds et gates exhaustifs; toute réintroduction est bloquée |
 | TD-002 | Moyenne | Qualité frontend | ESLint passe avec 37 avertissements préexistants | signaux faibles noyés et effets React fragiles | budget bloquant 37 livré en v2.570; corriger progressivement jusqu'à zéro sans jamais relever le plafond |
 | TD-003 | Moyenne | Documentation | `CLAUDE.md` contenait encore des faits v2.80 (261 outils) alors que le produit est en v2.569 | décisions prises sur une architecture inexistante | guide courant court, `ARCHITECTURE.md` canonique et test automatique de cohérence livrés en v2.569 |
 | TD-004 | Moyenne | Validation | le runner historique s'arrêtait au premier échec | résultats non exécutés présentés implicitement comme couverts | fermé en v2.568 : 237/237 étapes exécutées, rapport atomique et mode `--fail-fast` explicite |

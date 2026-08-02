@@ -16438,3 +16438,36 @@ facturation avec les données backend, sans erreur console. Le rapport atomique 
 `success=true`, 250/250 étapes réussies et zéro échec en 649,5 secondes : 363/363 outils avec
 harnais, 391 routes, 41/41 pages, cinq conversations réelles et voix navigateur sérialisée.
 Aucun effet externe ni migration.
+
+## 2026-08-02 — v2.578 — Workspace Emails sous le plafond frontend
+
+### Caractérisation et extraction
+
+`test_email_workspace.mjs` a figé avant déplacement les fournisseurs IMAP/SMTP, le test de
+connexion, l'ajout multi-comptes, le démarrage OAuth Google avec indice de compte, le mot de
+passe masqué, la boîte unifiée, la recherche, lecture, marquage, déplacement, composition,
+automatisation et surveillance. L'assistant de connexion devient
+`components/email/EmailSetupPanel.jsx`; ses styles partagés deviennent
+`components/email/emailStyles.js`. `app/emails/page.jsx` passe de 1 321 à 1 181 lignes.
+La baseline couvre 121 sources, zéro erreur, 37 avertissements et surtout zéro exception au
+plafond de 1 200 lignes.
+
+### Sécurité, logs, validation et rollback
+
+Les champs secrets restent de type `password`; OAuth conserve un indice de compte encodé et
+chaque boîte reste autorisée séparément. Aucun contenu d'e-mail, identifiant ou secret n'est
+lu par le test ni ajouté aux logs. Le backend reste l'autorité pour l'envoi et les comptes.
+Le test pré-extraction, le test post-extraction, ESLint ciblé, la baseline et le contrat du
+runner sont réussis. Validation de livraison exigée avant commit : architecture,
+documentation, build Turbopack, redémarrage contrôlé, parcours réel `/emails`, smokes et gate
+exhaustif. Rollback : réversion atomique du commit v2.578 puis redémarrage de Marvin; aucune
+migration de schéma ou de donnée persistante.
+
+Validation finale observée : arrêt gracieux en 9,6 secondes sans processus forcé, build
+Next.js 16.2.12 Turbopack réussi, redémarrage stable en v2.578.0 avec Ollama, SearXNG et HTTPS
+disponibles. Le parcours navigateur réel a affiché les trois boîtes existantes et ouvert
+l'assistant multi-boîtes; OAuth était présent, le champ secret masqué et les actions
+incomplètes désactivées, sans erreur console ni envoi. Le rapport atomique confirme
+`success=true`, 251/251 étapes réussies et zéro échec en 654,2 secondes : 363/363 outils avec
+harnais, 391 routes, 41/41 pages, cinq conversations réelles et voix navigateur sérialisée.
+La dette TD-001 est fermée sans effet externe ni migration.

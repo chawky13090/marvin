@@ -2,7 +2,5 @@
   "schemaVersion": 1,
   "warningBudget": 37,
   "largeFileThreshold": 1200,
-  "legacyLargeFiles": {
-    "app/emails/page.jsx": 1321
-  }
+  "legacyLargeFiles": {}
 }
