@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -25,6 +26,7 @@ async def _run() -> None:
         """
         <html><head>
           <meta property="og:image" content="/hero.jpg">
+          <meta property="og:image:secure_url" content="https://cdn.example/secure-hero.jpg">
           <meta property="og:site_name" content="Agence Exemple">
           <meta property="article:published_time" content="2026-08-01T09:00:00Z">
           <link rel="icon" href="/favicon.png">
@@ -33,7 +35,11 @@ async def _run() -> None:
         "lxml",
     )
     extracted = metadata.extract_soup_metadata(soup, "https://news.example/article")
-    assert extracted["image_url"] == "https://news.example/hero.jpg"
+    assert extracted["image_url"] == "https://cdn.example/secure-hero.jpg"
+    assert extracted["image_candidates"][:2] == [
+        "https://cdn.example/secure-hero.jpg",
+        "https://news.example/hero.jpg",
+    ]
     assert extracted["favicon_url"] == "https://news.example/favicon.png"
     assert extracted["publisher"] == "Agence Exemple"
 
@@ -47,6 +53,25 @@ async def _run() -> None:
     assert normalized["image_url"] == "https://www.example.com/preview.png"
     assert normalized["evidence_level"] == "page_read"
     assert metadata.normalize_source({"url": "https://example.com"})["image_url"] == ""
+
+    structured = BeautifulSoup(
+        """
+        <html><head>
+          <script type="application/ld+json">
+            {"@type":"NewsArticle","image":{"@type":"ImageObject","contentUrl":"/schema-photo.jpg"}}
+          </script>
+        </head><body>
+          <img class="site-logo" src="/logo.png" width="64" height="64">
+          <img class="article-photo" srcset="/small.jpg 320w, /large.jpg 1280w" alt="Photo du reportage">
+        </body></html>
+        """,
+        "lxml",
+    )
+    structured_metadata = metadata.extract_soup_metadata(structured, "https://news.example/report")
+    assert structured_metadata["image_candidates"][:2] == [
+        "https://news.example/schema-photo.jpg",
+        "https://news.example/large.jpg",
+    ]
 
     source_image = io.BytesIO()
     Image.new("RGB", (32, 20), "#70747a").save(source_image, format="PNG")
@@ -201,11 +226,11 @@ async def _run() -> None:
         finally:
             metadata.PREVIEW_CACHE_DIR = old_cache
 
-    with patch.object(
-        metadata.outbound_http,
-        "fetch_public",
-        new=AsyncMock(side_effect=OSError("transport interne")),
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-transport-") as directory, patch.object(
+        metadata.outbound_http, "fetch_public", new=AsyncMock(side_effect=OSError("transport interne")),
     ):
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
         try:
             await metadata.cache_preview("https://example.com/unavailable.png")
         except ValueError as exc:
@@ -213,6 +238,58 @@ async def _run() -> None:
             assert "transport interne" not in str(exc)
         else:
             raise AssertionError("Une panne de transport doit être rendue sans détail interne.")
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
+
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-negative-") as directory:
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
+        failed_fetch = AsyncMock(side_effect=OSError("transport interne"))
+        try:
+            with patch.object(metadata.outbound_http, "fetch_public", new=failed_fetch):
+                for expected in ("Aperçu distant indisponible.", "échec récent mémorisé"):
+                    try:
+                        await metadata.cache_preview("https://example.com/negative.png")
+                    except ValueError as exc:
+                        assert expected in str(exc)
+                    else:
+                        raise AssertionError("Un échec récent doit rester négativement mis en cache.")
+            assert failed_fetch.await_count == 1
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
+
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-stale-") as directory:
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
+        try:
+            with patch.object(metadata.outbound_http, "fetch_public", new=AsyncMock(return_value=image_response)):
+                stale_path, _ = await metadata.cache_preview("https://cdn.example/stale.png")
+            stale_time = stale_path.stat().st_mtime - metadata.CACHE_TTL_SECONDS - 60
+            os.utime(stale_path, (stale_time, stale_time))
+            with patch.object(metadata.outbound_http, "fetch_public", new=AsyncMock(side_effect=OSError("panne"))):
+                fallback_path, fallback_type = await metadata.cache_preview("https://cdn.example/stale.png")
+            assert fallback_path == stale_path and fallback_type == "image/webp"
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
+
+    with tempfile.TemporaryDirectory(prefix="marvin-source-preview-singleflight-") as directory:
+        old_cache = metadata.PREVIEW_CACHE_DIR
+        metadata.PREVIEW_CACHE_DIR = Path(directory)
+
+        async def delayed_image(_url: str, **_kwargs):
+            await asyncio.sleep(0.02)
+            return image_response
+
+        try:
+            with patch.object(metadata.outbound_http, "fetch_public", new=AsyncMock(side_effect=delayed_image)) as fetch:
+                first, second = await asyncio.gather(
+                    metadata.cache_preview("https://cdn.example/shared.png"),
+                    metadata.cache_preview("https://cdn.example/shared.png"),
+                )
+            assert first == second
+            assert fetch.await_count == 1
+        finally:
+            metadata.PREVIEW_CACHE_DIR = old_cache
 
 
 if __name__ == "__main__":

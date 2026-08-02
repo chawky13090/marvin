@@ -39,6 +39,13 @@
   color: var(--text-primary);
   outline: none;
 }
+.controls .sourcesButton {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  padding: 0 12px;
+  width: auto;
+}
 
 .track {
   display: grid;
@@ -83,7 +90,7 @@
 }
 .visual > img {
   height: 100%;
-  inset: 0;
+  inset: 48px 0 0;
   object-fit: cover;
   position: absolute;
   width: 100%;
@@ -157,6 +164,128 @@
 .restricted .visual { background: repeating-linear-gradient(135deg, #242528, #242528 12px, #1d1e20 12px, #1d1e20 24px); }
 .rejected { display: none; }
 
+.panelBackdrop {
+  align-items: stretch;
+  background: rgba(5, 5, 6, .58);
+  display: flex;
+  inset: 0;
+  justify-content: flex-end;
+  position: fixed;
+  z-index: 1200;
+}
+.sourcesPanel {
+  background: #17181a;
+  border-left: 1px solid #303135;
+  box-shadow: -24px 0 70px rgba(0, 0, 0, .42);
+  display: flex;
+  flex-direction: column;
+  max-width: min(92vw, 520px);
+  padding: 22px;
+  width: 100%;
+}
+.panelHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+.panelHeader > div { display: flex; flex-direction: column; gap: 5px; }
+.panelHeader strong { color: #f0f0f1; font-size: 18px; }
+.panelHeader span { color: #96989d; font-size: 12px; }
+.panelHeader button {
+  align-items: center;
+  background: #232427;
+  border: 1px solid #34363a;
+  border-radius: 50%;
+  color: #c7c8cb;
+  cursor: pointer;
+  display: flex;
+  font-size: 19px;
+  height: 34px;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  width: 34px;
+}
+.panelHeader button:hover, .panelHeader button:focus-visible {
+  background: #2b2c30;
+  color: #fff;
+  outline: none;
+}
+.sourceFilter { margin-top: 18px; }
+.sourceFilter input {
+  background: #202124;
+  border: 1px solid #34363a;
+  border-radius: 11px;
+  color: #ececee;
+  font: inherit;
+  padding: 11px 13px;
+  width: 100%;
+}
+.sourceFilter input:focus { border-color: #5a5d63; outline: none; }
+.sourceList {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sourceLink {
+  align-items: flex-start;
+  background: #1d1e21;
+  border: 1px solid #2c2e32;
+  border-radius: 13px;
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 26px minmax(0, 1fr) auto 18px;
+  padding: 12px;
+  text-decoration: none;
+}
+.sourceLink:hover, .sourceLink:focus-visible {
+  background: #242529;
+  border-color: #44464c;
+  outline: none;
+}
+.sourceIndex {
+  align-items: center;
+  background: #292a2e;
+  border-radius: 50%;
+  color: #b8babf;
+  display: flex;
+  font-size: 10px;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+.sourceLinkBody { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.sourceLinkBody strong {
+  color: #ececee;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.sourceLinkBody > span { color: #adaeb2; font-size: 11px; }
+.sourceLinkBody small {
+  color: #74767c;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sourceEvidence {
+  background: #2a2b2f;
+  border-radius: 999px;
+  color: #bcbec2;
+  font-size: 9px;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+.openSource { color: #8e9095; font-size: 14px; }
+.panelNote { color: #77797e; font-size: 10px; line-height: 1.45; margin: 14px 0 0; }
+.noSource { color: #999ba0; font-size: 12px; padding: 22px 8px; text-align: center; }
+
 @keyframes sourceShimmer {
   to { transform: translateX(100%); }
 }
@@ -169,7 +298,9 @@
   .gallery { margin-left: 0; width: 100%; }
   .header > div:first-child { align-items: flex-start; flex-direction: column; gap: 2px; }
   .track { grid-auto-columns: 86%; }
-  .controls { display: none; }
+  .controls button:not(.sourcesButton) { display: none; }
+  .sourcesPanel { max-width: 100%; padding: 18px 14px; }
+  .sourceEvidence { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

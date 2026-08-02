@@ -16025,3 +16025,56 @@ v2.565. Dans la recherche « feux de forêt », sept des neuf médias sont déj�
 repli d'erreur n'est rendu, ce qui confirme l'absence de régression sur la galerie qui
 fonctionnait. Dans la recherche « punaises de lit », quatre médias sont chargés, trois sources
 visibles utilisent le repli explicite et le compteur affiche correctement deux pages lues.
+
+## 2026-08-02 — v2.566 — Recherche approfondie sur les aperçus et panneau Sources
+
+Demande : approfondir les pratiques de rendu des sources Web, conserver la galerie déjà
+fonctionnelle sur les feux de forêt, améliorer le cas plus irrégulier des punaises de lit et
+offrir à l'utilisateur un accès libre à toutes les ressources visitées et à leurs liens.
+
+Comparaison effectuée sur les spécifications Open Graph, Schema.org ImageObject, HTML
+responsive images, l'API SearXNG, les recommandations Next.js, OWASP SSRF et RFC 5861.
+Trois architectures ont été évaluées : résolveur local multi-standard, navigateur headless
+pour chaque carte, service externe d'unfurl. Le résolveur local est retenu : il préserve le
+fonctionnement hors service tiers, la confidentialité, la portabilité de l'installeur et la
+latence. Le navigateur rendu reste un repli explicite pour les pages JavaScript; l'utiliser
+pour chaque tuile multiplierait les processus, le coût mémoire et la surface d'attaque.
+
+Le backend accepte maintenant `og:image:secure_url`, `og:image:url`, Twitter, `image_src`,
+les ImageObject JSON-LD bornés et les images éditoriales issues de `srcset` ou des attributs
+lazy-loading. Les logos, pixels et petites images explicitement dimensionnées sont écartés.
+Les candidats sont lancés ensemble, mais une fenêtre de qualité de 700 ms permet à une photo
+prioritaire de gagner sur un favicon rapide. Les appels identiques sont coalescés, les échecs
+sont mémorisés quinze minutes et une image expirée de moins de trente jours est servie en
+cas de panne. Les réponses ajoutent `stale-while-revalidate`/`stale-if-error` au cache privé.
+
+Sécurité : aucun cookie ni en-tête d'authentification n'est transféré; seuls HTTP(S) sur 80
+ou 443 vers des IP publiques sont admis et chaque redirection est revalidée. SVG, URL avec
+identifiants, réseau privé, réponse supérieure à 4 Mio, bombe de décompression et image de
+plus de 25 mégapixels restent refusés. JSON-LD est traité comme donnée avec limites de taille,
+profondeur, nœuds et candidats. L'observabilité journalise seulement domaine, empreinte URL
+tronquée, durée et type de repli, sans chemin ni paramètres complets.
+
+UX : la galerie conserve son rôle d'aperçu. Un bouton `Sources (N)` ouvre un panneau latéral
+inspiré de ChatGPT Search, listant toutes les pages avec numéro stable, titre, éditeur, URL
+directe et statut de preuve. Les longues listes sont filtrables; Échap, le bouton de fermeture
+et le clic hors panneau le ferment. Sur mobile, le bouton Sources reste accessible tandis que
+les flèches du carrousel sont masquées.
+
+Tests ajoutés : priorité Open Graph HTTPS, ImageObject JSON-LD, sélection du plus grand
+`srcset`, exclusion d'un logo, cache négatif, requête simultanée mutualisée, repli stale sur
+panne et contrat du panneau frontend. Aucune migration persistante. Rollback : réversion
+atomique du commit v2.566, suppression facultative de `data/cache/web-source-previews`, puis
+redémarrage backend/frontend.
+
+Validation réelle : le premier parcours navigateur a détecté un défaut non visible dans les
+tests statiques. Le panneau, rendu dans un message du chat, héritait du contexte de défilement
+de la conversation ; son en-tête était rogné et le clic sur la croix pouvait atteindre le
+bouton `Ctrl K` sous-jacent. Il est désormais rendu par portail dans `document.body`, sous
+l'en-tête global, avec un seul autofocus. Dans la conversation réelle, le panneau Feux de
+forêt affiche neuf liens directs et un filtre, puis se ferme sans ouvrir la palette. Le
+panneau Punaises de lit expose dix liens directs et se ferme également proprement. Les dix
+cartes sont présentes ; Rentokil fournit un aperçu WebP vérifié, tandis que FLEEN,
+AlloPunaise et Safelit ne publient aucun média récupérable par le client HTTP anonyme et
+restent donc en repli explicite plutôt que de recevoir une image non vérifiée. Redémarrage
+Marvin gracieux, sans PID forcé ; santé backend v2.566.0, 363 outils et frontend HTTP 200.

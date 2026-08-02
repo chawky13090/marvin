@@ -41,7 +41,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.565.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.566.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -202,7 +202,22 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.565.0)
+## 9. État actuel (v2.566.0)
+
+**v2.566 (sources vérifiables et aperçus multi-standard)** : le résolveur d'aperçus respecte
+désormais la hiérarchie Open Graph sécurisée, Twitter, `link image_src`, Schema.org JSON-LD
+et les images éditoriales `srcset`/lazy-loading, avant de réduire l'affichage à un favicon.
+Les candidats sont téléchargés en parallèle mais une courte fenêtre de qualité privilégie
+la vraie photo à la première petite icône disponible. Deux requêtes simultanées pour la même
+URL partagent le même travail; les échecs sont mémorisés quinze minutes et un aperçu ancien
+peut être servi pendant une panne conformément à `stale-if-error`. Le transport public
+conserve la validation SSRF à chaque redirection, refuse SVG, identifiants URL, réseaux non
+publics et images excessives. Le chat ajoute un bouton **Sources** ouvrant un panneau latéral
+avec toutes les pages, liens directs, numéros de citation et niveaux de preuve; la galerie
+rapide reste visible. Les logs ne contiennent que le domaine, une empreinte URL tronquée,
+la durée et le résultat, jamais la requête complète. Aucune migration persistante. Rollback :
+réversion atomique du commit v2.566, suppression facultative de
+`data/cache/web-source-previews`, puis redémarrage backend/frontend.
 
 **v2.565 (aperçus progressifs et replis visuels garantis)** : chaque carte de source affiche
 immédiatement un monogramme et un balayage de chargement, puis remplace cet état par l'image
