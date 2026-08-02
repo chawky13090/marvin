@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.572 — rendu des résultats Outils extrait et page sous le plafond frontend
+# v2.573 — carte des fichiers générés extraite du rendu central du chat
 # v2.565 — aperçus Web progressifs, replis concurrents et vérité visuelle du modèle
 # v2.564 — miniatures Web résolues et mode Lecture strictement épuré
 # v2.563 — galerie visuelle des sources réellement lues et aperçus privés durcis

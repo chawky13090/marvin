@@ -16272,3 +16272,42 @@ Validation finale observée le 2 août 2026 : rapport atomique `success=true`, 2
 363/363 outils avec harnais, 391 routes, 41/41 pages, rendu des cinq conversations réelles et
 voix navigateur réussis. Durée du gate final : 643,5 secondes. Aucun redémarrage, aucune
 mutation de schéma et aucun effet externe réel pendant cette tranche.
+
+## 2026-08-02 — v2.573 — Carte des fichiers générés extraite du chat
+
+### Caractérisation et extraction
+
+Avant modification, `test_generated_file_card.mjs` a figé les formats documentaires et image,
+l'aperçu via `/api/files/raw`, l'ouverture par `pc_open_file`, la conversion DOCX/PDF et le
+rendu des avertissements de sécurité. Ce test a réussi sur l'implémentation historique puis
+sur le composant extrait. `GeneratedFileCard.jsx` devient propriétaire de cette responsabilité
+et exporte les deux ensembles d'extensions utilisés par le rendu central.
+
+`MessageBubble.jsx` passe de 1 864 à 1 689 lignes. Son budget anti-régression est abaissé de
+175 lignes; il reste volontairement inscrit comme exception tant que les cartes de preuves et
+le rendu structuré des outils n'ont pas été extraits à leur tour.
+
+### Sécurité, logs, validation et rollback
+
+La décision d'autorisation demeure côté backend. Le clic d'ouverture ou de conversion garde
+exactement le contrat antérieur; aucune permission, URL, donnée personnelle, journal ou outil
+n'est ajouté. Les erreurs restent rendues localement sans exposer de secret. Validation exigée
+avant commit : caractérisation, ESLint/baseline, architecture, build Turbopack, smokes pages,
+chat et voix, puis gate exhaustif live. Rollback : réversion atomique du commit v2.573; aucune
+migration de schéma ou de donnée persistante.
+
+Le premier smoke post-redémarrage a trouvé un défaut indépendant de l'extraction : quatre
+conversations se chargeaient, puis la cinquième recevait parfois HTTP 401 depuis
+`/api/conversations/{id}`. La nouvelle instrumentation a identifié `proxy.js` comme émetteur.
+Son introspection de session dispose d'un timeout de trois secondes; sous charge, une panne ou
+un HTTP 5xx était converti à tort en « session invalide ». Le proxy répond désormais 503 avec
+`Retry-After: 1` dans ce seul cas. Le frontend peut alors utiliser son repli direct existant,
+qui présente le même cookie signé au backend. Une session absente/invalide reste 401, un droit
+insuffisant reste 403 et toute décision échoue fermée. Le test de politique dédié et trois
+parcours successifs de cinq conversations sont verts après correction.
+
+Validation finale observée : arrêt gracieux, deux builds Next.js 16.2.12 Turbopack réussis,
+redémarrage backend/frontend en v2.573.0, puis rapport atomique `success=true` avec 246/246
+étapes réussies en 647,2 secondes. Le rapport couvre 363/363 outils avec harnais, 391 routes,
+41/41 pages, cinq conversations réelles après charge et la voix navigateur. Aucun 401 n'est
+réapparu. Aucun effet externe réel, aucune migration et aucune modification de données.

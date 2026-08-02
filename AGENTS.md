@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.572.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.573.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.572.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.573.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -205,7 +205,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.572.0)
+## 9. État actuel (v2.573.0)
+
+**v2.573 (carte des fichiers générés extraite)** : l'aperçu, l'ouverture, la conversion et
+les avertissements des fichiers créés quittent `MessageBubble.jsx` pour
+`GeneratedFileCard.jsx`. Les extensions reconnues restent exportées vers le rendu central et
+un test de caractérisation protège les images, documents, conversions et avertissements.
+`MessageBubble.jsx` passe de 1 864 à 1 689 lignes sans changement de contrat. Le smoke a aussi
+isolé un 401 intermittent : le proxy Next confondait une introspection backend indisponible
+avec une session invalide. Il distingue désormais 401, 403 et 503 sans ouvrir l'accès; le
+repli direct existant peut reprendre une lecture après un 503. Rollback : réversion atomique
+du commit v2.573; aucune migration persistante.
 
 **v2.572 (page Outils sous le plafond)** : `ResultPanel` quitte la page Outils avec toutes ses
 branches historiques (erreur, fichier, Web, image, ports, réseau, traduction, shell et JSON)

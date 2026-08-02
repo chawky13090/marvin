@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { decideLanProxy } from './lib/lanProxyPolicy.mjs';
 
 
 const INTROSPECTION_URL =
@@ -21,8 +22,9 @@ export async function proxy(request) {
     );
   }
 
+  let response;
   try {
-    const response = await fetch(`${INTROSPECTION_URL}/api/auth/lan/introspect`, {
+    response = await fetch(`${INTROSPECTION_URL}/api/auth/lan/introspect`, {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -32,18 +34,35 @@ export async function proxy(request) {
       cache: 'no-store',
       signal: AbortSignal.timeout(3000),
     });
-    const result = response.ok ? await response.json() : null;
-    if (result?.authenticated === true && result?.authorized === true) {
-      return NextResponse.next();
-    }
-    if (result?.authenticated === true) {
-      return Response.json(
-        { detail: 'capability_required' },
-        { status: 403, headers: { 'Cache-Control': 'no-store' } },
-      );
-    }
   } catch {
     // Échec fermé : une panne du backend ne rend jamais les routes Next publiques.
+    return Response.json(
+      { detail: 'lan_introspection_unavailable' },
+      {
+        status: 503,
+        headers: { 'Cache-Control': 'no-store', 'Retry-After': '1' },
+      },
+    );
+  }
+  if (!response.ok) {
+    return Response.json(
+      { detail: 'lan_introspection_unavailable' },
+      {
+        status: 503,
+        headers: { 'Cache-Control': 'no-store', 'Retry-After': '1' },
+      },
+    );
+  }
+  const result = await response.json();
+  const decision = decideLanProxy(result);
+  if (decision === 'allow') {
+    return NextResponse.next();
+  }
+  if (decision === 'forbid') {
+    return Response.json(
+      { detail: 'capability_required' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
   return Response.json(
     { detail: 'lan_authentication_required' },
