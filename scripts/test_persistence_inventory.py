@@ -7,6 +7,8 @@ import re
 import sys
 from pathlib import Path
 
+from repository_test_scope import backend_python_files
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -26,9 +28,7 @@ READ_ONLY_JSONL_CONSUMERS = {"backend/full_backup.py"}
 
 def discovered_jsonl() -> set[tuple[str, str]]:
     discovered: set[tuple[str, str]] = set()
-    for path in BACKEND.rglob("*.py"):
-        if ".venv" in path.parts or "__pycache__" in path.parts:
-            continue
+    for path in backend_python_files(BACKEND):
         relative_module = path.relative_to(ROOT).as_posix()
         if relative_module in READ_ONLY_JSONL_CONSUMERS:
             continue

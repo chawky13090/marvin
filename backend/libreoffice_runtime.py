@@ -31,7 +31,7 @@ def capability() -> dict[str, Any]:
     try:
         completed = subprocess.run(
             [str(executable), "--headless", "--version"],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True, text=True, errors="replace", timeout=10, check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         version = (completed.stdout or completed.stderr or "").strip().splitlines()[0]
@@ -61,7 +61,7 @@ def render_docx_to_pdf(source: str | Path, output_dir: str | Path, *, timeout: i
         ]
         try:
             completed = subprocess.run(
-                command, capture_output=True, text=True, timeout=max(10, min(timeout, 180)),
+                command, capture_output=True, text=True, errors="replace", timeout=max(10, min(timeout, 180)),
                 check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except subprocess.TimeoutExpired:

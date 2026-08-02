@@ -6,6 +6,8 @@ import ast
 import tempfile
 from pathlib import Path
 
+from repository_test_scope import backend_python_files
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -18,8 +20,8 @@ from db_connection import get_conn
 
 def main() -> int:
     violations: list[str] = []
-    for path in BACKEND.rglob("*.py"):
-        if ".venv" in path.parts or path.name == "db_connection.py":
+    for path in backend_python_files(BACKEND):
+        if path.name == "db_connection.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         for node in ast.walk(tree):

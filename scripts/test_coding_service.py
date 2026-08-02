@@ -40,7 +40,7 @@ def main() -> int:
         assert not contract["git"]["dirty"]
         head = subprocess.run(
             ["git", "-C", str(repository), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=False, timeout=10,
+            capture_output=True, text=True, errors="replace", check=False, timeout=10,
         )
         assert head.returncode == 0 and head.stdout.strip()
 

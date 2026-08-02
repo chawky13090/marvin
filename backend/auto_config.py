@@ -72,7 +72,7 @@ def _nvidia_vram():
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.total,name", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=8, creationflags=0x08000000)
+            capture_output=True, text=True, errors="replace", timeout=8, creationflags=0x08000000)
         line = (out.stdout or "").strip().splitlines()[0]
         mb = int(line.split(",")[0].strip())
         name = line.split(",", 1)[1].strip()

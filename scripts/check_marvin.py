@@ -7,6 +7,7 @@ live passent exclusivement par HTTP afin de ne pas ouvrir Qdrant hors de FastAPI
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import py_compile
 import shutil
@@ -14,7 +15,10 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+
+from repository_test_scope import backend_python_files
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +38,13 @@ class Stage:
             raise ValueError("Le timeout d'une étape doit être compris entre 10 et 900 s.")
 
 
+@dataclass(frozen=True)
+class StageResult:
+    name: str
+    success: bool
+    duration_seconds: float
+
+
 def npm_command() -> str:
     command = shutil.which("npm.cmd") or shutil.which("npm")
     if not command:
@@ -42,11 +53,7 @@ def npm_command() -> str:
 
 
 def compile_backend() -> None:
-    files = [
-        path
-        for path in BACKEND.rglob("*.py")
-        if not {".venv", "data", "generated_videos"}.intersection(path.parts)
-    ]
+    files = backend_python_files(BACKEND)
     for path in files:
         py_compile.compile(str(path), doraise=True)
     print(f"Compilation Python OK - {len(files)} fichiers.")
@@ -80,6 +87,55 @@ def run_stage(stage: Stage) -> tuple[bool, float]:
         return False, time.perf_counter() - started
 
 
+def execute_stages(selected: list[Stage], *, fail_fast: bool) -> list[StageResult]:
+    results: list[StageResult] = []
+    for stage in selected:
+        success, duration = run_stage(stage)
+        results.append(StageResult(stage.name, success, duration))
+        if fail_fast and not success:
+            break
+    return results
+
+
+def write_report(
+    results: list[StageResult],
+    *,
+    expected_count: int,
+    quick: bool,
+    live: bool,
+    fail_fast: bool,
+    output_path: Path,
+) -> None:
+    artifacts_root = (ROOT / "artifacts").resolve()
+    resolved = output_path.resolve()
+    try:
+        resolved.relative_to(artifacts_root)
+    except ValueError as exc:
+        raise ValueError("Le rapport doit rester sous artifacts/.") from exc
+    payload = {
+        "schema_version": 1,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "mode": {"quick": quick, "live": live, "fail_fast": fail_fast},
+        "expected_stages": expected_count,
+        "executed_stages": len(results),
+        "succeeded": sum(item.success for item in results),
+        "failed": sum(not item.success for item in results),
+        "success": bool(results) and len(results) == expected_count and all(item.success for item in results),
+        "stages": [
+            {
+                "name": item.name,
+                "status": "passed" if item.success else "failed",
+                "duration_seconds": round(item.duration_seconds, 3),
+            }
+            for item in results
+        ],
+    }
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    temporary = resolved.with_suffix(resolved.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(resolved)
+
+
 def stages(*, quick: bool, live: bool) -> list[Stage]:
     if not VENV_PYTHON.exists():
         raise RuntimeError("backend/.venv est absent. Lancez INSTALLER-NOUVEAU-PC.bat.")
@@ -88,6 +144,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
     npm = npm_command()
     result = [
         Stage("Provenance du runtime Python", (python, "scripts/test_python_runtime.py")),
+        Stage("Runner de tests exhaustif", (python, "scripts/test_check_marvin_runner.py")),
         Stage("Runtime Node et modules natifs", ("node", "scripts/check_runtime.mjs")),
         Stage("Superviseur du backend Windows", (python, "scripts/test_server_supervisor.py")),
         Stage("Arrêt borné du backend", (python, "scripts/test_shutdown_runtime.py")),
@@ -450,6 +507,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validation consolidee de Marvin")
     parser.add_argument("--quick", action="store_true", help="ignore le build Next.js")
     parser.add_argument("--live", action="store_true", help="teste les services deja demarres")
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="arrete explicitement au premier echec; par defaut toutes les etapes sont executees",
+    )
+    parser.add_argument(
+        "--report",
+        default="artifacts/check-marvin-report.json",
+        help="rapport JSON atomique sous artifacts/",
+    )
     args = parser.parse_args()
 
     try:
@@ -458,19 +525,28 @@ def main() -> int:
         print(f"ECHEC: {exc}", file=sys.stderr)
         return 1
 
-    results: list[tuple[str, bool, float]] = []
-    for stage in selected:
-        success, duration = run_stage(stage)
-        results.append((stage.name, success, duration))
-        if not success:
-            break
+    results = execute_stages(selected, fail_fast=args.fail_fast)
 
     print(f"\n{'=' * 68}\nSYNTHESE\n{'=' * 68}")
-    for name, success, duration in results:
-        print(f"[{'OK' if success else 'ECHEC'}] {name} ({duration:.1f}s)")
+    for result in results:
+        print(f"[{'OK' if result.success else 'ECHEC'}] {result.name} ({result.duration_seconds:.1f}s)")
 
-    if not results or not all(success for _, success, _ in results):
-        print("Validation Marvin en echec.")
+    try:
+        write_report(
+            results,
+            expected_count=len(selected),
+            quick=args.quick,
+            live=args.live,
+            fail_fast=args.fail_fast,
+            output_path=ROOT / args.report,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"ECHEC: rapport non ecrit: {exc}", file=sys.stderr)
+        return 1
+
+    if not results or len(results) != len(selected) or not all(result.success for result in results):
+        failures = sum(not result.success for result in results)
+        print(f"Validation Marvin en echec - {failures} etape(s) en echec sur {len(results)} executee(s).")
         return 1
     print(f"Validation Marvin OK - {len(results)} etapes.")
     return 0

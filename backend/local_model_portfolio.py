@@ -80,6 +80,7 @@ def network_cost() -> str:
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=5,
             creationflags=0x08000000,
             check=False,

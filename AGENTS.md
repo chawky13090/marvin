@@ -202,7 +202,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.567.0)
+## 9. État actuel (v2.568.0)
+
+**v2.568 (barrière exhaustive et reproductible)** : `check_marvin.py` n'abandonne plus au
+premier échec; il exécute toutes les étapes par défaut, conserve `--fail-fast` comme choix
+explicite et écrit atomiquement `artifacts/check-marvin-report.json` avec statuts et durées,
+sans commandes ni sorties susceptibles de contenir des données sensibles. La première passe
+a exposé un unique faux défaut après l'étape 22 : les scanners statiques parcouraient le
+`.venv.rollback-*`. `repository_test_scope.py` fournit désormais la frontière commune aux
+inventaires JSONL, SQLite, imports, outils et compilation. Six sous-processus Windows
+textuels tolèrent aussi les octets non UTF-8; un contrôle AST interdit tout nouvel appel
+`subprocess.run(text=True)` sans politique `errors`. Validation réelle finale : 237/237
+étapes en 507,8 secondes, rapport `success=true`, zéro test masqué, lint zéro erreur. Aucune
+donnée persistante ou configuration migrée. Rollback : réversion atomique du commit v2.568;
+le rapport sous `artifacts/` est une preuve locale régénérable et peut être supprimé.
 
 **v2.567 (runtime Python portable et réversible)** : le `.venv` de développement dépendait
 du cache privé `codex-runtimes`; sa suppression aurait empêché tout démarrage et contredisait

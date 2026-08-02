@@ -9,6 +9,8 @@ import sys
 import time
 import types
 from pathlib import Path
+
+from repository_test_scope import backend_python_files
 from unittest.mock import AsyncMock, Mock, patch
 
 
@@ -93,8 +95,7 @@ def _check_static_composition() -> None:
 def _first_party_import_graph() -> dict[str, set[str]]:
     modules = {
         ".".join(path.relative_to(BACKEND).with_suffix("").parts): path
-        for path in BACKEND.rglob("*.py")
-        if ".venv" not in path.parts and "__pycache__" not in path.parts
+        for path in backend_python_files(BACKEND)
     }
     modules = {
         (name.removesuffix(".__init__")): path
@@ -154,6 +155,7 @@ def _check_bounded_clean_import() -> None:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=30,
         check=False,
     )

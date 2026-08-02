@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.567 — runtime Python portable, détecté, migré transactionnellement et réversible
+# v2.568 — runner exhaustif, rapport atomique et frontière unique des scans statiques
 # v2.565 — aperçus Web progressifs, replis concurrents et vérité visuelle du modèle
 # v2.564 — miniatures Web résolues et mode Lecture strictement épuré
 # v2.563 — galerie visuelle des sources réellement lues et aperçus privés durcis

@@ -4,6 +4,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from repository_test_scope import backend_python_files
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -44,9 +46,7 @@ def is_registry_access(value: ast.expr, aliases: set[str]) -> bool:
 
 def inventory() -> dict[str, int]:
     result = {}
-    for path in BACKEND.rglob("*.py"):
-        if any(part in {".venv", "__pycache__"} for part in path.parts):
-            continue
+    for path in backend_python_files(BACKEND):
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         aliases = registry_aliases(tree)
         count = sum(

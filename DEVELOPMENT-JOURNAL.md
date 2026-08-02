@@ -16124,3 +16124,36 @@ Le premier lint a justement détecté que ce dossier de sauvegarde exposait le J
 interne de Playwright à ESLint (106 faux échecs). `eslint.config.mjs` ignore maintenant les
 trois familles transactionnelles `.venv.next-*`, `.venv.rollback-*` et `.venv.failed-*`;
 le second lint termine avec zéro erreur et 37 avertissements applicatifs préexistants.
+
+## 2026-08-02 — v2.568 — Runner exhaustif et scans statiques bornés
+
+### Diagnostic et correction
+
+`scripts/check_marvin.py` interrompait la suite au premier échec. Une revendication globale
+ne pouvait donc pas distinguer « premier test en échec » de « tous les autres tests
+réussissent ». Le runner exécute maintenant toutes les étapes par défaut, propose
+`--fail-fast` uniquement pour un diagnostic volontairement court et écrit un rapport JSON
+atomique sous `artifacts/`. Ce rapport contient seulement nom, statut et durée de chaque
+étape; il n'enregistre ni ligne de commande, ni stdout/stderr, ni secret.
+
+La première passe exhaustive a terminé les 237 étapes et découvert un seul échec réel du
+gate : l'inventaire JSONL parcourait le `.venv.rollback-*` conservé par v2.567. La correction
+n'a pas supprimé le rollback. `repository_test_scope.py` définit une frontière commune qui
+exclut tous les `.venv*`, caches et données générées; elle est utilisée par les contrôles
+JSONL, SQLite, imports, consommateurs d'outils et compilation.
+
+La sortie complète a aussi révélé un `UnicodeDecodeError` dans un thread de lecture de
+sous-processus Windows sans effet sur le code retour. Les six appels `subprocess.run` en mode
+texte sans stratégie de décodage tolérante ont reçu `errors="replace"`. Le test du runner
+analyse désormais l'AST du backend et des scripts pour interdire la régression.
+
+### Validation, sécurité, logs et rollback
+
+Tests ciblés : runner exhaustif/fail-fast/rapport hors périmètre, inventaire JSONL, hygiène
+SQLite, composition FastAPI, consommateurs d'outils, portefeuille local, Coding Service,
+documents/LibreOffice : réussis. Première suite : 236/237, l'échec suivant ayant été corrigé.
+Seconde suite : **237/237 étapes réussies en 507,8 secondes**, rapport atomique
+`artifacts/check-marvin-report.json` avec `success=true`. Lint : zéro erreur, 37 avertissements
+frontend préexistants. Le rapport est ignoré par Git et ne contient aucune donnée utilisateur.
+Aucune migration ni modification de donnée. Rollback : réversion atomique du commit v2.568;
+suppression facultative du rapport local, sans impact sur Marvin.
