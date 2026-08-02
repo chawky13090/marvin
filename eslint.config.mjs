@@ -30,6 +30,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Environnements et données locales pouvant contenir leur propre JavaScript généré.
     "backend/.venv/**",
+    "backend/.venv.next-*/**",
+    "backend/.venv.rollback-*/**",
+    "backend/.venv.failed-*/**",
     "data/**",
     ".tmp.driveupload/**",
     "README/**",

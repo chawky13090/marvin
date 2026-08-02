@@ -43,6 +43,9 @@ next-env.d.ts
 
 # Python backend
 backend/.venv/
+backend/.venv.next-*/
+backend/.venv.rollback-*/
+backend/.venv.failed-*/
 backend/__pycache__/
 **/__pycache__/
 *.pyc

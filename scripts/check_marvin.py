@@ -87,6 +87,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
     python = str(VENV_PYTHON)
     npm = npm_command()
     result = [
+        Stage("Provenance du runtime Python", (python, "scripts/test_python_runtime.py")),
         Stage("Runtime Node et modules natifs", ("node", "scripts/check_runtime.mjs")),
         Stage("Superviseur du backend Windows", (python, "scripts/test_server_supervisor.py")),
         Stage("Arrêt borné du backend", (python, "scripts/test_shutdown_runtime.py")),

@@ -6,7 +6,7 @@
 
 ## 1. Qu'est-ce que Marvin
 
-Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **357 outils**.
+Assistant IA personnel/secrétaire pour technicien informatique. L'utilisateur = **Chaouki BOUSSAYRI**, technicien informatique chez **KOIOS**, francophone — répondre **court, direct, en français** (mener par le résultat, ne pas sur-expliquer). Il travaille de façon très autonome et délègue les décisions (« fais les choix toi-même », « innove »). Il **teste les fonctionnalités en direct** et signale les problèmes sans détour (« cela ne fonctionne pas, règle cela ») → **vérifier avec de vraies mesures, pas des suppositions**. Marvin lui est destiné mais aussi à d'**autres possesseurs** (penser distribuable). Marvin tourne **en local par défaut** (aucune API payante obligatoire) : un LLM **Ollama** local, une base vectorielle **Qdrant** locale, un backend **FastAPI**, un frontend **Next.js**. Il sait gérer agenda, e-mails, documents (Word/PDF/Excel/PPTX), recherche web, mémoire sémantique, génération d'images/vidéo locale, SSH, etc. — **363 outils**.
 
 L'utilisateur veut un Marvin **complet, puissant, qui ne fait pas de compromis**. Travailler de façon **autonome** : décider, innover, vérifier et améliorer les outils, ne pas s'arrêter pour demander à chaque étape.
 
@@ -48,7 +48,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 ### Fichiers backend clés (`backend/`)
 - `main.py` — cycle de vie et majorité des endpoints FastAPI historiques (gros fichier ; historique versionné en commentaires `# vX.Y`).
 - `api/` — routeurs FastAPI extraits progressivement : Doctor, conversations, projets, tâches et notes ont leurs modules dédiés.
-- `tools.py` — les **357 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
+- `tools.py` — les **363 outils** (`def execute_*`). `TOOLS_REGISTRY == TOOLS_SPEC` est contrôlé par `scripts/check_architecture.py`. `MODEL_PROFILES` vit dans `config.py` et reste mutable au runtime par `auto_config`.
 - `agent.py` — `run_agent` (boucle agentique, matching de compétences, injection système, escalade de modèle chat→agent).
 - `auto_config.py` — détecte le matériel, choisit le **mode** (eco/balanced/performance/max) et applique les leviers + choisit les modèles Ollama selon la VRAM.
 - `skills.py` — système de **compétences** (fichiers Markdown, voir §5).
@@ -73,7 +73,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 
 ### Frontend (`app/` = pages App Router, `components/`)
 - Pages : `outils`, `recherche`, `indexation`, `skills`, `sante`, `jour`, `calendar`, `emails`, `redaction`, `devis`, `documents`, `files`, `memoire`, `notes`, `tasks`, `vocal`, `video`, `ssh`, `monitoring`, `workflows`, `agents`, `technique`, `mobile`, `settings`…
-- `components/chat/` — `ChatInput.jsx` (barre de chat : 🖼️ image, 📎 document, 🧩 compétences, 🎤 dictée, 🔊 vocal), `ChatContainer.jsx`, `PrettyResult.jsx` (rendu propre des résultats d'outils + bascule JSON), `ToolCallCard`.
+- `components/chat/` — `ChatInput.jsx` (barre de chat : image, document, compétences, dictée, vocal), `ChatContainer.jsx`, `MessageBubble.jsx` et `PrettyResult.jsx` (rendu propre des résultats d'outils + bascule JSON). L'ancien `ToolCallCard` a été supprimé.
 - `components/sidebar/Sidebar.jsx` — navigation.
 
 ---
@@ -202,7 +202,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.566.0)
+## 9. État actuel (v2.567.0)
+
+**v2.567 (runtime Python portable et réversible)** : le `.venv` de développement dépendait
+du cache privé `codex-runtimes`; sa suppression aurait empêché tout démarrage et contredisait
+la distribution Windows. `resolve-python-runtime.ps1` choisit désormais uniquement un Python
+64 bits persistant 3.12/3.13 et rejette caches Codex, répertoires temporaires et alias
+WindowsApps. L'installateur utilise explicitement ce runtime; `start.bat`, Marvin Doctor et
+le rapport de capacités refusent ou signalent une provenance fragile. La migration construit
+un candidat isolé, installe les dépendances, exécute `pip check` et le contrôle d'architecture,
+puis échange atomiquement les dossiers. Sur cette machine, le runtime actif est Python
+3.13.14 officiel et l'ancien `.venv` reste sous
+`backend/.venv.rollback-20260802-111934`. Rollback exact, Marvin arrêté :
+`powershell -ExecutionPolicy Bypass -File scripts/migrate-python-runtime.ps1 -Action Rollback -BackupPath backend/.venv.rollback-20260802-111934`.
+Validation réelle : provenance, contrat installateur, composition FastAPI, pywin32, Doctor,
+architecture 363/363, backend HTTP 200 et frontend Turbopack HTTP 200. Aucune donnée métier
+ni secret migré; le journal de provenance ne contient que versions et chemins runtime.
+Les environnements transactionnels sont ignorés par Git et ESLint afin que leur conservation
+ne pollue ni les commits ni la qualité du frontend.
 
 **v2.566 (sources vérifiables et aperçus multi-standard)** : le résolveur d'aperçus respecte
 désormais la hiérarchie Open Graph sécurisée, Twitter, `link image_src`, Schema.org JSON-LD

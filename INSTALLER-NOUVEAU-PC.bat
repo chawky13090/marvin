@@ -34,8 +34,9 @@ if errorlevel 1 ( set "HAS_WINGET=0" ) else ( set "HAS_WINGET=1" )
 
 :: ============================================================ [1/9] Python
 echo [1/9] Verification de Python...
-where python >nul 2>&1
-if errorlevel 1 (
+set "MARVIN_PYTHON="
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\resolve-python-runtime.ps1" -Output Path 2^>nul`) do set "MARVIN_PYTHON=%%P"
+if not defined MARVIN_PYTHON (
     if "!HAS_WINGET!"=="1" (
         echo   [!] Python introuvable. Installation via winget...
         winget install -e --id Python.Python.3.13 --accept-package-agreements --accept-source-agreements
@@ -43,7 +44,7 @@ if errorlevel 1 (
         echo   [!] Python introuvable et winget absent ^(frequent sur Windows Server^).
         echo   Ouverture de la page de telechargement officielle dans le navigateur...
         start "" "https://www.python.org/downloads/windows/"
-        echo   -^> Telechargez la version stable la plus recente, lancez l'installeur,
+        echo   -^> Telechargez Python 3.13 64 bits, lancez l'installeur,
         echo      et cochez IMPERATIVEMENT "Add python.exe to PATH".
     )
     echo.
@@ -51,18 +52,18 @@ if errorlevel 1 (
     echo   FERMEZ cette fenetre et RELANCEZ ce script ^(le PATH doit etre recharge^).
     popd & pause & exit /b 1
 )
-for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo   [OK] %%v
+for /f "tokens=*" %%v in ('"!MARVIN_PYTHON!" --version 2^>^&1') do echo   [OK] %%v ^(!MARVIN_PYTHON!^)
 
 :: v2.182 -- certaines installations Python (notamment le paquet officiel sur
 :: Windows Server, constate en reel : Python 3.14.6 sans pip) n'embarquent pas
 :: pip par defaut. python -m pip --version est en LECTURE SEULE (ne modifie
 :: rien) -- seul le repli ensurepip ecrit quelque chose, et seulement si pip
 :: est reellement absent.
-python -m pip --version >nul 2>&1
+"!MARVIN_PYTHON!" -m pip --version >nul 2>&1
 if errorlevel 1 (
     echo   [ATTENTION] pip introuvable pour cet interpreteur Python. Reparation via ensurepip...
-    python -m ensurepip --upgrade >nul 2>&1
-    python -m pip --version >nul 2>&1
+    "!MARVIN_PYTHON!" -m ensurepip --upgrade >nul 2>&1
+    "!MARVIN_PYTHON!" -m pip --version >nul 2>&1
     if errorlevel 1 (
         echo   [ERREUR] ensurepip n'a pas pu installer pip. Reinstallez Python depuis
         echo   https://www.python.org/downloads/windows/ en cochant "pip" dans les
@@ -197,7 +198,7 @@ echo.
 echo [6/9] Creation de l'environnement Python et installation des dependances...
 echo   ^(cela peut prendre quelques minutes^)
 pushd backend
-python -m venv .venv
+"!MARVIN_PYTHON!" -m venv .venv
 if errorlevel 1 ( echo   [ERREUR] Creation du venv impossible. & popd & popd & pause & exit /b 1 )
 .venv\Scripts\python -m pip install --upgrade pip >nul
 .venv\Scripts\python -m pip install -r requirements.txt

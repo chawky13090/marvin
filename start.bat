@@ -31,6 +31,16 @@ if not exist "%~dp0backend\.venv\Scripts\python.exe" (
     echo [ERREUR] backend\.venv est absent ou incomplet. Lancez INSTALLER-NOUVEAU-PC.bat.
     goto :startup_error
 )
+pushd "%~dp0backend"
+.venv\Scripts\python.exe -c "import python_runtime; raise SystemExit(0 if python_runtime.inspect_runtime()['portable'] else 2)" >nul 2>&1
+set "PYTHON_RUNTIME_RC=%ERRORLEVEL%"
+popd
+if not "%PYTHON_RUNTIME_RC%"=="0" (
+    echo [ERREUR] backend\.venv depend d un Python temporaire, absent ou non supporte.
+    echo          Arretez Marvin puis executez :
+    echo          powershell -ExecutionPolicy Bypass -File scripts\migrate-python-runtime.ps1 -Action Migrate
+    goto :startup_error
+)
 if not exist "%~dp0node_modules" (
     echo [ERREUR] node_modules est absent. Lancez INSTALLER-NOUVEAU-PC.bat.
     goto :startup_error

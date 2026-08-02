@@ -16078,3 +16078,49 @@ cartes sont présentes ; Rentokil fournit un aperçu WebP vérifié, tandis que 
 AlloPunaise et Safelit ne publient aucun média récupérable par le client HTTP anonyme et
 restent donc en repli explicite plutôt que de recevoir une image non vérifiée. Redémarrage
 Marvin gracieux, sans PID forcé ; santé backend v2.566.0, 363 outils et frontend HTTP 200.
+
+## 2026-08-02 — v2.567 — Runtime Python portable et migration réversible
+
+### Demande et diagnostic
+
+L'audit croisé avec Claude a révélé que `backend/.venv/pyvenv.cfg` et
+`sys._base_executable` pointaient vers `C:/Users/Chawb/.cache/codex-runtimes/...`.
+Le code applicatif fonctionnait, mais un nettoyage du cache privé de Codex aurait cassé le
+backend et l'installeur pouvait recréer la même dépendance en utilisant le premier `python`
+du PATH. La cible retenue est Python CPython officiel 64 bits 3.12 ou 3.13; Python 3.14 est
+refusé tant que la matrice de dépendances Marvin ne le certifie pas.
+
+### Correction
+
+- `resolve-python-runtime.ps1` inventorie les candidats, inspecte version, architecture,
+  exécutable de base et provenance, puis rejette caches Codex, dossiers temporaires et alias
+  WindowsApps;
+- `python_runtime.py` expose le même diagnostic déterministe au démarrage, au Doctor et au
+  rapport d'installation;
+- `migrate-python-runtime.ps1` construit un `.venv.next-*`, installe les dépendances, exécute
+  `pip check` et le contrôle d'architecture, puis échange les dossiers seulement après succès;
+- `INSTALLER-NOUVEAU-PC.bat` utilise explicitement le runtime résolu; `start.bat` refuse un
+  environnement éphémère avec une procédure de remédiation exploitable;
+- le runner global et le contrat installateur couvrent désormais cette provenance.
+
+### Validation, sécurité, logs et rollback
+
+Migration réelle réussie vers CPython 3.13.14 officiel. Résultats observés : test de
+provenance réussi, `pip check` sans dépendance cassée, imports `pywin32` réussis, Doctor
+`python_runtime=ok`, contrat installateur réussi, composition FastAPI réussie, architecture
+363/363 outils et 391 routes. Après redémarrage, backend HTTP 200 avec Ollama disponible et
+frontend Next.js 16.2.12/Turbopack HTTP 200. Le manifeste atomique
+`data/install/python-runtime.json` ne contient aucun secret, uniquement version, provenance
+et chemins nécessaires au rollback; il suit la politique de rétention des états
+d'installation et n'ajoute aucun log bavard.
+
+L'ancien environnement est conservé dans
+`backend/.venv.rollback-20260802-111934` et ignoré par Git. Rollback exact, Marvin arrêté :
+`powershell -ExecutionPolicy Bypass -File scripts/migrate-python-runtime.ps1 -Action Rollback -BackupPath backend/.venv.rollback-20260802-111934`.
+Le script conserve également le runtime remplacé sous `.venv.failed-*`; aucune donnée métier
+ni migration de schéma n'est concernée. Rollback du code : réversion atomique du commit
+v2.567, puis utilisation du rollback runtime ci-dessus si nécessaire.
+Le premier lint a justement détecté que ce dossier de sauvegarde exposait le JavaScript
+interne de Playwright à ESLint (106 faux échecs). `eslint.config.mjs` ignore maintenant les
+trois familles transactionnelles `.venv.next-*`, `.venv.rollback-*` et `.venv.failed-*`;
+le second lint termine avec zéro erreur et 37 avertissements applicatifs préexistants.

@@ -17,7 +17,13 @@ def main() -> int:
     autostart = (ROOT / "scripts" / "install-marvin-autostart.ps1").read_text(encoding="utf-8")
     libreoffice = (ROOT / "scripts" / "manage-libreoffice.ps1").read_text(encoding="utf-8")
     libreoffice_manifest = (ROOT / "scripts" / "libreoffice-component.json").read_text(encoding="utf-8")
+    python_resolver = (ROOT / "scripts" / "resolve-python-runtime.ps1").read_text(encoding="utf-8")
+    python_migration = (ROOT / "scripts" / "migrate-python-runtime.ps1").read_text(encoding="utf-8")
+    starter = (ROOT / "start.bat").read_text(encoding="utf-8")
     assert "npm ci" in installer
+    assert "resolve-python-runtime.ps1" in installer
+    assert '"!MARVIN_PYTHON!" -m venv .venv' in installer
+    assert "python -m venv .venv" not in installer
     assert "nomic-embed-text" in installer
     assert "[1/9]" in installer
     assert "install-desktop-avatar.ps1" in installer
@@ -46,6 +52,13 @@ def main() -> int:
     assert "Marvin-Debian13-TestForge" in report
     assert "Marvin-Windows11-TestForge" in report
     assert "overall = if ($CoreReady)" in report
+    assert "python_runtime.inspect_runtime" in report
+    assert "codex-runtimes" in python_resolver
+    assert "3.12.0" in python_resolver and "3.14.0" in python_resolver
+    assert "ShouldProcess" in python_migration
+    assert ".venv.rollback-" in python_migration
+    assert "pip', 'check'" in python_migration
+    assert "python_runtime.inspect_runtime" in starter
     assert "New-ScheduledTaskTrigger -AtLogOn" in autostart
     assert "-LogonType Interactive" in autostart
     assert "-RunLevel Limited" in autostart

@@ -37,6 +37,20 @@ $Os = Get-CimInstance Win32_OperatingSystem
 $Computer = Get-CimInstance Win32_ComputerSystem
 
 $PythonPath = Join-Path $ProjectRoot 'backend\.venv\Scripts\python.exe'
+$PythonRuntime = $null
+if (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
+    Push-Location (Join-Path $ProjectRoot 'backend')
+    try {
+        $RuntimeJson = & $PythonPath -c "import json,python_runtime; print(json.dumps(python_runtime.inspect_runtime()))" 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($RuntimeJson -join ''))) {
+            $PythonRuntime = ($RuntimeJson -join '') | ConvertFrom-Json
+        }
+    } catch {
+        $PythonRuntime = $null
+    } finally {
+        Pop-Location
+    }
+}
 $NodeModules = Join-Path $ProjectRoot 'node_modules'
 $ElectronPath = Join-Path $ProjectRoot 'node_modules\electron\dist\electron.exe'
 $Desktop = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
@@ -56,8 +70,11 @@ if ($LibreOfficePath) {
 }
 
 $Core = [ordered]@{
-    backend_venv = if (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
-        New-Capability 'available' 'Environnement Python isolé présent.'
+    backend_venv = if ($PythonRuntime -and $PythonRuntime.portable) {
+        New-Capability 'available' ('Python ' + $PythonRuntime.version + ' isolé, persistant et reproductible.')
+    } elseif (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
+        $Reason = if ($PythonRuntime) { ($PythonRuntime.reasons -join ', ') } else { 'inspection impossible' }
+        New-Capability 'degraded' ('Environnement Python non portable : ' + $Reason) 'Arreter Marvin puis executer scripts\migrate-python-runtime.ps1 -Action Migrate.'
     } else { New-Capability 'unavailable' 'Environnement Python absent.' 'Relancer INSTALLER-NOUVEAU-PC.bat.' }
     node_runtime = if (Test-CommandAvailable 'node') {
         New-Capability 'available' ((& node --version 2>$null) -join '')

@@ -9,6 +9,7 @@ Barème (comme MEX) : départ 100 ; −10 par erreur, −3 par avertissement, �
 import os
 
 import database as db
+import python_runtime
 from config import MODEL_PROFILES, DANGEROUS_TOOLS, OLLAMA_URL, DATA_DIR
 
 
@@ -39,6 +40,24 @@ async def run_diagnostics() -> dict:
         checks.append(c)
 
     toolnames = set(_t.TOOLS_REGISTRY)
+
+    runtime = python_runtime.inspect_runtime()
+    if runtime["portable"]:
+        add(
+            "python_runtime",
+            "Runtime Python",
+            "ok",
+            f"Python {runtime['version']} persistant et reproductible.",
+        )
+    else:
+        reasons = ", ".join(runtime["reasons"]) or "provenance_inconnue"
+        add(
+            "python_runtime",
+            "Runtime Python",
+            "error",
+            f"Environnement non portable ({reasons}). La prochaine installation peut casser.",
+            fix="manual:migrate-python-runtime",
+        )
 
     # ── 1. Cohérence des outils (registry == spec) ─────────────────────────────
     try:
