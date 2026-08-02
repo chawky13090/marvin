@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.574.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.575.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -41,8 +41,8 @@ sont réparties dans 50 modules `backend/api/*.py`. `TOOLS_REGISTRY` et `TOOLS_S
 rester strictement égaux ; chaque outil passe par le gateway, sa politique, son résultat et
 ses preuves.
 
-Le frontend est fonctionnel mais sa modularisation reste une dette active : six fichiers JSX
-dépassent 1 300 lignes. Ne pas annoncer « dette nulle ». Caractériser le comportement avant
+Le frontend est fonctionnel mais sa modularisation reste une dette active : trois fichiers JSX
+dépassent encore 1 200 lignes. Ne pas annoncer « dette nulle ». Caractériser le comportement avant
 toute extraction, puis déplacer une responsabilité à la fois sans modifier le contrat UI.
 
 ## Modèles, modes et confidentialité

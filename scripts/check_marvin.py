@@ -493,6 +493,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Carte frontend des fichiers générés", ("node", "scripts/test_generated_file_card.mjs")),
         Stage("Proxy Next et sessions LAN", ("node", "scripts/test_next_api_proxy.mjs")),
         Stage("Rendus structurés des outils du chat", ("node", "scripts/test_chat_tool_results.mjs")),
+        Stage("Onglets vidéo locale", ("node", "--no-warnings", "scripts/test_video_local_tabs.mjs")),
         Stage("Logos locaux atomiques", (python, "scripts/test_tool_domain_logos.py")),
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),

@@ -16347,3 +16347,31 @@ d'extensions, d'ouverture, de conversion, d'aperçu et d'avertissement restent i
 Le second gate exhaustif est entièrement vert : rapport atomique `success=true`, 247/247
 étapes réussies en 627,4 secondes, 363/363 outils avec harnais, 391 routes, 41/41 pages,
 cinq conversations réelles et voix navigateur. Aucun effet externe ni migration.
+
+## 2026-08-02 — v2.575 — Page Vidéo modularisée sans régression fonctionnelle
+
+### Caractérisation et extraction
+
+`test_video_local_tabs.mjs` a figé avant déplacement les contrats des modèles vidéo locaux,
+des générations texte et image, de l'amélioration du prompt, de l'annulation coopérative,
+du flux de progression et des animations de texte. Les styles, zones de dépôt, progression
+et aperçus deviennent `components/video/VideoShared.jsx`; les deux onglets locaux deviennent
+`components/video/LocalVideoTabs.jsx`. `app/video/page.jsx` passe de 1 918 à 848 lignes sans
+modifier ses quatre onglets ni ses routes backend. La baseline tombe à trois exceptions,
+115 sources, zéro erreur et 37 avertissements, sans relever le budget.
+
+### Sécurité, logs, validation et rollback
+
+Les URL continuent de provenir de `lib/backend`; aucun endpoint, secret, droit, effet externe,
+schéma ou stockage n'est ajouté. L'annulation par `AbortController` et l'arrêt backend sont
+conservés. Les composants ne journalisent ni prompt, ni image, ni résultat vidéo; cette tranche
+n'a donc aucun nouvel événement ou impact de rétention. Validation exigée avant commit : test
+de caractérisation, ESLint/baseline, architecture/documentation, build Turbopack, smokes pages,
+chat et voix, puis gate exhaustif live. Rollback : réversion atomique du commit v2.575 puis
+redémarrage de Marvin; aucune migration persistante.
+
+Validation finale observée : arrêt gracieux en 9,9 secondes sans processus forcé, build
+Next.js 16.2.12 Turbopack réussi, redémarrage backend/frontend en v2.575.0 et `/video` en
+HTTP 200. Le rapport atomique confirme `success=true`, 248/248 étapes réussies et zéro échec
+en 687 secondes : 363/363 outils avec harnais, 391 routes, 41/41 pages, cinq conversations
+réelles et voix navigateur sérialisée. Aucun effet externe ni migration.
