@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.576.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.577.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.576.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.577.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -205,7 +205,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.576.0)
+## 9. État actuel (v2.577.0)
+
+**v2.577 (page Devis sous le plafond)** : les vues autonomes Base de connaissances IT et
+Factures/encaissements vivent dans `components/devis/DevisOperationsViews.jsx`; leurs
+primitives visuelles et leur client d'outils partagé vivent dans `components/devis/devisShared.js`.
+Les appels de recherche marché, recommandation IT, création de facture et encaissement gardent
+leurs contrats antérieurs. `app/devis/page.jsx` passe de 1 383 à 1 146 lignes et quitte les
+exceptions frontend. Le test de caractérisation couvre chargement, recherche marché, base IT,
+facturation et restrictions d'encaissement. Aucun endpoint, outil, autorisation, donnée ou log
+n'est modifié. Rollback : réversion atomique du commit v2.577 puis redémarrage de Marvin.
 
 **v2.576 (page Paramètres sous le plafond)** : le panneau Modèles/Ollama Cloud et ses quatre
 profils de confidentialité vivent dans `components/settings/ModelSettingsPanel.jsx`; le groupe

@@ -3,7 +3,6 @@
   "warningBudget": 37,
   "largeFileThreshold": 1200,
   "legacyLargeFiles": {
-    "app/devis/page.jsx": 1383,
     "app/emails/page.jsx": 1321
   }
 }

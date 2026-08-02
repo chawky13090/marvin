@@ -16408,3 +16408,33 @@ Next.js 16.2.12 Turbopack réussi, backend/frontend en v2.576.0 et `/settings` e
 Le second rapport atomique confirme `success=true`, 249/249 étapes réussies, zéro échec en
 642,4 secondes, 363/363 outils avec harnais, 391 routes, 41/41 pages, cinq conversations
 réelles et voix navigateur sérialisée. Aucun effet externe ni migration.
+
+## 2026-08-02 — v2.577 — Vues Devis et facturation modularisées
+
+### Caractérisation et extraction
+
+`test_devis_panels.mjs` a figé avant déplacement les chargements clients/devis/catalogue,
+les recherches de prix et de produits, la base de connaissances IT, les recommandations,
+la liste et la création de factures, l'encaissement ainsi que l'exclusion des factures déjà
+payées ou annulées. Les vues Base IT et Factures deviennent
+`components/devis/DevisOperationsViews.jsx`; les styles et clients HTTP communs deviennent
+`components/devis/devisShared.js`. `app/devis/page.jsx` passe de 1 383 à 1 146 lignes. La
+baseline tombe à une exception, 119 sources, zéro erreur et 37 avertissements.
+
+### Sécurité, logs, validation et rollback
+
+Le déplacement ne change aucun endpoint, outil, payload, règle d'autorisation ou effet
+sortant. Les réponses restent affichées sans nouveau journal; aucun contenu client, facture,
+secret ou résultat de recherche n'est persisté par le frontend. Le test pré-extraction,
+le test post-extraction, ESLint ciblé, la baseline et le contrat du runner sont réussis.
+Validation de livraison exigée avant commit : build Turbopack, redémarrage contrôlé, HTTP
+`/devis`, smokes live et gate exhaustif. Rollback : réversion atomique du commit v2.577 puis
+redémarrage de Marvin; aucune migration de schéma ou de donnée persistante.
+
+Validation finale observée : arrêt gracieux en 10,4 secondes sans processus forcé, build
+Next.js 16.2.12 Turbopack réussi, redémarrage stable en v2.577.0 avec Ollama, SearXNG et HTTPS
+disponibles. Le parcours navigateur réel a affiché le tableau Devis, la base IT et la
+facturation avec les données backend, sans erreur console. Le rapport atomique confirme
+`success=true`, 250/250 étapes réussies et zéro échec en 649,5 secondes : 363/363 outils avec
+harnais, 391 routes, 41/41 pages, cinq conversations réelles et voix navigateur sérialisée.
+Aucun effet externe ni migration.

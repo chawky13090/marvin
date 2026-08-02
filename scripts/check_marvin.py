@@ -495,6 +495,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Rendus structurés des outils du chat", ("node", "scripts/test_chat_tool_results.mjs")),
         Stage("Onglets vidéo locale", ("node", "--no-warnings", "scripts/test_video_local_tabs.mjs")),
         Stage("Panneaux des paramètres", ("node", "--no-warnings", "scripts/test_settings_panels.mjs")),
+        Stage("Vues Devis et facturation", ("node", "--no-warnings", "scripts/test_devis_panels.mjs")),
         Stage("Logos locaux atomiques", (python, "scripts/test_tool_domain_logos.py")),
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),
