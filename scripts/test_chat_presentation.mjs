@@ -57,6 +57,7 @@ assert.equal(audit.messages[0].toolInvocations[0].result.nested.password, '[MASQ
 assert.equal(audit.messages[0].toolInvocations[0].args.path, 'C:/safe', 'les données non sensibles doivent être conservées');
 const markdownAudit = conversationAuditToMarkdown(audit);
 const messageBubbleSource = fs.readFileSync(new URL('../components/chat/MessageBubble.jsx', import.meta.url), 'utf8');
+const toolResultSource = fs.readFileSync(new URL('../components/chat/ToolResultContent.jsx', import.meta.url), 'utf8');
 const sourceGallerySource = fs.readFileSync(new URL('../components/chat/SourceGallery.jsx', import.meta.url), 'utf8');
 const sourceGalleryCss = fs.readFileSync(new URL('../components/chat/SourceGallery.module.css', import.meta.url), 'utf8');
 const agentPromptSource = fs.readFileSync(new URL('../backend/agent_prompt.py', import.meta.url), 'utf8');
@@ -95,7 +96,7 @@ const fileExplorerSource = fs.readFileSync(new URL('../components/chat/FileExplo
 const typingIndicatorSource = fs.readFileSync(new URL('../components/chat/TypingIndicator.jsx', import.meta.url), 'utf8');
 const typingIndicatorCss = fs.readFileSync(new URL('../components/chat/TypingIndicator.module.css', import.meta.url), 'utf8');
 assert.match(
-  messageBubbleSource,
+  `${messageBubbleSource}\n${toolResultSource}`,
   /nextOffset=\{result\.has_more \? result\.next_offset : null\}/,
   'la pagination file_list doit etre transmise au composant du chat',
 );

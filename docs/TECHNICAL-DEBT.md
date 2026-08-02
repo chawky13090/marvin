@@ -1,12 +1,12 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-02 pour Marvin 2.573.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-02 pour Marvin 2.574.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 
 | ID | Sévérité | Domaine | Preuve actuelle | Risque | Traitement et critère de fermeture |
 |---|---|---|---|---|---|
-| TD-001 | Élevée | Frontend | 5 fichiers JSX dépassent 1 200 lignes; `app/outils/page.jsx` est passé de 3 406 à 963 lignes et `MessageBubble.jsx` de 1 864 à 1 689 lignes | revue difficile, collisions Claude/Codex, régressions d'état | poursuivre les extractions caractérisées jusqu'à aucun fichier au-dessus de 1 200 lignes sans dérogation documentée |
+| TD-001 | Élevée | Frontend | 4 fichiers JSX dépassent 1 200 lignes; `app/outils/page.jsx` est passé de 3 406 à 963 lignes et `MessageBubble.jsx` de 1 864 à 947 lignes | revue difficile, collisions Claude/Codex, régressions d'état | poursuivre les extractions caractérisées jusqu'à aucun fichier au-dessus de 1 200 lignes sans dérogation documentée |
 | TD-002 | Moyenne | Qualité frontend | ESLint passe avec 37 avertissements préexistants | signaux faibles noyés et effets React fragiles | budget bloquant 37 livré en v2.570; corriger progressivement jusqu'à zéro sans jamais relever le plafond |
 | TD-003 | Moyenne | Documentation | `CLAUDE.md` contenait encore des faits v2.80 (261 outils) alors que le produit est en v2.569 | décisions prises sur une architecture inexistante | guide courant court, `ARCHITECTURE.md` canonique et test automatique de cohérence livrés en v2.569 |
 | TD-004 | Moyenne | Validation | le runner historique s'arrêtait au premier échec | résultats non exécutés présentés implicitement comme couverts | fermé en v2.568 : 237/237 étapes exécutées, rapport atomique et mode `--fail-fast` explicite |

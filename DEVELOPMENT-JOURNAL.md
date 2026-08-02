@@ -16311,3 +16311,39 @@ redémarrage backend/frontend en v2.573.0, puis rapport atomique `success=true` 
 étapes réussies en 647,2 secondes. Le rapport couvre 363/363 outils avec harnais, 391 routes,
 41/41 pages, cinq conversations réelles après charge et la voix navigateur. Aucun 401 n'est
 réapparu. Aucun effet externe réel, aucune migration et aucune modification de données.
+
+## 2026-08-02 — v2.574 — Rendus structurés extraits de la bulle du chat
+
+### Caractérisation et extraction
+
+`test_chat_tool_results.mjs` a figé avant déplacement les rendus Recherche approfondie,
+Research Swarm, Council, équipe adaptative, Code/Test Forge, fichiers, e-mails, calendrier,
+système Windows et le fallback `PrettyResult`. Les 689 lignes de rendu deviennent
+`ToolResultContent.jsx`. La conversion Markdown et la sanitation DOMPurify sont centralisées
+dans `lib/chat/markdown.js`, sans changer les options GFM, les sauts de ligne ni la politique
+des liens externes.
+
+Le premier lint post-extraction a détecté que `CodingMissionTracker` restait aussi utilisé par
+l'orchestration principale; son import a été restauré au lieu de déplacer ce second contrat.
+Le test de présentation supposait également que la pagination `file_list` résidait dans le
+fichier historique; il vérifie désormais les deux propriétaires réels sans affaiblir
+l'assertion. `MessageBubble.jsx` passe de 1 689 à 947 lignes et quitte les exceptions; la
+baseline passe à quatre fichiers massifs, 113 sources, zéro erreur et 37 avertissements.
+
+### Sécurité, logs, validation et rollback
+
+La sanitation reste appliquée avant chaque `dangerouslySetInnerHTML`; aucun HTML, secret ou
+résultat d'outil n'est journalisé. Les autorisations, confirmations et preuves restent dans
+`MessageBubble` et le backend. Validation exigée : caractérisation, présentation chat,
+ESLint/baseline, architecture/documentation, build, smokes réels et gate exhaustif live.
+Rollback : réversion atomique du commit v2.574; aucune migration persistante.
+
+Le premier gate exhaustif a exécuté les 247 étapes mais a refusé la tranche sur
+`test_generated_file_card.mjs` : ce test cherchait encore l'import de la carte directement
+dans `MessageBubble.jsx`. La vérification est maintenant portée sur son propriétaire réel,
+`ToolResultContent.jsx`, tandis que la bulle doit importer `renderToolResult`. Les contrats
+d'extensions, d'ouverture, de conversion, d'aperçu et d'avertissement restent inchangés.
+
+Le second gate exhaustif est entièrement vert : rapport atomique `success=true`, 247/247
+étapes réussies en 627,4 secondes, 363/363 outils avec harnais, 391 routes, 41/41 pages,
+cinq conversations réelles et voix navigateur. Aucun effet externe ni migration.
