@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -36,6 +38,27 @@ async def main() -> int:
     finally:
         vector_store._client = previous_client
         vector_store._memory_payloads_migrated = previous_migrated
+    with tempfile.TemporaryDirectory(prefix="marvin-qdrant-exit-") as directory:
+        marker = Path(directory) / "closed.txt"
+        code = (
+            "from pathlib import Path; import vector_store; "
+            "P=Path(r'" + str(marker) + "'); "
+            "C=type('C',(),{'close':lambda self:P.write_text('closed',encoding='utf-8')}); "
+            "vector_store._client=C()"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=ROOT / "backend",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert marker.read_text(encoding="utf-8") == "closed"
+        assert "Exception ignored" not in completed.stderr
     print("Qdrant lifecycle OK - fermeture explicite, unique et idempotente.")
     return 0
 

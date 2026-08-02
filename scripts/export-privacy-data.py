@@ -19,9 +19,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Créer un export personnel Marvin chiffré.")
     parser.add_argument("stream_id")
     parser.add_argument("selector")
-    parser.add_argument("selector_value")
     parser.add_argument("destination", type=Path)
     arguments = parser.parse_args()
+    selector_value = getpass.getpass("Valeur exacte du sélecteur : ")
     first = getpass.getpass("Phrase secrète de l'export : ")
     second = getpass.getpass("Confirmer la phrase secrète : ")
     if first != second:
@@ -31,7 +31,7 @@ def main() -> int:
         result = privacy_rights.create_export(
             arguments.stream_id,
             arguments.selector,
-            arguments.selector_value,
+            selector_value,
             arguments.destination,
             passphrase=first,
         )
@@ -43,6 +43,7 @@ def main() -> int:
     finally:
         first = ""
         second = ""
+        selector_value = ""
 
 
 if __name__ == "__main__":

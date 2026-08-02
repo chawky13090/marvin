@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-02 : **v2.587.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-02 : **v2.588.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 

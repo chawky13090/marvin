@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.588.0 — Effacement de preuves compensé
+
+Demande : poursuivre SEC-010 jusqu'à un effacement sélectif réel sans casser les chaînes.
+
+Décision : `DurableEvidenceStore.rewrite_excluding` vérifie l'état initial et l'empreinte
+attendue, retire uniquement une égalité exacte, reconstruit séquences et chaînage, valide la
+nouvelle chaîne avant publication atomique et conserve une copie locale le temps du contrôle
+post-écriture. En cas d'échec, l'original est remis en place. `privacy_rights.erase_exact`
+exige en plus un snapshot complet AES-256-GCM/scrypt, déchiffré et comparé avant réécriture.
+
+Exploitation : les scripts d'effacement et de restauration refusent un backend actif et
+exigent `--confirmed`. Valeur de sélection et phrases secrètes sont saisies avec `getpass` et
+absentes des arguments, résultats et logs. Le reçu conserve seulement registre, nom du
+sélecteur, compteurs et empreintes. Le rollback annonce explicitement qu'il contient les
+données retirées et doit être finalisé après la fenêtre de contrôle.
+
+Validation : deux preuves chaînées, export, suppression exacte, rechaînage valide, absence de
+la valeur dans les événements, refus d'une empreinte concurrente, restauration retrouvant
+l'empreinte et les deux identités initiales. SEC-010 reste `MITIGATED` jusqu'à automatisation
+de la finalisation du rollback. Le premier gate global a trouvé le module de droits compté à
+tort comme propriétaire JSONL et un client Qdrant de test encore fermé par destructeur. Le
+module est déclaré consommateur en lecture seule et une fermeture `atexit`, testée dans un
+sous-processus, complète le lifecycle FastAPI. Le second gate exhaustif passe 260/260 en
+534,3 secondes, build Turbopack inclus, sans avertissement Qdrant. Rollback code : réversion
+atomique du commit v2.588.
+
 ## 2026-08-02 — v2.587.0 — Export personnel sélectif et chiffré
 
 Demande : poursuivre SEC-010 sans exposer ni altérer les chaînes de preuves existantes.

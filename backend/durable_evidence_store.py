@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import threading
 import time
+import uuid
 from collections import deque
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -18,6 +20,9 @@ EVIDENCE_SCHEMA_VERSION = "1.0"
 _MAX_RECORD_BYTES = 2 * 1024 * 1024
 _LOCKS_GUARD = threading.Lock()
 _PATH_LOCKS: dict[str, threading.RLock] = {}
+_INTEGRITY_FIELDS = frozenset({
+    "evidence_schema_version", "sequence", "previous_hash", "record_hash"
+})
 
 
 class DuplicateEvidenceError(ValueError):
@@ -359,3 +364,111 @@ class DurableEvidenceStore:
         with self._thread_lock, _interprocess_lock(self._lock_path):
             rows, corrupt = self._rows_unlocked()
         return self._integrity_unlocked(rows, corrupt)
+
+    def rewrite_excluding(
+        self,
+        predicate: Callable[[dict[str, Any]], bool],
+        *,
+        expected_last_hash: str | None,
+    ) -> dict[str, Any]:
+        """Réécrit atomiquement une chaîne valide en excluant des preuves sélectionnées."""
+        with self._thread_lock, _interprocess_lock(self._lock_path):
+            self._repair_partial_tail_unlocked()
+            rows, corrupt = self._rows_unlocked()
+            before = self._integrity_unlocked(rows, corrupt)
+            if not before["valid"]:
+                raise RuntimeError("L'intégrité du registre interdit sa réécriture.")
+            if before.get("last_hash") != expected_last_hash:
+                raise RuntimeError("Le registre a changé depuis la sauvegarde de rollback.")
+            retained = [row for row in rows if not predicate(row)]
+            removed = len(rows) - len(retained)
+            if removed == 0:
+                raise ValueError("Aucune preuve ne correspond au sélecteur exact.")
+
+            rebuilt: list[dict[str, Any]] = []
+            previous_hash = None
+            for row in retained:
+                business = {key: value for key, value in row.items() if key not in _INTEGRITY_FIELDS}
+                normalized = self._normalize_record(business)
+                enriched = {
+                    **normalized,
+                    "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
+                    "sequence": len(rebuilt) + 1,
+                    "previous_hash": previous_hash,
+                }
+                enriched["record_hash"] = _digest(enriched)
+                encoded = (json.dumps(enriched, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+                if len(encoded) > _MAX_RECORD_BYTES:
+                    raise ValueError("Une preuve reconstruite dépasse 2 Mio.")
+                rebuilt.append(enriched)
+                previous_hash = enriched["record_hash"]
+            after = self._integrity_unlocked(rebuilt, 0)
+            if not after["valid"]:
+                raise RuntimeError("La chaîne reconstruite est invalide.")
+
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.rewrite")
+            rollback = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.previous")
+            try:
+                with temporary.open("xb") as stream:
+                    for row in rebuilt:
+                        stream.write((json.dumps(row, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8"))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if self.path.exists():
+                    with self.path.open("rb") as reader, rollback.open("xb") as writer:
+                        shutil.copyfileobj(reader, writer, length=1024 * 1024)
+                        writer.flush()
+                        os.fsync(writer.fileno())
+                os.replace(temporary, self.path)
+                verified_rows, verified_corrupt = self._rows_unlocked()
+                verified = self._integrity_unlocked(verified_rows, verified_corrupt)
+                if not verified["valid"] or verified.get("last_hash") != after.get("last_hash"):
+                    raise RuntimeError("La validation post-réécriture a échoué.")
+            except BaseException:
+                if rollback.exists():
+                    os.replace(rollback, self.path)
+                raise
+            finally:
+                temporary.unlink(missing_ok=True)
+                rollback.unlink(missing_ok=True)
+            return {
+                "success": True,
+                "removed": removed,
+                "retained": len(rebuilt),
+                "before_last_hash": before.get("last_hash"),
+                "after_last_hash": after.get("last_hash"),
+            }
+
+    def restore_snapshot(self, snapshot: Path) -> dict[str, Any]:
+        """Restaure atomiquement un snapshot JSONL après validation complète de sa chaîne."""
+        source = Path(snapshot).resolve()
+        if not source.is_file() or source.is_symlink():
+            raise ValueError("Snapshot de preuves invalide.")
+        candidate = DurableEvidenceStore(
+            source,
+            stream_name=self.stream_name,
+            record_validator=self._record_validator,
+        )
+        try:
+            report = candidate.verify()
+        finally:
+            candidate._lock_path.unlink(missing_ok=True)
+        if not report["valid"]:
+            raise RuntimeError("Le snapshot de preuves est invalide.")
+        with self._thread_lock, _interprocess_lock(self._lock_path):
+            temporary = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.restore")
+            try:
+                with source.open("rb") as reader, temporary.open("xb") as writer:
+                    for chunk in iter(lambda: reader.read(1024 * 1024), b""):
+                        writer.write(chunk)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                os.replace(temporary, self.path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            restored_rows, restored_corrupt = self._rows_unlocked()
+            restored = self._integrity_unlocked(restored_rows, restored_corrupt)
+            if not restored["valid"] or restored.get("last_hash") != report.get("last_hash"):
+                raise RuntimeError("La restauration du snapshot a échoué.")
+            return restored

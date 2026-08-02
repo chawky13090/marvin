@@ -13,7 +13,13 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from durable_evidence_store import DurableEvidenceStore
 from portable_backup_encryption import decrypt_file
-from privacy_rights import ExportTarget, PrivacyRightsError, create_export
+from privacy_rights import (
+    ExportTarget,
+    PrivacyRightsError,
+    create_export,
+    erase_exact,
+    restore_rollback,
+)
 
 
 def main() -> int:
@@ -39,7 +45,46 @@ def main() -> int:
             pass
         else:
             raise AssertionError("Un sélecteur libre non déclaré doit être refusé.")
-    print("Privacy rights OK - sélection exacte, export chiffré vérifié et source intacte.")
+
+        before_hash = store.verify()["last_hash"]
+        rollback = root / "rollback.mrvprivacy"
+        erased = erase_exact(
+            "truth",
+            "conversation_id",
+            "conv-private",
+            rollback,
+            passphrase="correct horse battery",
+            confirmed=True,
+            event_logger=lambda event, attrs: events.append((event, attrs)),
+            targets=targets,
+        )
+        assert erased["removed"] == 1 and erased["retained"] == 1
+        assert erased["before_last_hash"] == before_hash
+        remaining = store.recent_verified(10)
+        assert [row["id"] for row in remaining] == ["two"]
+        assert store.verify()["valid"] is True
+        assert "conv-private" not in str(events)
+        assert erased["rollback_contains_erased_data"] is True
+        restored = restore_rollback(
+            "truth",
+            rollback,
+            passphrase="correct horse battery",
+            confirmed=True,
+            targets=targets,
+        )
+        assert restored["last_hash"] == before_hash
+        assert {row["id"] for row in store.recent_verified(10)} == {"one", "two"}
+        try:
+            store.rewrite_excluding(
+                lambda row: row.get("id") == "one",
+                expected_last_hash="0" * 64,
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Une chaîne modifiée depuis le snapshot doit être refusée.")
+        assert store.verify()["last_hash"] == before_hash
+    print("Privacy rights OK - export, effacement rechaîné et rollback chiffré vérifiés.")
     return 0
 
 

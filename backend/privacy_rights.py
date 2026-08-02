@@ -180,3 +180,112 @@ def create_export(
         plain.unlink(missing_ok=True)
         encrypted.unlink(missing_ok=True)
         verify_plain.unlink(missing_ok=True)
+
+
+def erase_exact(
+    stream_id: str,
+    selector: str,
+    selector_value: str,
+    rollback_destination: Path,
+    *,
+    passphrase: str,
+    confirmed: bool,
+    event_logger: Callable[[str, dict[str, Any]], None] = _default_event_logger,
+    targets: dict[str, ExportTarget] | None = None,
+) -> dict[str, Any]:
+    if confirmed is not True:
+        raise PrivacyRightsError("Une confirmation explicite est requise.")
+    catalog = targets if targets is not None else _targets()
+    target = catalog.get(str(stream_id).strip())
+    if target is None:
+        raise PrivacyRightsError("Registre d'effacement inconnu.")
+    selected_field = str(selector).strip()
+    if selected_field not in target.selectors:
+        raise PrivacyRightsError("Sélecteur non autorisé pour ce registre.")
+    expected = str(selector_value)
+    if not 1 <= len(expected) <= MAX_SELECTOR_CHARS:
+        raise PrivacyRightsError("Valeur de sélection invalide.")
+    rollback = _validate_destination(rollback_destination)
+    store = target.store_factory()
+    before = store.verify()
+    if not before.get("valid") or not store.path.is_file():
+        raise PrivacyRightsError("L'intégrité du registre source est invalide.")
+    count = int(before.get("records") or 0)
+    if count > MAX_EXPORT_RECORDS:
+        raise PrivacyRightsError("Le registre dépasse la limite de réécriture.")
+    rows = list(reversed(store.recent_verified(count or 1))) if count else []
+    matches = sum(_exact_match(row, selected_field, expected) for row in rows)
+    if matches == 0:
+        raise PrivacyRightsError("Aucune preuve ne correspond au sélecteur exact.")
+
+    encrypted = rollback.parent / f".{rollback.name}.{uuid.uuid4().hex}.partial"
+    verify_plain = rollback.parent / f".privacy-rollback-verify.{uuid.uuid4().hex}.jsonl"
+    try:
+        encryption = encrypt_file(store.path, encrypted, passphrase=passphrase)
+        decrypt_file(encrypted, verify_plain, passphrase=passphrase)
+        if verify_plain.read_bytes() != store.path.read_bytes():
+            raise PrivacyRightsError("La sauvegarde de rollback ne correspond pas à la source.")
+        os.replace(encrypted, rollback)
+        rewrite = store.rewrite_excluding(
+            lambda row: _exact_match(row, selected_field, expected),
+            expected_last_hash=before.get("last_hash"),
+        )
+        remaining = store.recent_verified(int(rewrite["retained"]) or 1) if rewrite["retained"] else []
+        if any(_exact_match(row, selected_field, expected) for row in remaining):
+            raise PrivacyRightsError("Le sélecteur reste présent après réécriture.")
+        result = {
+            "success": True,
+            "operation_id": uuid.uuid4().hex,
+            "stream_id": target.stream_id,
+            "selector": selected_field,
+            "removed": rewrite["removed"],
+            "retained": rewrite["retained"],
+            "before_last_hash": rewrite["before_last_hash"],
+            "after_last_hash": rewrite["after_last_hash"],
+            "rollback_filename": rollback.name,
+            "rollback_sha256": hashlib.sha256(rollback.read_bytes()).hexdigest(),
+            "source_plaintext_sha256": encryption["sha256"],
+            "rollback_contains_erased_data": True,
+            "finalization_required": True,
+        }
+        event_logger("privacy_erasure_rechain", result)
+        return result
+    except Exception as exc:
+        event_logger("privacy_erasure_rechain", {"success": False, "stream_id": target.stream_id, "selector": selected_field, "error_code": type(exc).__name__})
+        raise
+    finally:
+        encrypted.unlink(missing_ok=True)
+        verify_plain.unlink(missing_ok=True)
+
+
+def restore_rollback(
+    stream_id: str,
+    rollback_source: Path,
+    *,
+    passphrase: str,
+    confirmed: bool,
+    targets: dict[str, ExportTarget] | None = None,
+) -> dict[str, Any]:
+    if confirmed is not True:
+        raise PrivacyRightsError("Une confirmation explicite est requise.")
+    catalog = targets if targets is not None else _targets()
+    target = catalog.get(str(stream_id).strip())
+    if target is None:
+        raise PrivacyRightsError("Registre de restauration inconnu.")
+    source = rollback_source.absolute()
+    if source.suffix.lower() != EXPORT_EXTENSION or not source.is_file() or source.is_symlink():
+        raise PrivacyRightsError("Bundle de rollback invalide.")
+    store = target.store_factory()
+    plain = source.parent / f".privacy-rollback-restore.{uuid.uuid4().hex}.jsonl"
+    try:
+        decrypt_file(source, plain, passphrase=passphrase)
+        report = store.restore_snapshot(plain)
+        return {
+            "success": True,
+            "stream_id": target.stream_id,
+            "records": report["records"],
+            "last_hash": report["last_hash"],
+            "integrity_verified": True,
+        }
+    finally:
+        plain.unlink(missing_ok=True)

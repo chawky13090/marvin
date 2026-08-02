@@ -26,6 +26,7 @@ ALLOWED_STATES = {"structured", "pending"}
 READ_ONLY_JSONL_CONSUMERS = {
     "backend/full_backup.py",
     "backend/privacy_inventory.py",
+    "backend/privacy_rights.py",
 }
 
 

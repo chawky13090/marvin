@@ -2,6 +2,7 @@
 SecretaryAI Backend — Qdrant vector store (mode local, sans Docker).
 Utilise Ollama nomic-embed-text pour les embeddings.
 """
+import atexit
 import json
 import re as _re
 import time as _time
@@ -50,6 +51,9 @@ def close_client() -> None:
 async def close_runtime() -> None:
     """Rattache le client local au cycle de vie asynchrone de FastAPI."""
     close_client()
+
+
+atexit.register(close_client)
 
 
 COLLECTIONS = {
