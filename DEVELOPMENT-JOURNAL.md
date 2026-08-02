@@ -5,6 +5,25 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-02 — v2.585.0 — Cycle de vie Qdrant explicite
+
+Demande : poursuivre la consolidation avec tests réels, rollback et absence de régression.
+
+Constat : le client Qdrant global était fermé par la restauration hors ligne mais pas par le
+lifespan FastAPI. Il pouvait donc atteindre son destructeur après le démontage de
+l'interpréteur et produire l'avertissement intermittent recensé sous TD-008.
+
+Décision : rattacher sa fermeture idempotente au superviseur d'arrêt, après les workers et
+les clients HTTP. Le test utilise un faux client et n'ouvre jamais Qdrant sur les données
+réelles. Une étape dédiée rend cette exigence obligatoire dans `check_marvin.py`.
+
+Sécurité et logs : aucune donnée, collection, autorisation, exposition réseau ou secret ne
+change. Un échec de fermeture suit la journalisation structurée existante du superviseur sans
+contenu utilisateur. Rollback : réversion atomique du commit v2.585; aucune migration.
+
+Validation ciblée : `test_vector_store_lifecycle.py`, `test_main_composition.py`, compilation
+Python et invariants d'architecture. Validation exhaustive à consigner après exécution.
+
 ## 2026-08-02 — v2.584.0 — Sauvegarde portable et inventaire réel fermé
 
 ### Constat et décision

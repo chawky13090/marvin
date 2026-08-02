@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.584.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.585.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.584.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.585.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -208,7 +208,13 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.584.0)
+## 9. État actuel (v2.585.0)
+
+**v2.585 (cycle de vie Qdrant explicite)** : le client local global est désormais fermé par
+le lifecycle FastAPI après les consommateurs HTTP et les workers, via le superviseur borné
+d'arrêt. La fermeture est idempotente et possède une étape dédiée dans le gate exhaustif;
+elle n'ouvre jamais un second client sur les données réelles. TD-008 est fermé. Aucun schéma,
+donnée, secret ou journal métier modifié. Rollback : réversion atomique du commit v2.585.
 
 **v2.584 (sauvegarde portable et inventaire réel fermé)** : le bundle local DPAPI reste
 inchangé pour la restauration sur la même identité Windows. Un second format explicite

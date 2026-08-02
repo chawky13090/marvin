@@ -193,6 +193,9 @@ async def _check_lifespan() -> None:
     )
     engineering_radar = types.SimpleNamespace(background_worker=AsyncMock())
     model_market = types.SimpleNamespace(sync_recommended_cloud_models=AsyncMock())
+    vector_store = types.SimpleNamespace(
+        close_runtime=AsyncMock(side_effect=lambda: events.append("qdrant.close"))
+    )
 
     with (
         patch.object(main_module, "RuntimeSupervisor", return_value=supervisor),
@@ -222,6 +225,7 @@ async def _check_lifespan() -> None:
                 "engineering_radar": engineering_radar,
                 "model_market": model_market,
                 "skills": skills,
+                "vector_store": vector_store,
                 "web_browser": web_browser,
             },
         ),
@@ -242,6 +246,7 @@ async def _check_lifespan() -> None:
         "browser.close",
         "generation.close",
         "web.close",
+        "qdrant.close",
     ]
 
 

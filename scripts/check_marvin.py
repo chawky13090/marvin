@@ -148,6 +148,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Runtime Node et modules natifs", ("node", "scripts/check_runtime.mjs")),
         Stage("Superviseur du backend Windows", (python, "scripts/test_server_supervisor.py")),
         Stage("Arrêt borné du backend", (python, "scripts/test_shutdown_runtime.py")),
+        Stage("Fermeture explicite de Qdrant", (python, "scripts/test_vector_store_lifecycle.py")),
         Stage("Boucle réseau résiliente du backend Windows", (python, "scripts/test_windows_event_loop.py")),
         Stage("Installation Windows portable", (python, "scripts/test_installer_contract.py")),
         Stage("ACL Windows des données Marvin", (python, "scripts/test_data_acl.py")),

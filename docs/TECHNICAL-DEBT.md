@@ -1,6 +1,6 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-02 pour Marvin 2.584.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-02 pour Marvin 2.585.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 
@@ -13,7 +13,7 @@ qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNA
 | TD-005 | Faible | Gouvernance | version et journal touchent de nombreux commits | bruit de diff et conflits entre agents | conserver un commit atomique par tranche; étudier une note de version générée sans retirer la traçabilité actuelle |
 | TD-006 | Moyenne | Persistance | v2.584 crée et restaure isolément un export portable réel de 1 733 fichiers/618 281 759 octets, sans secrets DPAPI; aucun second support physique n'est actuellement connecté | restauration appliquée hors machine et résilience à la perte du volume C: non encore démontrées | copier sur support distinct/immuable, restaurer sur un second Windows, réauthentifier les secrets puis conserver la preuve d'intégrité |
 | TD-007 | Élevée | Sécurité | SEC-006, SEC-008, SEC-009, SEC-011 et SEC-012 sont fermés en v2.583, mais la matrice globale garde la fermeture de dette sécurité `partial` | les entrées restantes pourraient être confondues avec un domaine globalement vérifié | fermer ou faire accepter explicitement chaque entrée du registre sécurité; aucun statut `verified` par défaut |
-| TD-008 | Faible | Tests Qdrant | le gate 250/250 réussit mais un `QdrantClient.__del__` signale `sys.meta_path is None` à l'extinction d'un processus | bruit de sortie et fermeture implicite d'un client local dans au moins un test | identifier le propriétaire exact, fermer explicitement le client avant la fin de l'interpréteur et ajouter une assertion d'absence d'avertissement |
+| TD-008 | Fermée v2.585 | Tests Qdrant | le client global n'était pas rattaché au lifecycle FastAPI et pouvait atteindre `QdrantClient.__del__` après la fermeture de l'interpréteur | fermeture explicite supervisée après les consommateurs, idempotence testée et étape obligatoire du gate |
 
 ## Règles d'évolution
 

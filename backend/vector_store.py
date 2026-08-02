@@ -47,6 +47,11 @@ def close_client() -> None:
         client.close()
 
 
+async def close_runtime() -> None:
+    """Rattache le client local au cycle de vie asynchrone de FastAPI."""
+    close_client()
+
+
 COLLECTIONS = {
     "memories": 768,    # nomic-embed-text = 768 dims
     "notes": 768,

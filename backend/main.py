@@ -25,9 +25,6 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.550 — audit puissance : contexte Ollama, filtre cloud, vision, budgets d'execution
 # v2.549 — robot d'activité interactif intégré au composeur et adaptatif à la sidebar
 # v2.548 — activité latérale : robot à gauche, informations à droite, centre libéré
-# v2.540 — computer_control : alias query/key->target/text, rapport architecture outils
-# v2.539 — computer_control : alias action/coordonnee, focus resilient (AttachThreadInput)
-# v2.538 — computer_control : touches SendKeys via type, alias browser, message click clair
 # v2.537 — fiabilite des appels d'outils : coercion generique, hwnd, timeout interne
 # v2.536 — routage cloud interne aligne sur Model Market (qwen mieux utilise en agentique)
 # v2.535 — audit outils : correctifs OCR/reseau/diff/logo/commandes/telechargement
@@ -57,6 +54,7 @@ L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md
 # v2.555 - classement documentaire portable avec destination utilisateur prioritaire
 # v2.554 - contrat PDF vers piece jointe et verite des confirmations
 # v2.553 - exports de conversation, pieces jointes et reprise d'approbation
+# v2.585 - fermeture explicite du client Qdrant dans le lifecycle supervise
 from __future__ import annotations
 
 import sys
@@ -236,6 +234,7 @@ async def lifespan(app_instance: FastAPI):
         if coding_jobs_started:
             await shutdown_runtime.run("coding-jobs", coding_jobs.shutdown)
         import local_model_installer
+        import vector_store
         import web_browser
 
         await shutdown_runtime.run("local-model-installer", local_model_installer.shutdown)
@@ -243,6 +242,7 @@ async def lifespan(app_instance: FastAPI):
         await shutdown_runtime.run("web-browser", web_browser.close)
         await shutdown_runtime.run("generation-http", generation_runtime.close)
         await shutdown_runtime.run("web-http", web_runtime.close)
+        await shutdown_runtime.run("qdrant", vector_store.close_runtime)
 
 
 app = FastAPI(
