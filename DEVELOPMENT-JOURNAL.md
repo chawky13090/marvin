@@ -16208,3 +16208,26 @@ stocke ni source, ni sortie ESLint, ni secret. Résultat ciblé observé : 102 s
 avertissements et six exceptions historiques, zéro erreur. Architecture, documentation,
 build et smoke HTTP sont requis avant commit. Rollback : réversion atomique du commit v2.570;
 aucune migration persistante.
+
+## 2026-08-02 — v2.571 — Catalogue Outils extrait sans dérive visuelle
+
+### Caractérisation et extraction
+
+Avant modification, `test_tools_catalog.mjs` a figé 17 catégories, 141 outils curés, quatre
+groupes, les identifiants, l'absence de doublons et les adaptateurs de schéma. Une première
+extraction vers un unique fichier de 1 867 lignes aurait seulement déplacé la dette; elle a
+été corrigée avant commit. Les données sont maintenant séparées en quatre domaines de 240 à
+658 lignes et `lib/tools/catalog.js` ne conserve que 143 lignes de composition et règles.
+
+Le premier test post-extraction a détecté une modification de l'ordre des catégories causée
+par le regroupement physique. Un ordre canonique explicite a rétabli exactement la séquence
+historique. `app/outils/page.jsx` passe de 3 406 à 1 562 lignes; son plafond est abaissé de
+1 844 lignes et ne pourra pas remonter.
+
+### Sécurité, logs, validation et rollback
+
+Le changement est une extraction statique : aucun appel réseau, permission, donnée, journal
+ou schéma d'outil n'est ajouté. Le catalogue dynamique continue de compléter les outils du
+backend et les 363 contrats restent inchangés. Tests exigés avant commit : caractérisation du
+catalogue, baseline frontend, architecture 363/363, documentation, build Turbopack et smoke
+visuel `/outils`. Rollback : réversion atomique du commit v2.571; aucune migration.
