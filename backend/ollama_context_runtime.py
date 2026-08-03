@@ -55,14 +55,14 @@ def extract_max_context_tokens(payload: dict[str, Any]) -> int:
     return max(values, default=0)
 
 
-def _safe_positive_int(value: Any) -> int:
+def _safe_positive_int(value: Any, *, maximum: int = 10_000_000) -> int:
     if isinstance(value, bool):
         return 0
     try:
         parsed = int(value)
     except (TypeError, ValueError):
         return 0
-    return parsed if 0 < parsed <= 10_000_000 else 0
+    return parsed if 0 < parsed <= maximum else 0
 
 
 async def inspect_context_runtime(
@@ -89,7 +89,8 @@ async def inspect_context_runtime(
             "status": "deferred",
             "minimum_tokens": minimum_tokens,
             "recommended_tokens": recommended_tokens,
-            "launcher_requested_tokens": _safe_positive_int(os.getenv("OLLAMA_CONTEXT_LENGTH")),
+            "capture_process_env_tokens": _safe_positive_int(os.getenv("OLLAMA_CONTEXT_LENGTH")),
+            "capture_process_env_scope": "capture_process_only_not_ollama_runtime",
             "ollama_version": None,
             "models": [],
             "reason": "no_model_selected",
@@ -147,11 +148,18 @@ async def inspect_context_runtime(
             )
             allocated = _safe_positive_int((loaded or {}).get("context_length"))
             digest = str((loaded or {}).get("digest") or "") or None
+            size = _safe_positive_int((loaded or {}).get("size"), maximum=(1 << 63) - 1)
+            size_vram = _safe_positive_int(
+                (loaded or {}).get("size_vram"), maximum=(1 << 63) - 1
+            )
+            gpu_residency_ratio = (
+                round(size_vram / size, 4) if size and size_vram <= size else None
+            )
 
             if cloud:
-                effective = max_context
-                status = "verified" if effective >= minimum_tokens else "failed"
-                evidence = "ollama_cloud_full_context"
+                effective = None
+                status = "provider_declared" if max_context >= minimum_tokens else "failed"
+                evidence = "cloud_provider_declared_max"
             elif loaded is not None:
                 effective = allocated
                 status = "verified" if effective >= minimum_tokens else "failed"
@@ -173,16 +181,38 @@ async def inspect_context_runtime(
                 "meets_minimum": bool(effective and effective >= minimum_tokens),
                 "meets_recommended": bool(effective and effective >= recommended_tokens),
                 "digest": digest,
+                "runtime_size_bytes": size or None,
+                "runtime_size_vram_bytes": size_vram or None,
+                "gpu_residency_ratio": gpu_residency_ratio,
+                "processor_split_source": "api_ps_size_ratio" if gpu_residency_ratio is not None else None,
+                "gpu_residency_scope": (
+                    "ollama_reported_loaded_size_not_guaranteed_full_kv_reservation"
+                    if gpu_residency_ratio is not None
+                    else None
+                ),
+                "cloud_provider_declared_max": (max_context or None) if cloud else None,
+                "cloud_client_override_absent": cloud,
+                "cloud_runtime_allocation": None,
             }
 
         results = await asyncio.gather(*(inspect_model(name) for name in models))
         statuses = {item["status"] for item in results}
-        overall = "failed" if "failed" in statuses else "deferred" if "deferred" in statuses else "verified"
+        if "failed" in statuses:
+            overall = "failed"
+        elif "deferred" in statuses:
+            overall = "deferred"
+        elif statuses == {"provider_declared"}:
+            overall = "provider_declared"
+        elif "provider_declared" in statuses:
+            overall = "verified_with_provider_declarations"
+        else:
+            overall = "verified"
         return {
             "status": overall,
             "minimum_tokens": minimum_tokens,
             "recommended_tokens": recommended_tokens,
-            "launcher_requested_tokens": _safe_positive_int(os.getenv("OLLAMA_CONTEXT_LENGTH")),
+            "capture_process_env_tokens": _safe_positive_int(os.getenv("OLLAMA_CONTEXT_LENGTH")),
+            "capture_process_env_scope": "capture_process_only_not_ollama_runtime",
             "ollama_version": str(version_payload.get("version") or "") or None,
             "models": results,
             "documentation": {
@@ -195,7 +225,8 @@ async def inspect_context_runtime(
             "status": "failed",
             "minimum_tokens": minimum_tokens,
             "recommended_tokens": recommended_tokens,
-            "launcher_requested_tokens": _safe_positive_int(os.getenv("OLLAMA_CONTEXT_LENGTH")),
+            "capture_process_env_tokens": _safe_positive_int(os.getenv("OLLAMA_CONTEXT_LENGTH")),
+            "capture_process_env_scope": "capture_process_only_not_ollama_runtime",
             "ollama_version": None,
             "models": [],
             "reason": "ollama_inspection_failed",

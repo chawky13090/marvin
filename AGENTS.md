@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.589.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.590.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.589.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.590.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -129,10 +129,15 @@ Ultra débridé) sont distincts des trois niveaux d'autorisation (Sécurisé, St
 
 Le code continue de s'adapter automatiquement pour les installations locales ou hors ligne :
 - `auto_config.pick_mode(hw)` choisit eco/balanced/**performance**/**max** selon GPU/VRAM/RAM.
-- Sur le laptop 4 Go : chat=`qwen2.5:3b`, agent/analysis=`qwen2.5:7b`.
+- Sur la GTX 1650 4 Go actuelle : chat/agent/analysis=`qwen3:4b`, vision=`qwen3.5:2b`.
 - Sur une machine puissante : modèles 14b/32b, plus d'outils, OCR/recherche profonds, vidéo locale activée — **automatiquement, sans rien changer**.
-- Leviers par mode (dans `_MODES`) : `max_tools`, `whisper`, `learn`, `doc`, `allow_video`, `bg_scale`, `concurrency`, `web_depth`, `rag_k`, `ocr_max_pages`, `ocr_scale`, `history_depth`.
-- **Override modèle par machine** (v2.83) : réglage `model_overrides` (`{profil: modèle}`, en db `data/`) épingle un modèle précis par profil, prioritaire sur le mode (appliqué dans `apply_auto_config` si le modèle est installé). **Cette machine (RTX 3080) = chat+agent+analysis tous en `qwen2.5:14b`** (souhait de l'utilisateur) → un seul 14b résident en VRAM, pas de va-et-vient 7b↔14b. Pour revenir à l'auto : vider `model_overrides`.
+- Leviers par mode (dans `_MODES`) : `max_tools`, `whisper`, `learn`, `doc`, `allow_video`, `bg_scale`, `concurrency`, `web_depth`, `rag_k`, `ocr_max_pages`, `ocr_scale`, `history_depth`, `context_objective_tokens`.
+- Le contexte local est calculé selon le modèle et le matériel, puis vérifié sur un Ollama
+  isolé. Le profil machine vit dans `data/install/ollama-context-profile.json`; ne jamais
+  remplacer cette calibration par une constante VRAM. Cloud ne reçoit aucun `num_ctx`.
+- **Override modèle par machine** (v2.83) : `model_overrides` épingle un tag exact uniquement
+  s'il est installé et respecte le budget. Les anciens overrides qwen2.5:14b sont actuellement
+  rejetés car ces tags ont été retirés; ne pas les présenter comme actifs.
 - **Council v2** : `ai_model_council` consulte exactement cinq familles Ollama Cloud distinctes,
   puis effectue une critique anonymisée et un arbitrage. Aucun repli local silencieux n'est
   autorisé dans ce pipeline, afin que la provenance affichée reste exacte.
@@ -208,7 +213,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.589.0)
+## 9. État actuel (v2.590.0)
+
+**v2.590 (contexte Ollama adaptatif et preuve v1.1)** : la valeur fixe utilisateur 32K est
+supprimée. `ollama_context_policy.py` calcule le coût KV à partir des couches, têtes KV et
+dimensions clé/valeur du modèle exact, propose au plus deux candidats puis exige `/api/ps`
+et cinq générations bornées sur un Ollama isolé. Le profil certifié est stocké sous
+`data/install`, lié à un fingerprint matériel non nominatif et rejeté sur une autre machine;
+le repli non certifié reste 8192/f16. `start.bat` applique contexte, cache, Flash Attention et
+parallélisme au service local uniquement. Sur la GTX 1650 4 Go, `qwen3:4b` est certifié à
+32768, cache q8_0, Flash Attention et parallélisme 1. Le runner principal confirme ces options
+et cinq répétitions de calibration réussissent. L'oracle ignore la réflexion Qwen3 et exige
+une réponse finale synthétique exactement conforme; citer le jeton dans la réflexion ne suffit
+pas. La preuve v1.1 corrige aussi la sur-déclaration
+Cloud : `/api/show` est `provider_declared`, l'allocation interne demeure indisponible et une
+sonde de rétention sans override est requise. L'arrêt du serveur isolé tue tout son arbre afin
+d'éviter un `llama-server.exe` orphelin. Aucun modèle, secret ou donnée utilisateur n'est
+transmis par la calibration. Rollback : réversion atomique du commit v2.590, suppression du
+profil `data/install/ollama-context-profile.json`, puis redémarrage contrôlé d'Ollama.
 
 **v2.589 (contexte Ollama prouvé et Forge Windows pré-enregistré)** : Doctor distingue
 désormais la capacité maximale déclarée par `/api/show`, l'allocation locale réellement

@@ -55,13 +55,22 @@ async def main() -> int:
     local_verified = await runtime.inspect_context_runtime(
         ["qwen:4b"],
         client=FakeClient(
-            loaded=[{"name": "qwen:4b", "context_length": 32_768, "digest": "abc"}],
+            loaded=[{
+                "name": "qwen:4b", "context_length": 32_768, "digest": "abc",
+                "size": 7_000_000_000, "size_vram": 3_000_000_000,
+            }],
             shows={"qwen:4b": show(131_072)},
         ),
     )
     assert local_verified["status"] == "verified"
     assert local_verified["models"][0]["evidence"] == "api_ps_allocated_context"
     assert local_verified["models"][0]["effective_context_tokens"] == 32_768
+    assert local_verified["models"][0]["runtime_size_bytes"] == 7_000_000_000
+    assert local_verified["models"][0]["runtime_size_vram_bytes"] == 3_000_000_000
+    assert local_verified["models"][0]["gpu_residency_ratio"] == 0.4286
+    assert local_verified["models"][0]["gpu_residency_scope"] == (
+        "ollama_reported_loaded_size_not_guaranteed_full_kv_reservation"
+    )
 
     local_deferred = await runtime.inspect_context_runtime(
         ["qwen:4b"],
@@ -81,14 +90,16 @@ async def main() -> int:
     assert local_failed["status"] == "failed"
     assert local_failed["models"][0]["meets_minimum"] is False
 
-    cloud_verified = await runtime.inspect_context_runtime(
+    cloud_declared = await runtime.inspect_context_runtime(
         ["qwen:397b-cloud"],
         client=FakeClient(loaded=[], shows={"qwen:397b-cloud": show(262_144)}),
     )
-    assert cloud_verified["status"] == "verified"
-    assert cloud_verified["models"][0]["provider"] == "cloud"
-    assert cloud_verified["models"][0]["evidence"] == "ollama_cloud_full_context"
-    assert cloud_verified["models"][0]["meets_recommended"] is True
+    assert cloud_declared["status"] == "provider_declared"
+    assert cloud_declared["models"][0]["provider"] == "cloud"
+    assert cloud_declared["models"][0]["evidence"] == "cloud_provider_declared_max"
+    assert cloud_declared["models"][0]["effective_context_tokens"] is None
+    assert cloud_declared["models"][0]["meets_recommended"] is False
+    assert cloud_declared["models"][0]["cloud_provider_declared_max"] == 262_144
 
     invalid = await runtime.inspect_context_runtime(
         ["bad:cloud"],
@@ -104,7 +115,8 @@ async def main() -> int:
             ["qwen:4b"],
             client=FakeClient(loaded=[], shows={"qwen:4b": show(131_072)}),
         )
-        assert requested_only["launcher_requested_tokens"] == 32_768
+        assert requested_only["capture_process_env_tokens"] == 32_768
+        assert requested_only["capture_process_env_scope"] == "capture_process_only_not_ollama_runtime"
         assert requested_only["status"] == "deferred", (
             "La configuration du lanceur ne doit jamais devenir une preuve runtime."
         )

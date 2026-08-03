@@ -1,0 +1,41 @@
+{
+  "schema": "marvin.ollama-context-evidence/1.1",
+  "captured_at": "2026-08-03T00:37:19.160552+00:00",
+  "git_commit": "71fb1eda5a518cdcea9a3c383844be65165a8248",
+  "benchmark_contract": "windows-operator/v1.1",
+  "evidence": {
+    "status": "verified",
+    "minimum_tokens": 32768,
+    "recommended_tokens": 65536,
+    "capture_process_env_tokens": 0,
+    "capture_process_env_scope": "capture_process_only_not_ollama_runtime",
+    "ollama_version": "0.32.5",
+    "models": [
+      {
+        "model": "qwen3:4b",
+        "provider": "local",
+        "status": "verified",
+        "evidence": "api_ps_allocated_context",
+        "loaded": true,
+        "allocated_context_tokens": 32768,
+        "max_context_tokens": 262144,
+        "effective_context_tokens": 32768,
+        "meets_minimum": true,
+        "meets_recommended": false,
+        "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+        "runtime_size_bytes": 2497280480,
+        "runtime_size_vram_bytes": 2497280480,
+        "gpu_residency_ratio": 1.0,
+        "processor_split_source": "api_ps_size_ratio",
+        "gpu_residency_scope": "ollama_reported_loaded_size_not_guaranteed_full_kv_reservation",
+        "cloud_provider_declared_max": null,
+        "cloud_client_override_absent": false,
+        "cloud_runtime_allocation": null
+      }
+    ],
+    "documentation": {
+      "context": "https://docs.ollama.com/context-length",
+      "runtime": "https://docs.ollama.com/api/ps"
+    }
+  }
+}

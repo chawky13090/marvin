@@ -32,6 +32,7 @@ if not exist "%~dp0backend\.venv\Scripts\python.exe" (
     echo [ERREUR] backend\.venv est absent ou incomplet. Lancez INSTALLER-NOUVEAU-PC.bat.
     goto :startup_error
 )
+set "MARVIN_PYTHON=%~dp0backend\.venv\Scripts\python.exe"
 pushd "%~dp0backend"
 .venv\Scripts\python.exe -c "import python_runtime; raise SystemExit(0 if python_runtime.inspect_runtime()['portable'] else 2)" >nul 2>&1
 set "PYTHON_RUNTIME_RC=%ERRORLEVEL%"
@@ -90,13 +91,19 @@ set "OLLAMA_HOST=127.0.0.1:%OLLAMA_PORT%"
 set "OLLAMA_URL=http://127.0.0.1:%OLLAMA_PORT%"
 set "OLLAMA_BASE_URL=http://127.0.0.1:%OLLAMA_PORT%/v1"
 set "NEXT_PUBLIC_OLLAMA_PORT=%OLLAMA_PORT%"
-:: v2.550 - Fenetre de contexte fixee GLOBALEMENT sur le service (pas par appel Python) :
-:: prewarm, professeur et agent partagent alors tous la meme instance chargee (meme cle
-:: modele+num_ctx) au lieu de se disputer le defaut 4096 tokens d'Ollama, qui tronquait le
-:: prompt systeme et les schemas d'outils avant meme le message de l'utilisateur.
-if not defined OLLAMA_CONTEXT_LENGTH set "OLLAMA_CONTEXT_LENGTH=32768"
-echo       Ollama demande sur %OLLAMA_HOST% (contexte local minimal %OLLAMA_CONTEXT_LENGTH%).
-echo       Doctor verifiera l'allocation reelle; les modeles Cloud gardent leur contexte maximal.
+:: v2.590 - Le contexte local est lie au modele, au materiel et a une verification /api/ps.
+:: Aucun contexte client n'est envoye aux modeles Cloud : leur maximum fournisseur reste intact.
+set "OLLAMA_PROFILE_ENV=%TEMP%\marvin-ollama-profile-%RANDOM%.bat"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\resolve-ollama-context-profile.ps1" -PythonPath "%MARVIN_PYTHON%" -OutputBatch "%OLLAMA_PROFILE_ENV%" >nul 2>&1
+if exist "%OLLAMA_PROFILE_ENV%" call "%OLLAMA_PROFILE_ENV%"
+if exist "%OLLAMA_PROFILE_ENV%" del "%OLLAMA_PROFILE_ENV%" >nul 2>&1
+if not defined OLLAMA_CONTEXT_LENGTH set "OLLAMA_CONTEXT_LENGTH=8192"
+if not defined OLLAMA_KV_CACHE_TYPE set "OLLAMA_KV_CACHE_TYPE=f16"
+if not defined OLLAMA_FLASH_ATTENTION set "OLLAMA_FLASH_ATTENTION=1"
+if not defined OLLAMA_NUM_PARALLEL set "OLLAMA_NUM_PARALLEL=1"
+if not defined MARVIN_OLLAMA_PROFILE_STATUS set "MARVIN_OLLAMA_PROFILE_STATUS=bootstrap_unverified"
+echo       Ollama demande sur %OLLAMA_HOST% (profil local %MARVIN_OLLAMA_PROFILE_STATUS% : %OLLAMA_CONTEXT_LENGTH% tokens, cache %OLLAMA_KV_CACHE_TYPE%).
+echo       Doctor verifiera l'allocation et la residence GPU; le Cloud ne recoit aucun override de contexte.
 
 :: Verifier le service par HTTP : tasklist peut masquer un processus lance avec un autre
 :: niveau de privileges alors que l'API Ollama fonctionne parfaitement.

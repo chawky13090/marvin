@@ -90,7 +90,7 @@ async def run_diagnostics() -> dict:
         # La variable du lanceur n'est pas une preuve : un Ollama Desktop déjà actif
         # ne peut pas hériter rétroactivement de son environnement. Les modèles locaux
         # doivent apparaître dans /api/ps; Ollama Cloud est contrôlé sur la capacité du
-        # tag exact et la garantie fournisseur de contexte maximal.
+        # tag exact. L'allocation Cloud reste invisible et exige un test fonctionnel.
         try:
             import ollama_context_runtime
 
@@ -108,6 +108,19 @@ async def run_diagnostics() -> dict:
                 add(
                     "ollama_context_runtime", "Contexte Ollama", "ok",
                     "Contexte runtime vérifié : " + ", ".join(verified),
+                    details=context,
+                )
+            elif context_status in {"provider_declared", "verified_with_provider_declarations"}:
+                declared = [
+                    f"{item['model']}≤{item.get('cloud_provider_declared_max')}"
+                    for item in context.get("models", [])
+                    if item.get("status") == "provider_declared"
+                ]
+                add(
+                    "ollama_context_runtime", "Contexte Ollama", "info",
+                    "Capacité Cloud déclarée, allocation fournisseur non observable : "
+                    + ", ".join(declared)
+                    + ". Forge exigera un test fonctionnel de rétention.",
                     details=context,
                 )
             elif context_status == "deferred":

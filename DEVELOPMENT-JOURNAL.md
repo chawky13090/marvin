@@ -5,6 +5,62 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-03 — v2.590.0 — Contexte Ollama adaptatif, mesuré et portable
+
+Demande : corriger l'étape 1 Forge après revue Claude/Codex. La configuration locale doit
+être optimale selon le matériel de chaque Windows, les modèles Cloud doivent conserver leur
+capacité fournisseur, la baseline ne doit commencer qu'après calibration et Marvin ne doit
+pas gagner en vitesse en perdant de l'intelligence.
+
+Constats observés : la preuve v2.589 enregistrait l'environnement du script comme s'il était
+celui du service et qualifiait le Cloud de `verified` alors que son allocation n'est pas
+observable. Sur `qwen3:4b`, les métadonnées Ollama 0.32.5 exposent 36 couches, 8 têtes KV et
+128 dimensions clé/valeur : le cache f16 calculé vaut 4 831 838 208 octets à 32K, contre
+2 415 919 104 en q8_0. La première activation a aussi révélé deux défauts de cycle de vie :
+`MARVIN_PYTHON` n'était pas assigné dans `start.bat`, puis l'arrêt forcé du seul parent Ollama
+laissait un runner enfant. Ces deux causes ont été corrigées avant certification.
+
+Décision : `ollama_context_policy.py` calcule des candidats modèle+matériel, signale les
+architectures hybrides et limite l'essai réel à deux configurations. La calibration utilise
+un port loopback libre, Flash Attention, parallélisme 1, cinq répétitions et un arrêt complet
+de l'arbre Windows. Le profil machine n'est accepté par le lanceur qu'avec statut `verified`
+et fingerprint concordant; sinon 8192/f16 est appliqué et Doctor doit signaler l'absence de
+preuve. La valeur utilisateur historique `OLLAMA_CONTEXT_LENGTH=32768` a été retirée sans
+effacer une éventuelle valeur personnalisée différente. L'installeur reproduit désormais
+calcul, vérification et arrêt propre. Le contrat Forge v1 reste immuable; v1.1 le remplace
+avant baseline et distingue `local_runtime_verified`, `cloud_provider_declared` et la sonde
+fonctionnelle Cloud à profondeur observée. Aucun `num_ctx` n'est envoyé aux modèles Cloud.
+
+Validation réelle : les premières captures sont conservées sans réécriture et les rectificatifs
+successifs montrent pourquoi elles ne sont pas retenues. La capture r3 ne sérialisait pas les
+tailles supérieures à 10 millions d'octets; la borne est désormais distincte pour les tailles
+64 bits et couverte par un test à 7 milliards d'octets. La calibration r5 a ensuite montré que
+la simple présence de `CALIBRATION_OK` dans un raisonnement tronqué était un oracle insuffisant.
+L'oracle r6 extrait uniquement la réponse située après `</think>` et exige l'égalité exacte;
+`context-profile-v1.1-r6.json` alloue exactement 32768 à cinq reprises et obtient cinq réponses
+finales exactes avec la même empreinte SHA-256. Le service principal redémarré
+expose un runner `qwen3:4b -c 32768 -np 1 --cache-type-k q8_0 --cache-type-v q8_0
+--flash-attn on`; la capture v1.1 locale est `verified`. Le ratio `size_vram/size` est conservé
+comme mesure Ollama du chargé, avec une portée explicite : il ne prouve pas à lui seul la
+réservation complète du KV. Tests ciblés : calcul KV, profil machine, runtime, contrat Forge,
+installeur et compilation Python réussis. Une première gate consolidée a exécuté 261/261
+étapes avec succès en 588,2 secondes. Après le durcissement de l'oracle et la correction des
+tailles 64 bits, la gate finale a de nouveau exécuté 261/261 étapes avec succès en 631,9
+secondes; un redémarrage supervisé du backend a ensuite exposé v2.590.0, 363 outils et un
+health check `ok`. Le smoke final du service principal a produit la réponse utile exacte
+`LIVE_OK`; `local-context-evidence-v1.1-r6.json` confirme 32768 et le runner Windows expose
+les options q8_0/Flash Attention/parallélisme 1. Doctor obtient 97/100 car le modèle vision
+local `qwen3.5:2b`, non chargé en permanence, reste honnêtement `deferred`; aucun second modèle
+n'est maintenu artificiellement en mémoire pour améliorer ce score.
+
+Sécurité et logs : endpoints loopback uniquement, modèle exact validé, sorties bornées,
+aucun prompt utilisateur, secret, identifiant matériel stable ou contenu personnel dans les
+preuves. Les logs temporaires de calibration contiennent uniquement le prompt synthétique et
+les métriques Ollama; ils restent dans TEMP et ne sont pas incorporés au produit. Le profil
+runtime sous `data/` est ignoré par Git. Rollback code : réversion atomique du commit v2.590.
+Rollback machine : arrêter Ollama, supprimer `data/install/ollama-context-profile.json`, puis
+relancer Marvin; le repli 8192/f16 s'applique sans migration de données.
+
 ## 2026-08-03 — v2.589.0 — Contexte Ollama prouvé et contrat Forge Windows figé
 
 Demande : commencer la feuille de route validée par Chaouki, Claude et Codex sans ajouter

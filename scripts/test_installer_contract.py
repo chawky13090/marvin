@@ -19,14 +19,18 @@ def main() -> int:
     libreoffice_manifest = (ROOT / "scripts" / "libreoffice-component.json").read_text(encoding="utf-8")
     python_resolver = (ROOT / "scripts" / "resolve-python-runtime.ps1").read_text(encoding="utf-8")
     python_migration = (ROOT / "scripts" / "migrate-python-runtime.ps1").read_text(encoding="utf-8")
+    context_resolver = (ROOT / "scripts" / "resolve-ollama-context-profile.ps1").read_text(encoding="utf-8")
     starter = (ROOT / "start.bat").read_text(encoding="utf-8")
     assert "npm ci" in installer
     assert "resolve-python-runtime.ps1" in installer
     assert '"!MARVIN_PYTHON!" -m venv .venv' in installer
     assert "python -m venv .venv" not in installer
     assert "nomic-embed-text" in installer
-    assert "SetEnvironmentVariable('OLLAMA_CONTEXT_LENGTH','32768','User')" in installer
-    assert "Les modeles Ollama Cloud conservent leur contexte maximal" in installer
+    assert "SetEnvironmentVariable('OLLAMA_CONTEXT_LENGTH','32768','User')" not in installer
+    assert "calibrate-ollama-context.py --verify" in installer
+    assert "ollama-context-profile.json" in installer
+    assert "migrate-ollama-context-profile.ps1" in installer
+    assert "Les modeles Cloud ne recoivent aucun override de contexte" in installer
     assert "[1/9]" in installer
     assert "install-desktop-avatar.ps1" in installer
     assert "plan_local_models.py" in installer
@@ -65,8 +69,11 @@ def main() -> int:
     assert ".venv.rollback-" in python_migration
     assert "pip', 'check'" in python_migration
     assert "python_runtime.inspect_runtime" in starter
-    assert "Doctor verifiera l'allocation reelle" in starter
-    assert "les modeles Cloud gardent leur contexte maximal" in starter
+    assert 'set "MARVIN_PYTHON=%~dp0backend\\.venv\\Scripts\\python.exe"' in starter
+    assert "Doctor verifiera l'allocation et la residence GPU" in starter
+    assert "resolve-ollama-context-profile.ps1" in starter
+    assert "resolve-ollama-context-profile.py" in context_resolver
+    assert "le Cloud ne recoit aucun override de contexte" in starter
     assert "New-ScheduledTaskTrigger -AtLogOn" in autostart
     assert "-LogonType Interactive" in autostart
     assert "-RunLevel Limited" in autostart

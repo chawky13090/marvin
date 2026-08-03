@@ -1,0 +1,252 @@
+{
+  "schema": "marvin.ollama-context-profile/1.0",
+  "generated_at": "2026-08-03T00:22:50.278772+00:00",
+  "status": "verified",
+  "machine": {
+    "vendor": "nvidia",
+    "gpu": "NVIDIA GeForce GTX 1650",
+    "vram_gb": 4.0,
+    "ram_gb": 31.7
+  },
+  "machine_key": "01c215749eda6beb40ab",
+  "model": "qwen3:4b",
+  "model_digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+  "ollama_version": "0.32.5",
+  "proposal": {
+    "schema": "marvin.ollama-context-policy/1.0",
+    "method": "analytical_then_runtime_verification",
+    "attention_shape": {
+      "status": "calculated",
+      "formula": "layers * kv_heads * (key_length + value_length) * bytes_per_element",
+      "layer_count": 36,
+      "kv_head_count": 8,
+      "key_length": 128,
+      "value_length": 128,
+      "hybrid_metadata_keys": []
+    },
+    "model_max_context_tokens": 262144,
+    "model_size_bytes": 2497293931,
+    "vram_budget_bytes": 3221225472,
+    "ram_available_bytes": 7838315315,
+    "parallel": 1,
+    "requested_minimum": 32768,
+    "candidates": [
+      {
+        "context_tokens": 32768,
+        "kv_cache_type": "q8_0",
+        "kv_cache_bytes": 2415919104,
+        "projected_resident_bytes": 5315866219,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      }
+    ],
+    "all_estimates": [
+      {
+        "context_tokens": 8192,
+        "kv_cache_type": "f16",
+        "kv_cache_bytes": 1207959552,
+        "projected_resident_bytes": 4107906667,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 16384,
+        "kv_cache_type": "f16",
+        "kv_cache_bytes": 2415919104,
+        "projected_resident_bytes": 5315866219,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 32768,
+        "kv_cache_type": "f16",
+        "kv_cache_bytes": 4831838208,
+        "projected_resident_bytes": 7731785323,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 65536,
+        "kv_cache_type": "f16",
+        "kv_cache_bytes": 9663676416,
+        "projected_resident_bytes": 12563623531,
+        "fits_vram_budget": false,
+        "fits_host_memory": false
+      },
+      {
+        "context_tokens": 131072,
+        "kv_cache_type": "f16",
+        "kv_cache_bytes": 19327352832,
+        "projected_resident_bytes": 22227299947,
+        "fits_vram_budget": false,
+        "fits_host_memory": false
+      },
+      {
+        "context_tokens": 8192,
+        "kv_cache_type": "q8_0",
+        "kv_cache_bytes": 603979776,
+        "projected_resident_bytes": 3503926891,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 16384,
+        "kv_cache_type": "q8_0",
+        "kv_cache_bytes": 1207959552,
+        "projected_resident_bytes": 4107906667,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 32768,
+        "kv_cache_type": "q8_0",
+        "kv_cache_bytes": 2415919104,
+        "projected_resident_bytes": 5315866219,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 65536,
+        "kv_cache_type": "q8_0",
+        "kv_cache_bytes": 4831838208,
+        "projected_resident_bytes": 7731785323,
+        "fits_vram_budget": false,
+        "fits_host_memory": true
+      },
+      {
+        "context_tokens": 131072,
+        "kv_cache_type": "q8_0",
+        "kv_cache_bytes": 9663676416,
+        "projected_resident_bytes": 12563623531,
+        "fits_vram_budget": false,
+        "fits_host_memory": false
+      }
+    ],
+    "runtime_verification_required": true
+  },
+  "verifications": [
+    {
+      "context_tokens": 32768,
+      "kv_cache_type": "q8_0",
+      "kv_cache_bytes": 2415919104,
+      "projected_resident_bytes": 5315866219,
+      "fits_vram_budget": false,
+      "fits_host_memory": true,
+      "status": "verified",
+      "allocated_context_tokens": 32768,
+      "runtime_size_bytes": 5726273533,
+      "runtime_size_vram_bytes": 2345307995,
+      "gpu_residency_ratio": 0.4096,
+      "flash_attention_requested": true,
+      "parallel": 1,
+      "runs": [
+        {
+          "duration_ms": 33015.2,
+          "load_duration_ns": 11527651900,
+          "prompt_eval_duration_ns": 1141275000,
+          "eval_duration_ns": 20324093000,
+          "output_contract_passed": true,
+          "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+        },
+        {
+          "duration_ms": 21326.2,
+          "load_duration_ns": 354643000,
+          "prompt_eval_duration_ns": 96022000,
+          "eval_duration_ns": 20854148000,
+          "output_contract_passed": true,
+          "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+        },
+        {
+          "duration_ms": 21370.5,
+          "load_duration_ns": 339673100,
+          "prompt_eval_duration_ns": 97488000,
+          "eval_duration_ns": 20912323000,
+          "output_contract_passed": true,
+          "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+        },
+        {
+          "duration_ms": 23156.3,
+          "load_duration_ns": 513580000,
+          "prompt_eval_duration_ns": 129567000,
+          "eval_duration_ns": 22498565000,
+          "output_contract_passed": true,
+          "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+        },
+        {
+          "duration_ms": 22701.4,
+          "load_duration_ns": 373195900,
+          "prompt_eval_duration_ns": 104086000,
+          "eval_duration_ns": 22208301000,
+          "output_contract_passed": true,
+          "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+        }
+      ],
+      "total_duration_ms": 147519.2,
+      "temporary_log_scope": "os_temp_ephemeral_not_preserved"
+    }
+  ],
+  "selected": {
+    "context_tokens": 32768,
+    "kv_cache_type": "q8_0",
+    "kv_cache_bytes": 2415919104,
+    "projected_resident_bytes": 5315866219,
+    "fits_vram_budget": false,
+    "fits_host_memory": true,
+    "status": "verified",
+    "allocated_context_tokens": 32768,
+    "runtime_size_bytes": 5726273533,
+    "runtime_size_vram_bytes": 2345307995,
+    "gpu_residency_ratio": 0.4096,
+    "flash_attention_requested": true,
+    "parallel": 1,
+    "runs": [
+      {
+        "duration_ms": 33015.2,
+        "load_duration_ns": 11527651900,
+        "prompt_eval_duration_ns": 1141275000,
+        "eval_duration_ns": 20324093000,
+        "output_contract_passed": true,
+        "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+      },
+      {
+        "duration_ms": 21326.2,
+        "load_duration_ns": 354643000,
+        "prompt_eval_duration_ns": 96022000,
+        "eval_duration_ns": 20854148000,
+        "output_contract_passed": true,
+        "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+      },
+      {
+        "duration_ms": 21370.5,
+        "load_duration_ns": 339673100,
+        "prompt_eval_duration_ns": 97488000,
+        "eval_duration_ns": 20912323000,
+        "output_contract_passed": true,
+        "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+      },
+      {
+        "duration_ms": 23156.3,
+        "load_duration_ns": 513580000,
+        "prompt_eval_duration_ns": 129567000,
+        "eval_duration_ns": 22498565000,
+        "output_contract_passed": true,
+        "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+      },
+      {
+        "duration_ms": 22701.4,
+        "load_duration_ns": 373195900,
+        "prompt_eval_duration_ns": 104086000,
+        "eval_duration_ns": 22208301000,
+        "output_contract_passed": true,
+        "final_answer_sha256": "a572e16192842a2a46273ef78c03a4ceedcc03c61e95f7b172dc7a65f6780dbd"
+      }
+    ],
+    "total_duration_ms": 147519.2,
+    "temporary_log_scope": "os_temp_ephemeral_not_preserved"
+  },
+  "cloud_policy": {
+    "client_context_override": null,
+    "provider_maximum_preserved": true,
+    "runtime_allocation_observable": false
+  }
+}

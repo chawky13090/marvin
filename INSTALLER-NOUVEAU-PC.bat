@@ -120,17 +120,12 @@ echo.
 
 :: ============================================================ [3/9] Ollama
 echo [3/9] Verification d'Ollama...
-:: Ollama Desktop Windows peut demarrer avant Marvin. Persister le contexte local
-:: AVANT l'installation garantit que les prochains processus Ollama en heritent.
-:: Les modeles Ollama Cloud conservent leur contexte maximal gere par le fournisseur.
-set "OLLAMA_CONTEXT_LENGTH=32768"
-powershell -NoProfile -Command "try { [Environment]::SetEnvironmentVariable('OLLAMA_CONTEXT_LENGTH','32768','User'); exit 0 } catch { exit 1 }" >nul 2>&1
-if errorlevel 1 (
-    echo   [DEGRADE] Le contexte Ollama local n'a pas pu etre persiste pour cet utilisateur.
-    echo   Doctor devra le verifier apres redemarrage d'Ollama.
-) else (
-    echo   [OK] Contexte Ollama local minimal persiste a 32768 tokens.
-)
+:: Le contexte n'est plus persiste en valeur fixe. Il sera calcule apres le choix
+:: du modele local puis verifie sur un serveur Ollama isole. Le profil reste lie
+:: a cette machine. Les modeles Cloud ne recoivent aucun override de contexte.
+echo   [OK] Calibration materielle du contexte planifiee apres les modeles locaux.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\migrate-ollama-context-profile.ps1" -Action Apply -NoConfirm >nul 2>&1
+if errorlevel 1 echo   [DEGRADE] La valeur fixe historique de contexte devra etre retiree manuellement.
 set "OLLAMA=ollama"
 where ollama >nul 2>&1
 if errorlevel 1 (
@@ -263,8 +258,17 @@ echo.
 :: ============================================================ [8/9] Modeles IA
 echo [8/9] Selection et telechargement des modeles IA locaux adaptes...
 echo   Demarrage du service Ollama...
-start "" /B "!OLLAMA!" serve >nul 2>&1
-timeout /t 4 /nobreak >nul
+set "OLLAMA_STARTED_BY_INSTALLER=0"
+powershell -NoProfile -Command "try { Invoke-RestMethod 'http://127.0.0.1:11434/api/version' -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+    set "OLLAMA_STARTED_BY_INSTALLER=1"
+    set "OLLAMA_CONTEXT_LENGTH=8192"
+    set "OLLAMA_KV_CACHE_TYPE=f16"
+    set "OLLAMA_FLASH_ATTENTION=1"
+    set "OLLAMA_NUM_PARALLEL=1"
+    start "" /B "!OLLAMA!" serve >nul 2>&1
+    timeout /t 4 /nobreak >nul
+)
 set "LOCAL_MODEL_PLAN=%TEMP%\marvin-local-model-plan-%RANDOM%.txt"
 backend\.venv\Scripts\python.exe scripts\plan_local_models.py > "!LOCAL_MODEL_PLAN!"
 if errorlevel 1 (
@@ -281,6 +285,19 @@ echo   - nomic-embed-text ^(memoire semantique locale^)...
 "!OLLAMA!" pull nomic-embed-text
 if errorlevel 1 echo   [DEGRADE] nomic-embed-text indisponible : l'indexation semantique sera limitee.
 echo   [OK] Le portefeuille local a ete adapte a cette machine.
+echo   Calibration analytique puis verification Ollama isolee...
+backend\.venv\Scripts\python.exe scripts\calibrate-ollama-context.py --verify --repetitions 5 --output data\install\ollama-context-profile.json
+if errorlevel 1 (
+    echo   [DEGRADE] Aucun profil de contexte n'a ete certifie. Marvin utilisera le repli local 8192/f16.
+) else (
+    echo   [OK] Profil de contexte local certifie pour ce materiel et ce modele.
+)
+if "!OLLAMA_STARTED_BY_INSTALLER!"=="1" (
+    powershell -NoProfile -Command "try { Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction Stop | ForEach-Object { taskkill.exe /PID $_.OwningProcess /T /F | Out-Null }; exit 0 } catch { exit 1 }" >nul 2>&1
+    echo   [OK] Service temporaire arrete; start.bat appliquera le profil certifie.
+) else (
+    echo   [INFO] Ollama etait deja actif. Le profil sera applique au prochain redemarrage controle du service.
+)
 echo.
 
 :: ============================================================ [9/9] Config

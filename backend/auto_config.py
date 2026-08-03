@@ -29,6 +29,7 @@ _MODES = {
         "max_tools": 18, "whisper": "base", "learn": "resident", "doc": "rapide",
         "allow_video": False, "bg_scale": 2.0, "concurrency": 2,
         "web_depth": 1, "rag_k": 4, "ocr_max_pages": 5, "ocr_scale": 1.5, "history_depth": 10,
+        "context_objective_tokens": 8_192,
         "desc": "Empreinte minimale : petits modèles, peu d'outils, tâches de fond espacées. Machines modestes.",
     },
     "balanced": {
@@ -36,6 +37,7 @@ _MODES = {
         "max_tools": 40, "whisper": "small", "learn": "resident", "doc": "rapide",
         "allow_video": False, "bg_scale": 1.0, "concurrency": 3,
         "web_depth": 2, "rag_k": 6, "ocr_max_pages": 15, "ocr_scale": 2.0, "history_depth": 16,
+        "context_objective_tokens": 32_768,
         "desc": "Bon compromis vitesse/qualité. Recommandé pour un GPU 4-8 Go.",
     },
     "performance": {
@@ -43,6 +45,7 @@ _MODES = {
         "max_tools": 80, "whisper": "medium", "learn": "dedicated", "doc": "detaille",
         "allow_video": True, "bg_scale": 0.6, "concurrency": 6,
         "web_depth": 3, "rag_k": 8, "ocr_max_pages": 40, "ocr_scale": 2.5, "history_depth": 24,
+        "context_objective_tokens": 65_536,
         "desc": "Exploite une machine solide (GPU 8-16 Go) : modèles 14b, plus d'outils, vidéo locale, recherche + OCR plus profonds.",
     },
     "max": {
@@ -50,6 +53,7 @@ _MODES = {
         "max_tools": 250, "whisper": "medium", "learn": "dedicated", "doc": "detaille",
         "allow_video": True, "bg_scale": 0.5, "concurrency": 10,
         "web_depth": 4, "rag_k": 12, "ocr_max_pages": 100, "ocr_scale": 3.0, "history_depth": 32,
+        "context_objective_tokens": 131_072,
         "desc": "Tout en puissance (GPU 24 Go+). Modèles 32b, tous les outils, recherche/OCR/mémoire au maximum.",
     },
 }
@@ -66,6 +70,13 @@ def pick_mode(hw: dict) -> str:
     if v >= 9:
         return "performance"
     return "balanced"
+
+
+def context_objective_tokens(hw: dict, mode: str | None = None) -> int:
+    """Objectif produit ; le calcul modèle+matériel décide ensuite s'il est viable."""
+
+    selected = mode if mode in _MODES else pick_mode(hw)
+    return int(_MODES[selected]["context_objective_tokens"])
 
 
 def _nvidia_vram():
@@ -310,7 +321,8 @@ async def apply_auto_config(force: bool = False) -> dict:
                           "concurrency": mcfg.get("concurrency", 3),
                           "web_depth": mcfg.get("web_depth", 2), "rag_k": mcfg.get("rag_k", 6),
                           "ocr_max_pages": mcfg.get("ocr_max_pages", 15), "ocr_scale": mcfg.get("ocr_scale", 2.0),
-                          "history_depth": mcfg.get("history_depth", 16)},
+                          "history_depth": mcfg.get("history_depth", 16),
+                          "context_objective_tokens": mcfg.get("context_objective_tokens", 32_768)},
                "modes": [{"key": k, "label": _MODES[k]["label"], "desc": _MODES[k]["desc"]} for k in _MODE_ORDER]}
     db.set_setting("auto_config", summary)
     return summary

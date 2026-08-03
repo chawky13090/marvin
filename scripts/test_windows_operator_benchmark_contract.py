@@ -7,7 +7,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACT = ROOT / "benchmarks" / "windows-operator" / "v1"
+CONTRACT_V1 = ROOT / "benchmarks" / "windows-operator" / "v1"
+CONTRACT = ROOT / "benchmarks" / "windows-operator" / "v1.1"
 
 
 def read_json(name: str) -> dict:
@@ -19,11 +20,18 @@ def main() -> int:
     plan = read_json("benchmark-plan.json")
     schema = read_json("scenario-contract.schema.json")
 
+    legacy = json.loads((CONTRACT_V1 / "acceptance-policy.json").read_text(encoding="utf-8"))
+    assert legacy["schema"] == "marvin.windows-operator-acceptance/1.0"
+    assert legacy["context_precondition"]["cloud_evidence"] == "ollama_cloud_full_context"
+
     assert acceptance["status"] == "locked_before_baseline"
+    assert acceptance["supersedes"] == "../v1/acceptance-policy.json"
     context = acceptance["context_precondition"]
     assert context["minimum_tokens"] == 32_768
     assert context["recommended_tokens"] == 65_536
-    assert context["cloud_evidence"] == "ollama_cloud_full_context"
+    assert context["cloud_evidence"] == "cloud_provider_declared_max"
+    assert context["cloud_runtime_allocation"] == "unavailable"
+    assert context["cloud_long_context_behavioral_test_required"] is True
 
     outcomes = acceptance["outcomes"]
     assert set(outcomes) == {"generalized", "restricted", "rollback"}
@@ -34,7 +42,8 @@ def main() -> int:
     }
     assert "intelligence_regression_count" in generalized_metrics
     intelligence = acceptance["intelligence_preservation"]
-    assert intelligence["cloud_effective_to_max_context_ratio"] == 1.0
+    assert intelligence["cloud_client_context_override_count"] == 0
+    assert intelligence["cloud_behavioral_retention_must_not_regress"] is True
     assert intelligence["council_distinct_model_families_minimum"] == 5
     assert intelligence["tool_catalog_may_shrink"] is False
     assert acceptance["redundant_confirmation"]["target_count"] == 0
@@ -70,7 +79,8 @@ def main() -> int:
     assert catalog["both_visible_in_production"] is False
     assert plan["model_policy"]["dynamic_routing_allowed"] is False
     assert plan["model_policy"]["ollama_context_evidence_required"] is True
-    assert plan["model_policy"]["cloud_context_policy"] == "provider_maximum"
+    assert plan["model_policy"]["cloud_context_policy"] == "provider_declared_max_without_client_override"
+    assert plan["model_policy"]["cloud_behavioral_retention_test_required"] is True
     assert plan["model_policy"]["quality_and_capability_regression_suite_required"] is True
 
     required = set(schema["required"])
@@ -79,9 +89,12 @@ def main() -> int:
 
     runtime_source = (ROOT / "backend" / "ollama_context_runtime.py").read_text(encoding="utf-8")
     agent_source = (ROOT / "backend" / "agent.py").read_text(encoding="utf-8")
-    assert "ollama_cloud_full_context" in runtime_source
+    cloud_probe = (ROOT / "scripts" / "probe-ollama-cloud-context.py").read_text(encoding="utf-8")
+    assert "cloud_provider_declared_max" in runtime_source
     assert '"options": {"num_ctx"' not in agent_source
     assert "'options': {'num_ctx'" not in agent_source
+    assert '"num_ctx"' not in cloud_probe
+    assert '"client_context_override": None' in cloud_probe
 
     print("Windows operator benchmark contract OK - seuils, répétitions et isolation figés.")
     return 0

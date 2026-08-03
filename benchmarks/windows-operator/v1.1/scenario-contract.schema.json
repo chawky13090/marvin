@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marvin.local/schemas/windows-operator-scenario-1.1.json",
+  "title": "Marvin Windows Operator Scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "family", "prompt", "fixture_id", "oracle_id", "risk_class", "reversible"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"},
+    "family": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,31}$"},
+    "prompt": {"type": "string", "minLength": 3, "maxLength": 1000},
+    "fixture_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{2,95}$"},
+    "oracle_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{2,95}$"},
+    "risk_class": {"enum": ["read_only", "reversible", "sensitive", "irreversible"]},
+    "reversible": {"type": "boolean"},
+    "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 600},
+    "required_capabilities": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_.-]+$"}, "uniqueItems": true, "maxItems": 16}
+  }
+}

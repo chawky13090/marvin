@@ -74,16 +74,17 @@ async def _run(args: argparse.Namespace) -> int:
         recommended_tokens=args.recommended_tokens,
     )
     report = {
-        "schema": "marvin.ollama-context-evidence/1.0",
+        "schema": "marvin.ollama-context-evidence/1.1",
         "captured_at": datetime.now(UTC).isoformat(),
         "git_commit": _git_commit(),
-        "benchmark_contract": "windows-operator/v1",
+        "benchmark_contract": "windows-operator/v1.1",
         "evidence": evidence,
     }
     output = _safe_output(args.output)
     _write_atomic(output, report)
     print(json.dumps({"output": str(output), "status": evidence["status"]}, ensure_ascii=False))
-    return 0 if evidence["status"] == "verified" else 2
+    accepted = {"verified", "provider_declared", "verified_with_provider_declarations"}
+    return 0 if evidence["status"] in accepted else 2
 
 
 def main() -> int:
