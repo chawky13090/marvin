@@ -11,6 +11,7 @@ import cloud_routing as _cr
 import cortex as _cortex
 import database as db
 import memory_mesh
+import ollama_context_admission as _context_admission
 import tool_runtime
 from agent_orchestration import (
     dispatch_agent as _dispatch_agent_runtime,
@@ -461,14 +462,30 @@ async def _run_deterministic_agent(
             encode_sse=_sse,
         )
 
-    # NB : on NE force PAS num_ctx ici. Tester un num_ctx réduit (16K) a provoqué un RECHARGEMENT
-    # du modèle à chaque message (Ollama indexe l'instance par (modèle, num_ctx) : le prewarm et
-    # le « professeur » d'arrière-plan utilisent le défaut → conflit → thrash → 40s/message).
-    # Le vrai gain (≈60s→16s) vient du professeur qui réutilise le modèle déjà chargé.
+    # Le contexte local est admis une fois à la frontière du tour, puis reste immuable
+    # pendant cette mission. Les workers utilisent le même contrôleur : ils ne créent donc
+    # plus une instance concurrente avec un contexte différent. Un modèle Cloud ne reçoit
+    # jamais ``num_ctx`` et conserve le maximum du fournisseur.
     # top_p resserre l'échantillonnage aux tokens les plus probables (complète la température
     # basse) : réduit le risque que le modèle « invente » un nom d'outil/paramètre plausible
     # mais faux plutôt que de rester sur ce qu'il connaît réellement (v2.106, anti-hallucination).
     _ollama_options = {"temperature": temperature, "top_p": 0.9}
+    _context_mission_id = request_id or f"chat-{conversation_id or 'new'}-{time.monotonic_ns()}"
+    _context_decision = await _context_admission.admit_local_context(
+        active_model,
+        mission_id=_context_mission_id,
+        ollama_url=OLLAMA_URL,
+    )
+    yield _sse(_context_decision.public_event())
+    if _context_decision.status == "blocked":
+        yield _sse({
+            "type": "error",
+            "message": (
+                "Campagne Forge arrêtée : le runtime LLM a dérivé du manifeste verrouillé "
+                f"({_context_decision.reason})."
+            ),
+        })
+        return
 
     # Anti-« le modèle explique au lieu d'agir » : on ne le corrige qu'UNE fois.
     # Suivi de l'exécution et preuves pour l'auto-réparation des compétences.
@@ -513,7 +530,14 @@ async def _run_deterministic_agent(
                 system_prompt=system_prompt,
                 messages=ollama_msgs,
                 tools=tools_payload,
-                options=_ollama_options,
+                options={
+                    **_ollama_options,
+                    **(
+                        _context_decision.request_options()
+                        if active_model == _context_decision.model
+                        else {}
+                    ),
+                },
             )
             async for _event in _stream_model_step(
                 client=_ollama_client,
@@ -1077,7 +1101,14 @@ async def _run_deterministic_agent(
         active_model=active_model,
         system_prompt=system_prompt,
         ollama_messages=ollama_msgs,
-        options=_ollama_options,
+        options={
+            **_ollama_options,
+            **(
+                _context_decision.request_options()
+                if active_model == _context_decision.model
+                else {}
+            ),
+        },
         base_url=OLLAMA_URL,
         request_factory=_OllamaChatRequest,
         client_factory=_create_ollama_client,

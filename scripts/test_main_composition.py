@@ -25,6 +25,7 @@ EXPECTED_FUNCTIONS = {"lifespan", "_global_exception_handler"}
 EXPECTED_WORKERS = {
     "cron",
     "ollama-prewarm",
+    "ollama-context-recalibration",
     "whisper-prewarm",
     "email-watch",
     "email-automation",

@@ -41,6 +41,8 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 | `bug_log.py` — `bug_log.jsonl` | technical_log | incidents | 30 jours | structuré |
 | `skills.py` — `skills_match_log.jsonl` | technical_log | matcher de compétences | 30 jours | structuré |
 | `api_observability.py` — `api_requests.jsonl` | technical_log | erreurs et latences HTTP | 30 jours | structuré |
+| `ollama_context_admission.py` — `ollama-context-admission.jsonl` | technical_log | décisions de contexte Ollama | 30 jours | structuré |
+| `runtime_workers.py` — `ollama-context-recalibration.jsonl` | technical_log | recalibration Ollama | 30 jours | structuré |
 | `coding_mission.py` — `events.jsonl` | domain_event_stream | Coding Mission | avec la mission | structuré |
 | `engineering_radar.py` — `events.jsonl` | domain_event_stream | Radar documentaire | avec l'état Radar | structuré |
 | `mission_os.py` — `mission_events.jsonl` | domain_event_stream | Mission OS | avec la mission | structuré |
@@ -57,6 +59,8 @@ backend/audit.py|audit.jsonl|technical_log|90d|structured
 backend/bug_log.py|bug_log.jsonl|technical_log|30d|structured
 backend/skills.py|skills_match_log.jsonl|technical_log|30d|structured
 backend/api_observability.py|api_requests.jsonl|technical_log|30d|structured
+backend/ollama_context_admission.py|ollama-context-admission.jsonl|technical_log|30d|structured
+backend/runtime_workers.py|ollama-context-recalibration.jsonl|technical_log|30d|structured
 backend/coding_mission.py|events.jsonl|domain_event_stream|owner_lifecycle|structured
 backend/engineering_radar.py|events.jsonl|domain_event_stream|owner_lifecycle|structured
 backend/mission_os.py|mission_events.jsonl|domain_event_stream|owner_lifecycle|structured

@@ -79,6 +79,9 @@ def main() -> int:
     assert catalog["both_visible_in_production"] is False
     assert plan["model_policy"]["dynamic_routing_allowed"] is False
     assert plan["model_policy"]["ollama_context_evidence_required"] is True
+    assert plan["model_policy"]["runtime_lock_required"] is True
+    assert plan["model_policy"]["runtime_lock_environment"] == "MARVIN_FORGE_RUNTIME_LOCK"
+    assert plan["model_policy"]["runtime_lock_drift_policy"] == "fail_closed_and_discard_run"
     assert plan["model_policy"]["cloud_context_policy"] == "provider_declared_max_without_client_override"
     assert plan["model_policy"]["cloud_behavioral_retention_test_required"] is True
     assert plan["model_policy"]["quality_and_capability_regression_suite_required"] is True
@@ -89,10 +92,13 @@ def main() -> int:
 
     runtime_source = (ROOT / "backend" / "ollama_context_runtime.py").read_text(encoding="utf-8")
     agent_source = (ROOT / "backend" / "agent.py").read_text(encoding="utf-8")
+    admission_source = (ROOT / "backend" / "ollama_context_admission.py").read_text(encoding="utf-8")
     cloud_probe = (ROOT / "scripts" / "probe-ollama-cloud-context.py").read_text(encoding="utf-8")
     assert "cloud_provider_declared_max" in runtime_source
     assert '"options": {"num_ctx"' not in agent_source
     assert "'options': {'num_ctx'" not in agent_source
+    assert "load_active_lock" in admission_source
+    assert "cloud_client_override_absent" in admission_source
     assert '"num_ctx"' not in cloud_probe
     assert '"client_context_override": None' in cloud_probe
 

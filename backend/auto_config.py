@@ -82,12 +82,16 @@ def context_objective_tokens(hw: dict, mode: str | None = None) -> int:
 def _nvidia_vram():
     try:
         out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total,name", "--format=csv,noheader,nounits"],
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.total,name,driver_version",
+                "--format=csv,noheader,nounits",
+            ],
             capture_output=True, text=True, errors="replace", timeout=8, creationflags=0x08000000)
         line = (out.stdout or "").strip().splitlines()[0]
         mb = int(line.split(",")[0].strip())
-        name = line.split(",", 1)[1].strip()
-        return round(mb / 1024, 1), name
+        fields = [field.strip() for field in line.split(",", 2)]
+        return round(mb / 1024, 1), fields[1], fields[2]
     except Exception:
         return None
 
@@ -110,6 +114,7 @@ def detect_hardware() -> dict:
     if nv:
         return {
             "vendor": "nvidia", "vram_gb": nv[0], "gpu": nv[1],
+            "driver_version": nv[2],
             "ram_gb": ram, "ram_available_gb": ram_available,
             "disk_free_bytes": disk_free,
         }
@@ -119,6 +124,7 @@ def detect_hardware() -> dict:
         if amd and amd.get("vram_gb"):
             return {
                 "vendor": "amd", "vram_gb": amd["vram_gb"], "gpu": amd["name"],
+                "driver_version": str(amd.get("driver_version") or "unknown"),
                 "ram_gb": ram, "ram_available_gb": ram_available,
                 "disk_free_bytes": disk_free,
             }
@@ -126,6 +132,7 @@ def detect_hardware() -> dict:
         pass
     return {
         "vendor": "cpu", "vram_gb": 0.0, "gpu": "CPU (pas de GPU détecté)",
+        "driver_version": "not_applicable",
         "ram_gb": ram, "ram_available_gb": ram_available,
         "disk_free_bytes": disk_free,
     }

@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.590 — contexte Ollama adaptatif calculé, vérifié et lié à la machine
+# v2.591 — admission Ollama dynamique et verrou Forge exécutoire
 # v2.584 — sauvegarde portable chiffrée, inventaire réel fermé et restauration isolée
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement
@@ -139,12 +139,11 @@ from runtime_workers import (
     database_backup_worker as _db_backup_worker,
     health_trend_worker as _health_trend_worker,
     memory_consolidation_worker as _memory_consolidation_worker,
+    ollama_context_recalibration_worker as _ollama_context_recalibration_worker,
     prewarm_default_models as _prewarm_default_model,
     skill_night_learning_worker as _skill_night_learning_worker,
 )
 from lan_access import LanAccessMiddleware
-
-
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(errors="replace")
@@ -195,6 +194,7 @@ async def lifespan(app_instance: FastAPI):
     try:
         supervisor.start("cron", _cron_worker)
         supervisor.start("ollama-prewarm", _prewarm_default_model)
+        supervisor.start("ollama-context-recalibration", _ollama_context_recalibration_worker)
         supervisor.start("whisper-prewarm", prewarm_whisper)
         supervisor.start("email-watch", _email_watch_worker)
         supervisor.start("email-automation", _email_automation_worker)

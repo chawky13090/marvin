@@ -1,6 +1,6 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-03 pour Marvin 2.590.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-09 pour Marvin 2.591.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 
@@ -14,7 +14,7 @@ qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNA
 | TD-006 | Moyenne | Persistance | v2.584 crée et restaure isolément un export portable réel de 1 733 fichiers/618 281 759 octets, sans secrets DPAPI; aucun second support physique n'est actuellement connecté | restauration appliquée hors machine et résilience à la perte du volume C: non encore démontrées | copier sur support distinct/immuable, restaurer sur un second Windows, réauthentifier les secrets puis conserver la preuve d'intégrité |
 | TD-007 | Élevée | Sécurité | SEC-006, SEC-008, SEC-009, SEC-011 et SEC-012 sont fermés en v2.583, mais la matrice globale garde la fermeture de dette sécurité `partial` | les entrées restantes pourraient être confondues avec un domaine globalement vérifié | fermer ou faire accepter explicitement chaque entrée du registre sécurité; aucun statut `verified` par défaut |
 | TD-008 | Fermée v2.585 | Tests Qdrant | le client global n'était pas rattaché au lifecycle FastAPI et pouvait atteindre `QdrantClient.__del__` après la fermeture de l'interpréteur | fermeture explicite supervisée après les consommateurs, idempotence testée et étape obligatoire du gate |
-| TD-009 | Moyenne | Calibration LLM | v2.590 prouve 32K/q8_0 sur cinq réponses finales synthétiques exactes et le service principal; les tailles runtime 64 bits sont sérialisées, mais le holdout agentique local et la sonde Cloud longue n'ont pas encore été exécutés | confondre allocation mémoire, rétention et qualité métier pourrait figer une baseline non représentative | avant baseline Forge : exécuter le corpus qualité local figé et la sonde Cloud sans `num_ctx`; zéro régression et preuve versionnée requises |
+| TD-009 | Moyenne | Calibration LLM | v2.591 lie le profil au modèle, digest, pilote et runtime exacts, réévalue la pression mémoire par mission et verrouille Forge; sous 4,4 Gio de RAM disponible, Ollama 0.32.6 a certifié 16K/q8_0 après amorçage et cinq réponses mesurées exactes, donc le minimum Forge 32K n'est actuellement pas atteint | lancer la baseline sous pression ou confondre allocation, rétention et qualité métier produirait une référence non représentative | le worker idle doit recertifier au moins 32K lorsque la mémoire redevient suffisante; puis exécuter holdout local, co-résidence, sonde Cloud longue sans `num_ctx` et campagne Forge verrouillée avant fermeture |
 
 ## Règles d'évolution
 

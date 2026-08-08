@@ -95,6 +95,7 @@ def _machine_fingerprint(hardware: dict[str, Any]) -> dict[str, Any]:
     return {
         "vendor": str(hardware.get("vendor") or "unknown"),
         "gpu": str(hardware.get("gpu") or "unknown"),
+        "driver_version": str(hardware.get("driver_version") or "unknown"),
         "vram_gb": round(float(hardware.get("vram_gb") or 0), 1),
         "ram_gb": round(float(hardware.get("ram_gb") or 0), 1),
     }
@@ -176,6 +177,8 @@ def _verify_candidate(
     started = time.monotonic()
     process: subprocess.Popen[Any] | None = None
     runs: list[dict[str, Any]] = []
+    warmup: dict[str, Any] | None = None
+    oracle_warmup: dict[str, Any] | None = None
     try:
         with log_path.open("w", encoding="utf-8", errors="replace") as log:
             process = subprocess.Popen(
@@ -186,6 +189,49 @@ def _verify_candidate(
                 creationflags=creation_flags,
             )
             _wait_ready(base_url, process)
+            warmup_started = time.monotonic()
+            warmup_response = _request_json(
+                f"{base_url}/api/generate",
+                payload={
+                    "model": model,
+                    "prompt": ".",
+                    "stream": False,
+                    "think": False,
+                    "keep_alive": "2m",
+                    "options": {"temperature": 0, "num_predict": 1},
+                },
+                timeout=180,
+            )
+            warmup = {
+                "duration_ms": round((time.monotonic() - warmup_started) * 1000, 1),
+                "load_duration_ns": int(warmup_response.get("load_duration") or 0),
+                "excluded_from_quality_oracle": True,
+            }
+            oracle_warmup_started = time.monotonic()
+            oracle_warmup_response = _request_json(
+                f"{base_url}/api/generate",
+                payload={
+                    "model": model,
+                    "prompt": "Écris exactement CALIBRATION_OK et rien d'autre.",
+                    "stream": False,
+                    "think": False,
+                    "keep_alive": "2m",
+                    "options": {"temperature": 0, "num_predict": 256},
+                },
+                timeout=180,
+            )
+            oracle_warmup_answer = _extract_final_answer(
+                str(oracle_warmup_response.get("response") or "")
+            )
+            oracle_warmup = {
+                "duration_ms": round(
+                    (time.monotonic() - oracle_warmup_started) * 1000, 1
+                ),
+                "output_contract_passed": (
+                    oracle_warmup_answer.casefold() == "calibration_ok"
+                ),
+                "excluded_from_quality_oracle": True,
+            }
             for _ in range(repetitions):
                 run_started = time.monotonic()
                 response = _request_json(
@@ -245,6 +291,8 @@ def _verify_candidate(
         "gpu_residency_ratio": round(size_vram / size, 4) if size and size_vram <= size else None,
         "flash_attention_requested": True,
         "parallel": 1,
+        "warmup": warmup,
+        "oracle_warmup": oracle_warmup,
         "runs": runs,
         "total_duration_ms": round((time.monotonic() - started) * 1000, 1),
         "temporary_log_scope": "os_temp_ephemeral_not_preserved",
@@ -305,7 +353,7 @@ def main() -> int:
     selected = max(passing, key=lambda item: _candidate_score(item, minimum_tokens)) if passing else None
     fingerprint = _machine_fingerprint(hardware)
     profile = {
-        "schema": "marvin.ollama-context-profile/1.0",
+        "schema": "marvin.ollama-context-profile/1.1",
         "generated_at": datetime.now(UTC).isoformat(),
         "status": "verified" if selected else "calculated_pending_verification",
         "machine": fingerprint,
@@ -326,12 +374,17 @@ def main() -> int:
     allowed_roots = [(ROOT / "data" / "install").resolve(), (ROOT / "benchmarks" / "windows-operator" / "campaigns").resolve()]
     if not any(output == root or root in output.parents for root in allowed_roots) or output.suffix.casefold() != ".json":
         raise ValueError("La sortie doit rester dans data/install ou benchmarks/windows-operator/campaigns.")
-    _atomic_write(output, profile)
+    report_output = output
+    if output == DEFAULT_PROFILE.resolve() and not selected:
+        # Un échec de calibration ne doit jamais détruire le dernier profil actif
+        # certifié. Le diagnostic reste disponible dans un sidecar atomique borné.
+        report_output = output.with_name("ollama-context-profile.last-failed.json")
+    _atomic_write(report_output, profile)
     installed_profile = None
     if args.install_profile and selected:
         _atomic_write(DEFAULT_PROFILE, profile)
         installed_profile = str(DEFAULT_PROFILE)
-    print(json.dumps({"output": str(output), "installed_profile": installed_profile, "status": profile["status"], "model": model["name"], "selected": selected}, ensure_ascii=False))
+    print(json.dumps({"output": str(report_output), "installed_profile": installed_profile, "status": profile["status"], "model": model["name"], "selected": selected}, ensure_ascii=False))
     return 0 if selected or not args.verify else 2
 
 

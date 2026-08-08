@@ -21,6 +21,7 @@ def _fingerprint(hardware: dict) -> dict:
     return {
         "vendor": str(hardware.get("vendor") or "unknown"),
         "gpu": str(hardware.get("gpu") or "unknown"),
+        "driver_version": str(hardware.get("driver_version") or "unknown"),
         "vram_gb": round(float(hardware.get("vram_gb") or 0), 1),
         "ram_gb": round(float(hardware.get("ram_gb") or 0), 1),
     }
@@ -41,7 +42,7 @@ def resolve(path: Path = PROFILE) -> dict:
         return bootstrap
     machine = _fingerprint(auto_config.detect_hardware())
     if (
-        profile.get("schema") != "marvin.ollama-context-profile/1.0"
+        profile.get("schema") != "marvin.ollama-context-profile/1.1"
         or profile.get("status") != "verified"
         or profile.get("machine_key") != context_policy.machine_profile_key(machine)
         or not isinstance(profile.get("selected"), dict)

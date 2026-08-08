@@ -90,7 +90,7 @@ def run() -> dict[str, int]:
         raise ContractError("L'amélioration proactive doit rester obligatoire par tranche.")
     if not all(
         marker in text
-        for marker in ("14 JSONL classifiés", "preuves chaînées")
+        for marker in ("16 JSONL classifiés", "preuves chaînées")
     ):
         raise ContractError("La preuve d'inventaire des persistances JSONL doit rester visible.")
     for requirement in (

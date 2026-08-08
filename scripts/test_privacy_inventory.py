@@ -24,7 +24,7 @@ def main() -> int:
     }
     actual = {(item.module, item.file_pattern) for item in privacy_inventory.STREAMS}
     assert actual == expected, {"missing": sorted(expected - actual), "extra": sorted(actual - expected)}
-    assert len(actual) == len(privacy_inventory.STREAMS) == 14
+    assert len(actual) == len(privacy_inventory.STREAMS) == 16
     allowed_classes = {"indirect_identifier", "free_text", "public_reference", "technical_metadata"}
     for stream in privacy_inventory.STREAMS:
         assert stream.data_class in allowed_classes
@@ -35,9 +35,9 @@ def main() -> int:
         if stream.erasure_strategy == "rechain_required":
             assert stream.subject_selectors
     public = privacy_inventory.public_inventory()
-    assert len(public) == 14
+    assert len(public) == 16
     assert all("records" not in row and "values" not in row for row in public)
-    print("Privacy inventory OK - 14/14 flux classifiés, sélecteurs et stratégie explicites.")
+    print("Privacy inventory OK - 16/16 flux classifiés, sélecteurs et stratégie explicites.")
     return 0
 
 

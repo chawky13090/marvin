@@ -32,6 +32,8 @@ CALIBRATOR_SPEC.loader.exec_module(calibrator)
 def main() -> int:
     calibration_source = (ROOT / "scripts" / "calibrate-ollama-context.py").read_text(encoding="utf-8")
     assert '"taskkill.exe", "/PID", str(process.pid), "/T", "/F"' in calibration_source
+    assert "ollama-context-profile.last-failed.json" in calibration_source
+    assert '"excluded_from_quality_oracle": True' in calibration_source
     assert calibrator._extract_final_answer(
         "raisonnement qui cite CALIBRATION_OK sans répondre"
     ) != "CALIBRATION_OK"
@@ -45,7 +47,7 @@ def main() -> int:
         path.write_text(
             json.dumps(
                 {
-                    "schema": "marvin.ollama-context-profile/1.0",
+                    "schema": "marvin.ollama-context-profile/1.1",
                     "status": "verified",
                     "machine_key": ollama_context_policy.machine_profile_key(machine),
                     "model": "qwen:4b",
@@ -60,6 +62,10 @@ def main() -> int:
         assert result["context_tokens"] == 32768
         assert result["kv_cache_type"] == "q8_0"
         payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["schema"] = "marvin.ollama-context-profile/1.0"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        assert resolver.resolve(path)["status"] == "bootstrap_unverified"
+        payload["schema"] = "marvin.ollama-context-profile/1.1"
         payload["machine_key"] = "other-machine"
         path.write_text(json.dumps(payload), encoding="utf-8")
         assert resolver.resolve(path)["status"] == "bootstrap_unverified"

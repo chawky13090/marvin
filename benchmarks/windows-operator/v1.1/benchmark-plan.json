@@ -17,6 +17,9 @@
     "temperature_and_seed_recorded_when_supported": true,
     "ollama_context_evidence_required": true,
     "local_context_policy": "hardware_profile_pinned_per_campaign",
+    "runtime_lock_required": true,
+    "runtime_lock_environment": "MARVIN_FORGE_RUNTIME_LOCK",
+    "runtime_lock_drift_policy": "fail_closed_and_discard_run",
     "cloud_context_policy": "provider_declared_max_without_client_override",
     "cloud_behavioral_retention_test_required": true,
     "quality_and_capability_regression_suite_required": true

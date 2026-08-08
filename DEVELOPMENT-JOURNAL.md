@@ -5,6 +5,57 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.591.0 — Admission Ollama par mission et verrou runtime Forge
+
+Demande : poursuivre la feuille de route validée avec Claude sans lancer `windows_task` avant
+une baseline interprétable. Marvin doit exploiter au mieux chaque machine Windows, ne jamais
+plafonner les modèles Ollama Cloud, conserver son intelligence et rendre les campagnes Forge
+comparables malgré la pression mémoire ou une modification du runtime.
+
+Constats observés : Ollama 0.32.6 tourne sur une GTX 1650 4 Gio, pilote 610.74. La calibration
+exacte de `qwen3:4b` a certifié 16 384 tokens, cache KV q8_0, Flash Attention et parallélisme 1.
+Le runner observé mesure 4 290 091 416 octets, dont 2 314 752 491 en VRAM. Une génération
+identique à froid n'était pas représentative : deux warmups explicitement exclus sont désormais
+séparés des cinq répétitions mesurées, qui ont toutes produit la réponse finale exacte. Sous la
+pression RAM observée après calibration, l'admission réelle a choisi le repli explicite 8192;
+elle n'a ni prétendu que 16K restait soutenable ni modifié le modèle choisi. Un essai échoué
+écrasait auparavant le profil actif; ce défaut a été corrigé avant la certification finale et
+les échecs vont désormais dans `ollama-context-profile.last-failed.json`.
+
+Décision : `ollama_context_admission.py` prend une décision stable au début de chaque mission.
+Pour un modèle local, elle exige matériel et pilote concordants, tag et digest exacts, version
+Ollama exacte, profil 1.1 vérifié, RAM disponible, co-résidence et hystérésis; sinon elle replie
+explicitement à 8192. Pour un modèle Cloud, elle n'envoie jamais `num_ctx` et conserve donc la
+capacité maximale du fournisseur. Le prewarm partage cette décision. Un worker borné tente une
+recertification hors campagne Forge, hors modèle chargé et uniquement avec assez de marge RAM.
+Le lock Forge fige modèle, digest, version Ollama, contexte, cache, Flash Attention,
+parallélisme et SHA-256 du profil; toute dérive bloque la campagne. L'usage normal reste
+adaptatif. Le profil local courant cible le modèle agent exact; les autres tags locaux restent
+sur le repli sûr tant qu'ils ne disposent pas de certification propre.
+
+Sécurité, données et logs : appels Ollama limités au loopback, chemins de locks bornés,
+manifestes validés en liste blanche, aucune commande libre ni donnée utilisateur dans la
+calibration. Les deux journaux JSONL contiennent seulement décisions techniques, raisons et
+métriques bornées; ils utilisent `StructuredJsonlStore`, sont classifiés comme métadonnées
+techniques sans sélecteur personnel et sont conservés 30 jours. L'inventaire passe de 14 à 16
+flux sans migration ni réécriture des données existantes.
+
+Validations réelles : compilation Python et tests ciblés contexte, admission, lock Forge,
+agent, routage, boucle agentique, workers, installateur, runtime Ollama, composition FastAPI,
+inventaires persistance/confidentialité, documentation et architecture réussis. Le lock
+`live-preflight-20260809` a été créé, vérifié contre Ollama puis libéré. La gate finale a exécuté
+262/262 étapes avec succès en 566 secondes : 363 outils, 391 routes, `main.py` à 350 lignes,
+compilation backend et baseline frontend incluses. Après la campagne, le superviseur versionné
+a redémarré Marvin en 74,1 secondes et a observé l'état `ready`, la version 2.591.0, 363 outils,
+Ollama sur 11434, SearXNG sur 8890 et la passerelle HTTPS sur 443.
+
+Rollback : réversion atomique du commit v2.591. Si un lock Forge est actif, exécuter
+`scripts/forge-runtime-lock.py release --lock <chemin>` avant le retour. Pour revenir au repli
+local sûr, arrêter Ollama, archiver puis retirer
+`data/install/ollama-context-profile.json` et relancer Marvin; aucun schéma ni contenu métier
+n'est modifié. Les artefacts de preuve et locks libérés restent autonomes et peuvent être
+archivés sans effet sur le produit.
+
 ## 2026-08-03 — v2.590.0 — Contexte Ollama adaptatif, mesuré et portable
 
 Demande : corriger l'étape 1 Forge après revue Claude/Codex. La configuration locale doit

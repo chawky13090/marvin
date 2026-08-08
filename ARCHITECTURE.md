@@ -56,6 +56,8 @@ flowchart LR
 | `agent_loop_policy.py` | Politiques inter-itérations : repli sensible, relance Skill et refus Forge |
 | `agent_budget_completion.py` | Synthèse terminale sans outil et repli utilisateur lors d'un budget épuisé |
 | `agent_transport.py` | Client HTTP Ollama, payload `/api/chat`, décodage JSONL et erreurs de transport typées |
+| `ollama_context_admission.py` | Admission locale aux frontières de mission : modèle/digest/runtime exacts, pression RAM, co-résidence, hystérésis et absence d'override Cloud |
+| `forge_runtime_lock.py` | Verrou exécutoire des campagnes : modèle, digest, version Ollama, contexte, cache KV, parallélisme, expiration et échec fermé sur dérive |
 | `document_formatting.py` | Projection Markdown commune aux générateurs DOCX/PDF et échappement ReportLab |
 | `document_profile.py` | Identité persistante, champs autorisés et catalogue de modèles documentaires |
 | `action_replay.py` | Reçus transactionnels et déduplication des actions à effet de bord d'un tour chat |

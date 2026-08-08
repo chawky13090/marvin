@@ -389,6 +389,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Matérialisation des outils obligatoires", (python, "scripts/test_agent_required_tools.py")),
         Stage("Configuration modèle et confidentialité", (python, "scripts/test_agent_model_config.py")),
         Stage("Contexte Ollama réellement prouvé", (python, "scripts/test_ollama_context_runtime.py")),
+        Stage("Admission Ollama et verrou Forge", (python, "scripts/test_ollama_context_admission.py")),
         Stage(
             "Contrat Forge Windows Operator",
             (python, "scripts/test_windows_operator_benchmark_contract.py"),

@@ -25,11 +25,13 @@ EXPECTED_ALIASES = {
     "_db_backup_worker": "database_backup_worker",
     "_memory_consolidation_worker": "memory_consolidation_worker",
     "_health_trend_worker": "health_trend_worker",
+    "_ollama_context_recalibration_worker": "ollama_context_recalibration_worker",
 }
 
 EXPECTED_RUNTIME_TASKS = {
     "cron",
     "ollama-prewarm",
+    "ollama-context-recalibration",
     "whisper-prewarm",
     "email-watch",
     "email-automation",
@@ -138,11 +140,36 @@ async def _check_tool_index() -> None:
     assert received is runtime_workers.tool_module.TOOLS_SPEC
 
 
+def _check_context_recalibration_eligibility() -> None:
+    eligible, reason = runtime_workers.context_recalibration_eligibility(
+        "model_digest_drift",
+        loaded_model_count=0,
+        available_ram_bytes=10 * 1024**3,
+        projected_resident_bytes=5 * 1024**3,
+    )
+    assert eligible is True and reason == "idle_resources_available"
+    eligible, reason = runtime_workers.context_recalibration_eligibility(
+        "model_digest_drift",
+        loaded_model_count=1,
+        available_ram_bytes=10 * 1024**3,
+        projected_resident_bytes=5 * 1024**3,
+    )
+    assert eligible is False and reason == "ollama_models_are_resident"
+    eligible, reason = runtime_workers.context_recalibration_eligibility(
+        "runtime_memory_pressure",
+        loaded_model_count=0,
+        available_ram_bytes=10 * 1024**3,
+        projected_resident_bytes=5 * 1024**3,
+    )
+    assert eligible is False and reason == "profile_not_recalibratable"
+
+
 def main() -> int:
     _check_main_contract()
     asyncio.run(_check_prewarm_deduplication())
     asyncio.run(_check_tool_index())
-    print("Runtime Workers OK - facade main, 16 taches, prewarm deduplique et index outils.")
+    _check_context_recalibration_eligibility()
+    print("Runtime Workers OK - facade main, 17 taches, prewarm et recalibration bornes.")
     return 0
 
 

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.590.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.591.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -213,7 +213,26 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.590.0)
+## 9. État actuel (v2.591.0)
+
+**v2.591 (admission locale dynamique et Forge verrouillé)** : un profil local n'est plus
+réutilisé sur la seule identité de la machine. Le schéma 1.1 lie aussi le tag exact, son
+digest, la version Ollama et le pilote GPU. `ollama_context_admission.py` inspecte RAM
+disponible et `/api/ps` à la frontière de chaque mission, tient compte des modèles
+co-résidents, applique une marge d'hystérésis et fige la décision pendant le tour. Seul un
+modèle local reçoit `num_ctx`; le Cloud conserve toujours son maximum fournisseur. Une
+pression mémoire produit un repli 8K explicite et journalisé, jamais un faux statut vérifié.
+Le worker de recalibration attend cinq minutes, refuse toute concurrence avec un modèle
+résident ou une campagne Forge, exige une marge RAM, sérialise son travail et retente chaque
+heure jusqu'à l'objectif matériel. Sous Ollama 0.32.6, pilote NVIDIA 610.74 et environ 4,4 Gio
+de RAM disponible, `qwen3:4b` est honnêtement certifié à 16K/q8_0 : amorçage exclu puis cinq
+réponses mesurées exactes. Le minimum Forge 32K reste donc bloquant et TD-009 reste ouvert.
+`forge_runtime_lock.py` et `forge-runtime-lock.py` rendent le contrat exécutoire : modèle,
+digest, Ollama, profil, contexte, cache, Flash Attention et parallélisme sont épinglés avec
+expiration; toute dérive bloque et invalide l'exécution. Un échec de calibration n'écrase plus
+le dernier profil actif : il écrit un sidecar `last-failed`. Rollback code : réversion
+atomique du commit v2.591. Rollback runtime : libérer le verrou Forge, supprimer le profil
+1.1 et redémarrer; le bootstrap local 8192 s'applique, sans modifier le Cloud ni les données.
 
 **v2.590 (contexte Ollama adaptatif et preuve v1.1)** : la valeur fixe utilisateur 32K est
 supprimée. `ollama_context_policy.py` calcule le coût KV à partir des couches, têtes KV et
