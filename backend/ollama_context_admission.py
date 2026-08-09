@@ -40,6 +40,18 @@ def _is_cloud_model(name: str) -> bool:
     return normalized.endswith(":cloud") or normalized.endswith("-cloud")
 
 
+def _declared_context_tokens(payload: dict[str, Any]) -> int:
+    model_info = payload.get("model_info") if isinstance(payload, dict) else None
+    values = [
+        int(value)
+        for key, value in (model_info or {}).items()
+        if str(key).endswith(".context_length")
+        and isinstance(value, (int, float))
+        and 0 < int(value) <= 10_000_000
+    ]
+    return max(values, default=0)
+
+
 def _environment_int(name: str) -> int:
     try:
         return int(os.getenv(name, "0") or 0)
@@ -168,7 +180,74 @@ class ContextAdmissionController:
             cached = self._mission_decisions.get(stable_id)
         if cached is not None:
             return cached
+        active_lock = forge_runtime_lock.load_active_lock(PROJECT_DIR)
         if _is_cloud_model(model):
+            if active_lock is not None:
+                _lock_path, lock_payload = active_lock
+                runtime = lock_payload.get("runtime") if isinstance(lock_payload, dict) else {}
+                owns_client = client is None
+                http_client = client or httpx.AsyncClient(
+                    timeout=httpx.Timeout(8.0, connect=3.0)
+                )
+                base_url = ollama_url.rstrip("/")
+                try:
+                    version_response, tags_response, show_response = await asyncio.gather(
+                        http_client.get(f"{base_url}/api/version"),
+                        http_client.get(f"{base_url}/api/tags"),
+                        http_client.post(
+                            f"{base_url}/api/show",
+                            json={"model": model, "verbose": False},
+                        ),
+                    )
+                    for response in (version_response, tags_response, show_response):
+                        response.raise_for_status()
+                    installed = self._installed_model(tags_response.json(), model)
+                    errors = forge_runtime_lock.validate_lock_payload(
+                        lock_payload,
+                        model=model,
+                        model_digest=str((installed or {}).get("digest") or ""),
+                        ollama_version=str(version_response.json().get("version") or ""),
+                        context_tokens=0,
+                        kv_cache_type="",
+                        flash_attention=0,
+                        parallel=0,
+                        profile_sha256="",
+                        provider="cloud",
+                        provider_declared_context_tokens=_declared_context_tokens(
+                            show_response.json()
+                        ),
+                        cloud_evidence_sha256=forge_runtime_lock.cloud_evidence_hash(
+                            lock_payload, PROJECT_DIR
+                        ),
+                    )
+                except Exception:
+                    errors = ["cloud_runtime_inspection_failed"]
+                finally:
+                    if owns_client:
+                        await http_client.aclose()
+                if errors:
+                    return self._remember(
+                        stable_id,
+                        ContextAdmission(
+                            status="blocked",
+                            model=model,
+                            context_tokens=None,
+                            reason=errors[0],
+                            profile_verified=False,
+                            forge_locked=True,
+                        ),
+                    )
+                return self._remember(
+                    stable_id,
+                    ContextAdmission(
+                        status="cloud_provider_maximum",
+                        model=model,
+                        context_tokens=None,
+                        reason="forge_cloud_runtime_lock_verified",
+                        profile_verified=True,
+                        forge_locked=True,
+                    ),
+                )
             return self._remember(
                 stable_id,
                 ContextAdmission(
@@ -223,7 +302,6 @@ class ContextAdmissionController:
             != _canonical_model(model)
         ]
 
-        active_lock = forge_runtime_lock.load_active_lock(PROJECT_DIR)
         if active_lock is not None:
             _lock_path, lock_payload = active_lock
             runtime = lock_payload.get("runtime") if isinstance(lock_payload, dict) else {}

@@ -5,6 +5,41 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.598.0 — Verrou Forge Cloud exact et falsifiable
+
+Demande : préserver la capacité maximale des modèles Ollama Cloud, empêcher un changement
+silencieux de modèle entre baseline et rejeu et conserver une mesure Forge interprétable.
+
+Constat : le verrou 1.0 ne couvrait que les profils locaux. L'admission Cloud retournait
+avant de lire `MARVIN_FORGE_RUNTIME_LOCK`; une campagne pouvait donc router vers un autre tag
+Cloud sans être bloquée. `/api/show` déclarait bien la capacité du tag mais `/api/ps` ne peut
+pas observer l'allocation interne du fournisseur.
+
+Décision : le schéma 1.1 distingue `local` et `cloud`. Pour le Cloud, il fige tag exact,
+digest de l'inventaire `/api/tags`, version Ollama, capacité déclarée par `/api/show`, absence
+d'override client et empreinte SHA-256 d'une preuve de rétention comportementale. Il conserve
+`cloud_runtime_allocation=unavailable` et `provider_maximum_proven=false` : aucune capacité
+interne n'est inventée. L'admission vérifie ces invariants avant chaque mission verrouillée et
+échoue fermée sur dérive ou indisponibilité. Le chemin de preuve reste borné au dossier des
+campagnes; les locks 1.0 historiques restent libérables.
+
+Preuves réelles : `qwen3.5:397b-cloud`, digest exact commençant par `a7bf6f78`, Ollama
+0.32.6 et capacité déclarée 262 144. La sonde sans `num_ctx` a évalué 155 007 tokens et
+restitué le jeton placé au début. Le lock réel a été créé, vérifié puis libéré. Une admission
+réelle accepte ce modèle avec `forgeLocked=true`; `minimax-m3:cloud` sous le même lock est
+bloqué par `model_drift`. Les tests ciblés couvrent preuve modifiée, capacité réduite,
+identité exacte, compatibilité locale et contrat Forge. Après redémarrage officiel en
+69,8 s, Marvin est `ready` en v2.598.0 avec 363 outils, Ollama, SearXNG et HTTPS. La gate
+exhaustive finale passe 270/270 en 784,2 s; rapport :
+`artifacts/check-marvin-v2598-live-final.json`.
+
+Sécurité, logs et rollback : la preuve ne contient ni prompt, ni réponse, ni secret; seulement
+des métadonnées techniques, un hash de sentinelle et des compteurs. Aucun nouveau log ni flux
+personnel n'est créé. Le rollback est la réversion atomique du commit v2.598; avant retour,
+libérer tout lock actif avec `scripts/forge-runtime-lock.py release --lock <chemin>`. Les
+preuves et locks libérés sont autonomes et peuvent être archivés ou supprimés sans effet sur
+Marvin.
+
 ## 2026-08-09 — v2.597.0 — Matrice de panne des quatre profils
 
 Demande : optimiser Normal, Hyper, Tout cloud et Ultra pour une résilience maximale sur

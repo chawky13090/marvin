@@ -1,0 +1,39 @@
+{
+  "schema": "marvin.forge-runtime-lock/1.1",
+  "status": "released",
+  "campaign_id": "cloud-preflight-20260809",
+  "created_at": "2026-08-09T12:37:44.586342+00:00",
+  "expires_at": "2026-08-09T13:37:44.586342+00:00",
+  "dynamic_routing_allowed": false,
+  "profile_path_scope": "cloud_not_applicable",
+  "profile_sha256": "",
+  "runtime": {
+    "provider": "cloud",
+    "model": "qwen3.5:397b-cloud",
+    "model_digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca",
+    "ollama_version": "0.32.6",
+    "context_tokens": null,
+    "provider_declared_context_tokens": 262144,
+    "client_context_override": false,
+    "cloud_runtime_allocation": "unavailable",
+    "kv_cache_type": "",
+    "flash_attention": null,
+    "parallel": null,
+    "temperature": 0.1,
+    "seed": 0
+  },
+  "validation": {
+    "required_before_every_run": true,
+    "loaded_context_must_match_when_model_is_resident": true,
+    "interrupted_run_must_be_discarded": true
+  },
+  "cloud_evidence_path": "benchmarks/windows-operator/campaigns/preflight-20260809/cloud-retention-qwen3.5-397b.json",
+  "cloud_evidence_sha256": "c4f0b2e0efde4de06cbb78572e9c900ca5a31f99a282ad776473a3e638fa9855",
+  "cloud_behavioral_retention": {
+    "status": "verified_at_tested_depth",
+    "observed_prompt_tokens": 155007,
+    "minimum_prompt_tokens": 32768,
+    "provider_maximum_proven": false
+  },
+  "released_at": "2026-08-09T12:37:45.313143+00:00"
+}

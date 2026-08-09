@@ -1,0 +1,13 @@
+{
+  "schema": "marvin.ollama-cloud-context-behavior/1.0",
+  "captured_at": "2026-08-09T12:31:29.418644+00:00",
+  "model": "qwen3.5:397b-cloud",
+  "status": "verified_at_tested_depth",
+  "client_context_override": null,
+  "minimum_prompt_tokens": 32768,
+  "observed_prompt_tokens": 155007,
+  "sentinel_sha256": "3f0aa6d5117eeef9435d2bf0c19074736ad1fc8dac892bd5c8648cc55aca4063",
+  "sentinel_retrieved": true,
+  "provider_maximum_proven": false,
+  "note": "La sonde prouve la rétention à la profondeur observée, pas l'allocation maximale interne du fournisseur."
+}

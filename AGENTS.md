@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.597.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.598.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.597.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.598.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.597.0)
+## 9. État actuel (v2.598.0)
+
+**v2.598 (verrou Forge Cloud)** : une campagne Cloud fige désormais le fournisseur, le tag
+exact, son digest Ollama, la version Ollama et la capacité déclarée par `/api/show`. Elle
+refuse toute création sans preuve comportementale longue liée au même tag, sans override
+`num_ctx`; l'empreinte de cette preuve est revérifiée avant chaque exécution. L'allocation
+interne du fournisseur reste explicitement `unavailable`, jamais présentée comme observée.
+L'admission bloque un autre modèle, un digest/capacité modifié, une preuve altérée ou une
+inspection indisponible. Sur `qwen3.5:397b-cloud`, la capacité déclarée est 262 144 tokens et
+la sonde réelle a restitué le jeton initial après 155 007 tokens évalués. Le lock 1.1 a été
+créé, vérifié puis libéré. Rollback : réversion atomique du commit v2.598; les locks 1.0
+restent libérables et aucune donnée métier n'est modifiée.
 
 **v2.597 (pannes des quatre profils)** : Normal, Hyper, Tout cloud et Ultra possèdent une
 matrice exécutable couvrant contenus publics/sensibles, Cloud disponible/absent, repli local

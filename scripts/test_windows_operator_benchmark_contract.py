@@ -94,6 +94,8 @@ def main() -> int:
     agent_source = (ROOT / "backend" / "agent.py").read_text(encoding="utf-8")
     admission_source = (ROOT / "backend" / "ollama_context_admission.py").read_text(encoding="utf-8")
     cloud_probe = (ROOT / "scripts" / "probe-ollama-cloud-context.py").read_text(encoding="utf-8")
+    runtime_lock = (ROOT / "backend" / "forge_runtime_lock.py").read_text(encoding="utf-8")
+    runtime_lock_cli = (ROOT / "scripts" / "forge-runtime-lock.py").read_text(encoding="utf-8")
     assert "cloud_provider_declared_max" in runtime_source
     assert '"options": {"num_ctx"' not in agent_source
     assert "'options': {'num_ctx'" not in agent_source
@@ -101,6 +103,10 @@ def main() -> int:
     assert "cloud_client_override_absent" in admission_source
     assert '"num_ctx"' not in cloud_probe
     assert '"client_context_override": None' in cloud_probe
+    assert "provider_declared_context_tokens" in runtime_lock
+    assert "cloud_evidence_sha256" in runtime_lock
+    assert 'choices=("auto", "local", "cloud")' in runtime_lock_cli
+    assert "Une preuve comportementale Cloud est obligatoire" in runtime_lock_cli
 
     print("Windows operator benchmark contract OK - seuils, répétitions et isolation figés.")
     return 0

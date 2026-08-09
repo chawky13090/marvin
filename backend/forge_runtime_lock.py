@@ -16,8 +16,10 @@ from pathlib import Path
 from typing import Any
 
 
-SCHEMA = "marvin.forge-runtime-lock/1.0"
+SCHEMA = "marvin.forge-runtime-lock/1.1"
+RELEASABLE_SCHEMAS = {"marvin.forge-runtime-lock/1.0", SCHEMA}
 _CAMPAIGN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+_PROVIDERS = {"local", "cloud"}
 
 
 class ForgeRuntimeDriftError(RuntimeError):
@@ -60,6 +62,9 @@ def validate_lock_payload(
     flash_attention: int,
     parallel: int,
     profile_sha256: str,
+    provider: str | None = None,
+    provider_declared_context_tokens: int = 0,
+    cloud_evidence_sha256: str = "",
     now: datetime | None = None,
 ) -> list[str]:
     """Retourne des codes de dérive stables, sans contenu ni secret."""
@@ -72,7 +77,12 @@ def validate_lock_payload(
     expected = payload.get("runtime")
     if not isinstance(expected, dict):
         return [*errors, "runtime_contract_missing"]
+    expected_provider = str(expected.get("provider") or "local").casefold()
+    actual_provider = str(provider or expected_provider).casefold()
+    if expected_provider not in _PROVIDERS:
+        errors.append("runtime_provider_invalid")
     comparisons = {
+        "provider_drift": (expected_provider, actual_provider),
         "model_drift": (str(expected.get("model") or ""), str(model or "")),
         "model_digest_drift": (
             str(expected.get("model_digest") or ""),
@@ -82,27 +92,53 @@ def validate_lock_payload(
             str(expected.get("ollama_version") or ""),
             str(ollama_version or ""),
         ),
-        "context_drift": (
-            int(expected.get("context_tokens") or 0),
-            int(context_tokens or 0),
-        ),
-        "kv_cache_drift": (
-            str(expected.get("kv_cache_type") or ""),
-            str(kv_cache_type or ""),
-        ),
-        "parallel_drift": (
-            int(expected.get("parallel") or 0),
-            int(parallel or 0),
-        ),
-        "flash_attention_drift": (
-            int(expected.get("flash_attention") or 0),
-            int(flash_attention or 0),
-        ),
-        "profile_drift": (
-            str(payload.get("profile_sha256") or ""),
-            str(profile_sha256 or ""),
-        ),
     }
+    if expected_provider == "cloud":
+        comparisons.update(
+            {
+                "provider_context_drift": (
+                    int(expected.get("provider_declared_context_tokens") or 0),
+                    int(provider_declared_context_tokens or 0),
+                ),
+                "cloud_evidence_drift": (
+                    str(payload.get("cloud_evidence_sha256") or ""),
+                    str(cloud_evidence_sha256 or ""),
+                ),
+            }
+        )
+        if expected.get("client_context_override") is not False:
+            errors.append("cloud_client_context_override_present")
+        if expected.get("cloud_runtime_allocation") != "unavailable":
+            errors.append("cloud_runtime_allocation_overstated")
+        if int(expected.get("provider_declared_context_tokens") or 0) <= 0:
+            errors.append("provider_context_missing")
+        if not str(payload.get("cloud_evidence_sha256") or ""):
+            errors.append("cloud_evidence_missing")
+    else:
+        comparisons.update(
+            {
+                "context_drift": (
+                    int(expected.get("context_tokens") or 0),
+                    int(context_tokens or 0),
+                ),
+                "kv_cache_drift": (
+                    str(expected.get("kv_cache_type") or ""),
+                    str(kv_cache_type or ""),
+                ),
+                "parallel_drift": (
+                    int(expected.get("parallel") or 0),
+                    int(parallel or 0),
+                ),
+                "flash_attention_drift": (
+                    int(expected.get("flash_attention") or 0),
+                    int(flash_attention or 0),
+                ),
+                "profile_drift": (
+                    str(payload.get("profile_sha256") or ""),
+                    str(profile_sha256 or ""),
+                ),
+            }
+        )
     errors.extend(code for code, pair in comparisons.items() if pair[0] != pair[1])
     expires_at = parse_timestamp(payload.get("expires_at"))
     current = (now or datetime.now(UTC)).astimezone(UTC)
@@ -124,6 +160,32 @@ def allowed_lock_path(raw_path: str | os.PathLike[str], root: Path) -> Path:
     ):
         raise ValueError("Chemin de verrou Forge hors périmètre autorisé.")
     return path
+
+
+def allowed_cloud_evidence_path(raw_path: str | os.PathLike[str], root: Path) -> Path:
+    """Borne une preuve Cloud aux campagnes Forge versionnées/locales."""
+
+    path = Path(raw_path).resolve()
+    allowed = (root / "benchmarks" / "windows-operator" / "campaigns").resolve()
+    if path.suffix.casefold() != ".json" or allowed not in path.parents:
+        raise ValueError("Preuve Cloud Forge hors périmètre autorisé.")
+    return path
+
+
+def cloud_evidence_hash(payload: dict[str, Any], root: Path) -> str:
+    """Retourne l'empreinte observée d'une preuve Cloud référencée par le lock."""
+
+    raw_path = str(payload.get("cloud_evidence_path") or "").strip()
+    if not raw_path:
+        return ""
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = root / path
+    try:
+        allowed = allowed_cloud_evidence_path(path, root)
+    except ValueError:
+        return ""
+    return file_sha256(allowed) if allowed.is_file() else ""
 
 
 def load_active_lock(root: Path) -> tuple[Path, dict[str, Any]] | None:

@@ -1,6 +1,11 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-09 : **v2.597.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-09 : **v2.598.0, 363 outils, 391 routes FastAPI**.
+
+Forge Cloud utilise le verrou `marvin.forge-runtime-lock/1.1` : tag et digest exacts,
+version Ollama, capacité déclarée, absence de `num_ctx` et empreinte de la sonde longue sont
+revérifiés. L'allocation interne du fournisseur reste volontairement déclarée indisponible.
+La preuve réelle `qwen3.5:397b-cloud` a retenu 155 007 tokens sur 262 144 déclarés.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 

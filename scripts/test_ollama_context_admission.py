@@ -44,8 +44,17 @@ class FakeResponse:
 
 
 class FakeClient:
-    def __init__(self, *, digest: str = "digest-1", loaded: list[dict] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        digest: str = "digest-1",
+        cloud_digest: str = "cloud-digest-1",
+        cloud_context: int = 262_144,
+        loaded: list[dict] | None = None,
+    ) -> None:
         self.digest = digest
+        self.cloud_digest = cloud_digest
+        self.cloud_context = cloud_context
         self.loaded = loaded or []
         self.calls = 0
 
@@ -55,11 +64,27 @@ class FakeClient:
             return FakeResponse({"version": "0.32.5"})
         if url.endswith("/api/tags"):
             return FakeResponse(
-                {"models": [{"name": "qwen3:4b", "digest": self.digest}]}
+                {
+                    "models": [
+                        {"name": "qwen3:4b", "digest": self.digest},
+                        {
+                            "name": "qwen3.5:397b-cloud",
+                            "digest": self.cloud_digest,
+                        },
+                    ]
+                }
             )
         if url.endswith("/api/ps"):
             return FakeResponse({"models": self.loaded})
         raise AssertionError(url)
+
+    async def post(self, url: str, *, json: dict) -> FakeResponse:
+        self.calls += 1
+        if url.endswith("/api/show") and json.get("model") == "qwen3.5:397b-cloud":
+            return FakeResponse(
+                {"model_info": {"qwen3.5.context_length": self.cloud_context}}
+            )
+        raise AssertionError((url, json))
 
 
 def _profile() -> dict:
@@ -223,6 +248,62 @@ async def _run() -> None:
                 )
                 assert blocked.status == "blocked"
                 assert blocked.reason == "parallel_drift"
+
+            cloud_lock = {
+                "schema": forge_runtime_lock.SCHEMA,
+                "status": "active",
+                "dynamic_routing_allowed": False,
+                "expires_at": (now + timedelta(hours=1)).isoformat(),
+                "profile_sha256": "",
+                "cloud_evidence_path": "benchmarks/windows-operator/campaigns/test/cloud.json",
+                "cloud_evidence_sha256": "cloud-proof-hash",
+                "runtime": {
+                    "provider": "cloud",
+                    "model": "qwen3.5:397b-cloud",
+                    "model_digest": "cloud-digest-1",
+                    "ollama_version": "0.32.5",
+                    "context_tokens": None,
+                    "provider_declared_context_tokens": 262_144,
+                    "client_context_override": False,
+                    "cloud_runtime_allocation": "unavailable",
+                    "kv_cache_type": "",
+                    "flash_attention": None,
+                    "parallel": None,
+                },
+            }
+            cloud_locked_controller = admission.ContextAdmissionController(
+                profile_path=profile_path,
+                hardware_detector=lambda: dict(HARDWARE),
+                log_store=store,
+            )
+            with (
+                patch.object(
+                    forge_runtime_lock,
+                    "load_active_lock",
+                    return_value=(temp_path / "cloud-lock.json", cloud_lock),
+                ),
+                patch.object(
+                    forge_runtime_lock,
+                    "cloud_evidence_hash",
+                    return_value="cloud-proof-hash",
+                ),
+            ):
+                cloud_locked = await cloud_locked_controller.admit(
+                    "qwen3.5:397b-cloud",
+                    mission_id="cloud-locked-1",
+                    client=FakeClient(),
+                )
+                assert cloud_locked.status == "cloud_provider_maximum"
+                assert cloud_locked.forge_locked is True
+                assert cloud_locked.request_options() == {}
+
+                cloud_drift = await cloud_locked_controller.admit(
+                    "qwen3.5:397b-cloud",
+                    mission_id="cloud-locked-2",
+                    client=FakeClient(cloud_context=131_072),
+                )
+                assert cloud_drift.status == "blocked"
+                assert cloud_drift.reason == "provider_context_drift"
 
             records = store.recent(20)
             assert records
