@@ -5,6 +5,39 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.604.0 — Verdict Forge, rollback réel et empreintes portables
+
+Demande : terminer la tranche Windows selon les seuils pré-enregistrés, prouver le rollback et
+ne pas confondre une amélioration d'ingénierie avec une diffusion générale parfaite.
+
+Résultat : `evaluate_windows_operator_candidate.py` conclut mécaniquement
+`engineering_accepted_with_efficiency_debt`. Le contrat généralisé et le seuil d'ingénierie
+sont satisfaits : développement 45/50, holdout source-fermé 25/25, 75 exécutions réelles,
+réduction de 50 % du taux d'échec, zéro faux succès, zéro régression fonctionnelle et zéro
+confirmation redondante. La diffusion générale reste bloquée jusqu'à 300 exécutions sans faux
+succès. La médiane reste deux étapes, ratio 1,0 contre la cible 0,75; TD-010 demeure ouverte.
+
+Rollback réel : dans un worktree jetable distinct, les commits v2.600 à v2.603 ont été révertis
+sans conflit. L'index obtenu est identique à l'arbre v2.599 et `check_architecture.py` confirme
+Marvin 2.599.0, 363 outils, 391 routes, harness 363/363 et 81 restrictions. Le produit actif et
+les données utilisateur n'ont pas été touchés; le worktree a été retiré proprement.
+
+Incident utile : le test du corpus restauré échouait sur un checkout Windows bien que l'arbre
+Git soit identique. Cause prouvée : Git convertissait les fichiers texte gelés de LF vers CRLF
+et le test hachait les octets du checkout. Le test canonicalise désormais uniquement CRLF/LF
+pour les textes du contrat. La preuve runtime externe conserve son SHA-256 binaire exact.
+
+Sécurité et observabilité : aucune capacité, autorisation, donnée, secret, schéma ni politique
+de logs n'est modifié. Les preuves Forge sont des artefacts métier versionnés; les campagnes
+intermédiaires, verrous runtime et conversations de test restent exclus. Rollback v2.604 :
+réversion atomique du commit puis redémarrage contrôlé de Marvin.
+
+Validation finale du produit : verrou Forge libéré, redémarrage normal réussi en 160,2 s,
+runtime `ready` en v2.604.0 avec 364 outils, Ollama 11434, SearXNG 8890 et HTTPS 443. La gate
+live complète rejouée sur ce runtime passe 273/273 étapes en 834,4 s, notamment architecture,
+364 harness, sécurité, persistance, documents, domaines d'outils, frontend Turbopack, API,
+41 pages, chat persistant et vocal sérialisé.
+
 ## 2026-08-09 — v2.603.0 — Holdout Windows fermé et décision Forge mécanisée
 
 Demande : aller jusqu'au verdict reproductible du plan validé avec Claude, sans ajuster le

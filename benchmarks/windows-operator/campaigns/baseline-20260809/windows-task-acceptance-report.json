@@ -1,0 +1,343 @@
+{
+  "schema": "marvin.windows-task-acceptance-report/1.0",
+  "status": "engineering_accepted_with_efficiency_debt",
+  "outcome": {
+    "generalized_contract_met": true,
+    "engineering_evidence_met": true,
+    "general_release_evidence_met": false,
+    "general_release_blocker": "300 exécutions réelles sans faux succès requises"
+  },
+  "metrics": {
+    "baseline_success_rate": 0.8,
+    "candidate_success_rate": 0.9,
+    "holdout_success_rate": 1.0,
+    "success_rate_gain_points": 0.1,
+    "failure_rate_reduction": 0.5,
+    "false_success_count": 0,
+    "functional_regression_count": 0,
+    "intelligence_regression_count": 0,
+    "reversible_rollback_success_rate": 1.0,
+    "redundant_confirmation_count": 0,
+    "engineering_live_runs": 75
+  },
+  "efficiency": {
+    "baseline_median_steps": 2.0,
+    "candidate_median_steps": 2.0,
+    "median_step_ratio": 1.0,
+    "maximum_ratio": 0.75,
+    "met": false
+  },
+  "routing_diagnostic": {
+    "development": {
+      "runs": 240,
+      "passed": 132,
+      "failed": 108,
+      "success_rate": 0.55,
+      "forbidden_route_count": 0,
+      "false_success_measurable": false,
+      "false_success_count": null,
+      "stable_intents": 46,
+      "intent_count": 80,
+      "repeat_stability_rate": 0.575,
+      "median_duration_ms": 14750,
+      "by_family": {
+        "application_launch": {
+          "runs": 18,
+          "passed": 15,
+          "failed": 3,
+          "selected": {
+            "windows_task": 15,
+            "computer_control": 2,
+            "pc_open_app": 1
+          },
+          "success_rate": 0.8333
+        },
+        "desktop_observation": {
+          "runs": 21,
+          "passed": 21,
+          "failed": 0,
+          "selected": {
+            "computer_control": 21
+          },
+          "success_rate": 1.0
+        },
+        "file_discovery": {
+          "runs": 18,
+          "passed": 0,
+          "failed": 18,
+          "selected": {
+            "file_find": 8,
+            "pc_file_search": 4,
+            "pc_find_files": 2,
+            "unified_search": 2,
+            "pc_search_files": 1,
+            "system_search_content": 1
+          },
+          "success_rate": 0.0
+        },
+        "file_mutation": {
+          "runs": 21,
+          "passed": 0,
+          "failed": 21,
+          "selected": {
+            "file_find": 14,
+            "windows_task": 2,
+            "code_workspace_status": 1,
+            "computer_control": 1
+          },
+          "success_rate": 0.0
+        },
+        "network_diagnostics": {
+          "runs": 18,
+          "passed": 7,
+          "failed": 11,
+          "selected": {
+            "windows_task": 8,
+            "net_route_diagnostics": 7,
+            "net_dns_lookup": 6,
+            "net_traceroute": 3,
+            "net_ping": 2,
+            "computer_control": 1
+          },
+          "success_rate": 0.3889
+        },
+        "process_action": {
+          "runs": 21,
+          "passed": 6,
+          "failed": 15,
+          "selected": {
+            "computer_control": 15,
+            "windows_task": 6
+          },
+          "success_rate": 0.2857
+        },
+        "process_inventory": {
+          "runs": 21,
+          "passed": 19,
+          "failed": 2,
+          "selected": {
+            "windows_task": 19,
+            "computer_control": 2
+          },
+          "success_rate": 0.9048
+        },
+        "security_posture": {
+          "runs": 21,
+          "passed": 19,
+          "failed": 2,
+          "selected": {
+            "windows_task": 19,
+            "computer_control": 1,
+            "os_firewall": 1
+          },
+          "success_rate": 0.9048
+        },
+        "software_management": {
+          "runs": 21,
+          "passed": 4,
+          "failed": 17,
+          "selected": {
+            "winget_search": 9,
+            "computer_control": 7,
+            "winget_install": 4,
+            "windows_task": 1
+          },
+          "success_rate": 0.1905
+        },
+        "system_diagnostics": {
+          "runs": 21,
+          "passed": 11,
+          "failed": 10,
+          "selected": {
+            "windows_task": 13,
+            "win_system_report": 11,
+            "pc_event_log_errors": 10,
+            "pc_disk_smart_health": 7,
+            "pc_hardware_specs": 6,
+            "pc_hardware_temps": 6,
+            "pc_health_trend": 5,
+            "pc_system_info": 2,
+            "pc_gpu_status": 1,
+            "pc_installed_software": 1
+          },
+          "success_rate": 0.5238
+        },
+        "text_only_command": {
+          "runs": 18,
+          "passed": 18,
+          "failed": 0,
+          "selected": {},
+          "success_rate": 1.0
+        },
+        "windows_services": {
+          "runs": 21,
+          "passed": 12,
+          "failed": 9,
+          "selected": {
+            "win_service_action": 12,
+            "computer_control": 4,
+            "windows_task": 4,
+            "pc_run_powershell": 1
+          },
+          "success_rate": 0.5714
+        }
+      }
+    },
+    "holdout": {
+      "runs": 120,
+      "passed": 49,
+      "failed": 71,
+      "success_rate": 0.4083,
+      "forbidden_route_count": 0,
+      "false_success_measurable": false,
+      "false_success_count": null,
+      "stable_intents": 20,
+      "intent_count": 40,
+      "repeat_stability_rate": 0.5,
+      "median_duration_ms": 10698,
+      "by_family": {
+        "application_launch": {
+          "runs": 12,
+          "passed": 6,
+          "failed": 6,
+          "selected": {
+            "computer_control": 6,
+            "windows_task": 6
+          },
+          "success_rate": 0.5
+        },
+        "desktop_observation": {
+          "runs": 9,
+          "passed": 6,
+          "failed": 3,
+          "selected": {
+            "computer_control": 6,
+            "pc_gui_read": 2
+          },
+          "success_rate": 0.6667
+        },
+        "file_discovery": {
+          "runs": 12,
+          "passed": 0,
+          "failed": 12,
+          "selected": {
+            "pc_file_search": 5,
+            "file_find": 3,
+            "pc_find_files": 2,
+            "find_files": 1,
+            "system_search_content": 1
+          },
+          "success_rate": 0.0
+        },
+        "file_mutation": {
+          "runs": 9,
+          "passed": 0,
+          "failed": 9,
+          "selected": {
+            "computer_control": 3,
+            "file_find": 2,
+            "file_large_finder": 1,
+            "file_search_text": 1
+          },
+          "success_rate": 0.0
+        },
+        "network_diagnostics": {
+          "runs": 12,
+          "passed": 3,
+          "failed": 9,
+          "selected": {
+            "computer_control": 3,
+            "net_route_diagnostics": 3,
+            "net_traceroute": 3
+          },
+          "success_rate": 0.25
+        },
+        "process_action": {
+          "runs": 9,
+          "passed": 3,
+          "failed": 6,
+          "selected": {
+            "computer_control": 6,
+            "windows_task": 3
+          },
+          "success_rate": 0.3333
+        },
+        "process_inventory": {
+          "runs": 9,
+          "passed": 5,
+          "failed": 4,
+          "selected": {
+            "windows_task": 5,
+            "task_list": 3,
+            "computer_control": 1
+          },
+          "success_rate": 0.5556
+        },
+        "security_posture": {
+          "runs": 9,
+          "passed": 8,
+          "failed": 1,
+          "selected": {
+            "windows_task": 8,
+            "computer_control": 1
+          },
+          "success_rate": 0.8889
+        },
+        "software_management": {
+          "runs": 9,
+          "passed": 0,
+          "failed": 9,
+          "selected": {
+            "windows_task": 4,
+            "winget_search": 3,
+            "computer_control": 2
+          },
+          "success_rate": 0.0
+        },
+        "system_diagnostics": {
+          "runs": 9,
+          "passed": 3,
+          "failed": 6,
+          "selected": {
+            "windows_task": 30,
+            "pc_event_log_errors": 5,
+            "os_power_plan": 3,
+            "win_system_report": 3,
+            "pc_disk_smart_health": 2
+          },
+          "success_rate": 0.3333
+        },
+        "text_only_command": {
+          "runs": 12,
+          "passed": 12,
+          "failed": 0,
+          "selected": {},
+          "success_rate": 1.0
+        },
+        "windows_services": {
+          "runs": 9,
+          "passed": 3,
+          "failed": 6,
+          "selected": {
+            "computer_control": 4,
+            "win_service_action": 3,
+            "windows_task": 2
+          },
+          "success_rate": 0.3333
+        }
+      }
+    },
+    "is_acceptance_metric": false
+  },
+  "policy": {
+    "path": "benchmarks/windows-operator/v1.1/acceptance-policy.json",
+    "sha256": "4c30f212b31dcb470619c7a30e52a76a072b87746a1dbbdb2f8746d901c730bc"
+  },
+  "evidence": {
+    "e2e-development.json": "bc55d9206f0746661e75f377d6f93dc369b2de06bd0ab3f6646d10673dccfb0d",
+    "e2e-windows-task-normative-v2-candidate.json": "c049f8edd2751e1972f3519453880bbd89fc7ddae09c8ed0de7e8bf21a1aaf2a",
+    "e2e-windows-task-holdout-source-closed.json": "b7706d63c80b04840cd26f357d5478d36bcc1bf5c60d9b4f835ff7e3ae4f7007",
+    "routing-windows-task-normative-candidate.json": "790a80efa4106e45d4c9a7a6bc91a30f679e7048c76f5ff4c8476fe76d6e827b",
+    "routing-windows-task-holdout-source-closed.json": "355ec86529f0edab7656e9fa070b2a775012afa83c08a4b1d6b0def955f42794"
+  }
+}

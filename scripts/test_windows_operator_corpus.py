@@ -18,6 +18,12 @@ import windows_operator_fixtures as fixtures  # noqa: E402
 CONTRACT = ROOT / "benchmarks" / "windows-operator" / "v1.1"
 
 
+def _portable_text_sha256(path: Path) -> str:
+    """Hash versioned text independently of the checkout line-ending policy."""
+    canonical = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def main() -> int:
     corpus_path = CONTRACT / "intent-corpus.json"
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
@@ -31,13 +37,13 @@ def main() -> int:
         assert item["expected_tools"] or not item["action_expected"]
         assert set(item["expected_tools"]) <= set(TOOLS_REGISTRY)
         assert set(item["forbidden_tools"]) <= set(TOOLS_REGISTRY)
-    corpus_hash = hashlib.sha256(corpus_path.read_bytes()).hexdigest()
+    corpus_hash = _portable_text_sha256(corpus_path)
 
     manifest = json.loads((CONTRACT / "corpus-manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "frozen_before_baseline"
     assert manifest["holdout_opened"] is False
     for name, expected_hash in manifest["files"].items():
-        assert hashlib.sha256((CONTRACT / name).read_bytes()).hexdigest() == expected_hash
+        assert _portable_text_sha256(CONTRACT / name) == expected_hash
     runtime = manifest["runtime_precondition"]
     assert runtime["model"] == "qwen3.5:397b-cloud"
     assert runtime["provider_declared_context_tokens"] == 262_144
