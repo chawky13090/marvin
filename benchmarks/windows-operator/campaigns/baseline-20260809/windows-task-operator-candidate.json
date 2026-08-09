@@ -1,0 +1,1031 @@
+{
+  "schema": "marvin.windows-task-operator-candidate/1.0",
+  "status": "complete",
+  "split": "development",
+  "scenario_corpus_sha256": "b6fe4b6fa1daef9123ccb92dd74d3ed6ef1618c5c12e5d0bd33adc8c83b0b724",
+  "runs_per_scenario": 5,
+  "expected_runs": 50,
+  "source_hashes": {
+    "windows_task.py": "b5761e9db40eb79b3b5fc615e9f7ea04c7f74ab948bf894bf503a7f3a275a33e",
+    "windows_operator_fixtures.py": "a1c14ae5e7eb70a42229dce2837c1202e1ed7630b1c4ecd4c97b317413a3130e",
+    "filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180",
+    "pc_control.py": "d94ba1010635ad2071dd8e2ec7568c612e024ebdd2098e006c21a1657b316fa1",
+    "windows.py": "a889e9ef56dd48462389fb17a3b39dcbf53bff81d070be7aa26a1c831eb32892",
+    "winget.py": "0586ae818a75c22d1854aba6de4b4e134335e42bf645d7471df543b34f57387f",
+    "legacy_runner.py": "fd2944a6b7a2a809fad0d16dcb1a43d0de4d1b87f6d76348a7e44abad0a5817f",
+    "candidate_runner.py": "fed2874047824bcdd87d2e349ddb478dc7bce6a90a296a370c2b0dcd73f099fb"
+  },
+  "results": [
+    {
+      "scenario_id": "copy-file",
+      "run": 1,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_copy",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 7,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 2,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_copy",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 3,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_copy",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 6,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 4,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_copy",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 7,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 5,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_copy",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 1,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_create_folder",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 2,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 2,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_create_folder",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 2,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 3,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_create_folder",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 4,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_create_folder",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 5,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_create_folder",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 1,
+      "family": "security",
+      "operator": "windows_task",
+      "compiled_executor": "win_firewall_status",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4989,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 2,
+      "family": "security",
+      "operator": "windows_task",
+      "compiled_executor": "win_firewall_status",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4502,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 3,
+      "family": "security",
+      "operator": "windows_task",
+      "compiled_executor": "win_firewall_status",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4187,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 4,
+      "family": "security",
+      "operator": "windows_task",
+      "compiled_executor": "win_firewall_status",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4004,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 5,
+      "family": "security",
+      "operator": "windows_task",
+      "compiled_executor": "win_firewall_status",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4193,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 1,
+      "family": "software",
+      "operator": "windows_task",
+      "compiled_executor": "winget_list_installed",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3637,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 2,
+      "family": "software",
+      "operator": "windows_task",
+      "compiled_executor": "winget_list_installed",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3713,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 3,
+      "family": "software",
+      "operator": "windows_task",
+      "compiled_executor": "winget_list_installed",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3769,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 4,
+      "family": "software",
+      "operator": "windows_task",
+      "compiled_executor": "winget_list_installed",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3619,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 5,
+      "family": "software",
+      "operator": "windows_task",
+      "compiled_executor": "winget_list_installed",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3578,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 1,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_kill",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 238,
+      "oracle_evidence": {
+        "fixture_pid_running": false
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 2,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_kill",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 245,
+      "oracle_evidence": {
+        "fixture_pid_running": false
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 3,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_kill",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 237,
+      "oracle_evidence": {
+        "fixture_pid_running": false
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 4,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_kill",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 247,
+      "oracle_evidence": {
+        "fixture_pid_running": false
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 5,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_kill",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 245,
+      "oracle_evidence": {
+        "fixture_pid_running": false
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 1,
+      "family": "application",
+      "operator": "windows_task",
+      "compiled_executor": "pc_app_launch",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 499,
+      "oracle_evidence": {
+        "new_process_count": 2
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 2,
+      "family": "application",
+      "operator": "windows_task",
+      "compiled_executor": "pc_app_launch",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 367,
+      "oracle_evidence": {
+        "new_process_count": 2
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 3,
+      "family": "application",
+      "operator": "windows_task",
+      "compiled_executor": "pc_app_launch",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 382,
+      "oracle_evidence": {
+        "new_process_count": 2
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 4,
+      "family": "application",
+      "operator": "windows_task",
+      "compiled_executor": "pc_app_launch",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 406,
+      "oracle_evidence": {
+        "new_process_count": 2
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 5,
+      "family": "application",
+      "operator": "windows_task",
+      "compiled_executor": "pc_app_launch",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 372,
+      "oracle_evidence": {
+        "new_process_count": 2
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 1,
+      "family": "network",
+      "operator": "windows_task",
+      "compiled_executor": "win_network_config",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5920,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 2,
+      "family": "network",
+      "operator": "windows_task",
+      "compiled_executor": "win_network_config",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 13,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 3,
+      "family": "network",
+      "operator": "windows_task",
+      "compiled_executor": "win_network_config",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 12,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 4,
+      "family": "network",
+      "operator": "windows_task",
+      "compiled_executor": "win_network_config",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 16,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 5,
+      "family": "network",
+      "operator": "windows_task",
+      "compiled_executor": "win_network_config",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 15,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 1,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3005,
+      "oracle_evidence": {
+        "process_count": 410
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 2,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3170,
+      "oracle_evidence": {
+        "process_count": 407
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 3,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3006,
+      "oracle_evidence": {
+        "process_count": 407
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 4,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3203,
+      "oracle_evidence": {
+        "process_count": 407
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 5,
+      "family": "process",
+      "operator": "windows_task",
+      "compiled_executor": "pc_process_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3019,
+      "oracle_evidence": {
+        "process_count": 407
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 1,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_rename",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 2,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_rename",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 3,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_rename",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 4,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_rename",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 5,
+      "family": "file",
+      "operator": "windows_task",
+      "compiled_executor": "file_rename",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 1,
+      "family": "service",
+      "operator": "windows_task",
+      "compiled_executor": "win_services_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 1402,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 2,
+      "family": "service",
+      "operator": "windows_task",
+      "compiled_executor": "win_services_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 1407,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 3,
+      "family": "service",
+      "operator": "windows_task",
+      "compiled_executor": "win_services_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 1403,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 4,
+      "family": "service",
+      "operator": "windows_task",
+      "compiled_executor": "win_services_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 1499,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 5,
+      "family": "service",
+      "operator": "windows_task",
+      "compiled_executor": "win_services_list",
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "effect_verified": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 1520,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": null
+    }
+  ],
+  "summary": {
+    "runs": 50,
+    "passed": 50,
+    "failed": 0,
+    "success_rate": 1.0,
+    "false_success_count": 0,
+    "false_failure_count": 0,
+    "teardown_failure_count": 0,
+    "effect_verified_count": 50,
+    "median_duration_ms": 372
+  }
+}

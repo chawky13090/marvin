@@ -190,6 +190,15 @@ DANGEROUS_TOOLS: set[str] = {
 # autre action suit les politiques DANGEROUS + SECURE_BLOCKED sans rendre le statut
 # indisponible en mode Sécurisé.
 CONDITIONAL_TOOL_SAFE_ACTIONS: dict[str, frozenset[str]] = {
+    "windows_task": frozenset(
+        {
+            "process.list",
+            "service.list",
+            "security.firewall.status",
+            "network.status",
+            "software.list",
+        }
+    ),
     "computer_control": frozenset(
         {"observe", "verify", "screenshot", "list_windows", "wait"}
     ),

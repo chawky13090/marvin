@@ -66,6 +66,22 @@ def main() -> int:
         assert "pc_tailscale_status" in tailscale
         assert "billing_find_products" not in tailscale
 
+        windows_operation = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "lance le bloc-notes sur ce PC"}], "agent"
+        ))))
+        assert "windows_task" in windows_operation
+        assert "computer_control" not in windows_operation
+
+        visual_operation = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "clique dans la fenêtre Windows"}], "agent"
+        ))))
+        assert "computer_control" in visual_operation
+
+        browser_operation = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "ouvre Chrome et va sur le site France Travail"}], "agent"
+        ))))
+        assert "computer_control" in browser_operation
+
         workspace = set(_names(asyncio.run(selection.filter_relevant_tools(
             [{"role": "user", "content": "ouvre un code workspace pour ce projet"}], "agent"
         ))))

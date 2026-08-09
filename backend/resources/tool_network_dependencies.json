@@ -1374,6 +1374,10 @@
       "network": "internet",
       "services": []
     },
+    "windows_task": {
+      "network": "local",
+      "services": []
+    },
     "webapp_create": {
       "network": "local",
       "services": []

@@ -154,8 +154,8 @@ async def _probe(
             except httpx.HTTPError:
                 terminal = "conversation_cleanup_failed"
         root = Path(context["root"])
-        fixtures.teardown(context)
-        teardown_clean = not root.exists()
+        teardown = fixtures.teardown(context)
+        teardown_clean = bool(teardown.get("clean")) and not root.exists()
     oracle_passed = oracle_result.get("passed") is True
     return {
         "scenario_id": scenario["id"],

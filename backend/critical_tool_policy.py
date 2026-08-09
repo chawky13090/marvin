@@ -67,6 +67,16 @@ def approval_summary(tool_name: str, arguments: Mapping[str, Any]) -> str:
             if summary
             else "confirmation finale d'un engagement externe"
         )
+    if name == "windows_task":
+        action = str(arguments.get("action") or "action Windows").strip()
+        target = str(
+            arguments.get("target")
+            or arguments.get("destination")
+            or arguments.get("name")
+            or arguments.get("pid")
+            or "cet appareil"
+        ).strip()
+        return f"{action} sur {target[:200]}"
     target = str(
         arguments.get("path")
         or arguments.get("host")

@@ -10,7 +10,7 @@ flowchart LR
     UI["Next.js / React"] -->|"SSE / REST"| API["FastAPI"]
     API --> AGENT["Boucle agentique"]
     AGENT --> ROUTER["Routage outils et compétences"]
-    ROUTER --> TOOLS["363 outils"]
+    ROUTER --> TOOLS["364 outils"]
     AGENT --> OLLAMA["Ollama local / confidentialité"]
     AGENT --> CLOUD["Ollama Cloud / puissance"]
     API --> SQLITE["SQLite"]
@@ -211,8 +211,8 @@ génération de mots de passe, empreintes, Base64, JSON et statistiques textuell
 profondeur, complexité, sorties et opérations coûteuses sont bornées; aucun `eval` n'est utilisé.
 74. le gateway d'outils : `tool_gateway.py` applique le même cœur déterministe aux appels du
 chat, de l'interface et de MCP. Le catalogue `/api/tools/list` expose couverture, écarts,
-    couches et restrictions; `check_architecture.py` interdit une couverture inférieure à 363/363.
-75. les contrats d'outils fermés : les 363 schémas racine déclarent
+    couches et restrictions; `check_architecture.py` interdit une couverture inférieure à 364/364.
+75. les contrats d'outils fermés : les 364 schémas racine déclarent
 `additionalProperties=false`. Un champ halluciné ou mal orthographié est refusé avant
 permission, confirmation et effet de bord.
 76. la date et l'heure : `tool_domains/datetime_tools.py` possède horloge, parsing ISO,

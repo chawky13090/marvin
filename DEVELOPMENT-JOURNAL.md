@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.601.0 — Opérateur Windows typé et preuve indépendante
+
+Demande : permettre au LLM d'agir librement sur Windows sans dépendre d'une boucle visuelle
+rigide ni générer arbitrairement du PowerShell, tout en prouvant le résultat métier et en
+préservant les quatre profils de confidentialité et les niveaux d'autorisation.
+
+Décision : `backend/windows_task.py` expose dix actions fermées : inventaire des processus,
+services et logiciels, état pare-feu/réseau, lancement d'application, arrêt de processus,
+création de dossier, renommage et copie. L'action et ses paramètres sont compilés vers dix
+exécuteurs connus; les schémas refusent toute propriété supplémentaire et ne possèdent aucun
+champ `script` ou `command`. Une réussite n'est retournée qu'après une postcondition propre à
+l'action : processus absent, application observée, compte non vide, chemin présent ou SHA-256
+identique. `computer_control` n'est pas supprimé : le routeur le réserve aux captures, UIA,
+clics, saisies et navigation interactive.
+
+Sécurité et autorisation : cinq lectures sont admises en mode Sécurisé. Les cinq mutations
+restent conditionnellement dangereuses dans le gateway; le booléen fourni par un modèle est
+retiré, puis seule une preuve de l'interface ou un mandat Auto existant réinjecte la
+confirmation. L'opérateur ne crée pas de nouvelle voie d'élévation, ne transporte aucun
+secret et réutilise l'audit structuré du gateway. Les arguments de chemins restent soumis au
+résolveur de fichiers existant. Aucun événement supplémentaire ni donnée personnelle n'est
+journalisé; la politique de rotation existante est inchangée.
+
+Validation réelle : compilation Python, tests de contrat `windows_task`, sélection agentique,
+gateway, runtime PC et architecture réussis, avec 364/364 outils sous harness et 391 routes.
+La campagne directe utilise le corpus Forge gelé, dix scénarios réels et cinq répétitions :
+50/50, cinquante effets vérifiés, zéro faux succès, zéro faux échec et zéro échec de nettoyage.
+Le premier essai a révélé qu'un Bloc-notes empaqueté pouvait remplacer son PID après
+`terminate`; il n'a pas été conservé comme preuve. Le teardown final arrête uniquement les PID
+apparus depuis le setup, gère ce remplacement pendant cinq secondes, prouve leur absence et
+supprime la racine temporaire. Deux secondes après le rejeu, aucun Bloc-notes de fixture ne
+reste actif. Preuve :
+`benchmarks/windows-operator/campaigns/baseline-20260809/windows-task-operator-candidate.json`.
+
+Rollback : réversion atomique du commit v2.601 puis redémarrage contrôlé de Marvin. Aucun
+schéma, secret, réglage machine ou donnée utilisateur n'est modifié; les fixtures de campagne
+sont éphémères et leur absence est vérifiée. Le rejeu routage et bout en bout reste la tranche
+suivante avant généralisation définitive.
+
 ## 2026-08-09 — v2.600.0 — Succès d'arrêt de processus lié à une preuve d'effet
 
 Demande : garantir qu'une commande lancée ne soit jamais confondue avec le résultat demandé,

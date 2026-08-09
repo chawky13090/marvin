@@ -53,8 +53,15 @@ def setup(fixture_id: str, *, run_id: str) -> dict[str, Any]:
     elif fixture_id == "fixture.paint_absent":
         context.update({"process_name": "mspaint", "baseline_pids": sorted(_process_ids("mspaint"))})
     elif fixture_id == "fixture.notepad_running":
+        baseline_pids = sorted(_process_ids("notepad"))
         process = subprocess.Popen(["notepad.exe"], close_fds=True)
-        context.update({"process_name": "notepad", "fixture_pid": process.pid})
+        context.update(
+            {
+                "process_name": "notepad",
+                "fixture_pid": process.pid,
+                "baseline_pids": baseline_pids,
+            }
+        )
         time.sleep(1)
     elif fixture_id == "fixture.folder_absent":
         context["target"] = str(root / "created-folder")
@@ -145,21 +152,54 @@ def oracle(oracle_id: str, context: dict[str, Any]) -> dict[str, Any]:
     return {"passed": passed, "evidence": evidence}
 
 
-def teardown(context: dict[str, Any]) -> None:
+def teardown(context: dict[str, Any]) -> dict[str, Any]:
+    """Restaure la fixture et prouve l'absence des seuls processus qu'elle possede."""
     allowed_pids = set(context.get("created_pids") or [])
     fixture_pid = context.get("fixture_pid")
     if fixture_pid:
         allowed_pids.add(int(fixture_pid))
-    for pid in allowed_pids:
+    process_name = str(context.get("process_name") or "").strip()
+    baseline_pids = set(context.get("baseline_pids") or [])
+
+    def stop_owned(pid: int) -> None:
         try:
             process = psutil.Process(pid)
             process.terminate()
-            process.wait(timeout=3)
-        except (psutil.NoSuchProcess, psutil.TimeoutExpired, psutil.AccessDenied):
-            continue
+            try:
+                process.wait(timeout=3)
+            except psutil.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+            return
+
+    for pid in allowed_pids:
+        stop_owned(pid)
+
+    # Les applications Windows empaquetees peuvent remplacer leur processus apres
+    # l'arret du lanceur. Pendant au plus cinq secondes, toute nouvelle instance
+    # du nom de fixture qui n'existait pas au setup reste propriete du benchmark.
+    deadline = time.monotonic() + 5
+    while process_name and time.monotonic() < deadline:
+        spawned = _process_ids(process_name) - baseline_pids
+        if not spawned:
+            break
+        allowed_pids.update(spawned)
+        for pid in spawned:
+            stop_owned(pid)
+        time.sleep(0.2)
     root = Path(str(context.get("root") or "")).resolve()
     if root != FIXTURE_ROOT and FIXTURE_ROOT in root.parents:
         shutil.rmtree(root, ignore_errors=True)
+    remaining_pids = {pid for pid in allowed_pids if psutil.pid_exists(pid)}
+    if process_name:
+        remaining_pids.update(_process_ids(process_name) - baseline_pids)
+    root_absent = not root.exists()
+    return {
+        "clean": root_absent and not remaining_pids,
+        "root_absent": root_absent,
+        "remaining_pids": sorted(remaining_pids),
+    }
 
 
 FIXTURE_IDS = {

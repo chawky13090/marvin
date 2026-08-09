@@ -822,7 +822,7 @@ async def create_folder(args: dict[str, Any]) -> dict[str, Any]:
     path = _resolve(str(args.get("path", "")))
     try:
         Path(path).mkdir(parents=True, exist_ok=True)
-        return {"success": True, "message": f"Dossier créé : {path}"}
+        return {"success": True, "message": f"Dossier créé : {path}", "path": path}
     except Exception as exc:
         return {"error": str(exc)}
 

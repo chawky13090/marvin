@@ -123,8 +123,8 @@ async def _execute_once(scenario: dict[str, Any], run: int) -> dict[str, Any]:
         oracle_result = fixtures.oracle(str(scenario["oracle_id"]), context)
     finally:
         root = Path(context["root"])
-        fixtures.teardown(context)
-        teardown_clean = not root.exists()
+        teardown = fixtures.teardown(context)
+        teardown_clean = bool(teardown.get("clean")) and not root.exists()
     tool_success = tool_result.get("success") is True
     tool_failed = bool(
         tool_result.get("error") or tool_result.get("requiresConfirmation")

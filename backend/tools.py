@@ -33,6 +33,7 @@ import proactive_briefing
 import generation_runtime
 import ollama_context_admission
 import computer_runtime
+import windows_task as windows_task_runtime
 from storage_layout import roots as storage_roots
 from conversation_exports import export_conversation
 from tool_domains import quiz as quiz_domain
@@ -2204,6 +2205,7 @@ execute_pc_screenshot = pc_control_domain.execute_pc_screenshot
 execute_pc_system_info = pc_control_domain.execute_pc_system_info
 execute_pc_window_focus = pc_control_domain.execute_pc_window_focus
 execute_pc_window_list = pc_control_domain.execute_pc_window_list
+execute_windows_task = windows_task_runtime.execute
 
 execute_pc_conversation_trace = pc_diagnostics_domain.execute_pc_conversation_trace
 execute_pc_disk_smart_health = pc_diagnostics_domain.execute_pc_disk_smart_health
@@ -2515,6 +2517,7 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "pc_gui_click": execute_pc_gui_click,
     "pc_gui_type": execute_pc_gui_type,
     "computer_control": execute_computer_control,
+    "windows_task": execute_windows_task,
     "vm_lab_install": execute_vm_lab_install,
     "pc_notify": execute_pc_notify,
     "pc_pull_ollama_model": execute_pc_pull_ollama_model,
@@ -2847,6 +2850,20 @@ TOOLS_REGISTRY: dict[str, Any] = {
     "client_monthly_summary_generate": execute_client_monthly_summary_generate,
 }
 
+windows_task_runtime.configure(
+    {
+        "pc_process_list": execute_pc_process_list,
+        "pc_app_launch": execute_pc_app_launch,
+        "pc_process_kill": execute_pc_process_kill,
+        "win_services_list": execute_win_services_list,
+        "win_firewall_status": execute_win_firewall_status,
+        "win_network_config": execute_win_network_config,
+        "winget_list_installed": execute_winget_list_installed,
+        "file_create_folder": execute_file_create_folder,
+        "file_rename": execute_file_rename,
+        "file_copy": execute_file_copy,
+    }
+)
 computer_runtime.configure(TOOLS_REGISTRY)
 
 
@@ -4008,8 +4025,34 @@ TOOLS_SPEC = [
        ["text"]),
 
     _t(
+       "windows_task",
+       "Opérateur Windows typé pour les opérations système et fichiers courantes. "
+       "À préférer aux outils PC dispersés pour lister les processus/services/logiciels, "
+       "lire pare-feu ou réseau, lancer une application, arrêter un processus, créer un "
+       "dossier, renommer ou copier un fichier. Compile l'intention vers un exécuteur connu, "
+       "n'accepte aucune commande PowerShell libre et ne déclare le succès qu'après preuve. "
+       "computer_control reste réservé à l'interaction visuelle par capture/UIA.",
+       {
+        "action": {"type": "string", "enum": [
+            "process.list", "application.launch", "process.stop", "service.list",
+            "security.firewall.status", "network.status", "software.list",
+            "filesystem.create_folder", "filesystem.rename", "filesystem.copy"
+        ]},
+        "target": {"type": "string", "description": "Application ou dossier cible selon l'action"},
+        "pid": {"type": "integer", "minimum": 1, "description": "PID exact pour process.stop"},
+        "name": {"type": "string", "description": "Nom du processus si le PID est inconnu"},
+        "source": {"type": "string", "description": "Chemin source exact pour rename/copy"},
+        "destination": {"type": "string", "description": "Chemin destination exact pour rename/copy"},
+        "confirmed": {"type": "boolean", "description": "Injecté uniquement par le gateway après autorisation"}
+       },
+       ["action"]),
+
+    _t(
        "computer_control",
-       "Contrôle visuel agentique du PC et du navigateur. Le LLM conduit librement la boucle "
+       "Contrôle exclusivement visuel du PC et du navigateur lorsque l'action exige une "
+       "capture, un élément UIA, un clic, une saisie ou une navigation interactive. Pour les "
+       "processus, services, logiciels, applications et fichiers, utiliser windows_task. "
+       "Le LLM conduit librement la boucle "
        "Observer → Décider → Agir → Vérifier → Corriger. observe renvoie une capture et des "
        "element_ref facultatives. Utilise les coordonnées de frame_id lorsque l'UIA ne suffit "
        "pas. action=commit est obligatoire pour le clic final qui réserve, achète, publie ou "

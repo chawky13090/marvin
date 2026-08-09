@@ -152,12 +152,22 @@ _KEYWORD_TOOLS = {
      "interagis avec", "fenêtre windows", "fenetre windows"):
         {"computer_control", "pc_window_list", "pc_gui_read", "pc_screenshot"},
 
+    # Opérations Windows typées : l'opérateur compile vers les exécuteurs connus et
+    # vérifie l'effet. computer_control reste réservé aux gestes visuels ci-dessus.
+    ("processus actifs", "liste les processus", "arrête le processus", "arrete le processus",
+     "ferme l'application", "ferme le logiciel", "lance l'application", "ouvre l'application",
+     "lance le bloc-notes", "ouvre le bloc-notes", "services windows", "liste les services",
+     "configuration réseau", "configuration reseau", "état du pare-feu", "etat du pare-feu",
+     "logiciels installés", "logiciels installes", "crée le dossier", "cree le dossier",
+     "renomme le fichier", "copie le fichier"):
+        {"windows_task"},
+
     # Fichiers
     ("fichier", "dossier", "bureau", "documents", "downloads", "téléchargement",
      "fichiers", "dossiers"):
         {"system_search", "file_find", "file_list", "file_info", "file_read",
          "file_write", "file_delete", "file_rename", "file_move", "file_copy",
-         "file_create_folder", "file_search_text", "pc_get_real_paths"},
+         "file_create_folder", "file_search_text", "pc_get_real_paths", "windows_task"},
 
     # Recherche dans fichiers
     ("trouve", "cherche", "où est", "ou est", "ou se trouve", "trouver", "*.pdf",
@@ -168,7 +178,7 @@ _KEYWORD_TOOLS = {
     ("logiciel installé", "logiciels installés", "logiciels installer", "inventaire logiciel",
      "liste des programmes", "programmes installés", "quels logiciels", "applications installées",
      "liste logiciels", "logiciels sur ce pc", "logiciels du pc"):
-        {"pc_installed_software", "win_system_report", "pc_system_info"},
+        {"pc_installed_software", "win_system_report", "pc_system_info", "windows_task"},
 
     # Installer / mettre à jour / désinstaller un logiciel (Winget) — bug réel corrigé
     # v2.113 : aucune entrée ne routait ici avant, le LLM tombait parfois sur du routage
@@ -586,6 +596,17 @@ _KEYWORD_TOOLS_NORM = [
     (tuple(_strip_accents(k) for k in keywords), tools)
     for keywords, tools in _KEYWORD_TOOLS.items()
 ]
+_VISUAL_CONTROL_TERMS_NORM = tuple(
+    _strip_accents(term)
+    for term in (
+        "clique", "clic", "souris", "clavier", "remplis le formulaire",
+        "pilote le pc", "contrôle le pc", "controle le pc", "interagis avec",
+        "fenêtre windows", "fenetre windows", "capture d'écran", "screenshot",
+        "navigue dans le navigateur", "ouvre chrome", "ouvre edge", "ouvre firefox",
+        "ouvre le navigateur", "ouvre le site", "page web", "va sur le site",
+        "bouton", "réservation", "reservation",
+    )
+)
 _CAPABILITY_CATALOG = build_catalog(TOOLS_SPEC)
 
 
@@ -671,6 +692,15 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     except Exception:
         pass
     relevant |= semantic
+
+    # Un outil visuel de 24 paramètres ne concurrence pas l'opérateur système typé
+    # lorsque la demande ne contient aucun geste visuel. Il reste découvrable par
+    # tool_search et réapparaît dès qu'un signal UI explicite est présent.
+    visual_control_requested = any(
+        _keyword_present(term, text_norm) for term in _VISUAL_CONTROL_TERMS_NORM
+    )
+    if not visual_control_requested and "windows_task" in relevant:
+        relevant.discard("computer_control")
 
     # Un livrable Office explicite doit passer par son outil documentaire dédié.
     # Test Forge vérifie du code mais n'est pas un moteur de documents.

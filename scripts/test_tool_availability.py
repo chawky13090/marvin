@@ -31,8 +31,8 @@ def main() -> int:
     coverage = availability.validate_coverage(names)
     assert coverage == {
         "schema": availability.SCHEMA,
-        "tool_count": 363,
-        "inventory_count": 363,
+        "tool_count": 364,
+        "inventory_count": 364,
         "missing": [],
         "orphaned": [],
         "valid": True,
@@ -134,7 +134,7 @@ def main() -> int:
         )))
     assert "calculator" in fail_open
 
-    print("Tool Availability OK - 363 outils, degradation et ranking hors ligne.")
+    print("Tool Availability OK - 364 outils, degradation et ranking hors ligne.")
     return 0
 
 

@@ -26,6 +26,7 @@ _GUARDED_EXACT = frozenset({
     "bulk_rename", "code_workspace_control", "email_automation_run", "email_to_task",
     "pc_run_command", "pc_run_elevated", "pc_run_powershell", "ssh_exec",
     "ssh_exec_multi", "ssh_write_and_run", "sqlite_query",
+    "windows_task",
 })
 _SECRET_MARKERS = (
     "password", "token", "secret", "api_key", "apikey", "credential", "private_key",
