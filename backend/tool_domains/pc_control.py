@@ -1507,16 +1507,77 @@ async def execute_pc_process_kill(args: dict) -> dict:
         return {"requiresConfirmation": True, "message": f"Arrêter le processus {name or ''} (PID {pid}) ?"}
     try:
         if pid:
-            proc = psutil.Process(int(pid))
+            try:
+                proc = psutil.Process(int(pid))
+            except psutil.NoSuchProcess:
+                return {
+                    "success": True,
+                    "message": f"Processus {pid} déjà arrêté ; absence vérifiée.",
+                    "verification": {"pid": pid, "state": "absent"},
+                    "already_absent": True,
+                }
             proc.terminate()
-            return {"success": True, "message": f"Processus {pid} terminé"}
+            try:
+                await asyncio.to_thread(proc.wait, timeout=5)
+            except psutil.TimeoutExpired:
+                return {
+                    "error": (
+                        f"Le processus {pid} a reçu la demande d'arrêt mais reste actif "
+                        "après 5 secondes. Résultat non validé."
+                    ),
+                    "verification": {"pid": pid, "state": "still_running"},
+                }
+            return {
+                "success": True,
+                "message": f"Processus {pid} terminé et absence vérifiée.",
+                "verification": {"pid": pid, "state": "absent"},
+            }
         elif name:
-            killed = 0
+            matched = []
             for p in psutil.process_iter(["pid", "name"]):
-                if name.lower() in p.info["name"].lower():
-                    p.terminate()
-                    killed += 1
-            return {"success": True, "message": f"{killed} processus '{name}' terminés"}
+                try:
+                    if name.casefold() in str(p.info.get("name") or "").casefold():
+                        matched.append(p)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            if not matched:
+                return {
+                    "success": True,
+                    "message": f"Aucun processus '{name}' actif ; absence vérifiée.",
+                    "verification": {"name": name, "state": "absent", "matched": 0},
+                    "already_absent": True,
+                }
+            for process in matched:
+                try:
+                    process.terminate()
+                except psutil.NoSuchProcess:
+                    continue
+            _, alive = await asyncio.to_thread(psutil.wait_procs, matched, timeout=5)
+            alive_pids = sorted(process.pid for process in alive)
+            if alive_pids:
+                return {
+                    "error": (
+                        f"{len(alive_pids)} processus '{name}' restent actifs après "
+                        "5 secondes. Résultat non validé."
+                    ),
+                    "verification": {
+                        "name": name,
+                        "state": "partially_running",
+                        "remaining_pids": alive_pids,
+                    },
+                }
+            stopped_pids = sorted(process.pid for process in matched)
+            return {
+                "success": True,
+                "message": (
+                    f"{len(stopped_pids)} processus '{name}' terminés et absence vérifiée."
+                ),
+                "verification": {
+                    "name": name,
+                    "state": "absent",
+                    "stopped_pids": stopped_pids,
+                },
+            }
         return {"error": "PID ou nom de processus requis"}
     except Exception as e:
         return {"error": str(e)}

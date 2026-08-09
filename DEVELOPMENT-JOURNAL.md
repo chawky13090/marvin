@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.600.0 — Succès d'arrêt de processus lié à une preuve d'effet
+
+Demande : garantir qu'une commande lancée ne soit jamais confondue avec le résultat demandé,
+et supprimer les faux succès révélés par les oracles Forge.
+
+Constat : `pc_process_kill` appelait `terminate()` puis retournait immédiatement `success`.
+La baseline d'exécuteur obtenait 46/50 et quatre faux succès : l'outil déclarait le processus
+terminé alors que l'oracle indépendant voyait encore le PID. Le problème était l'absence de
+postcondition, pas le modèle ni le routage.
+
+Correction : pour un PID, l'outil attend maintenant sa disparition pendant cinq secondes et
+retourne `still_running` si elle n'est pas prouvée. Un PID déjà absent est traité de façon
+idempotente avec preuve. Pour un nom, tous les processus correspondants sont attendus; les PID
+encore vivants sont retournés sans succès supposé. Aucune escalade ou nouvelle action n'est
+tentée silencieusement.
+
+Validation : test unitaire nominal et timeout, test complet du domaine PC, puis 50 exécutions
+réelles de l'exécuteur candidat avec cinq répétitions par scénario : 50/50, zéro faux succès,
+zéro faux échec et zéro échec de nettoyage. Preuve :
+`benchmarks/windows-operator/campaigns/baseline-20260809/executor-postcondition-candidate.json`.
+
+Sécurité, logs et rollback : la confirmation existante reste obligatoire; aucun privilège,
+secret, donnée personnelle ou journal supplémentaire n'est introduit. La vérification réduit
+les déclarations trompeuses sans étendre les droits. Rollback : réversion atomique du commit
+v2.600; aucune migration ni donnée persistante.
+
 ## 2026-08-09 — v2.599.0 — Corpus gelé et baselines Forge Windows reproductibles
 
 Demande : mesurer objectivement Marvin avant de construire `windows_task`, préserver son

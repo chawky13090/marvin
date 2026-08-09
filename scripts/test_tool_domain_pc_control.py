@@ -66,6 +66,22 @@ class _ResolveWindow:
         return [_ResolveControl()]
 
 
+class _VerifiedProcess:
+    def __init__(self, pid: int, *, timeout: bool = False):
+        self.pid = pid
+        self.timeout = timeout
+        self.terminated = False
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+    def wait(self, timeout: float):
+        assert timeout == 5
+        if self.timeout:
+            raise pc_control.psutil.TimeoutExpired(timeout, self.pid)
+        return 0
+
+
 async def _run() -> None:
     previous_program_files = os.environ.get("ProgramFiles")
     with tempfile.TemporaryDirectory() as temp_root:
@@ -107,6 +123,26 @@ async def _run() -> None:
     )["error"]
     confirmation = await pc_control.execute_pc_process_kill({"pid": 123})
     assert confirmation["requiresConfirmation"] is True
+    original_process = pc_control.psutil.Process
+    verified_process = _VerifiedProcess(123)
+    try:
+        pc_control.psutil.Process = lambda _pid: verified_process
+        verified = await pc_control.execute_pc_process_kill(
+            {"pid": 123, "confirmed": True}
+        )
+        assert verified["success"] is True
+        assert verified["verification"] == {"pid": 123, "state": "absent"}
+        assert verified_process.terminated is True
+
+        timeout_process = _VerifiedProcess(124, timeout=True)
+        pc_control.psutil.Process = lambda _pid: timeout_process
+        not_verified = await pc_control.execute_pc_process_kill(
+            {"pid": 124, "confirmed": True}
+        )
+        assert "Résultat non validé" in not_verified["error"]
+        assert not_verified["verification"]["state"] == "still_running"
+    finally:
+        pc_control.psutil.Process = original_process
     assert "max_elements" in (
         await pc_control.execute_pc_gui_read({"max_elements": "beaucoup"})
     )["error"]
