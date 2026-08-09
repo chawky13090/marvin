@@ -2132,7 +2132,30 @@ async def execute_tool_search(
             limit = int(arguments.get("limit", limit))
         except (TypeError, ValueError, OverflowError):
             limit = 10
-    return CapabilityCatalog(TOOLS_SPEC).search(query, limit=limit)
+    import tool_availability
+
+    snapshot = await tool_availability.get_snapshot()
+    names = [
+        str(spec.get("function", {}).get("name") or "")
+        for spec in TOOLS_SPEC
+    ]
+    warning = None
+    try:
+        availability = tool_availability.availability_map(names, snapshot)
+    except tool_availability.ToolDependencyInventoryError as exc:
+        availability = None
+        warning = str(exc)
+    result = CapabilityCatalog(TOOLS_SPEC).search(
+        query, limit=limit, availability=availability
+    )
+    result["connectivity"] = {
+        "internet": snapshot.internet,
+        "services": dict(snapshot.services),
+        "observed_at": snapshot.observed_at,
+    }
+    if warning:
+        result["availability_warning"] = warning
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════

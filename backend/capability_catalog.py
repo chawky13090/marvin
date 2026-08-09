@@ -31,8 +31,8 @@ class CapabilityDescriptor:
     do_not_use_when: tuple[str, ...] = ()
     related_tools: tuple[str, ...] = ()
 
-    def public_dict(self) -> dict[str, Any]:
-        return {
+    def public_dict(self, *, availability: dict[str, Any] | None = None) -> dict[str, Any]:
+        result = {
             "name": self.name,
             "namespace": self.namespace,
             "summary": self.summary,
@@ -44,6 +44,9 @@ class CapabilityDescriptor:
             "do_not_use_when": list(self.do_not_use_when),
             "related_tools": list(self.related_tools),
         }
+        if availability is not None:
+            result["availability"] = availability
+        return result
 
 
 def _namespace(name: str) -> str:
@@ -139,7 +142,13 @@ class CapabilityCatalog:
                 seen.add(name)
         return result
 
-    def search(self, query: str, *, limit: int = 10) -> dict[str, Any]:
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        availability: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         normalized_query = " ".join(str(query or "").split())
         if not normalized_query:
             raise ValueError("La recherche de capacité est vide.")
@@ -166,7 +175,11 @@ class CapabilityCatalog:
             "count": len(names),
             "catalog_size": len(self),
             "candidates": [
-                self._descriptors[name].public_dict()
+                self._descriptors[name].public_dict(
+                    availability=(availability or {}).get(name)
+                    if availability is not None
+                    else None
+                )
                 for name in names
             ],
             "advisory_only": True,

@@ -1,0 +1,1474 @@
+{
+  "schema": "marvin.tool-network-dependencies/1.0",
+  "reviewed_at": "2026-08-09",
+  "tools": {
+    "ai_adaptive_team": {
+      "network": "local",
+      "services": []
+    },
+    "ai_code_forge": {
+      "network": "local",
+      "services": []
+    },
+    "ai_cortex_search": {
+      "network": "local",
+      "services": []
+    },
+    "ai_model_council": {
+      "network": "internet",
+      "services": [
+        "ollama"
+      ]
+    },
+    "ai_research_swarm": {
+      "network": "internet",
+      "services": [
+        "searxng",
+        "ollama"
+      ]
+    },
+    "ai_subagents_run": {
+      "network": "local",
+      "services": []
+    },
+    "ai_test_forge": {
+      "network": "local",
+      "services": []
+    },
+    "audio_convert": {
+      "network": "local",
+      "services": []
+    },
+    "audio_extract": {
+      "network": "local",
+      "services": []
+    },
+    "audio_info": {
+      "network": "local",
+      "services": []
+    },
+    "audio_merge": {
+      "network": "local",
+      "services": []
+    },
+    "audio_trim": {
+      "network": "local",
+      "services": []
+    },
+    "audio_volume": {
+      "network": "local",
+      "services": []
+    },
+    "base64_tool": {
+      "network": "local",
+      "services": []
+    },
+    "billing_analyze_need": {
+      "network": "local",
+      "services": []
+    },
+    "billing_catalog_enrich": {
+      "network": "internet",
+      "services": []
+    },
+    "billing_catalog_list": {
+      "network": "local",
+      "services": []
+    },
+    "billing_client_create": {
+      "network": "local",
+      "services": []
+    },
+    "billing_client_list": {
+      "network": "local",
+      "services": []
+    },
+    "billing_find_products": {
+      "network": "internet",
+      "services": []
+    },
+    "billing_generate_proposal": {
+      "network": "local",
+      "services": []
+    },
+    "billing_invoice_create": {
+      "network": "local",
+      "services": []
+    },
+    "billing_invoice_list": {
+      "network": "local",
+      "services": []
+    },
+    "billing_invoice_mark_paid": {
+      "network": "local",
+      "services": []
+    },
+    "billing_market_research": {
+      "network": "internet",
+      "services": []
+    },
+    "billing_price_recommendation": {
+      "network": "local",
+      "services": []
+    },
+    "billing_product_reviews": {
+      "network": "internet",
+      "services": []
+    },
+    "billing_quote_compare": {
+      "network": "local",
+      "services": []
+    },
+    "billing_quote_create": {
+      "network": "local",
+      "services": []
+    },
+    "billing_quote_email": {
+      "network": "internet",
+      "services": []
+    },
+    "billing_quote_list": {
+      "network": "local",
+      "services": []
+    },
+    "billing_quote_pdf": {
+      "network": "local",
+      "services": []
+    },
+    "billing_revenue_dashboard": {
+      "network": "local",
+      "services": []
+    },
+    "billing_seed_trade": {
+      "network": "local",
+      "services": []
+    },
+    "billing_tco_analysis": {
+      "network": "local",
+      "services": []
+    },
+    "billing_tier_breakdown": {
+      "network": "local",
+      "services": []
+    },
+    "bug_log_list": {
+      "network": "local",
+      "services": []
+    },
+    "bulk_rename": {
+      "network": "local",
+      "services": []
+    },
+    "calculator": {
+      "network": "local",
+      "services": []
+    },
+    "calendar_create": {
+      "network": "local",
+      "services": []
+    },
+    "calendar_delete": {
+      "network": "local",
+      "services": []
+    },
+    "calendar_list": {
+      "network": "local",
+      "services": []
+    },
+    "calendar_subscribe": {
+      "network": "internet",
+      "services": []
+    },
+    "calendar_subscriptions": {
+      "network": "local",
+      "services": []
+    },
+    "calendar_sync": {
+      "network": "internet",
+      "services": []
+    },
+    "calendar_unsubscribe": {
+      "network": "local",
+      "services": []
+    },
+    "calendar_update": {
+      "network": "local",
+      "services": []
+    },
+    "catharsis_clean": {
+      "network": "local",
+      "services": []
+    },
+    "catharsis_scan": {
+      "network": "local",
+      "services": []
+    },
+    "client_health_compute": {
+      "network": "local",
+      "services": []
+    },
+    "client_health_get": {
+      "network": "local",
+      "services": []
+    },
+    "client_health_history": {
+      "network": "local",
+      "services": []
+    },
+    "client_monthly_summary_generate": {
+      "network": "local",
+      "services": []
+    },
+    "client_recommendations_generate": {
+      "network": "local",
+      "services": []
+    },
+    "clipboard_append": {
+      "network": "local",
+      "services": []
+    },
+    "cmd_analyze_risk": {
+      "network": "local",
+      "services": []
+    },
+    "cmd_extract_from_text": {
+      "network": "local",
+      "services": []
+    },
+    "cmd_require_approval": {
+      "network": "local",
+      "services": []
+    },
+    "cmd_review_history": {
+      "network": "local",
+      "services": []
+    },
+    "cmd_suggest_safer_alternative": {
+      "network": "local",
+      "services": []
+    },
+    "code_python": {
+      "network": "local",
+      "services": []
+    },
+    "code_workspace_control": {
+      "network": "local",
+      "services": []
+    },
+    "code_workspace_start": {
+      "network": "local",
+      "services": []
+    },
+    "code_workspace_status": {
+      "network": "local",
+      "services": []
+    },
+    "color_tool": {
+      "network": "local",
+      "services": []
+    },
+    "computer_control": {
+      "network": "local",
+      "services": []
+    },
+    "conversation_export": {
+      "network": "local",
+      "services": []
+    },
+    "conversation_list": {
+      "network": "local",
+      "services": []
+    },
+    "conversation_move": {
+      "network": "local",
+      "services": []
+    },
+    "conversation_move_many": {
+      "network": "local",
+      "services": []
+    },
+    "conversation_search": {
+      "network": "local",
+      "services": []
+    },
+    "conversation_update": {
+      "network": "local",
+      "services": []
+    },
+    "csv_analyze": {
+      "network": "local",
+      "services": []
+    },
+    "csv_to_chart": {
+      "network": "local",
+      "services": []
+    },
+    "csv_to_xlsx": {
+      "network": "local",
+      "services": []
+    },
+    "daily_briefing": {
+      "network": "local",
+      "services": []
+    },
+    "datetime_info": {
+      "network": "local",
+      "services": []
+    },
+    "diff_text": {
+      "network": "local",
+      "services": []
+    },
+    "doc_analyze_input": {
+      "network": "local",
+      "services": []
+    },
+    "doc_asset_create": {
+      "network": "local",
+      "services": []
+    },
+    "doc_asset_list": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_change": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_client_sheet": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_from_screenshots": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_maintenance": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_onboarding": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_postmortem": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_procedure": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_recovery_plan": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_report": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_runbook": {
+      "network": "local",
+      "services": []
+    },
+    "doc_generate_schema": {
+      "network": "local",
+      "services": []
+    },
+    "doc_intervention_create": {
+      "network": "local",
+      "services": []
+    },
+    "doc_intervention_list": {
+      "network": "local",
+      "services": []
+    },
+    "doc_intervention_update": {
+      "network": "local",
+      "services": []
+    },
+    "doc_knowledge_search": {
+      "network": "local",
+      "services": []
+    },
+    "doc_template_list": {
+      "network": "local",
+      "services": []
+    },
+    "document_ask": {
+      "network": "local",
+      "services": []
+    },
+    "document_convert_format": {
+      "network": "local",
+      "services": []
+    },
+    "document_forget": {
+      "network": "local",
+      "services": []
+    },
+    "document_generate": {
+      "network": "local",
+      "services": []
+    },
+    "document_identity_set": {
+      "network": "local",
+      "services": []
+    },
+    "document_index": {
+      "network": "local",
+      "services": []
+    },
+    "document_list": {
+      "network": "local",
+      "services": []
+    },
+    "document_refine_section": {
+      "network": "local",
+      "services": []
+    },
+    "docx_to_text": {
+      "network": "local",
+      "services": []
+    },
+    "email_accounts": {
+      "network": "local",
+      "services": []
+    },
+    "email_apply_rules": {
+      "network": "internet",
+      "services": []
+    },
+    "email_attachment_summary": {
+      "network": "internet",
+      "services": []
+    },
+    "email_automation_run": {
+      "network": "internet",
+      "services": []
+    },
+    "email_digest": {
+      "network": "internet",
+      "services": []
+    },
+    "email_draft_reply": {
+      "network": "internet",
+      "services": [],
+      "offline_capable": true
+    },
+    "email_list": {
+      "network": "internet",
+      "services": []
+    },
+    "email_read": {
+      "network": "internet",
+      "services": []
+    },
+    "email_search": {
+      "network": "internet",
+      "services": []
+    },
+    "email_send": {
+      "network": "internet",
+      "services": []
+    },
+    "email_summarize": {
+      "network": "internet",
+      "services": [],
+      "offline_capable": true
+    },
+    "email_to_task": {
+      "network": "internet",
+      "services": [],
+      "offline_capable": true
+    },
+    "email_watch_check": {
+      "network": "internet",
+      "services": []
+    },
+    "event_create": {
+      "network": "local",
+      "services": []
+    },
+    "event_delete": {
+      "network": "local",
+      "services": []
+    },
+    "event_list": {
+      "network": "local",
+      "services": []
+    },
+    "event_update": {
+      "network": "local",
+      "services": []
+    },
+    "file_batch_read": {
+      "network": "local",
+      "services": []
+    },
+    "file_compress": {
+      "network": "local",
+      "services": []
+    },
+    "file_convert_docx_to_pdf": {
+      "network": "local",
+      "services": []
+    },
+    "file_copy": {
+      "network": "local",
+      "services": []
+    },
+    "file_create_docx": {
+      "network": "local",
+      "services": []
+    },
+    "file_create_folder": {
+      "network": "local",
+      "services": []
+    },
+    "file_create_pdf": {
+      "network": "local",
+      "services": []
+    },
+    "file_create_xlsx": {
+      "network": "local",
+      "services": []
+    },
+    "file_delete": {
+      "network": "local",
+      "services": []
+    },
+    "file_duplicate_finder": {
+      "network": "local",
+      "services": []
+    },
+    "file_extract": {
+      "network": "local",
+      "services": []
+    },
+    "file_find": {
+      "network": "local",
+      "services": []
+    },
+    "file_info": {
+      "network": "local",
+      "services": []
+    },
+    "file_large_finder": {
+      "network": "local",
+      "services": []
+    },
+    "file_list": {
+      "network": "local",
+      "services": []
+    },
+    "file_move": {
+      "network": "local",
+      "services": []
+    },
+    "file_read": {
+      "network": "local",
+      "services": []
+    },
+    "file_rename": {
+      "network": "local",
+      "services": []
+    },
+    "file_search_text": {
+      "network": "local",
+      "services": []
+    },
+    "file_write": {
+      "network": "local",
+      "services": []
+    },
+    "gif_optimize": {
+      "network": "local",
+      "services": []
+    },
+    "gif_to_video": {
+      "network": "local",
+      "services": []
+    },
+    "git_info": {
+      "network": "local",
+      "services": []
+    },
+    "google_drive_list": {
+      "network": "internet",
+      "services": []
+    },
+    "google_drive_read": {
+      "network": "internet",
+      "services": []
+    },
+    "google_drive_upload": {
+      "network": "internet",
+      "services": []
+    },
+    "hash_compute": {
+      "network": "local",
+      "services": []
+    },
+    "image_batch": {
+      "network": "local",
+      "services": []
+    },
+    "image_compress": {
+      "network": "local",
+      "services": []
+    },
+    "image_crop": {
+      "network": "local",
+      "services": []
+    },
+    "image_info": {
+      "network": "local",
+      "services": []
+    },
+    "image_resize": {
+      "network": "local",
+      "services": []
+    },
+    "image_rotate": {
+      "network": "local",
+      "services": []
+    },
+    "images_to_pdf": {
+      "network": "local",
+      "services": []
+    },
+    "infographic_create": {
+      "network": "local",
+      "services": []
+    },
+    "ip_info": {
+      "network": "internet",
+      "services": []
+    },
+    "it_kb_add": {
+      "network": "local",
+      "services": []
+    },
+    "it_kb_list": {
+      "network": "local",
+      "services": []
+    },
+    "it_kb_recommend": {
+      "network": "local",
+      "services": []
+    },
+    "it_kb_search": {
+      "network": "local",
+      "services": []
+    },
+    "itsm_asset_list": {
+      "network": "local",
+      "services": []
+    },
+    "itsm_ticket_create": {
+      "network": "local",
+      "services": []
+    },
+    "itsm_ticket_list": {
+      "network": "local",
+      "services": []
+    },
+    "json_tool": {
+      "network": "local",
+      "services": []
+    },
+    "logo_generate": {
+      "network": "local",
+      "services": []
+    },
+    "logo_list": {
+      "network": "local",
+      "services": []
+    },
+    "long_task_start": {
+      "network": "local",
+      "services": []
+    },
+    "long_task_status": {
+      "network": "local",
+      "services": []
+    },
+    "long_task_stop": {
+      "network": "local",
+      "services": []
+    },
+    "markdown_convert": {
+      "network": "local",
+      "services": []
+    },
+    "memory_delete": {
+      "network": "local",
+      "services": []
+    },
+    "memory_list": {
+      "network": "local",
+      "services": []
+    },
+    "memory_save": {
+      "network": "local",
+      "services": []
+    },
+    "memory_search": {
+      "network": "local",
+      "services": []
+    },
+    "net_dns_lookup": {
+      "network": "target",
+      "services": []
+    },
+    "net_http_probe": {
+      "network": "target",
+      "services": []
+    },
+    "net_inventory_annotate": {
+      "network": "local",
+      "services": []
+    },
+    "net_inventory_list": {
+      "network": "local",
+      "services": []
+    },
+    "net_inventory_scan": {
+      "network": "target",
+      "services": []
+    },
+    "net_nmap_scan": {
+      "network": "target",
+      "services": []
+    },
+    "net_ping": {
+      "network": "target",
+      "services": []
+    },
+    "net_port_scan": {
+      "network": "target",
+      "services": []
+    },
+    "net_route_diagnostics": {
+      "network": "target",
+      "services": []
+    },
+    "net_scan_local": {
+      "network": "target",
+      "services": []
+    },
+    "net_service_detect": {
+      "network": "target",
+      "services": []
+    },
+    "net_snmp_query": {
+      "network": "target",
+      "services": []
+    },
+    "net_subnet_calc": {
+      "network": "local",
+      "services": []
+    },
+    "net_subnet_sweep": {
+      "network": "target",
+      "services": []
+    },
+    "net_tls_check": {
+      "network": "target",
+      "services": []
+    },
+    "net_tls_check_bulk": {
+      "network": "target",
+      "services": []
+    },
+    "net_topology_diagram": {
+      "network": "target",
+      "services": []
+    },
+    "net_traceroute": {
+      "network": "target",
+      "services": []
+    },
+    "net_whois": {
+      "network": "internet",
+      "services": []
+    },
+    "note_create": {
+      "network": "local",
+      "services": []
+    },
+    "note_delete": {
+      "network": "local",
+      "services": []
+    },
+    "note_list": {
+      "network": "local",
+      "services": []
+    },
+    "note_update": {
+      "network": "local",
+      "services": []
+    },
+    "ocr_extract": {
+      "network": "local",
+      "services": []
+    },
+    "onedrive_list": {
+      "network": "internet",
+      "services": []
+    },
+    "onedrive_read": {
+      "network": "internet",
+      "services": []
+    },
+    "onedrive_upload": {
+      "network": "internet",
+      "services": []
+    },
+    "ops_checklist_generate": {
+      "network": "local",
+      "services": []
+    },
+    "ops_evidence_add": {
+      "network": "local",
+      "services": []
+    },
+    "ops_postcheck_run": {
+      "network": "local",
+      "services": []
+    },
+    "ops_precheck_create": {
+      "network": "local",
+      "services": []
+    },
+    "ops_precheck_run": {
+      "network": "local",
+      "services": []
+    },
+    "ops_validation_report_generate": {
+      "network": "local",
+      "services": []
+    },
+    "os_dark_mode": {
+      "network": "local",
+      "services": []
+    },
+    "os_firewall": {
+      "network": "local",
+      "services": []
+    },
+    "os_hibernation": {
+      "network": "local",
+      "services": []
+    },
+    "os_network_adapters": {
+      "network": "local",
+      "services": []
+    },
+    "os_power_plan": {
+      "network": "local",
+      "services": []
+    },
+    "password_generate": {
+      "network": "local",
+      "services": []
+    },
+    "pc_app_launch": {
+      "network": "local",
+      "services": []
+    },
+    "pc_bluetooth_status": {
+      "network": "local",
+      "services": []
+    },
+    "pc_browse": {
+      "network": "local",
+      "services": []
+    },
+    "pc_clipboard_get": {
+      "network": "local",
+      "services": []
+    },
+    "pc_clipboard_set": {
+      "network": "local",
+      "services": []
+    },
+    "pc_conversation_trace": {
+      "network": "local",
+      "services": []
+    },
+    "pc_disk_smart_health": {
+      "network": "local",
+      "services": []
+    },
+    "pc_driver_check": {
+      "network": "local",
+      "services": []
+    },
+    "pc_event_log_errors": {
+      "network": "local",
+      "services": []
+    },
+    "pc_get_real_paths": {
+      "network": "local",
+      "services": []
+    },
+    "pc_gpu_status": {
+      "network": "local",
+      "services": []
+    },
+    "pc_gui_click": {
+      "network": "local",
+      "services": []
+    },
+    "pc_gui_read": {
+      "network": "local",
+      "services": []
+    },
+    "pc_gui_type": {
+      "network": "local",
+      "services": []
+    },
+    "pc_hardware_specs": {
+      "network": "local",
+      "services": []
+    },
+    "pc_hardware_temps": {
+      "network": "local",
+      "services": []
+    },
+    "pc_health_trend": {
+      "network": "local",
+      "services": []
+    },
+    "pc_installed_software": {
+      "network": "local",
+      "services": []
+    },
+    "pc_notify": {
+      "network": "local",
+      "services": []
+    },
+    "pc_open_file": {
+      "network": "local",
+      "services": []
+    },
+    "pc_printer_list": {
+      "network": "local",
+      "services": []
+    },
+    "pc_printer_set_default": {
+      "network": "local",
+      "services": []
+    },
+    "pc_process_kill": {
+      "network": "local",
+      "services": []
+    },
+    "pc_process_list": {
+      "network": "local",
+      "services": []
+    },
+    "pc_pull_ollama_model": {
+      "network": "internet",
+      "services": [
+        "ollama"
+      ]
+    },
+    "pc_reveal": {
+      "network": "local",
+      "services": []
+    },
+    "pc_run_command": {
+      "network": "local",
+      "services": []
+    },
+    "pc_run_elevated": {
+      "network": "local",
+      "services": []
+    },
+    "pc_run_powershell": {
+      "network": "local",
+      "services": []
+    },
+    "pc_screenshot": {
+      "network": "local",
+      "services": []
+    },
+    "pc_system_info": {
+      "network": "local",
+      "services": []
+    },
+    "pc_tailscale_status": {
+      "network": "local",
+      "services": []
+    },
+    "pc_tool_reliability": {
+      "network": "local",
+      "services": []
+    },
+    "pc_usb_list": {
+      "network": "local",
+      "services": []
+    },
+    "pc_window_focus": {
+      "network": "local",
+      "services": []
+    },
+    "pc_window_list": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_add_page_numbers": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_compress": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_extract_images": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_fill_form": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_form_fields": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_info": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_merge": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_ocr": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_protect": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_read": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_rotate": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_split": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_to_images": {
+      "network": "local",
+      "services": []
+    },
+    "pdf_watermark": {
+      "network": "local",
+      "services": []
+    },
+    "pptx_create": {
+      "network": "local",
+      "services": []
+    },
+    "pptx_read": {
+      "network": "local",
+      "services": []
+    },
+    "project_create": {
+      "network": "local",
+      "services": []
+    },
+    "project_delete": {
+      "network": "local",
+      "services": []
+    },
+    "project_list": {
+      "network": "local",
+      "services": []
+    },
+    "project_update": {
+      "network": "local",
+      "services": []
+    },
+    "qr_generate": {
+      "network": "local",
+      "services": []
+    },
+    "quiz_answer": {
+      "network": "local",
+      "services": []
+    },
+    "quiz_generate": {
+      "network": "local",
+      "services": []
+    },
+    "quiz_next": {
+      "network": "local",
+      "services": []
+    },
+    "quiz_stats": {
+      "network": "local",
+      "services": []
+    },
+    "regex_tool": {
+      "network": "local",
+      "services": []
+    },
+    "registry_backup": {
+      "network": "local",
+      "services": []
+    },
+    "registry_get": {
+      "network": "local",
+      "services": []
+    },
+    "registry_set": {
+      "network": "local",
+      "services": []
+    },
+    "screen_ocr": {
+      "network": "local",
+      "services": []
+    },
+    "screen_record_gif": {
+      "network": "local",
+      "services": []
+    },
+    "screenshot_list": {
+      "network": "local",
+      "services": []
+    },
+    "search_semantic": {
+      "network": "local",
+      "services": []
+    },
+    "skill_learning_log": {
+      "network": "local",
+      "services": []
+    },
+    "sqlite_query": {
+      "network": "local",
+      "services": []
+    },
+    "sqlite_tables": {
+      "network": "local",
+      "services": []
+    },
+    "ssh_connection_save": {
+      "network": "local",
+      "services": []
+    },
+    "ssh_download": {
+      "network": "target",
+      "services": []
+    },
+    "ssh_exec": {
+      "network": "target",
+      "services": []
+    },
+    "ssh_exec_multi": {
+      "network": "target",
+      "services": []
+    },
+    "ssh_list": {
+      "network": "local",
+      "services": []
+    },
+    "ssh_list_dir": {
+      "network": "target",
+      "services": []
+    },
+    "ssh_server_info": {
+      "network": "target",
+      "services": []
+    },
+    "ssh_upload": {
+      "network": "target",
+      "services": []
+    },
+    "ssh_write_and_run": {
+      "network": "target",
+      "services": []
+    },
+    "system_cleanup": {
+      "network": "local",
+      "services": []
+    },
+    "system_restore_point": {
+      "network": "local",
+      "services": []
+    },
+    "system_search": {
+      "network": "local",
+      "services": []
+    },
+    "system_search_content": {
+      "network": "local",
+      "services": []
+    },
+    "system_self_test": {
+      "network": "local",
+      "services": []
+    },
+    "task_create": {
+      "network": "local",
+      "services": []
+    },
+    "task_delete": {
+      "network": "local",
+      "services": []
+    },
+    "task_list": {
+      "network": "local",
+      "services": []
+    },
+    "task_update": {
+      "network": "local",
+      "services": []
+    },
+    "telegram_send": {
+      "network": "internet",
+      "services": []
+    },
+    "text_extract": {
+      "network": "local",
+      "services": []
+    },
+    "text_join": {
+      "network": "local",
+      "services": []
+    },
+    "text_stats": {
+      "network": "local",
+      "services": []
+    },
+    "text_summarize": {
+      "network": "local",
+      "services": []
+    },
+    "text_to_speech": {
+      "network": "local",
+      "services": []
+    },
+    "tool_search": {
+      "network": "local",
+      "services": []
+    },
+    "translate": {
+      "network": "local",
+      "services": []
+    },
+    "tweak_debloat_list": {
+      "network": "local",
+      "services": []
+    },
+    "tweak_debloat_remove": {
+      "network": "local",
+      "services": []
+    },
+    "tweak_network_harden": {
+      "network": "local",
+      "services": []
+    },
+    "tweak_telemetry": {
+      "network": "local",
+      "services": []
+    },
+    "unified_search": {
+      "network": "local",
+      "services": []
+    },
+    "unit_convert": {
+      "network": "local",
+      "services": []
+    },
+    "url_analyze": {
+      "network": "internet",
+      "services": []
+    },
+    "video_compress": {
+      "network": "local",
+      "services": []
+    },
+    "video_extract_frames": {
+      "network": "local",
+      "services": []
+    },
+    "video_info": {
+      "network": "local",
+      "services": []
+    },
+    "video_resize": {
+      "network": "local",
+      "services": []
+    },
+    "video_speed": {
+      "network": "local",
+      "services": []
+    },
+    "video_to_gif": {
+      "network": "local",
+      "services": []
+    },
+    "video_trim": {
+      "network": "local",
+      "services": []
+    },
+    "video_watermark": {
+      "network": "local",
+      "services": []
+    },
+    "vm_lab_install": {
+      "network": "local",
+      "services": []
+    },
+    "voice_transcribe": {
+      "network": "local",
+      "services": []
+    },
+    "weather": {
+      "network": "internet",
+      "services": []
+    },
+    "web_browse": {
+      "network": "internet",
+      "services": []
+    },
+    "web_browser_open": {
+      "network": "internet",
+      "services": []
+    },
+    "web_deep_research": {
+      "network": "internet",
+      "services": [
+        "searxng"
+      ]
+    },
+    "web_media_extract": {
+      "network": "internet",
+      "services": []
+    },
+    "web_research": {
+      "network": "internet",
+      "services": [
+        "searxng"
+      ]
+    },
+    "web_search": {
+      "network": "internet",
+      "services": [
+        "searxng"
+      ]
+    },
+    "web_site_crawl": {
+      "network": "internet",
+      "services": []
+    },
+    "webapp_create": {
+      "network": "local",
+      "services": []
+    },
+    "win_disk_info": {
+      "network": "local",
+      "services": []
+    },
+    "win_event_log": {
+      "network": "local",
+      "services": []
+    },
+    "win_firewall_status": {
+      "network": "local",
+      "services": []
+    },
+    "win_network_config": {
+      "network": "local",
+      "services": []
+    },
+    "win_quick_launch": {
+      "network": "local",
+      "services": []
+    },
+    "win_quick_launch_list": {
+      "network": "local",
+      "services": []
+    },
+    "win_scheduled_tasks": {
+      "network": "local",
+      "services": []
+    },
+    "win_service_action": {
+      "network": "local",
+      "services": []
+    },
+    "win_services_list": {
+      "network": "local",
+      "services": []
+    },
+    "win_startup_programs": {
+      "network": "local",
+      "services": []
+    },
+    "win_system_report": {
+      "network": "local",
+      "services": []
+    },
+    "win_update_status": {
+      "network": "local",
+      "services": []
+    },
+    "win_uptime": {
+      "network": "local",
+      "services": []
+    },
+    "win_users_list": {
+      "network": "local",
+      "services": []
+    },
+    "winget_install": {
+      "network": "internet",
+      "services": []
+    },
+    "winget_list_installed": {
+      "network": "local",
+      "services": []
+    },
+    "winget_list_upgrades": {
+      "network": "internet",
+      "services": []
+    },
+    "winget_search": {
+      "network": "internet",
+      "services": []
+    },
+    "winget_uninstall": {
+      "network": "local",
+      "services": []
+    },
+    "winget_upgrade": {
+      "network": "internet",
+      "services": []
+    },
+    "xlsx_read": {
+      "network": "local",
+      "services": []
+    },
+    "xlsx_to_csv": {
+      "network": "local",
+      "services": []
+    },
+    "zip_list": {
+      "network": "local",
+      "services": []
+    }
+  }
+}

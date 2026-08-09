@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.596.0 — Inventaire réseau exact des 363 outils
+
+Demande : rendre la continuité hors ligne des quatre profils réellement efficace sans
+faire disparaître les capacités de Marvin ni gaspiller le contexte local sur des outils
+inexécutables.
+
+Constat : le catalogue décrivait correctement les usages des outils, mais ne distinguait pas
+les capacités locales, Internet, LAN/SSH ni les services Ollama/SearXNG. En panne Internet,
+le LLM pouvait donc recevoir et classer des schémas inutilisables. Une classification par
+préfixe seule aurait été fausse : `net_subnet_calc`, `net_inventory_list`, `ssh_list` et
+`ssh_connection_save` sont locaux, alors que `net_whois` exige Internet. Les résumés e-mail
+peuvent aussi travailler sur un corps déjà fourni sans récupération IMAP.
+
+Décision : un manifeste versionné couvre exactement les 363 noms du registre. Le snapshot
+runtime observe le signal Internet Windows et sonde de façon bornée les endpoints locaux
+Ollama et SearXNG, sans proxy hôte et avec cache de vingt secondes. Une cible LAN/SSH reste `unknown` jusqu'à
+son appel; elle n'est pas assimilée à Internet. Les chemins mixtes e-mail deviennent
+`degraded` hors ligne. Le classement retire les capacités non classables, sauf lorsqu'un
+mot-clé métier ou le nom exact prouve la demande utilisateur. `tool_search` reste toujours
+visible et retourne l'état annoté. Un inventaire absent ou corrompu conserve la sélection
+historique au lieu d'interrompre toutes les conversations.
+
+Sécurité et logs : aucune exécution, autorisation ou confirmation n'est modifiée. Les sondes
+font seulement des GET bornés vers les endpoints déjà configurés; l'URL SearXNG et les
+identifiants ne sont jamais retournés ni journalisés. L'état transitoire n'est pas persisté.
+Le manifeste ne contient ni secret ni donnée personnelle. Rollback : réversion atomique du
+commit v2.596 puis redémarrage; aucune migration ou donnée active n'est concernée.
+
+Validation finale : compilation des modules modifiés, couverture exacte
+363/363, statuts local/Internet/cible, service SearXNG indisponible, chemin e-mail dégradé,
+classement hors ligne, demande Web explicite, annotation de `tool_search` et repli sur
+manifeste absent passent. Le redémarrage officiel atteint `ready` en 68,9 s avec backend
+2.596.0, 363 outils, Ollama, SearXNG et HTTPS disponibles. Deux appels `tool_search` live
+retournent `web_search` disponible avec Internet/Ollama/SearXNG vrais : après correction de
+la résolution IPv6 de `localhost`, le contrat prend 71 ms à froid puis 43 ms à chaud, contre
+1 322 ms avant correction. La gate exhaustive `--quick --live` passe 268/268 en 799,6 s;
+rapport atomique `artifacts/check-marvin-v2596-live-final.json`. Les 37 avertissements ESLint
+historiques restent au plafond 37/37, sans nouvelle exception ni régression.
+
 ## 2026-08-09 — v2.595.0 — Parachute local fondé sur l'inventaire Ollama réel
 
 Demande : fermer toutes les références statiques vers des modèles retirés, y compris

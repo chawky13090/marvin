@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +15,7 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 import agent_tool_selection as selection
+from tool_availability import ConnectivitySnapshot
 
 
 def _names(specs: list[dict]) -> list[str]:
@@ -31,8 +32,19 @@ async def _route_empty(_text: str) -> dict:
 
 def main() -> int:
     empty_router = SimpleNamespace(route_tools=_route_empty)
-    with patch.dict(sys.modules, {"tool_router": empty_router}), patch.object(
-        selection.db, "get_setting", return_value="344"
+    online = ConnectivitySnapshot(
+        internet=True,
+        services={"ollama": True, "searxng": True},
+        observed_at=1.0,
+    )
+    with (
+        patch.dict(sys.modules, {"tool_router": empty_router}),
+        patch.object(selection.db, "get_setting", return_value="344"),
+        patch.object(
+            selection.tool_availability,
+            "get_snapshot",
+            AsyncMock(return_value=online),
+        ),
     ):
         all_specs = asyncio.run(selection.filter_relevant_tools([], "agent"))
         assert all_specs is selection.TOOLS_SPEC
@@ -126,6 +138,19 @@ def main() -> int:
         patch.object(selection, "_KEYWORD_TOOLS_NORM", [(('trigger',), {"d", "c", "b"})]),
         patch.object(selection, "_CAPABILITY_CATALOG", ()),
         patch.object(selection.db, "get_setting", return_value="3"),
+        patch.object(
+            selection.tool_availability,
+            "get_snapshot",
+            AsyncMock(return_value=online),
+        ),
+        patch.object(
+            selection.tool_availability,
+            "availability_map",
+            return_value={
+                name: {"status": "available", "rankable": True}
+                for name in ("a", "b", "c", "d", "z")
+            },
+        ),
     ):
         first = _names(asyncio.run(selection.filter_relevant_tools(
             [{"role": "user", "content": "trigger"}], "agent"

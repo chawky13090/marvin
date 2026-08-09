@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.595.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.596.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.595.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.596.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.595.0)
+## 9. État actuel (v2.596.0)
+
+**v2.596 (disponibilité réseau des outils)** : les 363 outils possèdent une entrée exacte
+dans `backend/resources/tool_network_dependencies.json`, avec dépendance locale, Internet,
+cible distante et services Ollama/SearXNG. `tool_search` expose cet état sans exécuter
+l'outil. Hors ligne, une capacité indisponible ou dégradée ne consomme plus un slot de
+classement limité, mais reste connue et redevient visible lorsqu'elle est explicitement
+demandée : Marvin peut donc expliquer le blocage ou employer un chemin hors ligne réel.
+Les outils e-mail hybrides distinguent l'entrée déjà fournie de la récupération IMAP; les
+cibles LAN/SSH restent `unknown`, jamais faussement déclarées hors service par une panne
+Internet. Un manifeste endommagé dégrade uniquement l'annotation et ne casse pas le chat.
+Rollback : réversion atomique du commit v2.596 puis redémarrage Marvin; aucune donnée à
+restaurer.
 
 **v2.595 (références locales effectives et repli sans catalogue)** : aucun profil runtime,
 modèle par défaut ou dernier recours ne contient désormais un tag Ollama historique supposé

@@ -5,6 +5,7 @@ import re
 
 import cloud_routing as _cr
 import database as db
+import tool_availability
 from tools import TOOLS_SPEC
 from tool_capability_ranking import build_catalog, rank_capabilities
 
@@ -38,6 +39,7 @@ _ALWAYS_INCLUDE = {
     "pc_get_real_paths",
     "memory_save", "memory_list",
     "datetime_info",
+    "tool_search",
 }
 
 # Repli BORNÉ quand aucun mot-clé métier ne matche : un petit jeu d'outils
@@ -694,6 +696,34 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     # N'envoyer que des outils RÉELLEMENT existants
     names = {s.get("function", {}).get("name") for s in TOOLS_SPEC}
     relevant &= names
+
+    # Un outil indisponible reste connu via ``tool_search`` mais ne consomme pas
+    # un slot de classement. Une demande métier explicite conserve toutefois
+    # l'outil afin qu'il retourne son diagnostic réel plutôt qu'une incapacité
+    # inventée par le modèle.
+    try:
+        snapshot = await tool_availability.get_snapshot()
+        availability = tool_availability.availability_map(names, snapshot)
+        unavailable = {
+            name for name, state in availability.items()
+            if not state.get("rankable", True)
+        }
+    except tool_availability.ToolDependencyInventoryError:
+        # The versioned gate prevents this in a valid installation. If an AV or
+        # damaged deployment removes the manifest at runtime, retain Marvin's
+        # previous functional selection instead of breaking every conversation.
+        unavailable = set()
+    explicit_names = {
+        name for name in names
+        if name and (
+            _keyword_present(name, text_norm)
+            or _keyword_present(name.replace("_", " "), text_norm)
+        )
+    }
+    explicitly_required = (keyword_hits | explicit_names) & unavailable
+    relevant = (relevant - unavailable) | explicitly_required
+    if unavailable:
+        relevant.add("tool_search")
 
     # 5) Plafond selon le MODE de performance (max_tools) : sur petite machine on envoie peu
     #    d'outils (rapide) ; sur machine puissante, beaucoup (meilleure sélection). On garde

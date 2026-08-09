@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-09 : **v2.595.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-09 : **v2.596.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -49,6 +49,12 @@ global. Il ne contient aucune route métier et reste borné à 350 lignes par te
 sont réparties dans 50 modules `backend/api/*.py`. `TOOLS_REGISTRY` et `TOOLS_SPEC` doivent
 rester strictement égaux ; chaque outil passe par le gateway, sa politique, son résultat et
 ses preuves.
+
+L'inventaire `backend/resources/tool_network_dependencies.json` couvre exactement les 363
+outils. En mode hors ligne, les outils Internet indisponibles restent découvrables via
+`tool_search`, mais ne prennent pas de place dans le classement borné sauf demande explicite.
+Une cible LAN ou SSH reste d'état inconnu tant qu'elle n'est pas testée; elle n'est jamais
+masquée sur le seul constat d'une panne Internet.
 
 Le frontend ne contient plus aucun fichier JavaScript/JSX au-dessus de 1 200 lignes. La
 baseline interdit toute nouvelle exception et conserve un budget maximal de 37 avertissements.

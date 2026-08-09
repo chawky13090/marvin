@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.595.0**
+**Version 2.596.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 363 outils pour agir sur Windows, les
@@ -26,6 +26,8 @@ un état de continuité dégradé dans le chat et les métadonnées des outils.
 ## Capacités principales
 
 - Chat en streaming avec sélection automatique du modèle et appels d’outils multi-étapes.
+- Découverte des 363 outils consciente de leur disponibilité locale, Internet, LAN/SSH,
+  Ollama et SearXNG, sans retirer une capacité explicitement demandée.
 - Administration Windows, inventaire matériel, monitoring, GUI Automation et commandes.
 - Diagnostic réseau, SSH, SNMP, Nmap, topologie et suivi des équipements.
 - Lecture et génération Word, PDF, Excel et PowerPoint, OCR et recherche documentaire.
