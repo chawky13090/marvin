@@ -5,6 +5,48 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.597.0 — Matrice de panne des quatre profils
+
+Demande : optimiser Normal, Hyper, Tout cloud et Ultra pour une résilience maximale sur
+n'importe quelle machine, avec tests à chaque étape, sans diminuer l'intelligence ni changer
+silencieusement la confidentialité ou les droits.
+
+Constat : la continuité après une panne Cloud en cours de génération était testée, mais le
+démarrage direct de Tout cloud sans candidat Cloud produisait un modèle local annoncé comme
+nominal. La sélection Cloud automatique était aussi conditionnée par la présence d'un
+override historique du rôle, alors que le Model Market dynamique doit rester la source de
+qualité. Les pannes SearXNG et Ollama n'étaient pas croisées explicitement avec les quatre
+presets dans une matrice unique.
+
+Décision : Tout cloud et Ultra consultent le meilleur candidat Cloud installé même si leur
+override a disparu. Si Tout cloud public ne trouve aucun candidat, il conserve son preset,
+utilise le repli local qualifié et émet `cloud_max_local_continuity`, `degraded=true` et la
+cause. Le chemin sensible local volontaire de Normal/Tout cloud reste nominal. Hyper reste
+strictement local. Ultra nominal reste Cloud pour les données publiques et sensibles; sa
+continuité locale de panne est annoncée. Sans aucun repli local qualifié, Marvin retourne une
+erreur actionnable au lieu d'inventer un tag.
+
+Sécurité et logs : aucune règle d'autorisation, confirmation, donnée sensible, secret ou
+persistance n'est modifiée. Le preset et le niveau de permission restent indépendants. Les
+événements exposent uniquement fournisseur, modèle, preset et cause technique bornée déjà
+publique; aucun prompt n'est ajouté aux logs. Rollback : réversion atomique du commit v2.597
+puis redémarrage; aucune migration de données.
+
+Validation : sept suites déterministes passent, couvrant la matrice complète, la
+résolution du modèle, les transitions de preset, la provenance, deux pannes transport HTTP,
+les retries Cloud, la continuité locale et le runtime de génération. Après redémarrage
+officiel en 67,9 s, le smoke réel passe 6/6 en 162,7 s et restaure tous les réglages : Normal
+public et Tout cloud public utilisent `qwen3.5:397b-cloud`; Normal sensible, Hyper et Tout
+cloud sensible utilisent `granite4.1:3b`; Ultra sensible utilise le Cloud. Chaque scénario
+appelle exactement une fois `calculator` et obtient 8 473.
+
+Une panne SearXNG réelle et réversible a ensuite été provoquée sur le conteneur exact
+`marvin-searxng` : `web_search` devient `unavailable` avec
+`service_searxng_unavailable`, tandis que `calculator` reste `available` et FastAPI `ok`.
+Le même conteneur a été redémarré, `/config` a retrouvé HTTP 200, puis `web_search` est
+revenu `available` après expiration du cache borné. La gate exhaustive finale passe
+269/269 après redémarrage; rapport : `artifacts/check-marvin-v2597-live-final.json`.
+
 ## 2026-08-09 — v2.596.0 — Inventaire réseau exact des 363 outils
 
 Demande : rendre la continuité hors ligne des quatre profils réellement efficace sans

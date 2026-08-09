@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.596.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.597.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.596.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.597.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.596.0)
+## 9. État actuel (v2.597.0)
+
+**v2.597 (pannes des quatre profils)** : Normal, Hyper, Tout cloud et Ultra possèdent une
+matrice exécutable couvrant contenus publics/sensibles, Cloud disponible/absent, repli local
+présent/absent, SearXNG isolément indisponible et Ollama local indisponible. Tout cloud et
+Ultra utilisent le meilleur modèle du Model Market même si un ancien override de rôle a
+disparu. Quand Tout cloud démarre directement sur le local faute de Cloud, le profil reste
+inchangé mais la provenance devient explicitement `cloud_max_local_continuity`, dégradée,
+au lieu d'un faux état nominal. Un contenu sensible en Tout cloud reste local par politique
+et n'est pas présenté comme une panne. Ultra conserve l'accès Cloud aux contenus sensibles
+en fonctionnement nominal et annonce son repli local seulement lors d'une panne. Aucun
+profil ni niveau de permission n'est modifié automatiquement. Rollback : réversion atomique
+du commit v2.597 puis redémarrage; aucune donnée persistante à restaurer.
 
 **v2.596 (disponibilité réseau des outils)** : les 363 outils possèdent une entrée exacte
 dans `backend/resources/tool_network_dependencies.json`, avec dépendance locale, Internet,

@@ -1,6 +1,6 @@
 {
   "name": "secretary-ai",
-  "version": "2.596.0",
+  "version": "2.597.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/start_next_dev.mjs",
@@ -27,6 +27,7 @@
     "check:generation-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_generation_runtime.py",
     "check:structured-logging": "backend\\.venv\\Scripts\\python.exe scripts\\test_structured_logging.py",
     "check:tool-availability": "backend\\.venv\\Scripts\\python.exe scripts\\test_tool_availability.py",
+    "check:privacy-failures": "backend\\.venv\\Scripts\\python.exe scripts\\test_privacy_failure_matrix.py",
     "check:skill-match-logging": "backend\\.venv\\Scripts\\python.exe scripts\\test_skill_match_logging.py",
     "check:persistence-inventory": "backend\\.venv\\Scripts\\python.exe scripts\\test_persistence_inventory.py",
     "check:durable-evidence": "backend\\.venv\\Scripts\\python.exe scripts\\test_durable_evidence_store.py",

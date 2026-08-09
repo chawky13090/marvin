@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.596.0**
+**Version 2.597.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 363 outils pour agir sur Windows, les
@@ -22,6 +22,8 @@ Cloud tout en conservant les données sensibles en local, et Ultra débridé aut
 données dans le Cloud. Une panne Cloud ne modifie jamais le profil ni les permissions : après
 des tentatives bornées entre modèles Cloud, Marvin utilise un modèle local certifié et expose
 un état de continuité dégradé dans le chat et les métadonnées des outils.
+La sélection Cloud reste dynamique lorsque l'override d'un ancien modèle a disparu; elle ne
+retombe pas silencieusement sur le local tant qu'un meilleur modèle Cloud est disponible.
 
 ## Capacités principales
 

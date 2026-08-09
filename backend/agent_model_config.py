@@ -47,19 +47,19 @@ class ModelConfig:
         provider = "ollama_cloud" if is_cloud_model(selected_model) else "ollama_local"
         resilience = cloud_routing.get_privacy_resilience()
         degraded = self.continuity_state != "nominal" and provider == "ollama_local"
-        privacy_mode = (
-            "hyper_local"
-            if self.lockdown
-            else (
-                "ultra_local_continuity"
-                if self.ultra_cloud_only and provider == "ollama_local"
-                else "ultra_cloud"
-                if self.ultra_cloud_only
-                else "sensitive_local"
-                if self.sensitive and provider == "ollama_local"
-                else "standard"
-            )
-        )
+        privacy_preset = cloud_routing.get_privacy_preset()
+        if self.lockdown:
+            privacy_mode = "hyper_local"
+        elif degraded:
+            privacy_mode = f"{privacy_preset}_local_continuity"
+        elif self.ultra_cloud_only and provider == "ollama_local":
+            privacy_mode = "ultra_local_continuity"
+        elif self.ultra_cloud_only:
+            privacy_mode = "ultra_cloud"
+        elif self.sensitive and provider == "ollama_local":
+            privacy_mode = "sensitive_local"
+        else:
+            privacy_mode = "standard"
         return {
             "type": "model_info",
             "profile": selected_profile,
@@ -67,7 +67,7 @@ class ModelConfig:
             "label": label or self.label,
             "provider": provider,
             "privacyMode": privacy_mode,
-            "privacyPreset": cloud_routing.get_privacy_preset(),
+            "privacyPreset": privacy_preset,
             "cloudPreferred": bool(resilience["cloud_preferred"]),
             "cloudOnly": self.ultra_cloud_only and provider == "ollama_cloud",
             "degraded": degraded,
@@ -97,15 +97,22 @@ async def resolve_model_config(
     lockdown = is_local_only_lockdown()
     ultra = (not lockdown) and is_ultra_unrestricted()
     initial_cloud_unavailable = False
+    privacy_preset = cloud_routing.get_privacy_preset()
+    normalized_text = cloud_routing.strip_accents((user_query or "").lower())
+    request_sensitive = is_sensitive_request(messages, normalized_text)
 
     if not requested_model or requested_model == "auto":
         await refresh_model_cache()
         profile_name, active_model, temperature = detect_profile(messages)
         cloud_enabled, cloud_overrides = get_cloud_config()
-        if cloud_enabled and not lockdown and profile_name in cloud_overrides:
-            normalized_text = cloud_routing.strip_accents((user_query or "").lower())
-            if ultra or not is_sensitive_request(messages, normalized_text):
-                configured = cloud_overrides[profile_name]
+        cloud_profile_requested = privacy_preset in {"cloud_max", "ultra"}
+        if (
+            cloud_enabled
+            and not lockdown
+            and (profile_name in cloud_overrides or cloud_profile_requested)
+        ):
+            if ultra or not request_sensitive:
+                configured = str(cloud_overrides.get(profile_name) or "")
                 installed = cloud_routing.list_installed_cloud_models()
                 need = (
                     cloud_routing.detect_task(user_query)
@@ -118,10 +125,14 @@ async def resolve_model_config(
                 # Les overrides de profil proviennent souvent d'un ancien preset et
                 # vieillissent dès qu'un modèle Cloud supérieur est installé. En mode
                 # Auto, le Model Market qualifié gagne; l'override reste un repli.
-                active_model = (
+                candidate = (
                     cloud_routing.pick_best_cloud_model(need)
                     or (configured if configured in installed else active_model)
                 )
+                if is_cloud_model(candidate):
+                    active_model = candidate
+                elif privacy_preset == "cloud_max":
+                    initial_cloud_unavailable = True
     else:
         active_model = requested_model
         profile_name = "manual"
@@ -156,9 +167,7 @@ async def resolve_model_config(
             initial_cloud_unavailable = True
 
     privacy = cortex_plan["resolved"]["privacy"]
-    sensitive = is_sensitive_request(
-        messages, cloud_routing.strip_accents((user_query or "").lower())
-    )
+    sensitive = request_sensitive
     if (
         not ultra
         and is_cloud_model(active_model)
@@ -175,7 +184,7 @@ async def resolve_model_config(
         )
 
     label = MODEL_PROFILES.get(profile_name, {}).get("label", f"🎯 {active_model}")
-    if ultra and initial_cloud_unavailable:
+    if initial_cloud_unavailable and privacy_preset in {"cloud_max", "ultra"}:
         label = f"Continuité locale · {active_model}"
     elif ultra:
         label = f"Cloud prioritaire · {active_model}"

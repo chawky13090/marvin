@@ -400,6 +400,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Matrice des profils de confidentialité",
             (python, "scripts/test_privacy_model_matrix.py"),
         ),
+        Stage(
+            "Matrice de pannes des quatre profils",
+            (python, "scripts/test_privacy_failure_matrix.py"),
+        ),
         Stage("État observable du Runner", (python, "scripts/test_agent_runner.py")),
         Stage("Observabilité du Runner", (python, "scripts/test_agent_observability.py")),
         Stage("Finalisation commune du Runner", (python, "scripts/test_agent_finalization.py")),
