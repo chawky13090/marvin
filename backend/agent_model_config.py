@@ -15,7 +15,11 @@ from agent_routing import (
     is_ultra_unrestricted,
     refresh_model_cache,
 )
-from config import DEFAULT_MODEL, MODEL_PROFILES
+from config import MODEL_PROFILES, effective_local_model
+
+
+class LocalModelUnavailable(RuntimeError):
+    """No proven local fallback is available for the active privacy policy."""
 
 
 @dataclass(slots=True)
@@ -122,15 +126,11 @@ async def resolve_model_config(
         active_model = requested_model
         profile_name = "manual"
         if lockdown and is_cloud_model(active_model):
-            active_model = MODEL_PROFILES.get("agent", {}).get("model") or DEFAULT_MODEL
+            active_model = effective_local_model("agent")
             profile_name = "agent"
         temperature = _manual_temperature(active_model)
 
-    local_fallback_model = (
-        MODEL_PROFILES.get(profile_name, {}).get("model")
-        or MODEL_PROFILES.get("agent", {}).get("model")
-        or DEFAULT_MODEL
-    )
+    local_fallback_model = effective_local_model(profile_name)
 
     if ultra:
         cloud_need = (
@@ -147,6 +147,11 @@ async def resolve_model_config(
                 requested_model=active_model if is_cloud_model(active_model) else None,
             )
         except cloud_routing.CloudOnlyModelUnavailable:
+            if not local_fallback_model:
+                raise LocalModelUnavailable(
+                    "Ollama Cloud est indisponible et aucun modele local compatible "
+                    "n'est installe. Ouvrez Parametres > Modeles pour installer un repli."
+                )
             active_model = local_fallback_model
             initial_cloud_unavailable = True
 
@@ -159,13 +164,15 @@ async def resolve_model_config(
         and is_cloud_model(active_model)
         and (privacy == "local" or (privacy == "hybrid_redacted" and sensitive))
     ):
-        active_model = (
-            MODEL_PROFILES.get(profile_name, {}).get("model")
-            or MODEL_PROFILES.get("agent", {}).get("model")
-            or DEFAULT_MODEL
-        )
+        active_model = effective_local_model(profile_name)
         if profile_name == "manual":
             profile_name = "agent"
+
+    if not active_model:
+        raise LocalModelUnavailable(
+            "Aucun modele local compatible n'est installe pour ce profil. "
+            "Ouvrez Parametres > Modeles pour installer un repli qualifie."
+        )
 
     label = MODEL_PROFILES.get(profile_name, {}).get("label", f"🎯 {active_model}")
     if ultra and initial_cloud_unavailable:

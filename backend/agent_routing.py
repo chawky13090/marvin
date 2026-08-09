@@ -114,11 +114,12 @@ _ANALYSIS_KEYWORDS = {
 
 # Cache des modèles disponibles dans Ollama (mis à jour au démarrage)
 _available_models_cache: set[str] = set()
+_model_cache_refreshed = False
 
 
 async def refresh_model_cache() -> set[str]:
     """Interroge Ollama pour lister les modèles installés et met à jour le cache."""
-    global _available_models_cache
+    global _available_models_cache, _model_cache_refreshed
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             r = await client.get(f"{OLLAMA_URL}/api/tags")
@@ -130,25 +131,26 @@ async def refresh_model_cache() -> set[str]:
                     n.removesuffix(":latest") for n in names if n.endswith(":latest")
                 }
                 _available_models_cache = names | latest_aliases
+                _model_cache_refreshed = True
     except Exception:
         pass
     return _available_models_cache
 
 
 def is_model_available(name: str) -> bool:
-    """Vérifie si un modèle est dans le cache (vrai si cache vide → on suppose dispo)."""
-    if not _available_models_cache:
-        return True
+    """Vérifie un tag exact; un inventaire absent n'est jamais une preuve."""
+    if not name or not _model_cache_refreshed:
+        return False
     canonical = name.removesuffix(":latest")
     return canonical in _available_models_cache or f"{canonical}:latest" in _available_models_cache
 
 
 def pick_available(preferred: str, fallbacks: list[str]) -> str:
-    """Retourne le premier modèle disponible de la liste (preferred en tête)."""
+    """Retourne le premier tag prouvé, ou une chaîne vide si aucun n'existe."""
     for name in [preferred, *fallbacks]:
-        if is_model_available(name):
+        if name and is_model_available(name):
             return name
-    return preferred  # last resort
+    return ""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -242,7 +244,7 @@ def detect_profile(messages: list[dict]) -> tuple[str, str, float]:
 
     if has_images:
         p = MODEL_PROFILES["vision"]
-        model = pick_available(p["model"], ["llava:7b", "llava", *AUTO_MODE_FALLBACKS])
+        model = pick_available(p["model"], AUTO_MODE_FALLBACKS)
         return "vision", model, p["temperature"]
 
     # ── Extraire le texte brut ─────────────────────────────────────────────────
@@ -300,7 +302,7 @@ def detect_profile(messages: list[dict]) -> tuple[str, str, float]:
     # prefer the analysis profile for better quality
     if has_analysis or word_count > 80:
         p = MODEL_PROFILES["analysis"]
-        model = pick_available(p["model"], ["qwen2.5:7b", *AUTO_MODE_FALLBACKS])
+        model = pick_available(p["model"], AUTO_MODE_FALLBACKS)
         return "analysis", model, p["temperature"]
 
     if has_action:
@@ -311,7 +313,7 @@ def detect_profile(messages: list[dict]) -> tuple[str, str, float]:
     # ── 4. Message court et conversationnel → Chat léger ─────────────────────
     if word_count <= 12:
         p = MODEL_PROFILES["chat"]
-        model = pick_available(p["model"], ["qwen2.5:3b", "llama3.2:3b", *AUTO_MODE_FALLBACKS])
+        model = pick_available(p["model"], AUTO_MODE_FALLBACKS)
         return "chat", model, p["temperature"]
 
     # ── 5. Défaut → Agent ─────────────────────────────────────────────────────

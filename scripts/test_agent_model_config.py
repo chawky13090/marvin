@@ -13,6 +13,7 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 import agent_model_config as models
+import config
 
 
 def _plan(privacy: str = "auto") -> dict:
@@ -158,7 +159,20 @@ async def _run() -> None:
 
 
 def main() -> int:
-    asyncio.run(_run())
+    original_models = {
+        profile: str(values.get("model") or "")
+        for profile, values in config.MODEL_PROFILES.items()
+    }
+    original_fallbacks = list(config.AUTO_MODE_FALLBACKS)
+    try:
+        for values in config.MODEL_PROFILES.values():
+            values["model"] = "local:4b"
+        config.AUTO_MODE_FALLBACKS[:] = ["local:4b"]
+        asyncio.run(_run())
+    finally:
+        for profile, model in original_models.items():
+            config.MODEL_PROFILES[profile]["model"] = model
+        config.AUTO_MODE_FALLBACKS[:] = original_fallbacks
     agent_source = (BACKEND / "agent.py").read_text(encoding="utf-8-sig")
     assert "_local_fallback_model = _agent_local" in agent_source
     assert "_model_config.event(" in agent_source

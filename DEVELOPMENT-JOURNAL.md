@@ -5,6 +5,54 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.595.0 — Parachute local fondé sur l'inventaire Ollama réel
+
+Demande : fermer toutes les références statiques vers des modèles retirés, y compris
+`DEFAULT_MODEL`, les profils, les fallbacks et les chemins de dernier recours, sans diminuer
+l'intelligence de Marvin et en conservant l'adaptation automatique à chaque machine.
+
+Constat : `auto_config` corrigeait les profils au démarrage nominal, mais une désactivation de
+l'auto-configuration ou un catalogue local illisible laissait actifs plusieurs tags absents.
+Le routeur considérait aussi un cache Ollama vide comme une preuve implicite de disponibilité.
+Enfin, le préchauffage et le runtime de génération contenaient encore des noms historiques.
+
+Décision : les valeurs d'amorçage sont vides sauf préférence explicite d'environnement.
+`resolve_runtime_models` construit les quatre rôles et la chaîne de repli uniquement depuis
+les métadonnées réellement retournées par Ollama, avec contrôle du budget et des capacités.
+Cette résolution minimale ne dépend pas du catalogue et s'exécute même lorsque les leviers
+automatiques sont désactivés. Les routeurs n'inventent plus de tag; s'il n'existe réellement
+aucun modèle local compatible et que la politique exige du local, l'utilisateur reçoit une
+erreur actionnable. Le Cloud ne reçoit toujours aucun `num_ctx` et son routage reste inchangé.
+
+Sécurité et logs : aucune commande de téléchargement ou suppression, aucune migration, aucun
+secret et aucune donnée utilisateur. Le résumé `auto_config` conserve seulement les tags et
+l'état de l'invariant. Un échec d'inventaire échoue fermé pour le local, sans affaiblir les
+confirmations des outils. Rollback : réversion atomique du commit v2.595 puis redémarrage;
+aucune restauration de donnée n'est nécessaire.
+
+Validation : compilation des modules modifiés; politique locale, routage, configuration des
+quatre profils, routage Cloud, runtime de génération, workers, documentation et architecture
+passent. Après redémarrage officiel, Marvin est `ready` en 70,1 s : backend 2.595.0,
+363 outils, Ollama, SearXNG et HTTPS disponibles. L'état live applique agent
+`granite4.1:3b`, chat/analyse `qwen3:4b`, vision `qwen3.5:2b`; ses trois fallbacks sont
+installés et `missing_references` est vide. La variante auto-configuration désactivée et le
+catalogue absent passe en test déterministe avec le même invariant.
+
+Le smoke live des profils passe 6/6 en 157,9 s et restaure exactement ses réglages : Normal
+public et Ultra sensible utilisent le Cloud; Normal sensible, Hyper et Tout cloud sensible
+utilisent Granite local; Tout cloud public utilise le Cloud. Chaque scénario exécute une fois
+`calculator`, obtient exactement 8 473 et produit une provenance cohérente. Les durées
+observées vont de 13,30 à 48,89 s et ne sont pas masquées.
+
+Gate consolidée : le premier passage a exécuté les 267 étapes et en a réussi 266. L'unique
+échec était un oracle historique qui exigeait une liste de fallbacks non vide avant même
+l'inventaire Ollama, donc exactement l'hypothèse supprimée par cette tranche. L'oracle vérifie
+désormais que le Runner partage la liste mutable de `config`, vide avant inventaire puis
+remplie en place. Après validation isolée, le rejeu live complet réussit **267/267** en
+794,2 s, dont compilation, 363/363 harness, 391 routes, 41 pages, chat et voix. Rapport local
+atomique : `artifacts/check-marvin-v2595-live-final.json`. Les incidents de transport visibles
+dans la sortie sont les pannes volontairement injectées par les tests négatifs correspondants.
+
 ## 2026-08-09 — v2.594.0 — Qualification runtime du portefeuille local
 
 Demande : rendre chaque profil efficace et portable sur toute machine Windows, tester chaque

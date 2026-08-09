@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from agent_budget_completion import synthesize_budget_answer
 import agent
+import config
 from agent_loop_policy import (
     _NATIVE_TOOL_CALL_LIMITS,
     build_action_execution_nudge,
@@ -34,8 +35,10 @@ from agent_transport import OllamaHTTPError
 
 async def main() -> int:
     assert _NATIVE_TOOL_CALL_LIMITS["computer_control"] == 24
-    # Régression du chemin Skill chat -> agent : la liste doit exister au runtime.
-    assert agent.AUTO_MODE_FALLBACKS
+    # Le Runner doit conserver la même liste mutable que l'auto-configuration.
+    # Elle est volontairement vide avant l'inventaire Ollama, puis remplie en place.
+    assert agent.AUTO_MODE_FALLBACKS is config.AUTO_MODE_FALLBACKS
+    assert isinstance(agent.AUTO_MODE_FALLBACKS, list)
 
     switch = sensitive_tool_model_switch(
         tool_calls=[{"function": {"name": "email_read"}}],

@@ -16,7 +16,7 @@ import database as db
 import local_model_policy
 import local_model_portfolio
 import local_model_qualification
-from config import MODEL_PROFILES, OLLAMA_URL
+from config import AUTO_MODE_FALLBACKS, MODEL_PROFILES, OLLAMA_URL
 
 # ── Modes de performance : règlent plusieurs leviers d'un coup, selon la machine ───────
 # Chaque mode bundle : cible de modèles + nb d'outils envoyés au LLM + modèle Whisper (STT)
@@ -243,8 +243,6 @@ async def apply_auto_config(force: bool = False) -> dict:
     enabled = db.get_setting("auto_model_config")
     if enabled is None:
         enabled = True
-    if not enabled and not force:
-        return {"enabled": False}
     installed = await _installed_models()
     hw = detect_hardware()
 
@@ -254,13 +252,48 @@ async def apply_auto_config(force: bool = False) -> dict:
     mode = override if override in _MODES else auto_mode
     mcfg = _MODES[mode]
 
-    rec = local_model_policy.recommend(hw, installed)
-    qualification = local_model_qualification.apply_to_recommendation(
-        rec, hw, installed,
-    )
-    for prof, model in rec["chosen"].items():
-        if prof in MODEL_PROFILES and model:
-            MODEL_PROFILES[prof]["model"] = model
+    bootstrap_profiles = {
+        profile: str(values.get("model") or "")
+        for profile, values in MODEL_PROFILES.items()
+    }
+    bootstrap_fallbacks = list(AUTO_MODE_FALLBACKS)
+    try:
+        rec = local_model_policy.recommend(hw, installed)
+        qualification = local_model_qualification.apply_to_recommendation(
+            rec, hw, installed,
+        )
+    except local_model_policy.LocalModelPolicyError as exc:
+        emergency = local_model_policy.resolve_runtime_models(
+            hw,
+            installed,
+            preferred_profiles=bootstrap_profiles,
+            preferred_fallbacks=bootstrap_fallbacks,
+        )
+        rec = {
+            "catalog_schema": None,
+            "catalog_updated_at": None,
+            "memory_budget_bytes": emergency["memory_budget_bytes"],
+            "memory_budget_gb": round(
+                emergency["memory_budget_bytes"] / local_model_policy.GIB, 2
+            ),
+            "chosen": {
+                role: model
+                for role, model in emergency["profiles"].items()
+                if model
+            },
+            "portfolio": {
+                role: {"recommended": None, "selected": model}
+                for role, model in emergency["profiles"].items()
+            },
+            "downloads": [],
+            "installed": emergency["installed"],
+            "disk_free_bytes": int(hw.get("disk_free_bytes") or 0),
+            "disk_reserve_bytes": 0,
+        }
+        qualification = {
+            "applied": False,
+            "reason": f"catalogue indisponible: {type(exc).__name__}",
+        }
 
     # Un override est une préférence, jamais une permission de dépasser le budget matériel.
     rejected_overrides = []
@@ -287,6 +320,48 @@ async def apply_auto_config(force: bool = False) -> dict:
             "profile": "*", "model": "*",
             "reason": "overrides illisibles ou catalogue indisponible",
         })
+
+    preferred_profiles = {
+        **bootstrap_profiles,
+        **{key: str(value) for key, value in rec["chosen"].items() if value},
+    }
+    for profile, values in MODEL_PROFILES.items():
+        candidate = str(values.get("model") or "")
+        if candidate:
+            preferred_profiles[profile] = candidate
+    effective = local_model_policy.resolve_runtime_models(
+        hw,
+        installed,
+        preferred_profiles=preferred_profiles,
+        preferred_fallbacks=bootstrap_fallbacks,
+    )
+    for profile in local_model_policy.RUNTIME_ROLES:
+        if profile in MODEL_PROFILES:
+            MODEL_PROFILES[profile]["model"] = str(
+                effective["profiles"].get(profile) or ""
+            )
+    AUTO_MODE_FALLBACKS[:] = list(effective["fallbacks"])
+    rec["chosen"] = {
+        profile: str(model)
+        for profile, model in effective["profiles"].items()
+        if model
+    }
+
+    apply_levers = bool(enabled or force)
+    if not apply_levers:
+        summary = {
+            "enabled": False,
+            "hardware": hw,
+            "applied": rec["chosen"],
+            "fallbacks": list(AUTO_MODE_FALLBACKS),
+            "effective_model_invariant": effective,
+            "rejected_overrides": rejected_overrides,
+            "local_model_qualification": qualification,
+            "mode": mode,
+            "auto_mode": auto_mode,
+        }
+        db.set_setting("auto_config", summary)
+        return summary
 
     # Libère la VRAM des modèles qui ne servent plus (changement de mode) — best-effort.
     try:
@@ -317,6 +392,8 @@ async def apply_auto_config(force: bool = False) -> dict:
     ]
     portfolio_policy = local_model_portfolio.evaluate(rec)
     summary = {"enabled": True, "hardware": hw, "applied": rec["chosen"],
+               "fallbacks": list(AUTO_MODE_FALLBACKS),
+               "effective_model_invariant": effective,
                "portfolio": rec["portfolio"],
                "recommended_to_install": [item["model"] for item in recommendations],
                "download_plan": rec["downloads"],

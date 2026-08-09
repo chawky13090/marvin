@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.594.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.595.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.594.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.595.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.594.0)
+## 9. État actuel (v2.595.0)
+
+**v2.595 (références locales effectives et repli sans catalogue)** : aucun profil runtime,
+modèle par défaut ou dernier recours ne contient désormais un tag Ollama historique supposé
+présent. Au démarrage, `auto_config` inventorie les tags exacts via `/api/tags`, enrichit leurs
+capacités avec `/api/show`, applique le portefeuille qualifié puis reconstruit en place les
+quatre profils et la chaîne de repli uniquement avec des modèles installés, compatibles avec
+le rôle et admis par le budget matériel. Cette frontière reste active même si
+`auto_model_config` est désactivé ou si le catalogue versionné est illisible. Un inventaire
+Ollama absent n'est plus assimilé à une disponibilité; l'absence réelle de repli produit une
+erreur exploitable au lieu d'appeler un tag fictif. Aucun modèle n'est téléchargé ou supprimé
+par cette tranche. Rollback : réversion atomique du commit v2.595 puis redémarrage Marvin.
 
 **v2.594 (qualification runtime des modèles locaux et tours locaux bornés)** : le choix local
 ne repose plus uniquement sur une note de catalogue. `qualify-local-models.py` exécute au

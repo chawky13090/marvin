@@ -23,7 +23,7 @@ DATA_DIR.mkdir(exist_ok=True)
 # ── Ollama ───────────────────────────────────────────────────────────────────
 # Use 127.0.0.1 instead of localhost to avoid Windows IPv6 resolution delay (~2s)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "qwen2.5:7b")   # modèle par défaut (agent)
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "").strip()
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
 # ── Profils de modèles (routing automatique) ─────────────────────────────────
@@ -31,28 +31,28 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 # Le mode "auto" sélectionne le profil en fonction du message de l'utilisateur.
 MODEL_PROFILES: dict = {
     "agent": {
-        "model":       "qwen2.5:7b",
+        "model":       DEFAULT_MODEL,
         "temperature": 0.1,     # très bas → tool calling déterministe, zéro hallucination
         "label":       "🤖 Agent",
         "tools":       True,
         "description": "Tâches avec outils, actions sur le PC",
     },
     "chat": {
-        "model":       "qwen2.5:3b",
+        "model":       os.getenv("MARVIN_CHAT_MODEL", "").strip(),
         "temperature": 0.4,     # bas pour réduire les hallucinations sur tool calling
         "label":       "💬 Chat",
         "tools":       True,    # qwen2.5:3b supporte le tool calling — activé pour gérer météo/horaire/recherche
         "description": "Réponses rapides, questions simples (avec outils légers)",
     },
     "analysis": {
-        "model":       "qwen2.5:14b",
+        "model":       os.getenv("MARVIN_ANALYSIS_MODEL", "").strip(),
         "temperature": 0.15,
         "label":       "🔍 Analyse",
         "tools":       True,
         "description": "Analyse approfondie, rédaction longue, documents",
     },
     "vision": {
-        "model":       "qwen3.5:2b",
+        "model":       os.getenv("MARVIN_VISION_MODEL", "").strip(),
         "temperature": 0.3,
         "label":       "👁️ Vision",
         "tools":       False,
@@ -60,8 +60,29 @@ MODEL_PROFILES: dict = {
     },
 }
 
-# Ordre de fallback si le modèle préféré n'est pas installé
-AUTO_MODE_FALLBACKS = ["qwen2.5:7b", "qwen2.5:3b", "qwen3:8b", "hermes3:8b", "llama3.2:3b"]
+# Préférences d'amorçage uniquement. La liste effective est remplacée en place
+# au démarrage par des tags locaux réellement présents dans Ollama. Une variable
+# d'environnement n'est jamais considérée comme une preuve d'installation.
+AUTO_MODE_FALLBACKS = [
+    model.strip()
+    for model in os.getenv("MARVIN_LOCAL_FALLBACKS", "").split(",")
+    if model.strip()
+]
+
+
+def effective_local_model(profile: str = "agent") -> str:
+    """Return an already-qualified local tag, or an empty string.
+
+    ``auto_config`` replaces profiles and this fallback chain in place after
+    reading ``/api/tags``. This function never invents a model name: callers
+    requiring local inference must explicitly handle an unavailable fallback.
+    """
+    candidates = [
+        MODEL_PROFILES.get(profile, {}).get("model"),
+        MODEL_PROFILES.get("agent", {}).get("model"),
+        *AUTO_MODE_FALLBACKS,
+    ]
+    return next((str(model) for model in candidates if str(model or "").strip()), "")
 
 # ── Serveur ──────────────────────────────────────────────────────────────────
 BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8005"))

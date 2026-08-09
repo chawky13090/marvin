@@ -111,7 +111,7 @@ from document_profile import (
     list_templates as _doc_templates_list,
     set_identity as execute_document_identity_set,
 )
-from config import DANGEROUS_TOOLS, OLLAMA_URL, DEFAULT_MODEL, MODEL_PROFILES
+from config import DANGEROUS_TOOLS, OLLAMA_URL, MODEL_PROFILES
 from platform_paths import PATHS as _SYSTEM_PATHS, expand_user_path
 
 

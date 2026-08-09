@@ -40,10 +40,12 @@ class _Client:
 
 def main() -> int:
     original_cache = routing._available_models_cache.copy()
+    original_refreshed = routing._model_cache_refreshed
     try:
         routing._available_models_cache = set()
-        assert routing.is_model_available("modele-inconnu")
-        assert routing.pick_available("primaire", ["repli"]) == "primaire"
+        routing._model_cache_refreshed = False
+        assert not routing.is_model_available("modele-inconnu")
+        assert routing.pick_available("primaire", ["repli"]) == ""
 
         with patch.object(routing.httpx, "AsyncClient", _Client):
             inventory = asyncio.run(routing.refresh_model_cache())
@@ -54,6 +56,7 @@ def main() -> int:
         assert routing.pick_available("absent:1b", ["qwen2.5:14b"]) == "qwen2.5:14b"
 
         routing._available_models_cache = set()
+        routing._model_cache_refreshed = True
         assert routing.detect_profile([])[0] == "agent"
         assert routing.detect_profile([{"role": "user", "content": "salut"}])[0] == "chat"
         assert routing.detect_profile([{
@@ -82,6 +85,7 @@ def main() -> int:
         )
     finally:
         routing._available_models_cache = original_cache
+        routing._model_cache_refreshed = original_refreshed
 
     tree = ast.parse((BACKEND / "agent.py").read_text(encoding="utf-8-sig"))
     definitions = {

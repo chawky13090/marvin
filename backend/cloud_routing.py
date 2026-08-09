@@ -468,8 +468,8 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
       cloud_overrides) n'est utilisé que si Ultra débridé est actif OU si le texte
       ne contient aucun mot-clé sensible.
     """
-    from config import MODEL_PROFILES, DEFAULT_MODEL
-    fallback = local_fallback or MODEL_PROFILES.get(profile, {}).get("model") or DEFAULT_MODEL
+    from config import effective_local_model
+    fallback = local_fallback or effective_local_model(profile)
     lockdown = is_local_only_lockdown()
     if lockdown:
         return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback

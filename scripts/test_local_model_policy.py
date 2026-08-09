@@ -94,6 +94,37 @@ def main() -> int:
         == "ollama_runtime_metadata"
     )
 
+    effective = local_model_policy.resolve_runtime_models(
+        small_gpu,
+        [
+            {
+                **installed("future-agent:2b", 2.4),
+                "capabilities": ["completion", "tools", "thinking"],
+                "context_tokens": 131_072,
+            },
+            {
+                **installed("future-vision:2b", 2.3),
+                "capabilities": ["completion", "vision"],
+                "context_tokens": 65_536,
+            },
+        ],
+        preferred_profiles={
+            "agent": "qwen2.5:7b",
+            "chat": "future-agent:2b",
+            "vision": "llava:7b",
+        },
+        preferred_fallbacks=["hermes3:8b", "future-agent:2b"],
+    )
+    assert effective["valid"] is True
+    assert effective["missing_references"] == []
+    assert effective["profiles"]["agent"] == "future-agent:2b"
+    assert effective["profiles"]["vision"] == "future-vision:2b"
+    assert effective["fallbacks"] == ["future-agent:2b"]
+    empty = local_model_policy.resolve_runtime_models(small_gpu, [])
+    assert empty["valid"] is True
+    assert set(empty["unavailable_roles"]) == set(local_model_policy.RUNTIME_ROLES)
+    assert empty["fallbacks"] == []
+
     cpu = {
         "vendor": "cpu", "vram_gb": 0.0, "ram_gb": 8.0,
         "ram_available_gb": 3.0, "disk_free_bytes": 8 * local_model_policy.GIB,
@@ -120,6 +151,7 @@ def main() -> int:
     profiles = {
         key: dict(value) for key, value in auto_config.MODEL_PROFILES.items()
     }
+    fallbacks: list[str] = []
     with (
         patch.object(auto_config, "detect_hardware", return_value=small_gpu),
         patch.object(auto_config, "_installed_models", new=AsyncMock(return_value=[
@@ -131,12 +163,45 @@ def main() -> int:
         patch.object(auto_config.db, "get_setting", side_effect=get_setting),
         patch.object(auto_config.db, "set_setting", side_effect=set_setting),
         patch.object(auto_config, "MODEL_PROFILES", profiles),
+        patch.object(auto_config, "AUTO_MODE_FALLBACKS", fallbacks),
     ):
         applied = asyncio.run(auto_config.apply_auto_config(force=True))
     assert applied["applied"]["agent"] == "qwen2.5:3b"
     assert len(applied["rejected_overrides"]) == 2
     assert applied["recommended_to_install"]
     assert settings["auto_config"]["catalog_schema"] == "marvin.local-model-catalog/1.0"
+    assert applied["effective_model_invariant"]["missing_references"] == []
+    assert all(model in applied["effective_model_invariant"]["installed"] for model in fallbacks)
+
+    disabled_settings = {"auto_model_config": False, "perf_mode": "auto"}
+    disabled_profiles = {
+        key: {**value, "model": "removed-model:99b"}
+        for key, value in auto_config.MODEL_PROFILES.items()
+    }
+    disabled_fallbacks = ["also-removed:1b"]
+    with (
+        patch.object(auto_config, "detect_hardware", return_value=small_gpu),
+        patch.object(auto_config, "_installed_models", new=AsyncMock(return_value=[
+            {
+                **installed("future-agent:2b", 2.4),
+                "capabilities": ["completion", "tools"],
+            },
+        ])),
+        patch.object(auto_config.db, "get_setting", side_effect=disabled_settings.get),
+        patch.object(auto_config.db, "set_setting", side_effect=lambda key, value: disabled_settings.__setitem__(key, value)),
+        patch.object(auto_config, "MODEL_PROFILES", disabled_profiles),
+        patch.object(auto_config, "AUTO_MODE_FALLBACKS", disabled_fallbacks),
+        patch.object(
+            auto_config.local_model_policy,
+            "recommend",
+            side_effect=local_model_policy.LocalModelPolicyError("catalogue absent"),
+        ),
+    ):
+        disabled = asyncio.run(auto_config.apply_auto_config())
+    assert disabled["enabled"] is False
+    assert disabled["effective_model_invariant"]["missing_references"] == []
+    assert disabled_profiles["agent"]["model"] == "future-agent:2b"
+    assert disabled_fallbacks == ["future-agent:2b"]
 
     print("Local Model Policy OK - matériel dynamique, budget, catalogue, disque et overrides.")
     return 0

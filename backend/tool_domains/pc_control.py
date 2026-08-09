@@ -1385,7 +1385,9 @@ async def execute_pc_notify(args: dict) -> dict:
 
 
 async def execute_pc_pull_ollama_model(args: dict) -> dict:
-    model = args.get("model", "llama3.2:3b")
+    model = str(args.get("model") or "").strip()
+    if not model:
+        return {"error": "Le nom exact du modele Ollama est requis."}
     try:
         import httpx
         async with httpx.AsyncClient(timeout=600.0) as client:

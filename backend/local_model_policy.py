@@ -244,6 +244,98 @@ def exact_installed_model(
     return _installed_map(installed_models).get(canonical_name(model))
 
 
+def resolve_runtime_models(
+    hardware: dict[str, Any],
+    installed_models: list[dict[str, Any]],
+    *,
+    preferred_profiles: dict[str, str] | None = None,
+    preferred_fallbacks: list[str] | None = None,
+) -> dict[str, Any]:
+    """Construit uniquement des références effectives prouvées par ``/api/tags``.
+
+    Cette frontière ne dépend pas du catalogue versionné : elle reste donc le
+    parachute minimal lorsque le catalogue, les réglages ou l'auto-configuration
+    avancée sont indisponibles.
+    """
+    installed = _installed_map(installed_models)
+    budget = memory_budget_bytes(hardware)
+    requested = preferred_profiles or {}
+    profiles: dict[str, str | None] = {}
+
+    for role in RUNTIME_ROLES:
+        preferred = canonical_name(requested.get(role, ""))
+        preferred_item = installed.get(preferred)
+        if (
+            preferred_item
+            and int(preferred_item.get("size_bytes") or 0) <= budget
+            and _supports_dynamic_role(preferred_item, role)
+        ):
+            profiles[role] = preferred
+            continue
+        selected = _dynamic_candidate(installed, role, budget)
+        profiles[role] = str(selected["name"]) if selected else None
+
+    ordered: list[str] = []
+    for candidate in [
+        profiles.get("agent"),
+        profiles.get("chat"),
+        profiles.get("analysis"),
+        *(preferred_fallbacks or []),
+    ]:
+        name = canonical_name(str(candidate or ""))
+        item = installed.get(name)
+        if (
+            name
+            and name not in ordered
+            and item
+            and int(item.get("size_bytes") or 0) <= budget
+            and (
+                _supports_dynamic_role(item, "agent")
+                or _supports_dynamic_role(item, "chat")
+                or _supports_dynamic_role(item, "analysis")
+            )
+        ):
+            ordered.append(name)
+
+    remaining = sorted(
+        (
+            item for item in installed.values()
+            if int(item.get("size_bytes") or 0) <= budget
+            and (
+                _supports_dynamic_role(item, "agent")
+                or _supports_dynamic_role(item, "chat")
+            )
+        ),
+        key=lambda item: (
+            "tools" in set(item.get("capabilities") or []),
+            "thinking" in set(item.get("capabilities") or []),
+            int(item.get("context_tokens") or 0),
+            int(item.get("size_bytes") or 0),
+            item["name"],
+        ),
+        reverse=True,
+    )
+    for item in remaining:
+        if item["name"] not in ordered:
+            ordered.append(item["name"])
+
+    referenced = {
+        name for name in [*profiles.values(), *ordered] if isinstance(name, str) and name
+    }
+    missing_references = sorted(referenced.difference(installed))
+    return {
+        "profiles": profiles,
+        "fallbacks": ordered,
+        "installed": sorted(installed),
+        "unavailable_roles": sorted(
+            role for role, model in profiles.items() if not model
+        ),
+        "missing_references": missing_references,
+        "valid": not missing_references,
+        "memory_budget_bytes": budget,
+    }
+
+
 def best_installed_for_role(
     role: str,
     hardware: dict[str, Any],

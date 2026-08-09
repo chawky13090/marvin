@@ -286,10 +286,19 @@ async def generate(
         text_for_sensitivity=prompt,
         has_images=bool(images),
     )
+    if not primary:
+        raise RuntimeError(
+            "Aucun modele local compatible n'est installe et aucun modele Cloud "
+            "n'est disponible pour cette generation."
+        )
     try:
-        local_light = _model_profiles.get("chat", {}).get("model") or "qwen2.5:3b"
+        local_light = (
+            _model_profiles.get("chat", {}).get("model")
+            or _model_profiles.get("agent", {}).get("model")
+            or ""
+        )
     except Exception:
-        local_light = "qwen2.5:3b"
+        local_light = ""
     fallback_models: list[str] = []
     if _routing.is_cloud_only_mode():
         need = "vision" if images else (_routing.detect_task(prompt) or "general")

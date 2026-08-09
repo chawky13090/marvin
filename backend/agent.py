@@ -52,6 +52,7 @@ from agent_context import (
 )
 from agent_session import prepare_turn as _prepare_turn, upgrade_title as _smart_title_upgrade
 from agent_planning import compile_turn_plan as _compile_turn_plan
+from agent_model_config import LocalModelUnavailable as _LocalModelUnavailable
 from agent_model_config import resolve_model_config as _resolve_model_config
 from agent_runner import RunnerState as _RunnerState
 from agent_observability import (
@@ -195,8 +196,13 @@ async def _run_deterministic_agent(
         _model_config = await _resolve_model_config(
             messages, _user_query, model, _cortex_plan
         )
-    except _cr.CloudOnlyModelUnavailable as exc:
-        yield _sse({"type": "error", "message": str(exc), "cloud_only": True})
+    except (_cr.CloudOnlyModelUnavailable, _LocalModelUnavailable) as exc:
+        yield _sse({
+            "type": "error",
+            "message": str(exc),
+            "cloud_only": isinstance(exc, _cr.CloudOnlyModelUnavailable),
+            "local_model_unavailable": isinstance(exc, _LocalModelUnavailable),
+        })
         return
     profile_name = _model_config.profile_name
     active_model = _model_config.active_model

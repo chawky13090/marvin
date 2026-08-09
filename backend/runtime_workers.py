@@ -35,13 +35,13 @@ async def prewarm_default_models() -> None:
         return
 
     models_to_warm = [
-        MODEL_PROFILES.get("agent", {}).get("model", "qwen2.5:7b"),
-        MODEL_PROFILES.get("chat", {}).get("model", "qwen2.5:3b"),
+        MODEL_PROFILES.get("agent", {}).get("model", ""),
+        MODEL_PROFILES.get("chat", {}).get("model", ""),
     ]
     seen: set[str] = set()
     async with httpx.AsyncClient(timeout=120.0) as client:
         for model in models_to_warm:
-            if model in seen:
+            if not model or model in seen:
                 continue
             seen.add(model)
             try:
