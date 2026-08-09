@@ -7,6 +7,7 @@ import re
 from typing import Any, Awaitable, Callable
 
 import bug_log
+from agent_loop_policy import render_terminal_file_list
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,19 @@ async def complete_turn(
         runner_state,
         conversation_id,
     )
+    file_receipt_content = render_terminal_file_list(
+        user_query,
+        getattr(runner_state, "successful_results", []),
+    )
+    if file_receipt_content and file_receipt_content != final_content:
+        final_content = file_receipt_content
+        bug_log.log_bug(
+            "file_list_result_reconciled",
+            "La réponse terminale a été alignée sur les comptes exacts du reçu file_list.",
+            context={"tool": "file_list"},
+            conversation_id=conversation_id,
+            tool_name="file_list",
+        )
     reconciled_confirmation = _reconcile_pending_confirmation(final_content, runner_state)
     if reconciled_confirmation != final_content:
         bug_log.log_bug(

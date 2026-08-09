@@ -160,6 +160,29 @@ class RunnerState:
                             if isinstance(image, dict) and image.get("path")
                         ],
                     })
+                if tool_name == "file_list":
+                    entries = [
+                        {
+                            "name": str(entry.get("name") or "")[:300],
+                            "type": str(entry.get("type") or "")[:40],
+                            "size": str(entry.get("size") or "")[:80],
+                        }
+                        for entry in (result.get("files") or [])[:2_000]
+                        if isinstance(entry, dict)
+                    ]
+                    compact_result.update({
+                        "current_dir": str(result.get("currentDir") or "")[:32_767],
+                        "count": int(result.get("count") or len(entries)),
+                        "total_count": int(result.get("total_count") or len(entries)),
+                        "offset": int(result.get("offset") or 0),
+                        "has_more": bool(result.get("has_more")),
+                        "next_offset": result.get("next_offset"),
+                        "entries": entries,
+                        "entries_omitted": max(
+                            0,
+                            len(result.get("files") or []) - len(entries),
+                        ),
+                    })
                 self.successful_results.append(compact_result)
         if not self.long_chain_reported and self.tool_count > 8:
             self.long_chain_reported = True

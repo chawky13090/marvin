@@ -84,6 +84,25 @@ def main() -> int:
         {"effort": "instant"},
     )
     assert "net_ping" in explicit.explicit_tool_names
+    assert "net_ping" in explicit.required_tool_names
+
+    explicit_native = planning.compile_turn_plan(
+        [{"role": "user", "content": "utilise exactement l'outil calculator"}],
+        "utilise exactement l'outil calculator avec l'expression 37*229",
+        {"effort": "instant"},
+        llm_native=True,
+    )
+    assert explicit_native.explicit_tool_names == {"calculator"}
+    assert explicit_native.required_tool_names == {"calculator"}
+
+    discussed_native = planning.compile_turn_plan(
+        [{"role": "user", "content": "pourquoi calculator echoue ?"}],
+        "pourquoi calculator echoue ?",
+        {"effort": "instant"},
+        llm_native=True,
+    )
+    assert discussed_native.explicit_tool_names == set()
+    assert "calculator" not in discussed_native.required_tool_names
 
     for web_query in (
         "donne les derniers infos sur koios.fr en visitant leur site",

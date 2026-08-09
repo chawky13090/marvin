@@ -107,6 +107,7 @@ from agent_loop_policy import (
     requires_computer_action_nudge as _requires_computer_action_nudge,
     render_blocking_outcomes as _render_blocking_outcomes,
     render_latest_web_result as _render_latest_web_result,
+    render_terminal_file_list as _render_terminal_file_list,
     retryable_cloud_model_error as _retryable_cloud_model_error,
     native_tool_call_limit as _native_tool_call_limit,
     should_suppress_model_text as _should_suppress_model_text,
@@ -292,7 +293,9 @@ async def _run_deterministic_agent(
             else _filter_relevant_tools
         ),
         match_skill=(
-            _native_no_skill if native_decision_mode else None
+            _native_no_skill
+            if native_decision_mode or _explicit_tool_names
+            else None
         ),
         recall=(
             _native_no_recall if native_decision_mode else None
@@ -488,6 +491,70 @@ async def _run_deterministic_agent(
             ),
         })
         return
+
+    # Un prompt de près de 30 ko consomme presque toute une fenêtre locale de 8K
+    # avant même les messages et les schémas d'outils. Sur un petit modèle cela
+    # dégrade à la fois la latence et le respect des règles placées en fin de prompt.
+    # La variante compacte conserve les contrats essentiels et n'est activée que
+    # pour une allocation locale réellement admise <= 16K. Le Cloud et les machines
+    # locales disposant d'une grande fenêtre gardent le prompt exhaustif.
+    _compact_local_prompt = bool(
+        not _is_cloud_model(active_model)
+        and _context_decision.context_tokens is not None
+        and int(_context_decision.context_tokens) <= 16_384
+    )
+    if _compact_local_prompt:
+        _compact_context = await _prepare_agent_context(
+            messages=messages,
+            conversation_id=conversation_id,
+            profile_name=profile_name,
+            cortex_plan=_cortex_plan,
+            tool_suppression=_tool_suppression,
+            required_tool_names=_required_tool_names,
+            max_context_messages=MAX_CONTEXT_MESSAGES,
+            default_permission_level=DEFAULT_PERMISSION_LEVEL,
+            model_profiles=MODEL_PROFILES,
+            get_setting=db.get_setting,
+            get_memories=db.get_memories,
+            get_conversation=db.get_conversation,
+            get_project=db.get_project,
+            to_ollama_messages=_to_ollama_messages,
+            build_system_prompt=(
+                lambda memories, level: _build_system_prompt(
+                    memories,
+                    level,
+                    compact=True,
+                )
+            ),
+            cortex_prompt_block=(
+                (lambda _plan: "")
+                if native_decision_mode
+                else _cortex.prompt_block
+            ),
+            # Les chemins ont déjà été observés par la première préparation et les
+            # messages résultants sont conservés; ne pas répéter cet effet de lecture.
+            get_real_paths=None,
+            filter_memories=memory_mesh.filter_active,
+            contextual_web_query=_contextual_web_query,
+            include_document_identity=not native_decision_mode,
+        )
+        system_prompt = _compact_context.system_prompt
+        if _skill:
+            _compact_skill_context = _build_skill_prompt_context(
+                system_prompt,
+                _skill,
+                get_golden_trace=_skills_context.get_golden_trace,
+                resources_prompt_block=_skills_context.resources_prompt_block,
+            )
+            if _compact_skill_context.valid:
+                system_prompt = _compact_skill_context.prompt
+    yield _sse({
+        "type": "prompt_profile",
+        "profile": "compact_local" if _compact_local_prompt else "exhaustive",
+        "systemChars": len(system_prompt),
+        "contextTokens": _context_decision.context_tokens,
+        "toolCount": len(tools_payload),
+    })
 
     # Anti-« le modèle explique au lieu d'agir » : on ne le corrige qu'UNE fois.
     # Suivi de l'exécution et preuves pour l'auto-réparation des compétences.
@@ -866,6 +933,21 @@ async def _run_deterministic_agent(
                         "exhausted": sorted(newly_exhausted),
                         "remaining": len(tools_payload),
                     })
+
+            _terminal_file_answer = _render_terminal_file_list(
+                _user_query,
+                _runner_state.successful_results,
+            )
+            if _terminal_file_answer:
+                yield _sse({"type": "text", "text": _terminal_file_answer})
+                _completion = await _finish_turn(
+                    _terminal_file_answer,
+                    "deterministic_file_receipt",
+                    learn=True,
+                )
+                for _event in _completion.events:
+                    yield _event
+                return
 
         elif (
             not full_content.strip()

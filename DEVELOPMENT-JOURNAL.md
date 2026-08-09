@@ -5,6 +5,106 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.594.0 — Qualification runtime du portefeuille local
+
+Demande : rendre chaque profil efficace et portable sur toute machine Windows, tester chaque
+étape avec redémarrage et appels d'outils réels, et autoriser les téléchargements ou retraits
+de modèles nécessaires sans réduire l'intelligence de Marvin.
+
+Constat réel : la sélection locale favorisait statiquement les capacités `thinking`, la taille
+de contexte et la taille du modèle. Elle ne mesurait ni la fiabilité du cycle d'outil ni sa
+latence. Un premier benchmark à contexte égal 8192 a mesuré un appel d'outil à froid en 44,6 s
+pour Qwen 3.5 2B, 36,4 s pour Qwen 3.5 4B, 49,1 s pour Qwen3 4B et 13,1 s pour Granite 4.1 3B.
+Qwen 2.5 Coder 3B n'a pas appelé l'outil. Sur un cycle complet répété, Qwen3 4B atteignait
+environ 53 s à chaud. Cela explique une part majeure des douze minutes observées dans le tour
+Hyper précédent. Qwen 3.5 4B a été refusé par le qualificateur car ses 3,39 Go dépassent le
+budget VRAM sûr calculé à 3,0 Go sur cette GTX 1650 4 Go.
+
+Décision : `local_model_qualification.py` ne remplace le choix statique que par une preuve liée
+au matériel et au digest exact. `qualify-local-models.py` impose trois à cinq répétitions du
+cycle appel d'outil, résultat et réponse finale, avec timeouts bornés, déchargement entre les
+candidats et métriques sans contenu utilisateur. Seul le rôle agent est optimisé par cette
+preuve; chat et analyse conservent Qwen3 4B pour éviter une régression d'intelligence. Granite
+4.1 3B gagne avec 3/3 succès et une médiane chaude de 2 018,2 ms; Qwen 3.5 2B réussit aussi 3/3
+mais à 8 551,2 ms. Le calibrateur et l'installateur consomment désormais cette preuve avant la
+calibration de contexte. Aucun modèle existant n'a été supprimé.
+
+Validation avant redémarrage : le test déterministe rejette les preuves d'une autre machine ou
+d'un autre digest et choisit le candidat valide le plus rapide. La calibration isolée de
+Granite a vérifié deux candidats : 8 192/f16 à 75,5 % de résidence GPU et 32 768/q8_0 à
+59,89 %. Cinq générations sur cinq ont respecté l'oracle pour chaque candidat. Le produit
+retient 8 192/f16, Flash Attention et parallélisme 1 car le seuil opérationnel GPU est 70 %;
+le candidat 32K reste une preuve fonctionnelle mais n'est pas annoncé optimal sur cette GTX
+1650. Le profil Qwen3 précédent a été sauvegardé et vérifié par SHA-256 sous
+`data/install/ollama-context-profile.rollback-v2594.json`. Les validations après redémarrage
+et les tests réels sont consignés ci-dessous.
+
+Optimisation et correction après mesure réelle : la sélection par sous-chaîne confondait `ip`
+avec `multiplie` et injectait à tort toute la famille réseau. Les mots-clés sont maintenant
+comparés par frontières lexicales; `pc` n'est plus un déclencheur ambigu de facturation. Pour
+un modèle local admis à 16K ou moins, un prompt compact conserve toutes les règles critiques
+mais évite le texte explicatif non nécessaire. Une demande nommant exactement un outil ne se
+voit plus ajouter des outils de compétence ou de recette. Enfin, le reçu complet de
+`file_list` reste inchangé pour l'interface et la preuve, tandis que sa projection vers le LLM
+est bornée. Une simple demande de liste est finalisée depuis le reçu exact afin d'empêcher le
+faux comptage observé (le modèle avait annoncé 10 dossiers au lieu de 18) et d'éviter une
+seconde génération inutile.
+
+Résultats réellement observés après redémarrage officiel : état global `ready`, backend
+2.594.0, 363 outils, frontend, Ollama, SearXNG et HTTPS disponibles. La demande naturelle de
+liste de Documents a terminé en 17,17 s avec un unique `file_list` et la restitution exacte de
+50 éléments, 18 dossiers et 32 fichiers. Le smoke réversible des profils a exécuté six appels
+réels à `calculator` : Normal public sur Cloud (12,46 s), Normal sensible en local Granite
+(35,21 s), Hyper en local Granite (24,65 s), Tout cloud public sur Cloud (13,03 s), Tout cloud
+sensible en local Granite (83,61 s) et Ultra sensible sur Cloud (23,12 s). Chaque parcours a
+produit exactement 8 473, un seul appel d'outil, une provenance conforme et un événement final;
+les cinq réglages initiaux ont été restaurés exactement. La variance locale 24,65–83,61 s est
+conservée comme mesure, pas masquée comme un succès de performance.
+
+Sécurité, logs et rollback : aucune donnée utilisateur réelle ne participe au benchmark de
+qualification; le smoke des profils utilise seulement une chaîne synthétique explicitement
+non secrète. Aucun secret
+ni réponse brute n'est persisté, et les erreurs stockent uniquement leur type. La preuve est
+atomique et devient invalide sur dérive du GPU, du pilote ou du digest. Les téléchargements
+restent allowlistés; les suppressions demeurent séparées et confirmées. Rollback code : réversion
+atomique du commit v2.594. Rollback runtime : arrêter Marvin, recopier
+`ollama-context-profile.rollback-v2594.json` sur `ollama-context-profile.json`, supprimer ou
+archiver `local-model-qualification.json`, puis redémarrer.
+
+Correctifs et validation finale de la tranche : le chemin LLM natif conservait la sélection
+d'outils mais perdait l'obligation explicite formulée par l'utilisateur. Granite pouvait donc
+calculer mentalement `37*229` sans produire la preuve `calculator`. Le compilateur de tour
+reconnaît désormais uniquement une demande positive combinant un verbe d'exécution et le nom
+exact de l'outil; une simple discussion ou une négation ne déclenche rien. L'outil demandé est
+matérialisé par le harness si le modèle tente de conclure sans l'appeler, tout en conservant les
+permissions et confirmations existantes. Le smoke final passe 6/6 en 115,9 s : un unique appel
+`calculator` et le résultat 8 473 dans chaque profil, avec provenance Cloud/local conforme.
+
+Les smoke tests navigateur ont aussi été durcis sans affaiblir leurs oracles : conversation
+vocale synthétique déterministe et supprimée, navigation Chat avec reprise bornée, puis attente
+de deux sondes backend rapides après le parcours des 41 pages. Cela élimine la dépendance à
+l'historique utilisateur et la course où des requêtes de pages encore en drainage provoquaient
+un 503 transitoire sur le chat suivant. Le smoke des profils marque et supprime désormais ses
+conversations en `finally`, et nettoie au lancement les seules fixtures identifiées d'un run
+tué brutalement. Quatorze anciennes conversations portant le préfixe de requête de test ont été
+supprimées; zéro fixture reste après validation.
+
+Après un nouveau redémarrage officiel (`ready` en 67,8 s, version 2.594.0, 363 outils, Ollama,
+SearXNG et HTTPS disponibles), la gate live exhaustive a exécuté et réussi **267/267 étapes**
+en 792,6 s. Elle couvre notamment compilation Python, cohérence des dépendances, architecture,
+363/363 outils sous harness, 391 routes, frontend, contrats HTTP, 41 pages, rendu du chat et
+sérialisation vocale. Rapport atomique :
+`artifacts/check-marvin-v2594-live-final.json` (artefact de validation local non versionné).
+Les erreurs MCP/Ollama/log visibles dans la sortie sont des pannes injectées par les tests
+négatifs correspondants; toutes leurs étapes ont le statut `passed`.
+
+Impact sécurité et journalisation final : l'obligation d'outil ne contourne jamais le gateway
+d'autorisation et ne s'active ni sur une mention informative ni sur une demande négative. Les
+fixtures ne contiennent aucun secret et sont supprimées précisément par identifiant. Aucun
+schéma, secret, preuve métier ou journal de production n'est modifié. Le rollback reste la
+réversion atomique du commit v2.594; le profil de contexte possède en plus la copie de rollback
+vérifiée déjà indiquée ci-dessus.
+
 ## 2026-08-09 — v2.593.0 — Résilience des quatre profils de confidentialité
 
 Demande : optimiser dynamiquement Normal, Hyper sécurisé, Tout cloud et Ultra débridé pour

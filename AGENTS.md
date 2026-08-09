@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.593.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.594.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.593.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.594.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,35 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.593.0)
+## 9. État actuel (v2.594.0)
+
+**v2.594 (qualification runtime des modèles locaux et tours locaux bornés)** : le choix local
+ne repose plus uniquement sur une note de catalogue. `qualify-local-models.py` exécute au
+moins trois cycles complets appel d'outil, résultat et réponse finale sur les candidats qui
+respectent le budget mémoire. La preuve est liée au GPU, au pilote et au digest Ollama exact;
+toute dérive annule automatiquement le gagnant. Seul le rôle agent est actuellement éligible
+à cette optimisation, afin de ne pas remplacer un modèle d'analyse plus riche par un routeur
+plus rapide. Sur la GTX 1650 4 Go, Granite 4.1 3B réussit 3/3 à environ 2,0 s à chaud, contre
+8,5 s pour Qwen 3.5 2B et 53 s pour Qwen3 4B. Granite est donc l'agent local, tandis que chat
+et analyse restent sur Qwen3 4B. Le calibrateur a vérifié 8K/f16 et 32K/q8_0; le produit retient
+8K/f16 à 75,5 % de résidence GPU plutôt que 32K/q8_0 à 59,89 %, conformément au seuil
+opérationnel de 70 %. Le prompt local 8K est compact mais conserve les règles, chemins,
+permissions, mémoire et contrats d'outils. Les mots-clés utilisent des frontières lexicales :
+`ip` ne correspond plus à `multiplie`, et une demande explicite d'outil reste exclusive. Les
+reçus `file_list` conservent la preuve complète pour l'UI, bornent seulement leur projection
+LLM et produisent directement les totaux exacts pour une simple demande de liste. Après
+redémarrage, le cas réel Documents termine en 17,17 s avec 50 éléments, 18 dossiers et 32
+fichiers; les six parcours réels Normal/Hyper/Tout cloud/Ultra passent et restaurent les cinq
+réglages initiaux. L'installateur qualifie le portefeuille avant de calibrer le contexte.
+Une demande positive nommant exactement un outil devient une obligation du plan natif; une
+mention informative ou négative ne l'est pas, et le gateway d'autorisation reste inchangé.
+Les smoke tests créent des conversations marquées et jetables, nettoient les reliquats d'une
+interruption et ne dépendent plus de l'historique utilisateur. Après redémarrage officiel, la
+gate live exhaustive passe 267/267 étapes, dont 41 pages, chat et voix. Aucun modèle n'est
+supprimé automatiquement. Rollback code : réversion atomique du commit
+v2.594. Rollback runtime : restaurer
+`data/install/ollama-context-profile.rollback-v2594.json` et retirer
+`data/install/local-model-qualification.json`, puis redémarrer Marvin.
 
 **v2.593 (résilience des profils de confidentialité)** : `privacy_resilience.py` sépare le
 profil choisi, le fournisseur réellement utilisé et l'état de continuité. Normal reste

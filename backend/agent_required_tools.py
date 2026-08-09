@@ -249,6 +249,16 @@ def _arguments_for(
     name: str,
     context: RequiredToolContext,
 ) -> dict[str, Any] | None:
+    if name == "calculator":
+        match = re.search(
+            r"\bexpression\s+([0-9\s+\-*/().,%^]+)",
+            context.user_query,
+            re.IGNORECASE,
+        )
+        if not match:
+            return None
+        expression = match.group(1).strip().rstrip(".,;:")
+        return {"expression": expression} if expression else None
     if name in {
         "ai_model_council",
         "ai_cortex_search",

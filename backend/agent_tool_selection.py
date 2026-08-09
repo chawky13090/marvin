@@ -302,7 +302,7 @@ _KEYWORD_TOOLS = {
          "calendar_list", "calendar_create", "calendar_update", "calendar_delete"},
 
     # Emails
-    ("email", "mail", "courriel", "gmail", "outlook", "boîte de réception", "envoie un mail",
+    ("email", "emails", "mail", "courriel", "gmail", "outlook", "boîte de réception", "envoie un mail",
      "boîte mail", "boite mail", "mes mails", "quelle boîte", "quels comptes mail",
      "réponds au mail", "reponds au mail", "réponse au mail", "rédige une réponse",
      "redige une reponse", "répondre à ce mail", "repondre a ce mail", "brouillon de réponse",
@@ -552,7 +552,7 @@ _KEYWORD_TOOLS = {
      "tarif de", "acheter", "achat", "à vendre", "prix moyen", "entrée de gamme",
      "entré de gamme", "milieu de gamme", "haut de gamme", "moins de", "pas cher",
      "le moins cher", "budget", "à partir de", "fourchette de prix", "ça vaut",
-     "ca vaut", "ça coûte combien", "pc", "ordinateur", "portable", "laptop",
+     "ca vaut", "ça coûte combien", "ordinateur", "portable", "laptop",
      "macbook", "serveur", "écran", "imprimante", "disque dur", "ssd", "barrette",
      "carte graphique", "processeur", "switch", "routeur", "nas"):
         {"billing_market_research", "billing_find_products", "billing_product_reviews",
@@ -585,6 +585,24 @@ _KEYWORD_TOOLS_NORM = [
     for keywords, tools in _KEYWORD_TOOLS.items()
 ]
 _CAPABILITY_CATALOG = build_catalog(TOOLS_SPEC)
+
+
+def _keyword_present(keyword: str, text: str) -> bool:
+    """Matche un terme metier complet, jamais une sous-chaine accidentelle.
+
+    Les anciens ``keyword in text`` faisaient par exemple correspondre ``ip`` dans
+    ``multiplie`` et exposaient toute la suite reseau pour un calcul. Les bornes ne
+    sont ajoutees qu'aux extremites alphanumeriques afin de conserver les marqueurs
+    ponctues historiques tels que ``+ * -``.
+    """
+
+    normalized = str(keyword or "").strip()
+    if not normalized:
+        return False
+    escaped = re.escape(normalized).replace(r"\ ", r"\s+")
+    left = r"(?<![a-z0-9])" if normalized[0].isalnum() else ""
+    right = r"(?![a-z0-9])" if normalized[-1].isalnum() else ""
+    return re.search(left + escaped + right, text) is not None
 
 
 async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list:
@@ -631,7 +649,7 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     relevant = set(_ALWAYS_INCLUDE)
     keyword_hits = set()
     for keywords, tools in _KEYWORD_TOOLS_NORM:
-        if any(k in text_norm for k in keywords):
+        if any(_keyword_present(k, text_norm) for k in keywords):
             keyword_hits.update(tools)
     relevant |= keyword_hits
 

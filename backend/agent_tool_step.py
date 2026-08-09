@@ -346,6 +346,11 @@ def compact_tool_result(
         and isinstance(result, dict)
         and isinstance(result.get("files"), list)
     ):
+        # Le reçu complet reste disponible pour l'UI et la preuve métier. Seule
+        # cette projection injectée dans le contexte du modèle est bornée. Une
+        # grande arborescence ne doit jamais évincer le prompt ni forcer Ollama
+        # à recharger un contexte plus grand.
+        projection_budget = max(512, int(max_chars))
         projection = {
             key: result.get(key)
             for key in (
@@ -353,15 +358,28 @@ def compact_tool_result(
                 "limit", "has_more", "next_offset",
             )
         }
-        projection["files"] = [
+        entries = [
             {
-                "name": item.get("name"),
-                "type": item.get("type"),
-                "size": item.get("size"),
+                "name": str(item.get("name") or "")[:300],
+                "type": str(item.get("type") or "")[:40],
+                "size": str(item.get("size") or "")[:80],
             }
             for item in result["files"]
             if isinstance(item, dict)
         ]
+        projection["files"] = []
+        projection["files_omitted"] = len(entries)
+        projection["files_projection_complete"] = False
+        for entry in entries:
+            projection["files"].append(entry)
+            projection["files_omitted"] = len(entries) - len(projection["files"])
+            projection["files_projection_complete"] = projection["files_omitted"] == 0
+            encoded = json.dumps(projection, ensure_ascii=False)
+            if len(encoded) > projection_budget:
+                projection["files"].pop()
+                projection["files_omitted"] = len(entries) - len(projection["files"])
+                projection["files_projection_complete"] = False
+                break
         return json.dumps(projection, ensure_ascii=False)
     if tool_name == "pdf_read":
         max_chars = max(max_chars, 16_000)

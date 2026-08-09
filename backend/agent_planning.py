@@ -13,7 +13,7 @@ from typing import Any
 
 import cloud_routing
 import cortex
-from agent_policy import exact_tool_mentions_from_text
+from agent_policy import requested_exact_tool_mentions_from_text
 from intent_guard import (
     tool_suppression_reason,
     wants_command_text_only,
@@ -317,7 +317,7 @@ def compile_turn_plan(
     llm_native: bool = False,
 ) -> TurnPlan:
     """Compile les contraintes du tour sans appel réseau, stockage ou modèle."""
-    explicit_tool_names = exact_tool_mentions_from_text(
+    explicit_tool_names = requested_exact_tool_mentions_from_text(
         user_query,
         tool_names=_TOOL_NAMES,
     )
@@ -328,13 +328,14 @@ def compile_turn_plan(
         # explicites négatives, la confidentialité et les budgets de sûreté.
         cortex_plan = cortex.compile_contract(user_query, cortex_contract)
         execution_budget = cortex_plan["execution_budget"]
-        native_requirements = (
-            set()
-            if tool_suppression
-            else _deterministic_action_requirements(messages, user_query)
-        )
+        native_requirements = set()
+        if not tool_suppression:
+            native_requirements.update(explicit_tool_names)
+            native_requirements.update(
+                _deterministic_action_requirements(messages, user_query)
+            )
         return TurnPlan(
-            explicit_tool_names=set(),
+            explicit_tool_names=(set() if tool_suppression else explicit_tool_names),
             command_text_only=command_text_only,
             tool_suppression=tool_suppression,
             required_tool_names=native_requirements,
@@ -354,6 +355,8 @@ def compile_turn_plan(
         if not tool_suppression and wants_model_council(user_query)
         else set()
     )
+    if not tool_suppression:
+        required_tool_names.update(explicit_tool_names)
 
     workspace_norm = cloud_routing.strip_accents((user_query or "").casefold())
     workspace_route = None if tool_suppression else workspace_followup(messages, user_query)

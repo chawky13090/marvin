@@ -130,12 +130,14 @@ def main() -> int:
         ],
     }
     projected_files = json.loads(compact_tool_result(
-        file_page, max_chars=100, tool_name="file_list"
+        file_page, max_chars=1_000, tool_name="file_list"
     ))
-    assert len(projected_files["files"]) == 51
-    assert projected_files["files"][-1]["name"] == "document-50.txt"
+    assert 0 < len(projected_files["files"]) < 51
+    assert projected_files["files_omitted"] == 51 - len(projected_files["files"])
+    assert projected_files["files_projection_complete"] is False
     assert projected_files["has_more"] is False
     assert "path" not in projected_files["files"][0]
+    assert len(json.dumps(projected_files, ensure_ascii=False)) <= 1_000
 
     computer_result = {
         "success": True,

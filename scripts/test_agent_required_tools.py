@@ -103,6 +103,25 @@ def main() -> int:
         "site": "aspire le site France Travail"
     }
 
+    calculator = inject_required_tool_calls(
+        required_names={"calculator"},
+        executed_names=set(),
+        tool_calls=[],
+        step=0,
+        max_steps=10,
+        context=RequiredToolContext(
+            user_query=(
+                "Le mot de passe fictif est DEMO-NON-SECRET. Utilise exactement "
+                "l'outil calculator avec l'expression 37*229."
+            )
+        ),
+        call_id_factory=lambda: "required-calculator",
+    )
+    assert calculator.injected_names == ("calculator",)
+    assert calculator.tool_calls[0]["function"]["arguments"] == {
+        "expression": "37*229"
+    }
+
     satisfied = inject_required_tool_calls(
         required_names={"ai_model_council", "long_task_start"},
         executed_names={"ai_model_council"},

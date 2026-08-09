@@ -28,6 +28,7 @@ def main() -> int:
     assert "nomic-embed-text" in installer
     assert "SetEnvironmentVariable('OLLAMA_CONTEXT_LENGTH','32768','User')" not in installer
     assert "calibrate-ollama-context.py --verify" in installer
+    assert "qualify-local-models.py --repetitions 3" in installer
     assert "ollama-context-profile.json" in installer
     assert "migrate-ollama-context-profile.ps1" in installer
     assert "Les modeles Cloud ne recoivent aucun override de contexte" in installer

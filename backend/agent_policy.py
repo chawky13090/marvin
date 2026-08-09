@@ -38,3 +38,32 @@ def exact_tool_mentions_from_text(
                 break
     return found
 
+
+def requested_exact_tool_mentions_from_text(
+    text: str,
+    *,
+    tool_names: Collection[str],
+) -> set[str]:
+    """Isole les noms exacts que l'utilisateur demande explicitement d'executer."""
+    mentioned = exact_tool_mentions_from_text(text, tool_names=tool_names)
+    if not mentioned:
+        return set()
+    normalized = str(text).lower()
+    verb = r"(?:utilis(?:e|er|ez)|ex[ée]cut(?:e|er|ez)|appell(?:e|er|ez)|lanc(?:e|er|ez)|emploie|invoqu(?:e|er|ez))"
+    requested: set[str] = set()
+    for name in mentioned:
+        aliases = {str(name).lower(), str(name).lower().replace("_", " ")}
+        for alias in aliases:
+            escaped = re.escape(alias)
+            negative = re.search(
+                rf"(?:\bne\s+|\bn['’]\s*|\bsans\s+)(?:pas\s+)?{verb}[^.!?\n]{{0,100}}{escaped}",
+                normalized,
+            )
+            positive = re.search(
+                rf"(?:\b{verb}\b[^.!?\n]{{0,100}}{escaped}|\b(?:outil|tool)\s+{escaped}\b)",
+                normalized,
+            )
+            if positive and not negative:
+                requested.add(name)
+                break
+    return requested

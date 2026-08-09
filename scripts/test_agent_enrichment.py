@@ -70,10 +70,10 @@ async def main() -> int:
     ]
     explicit = assemble_tool_payload(
         selected,
-        tools_spec=[spec("search"), spec("verify")],
+        tools_spec=[spec("search"), spec("verify"), spec("required")],
         explicit_tool_names={"verify"},
-        required_tool_names=set(),
-        skill=None,
+        required_tool_names={"required"},
+        skill={"tools": ["search"]},
         use_tools=True,
     )
     assert [item["function"]["name"] for item in explicit] == ["verify"]

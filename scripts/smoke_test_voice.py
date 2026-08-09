@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import sys
+from pathlib import Path
 
 from playwright.async_api import async_playwright
 
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
+
+import database as db  # noqa: E402
+
+
 BASE_URL = "http://localhost:3000"
+VOICE_FIXTURE_PREFIX = "[SMOKE:voice]"
 
 
 async def navigate_with_marvin_menu(page, label: str, path: str) -> None:
@@ -25,38 +34,44 @@ async def navigate_with_marvin_menu(page, label: str, path: str) -> None:
     await page.wait_for_url(BASE_URL + path, timeout=10_000)
 
 
-async def open_voice_ready_conversation(page) -> bool:
-    conversation_id = await page.evaluate(
-        """async () => {
-            const listResponse = await fetch('/api/conversations');
-            if (!listResponse.ok) return null;
-            const payload = await listResponse.json();
-            const conversations = Array.isArray(payload) ? payload : (payload.conversations || []);
-            for (const conversation of conversations.slice(0, 20)) {
-                const response = await fetch(`/api/conversations/${conversation.id}`);
-                if (!response.ok) continue;
-                const detail = await response.json();
-                const assistants = (detail.messages || []).filter(message => message.role === 'assistant');
-                if (assistants.length >= 2) return conversation.id;
-            }
-            return null;
-        }"""
+def create_voice_fixture() -> str:
+    """Cree une conversation bornee, sans LLM ni donnee utilisateur."""
+    conversation = db.create_conversation(
+        f"{VOICE_FIXTURE_PREFIX} Test temporaire de serialisation vocale"
     )
-    if not conversation_id:
-        return False
-    await page.evaluate(
-        """conversationId => localStorage.setItem(
-            'marvin:last-conversation-id',
-            conversationId,
-        )""",
-        conversation_id,
+    conversation_id = str(conversation["id"])
+    db.create_message(conversation_id, "user", "Test audio temporaire.")
+    db.create_message(conversation_id, "assistant", "Premiere reponse de test.")
+    db.create_message(conversation_id, "assistant", "Deuxieme reponse de test.")
+    return conversation_id
+
+
+def cleanup_orphan_voice_fixtures() -> int:
+    candidates = db.search_conversations(VOICE_FIXTURE_PREFIX, limit=100)
+    orphan_ids = [
+        str(item["id"])
+        for item in candidates
+        if str(item.get("title") or "").startswith(VOICE_FIXTURE_PREFIX)
+    ]
+    for conversation_id in orphan_ids:
+        db.delete_conversation(conversation_id)
+    return len(orphan_ids)
+
+
+async def open_voice_ready_conversation(page, conversation_id: str) -> bool:
+    await page.goto(
+        f"{BASE_URL}/?conversation={conversation_id}",
+        wait_until="domcontentloaded",
+        timeout=30_000,
     )
-    await page.reload(wait_until="domcontentloaded", timeout=30_000)
     await page.wait_for_timeout(1_000)
     return True
 
 
 async def main() -> int:
+    cleanup_orphan_voice_fixtures()
+    fixture_id = create_voice_fixture()
+    atexit.register(db.delete_conversation, fixture_id)
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(channel="chrome")
         page = await browser.new_page(viewport={"width": 1280, "height": 1200})
@@ -95,16 +110,15 @@ async def main() -> int:
             "**/api/voice/speak",
             lambda route: route.fulfill(status=200, content_type="audio/mpeg", body=b"ID3"),
         )
-        await page.goto(BASE_URL, wait_until="networkidle", timeout=30_000)
+        await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=30_000)
         await page.wait_for_timeout(1_000)
 
         listen = page.locator('button[title="\u00c9couter la r\u00e9ponse"]')
-        if await listen.count() < 2:
-            await open_voice_ready_conversation(page)
-            try:
-                await listen.nth(1).wait_for(state="visible", timeout=15_000)
-            except Exception:
-                pass
+        await open_voice_ready_conversation(page, fixture_id)
+        try:
+            await listen.nth(1).wait_for(state="visible", timeout=15_000)
+        except Exception:
+            pass
 
         count = await listen.count()
         if count < 2:
@@ -121,7 +135,7 @@ async def main() -> int:
         await page.wait_for_timeout(250)
         listen = page.locator('button[title="\u00c9couter la r\u00e9ponse"]')
         if await listen.count() < 1:
-            await open_voice_ready_conversation(page)
+            await open_voice_ready_conversation(page, fixture_id)
             try:
                 await listen.first.wait_for(state="visible", timeout=15_000)
             except Exception:

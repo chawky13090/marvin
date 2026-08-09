@@ -15,6 +15,7 @@ import subprocess
 import database as db
 import local_model_policy
 import local_model_portfolio
+import local_model_qualification
 from config import MODEL_PROFILES, OLLAMA_URL
 
 # ── Modes de performance : règlent plusieurs leviers d'un coup, selon la machine ───────
@@ -148,6 +149,7 @@ async def _installed_models() -> list[dict]:
             for m in r.json().get("models", []):
                 models.append({
                     "name": str(m.get("name") or ""),
+                    "digest": str(m.get("digest") or ""),
                     "size_bytes": int(m.get("size") or 0),
                     "parameter_size": str((m.get("details") or {}).get("parameter_size") or ""),
                     "quantization": str((m.get("details") or {}).get("quantization_level") or ""),
@@ -253,6 +255,9 @@ async def apply_auto_config(force: bool = False) -> dict:
     mcfg = _MODES[mode]
 
     rec = local_model_policy.recommend(hw, installed)
+    qualification = local_model_qualification.apply_to_recommendation(
+        rec, hw, installed,
+    )
     for prof, model in rec["chosen"].items():
         if prof in MODEL_PROFILES and model:
             MODEL_PROFILES[prof]["model"] = model
@@ -320,6 +325,7 @@ async def apply_auto_config(force: bool = False) -> dict:
                "catalog_schema": rec["catalog_schema"],
                "catalog_updated_at": rec["catalog_updated_at"],
                "local_portfolio": portfolio_policy,
+               "local_model_qualification": qualification,
                "mode": mode, "mode_label": mcfg["label"], "mode_desc": mcfg["desc"],
                "auto_mode": auto_mode, "is_override": bool(override in _MODES),
                "levers": {"max_tools": mcfg["max_tools"], "whisper": mcfg["whisper"],

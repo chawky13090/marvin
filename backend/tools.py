@@ -31,6 +31,7 @@ import voice_transcription as voice_transcription_runtime
 import web_runtime
 import proactive_briefing
 import generation_runtime
+import ollama_context_admission
 import computer_runtime
 from storage_layout import roots as storage_roots
 from conversation_exports import export_conversation
@@ -1577,6 +1578,7 @@ generation_runtime.configure(
     base_url=OLLAMA_URL,
     model_profiles=MODEL_PROFILES,
     cloud_only_unavailable=cloud_routing_runtime.CloudOnlyModelUnavailable,
+    context_admitter=ollama_context_admission.admit_local_context,
 )
 _ollama_generate = generation_runtime.generate
 

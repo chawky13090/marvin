@@ -31,6 +31,7 @@ sys.path.insert(0, str(BACKEND))
 
 import auto_config  # noqa: E402
 import local_model_policy  # noqa: E402
+import local_model_qualification  # noqa: E402
 import ollama_context_policy as context_policy  # noqa: E402
 
 
@@ -84,6 +85,9 @@ def _select_model(models: list[dict[str, Any]], hardware: dict[str, Any], reques
             raise ValueError(f"Modèle local exact absent : {requested}")
         return selected
     recommendation = local_model_policy.recommend(hardware, models)
+    local_model_qualification.apply_to_recommendation(
+        recommendation, hardware, models,
+    )
     selected_name = recommendation.get("chosen", {}).get("agent")
     selected = local_model_policy.exact_installed_model(str(selected_name or ""), models)
     if selected is None:
@@ -309,13 +313,36 @@ def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _candidate_score(item: dict[str, Any], minimum: int) -> tuple[int, int, int, float]:
-    return (
-        int(int(item.get("context_tokens") or 0) >= minimum),
-        int(item.get("context_tokens") or 0),
-        int(item.get("kv_cache_type") == "f16"),
-        float(item.get("gpu_residency_ratio") or 0),
-    )
+MIN_OPERATIONAL_GPU_RESIDENCY = 0.70
+
+
+def _select_candidate(
+    passing: list[dict[str, Any]],
+    *,
+    objective_tokens: int,
+    explicit_minimum: bool,
+    hardware: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Distingue contexte fonctionnel maximal et contexte produit exploitable.
+
+    Une campagne qui fournit explicitement ``--minimum-tokens`` conserve ce plancher.
+    Le produit courant privilegie la residence GPU avant la taille de fenetre afin de ne
+    pas certifier comme optimal un contexte massivement deporte sur le CPU.
+    """
+    if not passing:
+        return None
+    has_gpu = str(hardware.get("vendor") or "cpu") in {"nvidia", "amd"}
+
+    def score(item: dict[str, Any]) -> tuple[int, int, int, float]:
+        tokens = int(item.get("context_tokens") or 0)
+        residency = float(item.get("gpu_residency_ratio") or 0)
+        operational = int(not has_gpu or residency >= MIN_OPERATIONAL_GPU_RESIDENCY)
+        objective_met = int(tokens >= objective_tokens)
+        if explicit_minimum:
+            return objective_met, operational, tokens, residency
+        return operational, objective_met, tokens, residency
+
+    return max(passing, key=score)
 
 
 def main() -> int:
@@ -350,7 +377,12 @@ def main() -> int:
         for item in proposal["candidates"]
     ] if args.verify else []
     passing = [item for item in verified if item["status"] == "verified"]
-    selected = max(passing, key=lambda item: _candidate_score(item, minimum_tokens)) if passing else None
+    selected = _select_candidate(
+        passing,
+        objective_tokens=minimum_tokens,
+        explicit_minimum=args.minimum_tokens is not None,
+        hardware=hardware,
+    )
     fingerprint = _machine_fingerprint(hardware)
     profile = {
         "schema": "marvin.ollama-context-profile/1.1",
@@ -364,6 +396,12 @@ def main() -> int:
         "proposal": proposal,
         "verifications": verified,
         "selected": selected,
+        "selection_policy": {
+            "product_prefers_operational_gpu_residency": args.minimum_tokens is None,
+            "minimum_operational_gpu_residency_ratio": MIN_OPERATIONAL_GPU_RESIDENCY,
+            "explicit_minimum_tokens": args.minimum_tokens,
+            "objective_tokens": minimum_tokens,
+        },
         "cloud_policy": {
             "client_context_override": None,
             "provider_maximum_preserved": True,

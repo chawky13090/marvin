@@ -34,6 +34,21 @@ RAW_JSON_RE = re.compile(
 )
 
 
+async def goto_chat_page(page) -> None:
+    """Attend les contrats UI metier avec un seul repli borne sous forte charge."""
+    last_error = None
+    for attempt in range(2):
+        try:
+            await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30_000)
+            await page.locator("textarea").first.wait_for(state="visible", timeout=15_000)
+            return
+        except Exception as error:
+            last_error = error
+            if attempt == 0:
+                await page.wait_for_timeout(500)
+    raise last_error or RuntimeError("Le chat Marvin ne s'est pas materialise.")
+
+
 async def check_conversation(page, title_snippet: str, conversation_id: str) -> dict:
     issues = []
     item = page.get_by_role(
@@ -113,8 +128,7 @@ async def main() -> int:
         # La page possède des pollers à 10/15 s : `networkidle` n'est donc pas
         # un contrat de disponibilité et devient aléatoire sous charge. Attendre
         # les éléments métier réellement nécessaires au parcours.
-        await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30000)
-        await page.locator("textarea").first.wait_for(state="visible", timeout=15000)
+        await goto_chat_page(page)
         await page.locator("[data-conversation-id]").first.wait_for(timeout=15000)
 
         if await page.locator("textarea:visible").count() == 0:
@@ -147,8 +161,7 @@ async def main() -> int:
 
         results = []
         for title, conversation_id in samples:
-            await page.goto(BASE_URL + "/", wait_until="domcontentloaded", timeout=30000)
-            await page.locator("textarea").first.wait_for(state="visible", timeout=15000)
+            await goto_chat_page(page)
             await page.get_by_role(
                 "button",
                 name=f"Ouvrir la conversation {title}",

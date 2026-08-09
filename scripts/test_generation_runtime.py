@@ -74,6 +74,19 @@ async def main() -> None:
         async def aclose(self):
             self.is_closed = True
 
+    class Admission:
+        status = "admitted"
+
+        @staticmethod
+        def request_options():
+            return {"num_ctx": 8192}
+
+    async def admit_local(model, *, mission_id, ollama_url):
+        assert model.endswith(":local")
+        assert mission_id.startswith("generation-")
+        assert ollama_url == "http://ollama"
+        return Admission()
+
     ticks = iter((0.0, 0.1, 1.0, 1.4, 2.0, 2.5))
     generation_runtime.configure(
         routing=FakeRouting(),
@@ -82,6 +95,7 @@ async def main() -> None:
         clock=lambda: next(ticks),
         sleep=lambda _seconds: asyncio.sleep(0),
         client_factory=Client,
+        context_admitter=admit_local,
     )
     generation_runtime.reset_stats()
     with patch("httpx.AsyncClient", Client):
@@ -113,6 +127,7 @@ async def main() -> None:
 
     assert calls[0]["url"] == "http://ollama/api/generate"
     assert calls[0]["payload"]["stream"] is False
+    assert calls[0]["payload"]["options"] == {"num_ctx": 8192}
     assert calls[0]["timeout"] == 180
     assert calls[-1]["timeout"] == 30
     assert [call["payload"]["model"] for call in calls] == [

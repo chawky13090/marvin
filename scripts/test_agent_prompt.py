@@ -23,11 +23,15 @@ def main() -> int:
             [{"content": "Les reponses doivent rester concises."}], permission_level=2,
             now=datetime(2026, 7, 22, 12, 0),
         )
+        compact = build_system_prompt(
+            [{"content": "Les reponses doivent rester concises."}], permission_level=2,
+            now=datetime(2026, 7, 22, 12, 0), compact=True,
+        )
         secure = build_system_prompt([], permission_level=1)
         expert = build_system_prompt([], permission_level=3)
         unknown = build_system_prompt([], permission_level=999)
 
-    for prompt in (standard, secure, expert, unknown):
+    for prompt in (standard, compact, secure, expert, unknown):
         assert "Tu es Marvin" in prompt
         assert "RÈGLES D'OR ANTI-ERREUR" in prompt
         assert "RESTE SUR LA DEMANDE INITIALE" in prompt
@@ -38,6 +42,13 @@ def main() -> int:
         assert str(Path(fake_home) / "Desktop") in prompt
 
     assert "MÉMOIRE PERSONNELLE" in standard
+    assert "MÉMOIRE PERSONNELLE" in compact
+    assert len(compact) < len(standard) * 0.4
+    assert "confirmation requise" in compact
+    assert "billing_market_research" in compact
+    assert "pc_get_real_paths" in compact
+    assert fake_home in compact
+    assert str(Path(fake_home) / "Desktop") in compact
     assert "Date actuelle : mercredi 22 juillet 2026" in standard
     assert "Les reponses doivent rester concises." in standard
     assert "STANDARD (confirmation requise)" in standard

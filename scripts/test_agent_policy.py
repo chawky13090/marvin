@@ -11,7 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from agent_policy import autotitle_from_text, exact_tool_mentions_from_text
+from agent_policy import (
+    autotitle_from_text,
+    exact_tool_mentions_from_text,
+    requested_exact_tool_mentions_from_text,
+)
 
 
 def main() -> int:
@@ -24,6 +28,15 @@ def main() -> int:
         "Utilise file_find puis PC RUN POWERSHELL.", tool_names=names
     ) == {"file_find", "pc_run_powershell"}
     assert exact_tool_mentions_from_text("profile_findings", tool_names=names) == set()
+    assert requested_exact_tool_mentions_from_text(
+        "Utilise exactement l'outil file_find.", tool_names=names
+    ) == {"file_find"}
+    assert requested_exact_tool_mentions_from_text(
+        "Pourquoi file_find ne fonctionne-t-il pas ?", tool_names=names
+    ) == set()
+    assert requested_exact_tool_mentions_from_text(
+        "N'utilise pas file_find.", tool_names=names
+    ) == set()
 
     tree = ast.parse((BACKEND / "agent.py").read_text(encoding="utf-8-sig"))
     definitions = {

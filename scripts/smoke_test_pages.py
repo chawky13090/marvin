@@ -17,6 +17,8 @@ Nécessite Playwright (déjà dans backend/.venv, channel="chrome").
 """
 import asyncio
 import sys
+import time
+import urllib.request
 
 from playwright.async_api import async_playwright
 
@@ -32,6 +34,30 @@ PAGES = [
     "/recherche", "/redaction", "/sante", "/settings", "/skills", "/ssh", "/systeme",
     "/tasks", "/technique", "/video", "/vocal", "/workflows",
 ]
+
+
+def _probe_backend_health() -> tuple[bool, float]:
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8005/api/health", timeout=6) as response:
+            response.read(1)
+            return response.status == 200, time.monotonic() - started
+    except Exception:
+        return False, time.monotonic() - started
+
+
+async def wait_for_backend_drain(timeout_seconds: float = 120.0) -> tuple[bool, float]:
+    """Exige deux sondes consecutives rapides apres les chargements de pages."""
+    deadline = time.monotonic() + timeout_seconds
+    consecutive = 0
+    last_duration = 0.0
+    while time.monotonic() < deadline:
+        healthy, last_duration = await asyncio.to_thread(_probe_backend_health)
+        consecutive = consecutive + 1 if healthy and last_duration <= 3.0 else 0
+        if consecutive >= 2:
+            return True, last_duration
+        await asyncio.sleep(1.0)
+    return False, last_duration
 
 
 async def check(browser, path: str) -> dict:
@@ -59,6 +85,7 @@ async def main() -> int:
         browser = await p.chromium.launch(channel="chrome")
         results = [await check(browser, path) for path in PAGES]
         await browser.close()
+        drained, drain_latency = await wait_for_backend_drain()
 
     print(f"\n{'='*60}\nSMOKE TEST PAGES MARVIN\n{'='*60}")
     failed = [r for r in results if not r["ok"]]
@@ -69,7 +96,12 @@ async def main() -> int:
             print(f"          -> {e[:200]}")
 
     print(f"\nRésultat : {len(results) - len(failed)}/{len(results)} pages OK")
-    return 0 if not failed else 1
+    print(
+        "Backend apres parcours : "
+        + ("PRET" if drained else "ECHEC")
+        + f" ({drain_latency:.2f}s, deux sondes <= 3s requises)"
+    )
+    return 0 if not failed and drained else 1
 
 
 if __name__ == "__main__":

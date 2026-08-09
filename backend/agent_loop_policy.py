@@ -48,11 +48,82 @@ _CONTINUATION_REQUEST_RE = re.compile(
     re.IGNORECASE,
 )
 
+_DIRECT_FILE_LIST_RE = re.compile(
+    r"\b(?:liste|lister|affiche|afficher|montre|montrer|combien|contenu)\b"
+    r".*\b(?:fichiers?|dossiers?|r[ée]pertoire|r[ée]pertoires|[ée]l[ée]ments?)\b"
+    r"|\b(?:fichiers?|dossiers?|r[ée]pertoire|r[ée]pertoires|[ée]l[ée]ments?)\b"
+    r".*\b(?:liste|lister|affiche|afficher|montre|montrer|combien|contenu)\b",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class ModelSwitch:
     model: str
     event: dict[str, Any]
+
+
+def render_terminal_file_list(
+    user_query: str,
+    successful_results: list[dict[str, Any]],
+) -> str | None:
+    """Rend les listes simples depuis le reçu exact, sans seconde inférence LLM.
+
+    Le modèle reste libre de choisir l'outil. Une fois une lecture déterministe
+    réussie, recompter ou recopier les entrées avec un petit modèle local ajoute
+    de la latence et peut créer un faux succès. Les requêtes d'analyse plus
+    complexes conservent le parcours LLM normal.
+    """
+    if not _DIRECT_FILE_LIST_RE.search(str(user_query or "")):
+        return None
+    latest = next(
+        (
+            item
+            for item in reversed(successful_results or [])
+            if item.get("tool") == "file_list" and isinstance(item.get("entries"), list)
+        ),
+        None,
+    )
+    if not latest:
+        return None
+    entries = latest["entries"]
+    directory_count = sum(
+        1 for entry in entries if str(entry.get("type") or "").casefold() == "dossier"
+    )
+    file_count = len(entries) - directory_count
+    observed_count = int(latest.get("count") or len(entries))
+    total_count = int(latest.get("total_count") or observed_count)
+    current_dir = str(latest.get("current_dir") or "dossier demandé")
+    has_more = bool(latest.get("has_more"))
+    omitted = int(latest.get("entries_omitted") or 0)
+
+    if has_more:
+        summary = (
+            f"`{current_dir}` contient **{total_count} éléments**. "
+            f"Cette page en affiche **{observed_count}** : "
+            f"**{directory_count} dossiers** et **{file_count} fichiers**."
+        )
+    else:
+        summary = (
+            f"`{current_dir}` contient **{total_count} éléments** : "
+            f"**{directory_count} dossiers** et **{file_count} fichiers**."
+        )
+    lines = []
+    for entry in entries:
+        name = str(entry.get("name") or "").strip()
+        if not name:
+            continue
+        kind = str(entry.get("type") or "").casefold()
+        size = str(entry.get("size") or "").strip()
+        suffix = "/" if kind == "dossier" else (f" — {size}" if size else "")
+        lines.append(f"- `{name}{suffix}`")
+    if omitted:
+        lines.append(f"- … {omitted} entrées supplémentaires restent visibles dans le reçu complet.")
+    if has_more:
+        lines.append(
+            f"- Page suivante disponible à partir de l’offset `{latest.get('next_offset')}`."
+        )
+    return summary + ("\n\n" + "\n".join(lines) if lines else "")
 
 
 def retryable_cloud_model_error(exc: Exception) -> bool:

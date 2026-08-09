@@ -285,6 +285,13 @@ echo   - nomic-embed-text ^(memoire semantique locale^)...
 "!OLLAMA!" pull nomic-embed-text
 if errorlevel 1 echo   [DEGRADE] nomic-embed-text indisponible : l'indexation semantique sera limitee.
 echo   [OK] Le portefeuille local a ete adapte a cette machine.
+echo   Qualification reelle des modeles agents locaux ^(appel outil et resultat, 3 repetitions^)...
+backend\.venv\Scripts\python.exe scripts\qualify-local-models.py --repetitions 3
+if errorlevel 1 (
+    echo   [DEGRADE] Aucun modele agent local qualifie. La selection statique sure est conservee.
+) else (
+    echo   [OK] Modele agent local qualifie sur le materiel et le digest courants.
+)
 echo   Calibration analytique puis verification Ollama isolee...
 backend\.venv\Scripts\python.exe scripts\calibrate-ollama-context.py --verify --repetitions 5 --output data\install\ollama-context-profile.json
 if errorlevel 1 (

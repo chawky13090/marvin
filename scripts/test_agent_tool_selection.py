@@ -42,6 +42,18 @@ def main() -> int:
         ))))
         assert {"web_search", "web_browse", "web_research"} <= web
 
+        calculation = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "calcule 17 multiplie par 757"}], "agent"
+        ))))
+        assert "calculator" in calculation
+        assert not any(name.startswith("net_") for name in calculation), calculation
+
+        tailscale = set(_names(asyncio.run(selection.filter_relevant_tools(
+            [{"role": "user", "content": "statut du service Tailscale sur ce PC"}], "agent"
+        ))))
+        assert "pc_tailscale_status" in tailscale
+        assert "billing_find_products" not in tailscale
+
         workspace = set(_names(asyncio.run(selection.filter_relevant_tools(
             [{"role": "user", "content": "ouvre un code workspace pour ce projet"}], "agent"
         ))))
@@ -122,6 +134,10 @@ def main() -> int:
             [{"role": "user", "content": "trigger"}], "agent"
         )))
         assert first == second == ["a", "b", "z"]
+
+    assert selection._keyword_present("ip", "adresse ip locale")
+    assert not selection._keyword_present("ip", "calcule le produit multiplie")
+    assert selection._keyword_present("site web", "ouvre ce site   web")
 
     tree = ast.parse((BACKEND / "agent.py").read_text(encoding="utf-8-sig"))
     definitions = {

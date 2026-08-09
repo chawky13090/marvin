@@ -47,6 +47,7 @@ _clock: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], Any] = asyncio.sleep
 _cloud_only_unavailable: type[Exception] = RuntimeError
 _client_factory: Callable[[], httpx.AsyncClient] | None = None
+_context_admitter: Callable[..., Any] | None = None
 _client: httpx.AsyncClient | None = None
 _client_lock = threading.Lock()
 
@@ -73,9 +74,10 @@ def configure(
     sleep: Callable[[float], Any] = asyncio.sleep,
     cloud_only_unavailable: type[Exception] = RuntimeError,
     client_factory: Callable[[], httpx.AsyncClient] | None = None,
+    context_admitter: Callable[..., Any] | None = None,
 ) -> None:
     global _routing, _base_url, _model_profiles, _clock, _sleep
-    global _cloud_only_unavailable, _client_factory, _client
+    global _cloud_only_unavailable, _client_factory, _context_admitter, _client
     _routing = routing
     _base_url = str(base_url).rstrip("/")
     _model_profiles = model_profiles
@@ -83,6 +85,7 @@ def configure(
     _sleep = sleep
     _cloud_only_unavailable = cloud_only_unavailable
     _client_factory = client_factory or _default_client_factory
+    _context_admitter = context_admitter
     with _client_lock:
         if _client is not None and not getattr(_client, "is_closed", False):
             raise RuntimeError(
@@ -217,6 +220,7 @@ async def _call(
     prompt: str,
     images: list[Any] | None,
     timeout: int,
+    mission_id: str,
 ) -> str:
     payload: dict[str, Any] = {
         "model": model,
@@ -225,6 +229,17 @@ async def _call(
     }
     if images:
         payload["images"] = images
+    if _context_admitter is not None and _routing is not None and not _routing.is_cloud_model(model):
+        admission = await _context_admitter(
+            model,
+            mission_id=mission_id,
+            ollama_url=_base_url,
+        )
+        if getattr(admission, "status", "") == "blocked":
+            raise RuntimeError("Le contexte local est bloque par le verrou Forge.")
+        options = admission.request_options()
+        if options:
+            payload["options"] = options
     client = _get_client()
     request_timeout = httpx.Timeout(
         connect=10.0,
@@ -264,6 +279,7 @@ async def generate(
 
     assert _routing is not None and _model_profiles is not None
     started = _clock()
+    runtime_mission_id = f"generation-{time.monotonic_ns()}"
     primary = _routing.resolve_model(
         model,
         profile="agent",
@@ -311,6 +327,7 @@ async def generate(
             prompt=prompt,
             images=images,
             timeout=timeout_value,
+            mission_id=runtime_mission_id,
         )
         result = _metadata(text, primary) if return_metadata else text
         _record(
@@ -335,6 +352,7 @@ async def generate(
                     prompt=prompt,
                     images=images,
                     timeout=timeout_value,
+                    mission_id=runtime_mission_id,
                 )
                 result = _metadata(text, primary) if return_metadata else text
                 _record(
@@ -360,6 +378,7 @@ async def generate(
                 prompt=prompt,
                 images=images,
                 timeout=light_timeout,
+                mission_id=runtime_mission_id,
             )
             fallback_reason = (
                 "cloud_connectivity_unavailable"

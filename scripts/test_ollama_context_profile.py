@@ -40,6 +40,17 @@ def main() -> int:
     assert calibrator._extract_final_answer(
         "raisonnement\n</think>\nCALIBRATION_OK"
     ) == "CALIBRATION_OK"
+    candidates = [
+        {"context_tokens": 8192, "gpu_residency_ratio": 0.76, "kv_cache_type": "q8_0"},
+        {"context_tokens": 32768, "gpu_residency_ratio": 0.59, "kv_cache_type": "q8_0"},
+    ]
+    gpu = {"vendor": "nvidia", "vram_gb": 4.0}
+    assert calibrator._select_candidate(
+        candidates, objective_tokens=32768, explicit_minimum=False, hardware=gpu,
+    )["context_tokens"] == 8192
+    assert calibrator._select_candidate(
+        candidates, objective_tokens=32768, explicit_minimum=True, hardware=gpu,
+    )["context_tokens"] == 32768
     with tempfile.TemporaryDirectory() as temp:
         path = Path(temp) / "profile.json"
         assert resolver.resolve(path)["status"] == "bootstrap_unverified"

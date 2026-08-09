@@ -138,7 +138,11 @@ def assemble_tool_payload(
             if spec.get("function", {}).get("name") in explicit_tool_names
         ]
         if explicit:
-            payload = explicit
+            # Un nom exact cité par l'utilisateur constitue un contrat exclusif.
+            # Ajouter ensuite les outils d'une compétence ou d'un ancien forçage Cortex
+            # contredit ce contrat et pousse les petits modèles à appeler un outil que le
+            # gateway bloquera. Les protections d'exécution restent dans le harness.
+            return explicit
 
     required = required_tool_names if use_tools else set()
     skill_tools = set(skill.get("tools") or []) if skill and use_tools else set()

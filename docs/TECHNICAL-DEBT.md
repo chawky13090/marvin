@@ -1,6 +1,6 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-09 pour Marvin 2.593.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-09 pour Marvin 2.594.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 
@@ -14,7 +14,7 @@ qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNA
 | TD-006 | Moyenne | Persistance | v2.584 crée et restaure isolément un export portable réel de 1 733 fichiers/618 281 759 octets, sans secrets DPAPI; aucun second support physique n'est actuellement connecté | restauration appliquée hors machine et résilience à la perte du volume C: non encore démontrées | copier sur support distinct/immuable, restaurer sur un second Windows, réauthentifier les secrets puis conserver la preuve d'intégrité |
 | TD-007 | Élevée | Sécurité | SEC-006, SEC-008, SEC-009, SEC-011 et SEC-012 sont fermés en v2.583, mais la matrice globale garde la fermeture de dette sécurité `partial` | les entrées restantes pourraient être confondues avec un domaine globalement vérifié | fermer ou faire accepter explicitement chaque entrée du registre sécurité; aucun statut `verified` par défaut |
 | TD-008 | Fermée v2.585 | Tests Qdrant | le client global n'était pas rattaché au lifecycle FastAPI et pouvait atteindre `QdrantClient.__del__` après la fermeture de l'interpréteur | fermeture explicite supervisée après les consommateurs, idempotence testée et étape obligatoire du gate |
-| TD-009 | Moyenne | Calibration LLM | v2.592 isole les métadonnées texte des tours vision/audio, dérive prudemment les dimensions absentes et couvre les architectures hybrides; six modèles génératifs locaux installés produisent désormais un candidat analytique. Le profil actif reste certifié 16K/q8_0 et le minimum Forge 32K n'est actuellement pas atteint | lancer la baseline sous pression ou confondre estimation analytique, allocation, rétention et qualité métier produirait une référence non représentative | le worker idle doit recertifier au moins 32K lorsque la mémoire redevient suffisante; puis exécuter holdout local, co-résidence, sonde Cloud longue sans `num_ctx` et campagne Forge verrouillée avant fermeture |
+| TD-009 | Moyenne | Calibration LLM | v2.594 qualifie Granite 4.1 3B par 3/3 cycles d'outil et certifie deux profils liés au matériel : 8K/f16 à 75,5 % de résidence GPU et 32K/q8_0 à 59,89 %. Le produit choisit 8K pour la performance interactive sur GTX 1650 4 Go; la capacité Cloud reste sans override client | confondre le profil produit optimal, le candidat Forge fonctionnel et la capacité Cloud déclarée produirait une baseline non représentative | exécuter le holdout local et la co-résidence sous verrou 32K explicite, puis la sonde Cloud longue sans `num_ctx` et la campagne Forge gelée; conserver les métriques locales et Cloud séparées avant fermeture |
 
 ## Règles d'évolution
 

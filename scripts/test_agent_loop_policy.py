@@ -23,6 +23,7 @@ from agent_loop_policy import (
     requires_computer_action_nudge,
     render_blocking_outcomes,
     render_latest_web_result,
+    render_terminal_file_list,
     retryable_cloud_model_error,
     should_suppress_model_text,
     skill_requires_nudge,
@@ -183,6 +184,30 @@ async def main() -> int:
         "Résultat vérifié.\n\n### Sources\n\n"
         "- [Source](https://example.com/page)"
     )
+    deterministic_files = render_terminal_file_list(
+        "Affiche la liste des fichiers du dossier Documents",
+        [{
+            "tool": "file_list",
+            "current_dir": r"C:\Users\Test\Documents",
+            "count": 3,
+            "total_count": 3,
+            "has_more": False,
+            "entries": [
+                {"name": "Projet", "type": "dossier", "size": ""},
+                {"name": "a.txt", "type": "fichier", "size": "2 Ko"},
+                {"name": "b.pdf", "type": "fichier", "size": "8 Ko"},
+            ],
+        }],
+    )
+    assert deterministic_files is not None
+    assert "3 éléments" in deterministic_files
+    assert "1 dossiers" in deterministic_files
+    assert "2 fichiers" in deterministic_files
+    assert "`Projet/`" in deterministic_files
+    assert render_terminal_file_list(
+        "Analyse la répartition des tailles du dossier",
+        [{"tool": "file_list", "entries": []}],
+    ) is None
     assert retryable_cloud_model_error(OllamaHTTPError(402, "quota modèle")) is True
     assert retryable_cloud_model_error(OllamaHTTPError(503, "indisponible")) is True
     assert retryable_cloud_model_error(OllamaHTTPError(401, "auth")) is False
