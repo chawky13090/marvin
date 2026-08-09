@@ -5,6 +5,49 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.603.0 — Holdout Windows fermé et décision Forge mécanisée
+
+Demande : aller jusqu'au verdict reproductible du plan validé avec Claude, sans ajuster le
+candidat sur les scénarios réservés, en testant chaque étape et en conservant un rollback.
+
+Décision : le runner E2E accepte explicitement `development` ou `holdout`; le split fait
+partie de l'identité immuable d'une reprise. Le holdout n'a été ouvert qu'après le commit
+v2.602 et aucune décision de routage ou d'opérateur n'a ensuite été modifiée à partir de son
+contenu. `evaluate_windows_operator_candidate.py` applique les seuils gelés et distingue
+trois faits : contrat fonctionnel, nombre d'exécutions d'ingénierie et preuve statistique de
+diffusion générale. Son propre test négatif impose un rollback dès le premier faux succès.
+
+Résultats réels source-fermés : routage holdout 120/120 décisions et nettoyages vérifiés,
+exactitude 40,83 %, stabilité 50 %, zéro outil interdit et médiane 10 698 ms. Ce score est
+diagnostique et n'est pas utilisé comme oracle métier. Parcours E2E holdout : 25/25, 100 %,
+zéro faux succès, faux échec, erreur technique, nettoyage défaillant ou confirmation
+redondante; deux appels incidents ont été récupérés.
+Avec les 50 parcours développement, la preuve totalise 75 exécutions réelles sans faux succès,
+satisfait le seuil d'ingénierie et réduit de 50 % le taux d'échec face à la baseline. La cible
+d'efficacité n'est pas satisfaite : médiane de deux appels comme la baseline, ratio 1,0 au lieu
+de 0,75. La diffusion générale reste donc honnêtement distincte et exige encore 300 exécutions.
+
+Tests réels avant versionnement : compilation des runners et de l'évaluateur, tests du corpus,
+du contrat et de la décision machine. La première gate exhaustive a exposé cinq défauts : un
+appel `subprocess` de fixture sans décodage tolérant et quatre smokes live rendus inaccessibles
+par l'arrêt du frontend. La fixture a été corrigée, le frontend Turbopack relancé et les smokes
+ont révélé puis fait corriger deux faiblesses supplémentaires : sélection d'une conversation
+par titre non unique et échantillonnage de conversations Forge vides. La gate complète rejouée
+passe finalement 273/273 étapes; API 28/28, pages 41/41, chat 5/5 conversations réelles et voix
+strictement sérialisée. Les preuves contiennent uniquement résultats, oracles,
+durées, identités de modèle et empreintes sources. Aucun secret, chemin personnel arbitraire,
+contenu de conversation ou donnée utilisateur n'est journalisé. La rotation des logs applicatifs
+n'est pas modifiée; les artefacts Forge sont des preuves métier versionnées et conservées.
+
+Sécurité : les scénarios restent réversibles, confinés à leurs fixtures, protégés par mutex et
+nettoyés en `finally`. Le holdout ne peut pas être réutilisé pour ajuster ce candidat; une
+nouvelle optimisation exige un corpus versionné distinct. Le contrôle visuel incident et le
+ratio d'étapes restent sous TD-010 et interdisent de déclarer le routage parfait.
+
+Rollback : réversion atomique du commit v2.603 puis redémarrage contrôlé de Marvin. Aucun
+schéma, secret, configuration persistante ou donnée utilisateur n'est modifié. Les fichiers de
+preuve restent autonomes et peuvent être archivés sans affecter le produit.
+
 ## 2026-08-09 — v2.602.0 — Routage Windows canonique et autorisations sans doublon
 
 Demande : transformer l'opérateur Windows typé en parcours agentique réellement exploitable,

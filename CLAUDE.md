@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-09 : **v2.602.0, 364 outils, 391 routes FastAPI**.
+État courant au 2026-08-09 : **v2.603.0, 364 outils, 391 routes FastAPI**.
 
 Forge Cloud utilise le verrou `marvin.forge-runtime-lock/1.1` : tag et digest exacts,
 version Ollama, capacité déclarée, absence de `num_ctx` et empreinte de la sonde longue sont
@@ -34,6 +34,9 @@ pour les gestes réellement visuels (capture, UIA, clic, saisie et navigation in
 Les preuves et le corpus gelé restent dans `benchmarks/windows-operator/v1.1/`.
 Les anciens appels Windows sont canonisés vers cette façade quand leur intention est typée;
 le contrôle visuel ne doit plus consommer un emplacement de classement pour ces demandes.
+Le holdout fermé atteint 25/25 parcours métier et zéro faux succès. Cette preuve permet une
+acceptation d'ingénierie, mais pas encore une généralisation statistique : le contrat exige
+300 exécutions réelles sans faux succès avant une diffusion générale.
 Le projet reste installable sur d'autres Windows 11 sans dépendre des caches privés d'un agent
 ou de chemins liés à la machine de développement.
 

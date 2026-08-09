@@ -1,0 +1,783 @@
+{
+  "schema": "marvin.windows-task-e2e-candidate/1.0",
+  "status": "complete",
+  "split": "holdout",
+  "model": "qwen3.5:397b-cloud",
+  "model_digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca",
+  "scenario_corpus_sha256": "b6fe4b6fa1daef9123ccb92dd74d3ed6ef1618c5c12e5d0bd33adc8c83b0b724",
+  "cortex": {
+    "effort": "standard",
+    "evidence": "none",
+    "review": "none",
+    "autonomy": "execute",
+    "privacy": "cloud",
+    "output": "chat",
+    "pinned": true
+  },
+  "runs_per_scenario": 5,
+  "execution_policy": "windows_task",
+  "expected_runs": 25,
+  "results": [
+    {
+      "scenario_id": "launch-paint",
+      "run": 1,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 50296,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-paint",
+      "run": 2,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 61600,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-paint",
+      "run": 3,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26881,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-paint",
+      "run": 4,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 18249,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-paint",
+      "run": 5,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 27610,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "move-file",
+      "run": 1,
+      "family": "file",
+      "target_capability": "file_move",
+      "effective_target_capability": "file_move",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_move"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21368,
+      "oracle_evidence": {
+        "move_complete": true
+      }
+    },
+    {
+      "scenario_id": "move-file",
+      "run": 2,
+      "family": "file",
+      "target_capability": "file_move",
+      "effective_target_capability": "file_move",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_move"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22634,
+      "oracle_evidence": {
+        "move_complete": true
+      }
+    },
+    {
+      "scenario_id": "move-file",
+      "run": 3,
+      "family": "file",
+      "target_capability": "file_move",
+      "effective_target_capability": "file_move",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_move"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25734,
+      "oracle_evidence": {
+        "move_complete": true
+      }
+    },
+    {
+      "scenario_id": "move-file",
+      "run": 4,
+      "family": "file",
+      "target_capability": "file_move",
+      "effective_target_capability": "file_move",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_move"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23405,
+      "oracle_evidence": {
+        "move_complete": true
+      }
+    },
+    {
+      "scenario_id": "move-file",
+      "run": 5,
+      "family": "file",
+      "target_capability": "file_move",
+      "effective_target_capability": "file_move",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_move"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 31142,
+      "oracle_evidence": {
+        "move_complete": true
+      }
+    },
+    {
+      "scenario_id": "system-info",
+      "run": 1,
+      "family": "diagnostic",
+      "target_capability": "pc_system_info",
+      "effective_target_capability": "pc_system_info",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_system_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22909,
+      "oracle_evidence": {
+        "cpu_count": 12,
+        "ram_bytes": 34075746304
+      }
+    },
+    {
+      "scenario_id": "system-info",
+      "run": 2,
+      "family": "diagnostic",
+      "target_capability": "pc_system_info",
+      "effective_target_capability": "pc_system_info",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_system_info",
+        "pc_hardware_specs"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 33310,
+      "oracle_evidence": {
+        "cpu_count": 12,
+        "ram_bytes": 34075746304
+      }
+    },
+    {
+      "scenario_id": "system-info",
+      "run": 3,
+      "family": "diagnostic",
+      "target_capability": "pc_system_info",
+      "effective_target_capability": "pc_system_info",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_system_info",
+        "pc_hardware_specs"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 31193,
+      "oracle_evidence": {
+        "cpu_count": 12,
+        "ram_bytes": 34075746304
+      }
+    },
+    {
+      "scenario_id": "system-info",
+      "run": 4,
+      "family": "diagnostic",
+      "target_capability": "pc_system_info",
+      "effective_target_capability": "pc_system_info",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_system_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 24982,
+      "oracle_evidence": {
+        "cpu_count": 12,
+        "ram_bytes": 34075746304
+      }
+    },
+    {
+      "scenario_id": "system-info",
+      "run": 5,
+      "family": "diagnostic",
+      "target_capability": "pc_system_info",
+      "effective_target_capability": "pc_system_info",
+      "terminal": "done",
+      "selected_tools": [
+        "pc_get_system_info",
+        "tool_search",
+        "pc_system_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25977,
+      "oracle_evidence": {
+        "cpu_count": 12,
+        "ram_bytes": 34075746304
+      }
+    },
+    {
+      "scenario_id": "uptime",
+      "run": 1,
+      "family": "diagnostic",
+      "target_capability": "win_uptime",
+      "effective_target_capability": "win_uptime",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_uptime"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 19386,
+      "oracle_evidence": {
+        "uptime_seconds": 140579
+      }
+    },
+    {
+      "scenario_id": "uptime",
+      "run": 2,
+      "family": "diagnostic",
+      "target_capability": "win_uptime",
+      "effective_target_capability": "win_uptime",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_quick_launch",
+        "tool_search",
+        "pc_run_powershell"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": false,
+      "target_tool_failed": false,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 27448,
+      "oracle_evidence": {
+        "uptime_seconds": 140606
+      }
+    },
+    {
+      "scenario_id": "uptime",
+      "run": 3,
+      "family": "diagnostic",
+      "target_capability": "win_uptime",
+      "effective_target_capability": "win_uptime",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_uptime"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 18676,
+      "oracle_evidence": {
+        "uptime_seconds": 140625
+      }
+    },
+    {
+      "scenario_id": "uptime",
+      "run": 4,
+      "family": "diagnostic",
+      "target_capability": "win_uptime",
+      "effective_target_capability": "win_uptime",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_uptime"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 20081,
+      "oracle_evidence": {
+        "uptime_seconds": 140645
+      }
+    },
+    {
+      "scenario_id": "uptime",
+      "run": 5,
+      "family": "diagnostic",
+      "target_capability": "win_uptime",
+      "effective_target_capability": "win_uptime",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_uptime"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25197,
+      "oracle_evidence": {
+        "uptime_seconds": 140670
+      }
+    },
+    {
+      "scenario_id": "write-file",
+      "run": 1,
+      "family": "file",
+      "target_capability": "file_write",
+      "effective_target_capability": "file_write",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_write"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23766,
+      "oracle_evidence": {
+        "content_exact": true
+      }
+    },
+    {
+      "scenario_id": "write-file",
+      "run": 2,
+      "family": "file",
+      "target_capability": "file_write",
+      "effective_target_capability": "file_write",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_write"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23008,
+      "oracle_evidence": {
+        "content_exact": true
+      }
+    },
+    {
+      "scenario_id": "write-file",
+      "run": 3,
+      "family": "file",
+      "target_capability": "file_write",
+      "effective_target_capability": "file_write",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_write"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 20152,
+      "oracle_evidence": {
+        "content_exact": true
+      }
+    },
+    {
+      "scenario_id": "write-file",
+      "run": 4,
+      "family": "file",
+      "target_capability": "file_write",
+      "effective_target_capability": "file_write",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_write"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21350,
+      "oracle_evidence": {
+        "content_exact": true
+      }
+    },
+    {
+      "scenario_id": "write-file",
+      "run": 5,
+      "family": "file",
+      "target_capability": "file_write",
+      "effective_target_capability": "file_write",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_write"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21302,
+      "oracle_evidence": {
+        "content_exact": true
+      }
+    }
+  ],
+  "source_hashes": {
+    "agent.py": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+    "agent_gateway.py": "2abf0c4537d467cceb3f2840b00ace292953e8a1589df3a340a3e86bdfda6fa1",
+    "agent_tool_batch.py": "1787c8a8b6c7ec8df8f434a8aa8124df817c3a93c6133f37af361f9236be6202",
+    "agent_tool_step.py": "b10b14745b61d1cde3678d6ba5ad434e63464f835ee6de5b4f1c028998ec078a",
+    "capability_catalog.py": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+    "capability_discovery.py": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+    "config.py": "4b3695f0e62cc3c1274f357fbac32f47ee415d5ed73b6ee0c8f1eb456d38dfe2",
+    "tool_gateway.py": "c2922788ad430fdb3417f489580545c9c28ad7e497cc41f1acee6cbd25a09a78",
+    "tools.py": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+    "windows_task.py": "e61f1fe59539ac9ee503dbb8c938bfc8a619dbf9f06ce074f6469338608a9934",
+    "fixtures.py": "b00cf80588b4b9227297ba97f46e5590c8be197f0df00d022cd822eb3284bb7b",
+    "e2e_runner.py": "cc79277702f08796bb208d0107346c431a02f8f920d9a07bf14a209ac10caeb1"
+  },
+  "summary": {
+    "runs": 25,
+    "passed": 25,
+    "failed": 0,
+    "success_rate": 1.0,
+    "false_success_count": 0,
+    "target_false_failure_count": 0,
+    "recovered_incidental_failure_count": 2,
+    "technical_error_count": 0,
+    "cleanup_failure_count": 0,
+    "confirmation_required_count": 1,
+    "redundant_confirmation_count": 0,
+    "median_duration_ms": 23766
+  }
+}

@@ -75,6 +75,8 @@ async def _exercise_routes() -> None:
         )
         body = await _collect_stream(response)
     assert '"type":"done"' in body
+    assert '"conversationId": "forge-ephemeral-test"' in body
+    assert '"ephemeral": true' in body
     assert run_agent.call_args.kwargs["benchmark_ephemeral"] is True
     assert run_agent.call_args.args[1] == "forge-ephemeral-test"
     create_conversation.assert_called_once_with("Forge benchmark éphémère")

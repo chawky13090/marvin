@@ -402,6 +402,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_windows_operator_corpus.py"),
         ),
         Stage(
+            "Decision Forge Windows mecanique",
+            (python, "scripts/test_windows_operator_acceptance.py"),
+        ),
+        Stage(
             "Operateur Windows type et postconditions",
             (python, "scripts/test_windows_task.py"),
         ),

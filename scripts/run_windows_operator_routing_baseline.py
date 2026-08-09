@@ -150,41 +150,55 @@ async def _probe(
     original_selected: list[str] = []
     locked = False
     observed_model = ""
+    conversation_id = ""
+    cleanup_verified = False
     terminal = "stream_ended"
-    async with client.stream(
-        "POST",
-        "http://127.0.0.1:8005/api/chat",
-        json={
-            "messages": [{"role": "user", "content": item["prompt"]}],
-            "model": model,
-            "benchmarkEphemeral": True,
-        },
-    ) as response:
-        response.raise_for_status()
-        async for line in response.aiter_lines():
-            if not line.startswith("data: "):
-                continue
-            event = json.loads(line[6:])
-            event_type = str(event.get("type") or "")
-            if event_type == "context_admission":
-                locked = event.get("forgeLocked") is True
-            elif event_type == "model_info":
-                observed_model = str(event.get("model") or "")
-            elif event_type == "benchmark_routing":
-                selected = [str(name) for name in event.get("toolNames") or [] if str(name)]
-                original_selected = [
-                    str(name)
-                    for name in event.get("originalToolNames") or selected
-                    if str(name)
-                ]
-                terminal = "tool_selection"
-                break
-            elif event_type == "error":
-                terminal = "error"
-                break
-            elif event_type == "done":
-                terminal = "text_only"
-                break
+    try:
+        async with client.stream(
+            "POST",
+            "http://127.0.0.1:8005/api/chat",
+            json={
+                "messages": [{"role": "user", "content": item["prompt"]}],
+                "model": model,
+                "benchmarkEphemeral": True,
+            },
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                event = json.loads(line[6:])
+                event_type = str(event.get("type") or "")
+                if event_type == "conv_id":
+                    conversation_id = str(event.get("conversationId") or "")
+                elif event_type == "context_admission":
+                    locked = event.get("forgeLocked") is True
+                elif event_type == "model_info":
+                    observed_model = str(event.get("model") or "")
+                elif event_type == "benchmark_routing":
+                    selected = [str(name) for name in event.get("toolNames") or [] if str(name)]
+                    original_selected = [
+                        str(name)
+                        for name in event.get("originalToolNames") or selected
+                        if str(name)
+                    ]
+                    terminal = "tool_selection"
+                    break
+                elif event_type == "error":
+                    terminal = "error"
+                    break
+                elif event_type == "done":
+                    terminal = "text_only"
+                    break
+    finally:
+        if conversation_id:
+            response = await client.delete(
+                f"http://127.0.0.1:8005/api/conversations/{conversation_id}"
+            )
+            if response.status_code >= 400:
+                terminal = "conversation_cleanup_failed"
+            else:
+                cleanup_verified = True
     expected = set(item["expected_tools"])
     if routing_policy == "windows_task" and item["family"] in _WINDOWS_TASK_FAMILIES:
         expected = {"windows_task"}
@@ -192,6 +206,7 @@ async def _probe(
     passed = (
         locked
         and observed_model == model
+        and cleanup_verified
         and not (forbidden & set(selected))
         and (bool(expected & set(selected)) if item["action_expected"] else not selected)
     )
@@ -208,6 +223,7 @@ async def _probe(
         "forbidden_match": bool(forbidden & set(selected)),
         "forge_locked": locked,
         "model_exact": observed_model == model,
+        "conversation_cleanup_verified": cleanup_verified,
         "passed": passed,
         "duration_ms": int((time.monotonic() - started) * 1000),
     }

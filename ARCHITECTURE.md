@@ -33,6 +33,8 @@ flowchart LR
 | `agent_policy.py` | Politiques textuelles pures : titres et noms d'outils explicitement cités |
 | `agent_prompt.py` | Prompt système, permissions, chemins dynamiques, mémoire et date déterministe |
 | `agent_safety.py` | Validation pré-exécution des outils et analyse post-génération des scripts/documents |
+| `windows_task.py` | Façade Windows typée, compilation vers des exécuteurs connus et postconditions métier |
+| `scripts/evaluate_windows_operator_candidate.py` | Décision Forge mécanisée : seuils gelés, holdout, faux succès, rollback et niveau de preuve |
 | `agent_protocol.py` | Conversion UI/base vers Ollama et encodage JSON des événements SSE |
 | `agent_routing.py` | Inventaire Ollama, sélection de profil et détection du contexte sensible |
 | `agent_tool_selection.py` | Matrice d'outils, routage sémantique, repli borné et plafond déterministe |

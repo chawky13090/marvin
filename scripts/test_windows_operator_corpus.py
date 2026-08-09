@@ -90,6 +90,20 @@ def main() -> int:
     assert '"type": "benchmark_routing"' in agent_source
     assert '"toolNames"' in agent_source
 
+    e2e_source = (ROOT / "scripts" / "run_windows_operator_e2e_baseline.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'choices=("development", "holdout")' in e2e_source
+    assert 'item["split"] == args.split' in e2e_source
+    assert '"split": args.split' in e2e_source
+    assert '"split",' in e2e_source
+    assert '"agent_gateway.py"' in e2e_source
+    routing_source = (
+        ROOT / "scripts" / "run_windows_operator_routing_baseline.py"
+    ).read_text(encoding="utf-8")
+    assert '"conversation_cleanup_verified"' in routing_source
+    assert 'f"http://127.0.0.1:8005/api/conversations/{conversation_id}"' in routing_source
+
     print(f"Windows operator corpus OK - 120 intentions, 15 scénarios, sha256={corpus_hash}.")
     return 0
 

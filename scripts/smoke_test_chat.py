@@ -51,10 +51,10 @@ async def goto_chat_page(page) -> None:
 
 async def check_conversation(page, title_snippet: str, conversation_id: str) -> dict:
     issues = []
-    item = page.get_by_role(
-        "button",
-        name=f"Ouvrir la conversation {title_snippet}",
-        exact=True,
+    # Un titre n'est pas une identité : plusieurs conversations légitimes peuvent
+    # porter le même nom. Le contrat DOM expose précisément l'UUID persistant.
+    item = page.locator(
+        f'[data-conversation-id="{conversation_id}"] .conversation-row-main'
     ).first
     try:
         await item.wait_for(state="visible", timeout=5000)
@@ -148,24 +148,37 @@ async def main() -> int:
                 id: row.dataset.conversationId || '',
                 title: row.querySelector('.conversation-row-main span')?.textContent?.trim() || '',
             }))""",
-            SAMPLE_SIZE,
+            SAMPLE_SIZE * 4,
         )
         samples = []
         sampled_ids = set()
         for sample in raw_samples:
             conversation_id = sample.get("id")
             title = sample.get("title")
-            if conversation_id and title and conversation_id not in sampled_ids:
-                sampled_ids.add(conversation_id)
-                samples.append((title, conversation_id))
+            if not conversation_id or not title or conversation_id in sampled_ids:
+                continue
+            response = await page.request.get(
+                f"http://127.0.0.1:8005/api/conversations/{conversation_id}"
+            )
+            if not response.ok:
+                continue
+            payload = await response.json()
+            if not payload.get("messages"):
+                continue
+            sampled_ids.add(conversation_id)
+            samples.append((title, conversation_id))
+            if len(samples) >= SAMPLE_SIZE:
+                break
+        if len(samples) < SAMPLE_SIZE:
+            print(f"ÉCHEC : seulement {len(samples)} conversations non vides disponibles.")
+            await browser.close()
+            return 1
 
         results = []
         for title, conversation_id in samples:
             await goto_chat_page(page)
-            await page.get_by_role(
-                "button",
-                name=f"Ouvrir la conversation {title}",
-                exact=True,
+            await page.locator(
+                f'[data-conversation-id="{conversation_id}"] .conversation-row-main'
             ).first.wait_for(state="visible", timeout=15000)
             results.append(await check_conversation(page, title, conversation_id))
 

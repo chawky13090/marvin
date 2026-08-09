@@ -292,7 +292,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     if CAMPAIGNS not in output.parents or output.suffix.casefold() != ".json":
         raise ValueError("La baseline doit rester dans le dossier des campagnes.")
     contract = _read_json(CONTRACT / "live-scenarios.json")
-    scenarios = [item for item in contract["scenarios"] if item["split"] == "development"]
+    scenarios = [item for item in contract["scenarios"] if item["split"] == args.split]
     expected_runs = len(scenarios) * args.runs
     payload = {
         "schema": (
@@ -301,7 +301,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             else "marvin.windows-operator-e2e-baseline/1.2"
         ),
         "status": "running",
-        "split": "development",
+        "split": args.split,
         "model": model,
         "model_digest": runtime["model_digest"],
         "scenario_corpus_sha256": manifest["files"]["live-scenarios.json"],
@@ -314,6 +314,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     if args.execution_policy == "windows_task":
         payload["source_hashes"] = {
             "agent.py": _sha256(BACKEND / "agent.py"),
+            "agent_gateway.py": _sha256(BACKEND / "api" / "agent_gateway.py"),
             "agent_tool_batch.py": _sha256(BACKEND / "agent_tool_batch.py"),
             "agent_tool_step.py": _sha256(BACKEND / "agent_tool_step.py"),
             "capability_catalog.py": _sha256(BACKEND / "capability_catalog.py"),
@@ -333,6 +334,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             "model_digest",
             "scenario_corpus_sha256",
             "cortex",
+            "split",
             "runs_per_scenario",
             "execution_policy",
         )
@@ -366,6 +368,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--split", choices=("development", "holdout"), default="development"
+    )
     parser.add_argument("--runs", type=int, choices=range(1, 6), default=5)
     parser.add_argument("--timeout", type=float, default=900)
     parser.add_argument(

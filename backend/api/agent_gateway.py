@@ -185,6 +185,13 @@ async def chat(request: ChatRequest):
 
         async def event_stream():
             try:
+                if benchmark_conversation_id:
+                    event = {
+                        "type": "conv_id",
+                        "conversationId": benchmark_conversation_id,
+                        "ephemeral": True,
+                    }
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                 async for chunk in run_agent(
                     request.messages,
                     benchmark_conversation_id or request.conversationId,

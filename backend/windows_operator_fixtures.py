@@ -118,6 +118,7 @@ def _powershell_count(command: str) -> int:
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
         capture_output=True,
         text=True,
+        errors="replace",
         timeout=30,
         check=False,
     )

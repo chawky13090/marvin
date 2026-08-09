@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.602.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.603.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.602.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.603.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.602.0)
+## 9. État actuel (v2.603.0)
+
+**v2.603 (holdout et décision Forge mécanisée)** : le runner E2E accepte désormais les splits
+`development` et `holdout`, lie le split à son identité de reprise et refuse tout mélange de
+campagnes. Le holdout source-fermé, ouvert seulement après le gel de v2.602, obtient 25/25
+parcours métier, zéro faux succès, erreur technique, fuite de fixture, défaut de nettoyage ou
+confirmation redondante; deux appels incidents sont récupérés. Le routage diagnostique obtient
+40,83 %, 50 % de stabilité, une médiane de 10 698 ms et zéro outil interdit sur 120/120 tours
+nettoyés; il ne remplace jamais
+l'oracle métier. `evaluate_windows_operator_candidate.py` applique mécaniquement les seuils
+pré-enregistrés, contrôle l'identité du modèle et les empreintes des preuves, et distingue
+acceptation d'ingénierie de diffusion générale. Les 75 exécutions réelles satisfont la gate
+d'ingénierie; la diffusion générale reste bloquée jusqu'à 300 exécutions sans faux succès.
+Le ratio médian d'étapes est 1,0 contre une cible de 0,75 : la capacité est acceptée avec une
+dette d'efficacité explicite, pas présentée comme parfaite. Rollback : réversion atomique du
+commit v2.603; aucun schéma, secret, réglage machine ou donnée utilisateur n'est migré.
+La gate exhaustive finale passe 273/273 avec frontend Turbopack, API, 41 pages, chat persistant
+sur cinq conversations réelles et lecture vocale strictement sérialisée.
 
 **v2.602 (routage canonique et autorisations cohérentes)** : les appels historiques de
 processus, services, logiciels, applications et fichiers sont normalisés vers `windows_task`

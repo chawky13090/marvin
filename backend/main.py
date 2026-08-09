@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.602 — routage Windows canonique et autorisations sans doublon
+# v2.603 — holdout Windows fermé et décision Forge mécanisée
 # v2.584 — sauvegarde portable chiffrée, inventaire réel fermé et restauration isolée
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement
