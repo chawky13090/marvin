@@ -121,6 +121,29 @@ async def _exercise_internal_continuation() -> None:
     update_title.assert_not_called()
 
 
+async def _exercise_ephemeral_forge_turn() -> None:
+    with (
+        patch.object(session.db, "create_conversation") as create_conversation,
+        patch.object(session.db, "create_message") as create_message,
+        patch.object(session.db, "get_conversation") as get_conversation,
+        patch.object(session.db, "update_conversation_title") as update_title,
+    ):
+        prepared = await session.prepare_turn(
+            [{"role": "user", "content": "Mesure de routage"}],
+            "forge-benchmark-conversation",
+            None,
+            persist_user_message=False,
+            ephemeral=True,
+        )
+    assert prepared.conversation_id == "forge-benchmark-conversation"
+    assert prepared.user_query == "Mesure de routage"
+    assert prepared.events == []
+    create_conversation.assert_not_called()
+    create_message.assert_not_called()
+    get_conversation.assert_called_once_with(prepared.conversation_id)
+    update_title.assert_not_called()
+
+
 def main() -> int:
     assert session.extract_user_text(None) == ""
     assert session.extract_user_text({"role": "assistant", "content": "x"}) == ""
@@ -128,6 +151,7 @@ def main() -> int:
     asyncio.run(_exercise_new_turn())
     asyncio.run(_exercise_existing_turn())
     asyncio.run(_exercise_internal_continuation())
+    asyncio.run(_exercise_ephemeral_forge_turn())
 
     tree = ast.parse((BACKEND / "agent.py").read_text(encoding="utf-8-sig"))
     definitions = {

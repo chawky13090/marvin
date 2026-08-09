@@ -398,6 +398,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_windows_operator_benchmark_contract.py"),
         ),
         Stage(
+            "Corpus Forge Windows gele",
+            (python, "scripts/test_windows_operator_corpus.py"),
+        ),
+        Stage(
             "Matrice des profils de confidentialité",
             (python, "scripts/test_privacy_model_matrix.py"),
         ),

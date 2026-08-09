@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import httpx
 import json
 import os
 import sys
@@ -51,16 +52,21 @@ class FakeClient:
         cloud_digest: str = "cloud-digest-1",
         cloud_context: int = 262_144,
         loaded: list[dict] | None = None,
+        transient_version_failures: int = 0,
     ) -> None:
         self.digest = digest
         self.cloud_digest = cloud_digest
         self.cloud_context = cloud_context
         self.loaded = loaded or []
+        self.transient_version_failures = transient_version_failures
         self.calls = 0
 
     async def get(self, url: str) -> FakeResponse:
         self.calls += 1
         if url.endswith("/api/version"):
+            if self.transient_version_failures:
+                self.transient_version_failures -= 1
+                raise httpx.ReadTimeout("transient test failure")
             return FakeResponse({"version": "0.32.5"})
         if url.endswith("/api/tags"):
             return FakeResponse(
@@ -304,6 +310,14 @@ async def _run() -> None:
                 )
                 assert cloud_drift.status == "blocked"
                 assert cloud_drift.reason == "provider_context_drift"
+
+                cloud_retry = await cloud_locked_controller.admit(
+                    "qwen3.5:397b-cloud",
+                    mission_id="cloud-locked-retry",
+                    client=FakeClient(transient_version_failures=1),
+                )
+                assert cloud_retry.status == "cloud_provider_maximum"
+                assert cloud_retry.forge_locked is True
 
             records = store.recent(20)
             assert records

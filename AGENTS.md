@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.598.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.599.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.598.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.599.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.598.0)
+## 9. État actuel (v2.599.0)
+
+**v2.599 (corpus et baselines Forge Windows)** : le contrat gelé contient 120 intentions
+(80 développement, 40 holdout fermé) et 15 scénarios réels (10 développement, 5 holdout),
+avec fixtures, setup/teardown automatiques et oracles indépendants. Le modèle Cloud exact,
+son digest, sa preuve de rétention et le profil Cortex sont verrouillés. Trois couches
+séparent désormais routage, exécuteur et parcours complet. Le mode API éphémère réservé à
+Forge refuse tout emploi hors verrou et supprime sa conversation en `finally`. La baseline
+de routage obtient 46,25 %; l'exécuteur historique 92 %; le parcours complet corrigé obtient
+80 %, zéro faux succès, zéro erreur technique et zéro fuite de fixture/conversation sur
+50 exécutions. Les artefacts méthodologiquement invalides restent nommés `invalid-*` et ne
+comptent jamais dans les seuils. Rollback : réversion atomique du commit v2.599 puis
+libération du verrou Forge; aucune donnée utilisateur ni schéma persistant n'est modifié.
 
 **v2.598 (verrou Forge Cloud)** : une campagne Cloud fige désormais le fournisseur, le tag
 exact, son digest Ollama, la version Ollama et la capacité déclarée par `/api/show`. Elle

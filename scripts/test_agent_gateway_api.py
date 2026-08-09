@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -38,6 +39,46 @@ async def _exercise_routes() -> None:
     assert '"type":"done"' in body
     assert response.headers["cache-control"] == "no-cache"
     assert response.headers["x-accel-buffering"] == "no"
+
+    try:
+        await agent_gateway.chat(
+            agent_gateway.ChatRequest(
+                messages=[{"role": "user", "content": "sonde"}],
+                benchmarkEphemeral=True,
+            )
+        )
+    except agent_gateway.HTTPException as exc:
+        assert exc.status_code == 403
+    else:
+        raise AssertionError("Une sonde éphémère hors verrou Forge doit être refusée.")
+
+    with (
+        patch.dict(os.environ, {"MARVIN_FORGE_ROUTING_ONLY": "1"}),
+        patch.object(
+            agent_gateway.forge_runtime_lock,
+            "load_active_lock",
+            return_value=(Path("lock.json"), {"status": "active"}),
+        ),
+        patch.object(
+            agent_gateway.db,
+            "create_conversation",
+            return_value={"id": "forge-ephemeral-test"},
+        ) as create_conversation,
+        patch.object(agent_gateway.db, "delete_conversation") as delete_conversation,
+        patch.object(agent_gateway, "run_agent", return_value=generated()) as run_agent,
+    ):
+        response = await agent_gateway.chat(
+            agent_gateway.ChatRequest(
+                messages=[{"role": "user", "content": "sonde"}],
+                benchmarkEphemeral=True,
+            )
+        )
+        body = await _collect_stream(response)
+    assert '"type":"done"' in body
+    assert run_agent.call_args.kwargs["benchmark_ephemeral"] is True
+    assert run_agent.call_args.args[1] == "forge-ephemeral-test"
+    create_conversation.assert_called_once_with("Forge benchmark éphémère")
+    delete_conversation.assert_called_once_with("forge-ephemeral-test")
 
     with patch.object(agent_gateway.db, "get_conversation", return_value=None):
         try:

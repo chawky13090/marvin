@@ -4,6 +4,7 @@ Orchestre Ollama via l'adaptateur de transport, gère la boucle d'appel d'outils
 et produit les événements SSE du frontend.
 """
 import asyncio
+import os
 import time
 from typing import AsyncIterator
 
@@ -152,6 +153,7 @@ async def _run_deterministic_agent(
     *,
     native_decision_mode: bool = False,
     internal_continuation: bool = False,
+    benchmark_ephemeral: bool = False,
 ) -> AsyncIterator[str]:
     """
     Générateur SSE. Yielde des événements de type :
@@ -167,7 +169,8 @@ async def _run_deterministic_agent(
         conversation_id,
         request_id,
         background_tasks=_BG_LEARN_TASKS,
-        persist_user_message=not internal_continuation,
+        persist_user_message=not internal_continuation and not benchmark_ephemeral,
+        ephemeral=benchmark_ephemeral,
     )
     conversation_id = _prepared_turn.conversation_id
     _user_query = _prepared_turn.user_query
@@ -759,6 +762,29 @@ async def _run_deterministic_agent(
             inject_required_tool_calls=_inject_required_tool_calls,
         )
         tool_calls_found = _prepared_model_step.tool_calls
+        benchmark_action_calls = [
+            call
+            for call in tool_calls_found
+            if str(call.get("function", {}).get("name") or "") != "tool_search"
+        ]
+        if (
+            benchmark_action_calls
+            and os.getenv("MARVIN_FORGE_ROUTING_ONLY", "0") == "1"
+            and _context_decision.forge_locked
+        ):
+            # Mode de mesure disponible uniquement sous un verrou Forge vérifié.
+            # `tool_search` peut avoir enrichi le catalogue en lecture seule ; toute
+            # capacité d'action s'arrête ici, avant le gateway d'exécution.
+            yield _sse(
+                {
+                    "type": "benchmark_routing",
+                    "toolNames": [
+                        str(call.get("function", {}).get("name") or "")
+                        for call in benchmark_action_calls
+                    ],
+                }
+            )
+            return
         if _is_cloud_model(active_model) and (
             full_content.strip() or tool_calls_found
         ):
@@ -1226,6 +1252,7 @@ async def run_agent(
     cortex_contract: dict | None = None,
     request_id: str | None = None,
     internal_continuation: bool = False,
+    benchmark_ephemeral: bool = False,
 ) -> AsyncIterator[str]:
     """Point d'entrée stable, commutable sans modifier les routes HTTP."""
 
@@ -1237,6 +1264,7 @@ async def run_agent(
             cortex_contract,
             request_id,
             internal_continuation=internal_continuation,
+            benchmark_ephemeral=benchmark_ephemeral,
         )
 
     def native_factory() -> AsyncIterator[str]:
@@ -1248,6 +1276,7 @@ async def run_agent(
             request_id,
             native_decision_mode=True,
             internal_continuation=internal_continuation,
+            benchmark_ephemeral=benchmark_ephemeral,
         )
 
     async for event in _dispatch_agent_runtime(

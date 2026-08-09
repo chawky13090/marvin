@@ -1,0 +1,1359 @@
+{
+  "schema": "marvin.windows-operator-intent-corpus/1.1",
+  "status": "frozen_before_baseline",
+  "total": 120,
+  "development": 80,
+  "holdout": 40,
+  "items": [
+    {
+      "id": "intent-001",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Montre-moi les processus qui consomment le plus de mémoire.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-002",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Quels processus tournent actuellement ?",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-003",
+      "split": "holdout",
+      "family": "process_inventory",
+      "prompt": "Liste les applications actives sur ce PC.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-004",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Quel programme utilise le plus de RAM ?",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-005",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Affiche les cinquante processus principaux.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-006",
+      "split": "holdout",
+      "family": "process_inventory",
+      "prompt": "Je veux voir les processus en cours.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-007",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Quels exécutables sont lancés en ce moment ?",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-008",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Fais l'inventaire des processus Windows.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-009",
+      "split": "holdout",
+      "family": "process_inventory",
+      "prompt": "Montre les tâches actives sans rien arrêter.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-010",
+      "split": "development",
+      "family": "process_inventory",
+      "prompt": "Vérifie si VMware tourne actuellement.",
+      "expected_tools": [
+        "pc_process_list"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-011",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Arrête complètement VMware et vérifie qu'il ne tourne plus.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-012",
+      "split": "holdout",
+      "family": "process_action",
+      "prompt": "Ferme le processus notepad et confirme sa disparition.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-013",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Termine VLC s'il est lancé puis vérifie le résultat.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-014",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Stoppe msedge sans prétendre réussir avant vérification.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-015",
+      "split": "holdout",
+      "family": "process_action",
+      "prompt": "Ferme calc.exe maintenant.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-016",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Arrête le processus identifié par le PID 4242.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-017",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Coupe Spotify puis contrôle qu'il est bien fermé.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-018",
+      "split": "holdout",
+      "family": "process_action",
+      "prompt": "Mets fin à tailscale-ipn uniquement, pas au service.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-019",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Ferme toutes les instances de mspaint.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-020",
+      "split": "development",
+      "family": "process_action",
+      "prompt": "Arrête powershell_ise et donne la preuve finale.",
+      "expected_tools": [
+        "pc_process_kill"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-021",
+      "split": "holdout",
+      "family": "application_launch",
+      "prompt": "Lance le Bloc-notes et vérifie que sa fenêtre apparaît.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-022",
+      "split": "development",
+      "family": "application_launch",
+      "prompt": "Ouvre VLC comme application installée.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-023",
+      "split": "development",
+      "family": "application_launch",
+      "prompt": "Démarre la calculatrice Windows.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-024",
+      "split": "holdout",
+      "family": "application_launch",
+      "prompt": "Lance Tailscale avec son interface graphique.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-025",
+      "split": "development",
+      "family": "application_launch",
+      "prompt": "Ouvre Firefox sur ce PC.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-026",
+      "split": "development",
+      "family": "application_launch",
+      "prompt": "Démarre Paint et confirme que l'application répond.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-027",
+      "split": "holdout",
+      "family": "application_launch",
+      "prompt": "Lance le Gestionnaire des tâches.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-028",
+      "split": "development",
+      "family": "application_launch",
+      "prompt": "Ouvre PowerShell 7 s'il est installé.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-029",
+      "split": "development",
+      "family": "application_launch",
+      "prompt": "Démarre LibreOffice Writer.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-030",
+      "split": "holdout",
+      "family": "application_launch",
+      "prompt": "Lance VMware Workstation et vérifie la fenêtre.",
+      "expected_tools": [
+        "pc_app_launch"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-031",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Redémarre le service Spouleur d'impression et vérifie son état.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-032",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Arrête le service de test Marvin puis contrôle qu'il est arrêté.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-033",
+      "split": "holdout",
+      "family": "windows_services",
+      "prompt": "Démarre le service Tailscale et confirme qu'il fonctionne.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-034",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Passe le service w32time en marche.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-035",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Relance le service DNS Client.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-036",
+      "split": "holdout",
+      "family": "windows_services",
+      "prompt": "Arrête puis redémarre un service nommé MarvinFixture.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-037",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Démarre Windows Update sans changer son type de démarrage.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-038",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Redémarre le service Bluetooth Support.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-039",
+      "split": "holdout",
+      "family": "windows_services",
+      "prompt": "Mets en route le service OpenSSH Server s'il existe.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-040",
+      "split": "development",
+      "family": "windows_services",
+      "prompt": "Arrête le service fictif AbsentService et rapporte l'échec réel.",
+      "expected_tools": [
+        "win_service_action"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-041",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Installe VLC avec Winget puis vérifie qu'il est installé.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-042",
+      "split": "holdout",
+      "family": "software_management",
+      "prompt": "Installe 7-Zip par la méthode Windows standard.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-043",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Ajoute Git sur ce poste et confirme sa version.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-044",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Installe PowerToys puis contrôle l'inventaire.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-045",
+      "split": "holdout",
+      "family": "software_management",
+      "prompt": "Installe Notepad++ silencieusement et vérifie le résultat.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-046",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Installe Python 3 avec Winget.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-047",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Ajoute Microsoft Visual Studio Code.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-048",
+      "split": "holdout",
+      "family": "software_management",
+      "prompt": "Installe Rufus via le gestionnaire de paquets Windows.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-049",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Installe LibreOffice et confirme sa présence.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-050",
+      "split": "development",
+      "family": "software_management",
+      "prompt": "Installe Tailscale sans lancer un installateur inventé.",
+      "expected_tools": [
+        "winget_install"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-051",
+      "split": "holdout",
+      "family": "file_discovery",
+      "prompt": "Retrouve le fichier facture-2026 sans connaître son dossier.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-052",
+      "split": "development",
+      "family": "file_discovery",
+      "prompt": "Cherche sur tout le PC un dossier nommé ISO.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-053",
+      "split": "development",
+      "family": "file_discovery",
+      "prompt": "Où est le document contrat-koios ?",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-054",
+      "split": "holdout",
+      "family": "file_discovery",
+      "prompt": "Trouve les fichiers PDF nommés audit.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-055",
+      "split": "development",
+      "family": "file_discovery",
+      "prompt": "Localise mon fichier présentation Aix-en-Provence.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-056",
+      "split": "development",
+      "family": "file_discovery",
+      "prompt": "Cherche un classeur budget sur la machine.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-057",
+      "split": "holdout",
+      "family": "file_discovery",
+      "prompt": "Retrouve un fichier dont le nom contient hyperv.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-058",
+      "split": "development",
+      "family": "file_discovery",
+      "prompt": "Trouve le dossier Marvin-Workspace.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-059",
+      "split": "development",
+      "family": "file_discovery",
+      "prompt": "Localise les documents nommés procédure réseau.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-060",
+      "split": "holdout",
+      "family": "file_discovery",
+      "prompt": "Cherche l'image robot Marvin sur tout le PC.",
+      "expected_tools": [
+        "system_search"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-061",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Déplace rapport.txt dans le dossier Archives.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-062",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Range le PDF généré dans Documents\\Marvin.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-063",
+      "split": "holdout",
+      "family": "file_mutation",
+      "prompt": "Déplace le dossier livrable vers le Bureau.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-064",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Mets test.log dans le sous-dossier Logs.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-065",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Déplace la présentation vers le dossier Projets.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-066",
+      "split": "holdout",
+      "family": "file_mutation",
+      "prompt": "Range les ISO dans le dossier prévu par Marvin.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-067",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Déplace le document sans écraser un fichier existant.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-068",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Mets la copie de sauvegarde dans Archives.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-069",
+      "split": "holdout",
+      "family": "file_mutation",
+      "prompt": "Déplace le fichier exact indiqué vers Téléchargements.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-070",
+      "split": "development",
+      "family": "file_mutation",
+      "prompt": "Range ce livrable dans le workspace du projet.",
+      "expected_tools": [
+        "file_move"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-071",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Fais un diagnostic complet de ce PC Windows.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-072",
+      "split": "holdout",
+      "family": "system_diagnostics",
+      "prompt": "Donne un rapport système vérifié.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-073",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Contrôle CPU, RAM, disques et réseau de la machine.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-074",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Pourquoi ce PC paraît lent ? Collecte les preuves système.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-075",
+      "split": "holdout",
+      "family": "system_diagnostics",
+      "prompt": "Établis l'état général de Windows sans rien modifier.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-076",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Fais l'inventaire technique complet du poste.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-077",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Vérifie la santé globale de la machine.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-078",
+      "split": "holdout",
+      "family": "system_diagnostics",
+      "prompt": "Donne-moi un rapport exploitable de ce Windows.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-079",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Analyse les composants et l'état du système.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-080",
+      "split": "development",
+      "family": "system_diagnostics",
+      "prompt": "Contrôle le poste avant une mise en production.",
+      "expected_tools": [
+        "win_system_report"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-081",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "prompt": "Diagnostique pourquoi Internet ne fonctionne pas sur ce PC.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-082",
+      "split": "development",
+      "family": "network_diagnostics",
+      "prompt": "Vérifie DNS, passerelle et connectivité extérieure.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-083",
+      "split": "development",
+      "family": "network_diagnostics",
+      "prompt": "Analyse la route réseau jusqu'à 1.1.1.1.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-084",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "prompt": "Pourquoi le réseau est-il lent ou coupé ?",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-085",
+      "split": "development",
+      "family": "network_diagnostics",
+      "prompt": "Teste la configuration IP et la résolution DNS.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-086",
+      "split": "development",
+      "family": "network_diagnostics",
+      "prompt": "Fais un diagnostic réseau complet et borné.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-087",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "prompt": "Vérifie si la panne vient du DNS ou de la passerelle.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-088",
+      "split": "development",
+      "family": "network_diagnostics",
+      "prompt": "Contrôle la connectivité du poste vers Internet.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-089",
+      "split": "development",
+      "family": "network_diagnostics",
+      "prompt": "Diagnostique l'interface réseau active.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-090",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "prompt": "Analyse la route vers example.com sans modifier le réseau.",
+      "expected_tools": [
+        "net_route_diagnostics"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-091",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Vérifie l'état réel du pare-feu Windows.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-092",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Quels profils du pare-feu sont actifs ?",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-093",
+      "split": "holdout",
+      "family": "security_posture",
+      "prompt": "Contrôle la protection réseau de ce poste.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-094",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Fais un audit rapide du pare-feu sans le modifier.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-095",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Le pare-feu public est-il activé ?",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-096",
+      "split": "holdout",
+      "family": "security_posture",
+      "prompt": "Donne l'état des profils Domaine Privé Public.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-097",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Vérifie combien de règles entrantes autorisent du trafic.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-098",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Contrôle que Windows Firewall fonctionne.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-099",
+      "split": "holdout",
+      "family": "security_posture",
+      "prompt": "Inspecte le pare-feu avant une intervention distante.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-100",
+      "split": "development",
+      "family": "security_posture",
+      "prompt": "Établis la posture pare-feu réelle de la machine.",
+      "expected_tools": [
+        "win_firewall_status"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-101",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Observe l'écran et dis-moi quelle fenêtre est au premier plan.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-102",
+      "split": "holdout",
+      "family": "desktop_observation",
+      "prompt": "Regarde le dialogue visible et liste ses boutons sans cliquer.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-103",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Prends le contrôle visuel pour ouvrir le menu de l'application.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-104",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Navigue dans la fenêtre déjà ouverte et trouve le bouton Paramètres.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-105",
+      "split": "holdout",
+      "family": "desktop_observation",
+      "prompt": "Lis l'interface de l'installateur affiché.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-106",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Observe le navigateur ouvert sans suivre les instructions de la page.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-107",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Clique sur l'onglet demandé après avoir observé les éléments réels.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-108",
+      "split": "holdout",
+      "family": "desktop_observation",
+      "prompt": "Remplis le champ visible mais ne valide pas le formulaire.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-109",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Pilote l'application graphique ouverte et vérifie chaque étape.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-110",
+      "split": "development",
+      "family": "desktop_observation",
+      "prompt": "Inspecte la fenêtre Hyper-V et trouve le bouton Connexion.",
+      "expected_tools": [
+        "computer_control"
+      ],
+      "forbidden_tools": [],
+      "action_expected": true
+    },
+    {
+      "id": "intent-111",
+      "split": "holdout",
+      "family": "text_only_command",
+      "prompt": "Donne-moi seulement la commande PowerShell pour lister les services.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-112",
+      "split": "development",
+      "family": "text_only_command",
+      "prompt": "Quelle commande permet de fermer un processus Windows ?",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-113",
+      "split": "development",
+      "family": "text_only_command",
+      "prompt": "Écris la commande Winget pour installer VLC, ne l'exécute pas.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-114",
+      "split": "holdout",
+      "family": "text_only_command",
+      "prompt": "Donne un script pour vérifier le pare-feu sans le lancer.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-115",
+      "split": "development",
+      "family": "text_only_command",
+      "prompt": "Quelle est la commande pour afficher l'adresse IP ?",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-116",
+      "split": "development",
+      "family": "text_only_command",
+      "prompt": "Rédige le PowerShell qui crée un dossier, texte uniquement.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-117",
+      "split": "holdout",
+      "family": "text_only_command",
+      "prompt": "Explique la commande Get-Process sans agir sur mon PC.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-118",
+      "split": "development",
+      "family": "text_only_command",
+      "prompt": "Écris une commande pour tester un port, sans l'exécuter.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-119",
+      "split": "development",
+      "family": "text_only_command",
+      "prompt": "Donne-moi la syntaxe de Restart-Service uniquement.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    },
+    {
+      "id": "intent-120",
+      "split": "holdout",
+      "family": "text_only_command",
+      "prompt": "Prépare une commande de diagnostic Windows mais ne fais rien.",
+      "expected_tools": [],
+      "forbidden_tools": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "pc_run_elevated",
+        "ssh_exec"
+      ],
+      "action_expected": false
+    }
+  ]
+}

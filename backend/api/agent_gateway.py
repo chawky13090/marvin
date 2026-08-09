@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from typing import Annotated, Any
 from uuid import UUID
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field, model_validator
 import chat_turn_runtime
 import database as db
 import agent_autonomy
+import forge_runtime_lock
 from action_replay import IdempotencyMismatchError
 import tool_gateway
 import tool_runtime
@@ -85,6 +87,7 @@ class ChatRequest(BaseModel):
     )
     cortex: dict | None = None
     continuationApprovalId: UUID | None = None
+    benchmarkEphemeral: bool = False
 
     @model_validator(mode="after")
     def validate_payload_size(self) -> "ChatRequest":
@@ -94,6 +97,7 @@ class ChatRequest(BaseModel):
                 "conversationId": self.conversationId,
                 "model": self.model,
                 "cortex": self.cortex,
+                "benchmarkEphemeral": self.benchmarkEphemeral,
                 "continuationApprovalId": (
                     str(self.continuationApprovalId)
                     if self.continuationApprovalId
@@ -139,6 +143,25 @@ class AutonomyRequest(BaseModel):
 
 @router.post("/api/chat")
 async def chat(request: ChatRequest):
+    benchmark_conversation_id: str | None = None
+    if request.benchmarkEphemeral:
+        if request.conversationId or request.requestId or request.continuationApprovalId:
+            raise HTTPException(
+                status_code=422,
+                detail="Une sonde Forge éphémère ne reprend aucune session.",
+            )
+        try:
+            active_lock = forge_runtime_lock.load_active_lock(BACKEND_DIR.parent)
+        except (OSError, ValueError, forge_runtime_lock.ForgeRuntimeDriftError):
+            active_lock = None
+        if os.getenv("MARVIN_FORGE_ROUTING_ONLY", "0") != "1" or active_lock is None:
+            raise HTTPException(
+                status_code=403,
+                detail="Une sonde éphémère exige le verrou Forge sans exécution.",
+            )
+        benchmark_conversation_id = str(
+            db.create_conversation("Forge benchmark éphémère")["id"]
+        )
     if request.conversationId and db.get_conversation(request.conversationId) is None:
         raise HTTPException(status_code=404, detail="Conversation introuvable.")
     internal_continuation = request.continuationApprovalId is not None
@@ -161,14 +184,19 @@ async def chat(request: ChatRequest):
     if not request.requestId:
 
         async def event_stream():
-            async for chunk in run_agent(
-                request.messages,
-                request.conversationId,
-                request.model,
-                request.cortex,
-                internal_continuation=internal_continuation,
-            ):
-                yield chunk
+            try:
+                async for chunk in run_agent(
+                    request.messages,
+                    benchmark_conversation_id or request.conversationId,
+                    request.model,
+                    request.cortex,
+                    internal_continuation=internal_continuation,
+                    benchmark_ephemeral=request.benchmarkEphemeral,
+                ):
+                    yield chunk
+            finally:
+                if benchmark_conversation_id:
+                    db.delete_conversation(benchmark_conversation_id)
 
     else:
         fingerprint = chat_turn_runtime.payload_hash(
@@ -193,6 +221,7 @@ async def chat(request: ChatRequest):
                 request.cortex,
                 request_id=request.requestId,
                 internal_continuation=internal_continuation,
+                benchmark_ephemeral=request.benchmarkEphemeral,
             )
 
         async def event_stream():

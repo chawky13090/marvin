@@ -71,9 +71,12 @@ async def prepare_turn(
     *,
     background_tasks: set[asyncio.Task] | None = None,
     persist_user_message: bool = True,
+    ephemeral: bool = False,
 ) -> PreparedTurn:
     """Crée/reprend une session et persiste son entrée avant l'orchestration LLM."""
     events: list[dict[str, Any]] = []
+    if ephemeral and not conversation_id:
+        raise ValueError("Une session éphémère doit être réservée par le gateway.")
     if not conversation_id:
         conversation = db.create_conversation("Nouvelle conversation")
         conversation_id = conversation["id"]

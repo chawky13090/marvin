@@ -1,0 +1,976 @@
+{
+  "schema": "marvin.windows-operator-executor-baseline/1.1",
+  "status": "complete",
+  "split": "development",
+  "scenario_corpus_sha256": "b6fe4b6fa1daef9123ccb92dd74d3ed6ef1618c5c12e5d0bd33adc8c83b0b724",
+  "runs_per_scenario": 5,
+  "expected_runs": 50,
+  "executor_sources": {
+    "filesystem.py": "c272226fd85b8b8a8d4a3452ea2ad15975550c27a84255ac3d3d09ac3e2c9358",
+    "pc_control.py": "d545a568931e66da6886b7350ade9ecac556845963b64474db3598cc78acb3a9",
+    "windows.py": "a889e9ef56dd48462389fb17a3b39dcbf53bff81d070be7aa26a1c831eb32892",
+    "winget.py": "0586ae818a75c22d1854aba6de4b4e134335e42bf645d7471df543b34f57387f"
+  },
+  "results": [
+    {
+      "scenario_id": "copy-file",
+      "run": 1,
+      "family": "file",
+      "capability": "file_copy",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 10,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 2,
+      "family": "file",
+      "capability": "file_copy",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 8,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 3,
+      "family": "file",
+      "capability": "file_copy",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 7,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 4,
+      "family": "file",
+      "capability": "file_copy",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 7,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 5,
+      "family": "file",
+      "capability": "file_copy",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 7,
+      "oracle_evidence": {
+        "hash_equal": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 1,
+      "family": "file",
+      "capability": "file_create_folder",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 2,
+      "family": "file",
+      "capability": "file_create_folder",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 3,
+      "family": "file",
+      "capability": "file_create_folder",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 4,
+      "family": "file",
+      "capability": "file_create_folder",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 5,
+      "family": "file",
+      "capability": "file_create_folder",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3,
+      "oracle_evidence": {
+        "target_exists": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 1,
+      "family": "security",
+      "capability": "win_firewall_status",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 2421,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 2,
+      "family": "security",
+      "capability": "win_firewall_status",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 1944,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 3,
+      "family": "security",
+      "capability": "win_firewall_status",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 2250,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 4,
+      "family": "security",
+      "capability": "win_firewall_status",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 2259,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 5,
+      "family": "security",
+      "capability": "win_firewall_status",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 2095,
+      "oracle_evidence": {
+        "profile_count": 3
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 1,
+      "family": "software",
+      "capability": "winget_list_installed",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4474,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 2,
+      "family": "software",
+      "capability": "winget_list_installed",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4840,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 3,
+      "family": "software",
+      "capability": "winget_list_installed",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4195,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 4,
+      "family": "software",
+      "capability": "winget_list_installed",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4462,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 5,
+      "family": "software",
+      "capability": "winget_list_installed",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4165,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 1,
+      "family": "process",
+      "capability": "pc_process_kill",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 10,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 2,
+      "family": "process",
+      "capability": "pc_process_kill",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 12,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 3,
+      "family": "process",
+      "capability": "pc_process_kill",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 9,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 4,
+      "family": "process",
+      "capability": "pc_process_kill",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 12,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 5,
+      "family": "process",
+      "capability": "pc_process_kill",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 10,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 1,
+      "family": "application",
+      "capability": "pc_app_launch",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 489,
+      "oracle_evidence": {
+        "new_process_count": 1
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 2,
+      "family": "application",
+      "capability": "pc_app_launch",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 345,
+      "oracle_evidence": {
+        "new_process_count": 1
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 3,
+      "family": "application",
+      "capability": "pc_app_launch",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 370,
+      "oracle_evidence": {
+        "new_process_count": 1
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 4,
+      "family": "application",
+      "capability": "pc_app_launch",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 391,
+      "oracle_evidence": {
+        "new_process_count": 1
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 5,
+      "family": "application",
+      "capability": "pc_app_launch",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 403,
+      "oracle_evidence": {
+        "new_process_count": 1
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 1,
+      "family": "network",
+      "capability": "win_network_config",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 29,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 2,
+      "family": "network",
+      "capability": "win_network_config",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 3,
+      "family": "network",
+      "capability": "win_network_config",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 17,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 4,
+      "family": "network",
+      "capability": "win_network_config",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 17,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 5,
+      "family": "network",
+      "capability": "win_network_config",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21,
+      "oracle_evidence": {
+        "adapter_count": 8
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 1,
+      "family": "process",
+      "capability": "pc_process_list",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4055,
+      "oracle_evidence": {
+        "process_count": 431
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 2,
+      "family": "process",
+      "capability": "pc_process_list",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3831,
+      "oracle_evidence": {
+        "process_count": 423
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 3,
+      "family": "process",
+      "capability": "pc_process_list",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3920,
+      "oracle_evidence": {
+        "process_count": 425
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 4,
+      "family": "process",
+      "capability": "pc_process_list",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 4051,
+      "oracle_evidence": {
+        "process_count": 423
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 5,
+      "family": "process",
+      "capability": "pc_process_list",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 3757,
+      "oracle_evidence": {
+        "process_count": 425
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 1,
+      "family": "file",
+      "capability": "file_rename",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 2,
+      "family": "file",
+      "capability": "file_rename",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 3,
+      "family": "file",
+      "capability": "file_rename",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 4,
+      "family": "file",
+      "capability": "file_rename",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 5,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 5,
+      "family": "file",
+      "capability": "file_rename",
+      "tool_reported_success": true,
+      "tool_completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 6,
+      "oracle_evidence": {
+        "rename_complete": true
+      },
+      "tool_error_type": null
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 1,
+      "family": "service",
+      "capability": "win_services_list",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 566,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 2,
+      "family": "service",
+      "capability": "win_services_list",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 619,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 3,
+      "family": "service",
+      "capability": "win_services_list",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 569,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 4,
+      "family": "service",
+      "capability": "win_services_list",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 657,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": "reported_error"
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 5,
+      "family": "service",
+      "capability": "win_services_list",
+      "tool_reported_success": false,
+      "tool_completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 578,
+      "oracle_evidence": {
+        "service_count": 351
+      },
+      "tool_error_type": "reported_error"
+    }
+  ],
+  "summary": {
+    "runs": 50,
+    "passed": 45,
+    "failed": 5,
+    "success_rate": 0.9,
+    "false_success_count": 5,
+    "false_failure_count": 15,
+    "teardown_failure_count": 0,
+    "median_duration_ms": 345
+  }
+}

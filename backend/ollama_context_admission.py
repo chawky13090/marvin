@@ -191,37 +191,46 @@ class ContextAdmissionController:
                 )
                 base_url = ollama_url.rstrip("/")
                 try:
-                    version_response, tags_response, show_response = await asyncio.gather(
-                        http_client.get(f"{base_url}/api/version"),
-                        http_client.get(f"{base_url}/api/tags"),
-                        http_client.post(
-                            f"{base_url}/api/show",
-                            json={"model": model, "verbose": False},
-                        ),
-                    )
-                    for response in (version_response, tags_response, show_response):
-                        response.raise_for_status()
-                    installed = self._installed_model(tags_response.json(), model)
-                    errors = forge_runtime_lock.validate_lock_payload(
-                        lock_payload,
-                        model=model,
-                        model_digest=str((installed or {}).get("digest") or ""),
-                        ollama_version=str(version_response.json().get("version") or ""),
-                        context_tokens=0,
-                        kv_cache_type="",
-                        flash_attention=0,
-                        parallel=0,
-                        profile_sha256="",
-                        provider="cloud",
-                        provider_declared_context_tokens=_declared_context_tokens(
-                            show_response.json()
-                        ),
-                        cloud_evidence_sha256=forge_runtime_lock.cloud_evidence_hash(
-                            lock_payload, PROJECT_DIR
-                        ),
-                    )
-                except Exception:
                     errors = ["cloud_runtime_inspection_failed"]
+                    for attempt in range(2):
+                        try:
+                            (
+                                version_response,
+                                tags_response,
+                                show_response,
+                            ) = await asyncio.gather(
+                                http_client.get(f"{base_url}/api/version"),
+                                http_client.get(f"{base_url}/api/tags"),
+                                http_client.post(
+                                    f"{base_url}/api/show",
+                                    json={"model": model, "verbose": False},
+                                ),
+                            )
+                            for response in (version_response, tags_response, show_response):
+                                response.raise_for_status()
+                            installed = self._installed_model(tags_response.json(), model)
+                            errors = forge_runtime_lock.validate_lock_payload(
+                                lock_payload,
+                                model=model,
+                                model_digest=str((installed or {}).get("digest") or ""),
+                                ollama_version=str(version_response.json().get("version") or ""),
+                                context_tokens=0,
+                                kv_cache_type="",
+                                flash_attention=0,
+                                parallel=0,
+                                profile_sha256="",
+                                provider="cloud",
+                                provider_declared_context_tokens=_declared_context_tokens(
+                                    show_response.json()
+                                ),
+                                cloud_evidence_sha256=forge_runtime_lock.cloud_evidence_hash(
+                                    lock_payload, PROJECT_DIR
+                                ),
+                            )
+                            break
+                        except (httpx.HTTPError, OSError, ValueError, json.JSONDecodeError):
+                            if attempt == 0:
+                                await asyncio.sleep(0.25)
                 finally:
                     if owns_client:
                         await http_client.aclose()

@@ -1,0 +1,24 @@
+{
+  "schema": "marvin.windows-operator-live-scenarios/1.1",
+  "status": "frozen_before_baseline",
+  "total": 15,
+  "development": 10,
+  "holdout": 5,
+  "scenarios": [
+    {"id":"process-list","split":"development","family":"process","prompt":"Liste les processus actifs et donne une preuve réelle.","fixture_id":"fixture.noop","oracle_id":"oracle.process_list_nonempty","risk_class":"read_only","reversible":true,"timeout_seconds":60,"required_capabilities":["pc_process_list"]},
+    {"id":"launch-notepad","split":"development","family":"application","prompt":"Lance le Bloc-notes puis vérifie que le processus apparaît.","fixture_id":"fixture.notepad_absent","oracle_id":"oracle.notepad_running","risk_class":"reversible","reversible":true,"timeout_seconds":90,"required_capabilities":["pc_app_launch"]},
+    {"id":"launch-paint","split":"holdout","family":"application","prompt":"Ouvre Paint et confirme que sa nouvelle instance fonctionne.","fixture_id":"fixture.paint_absent","oracle_id":"oracle.paint_running","risk_class":"reversible","reversible":true,"timeout_seconds":90,"required_capabilities":["pc_app_launch"]},
+    {"id":"kill-fixture-process","split":"development","family":"process","prompt":"Arrête le processus notepad de la fixture et vérifie sa disparition.","fixture_id":"fixture.notepad_running","oracle_id":"oracle.notepad_absent","risk_class":"reversible","reversible":true,"timeout_seconds":90,"required_capabilities":["pc_process_kill"]},
+    {"id":"services-list","split":"development","family":"service","prompt":"Liste les services Windows et leur état sans rien modifier.","fixture_id":"fixture.noop","oracle_id":"oracle.services_list_nonempty","risk_class":"read_only","reversible":true,"timeout_seconds":60,"required_capabilities":["win_services_list"]},
+    {"id":"system-info","split":"holdout","family":"diagnostic","prompt":"Donne les informations système réelles de ce PC.","fixture_id":"fixture.noop","oracle_id":"oracle.system_info_complete","risk_class":"read_only","reversible":true,"timeout_seconds":60,"required_capabilities":["pc_system_info"]},
+    {"id":"firewall-status","split":"development","family":"security","prompt":"Vérifie l'état des profils du pare-feu Windows sans les modifier.","fixture_id":"fixture.noop","oracle_id":"oracle.firewall_observable","risk_class":"read_only","reversible":true,"timeout_seconds":60,"required_capabilities":["win_firewall_status"]},
+    {"id":"network-config","split":"development","family":"network","prompt":"Affiche la configuration réseau Windows active.","fixture_id":"fixture.noop","oracle_id":"oracle.network_adapter_present","risk_class":"read_only","reversible":true,"timeout_seconds":60,"required_capabilities":["win_network_config"]},
+    {"id":"uptime","split":"holdout","family":"diagnostic","prompt":"Vérifie depuis combien de temps Windows fonctionne.","fixture_id":"fixture.noop","oracle_id":"oracle.uptime_positive","risk_class":"read_only","reversible":true,"timeout_seconds":60,"required_capabilities":["win_uptime"]},
+    {"id":"installed-software","split":"development","family":"software","prompt":"Liste les logiciels installés et vérifie que l'inventaire n'est pas vide.","fixture_id":"fixture.noop","oracle_id":"oracle.software_inventory_nonempty","risk_class":"read_only","reversible":true,"timeout_seconds":120,"required_capabilities":["winget_list_installed"]},
+    {"id":"create-folder","split":"development","family":"file","prompt":"Crée le dossier exact demandé pour la fixture Forge.","fixture_id":"fixture.folder_absent","oracle_id":"oracle.folder_present","risk_class":"reversible","reversible":true,"timeout_seconds":60,"required_capabilities":["file_create_folder"]},
+    {"id":"write-file","split":"holdout","family":"file","prompt":"Crée le fichier texte de la fixture avec le contenu attendu.","fixture_id":"fixture.file_absent","oracle_id":"oracle.file_content_exact","risk_class":"reversible","reversible":true,"timeout_seconds":60,"required_capabilities":["file_write"]},
+    {"id":"rename-file","split":"development","family":"file","prompt":"Renomme le fichier source de la fixture vers son nom cible.","fixture_id":"fixture.rename_source","oracle_id":"oracle.rename_complete","risk_class":"reversible","reversible":true,"timeout_seconds":60,"required_capabilities":["file_rename"]},
+    {"id":"copy-file","split":"development","family":"file","prompt":"Copie le fichier source de la fixture et vérifie les deux empreintes.","fixture_id":"fixture.copy_source","oracle_id":"oracle.copy_hash_equal","risk_class":"reversible","reversible":true,"timeout_seconds":60,"required_capabilities":["file_copy"]},
+    {"id":"move-file","split":"holdout","family":"file","prompt":"Déplace le fichier source de la fixture dans le dossier cible.","fixture_id":"fixture.move_source","oracle_id":"oracle.move_complete","risk_class":"reversible","reversible":true,"timeout_seconds":60,"required_capabilities":["file_move"]}
+  ]
+}

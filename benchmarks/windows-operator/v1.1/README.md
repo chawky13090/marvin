@@ -38,6 +38,22 @@ la version Ollama, le profil, le contexte, le cache KV ou le parallélisme déri
 expire après 24 heures par défaut. Une exécution interrompue ou en dérive est rejetée, jamais
 comptée dans les métriques.
 
+## Corpus et couches de mesure
+
+`corpus-manifest.json` fige par SHA-256 les 120 intentions et les 15 scénarios avant toute
+implémentation de `windows_task`. Le holdout (40 intentions et 5 scénarios) reste fermé
+pendant le développement. Les campagnes normatives sont séparées :
+
+- `routing-development.json` : 240 décisions, trois répétitions par intention ;
+- `executor-development.json` : 50 exécutions directes avec oracle indépendant ;
+- `e2e-development.json` : 50 parcours FastAPI complets avec modèle et Cortex épinglés.
+
+Une réussite de `tool_search` n'est jamais une affirmation de succès métier. Le
+classificateur bout-en-bout ne qualifie un faux succès que lorsque l'outil cible annonce
+l'achèvement et que l'oracle indépendant constate l'échec. Les artefacts `invalid-*`
+documentent les campagnes interrompues ou une méthodologie rejetée; ils sont exclus des
+comparaisons et des seuils.
+
 ## Rollback
 
 Une réversion atomique restaure le contrat v1. Les preuves v1 et v1.1 ne sont jamais

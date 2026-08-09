@@ -5,6 +5,38 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.599.0 — Corpus gelé et baselines Forge Windows reproductibles
+
+Demande : mesurer objectivement Marvin avant de construire `windows_task`, préserver son
+intelligence et isoler le routage, l'exécuteur et le parcours complet avec un modèle Cloud
+exact, des répétitions, des états initiaux reproductibles et des oracles indépendants.
+
+Décision : le corpus v1.1 fige 120 intentions (80 développement, 40 holdout) et 15 scénarios
+réels (10 développement, 5 holdout). Les fixtures Windows créent puis nettoient leurs seuls
+fichiers et processus sous une racine Forge bornée. Le verrou Cloud impose
+`qwen3.5:397b-cloud`, son digest, la preuve de contexte long et un profil Cortex constant.
+Un mode `benchmarkEphemeral`, inaccessible sans verrou et variable dédiée, ne persiste ni
+message ni conversation. La sélection éphémère peut exécuter `tool_search`, mais s'arrête
+avant toute autre action. L'admission Cloud possède un retry borné uniquement sur erreur de
+transport/JSON et échoue fermée ensuite.
+
+Preuves : routage 111/240 (46,25 %), sans route interdite; exécuteur historique 46/50
+(92 %, quatre faux succès sur `pc_process_kill`); parcours complet normatif 40/50 (80 %),
+zéro faux succès, une erreur cible récupérée, neuf erreurs incidentes récupérées, zéro erreur
+technique et zéro échec de nettoyage. Le premier parcours complet comptait à tort une
+réussite de `tool_search` comme succès métier : il a été conservé sous
+`e2e-development-invalid-claim-classifier.json`, le classificateur a reçu un test unitaire,
+puis les 50 exécutions ont été entièrement rejouées. Les autres artefacts `invalid-*`
+documentent de la même façon les méthodologies rejetées et ne comptent dans aucun seuil.
+
+Sécurité, logs et rollback : le mode éphémère est fermé par défaut, lié au verrou actif,
+refuse request/conversation/continuation et supprime son état en `finally`. Les artefacts ne
+contiennent ni réponse, ni contenu utilisateur, ni secret; uniquement scénarios synthétiques,
+outils sélectionnés, métriques et preuves d'oracle. Aucun nouveau flux personnel ou log de
+production n'est créé. Rollback : libérer le lock avec
+`scripts/forge-runtime-lock.py release --lock <chemin>`, puis réversion atomique du commit
+v2.599. Les fixtures restantes peuvent être supprimées sans toucher aux données utilisateur.
+
 ## 2026-08-09 — v2.598.0 — Verrou Forge Cloud exact et falsifiable
 
 Demande : préserver la capacité maximale des modèles Ollama Cloud, empêcher un changement

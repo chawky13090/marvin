@@ -1,0 +1,23 @@
+{
+  "schema": "marvin.windows-operator-corpus-manifest/1.1",
+  "status": "frozen_before_baseline",
+  "frozen_at": "2026-08-09T12:55:00Z",
+  "holdout_opened": false,
+  "files": {
+    "intent-corpus.json": "9f223d59083582b53c1352a0215a9b506b1945f3b49bf4fe220409f46d11241f",
+    "live-scenarios.json": "b6fe4b6fa1daef9123ccb92dd74d3ed6ef1618c5c12e5d0bd33adc8c83b0b724",
+    "scenario-contract.schema.json": "608a03d3fe9c87d317c9af78f7ed49b33402c3399c81544e15739f188b0b4a20",
+    "acceptance-policy.json": "4c30f212b31dcb470619c7a30e52a76a072b87746a1dbbdb2f8746d901c730bc",
+    "benchmark-plan.json": "377e21d9455929abe3d4be89440d9a4584b8964cbd5c6b91783ddc9d79720649"
+  },
+  "runtime_precondition": {
+    "provider": "cloud",
+    "model": "qwen3.5:397b-cloud",
+    "model_digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca",
+    "ollama_version": "0.32.6",
+    "provider_declared_context_tokens": 262144,
+    "client_context_override": null,
+    "behavioral_evidence": "../campaigns/preflight-20260809/cloud-retention-qwen3.5-397b.json",
+    "behavioral_evidence_sha256": "c4f0b2e0efde4de06cbb78572e9c900ca5a31f99a282ad776473a3e638fa9855"
+  }
+}

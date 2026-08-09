@@ -1,0 +1,1182 @@
+{
+  "schema": "marvin.windows-operator-routing-baseline/1.1",
+  "status": "running",
+  "split": "development",
+  "model": "qwen3.5:397b-cloud",
+  "model_digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca",
+  "corpus_sha256": "9f223d59083582b53c1352a0215a9b506b1945f3b49bf4fe220409f46d11241f",
+  "runs_per_intent": 3,
+  "expected_runs": 240,
+  "results": [
+    {
+      "intent_id": "intent-001",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5782
+    },
+    {
+      "intent_id": "intent-001",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6844
+    },
+    {
+      "intent_id": "intent-001",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 8510
+    },
+    {
+      "intent_id": "intent-002",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5008
+    },
+    {
+      "intent_id": "intent-002",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7671
+    },
+    {
+      "intent_id": "intent-002",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4154
+    },
+    {
+      "intent_id": "intent-004",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 8112
+    },
+    {
+      "intent_id": "intent-004",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5490
+    },
+    {
+      "intent_id": "intent-004",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5934
+    },
+    {
+      "intent_id": "intent-005",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5432
+    },
+    {
+      "intent_id": "intent-005",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5225
+    },
+    {
+      "intent_id": "intent-005",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5300
+    },
+    {
+      "intent_id": "intent-007",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5549
+    },
+    {
+      "intent_id": "intent-007",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5500
+    },
+    {
+      "intent_id": "intent-007",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7311
+    },
+    {
+      "intent_id": "intent-008",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4668
+    },
+    {
+      "intent_id": "intent-008",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4598
+    },
+    {
+      "intent_id": "intent-008",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4769
+    },
+    {
+      "intent_id": "intent-010",
+      "run": 1,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6086
+    },
+    {
+      "intent_id": "intent-010",
+      "run": 2,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5377
+    },
+    {
+      "intent_id": "intent-010",
+      "run": 3,
+      "family": "process_inventory",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5477
+    },
+    {
+      "intent_id": "intent-011",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6072
+    },
+    {
+      "intent_id": "intent-011",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4119
+    },
+    {
+      "intent_id": "intent-011",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4297
+    },
+    {
+      "intent_id": "intent-013",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 3853
+    },
+    {
+      "intent_id": "intent-013",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 9167
+    },
+    {
+      "intent_id": "intent-013",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5163
+    },
+    {
+      "intent_id": "intent-014",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7137
+    },
+    {
+      "intent_id": "intent-014",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5147
+    },
+    {
+      "intent_id": "intent-014",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6013
+    },
+    {
+      "intent_id": "intent-016",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7137
+    },
+    {
+      "intent_id": "intent-016",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6337
+    },
+    {
+      "intent_id": "intent-016",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6369
+    },
+    {
+      "intent_id": "intent-017",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5263
+    },
+    {
+      "intent_id": "intent-017",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5343
+    },
+    {
+      "intent_id": "intent-017",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7359
+    },
+    {
+      "intent_id": "intent-019",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4425
+    },
+    {
+      "intent_id": "intent-019",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6516
+    },
+    {
+      "intent_id": "intent-019",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6901
+    },
+    {
+      "intent_id": "intent-020",
+      "run": 1,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 3882
+    },
+    {
+      "intent_id": "intent-020",
+      "run": 2,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 3727
+    },
+    {
+      "intent_id": "intent-020",
+      "run": 3,
+      "family": "process_action",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4168
+    },
+    {
+      "intent_id": "intent-022",
+      "run": 1,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6283
+    },
+    {
+      "intent_id": "intent-022",
+      "run": 2,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "pc_app_launch"
+      ],
+      "expected_match": true,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": true,
+      "duration_ms": 5161
+    },
+    {
+      "intent_id": "intent-022",
+      "run": 3,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7818
+    },
+    {
+      "intent_id": "intent-023",
+      "run": 1,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4830
+    },
+    {
+      "intent_id": "intent-023",
+      "run": 2,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 3802
+    },
+    {
+      "intent_id": "intent-023",
+      "run": 3,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4714
+    },
+    {
+      "intent_id": "intent-025",
+      "run": 1,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4449
+    },
+    {
+      "intent_id": "intent-025",
+      "run": 2,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5834
+    },
+    {
+      "intent_id": "intent-025",
+      "run": 3,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5332
+    },
+    {
+      "intent_id": "intent-026",
+      "run": 1,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5597
+    },
+    {
+      "intent_id": "intent-026",
+      "run": 2,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5798
+    },
+    {
+      "intent_id": "intent-026",
+      "run": 3,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7858
+    },
+    {
+      "intent_id": "intent-028",
+      "run": 1,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 8864
+    },
+    {
+      "intent_id": "intent-028",
+      "run": 2,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7268
+    },
+    {
+      "intent_id": "intent-028",
+      "run": 3,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 9378
+    },
+    {
+      "intent_id": "intent-029",
+      "run": 1,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "pc_app_launch"
+      ],
+      "expected_match": true,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": true,
+      "duration_ms": 7623
+    },
+    {
+      "intent_id": "intent-029",
+      "run": 2,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "pc_app_launch"
+      ],
+      "expected_match": true,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": true,
+      "duration_ms": 5826
+    },
+    {
+      "intent_id": "intent-029",
+      "run": 3,
+      "family": "application_launch",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "pc_app_launch"
+      ],
+      "expected_match": true,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": true,
+      "duration_ms": 3952
+    },
+    {
+      "intent_id": "intent-031",
+      "run": 1,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5452
+    },
+    {
+      "intent_id": "intent-031",
+      "run": 2,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5345
+    },
+    {
+      "intent_id": "intent-031",
+      "run": 3,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5969
+    },
+    {
+      "intent_id": "intent-032",
+      "run": 1,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4820
+    },
+    {
+      "intent_id": "intent-032",
+      "run": 2,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5816
+    },
+    {
+      "intent_id": "intent-032",
+      "run": 3,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7129
+    },
+    {
+      "intent_id": "intent-034",
+      "run": 1,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6186
+    },
+    {
+      "intent_id": "intent-034",
+      "run": 2,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5987
+    },
+    {
+      "intent_id": "intent-034",
+      "run": 3,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 9247
+    },
+    {
+      "intent_id": "intent-035",
+      "run": 1,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5968
+    },
+    {
+      "intent_id": "intent-035",
+      "run": 2,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4662
+    },
+    {
+      "intent_id": "intent-035",
+      "run": 3,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 4830
+    },
+    {
+      "intent_id": "intent-037",
+      "run": 1,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5352
+    },
+    {
+      "intent_id": "intent-037",
+      "run": 2,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 7061
+    },
+    {
+      "intent_id": "intent-037",
+      "run": 3,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 5418
+    },
+    {
+      "intent_id": "intent-038",
+      "run": 1,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6933
+    },
+    {
+      "intent_id": "intent-038",
+      "run": 2,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "tool_search"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6767
+    },
+    {
+      "intent_id": "intent-038",
+      "run": 3,
+      "family": "windows_services",
+      "terminal": "tool_selection",
+      "selected_tools": [
+        "computer_control"
+      ],
+      "expected_match": false,
+      "forbidden_match": false,
+      "forge_locked": true,
+      "model_exact": true,
+      "passed": false,
+      "duration_ms": 6707
+    }
+  ]
+}

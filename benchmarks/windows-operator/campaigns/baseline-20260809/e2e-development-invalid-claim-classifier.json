@@ -1,0 +1,1209 @@
+{
+  "schema": "marvin.windows-operator-e2e-baseline/1.1",
+  "status": "complete",
+  "split": "development",
+  "model": "qwen3.5:397b-cloud",
+  "model_digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca",
+  "scenario_corpus_sha256": "b6fe4b6fa1daef9123ccb92dd74d3ed6ef1618c5c12e5d0bd33adc8c83b0b724",
+  "cortex": {
+    "effort": "standard",
+    "evidence": "none",
+    "review": "none",
+    "autonomy": "execute",
+    "privacy": "cloud",
+    "output": "chat",
+    "pinned": true
+  },
+  "runs_per_scenario": 5,
+  "expected_runs": 50,
+  "results": [
+    {
+      "scenario_id": "copy-file",
+      "run": 1,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "tool_search",
+        "tool_search",
+        "file_copy",
+        "file_info",
+        "file_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 39159,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 2,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "tool_search",
+        "tool_search",
+        "tool_search",
+        "file_read",
+        "file_write",
+        "hash_compute",
+        "hash_compute"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 49387,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 3,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "tool_search",
+        "file_copy",
+        "file_info",
+        "file_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 35392,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 4,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "tool_search",
+        "tool_search",
+        "file_read",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 45517,
+      "oracle_evidence": {
+        "hash_equal": false
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 5,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "tool_search",
+        "file_copy",
+        "file_info",
+        "file_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 53949,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 1,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_create_folder"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22176,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 2,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_create_folder"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21905,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 3,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "file_create_folder"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26591,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 4,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_create_folder"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23294,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 5,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_create_folder"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 19809,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 1,
+      "family": "security",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_firewall_status"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23995,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 2,
+      "family": "security",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_firewall_status"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25669,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 3,
+      "family": "security",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_firewall_status"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 35491,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 4,
+      "family": "security",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_firewall_status"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 28331,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 5,
+      "family": "security",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_firewall_status"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23629,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 1,
+      "family": "software",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "winget_list_installed"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 39685,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 2,
+      "family": "software",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "winget_list_installed"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25357,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 3,
+      "family": "software",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "winget_list_installed"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 24027,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 4,
+      "family": "software",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "winget_list_installed"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 24265,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 5,
+      "family": "software",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "winget_list_installed"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23753,
+      "oracle_evidence": {
+        "registry_entry_count": 124
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 1,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "pc_process_kill"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 28584,
+      "oracle_evidence": {
+        "fixture_pid_running": false
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 2,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "pc_process_kill"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 27911,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 3,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_process_kill"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 23897,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 4,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_process_kill"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 27740,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 5,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "tool_search",
+        "pc_process_kill"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": false,
+      "false_success": true,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 29506,
+      "oracle_evidence": {
+        "fixture_pid_running": true
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 1,
+      "family": "application",
+      "terminal": "done",
+      "selected_tools": [
+        "pc_app_launch",
+        "pc_app_launch"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21924,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 2,
+      "family": "application",
+      "terminal": "done",
+      "selected_tools": [
+        "pc_app_launch",
+        "pc_app_launch"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 30419,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 3,
+      "family": "application",
+      "terminal": "done",
+      "selected_tools": [
+        "pc_app_launch"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 19325,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 4,
+      "family": "application",
+      "terminal": "done",
+      "selected_tools": [
+        "pc_app_launch",
+        "pc_app_launch"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 21575,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 5,
+      "family": "application",
+      "terminal": "done",
+      "selected_tools": [
+        "pc_app_launch"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 18199,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 1,
+      "family": "network",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "computer_control",
+        "computer_control",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 66565,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 2,
+      "family": "network",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "computer_control",
+        "computer_control",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 45379,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 3,
+      "family": "network",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_run_powershell"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22348,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 4,
+      "family": "network",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 27516,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 5,
+      "family": "network",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": false,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22472,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 1,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_process_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 53763,
+      "oracle_evidence": {
+        "process_count": 427
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 2,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_process_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 54943,
+      "oracle_evidence": {
+        "process_count": 434
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 3,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_process_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 31564,
+      "oracle_evidence": {
+        "process_count": 430
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 4,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "computer_control",
+        "tool_search",
+        "pc_process_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": true,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 77751,
+      "oracle_evidence": {
+        "process_count": 433
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 5,
+      "family": "process",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "pc_process_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 30424,
+      "oracle_evidence": {
+        "process_count": 433
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 1,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_rename"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22641,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 2,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_rename"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22823,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 3,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_rename"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25672,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 4,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_rename"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 22458,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 5,
+      "family": "file",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "file_rename"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23363,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 1,
+      "family": "service",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_services_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 24937,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 2,
+      "family": "service",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_services_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25868,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 3,
+      "family": "service",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_services_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26897,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 4,
+      "family": "service",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_services_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 27351,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 5,
+      "family": "service",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "win_services_list"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "completion_claimed": true,
+      "tool_failed": false,
+      "oracle_passed": true,
+      "false_success": false,
+      "false_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 24351,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    }
+  ],
+  "summary": {
+    "runs": 50,
+    "passed": 45,
+    "failed": 5,
+    "success_rate": 0.9,
+    "false_success_count": 5,
+    "false_failure_count": 11,
+    "technical_error_count": 0,
+    "cleanup_failure_count": 0,
+    "median_duration_ms": 25868
+  }
+}
