@@ -38,6 +38,7 @@ class PreparedToolCall:
     name: str
     arguments: dict[str, Any]
     read_signature: str = ""
+    canonicalized_from: str = ""
 
 
 # v2.526 — Incident réel reproduit (conversation « PowerPoint article Windows
@@ -60,6 +61,72 @@ class PreparedToolCall:
 # pour ne plus dépendre d'une liste d'exceptions entretenue outil par outil.
 _TRUE_LITERALS = frozenset({"true", "1", "yes", "oui"})
 _FALSE_LITERALS = frozenset({"false", "0", "no", "non"})
+
+
+def _canonicalize_windows_driver(
+    name: str,
+    arguments: dict[str, Any],
+) -> tuple[str, dict[str, Any], str]:
+    """Compile les anciens pilotes LLM vers la facade Windows typee.
+
+    Les outils historiques restent enregistres pour les API et pour le pilote
+    interne. Seule la frontiere LLM est canonisee; aucun argument libre n'est
+    propage et la validation finale utilise ensuite le schema windows_task.
+    """
+    action = ""
+    projected: dict[str, Any] = {}
+    if name == "pc_process_list":
+        action = "process.list"
+        if arguments.get("sort_by") is not None:
+            projected["sort_by"] = arguments["sort_by"]
+    elif name == "pc_process_kill":
+        action = "process.stop"
+        for key in ("pid", "name"):
+            if arguments.get(key) not in (None, ""):
+                projected[key] = arguments[key]
+    elif name == "pc_app_launch":
+        action = "application.launch"
+        projected["target"] = arguments.get("app_name")
+        if arguments.get("url"):
+            projected["url"] = arguments["url"]
+    elif name == "win_services_list":
+        action = "service.list"
+        for key in ("filter", "status"):
+            if arguments.get(key) not in (None, ""):
+                projected[key] = arguments[key]
+    elif name == "win_firewall_status":
+        action = "security.firewall.status"
+    elif name == "win_network_config":
+        action = "network.status"
+    elif name == "winget_list_installed":
+        action = "software.list"
+        if arguments.get("query"):
+            projected["query"] = arguments["query"]
+    elif name == "file_create_folder":
+        action = "filesystem.create_folder"
+        projected["target"] = arguments.get("path")
+    elif name == "file_rename":
+        action = "filesystem.rename"
+        projected["source"] = arguments.get("source")
+        projected["destination"] = arguments.get("destination") or arguments.get("new_name")
+    elif name == "file_copy":
+        action = "filesystem.copy"
+        projected["source"] = arguments.get("source")
+        projected["destination"] = arguments.get("destination")
+    elif (
+        name == "computer_control"
+        and str(arguments.get("action") or "").strip().casefold() == "open"
+        and arguments.get("target")
+        and not str(arguments.get("target") or "").strip().casefold().startswith(("http://", "https://"))
+    ):
+        action = "application.launch"
+        projected["target"] = arguments.get("target")
+        if arguments.get("url"):
+            projected["url"] = arguments["url"]
+    if not action:
+        return name, arguments, ""
+    projected["action"] = action
+    return "windows_task", projected, name
 
 
 def _coerce_stringified_scalar(value: str, expected: str) -> Any:
@@ -277,6 +344,11 @@ def prepare_tool_call(
         name = "ssh_connection_save"
         arguments.pop("save", None)
 
+    name, arguments, canonicalized_from = _canonicalize_windows_driver(
+        name,
+        arguments,
+    )
+
     read_signature = ""
     if name == "code_workspace_status":
         read_signature = json.dumps(
@@ -290,6 +362,7 @@ def prepare_tool_call(
         name=name,
         arguments=arguments,
         read_signature=read_signature,
+        canonicalized_from=canonicalized_from,
     )
 
 

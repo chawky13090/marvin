@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -53,16 +54,26 @@ def setup(fixture_id: str, *, run_id: str) -> dict[str, Any]:
     elif fixture_id == "fixture.paint_absent":
         context.update({"process_name": "mspaint", "baseline_pids": sorted(_process_ids("mspaint"))})
     elif fixture_id == "fixture.notepad_running":
-        baseline_pids = sorted(_process_ids("notepad"))
-        process = subprocess.Popen(["notepad.exe"], close_fds=True)
+        # Un Bloc-notes Windows 11 empaqueté peut remplacer son PID ou se fermer
+        # spontanément. Pour mesurer process.stop, utiliser un sleeper inerte et
+        # stable, possédé par la fixture; le vrai lancement de Bloc-notes est testé
+        # séparément par fixture.notepad_absent.
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(600)"],
+            close_fds=True,
+            creationflags=creationflags,
+        )
+        time.sleep(0.2)
+        if process.poll() is not None or not psutil.pid_exists(process.pid):
+            raise RuntimeError("La fixture processus stable n'a pas démarré.")
         context.update(
             {
-                "process_name": "notepad",
                 "fixture_pid": process.pid,
-                "baseline_pids": baseline_pids,
+                "fixture_pids": [process.pid],
+                "fixture_kind": "stable_inert_process",
             }
         )
-        time.sleep(1)
     elif fixture_id == "fixture.folder_absent":
         context["target"] = str(root / "created-folder")
     elif fixture_id == "fixture.file_absent":
@@ -88,7 +99,17 @@ def setup(fixture_id: str, *, run_id: str) -> dict[str, Any]:
 
 
 def enrich_prompt(prompt: str, context: dict[str, Any]) -> str:
-    public = {key: value for key, value in context.items() if key not in {"baseline_pids", "run_id", "root"}}
+    public = {
+        key: value
+        for key, value in context.items()
+        if key not in {
+            "baseline_pids",
+            "fixture_pids",
+            "fixture_kind",
+            "run_id",
+            "root",
+        }
+    }
     return f"{prompt}\nParamètres exacts de la fixture : {json.dumps(public, ensure_ascii=False)}"
 
 
@@ -118,7 +139,13 @@ def oracle(oracle_id: str, context: dict[str, Any]) -> dict[str, Any]:
         created = sorted(current - baseline); passed = bool(created); evidence = {"new_process_count": len(created)}
         context["created_pids"] = created
     elif oracle_id == "oracle.notepad_absent":
-        pid = int(context["fixture_pid"]); passed = not psutil.pid_exists(pid); evidence = {"fixture_pid_running": not passed}
+        fixture_pids = [int(pid) for pid in context.get("fixture_pids") or []]
+        remaining = sorted(pid for pid in fixture_pids if psutil.pid_exists(pid))
+        passed = not remaining
+        evidence = {
+            "fixture_process_count": len(fixture_pids),
+            "remaining_fixture_process_count": len(remaining),
+        }
     elif oracle_id == "oracle.services_list_nonempty":
         count = _powershell_count("@(Get-Service).Count"); passed = count > 0; evidence = {"service_count": count}
     elif oracle_id == "oracle.system_info_complete":
@@ -158,6 +185,7 @@ def teardown(context: dict[str, Any]) -> dict[str, Any]:
     fixture_pid = context.get("fixture_pid")
     if fixture_pid:
         allowed_pids.add(int(fixture_pid))
+    allowed_pids.update(int(pid) for pid in context.get("fixture_pids") or [])
     process_name = str(context.get("process_name") or "").strip()
     baseline_pids = set(context.get("baseline_pids") or [])
 

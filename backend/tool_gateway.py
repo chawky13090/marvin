@@ -23,6 +23,7 @@ from policy_engine import (
 from repositories import tool_approvals
 from config import (
     CONDITIONAL_TOOL_SAFE_ACTIONS,
+    CONDITIONAL_TOOL_STANDARD_ACTIONS,
     DANGEROUS_TOOLS,
     PERMISSION_EXPERT,
     PERMISSION_SECURE,
@@ -38,6 +39,16 @@ def _conditional_mutation(tool_name: str, arguments: Mapping[str, Any]) -> bool:
         return False
     action = str(arguments.get("action") or "").strip().lower()
     return action not in safe_actions
+
+
+def _conditional_requires_confirmation(
+    tool_name: str, arguments: Mapping[str, Any]
+) -> bool:
+    standard_actions = CONDITIONAL_TOOL_STANDARD_ACTIONS.get(tool_name)
+    if standard_actions is None:
+        return False
+    action = str(arguments.get("action") or "").strip().lower()
+    return action not in standard_actions
 
 
 # Outils qui EXÉCUTENT une commande brute, et le nom de l'argument qui la porte.
@@ -217,7 +228,12 @@ async def execute_tool(
         )
     ):
         return ToolGatewayResult(_permission_denied(request.tool_name), False, 403)
-    dangerous_call = request.tool_name in DANGEROUS_TOOLS or conditional_mutation
+    conditional_confirmation = _conditional_requires_confirmation(
+        request.tool_name, arguments
+    )
+    dangerous_call = (
+        request.tool_name in DANGEROUS_TOOLS or conditional_confirmation
+    )
     if dangerous_call:
         # Le digest porte sur les arguments métier, jamais sur un booléen fabriqué
         # par le modèle. La preuve UI est recréée pour ce digest exact seulement.
@@ -330,6 +346,15 @@ async def execute_tool(
                 False,
                 409,
             )
+        arguments["confirmed"] = True
+    elif (
+        request.tool_name in CONDITIONAL_TOOL_STANDARD_ACTIONS
+        and conditional_mutation
+    ):
+        # La facade conserve sa propre barriere `confirmed` pour interdire les
+        # appels directs hors gateway. Une action Standard explicitement
+        # admise par action recoit ici la preuve produite par la politique;
+        # elle ne vient jamais du LLM ni des arguments utilisateur.
         arguments["confirmed"] = True
 
     started = time.monotonic()

@@ -33,6 +33,9 @@ CASES = (
     ),
     ("Crée un dossier projet Loïc dans la barre latérale.", "project_create"),
     ("Crée un répertoire physique C:\\Temp\\validation.", "file_create_folder"),
+    ("Crée le dossier exact demandé pour la fixture Forge.", "windows_task"),
+    ("Liste les processus actifs puis trie-les par mémoire.", "windows_task"),
+    ("Ferme le processus VMware et vérifie qu'il est arrêté.", "windows_task"),
     ("Affiche la date et l'heure actuelles.", "datetime_info"),
     ("Recherche les logiciels installables avec Winget.", "winget_search"),
     ("Liste le contenu du dossier distant par SSH.", "ssh_list_dir"),
@@ -87,6 +90,23 @@ def test_profiles_and_rollback() -> None:
     )
     assert legacy["discovery_schema"] == "legacy"
     assert all(not item["aliases"] for item in legacy["candidates"])
+
+    typed = _rank(
+        enhanced,
+        "Crée le dossier exact demandé pour la fixture Forge.",
+        limit=5,
+    )
+    assert "windows_task" in typed
+    assert typed.index("windows_task") < typed.index("computer_control") \
+        if "computer_control" in typed else True
+    assert "computer_control" not in typed
+
+    visual = _rank(
+        enhanced,
+        "Clique dans l'interface Windows après une capture d'écran.",
+        limit=10,
+    )
+    assert "computer_control" in visual
 
 
 def test_index_invalidation() -> None:

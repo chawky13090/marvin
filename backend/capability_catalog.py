@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable
+import unicodedata
 
 from tool_capability_ranking import build_catalog, rank_capabilities
 from capability_discovery import (
@@ -52,6 +53,41 @@ class CapabilityDescriptor:
 def _namespace(name: str) -> str:
     parts = [part for part in name.split("_") if part]
     return parts[0] if parts else "general"
+
+
+_VISUAL_DISCOVERY_TERMS = (
+    "clic",
+    "clique",
+    "souris",
+    "clavier",
+    "capture",
+    "screenshot",
+    "uia",
+    "interface",
+    "formulaire",
+    "bouton",
+    "navigateur",
+    "page web",
+)
+
+
+def _normalized_text(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", str(value or "").casefold())
+    return " ".join(
+        "".join(char for char in decomposed if not unicodedata.combining(char)).split()
+    )
+
+
+def _hide_visual_fallback_for_typed_query(
+    query: str,
+    names: list[str],
+) -> list[str]:
+    """Garde computer_control connu, mais hors slots pour une action typée."""
+    normalized = _normalized_text(query)
+    visual_requested = any(term in normalized for term in _VISUAL_DISCOVERY_TERMS)
+    if not visual_requested and "windows_task" in names:
+        return [name for name in names if name != "computer_control"]
+    return names
 
 
 class CapabilityCatalog:
@@ -160,16 +196,19 @@ class CapabilityCatalog:
         names: list[str] = []
         if exact_name in self._specifications:
             names.append(exact_name)
+        ranked_limit = min(20, max(bounded_limit, bounded_limit * 2))
         for name, _score in rank_capabilities(
             normalized_query,
             self._ranking_catalog,
-            limit=bounded_limit,
+            limit=ranked_limit,
             min_score=1.5,
         ):
             if name not in names:
                 names.append(name)
-            if len(names) >= bounded_limit:
+            if len(names) >= ranked_limit:
                 break
+        names = _hide_visual_fallback_for_typed_query(normalized_query, names)
+        names = names[:bounded_limit]
         return {
             "query": normalized_query,
             "count": len(names),

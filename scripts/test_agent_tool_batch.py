@@ -121,6 +121,7 @@ async def main() -> int:
                 name=name,
                 arguments=dict(arguments),
                 read_signature="forge:project",
+                canonicalized_from="legacy_test_forge",
             ),
             inject_internal_context=lambda _name, arguments, conversation_id: {
                 **arguments,
@@ -153,6 +154,7 @@ async def main() -> int:
     assert events[2]["evidence"]["proof_recorded"] is True
     assert events[2]["evidence"]["sequence"] == 23
     assert events[0]["args"]["path"] == "project-repris"
+    assert events[0]["canonicalizedFrom"] == "legacy_test_forge"
     assert read_signatures == {"forge:project"}
     assert runner.blocking[0][0] == "ai_test_forge"
     assert long_chains == [("teste", 1)]

@@ -4039,8 +4039,13 @@ TOOLS_SPEC = [
             "filesystem.create_folder", "filesystem.rename", "filesystem.copy"
         ]},
         "target": {"type": "string", "description": "Application ou dossier cible selon l'action"},
+        "url": {"type": "string", "description": "URL optionnelle pour lancer un navigateur sur une page"},
         "pid": {"type": "integer", "minimum": 1, "description": "PID exact pour process.stop"},
         "name": {"type": "string", "description": "Nom du processus si le PID est inconnu"},
+        "sort_by": {"type": "string", "enum": ["memory", "cpu", "name"], "description": "Tri de process.list"},
+        "filter": {"type": "string", "description": "Filtre de nom pour service.list"},
+        "status": {"type": "string", "enum": ["running", "stopped", "paused", "start_pending", "stop_pending"], "description": "Etat filtre pour service.list"},
+        "query": {"type": "string", "description": "Filtre de logiciel pour software.list"},
         "source": {"type": "string", "description": "Chemin source exact pour rename/copy"},
         "destination": {"type": "string", "description": "Chemin destination exact pour rename/copy"},
         "confirmed": {"type": "boolean", "description": "Injecté uniquement par le gateway après autorisation"}

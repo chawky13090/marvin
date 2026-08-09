@@ -272,6 +272,9 @@ async def _execute_parallel_group(
         )
         tool_call["function"]["name"] = prepared.name
         db_call["toolName"] = prepared.name
+        canonicalized_from = getattr(prepared, "canonicalized_from", "")
+        if canonicalized_from:
+            db_call["canonicalizedFrom"] = canonicalized_from
         prepared_calls.append((tool_call, db_call, prepared))
 
     for _tool_call, db_call, prepared in prepared_calls:
@@ -280,6 +283,7 @@ async def _execute_parallel_group(
             "toolCallId": db_call["toolCallId"],
             "toolName": prepared.name,
             "args": prepared.arguments,
+            "canonicalizedFrom": getattr(prepared, "canonicalized_from", "") or None,
         }
 
     event_queue: asyncio.Queue[tuple[str, str, str, Any]] = asyncio.Queue(maxsize=256)
@@ -559,6 +563,9 @@ async def execute_tool_batch(
         read_signature = prepared.read_signature
         tool_call["function"]["name"] = tool_name
         db_call["toolName"] = tool_name
+        canonicalized_from = getattr(prepared, "canonicalized_from", "")
+        if canonicalized_from:
+            db_call["canonicalizedFrom"] = canonicalized_from
         tool_call_id = db_call["toolCallId"]
 
         yield {
@@ -566,6 +573,7 @@ async def execute_tool_batch(
             "toolCallId": tool_call_id,
             "toolName": tool_name,
             "args": arguments,
+            "canonicalizedFrom": canonicalized_from or None,
         }
 
         started_at = clock()

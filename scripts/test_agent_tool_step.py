@@ -43,6 +43,29 @@ def main() -> int:
     assert computer.arguments["capture_before"] is True
     assert computer.arguments["embed"] == "invalide"
 
+    process = prepare_tool_call(
+        "pc_process_kill", {"pid": "4242", "confirmed": True}
+    )
+    assert process.name == "windows_task"
+    assert process.canonicalized_from == "pc_process_kill"
+    assert process.arguments == {"action": "process.stop", "pid": "4242"}
+
+    app = prepare_tool_call(
+        "pc_app_launch", {"app_name": "firefox", "url": "https://example.com/"}
+    )
+    assert app.name == "windows_task"
+    assert app.arguments == {
+        "action": "application.launch",
+        "target": "firefox",
+        "url": "https://example.com/",
+    }
+
+    visual = prepare_tool_call(
+        "computer_control", {"action": "click", "x": 10, "y": 20}
+    )
+    assert visual.name == "computer_control"
+    assert visual.canonicalized_from == ""
+
     browser = prepare_tool_call(
         "web_browser_open",
         {"target": "https://example.com/", "max_chars": "30000"},

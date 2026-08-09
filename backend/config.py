@@ -210,3 +210,20 @@ CONDITIONAL_TOOL_SAFE_ACTIONS: dict[str, frozenset[str]] = {
     "os_hibernation": frozenset({"status"}),
     "os_network_adapters": frozenset({"list", "status"}),
 }
+
+# Actions conditionnelles admises en niveau Standard sans confirmation. Elles
+# restent interdites en niveau Securise si elles ne figurent pas dans la liste
+# de lecture ci-dessus. Cette separation evite de confondre « reversible » et
+# « lecture seule » tout en preservant le comportement historique des pilotes.
+CONDITIONAL_TOOL_STANDARD_ACTIONS: dict[str, frozenset[str]] = {
+    **CONDITIONAL_TOOL_SAFE_ACTIONS,
+    "windows_task": CONDITIONAL_TOOL_SAFE_ACTIONS["windows_task"]
+    | frozenset(
+        {
+            "application.launch",
+            "filesystem.create_folder",
+            "filesystem.rename",
+            "filesystem.copy",
+        }
+    ),
+}

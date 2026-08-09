@@ -67,6 +67,23 @@ def main() -> int:
         fixtures.teardown(context)
         assert not root.exists()
 
+    # Le Bloc-notes empaqueté peut remplacer le PID du lanceur. L'oracle doit
+    # suivre toute instance apparue depuis le setup, pas seulement ce premier PID.
+    original_pid_exists = fixtures.psutil.pid_exists
+    process_context = {
+        "fixture_pid": 22,
+        "fixture_pids": [22],
+    }
+    try:
+        fixtures.psutil.pid_exists = lambda pid: pid == 22
+        still_running = fixtures.oracle("oracle.notepad_absent", process_context)
+        assert still_running["passed"] is False
+        assert still_running["evidence"]["remaining_fixture_process_count"] == 1
+        fixtures.psutil.pid_exists = lambda _pid: False
+        assert fixtures.oracle("oracle.notepad_absent", process_context)["passed"] is True
+    finally:
+        fixtures.psutil.pid_exists = original_pid_exists
+
     agent_source = (ROOT / "backend" / "agent.py").read_text(encoding="utf-8")
     assert 'os.getenv("MARVIN_FORGE_ROUTING_ONLY", "0") == "1"' in agent_source
     assert "and _context_decision.forge_locked" in agent_source

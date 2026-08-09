@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import contextmanager
+import ctypes
 import hashlib
 import json
 import os
@@ -33,6 +35,50 @@ CORTEX = {
     "output": "chat",
     "pinned": True,
 }
+
+WINDOWS_TASK_DRIVERS = frozenset({
+    "pc_process_list",
+    "pc_app_launch",
+    "pc_process_kill",
+    "win_services_list",
+    "win_firewall_status",
+    "win_network_config",
+    "winget_list_installed",
+    "file_create_folder",
+    "file_rename",
+    "file_copy",
+})
+
+
+@contextmanager
+def _campaign_mutex(output: Path):
+    """Interdit deux producteurs Windows sur le même artefact E2E Forge."""
+    identity = hashlib.sha256(
+        str(output.resolve()).casefold().encode("utf-8")
+    ).hexdigest()
+    name = f"Local\\MarvinForgeE2E-{identity}"
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = (
+        ctypes.c_void_p,
+        ctypes.c_bool,
+        ctypes.c_wchar_p,
+    )
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.ReleaseMutex.argtypes = (ctypes.c_void_p,)
+    kernel32.ReleaseMutex.restype = ctypes.c_bool
+    kernel32.CloseHandle.argtypes = (ctypes.c_void_p,)
+    kernel32.CloseHandle.restype = ctypes.c_bool
+    handle = kernel32.CreateMutexW(None, True, name)
+    if not handle:
+        raise OSError(ctypes.get_last_error(), "Création du mutex Forge impossible")
+    if ctypes.get_last_error() == 183:
+        kernel32.CloseHandle(handle)
+        raise RuntimeError("Une campagne Forge écrit déjà cet artefact.")
+    try:
+        yield
+    finally:
+        kernel32.ReleaseMutex(handle)
+        kernel32.CloseHandle(handle)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -88,6 +134,7 @@ async def _probe(
     scenario: dict[str, Any],
     run: int,
     model: str,
+    execution_policy: str,
 ) -> dict[str, Any]:
     run_id = f"e2e-{scenario['id']}-{run}"
     context = fixtures.setup(str(scenario["fixture_id"]), run_id=run_id)
@@ -96,9 +143,16 @@ async def _probe(
     conversation_id = ""
     selected_tools: list[str] = []
     target_capability = str(scenario["required_capabilities"][0])
+    effective_target_capability = (
+        "windows_task"
+        if execution_policy == "windows_task"
+        and target_capability in WINDOWS_TASK_DRIVERS
+        else target_capability
+    )
     target_completion_claimed = False
     target_tool_failed = False
     incidental_tool_failed = False
+    confirmation_required_count = 0
     forge_locked = False
     model_exact = False
     terminal = "stream_ended"
@@ -131,8 +185,18 @@ async def _probe(
                     if name:
                         selected_tools.append(name)
                 elif event_type == "tool_end":
+                    result = event.get("result")
+                    contract = result.get("_contract") if isinstance(result, dict) else None
+                    if isinstance(result, dict) and (
+                        result.get("requiresConfirmation") is True
+                        or (
+                            isinstance(contract, dict)
+                            and contract.get("error_code") == "CONFIRMATION_REQUIRED"
+                        )
+                    ):
+                        confirmation_required_count += 1
                     target_claim, target_failure, incidental_failure = (
-                        _classify_tool_end(event, target_capability)
+                        _classify_tool_end(event, effective_target_capability)
                     )
                     target_completion_claimed |= target_claim
                     target_tool_failed |= target_failure
@@ -162,6 +226,7 @@ async def _probe(
         "run": run,
         "family": scenario["family"],
         "target_capability": target_capability,
+        "effective_target_capability": effective_target_capability,
         "terminal": terminal,
         "selected_tools": selected_tools,
         "forge_locked": forge_locked,
@@ -169,6 +234,8 @@ async def _probe(
         "target_completion_claimed": target_completion_claimed,
         "target_tool_failed": target_tool_failed,
         "incidental_tool_failed": incidental_tool_failed,
+        "confirmation_required_count": confirmation_required_count,
+        "redundant_confirmation_count": max(0, confirmation_required_count - 1),
         "oracle_passed": oracle_passed,
         "false_success": target_completion_claimed and not oracle_passed,
         "target_false_failure": target_tool_failed and oracle_passed,
@@ -200,6 +267,12 @@ def _summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
             or not bool(row["teardown_clean"])
             for row in results
         ),
+        "confirmation_required_count": sum(
+            int(row.get("confirmation_required_count") or 0) for row in results
+        ),
+        "redundant_confirmation_count": sum(
+            int(row.get("redundant_confirmation_count") or 0) for row in results
+        ),
         "median_duration_ms": (
             sorted(row["duration_ms"] for row in results)[len(results) // 2]
             if results
@@ -222,7 +295,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     scenarios = [item for item in contract["scenarios"] if item["split"] == "development"]
     expected_runs = len(scenarios) * args.runs
     payload = {
-        "schema": "marvin.windows-operator-e2e-baseline/1.2",
+        "schema": (
+            "marvin.windows-task-e2e-candidate/1.0"
+            if args.execution_policy == "windows_task"
+            else "marvin.windows-operator-e2e-baseline/1.2"
+        ),
         "status": "running",
         "split": "development",
         "model": model,
@@ -230,9 +307,24 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "scenario_corpus_sha256": manifest["files"]["live-scenarios.json"],
         "cortex": CORTEX,
         "runs_per_scenario": args.runs,
+        "execution_policy": args.execution_policy,
         "expected_runs": expected_runs,
         "results": [],
     }
+    if args.execution_policy == "windows_task":
+        payload["source_hashes"] = {
+            "agent.py": _sha256(BACKEND / "agent.py"),
+            "agent_tool_batch.py": _sha256(BACKEND / "agent_tool_batch.py"),
+            "agent_tool_step.py": _sha256(BACKEND / "agent_tool_step.py"),
+            "capability_catalog.py": _sha256(BACKEND / "capability_catalog.py"),
+            "capability_discovery.py": _sha256(BACKEND / "capability_discovery.py"),
+            "config.py": _sha256(BACKEND / "config.py"),
+            "tool_gateway.py": _sha256(BACKEND / "tool_gateway.py"),
+            "tools.py": _sha256(BACKEND / "tools.py"),
+            "windows_task.py": _sha256(BACKEND / "windows_task.py"),
+            "fixtures.py": _sha256(BACKEND / "windows_operator_fixtures.py"),
+            "e2e_runner.py": _sha256(Path(__file__)),
+        }
     if output.is_file():
         existing = _read_json(output)
         identity = (
@@ -242,7 +334,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             "scenario_corpus_sha256",
             "cortex",
             "runs_per_scenario",
+            "execution_policy",
         )
+        if args.execution_policy == "windows_task":
+            identity += ("source_hashes",)
         if any(existing.get(key) != payload.get(key) for key in identity):
             raise ValueError("La reprise ne correspond pas au manifeste gelé.")
         payload = existing
@@ -254,7 +349,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             for run in range(1, args.runs + 1):
                 if (scenario["id"], run) in completed:
                     continue
-                payload["results"].append(await _probe(client, scenario, run, model))
+                payload["results"].append(
+                    await _probe(client, scenario, run, model, args.execution_policy)
+                )
                 payload["results"].sort(
                     key=lambda row: (row["scenario_id"], row["run"])
                 )
@@ -271,8 +368,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runs", type=int, choices=range(1, 6), default=5)
     parser.add_argument("--timeout", type=float, default=900)
+    parser.add_argument(
+        "--execution-policy",
+        choices=("baseline", "windows_task"),
+        default="baseline",
+    )
     parser.add_argument("--output", required=True)
-    result = asyncio.run(_run(parser.parse_args()))
+    args = parser.parse_args()
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = ROOT / output
+    with _campaign_mutex(output):
+        result = asyncio.run(_run(args))
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result["status"] == "complete" else 2
 

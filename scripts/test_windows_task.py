@@ -6,6 +6,7 @@ import asyncio
 import shutil
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 
@@ -18,10 +19,16 @@ import action_replay
 import tool_gateway
 import tools
 import windows_task
-from config import CONDITIONAL_TOOL_SAFE_ACTIONS
+from config import (
+    CONDITIONAL_TOOL_SAFE_ACTIONS,
+    CONDITIONAL_TOOL_STANDARD_ACTIONS,
+    PERMISSION_SECURE,
+    PERMISSION_STANDARD,
+)
 
 
 async def _run() -> None:
+    policy_conversation_id = f"windows-task-policy-{uuid.uuid4()}"
     calls: list[tuple[str, dict]] = []
 
     async def process_list(args):
@@ -94,6 +101,18 @@ async def _run() -> None:
     for action in windows_task.READ_ACTIONS:
         result = await windows_task.execute({"action": action})
         assert result["success"] is True and result["effect_verified"] is True
+
+    await windows_task.execute({"action": "process.list", "sort_by": "cpu"})
+    await windows_task.execute(
+        {"action": "service.list", "filter": "print", "status": "running"}
+    )
+    await windows_task.execute({"action": "software.list", "query": "VLC"})
+    assert ("pc_process_list", {"sort_by": "cpu"}) in calls
+    assert (
+        "win_services_list",
+        {"filter": "print", "status": "running"},
+    ) in calls
+    assert ("winget_list_installed", {"query": "VLC"}) in calls
 
     launched = await windows_task.execute(
         {"action": "application.launch", "target": "notepad", "confirmed": True}
@@ -168,8 +187,83 @@ async def _run() -> None:
         item["function"]["name"] == "windows_task" for item in tools.TOOLS_SPEC
     )
     assert CONDITIONAL_TOOL_SAFE_ACTIONS["windows_task"] == windows_task.READ_ACTIONS
+    assert CONDITIONAL_TOOL_STANDARD_ACTIONS["windows_task"] == (
+        windows_task.READ_ACTIONS
+        | {
+            "application.launch",
+            "filesystem.create_folder",
+            "filesystem.rename",
+            "filesystem.copy",
+        }
+    )
     assert tool_gateway._conditional_mutation("windows_task", {"action": "process.list"}) is False
     assert tool_gateway._conditional_mutation("windows_task", {"action": "process.stop"}) is True
+    assert tool_gateway._conditional_mutation("windows_task", {"action": "filesystem.copy"}) is True
+    assert tool_gateway._conditional_requires_confirmation(
+        "windows_task", {"action": "filesystem.copy"}
+    ) is False
+    assert tool_gateway._conditional_requires_confirmation(
+        "windows_task", {"action": "process.stop"}
+    ) is True
+    windows_task.configure(
+        {
+            "pc_process_list": process_list,
+            "pc_app_launch": app_launch,
+            "pc_process_kill": process_kill,
+            "win_services_list": services,
+            "win_firewall_status": firewall,
+            "win_network_config": network,
+            "winget_list_installed": software,
+            "file_create_folder": create_folder,
+            "file_rename": rename,
+            "file_copy": copy,
+        }
+    )
+    specification = [
+        item for item in tools.TOOLS_SPEC
+        if item["function"]["name"] == "windows_task"
+    ]
+
+    class Database:
+        @staticmethod
+        def log_execution(*_args, **_kwargs):
+            return None
+
+    async def gateway_call(action_args, permission_level):
+        return await tool_gateway.execute_tool(
+            tool_gateway.ToolGatewayRequest(
+                tool_name="windows_task",
+                arguments=action_args,
+                source="test",
+                permission_level=permission_level,
+                conversation_id=policy_conversation_id,
+            ),
+            registry={"windows_task": windows_task.execute},
+            specifications=specification,
+            database=Database,
+            normalizer=lambda _name, result, **_kwargs: result,
+            audit_logger=lambda *_args, **_kwargs: None,
+        )
+
+    standard_launch = await gateway_call(
+        {"action": "application.launch", "target": "notepad"},
+        PERMISSION_STANDARD,
+    )
+    assert standard_launch.executed is True
+    assert standard_launch.result.get("effect_verified") is True, standard_launch.result
+    assert standard_launch.result.get("requiresConfirmation") is not True
+    secure_launch = await gateway_call(
+        {"action": "application.launch", "target": "notepad"},
+        PERMISSION_SECURE,
+    )
+    assert secure_launch.executed is False
+    assert secure_launch.result.get("permission_denied") is True
+    standard_stop = await gateway_call(
+        {"action": "process.stop", "pid": 4242},
+        PERMISSION_STANDARD,
+    )
+    assert standard_stop.executed is False
+    assert standard_stop.result.get("requiresConfirmation") is True
     assert action_replay.should_guard("windows_task") is True
     assert all("script" not in arguments and "command" not in arguments for _, arguments in calls)
 

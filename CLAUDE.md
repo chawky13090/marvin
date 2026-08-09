@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-09 : **v2.601.0, 364 outils, 391 routes FastAPI**.
+État courant au 2026-08-09 : **v2.602.0, 364 outils, 391 routes FastAPI**.
 
 Forge Cloud utilise le verrou `marvin.forge-runtime-lock/1.1` : tag et digest exacts,
 version Ollama, capacité déclarée, absence de `num_ctx` et empreinte de la sonde longue sont
@@ -28,13 +28,14 @@ calculé depuis le modèle et le matériel, vérifié sur un Ollama isolé puis 
 Doctor lit `/api/ps`; la capacité Cloud est déclarative et une sonde de rétention séparée
 la vérifie fonctionnellement sans jamais envoyer de `num_ctx`. La calibration locale n'accepte
 un modèle que si cinq réponses finales exactes passent; une occurrence dans sa réflexion est
-insuffisante. Le contrat pré-enregistré du
-L'opérateur Windows mesuré est dans `backend/windows_task.py`; il compile dix actions typées
+insuffisante. L'opérateur Windows mesuré est dans `backend/windows_task.py`; il compile dix actions typées
 vers des exécuteurs connus et vérifie leur effet. `computer_control` reste visible uniquement
 pour les gestes réellement visuels (capture, UIA, clic, saisie et navigation interactive).
 Les preuves et le corpus gelé restent dans `benchmarks/windows-operator/v1.1/`.
-installable sur d'autres Windows 11 sans dépendre des caches privés d'un agent ou de chemins
-liés à la machine de développement.
+Les anciens appels Windows sont canonisés vers cette façade quand leur intention est typée;
+le contrôle visuel ne doit plus consommer un emplacement de classement pour ces demandes.
+Le projet reste installable sur d'autres Windows 11 sans dépendre des caches privés d'un agent
+ou de chemins liés à la machine de développement.
 
 Les objectifs non négociables sont la compétence réelle, la liberté de raisonnement des LLM,
 la validation du résultat métier, la conservation des fonctions et un harnais renforcé pour

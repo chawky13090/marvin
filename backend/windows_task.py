@@ -68,10 +68,29 @@ def _required_text(args: dict[str, Any], field: str) -> str:
 
 
 def _compile(action: str, args: dict[str, Any]) -> dict[str, Any]:
+    if action == "process.list":
+        sort_by = str(args.get("sort_by") or "memory").strip().casefold()
+        if sort_by not in {"memory", "cpu", "name"}:
+            raise ValueError("Parametre 'sort_by' invalide.")
+        return {"sort_by": sort_by}
+    if action == "service.list":
+        compiled = {}
+        if str(args.get("filter") or "").strip():
+            compiled["filter"] = str(args["filter"]).strip()
+        if str(args.get("status") or "").strip():
+            compiled["status"] = str(args["status"]).strip().casefold()
+        return compiled
+    if action == "software.list":
+        query = str(args.get("query") or "").strip()
+        return {"query": query} if query else {}
     if action in READ_ACTIONS:
         return {}
     if action == "application.launch":
-        return {"app_name": _required_text(args, "target")}
+        compiled = {"app_name": _required_text(args, "target")}
+        url = str(args.get("url") or "").strip()
+        if url:
+            compiled["url"] = url
+        return compiled
     if action == "process.stop":
         pid = args.get("pid")
         name = str(args.get("name") or "").strip()

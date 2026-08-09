@@ -767,6 +767,17 @@ async def _run_deterministic_agent(
             for call in tool_calls_found
             if str(call.get("function", {}).get("name") or "") != "tool_search"
         ]
+        benchmark_original_names: list[str] = []
+        benchmark_compiled_names: list[str] = []
+        for _benchmark_call in benchmark_action_calls:
+            _benchmark_function = _benchmark_call.get("function", {})
+            _benchmark_name = str(_benchmark_function.get("name") or "")
+            benchmark_original_names.append(_benchmark_name)
+            _benchmark_prepared = _prepare_tool_call(
+                _benchmark_name,
+                _benchmark_function.get("arguments") or {},
+            )
+            benchmark_compiled_names.append(_benchmark_prepared.name)
         if (
             benchmark_action_calls
             and os.getenv("MARVIN_FORGE_ROUTING_ONLY", "0") == "1"
@@ -778,10 +789,15 @@ async def _run_deterministic_agent(
             yield _sse(
                 {
                     "type": "benchmark_routing",
-                    "toolNames": [
-                        str(call.get("function", {}).get("name") or "")
-                        for call in benchmark_action_calls
-                    ],
+                    "toolNames": benchmark_compiled_names,
+                    "originalToolNames": benchmark_original_names,
+                    "canonicalizedCount": sum(
+                        original != compiled
+                        for original, compiled in zip(
+                            benchmark_original_names,
+                            benchmark_compiled_names,
+                        )
+                    ),
                 }
             )
             return
@@ -883,6 +899,19 @@ async def _run_deterministic_agent(
                 ),
             ):
                 yield _sse(_event)
+            # Une approbation en attente termine le tour. Relancer le modele
+            # provoquerait une seconde carte pour le meme mandat alors qu'aucun
+            # texte ne peut valider la premiere. La reprise se fait uniquement
+            # apres le clic UI, dans un nouveau tour explicitement autorise.
+            if _runner_state.pending_confirmations:
+                _completion = await _finish_turn(
+                    "",
+                    "pending_confirmation",
+                    learn=False,
+                )
+                for _event in _completion.events:
+                    yield _event
+                return
             if (
                 _is_cloud_model(_decision_model)
                 and len(_runner_state.successful_calls)

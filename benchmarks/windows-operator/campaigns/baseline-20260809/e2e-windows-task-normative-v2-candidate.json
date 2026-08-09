@@ -1,0 +1,1515 @@
+{
+  "schema": "marvin.windows-task-e2e-candidate/1.0",
+  "status": "complete",
+  "split": "development",
+  "model": "qwen3.5:397b-cloud",
+  "model_digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca",
+  "scenario_corpus_sha256": "b6fe4b6fa1daef9123ccb92dd74d3ed6ef1618c5c12e5d0bd33adc8c83b0b724",
+  "cortex": {
+    "effort": "standard",
+    "evidence": "none",
+    "review": "none",
+    "autonomy": "execute",
+    "privacy": "cloud",
+    "output": "chat",
+    "pinned": true
+  },
+  "runs_per_scenario": 5,
+  "execution_policy": "windows_task",
+  "expected_runs": 50,
+  "results": [
+    {
+      "scenario_id": "copy-file",
+      "run": 1,
+      "family": "file",
+      "target_capability": "file_copy",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task",
+        "file_info",
+        "file_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 31394,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 2,
+      "family": "file",
+      "target_capability": "file_copy",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26893,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 3,
+      "family": "file",
+      "target_capability": "file_copy",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26477,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 4,
+      "family": "file",
+      "target_capability": "file_copy",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task",
+        "file_info",
+        "file_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 41328,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "copy-file",
+      "run": 5,
+      "family": "file",
+      "target_capability": "file_copy",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task",
+        "file_info",
+        "file_info"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 33356,
+      "oracle_evidence": {
+        "hash_equal": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 1,
+      "family": "file",
+      "target_capability": "file_create_folder",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 28449,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 2,
+      "family": "file",
+      "target_capability": "file_create_folder",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25106,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 3,
+      "family": "file",
+      "target_capability": "file_create_folder",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25051,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 4,
+      "family": "file",
+      "target_capability": "file_create_folder",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26468,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "create-folder",
+      "run": 5,
+      "family": "file",
+      "target_capability": "file_create_folder",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 23848,
+      "oracle_evidence": {
+        "target_exists": true
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 1,
+      "family": "security",
+      "target_capability": "win_firewall_status",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 44339,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 2,
+      "family": "security",
+      "target_capability": "win_firewall_status",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 43763,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 3,
+      "family": "security",
+      "target_capability": "win_firewall_status",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 47015,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 4,
+      "family": "security",
+      "target_capability": "win_firewall_status",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 54765,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "firewall-status",
+      "run": 5,
+      "family": "security",
+      "target_capability": "win_firewall_status",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 59771,
+      "oracle_evidence": {
+        "profile_count": 3
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 1,
+      "family": "software",
+      "target_capability": "winget_list_installed",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 49089,
+      "oracle_evidence": {
+        "registry_entry_count": 128
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 2,
+      "family": "software",
+      "target_capability": "winget_list_installed",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 33123,
+      "oracle_evidence": {
+        "registry_entry_count": 128
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 3,
+      "family": "software",
+      "target_capability": "winget_list_installed",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 27972,
+      "oracle_evidence": {
+        "registry_entry_count": 128
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 4,
+      "family": "software",
+      "target_capability": "winget_list_installed",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 30172,
+      "oracle_evidence": {
+        "registry_entry_count": 128
+      }
+    },
+    {
+      "scenario_id": "installed-software",
+      "run": 5,
+      "family": "software",
+      "target_capability": "winget_list_installed",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 25790,
+      "oracle_evidence": {
+        "registry_entry_count": 128
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 1,
+      "family": "process",
+      "target_capability": "pc_process_kill",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": false,
+      "target_tool_failed": true,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": false,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 44180,
+      "oracle_evidence": {
+        "fixture_process_count": 1,
+        "remaining_fixture_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 2,
+      "family": "process",
+      "target_capability": "pc_process_kill",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": false,
+      "target_tool_failed": true,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": false,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 32208,
+      "oracle_evidence": {
+        "fixture_process_count": 1,
+        "remaining_fixture_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 3,
+      "family": "process",
+      "target_capability": "pc_process_kill",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "computer_control",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": false,
+      "target_tool_failed": false,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": false,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 38527,
+      "oracle_evidence": {
+        "fixture_process_count": 1,
+        "remaining_fixture_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 4,
+      "family": "process",
+      "target_capability": "pc_process_kill",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": false,
+      "target_tool_failed": true,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": false,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 31685,
+      "oracle_evidence": {
+        "fixture_process_count": 1,
+        "remaining_fixture_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "kill-fixture-process",
+      "run": 5,
+      "family": "process",
+      "target_capability": "pc_process_kill",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": false,
+      "target_tool_failed": true,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": false,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": false,
+      "duration_ms": 41847,
+      "oracle_evidence": {
+        "fixture_process_count": 1,
+        "remaining_fixture_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 1,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 45685,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 2,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 31758,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 3,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 52477,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 4,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 38700,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "launch-notepad",
+      "run": 5,
+      "family": "application",
+      "target_capability": "pc_app_launch",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "windows_task",
+        "windows_task",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": true,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": true,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 42404,
+      "oracle_evidence": {
+        "new_process_count": 1
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 1,
+      "family": "network",
+      "target_capability": "win_network_config",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 47502,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 2,
+      "family": "network",
+      "target_capability": "win_network_config",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "windows_task",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 73197,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 3,
+      "family": "network",
+      "target_capability": "win_network_config",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 41624,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 4,
+      "family": "network",
+      "target_capability": "win_network_config",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "computer_control",
+        "windows_task",
+        "computer_control"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": true,
+      "confirmation_required_count": 1,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": true,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 39339,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "network-config",
+      "run": 5,
+      "family": "network",
+      "target_capability": "win_network_config",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 56465,
+      "oracle_evidence": {
+        "adapter_count": 8
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 1,
+      "family": "process",
+      "target_capability": "pc_process_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 48110,
+      "oracle_evidence": {
+        "process_count": 402
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 2,
+      "family": "process",
+      "target_capability": "pc_process_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 49174,
+      "oracle_evidence": {
+        "process_count": 405
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 3,
+      "family": "process",
+      "target_capability": "pc_process_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 44653,
+      "oracle_evidence": {
+        "process_count": 405
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 4,
+      "family": "process",
+      "target_capability": "pc_process_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 53591,
+      "oracle_evidence": {
+        "process_count": 409
+      }
+    },
+    {
+      "scenario_id": "process-list",
+      "run": 5,
+      "family": "process",
+      "target_capability": "pc_process_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 55782,
+      "oracle_evidence": {
+        "process_count": 402
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 1,
+      "family": "file",
+      "target_capability": "file_rename",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 33258,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 2,
+      "family": "file",
+      "target_capability": "file_rename",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 29498,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 3,
+      "family": "file",
+      "target_capability": "file_rename",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 37301,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 4,
+      "family": "file",
+      "target_capability": "file_rename",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 26972,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "rename-file",
+      "run": 5,
+      "family": "file",
+      "target_capability": "file_rename",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 28305,
+      "oracle_evidence": {
+        "rename_complete": true
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 1,
+      "family": "service",
+      "target_capability": "win_services_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 39493,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 2,
+      "family": "service",
+      "target_capability": "win_services_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 53388,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 3,
+      "family": "service",
+      "target_capability": "win_services_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 51401,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 4,
+      "family": "service",
+      "target_capability": "win_services_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 40233,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    },
+    {
+      "scenario_id": "services-list",
+      "run": 5,
+      "family": "service",
+      "target_capability": "win_services_list",
+      "effective_target_capability": "windows_task",
+      "terminal": "done",
+      "selected_tools": [
+        "tool_search",
+        "windows_task"
+      ],
+      "forge_locked": true,
+      "model_exact": true,
+      "target_completion_claimed": true,
+      "target_tool_failed": false,
+      "incidental_tool_failed": false,
+      "confirmation_required_count": 0,
+      "redundant_confirmation_count": 0,
+      "oracle_passed": true,
+      "false_success": false,
+      "target_false_failure": false,
+      "recovered_incidental_failure": false,
+      "teardown_clean": true,
+      "passed": true,
+      "duration_ms": 49036,
+      "oracle_evidence": {
+        "service_count": 351
+      }
+    }
+  ],
+  "source_hashes": {
+    "agent.py": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+    "agent_tool_batch.py": "1787c8a8b6c7ec8df8f434a8aa8124df817c3a93c6133f37af361f9236be6202",
+    "agent_tool_step.py": "b10b14745b61d1cde3678d6ba5ad434e63464f835ee6de5b4f1c028998ec078a",
+    "capability_catalog.py": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+    "capability_discovery.py": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+    "config.py": "4b3695f0e62cc3c1274f357fbac32f47ee415d5ed73b6ee0c8f1eb456d38dfe2",
+    "tool_gateway.py": "c2922788ad430fdb3417f489580545c9c28ad7e497cc41f1acee6cbd25a09a78",
+    "tools.py": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+    "windows_task.py": "e61f1fe59539ac9ee503dbb8c938bfc8a619dbf9f06ce074f6469338608a9934",
+    "fixtures.py": "8b9bb077bfcffe0871275518cff6ceea90fabeba8324647e7cf6fecb5ba493fc",
+    "e2e_runner.py": "56a8eea4b6a4971d6f9a6b2441835077c6a28e8fac745869293079498a2fe15d"
+  },
+  "summary": {
+    "runs": 50,
+    "passed": 45,
+    "failed": 5,
+    "success_rate": 0.9,
+    "false_success_count": 0,
+    "target_false_failure_count": 1,
+    "recovered_incidental_failure_count": 2,
+    "technical_error_count": 0,
+    "cleanup_failure_count": 0,
+    "confirmation_required_count": 7,
+    "redundant_confirmation_count": 0,
+    "median_duration_ms": 40233
+  }
+}

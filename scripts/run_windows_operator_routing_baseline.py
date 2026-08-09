@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import contextmanager
+import ctypes
 import hashlib
 import json
 import os
@@ -18,6 +20,40 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "benchmarks" / "windows-operator" / "v1.1"
 CAMPAIGNS = (ROOT / "benchmarks" / "windows-operator" / "campaigns").resolve()
+_WINDOWS_TASK_FAMILIES = frozenset(
+    {"application_launch", "process_action", "process_inventory", "security_posture"}
+)
+
+
+@contextmanager
+def _campaign_mutex(output: Path):
+    """Interdit deux producteurs Windows sur le meme artefact Forge."""
+    identity = hashlib.sha256(
+        str(output.resolve()).casefold().encode("utf-8")
+    ).hexdigest()
+    name = f"Local\\MarvinForgeRouting-{identity}"
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = (
+        ctypes.c_void_p,
+        ctypes.c_bool,
+        ctypes.c_wchar_p,
+    )
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.ReleaseMutex.argtypes = (ctypes.c_void_p,)
+    kernel32.ReleaseMutex.restype = ctypes.c_bool
+    kernel32.CloseHandle.argtypes = (ctypes.c_void_p,)
+    kernel32.CloseHandle.restype = ctypes.c_bool
+    handle = kernel32.CreateMutexW(None, True, name)
+    if not handle:
+        raise OSError(ctypes.get_last_error(), "Creation du mutex Forge impossible")
+    if ctypes.get_last_error() == 183:
+        kernel32.CloseHandle(handle)
+        raise RuntimeError("Une campagne Forge ecrit deja cet artefact.")
+    try:
+        yield
+    finally:
+        kernel32.ReleaseMutex(handle)
+        kernel32.CloseHandle(handle)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -102,9 +138,16 @@ def _summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-async def _probe(client: httpx.AsyncClient, item: dict[str, Any], run: int, model: str) -> dict[str, Any]:
+async def _probe(
+    client: httpx.AsyncClient,
+    item: dict[str, Any],
+    run: int,
+    model: str,
+    routing_policy: str,
+) -> dict[str, Any]:
     started = time.monotonic()
     selected: list[str] = []
+    original_selected: list[str] = []
     locked = False
     observed_model = ""
     terminal = "stream_ended"
@@ -129,6 +172,11 @@ async def _probe(client: httpx.AsyncClient, item: dict[str, Any], run: int, mode
                 observed_model = str(event.get("model") or "")
             elif event_type == "benchmark_routing":
                 selected = [str(name) for name in event.get("toolNames") or [] if str(name)]
+                original_selected = [
+                    str(name)
+                    for name in event.get("originalToolNames") or selected
+                    if str(name)
+                ]
                 terminal = "tool_selection"
                 break
             elif event_type == "error":
@@ -138,6 +186,8 @@ async def _probe(client: httpx.AsyncClient, item: dict[str, Any], run: int, mode
                 terminal = "text_only"
                 break
     expected = set(item["expected_tools"])
+    if routing_policy == "windows_task" and item["family"] in _WINDOWS_TASK_FAMILIES:
+        expected = {"windows_task"}
     forbidden = set(item["forbidden_tools"])
     passed = (
         locked
@@ -151,6 +201,9 @@ async def _probe(client: httpx.AsyncClient, item: dict[str, Any], run: int, mode
         "family": item["family"],
         "terminal": terminal,
         "selected_tools": selected,
+        "original_selected_tools": original_selected,
+        "canonicalized": selected != original_selected,
+        "expected_tools_effective": sorted(expected),
         "expected_match": bool(expected & set(selected)) if expected else not selected,
         "forbidden_match": bool(forbidden & set(selected)),
         "forge_locked": locked,
@@ -174,19 +227,60 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     items = [item for item in corpus["items"] if item["split"] == args.split]
     expected_runs = len(items) * args.runs
     payload = {
-        "schema": "marvin.windows-operator-routing-baseline/1.1",
+        "schema": (
+            "marvin.windows-task-routing-candidate/1.0"
+            if args.routing_policy == "windows_task"
+            else "marvin.windows-operator-routing-baseline/1.1"
+        ),
         "status": "running",
         "split": args.split,
         "model": model,
         "model_digest": runtime["model_digest"],
         "corpus_sha256": manifest["files"]["intent-corpus.json"],
         "runs_per_intent": args.runs,
+        "routing_policy": args.routing_policy,
+        "concurrency": args.concurrency,
         "expected_runs": expected_runs,
         "results": [],
     }
+    if args.routing_policy == "windows_task":
+        payload["source_hashes"] = {
+            "agent.py": hashlib.sha256(
+                (ROOT / "backend" / "agent.py").read_bytes()
+            ).hexdigest(),
+            "agent_tool_step.py": hashlib.sha256(
+                (ROOT / "backend" / "agent_tool_step.py").read_bytes()
+            ).hexdigest(),
+            "agent_tool_selection.py": hashlib.sha256(
+                (ROOT / "backend" / "agent_tool_selection.py").read_bytes()
+            ).hexdigest(),
+            "capability_catalog.py": hashlib.sha256(
+                (ROOT / "backend" / "capability_catalog.py").read_bytes()
+            ).hexdigest(),
+            "capability_discovery.py": hashlib.sha256(
+                (ROOT / "backend" / "capability_discovery.py").read_bytes()
+            ).hexdigest(),
+            "tools.py": hashlib.sha256(
+                (ROOT / "backend" / "tools.py").read_bytes()
+            ).hexdigest(),
+            "windows_task.py": hashlib.sha256(
+                (ROOT / "backend" / "windows_task.py").read_bytes()
+            ).hexdigest(),
+            "routing_runner.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        }
     if output.is_file():
         existing = _read_json(output)
-        identity = ("model", "model_digest", "corpus_sha256", "split", "runs_per_intent")
+        identity = (
+            "model",
+            "model_digest",
+            "corpus_sha256",
+            "split",
+            "runs_per_intent",
+            "routing_policy",
+            "concurrency",
+        )
+        if args.routing_policy == "windows_task":
+            identity += ("source_hashes",)
         if any(existing.get(key) != payload.get(key) for key in identity):
             raise ValueError("La reprise ne correspond pas au manifeste gelé.")
         payload = existing
@@ -197,7 +291,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=httpx.Timeout(args.timeout, connect=5)) as client:
         async def worker(item: dict[str, Any], run: int) -> None:
             async with semaphore:
-                result = await _probe(client, item, run, model)
+                result = await _probe(client, item, run, model, args.routing_policy)
             async with lock:
                 payload["results"].append(result)
                 payload["results"].sort(key=lambda row: (row["intent_id"], row["run"]))
@@ -217,8 +311,19 @@ def main() -> int:
     parser.add_argument("--runs", type=int, choices=range(1, 6), default=3)
     parser.add_argument("--concurrency", type=int, choices=range(1, 5), default=2)
     parser.add_argument("--timeout", type=float, default=180)
+    parser.add_argument(
+        "--routing-policy",
+        choices=("baseline", "windows_task"),
+        default="baseline",
+        help="Attentes historiques ou facade windows_task pour ses familles prises en charge.",
+    )
     parser.add_argument("--output", required=True)
-    result = asyncio.run(_run(parser.parse_args()))
+    args = parser.parse_args()
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = ROOT / output
+    with _campaign_mutex(output):
+        result = asyncio.run(_run(args))
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result["status"] == "complete" else 2
 
@@ -226,6 +331,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, httpx.HTTPError) as exc:
+    except (OSError, RuntimeError, ValueError, httpx.HTTPError) as exc:
         print(f"Baseline Forge refusée : {exc}", file=sys.stderr)
         raise SystemExit(2)

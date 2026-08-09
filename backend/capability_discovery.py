@@ -89,6 +89,40 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         do_not_use_when=("le contenu doit être analysé par Marvin",),
         related_tools=("file_read", "pdf_read", "pc_reveal"),
     ),
+    "windows_task": DiscoveryProfile(
+        "Exécuter et vérifier une opération Windows typée",
+        aliases=(
+            "créer un dossier",
+            "créer le dossier",
+            "nouveau dossier physique",
+            "lister les processus",
+            "liste les processus actifs",
+            "trier les processus par mémoire",
+            "lancer une application",
+            "fermer un processus",
+            "lister les services windows",
+            "vérifier le pare-feu windows",
+            "afficher la configuration réseau",
+            "lister les logiciels installés",
+            "créer un dossier windows",
+            "renommer un fichier",
+            "copier un fichier",
+        ),
+        use_when=(
+            "une action Windows courante possède un exécuteur typé et une postcondition",
+            "le résultat doit être vérifié indépendamment après l'action",
+        ),
+        do_not_use_when=(
+            "interaction visuelle par clic, saisie, capture ou UIA",
+            "administration avancée non couverte par le contrat typé",
+        ),
+        related_tools=(
+            "computer_control",
+            "file_create_folder",
+            "pc_process_list",
+            "pc_process_kill",
+        ),
+    ),
     "computer_control": DiscoveryProfile(
         "Piloter visuellement le PC ou un navigateur",
         aliases=(
@@ -105,6 +139,7 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         do_not_use_when=(
             "un outil métier direct peut accomplir et vérifier la tâche",
             "une simple lecture de fichier ou commande suffit",
+            "windows_task couvre l'opération système ou fichier demandée",
         ),
         related_tools=(
             "pc_gui_read",

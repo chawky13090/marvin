@@ -5,6 +5,56 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.602.0 — Routage Windows canonique et autorisations sans doublon
+
+Demande : transformer l'opérateur Windows typé en parcours agentique réellement exploitable,
+laisser le LLM choisir et raisonner librement, mais empêcher les commandes arbitraires, les
+faux succès et les confirmations répétées. Chaque mesure devait être liée au code exact,
+répétable, réversible et compatible avec les profils Normal, Hyper local, Tout cloud et Ultra.
+
+Constats : la façade directe de v2.601 réussissait 50/50, mais le LLM pouvait encore choisir
+un ancien nom d'outil ou `computer_control`, transmettre un champ `confirmed` inventé et
+continuer son tour après la création d'une autorisation. Les premières campagnes candidates
+ont donc été rejetées : politique d'autorisation incorrecte, confirmation injectée au runtime,
+preuve source incomplète ou oracle Bloc-notes dépendant du cycle de vie d'une application
+Windows moderne. Ces artefacts ne constituent pas des preuves normatives.
+
+Décision : `agent_tool_step.py` canonise les intentions Windows historiques vers
+`windows_task`, projette uniquement les champs connus et supprime toute approbation fabriquée
+par le modèle. Le gateway reste l'unique autorité : lectures en mode Sécurisé, mutations
+réversibles sans confirmation redondante en Standard, arrêt de processus confirmé hors mandat
+Auto. Une autorisation en attente termine le tour avec `pending_confirmation`. Les événements
+de routage et d'outil conservent le nom original pour audit. `capability_discovery.py` décrit
+explicitement les dix actions et `capability_catalog.py` garde le pilote visuel découvrable
+seulement lorsqu'une interaction graphique est réellement demandée. La fixture de processus
+utilise un PID Python inerte possédé par la campagne, avec oracle et teardown indépendants.
+
+Mesures réelles liées aux empreintes sources : routage développement 240/240, exactitude 55 %
+contre 46,25 % (+8,75 points), zéro outil interdit; stabilité 57,5 % contre 61,25 % et médiane
+14 750 ms contre 10 887 ms, donc ces deux régressions diagnostiques restent visibles. Parcours
+bout en bout : 45/50 (90 %) contre 40/50 (80 %), soit 50 % de réduction du taux d'échec,
+zéro faux succès, zéro erreur technique, zéro fuite de fixture et zéro confirmation redondante.
+Les cinq échecs sont exactement les cinq arrêts de processus qui attendent légitimement
+l'approbation en mode Normal. Deux parcours réseau récupèrent un appel visuel incident; cette
+dette est inscrite sous TD-010 et doit être arbitrée par le holdout, pas masquée.
+
+Validation réelle : tests unitaires et intégration ciblés de l'opérateur, du gateway, de la
+canonisation, du batch, de la sélection, de la découverte, du corpus et du contrat Forge;
+contrôle d'architecture à 364/364 outils sous harnais et 391 routes. La campagne utilise le
+modèle Cloud exact verrouillé, cinq répétitions par scénario, setup/teardown automatique et
+oracles externes. Aucun secret, contenu personnel ou commande libre n'est ajouté aux logs;
+les preuves ne contiennent que décisions, identifiants de scénario, durées et empreintes.
+
+Sécurité : les entrées restent fermées par schéma, aucune chaîne PowerShell libre n'est
+acceptée, l'approbation vient uniquement du gateway et l'effet est vérifié hors du chemin de
+commande. Le mode Ultra conserve son mandat jusqu'à révocation sans affaiblir les autres modes.
+Le holdout fermé, la gate exhaustive et le test de rollback restent requis avant
+généralisation; v2.602 ne les sur-déclare pas.
+
+Rollback : réversion atomique du commit v2.602 puis redémarrage contrôlé de Marvin. Aucun
+schéma, secret, réglage machine ou donnée utilisateur n'est migré; les fixtures sont isolées
+dans un répertoire temporaire et leur nettoyage est vérifié à chaque répétition.
+
 ## 2026-08-09 — v2.601.0 — Opérateur Windows typé et preuve indépendante
 
 Demande : permettre au LLM d'agir librement sur Windows sans dépendre d'une boucle visuelle
