@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.591.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.592.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -213,7 +213,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.591.0)
+## 9. État actuel (v2.592.0)
+
+**v2.592 (calibration locale multi-architectures)** : le calcul du cache KV sélectionne
+désormais l'espace de métadonnées texte exact et exclut les tours vision/audio. Les dimensions
+de clé absentes sont dérivées de l'embedding et du nombre de têtes; une tête KV absente reçoit
+une borne supérieure prudente et les architectures hybrides utilisent leur intervalle réel
+d'attention. Une ambiguïté échoue fermée. Un smoke test réel interroge `/api/tags` et
+`/api/show`; les six modèles locaux génératifs installés produisent un candidat sans
+téléchargement ni modification de profil. Backend, frontend, Ollama et un parcours réel
+`tool_search` puis `calculator` ont été revérifiés après redémarrage. Rollback : réversion
+atomique du commit v2.592; aucun schéma, profil persistant, modèle ou donnée n'est modifié.
+Un cache Turbopack incohérent ayant servi `/api/status` en 404 a été conservé sous
+`.next.rollback-20260809-030119`; la reconstruction propre a restauré la route avant validation.
 
 **v2.591 (admission locale dynamique et Forge verrouillé)** : un profil local n'est plus
 réutilisé sur la seule identité de la machine. Le schéma 1.1 lie aussi le tag exact, son

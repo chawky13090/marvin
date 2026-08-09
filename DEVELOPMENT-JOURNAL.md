@@ -5,6 +5,37 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.592.0 — Calibration locale multi-architectures
+
+Demande : rendre les quatre profils de confidentialité résilients et portables, avec test et
+redémarrage à chaque tranche. La première dépendance est un calcul local fiable sur tous les
+modèles installés, sans confondre les architectures texte, vision et audio.
+
+Constats observés : l'ancien calcul ne fonctionnait que pour `qwen3:4b`; les dimensions de clé
+manquaient sur Qwen 2.5 Coder et Granite, tandis que Qwen 3.5 mélange attention hybride et tour
+vision. Les métadonnées réelles Ollama ont confirmé ces variantes. Une première exécution a
+également montré que Qwen 3.5 devait utiliser `full_attention_interval` pour ne pas surévaluer
+toutes les couches comme des couches d'attention.
+
+Décision : sélectionner l'unique namespace texte, échouer sur ambiguïté, dériver exactement
+`embedding_length / head_count`, borner prudemment les têtes KV absentes et compter les couches
+d'attention hybrides. L'estimation reste explicitement `estimated` dès qu'une dérivation est
+utilisée; `/api/ps` et la génération fonctionnelle restent nécessaires à toute certification.
+
+Validations réelles : test unitaire et compilation Python réussis; architecture 2.591 initiale
+à 363 outils/391 routes; matrice live réussie sur six modèles génératifs locaux; arrêt gracieux,
+redémarrage backend/frontend, Ollama connecté et intégration Search disponible; chat réel en
+Ultra ayant exécuté `tool_search`, puis `calculator(17*19)` avec preuve durable et résultat 323.
+Le premier redémarrage après changement de version a exposé un cache Turbopack incohérent :
+`/` répondait 200 mais `/api/status` 404. `.next` a été déplacé sans suppression vers
+`.next.rollback-20260809-030119`; une reconstruction Turbopack propre a rétabli `/api/status`,
+puis un second chat réel a exécuté `calculator(23*29)` et rendu 667.
+Aucun modèle, secret, schéma ou profil persistant n'a été modifié. Journalisation : aucune
+nouvelle donnée métier; le smoke n'imprime que tags, namespaces et statuts. Sécurité : les
+métadonnées viennent d'Ollama local, aucune instruction observée n'est exécutée.
+
+Rollback : réversion atomique du commit v2.592. Aucun rollback de données n'est requis.
+
 ## 2026-08-09 — v2.591.0 — Admission Ollama par mission et verrou runtime Forge
 
 Demande : poursuivre la feuille de route validée avec Claude sans lancer `windows_task` avant

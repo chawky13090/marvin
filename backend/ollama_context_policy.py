@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from typing import Any
 
 
@@ -34,6 +35,48 @@ def _numeric_metadata(model_info: dict[str, Any], suffix: str) -> float | None:
     return max(values) if values else None
 
 
+_NON_TEXT_NAMESPACES = (".vision.", ".audio.", ".image.", ".mmproj.", ".projector.")
+
+
+def _positive_number(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and float(value) > 0:
+        return float(value)
+    return None
+
+
+def _text_namespace(model_info: dict[str, Any]) -> str:
+    """Retourne l'unique espace de métadonnées du transformeur texte.
+
+    Les modèles multimodaux publient aussi ``*.vision.*`` ou ``*.audio.*``.
+    Une recherche globale par suffixe peut alors combiner deux architectures et
+    produire un budget KV faux. Une ambiguïté résiduelle échoue fermée.
+    """
+
+    candidates: set[str] = set()
+    for key, value in model_info.items():
+        normalized = str(key).casefold()
+        if any(marker in normalized for marker in _NON_TEXT_NAMESPACES):
+            continue
+        if normalized.endswith(".context_length") and _positive_number(value):
+            candidates.add(str(key)[: -len(".context_length")])
+    if not candidates:
+        for key, value in model_info.items():
+            normalized = str(key).casefold()
+            if any(marker in normalized for marker in _NON_TEXT_NAMESPACES):
+                continue
+            if normalized.endswith(".block_count") and _positive_number(value):
+                candidates.add(str(key)[: -len(".block_count")])
+    if len(candidates) != 1:
+        raise ContextPolicyError("text_namespace_ambiguous")
+    return next(iter(candidates))
+
+
+def _namespace_number(
+    model_info: dict[str, Any], namespace: str, field: str
+) -> float | None:
+    return _positive_number(model_info.get(f"{namespace}.{field}"))
+
+
 def extract_attention_shape(show_payload: dict[str, Any]) -> dict[str, Any]:
     """Extrait une forme KV standard et signale les architectures non prouvées.
 
@@ -45,14 +88,40 @@ def extract_attention_shape(show_payload: dict[str, Any]) -> dict[str, Any]:
     model_info = show_payload.get("model_info")
     if not isinstance(model_info, dict):
         raise ContextPolicyError("model_info_absent")
-    layer_count = _numeric_metadata(model_info, ".block_count")
-    kv_heads = _numeric_metadata(model_info, ".attention.head_count_kv")
-    key_length = _numeric_metadata(model_info, ".attention.key_length")
-    value_length = _numeric_metadata(model_info, ".attention.value_length")
+    namespace = _text_namespace(model_info)
+    derivations: list[str] = []
+    layer_count = _namespace_number(model_info, namespace, "block_count")
+    context_length = _namespace_number(model_info, namespace, "context_length")
+    attention_heads = _namespace_number(model_info, namespace, "attention.head_count")
+    kv_heads = _namespace_number(model_info, namespace, "attention.head_count_kv")
+    if kv_heads is None and attention_heads is not None:
+        # Borne supérieure prudente : une attention multi-query/groupée ne peut
+        # pas avoir davantage de têtes KV que de têtes de requête.
+        kv_heads = attention_heads
+        derivations.append("kv_head_count_from_attention_head_count_upper_bound")
+    key_length = _namespace_number(model_info, namespace, "attention.key_length")
+    if key_length is None:
+        embedding_length = _namespace_number(model_info, namespace, "embedding_length")
+        if embedding_length is not None and attention_heads is not None:
+            quotient = embedding_length / attention_heads
+            if quotient.is_integer():
+                key_length = quotient
+                derivations.append("key_length_from_embedding_length_div_head_count")
+    value_length = _namespace_number(model_info, namespace, "attention.value_length")
     if value_length is None:
         value_length = key_length
-    if not all((layer_count, kv_heads, key_length, value_length)):
+        if key_length is not None:
+            derivations.append("value_length_from_key_length")
+    if not all((layer_count, context_length, kv_heads, key_length, value_length)):
         raise ContextPolicyError("attention_shape_incomplete")
+
+    attention_layer_count = layer_count
+    attention_interval = _namespace_number(
+        model_info, namespace, "full_attention_interval"
+    )
+    if attention_interval and attention_interval > 1:
+        attention_layer_count = math.ceil(layer_count / attention_interval)
+        derivations.append("attention_layer_count_from_full_attention_interval")
 
     hybrid_markers = (
         "recurrent",
@@ -64,15 +133,20 @@ def extract_attention_shape(show_payload: dict[str, Any]) -> dict[str, Any]:
     hybrid_keys = sorted(
         str(key)
         for key in model_info
-        if any(marker in str(key).casefold() for marker in hybrid_markers)
+        if str(key).startswith(f"{namespace}.")
+        and any(marker in str(key).casefold() for marker in hybrid_markers)
     )
     return {
-        "status": "estimated" if hybrid_keys else "calculated",
-        "formula": "layers * kv_heads * (key_length + value_length) * bytes_per_element",
+        "status": "estimated" if hybrid_keys or derivations else "calculated",
+        "formula": "attention_layers * kv_heads * (key_length + value_length) * bytes_per_element",
+        "metadata_namespace": namespace,
         "layer_count": int(layer_count),
+        "attention_layer_count": int(attention_layer_count),
+        "context_length": int(context_length),
         "kv_head_count": int(kv_heads),
         "key_length": int(key_length),
         "value_length": int(value_length),
+        "derivations": derivations,
         "hybrid_metadata_keys": hybrid_keys,
     }
 
@@ -89,7 +163,7 @@ def kv_cache_bytes(
     if context_tokens <= 0 or parallel <= 0:
         raise ContextPolicyError("context_or_parallel_invalid")
     elements = (
-        int(shape["layer_count"])
+        int(shape.get("attention_layer_count") or shape["layer_count"])
         * int(shape["kv_head_count"])
         * (int(shape["key_length"]) + int(shape["value_length"]))
         * int(context_tokens)
@@ -117,9 +191,7 @@ def propose_context_candidates(
     if min(model_size_bytes, vram_budget_bytes, ram_available_bytes) <= 0:
         raise ContextPolicyError("memory_budget_invalid")
     shape = extract_attention_shape(show_payload)
-    max_context = int(
-        _numeric_metadata(show_payload.get("model_info") or {}, ".context_length") or 0
-    )
+    max_context = int(shape["context_length"])
     candidates = [value for value in CONTEXT_CANDIDATES if value <= max_context]
     if not candidates:
         raise ContextPolicyError("model_context_capacity_unknown")
