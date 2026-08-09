@@ -343,7 +343,9 @@ async def _run_deterministic_agent(
                 profile_name="agent",
                 active_model=active_model,
                 label=(
-                    f"☁️ Cloud strict · compétence {_skill['name']}"
+                    f"Cloud prioritaire · compétence {_skill['name']}"
+                    if _ultra and _is_cloud_model(active_model)
+                    else f"Continuité locale · compétence {_skill['name']}"
                     if _ultra
                     else f"🛠️ Compétence : {_skill['name']}"
                 ),
@@ -629,7 +631,8 @@ async def _run_deterministic_agent(
                     active_model=active_model,
                     profile_name=profile_name,
                     local_fallback_model=_local_fallback_model,
-                    ultra_cloud_only=_ultra,
+                    privacy_preset=_cr.get_privacy_preset(),
+                    local_continuity_allowed=_cr.allows_announced_local_continuity(),
                     is_cloud_model=_is_cloud_model,
                     already_attempted=_attempted_connectivity_fallback,
                 )

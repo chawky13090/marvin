@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.592.0**
+**Version 2.593.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 363 outils pour agir sur Windows, les
@@ -15,6 +15,13 @@ Voir `DESKTOP-AVATAR.md`.
 Le fonctionnement est local par défaut : Ollama exécute les modèles, SQLite conserve les
 données applicatives et Qdrant assure la recherche vectorielle. Le cloud est facultatif,
 explicitement activé et protégé par les modes de confidentialité de Marvin.
+
+Les quatre profils de confidentialité ont un contrat de résilience commun. Normal protège
+les données sensibles en local, Hyper sécurisé interdit le Cloud, Tout cloud privilégie le
+Cloud tout en conservant les données sensibles en local, et Ultra débridé autorise aussi ces
+données dans le Cloud. Une panne Cloud ne modifie jamais le profil ni les permissions : après
+des tentatives bornées entre modèles Cloud, Marvin utilise un modèle local certifié et expose
+un état de continuité dégradé dans le chat et les métadonnées des outils.
 
 ## Capacités principales
 

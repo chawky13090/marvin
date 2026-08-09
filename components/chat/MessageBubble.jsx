@@ -93,8 +93,10 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
     </div>
   ) : null;
 
-  const provenanceLabel = message.modelInfo?.privacyMode === 'ultra_cloud'
-    ? 'Cloud strict'
+  const provenanceLabel = message.modelInfo?.privacyMode === 'ultra_local_continuity'
+    ? 'Ultra · continuité locale'
+    : message.modelInfo?.privacyMode === 'ultra_cloud'
+    ? 'Cloud prioritaire'
     : message.modelInfo?.privacyMode === 'hyper_local'
       ? 'Local protégé'
       : message.modelInfo?.privacyMode === 'sensitive_local'

@@ -30,6 +30,9 @@ class FakeRouting:
     def is_cloud_only_mode(self):
         return self.cloud_only
 
+    def allows_announced_local_continuity(self):
+        return True
+
     def is_cloud_model(self, model):
         return model.endswith(":cloud")
 
@@ -89,7 +92,11 @@ async def main() -> None:
             "model": "primary:local",
             "provider": "ollama_local",
             "privacy_preset": "normal",
+            "cloud_preferred": False,
             "cloud_only": False,
+            "degraded": False,
+            "continuity_state": "nominal",
+            "switch_reason": None,
         }
 
         responses[:] = [
@@ -153,6 +160,32 @@ async def main() -> None:
     assert all(call["payload"]["model"].endswith(":cloud") for call in calls)
     await generation_runtime.close()
 
+    generation_runtime.configure(
+        routing=FakeRouting(cloud_only=True),
+        base_url="http://ollama",
+        model_profiles={"chat": {"model": "continuity:local"}},
+        sleep=lambda _seconds: asyncio.sleep(0),
+        client_factory=Client,
+    )
+    calls.clear()
+    with patch("httpx.AsyncClient", Client):
+        responses[:] = [
+            httpx.ReadTimeout("primary timeout"),
+            httpx.ReadTimeout("cloud alternate timeout"),
+            "local continuity",
+        ]
+        continuity = await generation_runtime.generate(
+            "diagnostic",
+            return_metadata=True,
+        )
+    assert continuity["model"] == "continuity:local"
+    assert continuity["privacy_preset"] == "ultra"
+    assert continuity["cloud_preferred"] is True
+    assert continuity["cloud_only"] is False
+    assert continuity["degraded"] is True
+    assert continuity["continuity_state"] == "local_continuity"
+    await generation_runtime.close()
+
     for bad_timeout in (0, 901, "invalid"):
         try:
             await generation_runtime.generate("x", timeout=bad_timeout)
@@ -168,7 +201,7 @@ async def main() -> None:
         cloud_only_unavailable=cloud_routing.CloudOnlyModelUnavailable,
     )
     assert tools._ollama_generate is generation_runtime.generate
-    assert generation_runtime.snapshot()["total"] == 1
+    assert generation_runtime.snapshot()["total"] == 2
     print(
         "Generation Runtime OK - routage, retry, timeout, repli Cloud, "
         "métriques sans contenu et façade."

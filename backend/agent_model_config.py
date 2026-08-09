@@ -28,6 +28,8 @@ class ModelConfig:
     lockdown: bool
     ultra_cloud_only: bool
     sensitive: bool
+    continuity_state: str = "nominal"
+    switch_reason: str | None = None
 
     def event(
         self,
@@ -38,17 +40,20 @@ class ModelConfig:
     ) -> dict[str, Any]:
         selected_model = active_model or self.active_model
         selected_profile = profile_name or self.profile_name
+        provider = "ollama_cloud" if is_cloud_model(selected_model) else "ollama_local"
+        resilience = cloud_routing.get_privacy_resilience()
+        degraded = self.continuity_state != "nominal" and provider == "ollama_local"
         privacy_mode = (
             "hyper_local"
             if self.lockdown
             else (
-                "ultra_cloud"
+                "ultra_local_continuity"
+                if self.ultra_cloud_only and provider == "ollama_local"
+                else "ultra_cloud"
                 if self.ultra_cloud_only
-                else (
-                    "sensitive_local"
-                    if self.sensitive and not is_cloud_model(selected_model)
-                    else "standard"
-                )
+                else "sensitive_local"
+                if self.sensitive and provider == "ollama_local"
+                else "standard"
             )
         )
         return {
@@ -56,10 +61,14 @@ class ModelConfig:
             "profile": selected_profile,
             "model": selected_model,
             "label": label or self.label,
-            "provider": "ollama_cloud" if is_cloud_model(selected_model) else "ollama_local",
+            "provider": provider,
             "privacyMode": privacy_mode,
             "privacyPreset": cloud_routing.get_privacy_preset(),
-            "cloudOnly": self.ultra_cloud_only,
+            "cloudPreferred": bool(resilience["cloud_preferred"]),
+            "cloudOnly": self.ultra_cloud_only and provider == "ollama_cloud",
+            "degraded": degraded,
+            "continuityState": self.continuity_state if degraded else "nominal",
+            "switchReason": self.switch_reason if degraded else None,
             "sensitive": self.sensitive,
         }
 
@@ -83,6 +92,7 @@ async def resolve_model_config(
     """Résout une fois le modèle du tour et son repli, avant la boucle d'outils."""
     lockdown = is_local_only_lockdown()
     ultra = (not lockdown) and is_ultra_unrestricted()
+    initial_cloud_unavailable = False
 
     if not requested_model or requested_model == "auto":
         await refresh_model_cache()
@@ -116,6 +126,12 @@ async def resolve_model_config(
             profile_name = "agent"
         temperature = _manual_temperature(active_model)
 
+    local_fallback_model = (
+        MODEL_PROFILES.get(profile_name, {}).get("model")
+        or MODEL_PROFILES.get("agent", {}).get("model")
+        or DEFAULT_MODEL
+    )
+
     if ultra:
         cloud_need = (
             "vision"
@@ -125,10 +141,14 @@ async def resolve_model_config(
                 or {"analysis": "reasoning", "agent": "agentic"}.get(profile_name, "general")
             )
         )
-        active_model = cloud_routing.require_cloud_model(
-            cloud_need,
-            requested_model=active_model if is_cloud_model(active_model) else None,
-        )
+        try:
+            active_model = cloud_routing.require_cloud_model(
+                cloud_need,
+                requested_model=active_model if is_cloud_model(active_model) else None,
+            )
+        except cloud_routing.CloudOnlyModelUnavailable:
+            active_model = local_fallback_model
+            initial_cloud_unavailable = True
 
     privacy = cortex_plan["resolved"]["privacy"]
     sensitive = is_sensitive_request(
@@ -147,14 +167,11 @@ async def resolve_model_config(
         if profile_name == "manual":
             profile_name = "agent"
 
-    local_fallback_model = (
-        MODEL_PROFILES.get(profile_name, {}).get("model")
-        or MODEL_PROFILES.get("agent", {}).get("model")
-        or DEFAULT_MODEL
-    )
     label = MODEL_PROFILES.get(profile_name, {}).get("label", f"🎯 {active_model}")
-    if ultra:
-        label = f"☁️ Cloud strict · {active_model}"
+    if ultra and initial_cloud_unavailable:
+        label = f"Continuité locale · {active_model}"
+    elif ultra:
+        label = f"Cloud prioritaire · {active_model}"
     elif profile_name == "manual":
         label = f"🎯 {active_model}"
 
@@ -167,4 +184,6 @@ async def resolve_model_config(
         lockdown=lockdown,
         ultra_cloud_only=ultra,
         sensitive=sensitive,
+        continuity_state=("local_continuity" if initial_cloud_unavailable else "nominal"),
+        switch_reason=("cloud_model_unavailable" if initial_cloud_unavailable else None),
     )

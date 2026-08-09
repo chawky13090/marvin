@@ -55,13 +55,38 @@ async def _run() -> None:
     ):
         ultra = await models.resolve_model_config(messages, "code sensible", "local:14b", _plan("local"))
     assert ultra.active_model == "kimi:cloud"
-    assert ultra.label == "☁️ Cloud strict · kimi:cloud"
+    assert ultra.label == "Cloud prioritaire · kimi:cloud"
     ultra_event = ultra.event()
     assert ultra_event["provider"] == "ollama_cloud"
     assert ultra_event["privacyMode"] == "ultra_cloud"
     assert ultra_event["cloudOnly"] is True
+    assert ultra_event["cloudPreferred"] is True
+    assert ultra_event["degraded"] is False
     assert ultra_event["sensitive"] is True
     require.assert_called_once_with("coding", requested_model=None)
+
+    with (
+        patch.object(models, "is_local_only_lockdown", return_value=False),
+        patch.object(models, "is_ultra_unrestricted", return_value=True),
+        patch.object(models, "is_cloud_model", side_effect=lambda name: name.endswith(":cloud")),
+        patch.object(models, "is_sensitive_request", return_value=True),
+        patch.object(models.cloud_routing, "detect_task", return_value="coding"),
+        patch.object(
+            models.cloud_routing,
+            "require_cloud_model",
+            side_effect=models.cloud_routing.CloudOnlyModelUnavailable("offline"),
+        ),
+    ):
+        ultra_local = await models.resolve_model_config(
+            messages, "code sensible", "local:14b", _plan("local")
+        )
+    assert ultra_local.active_model == ultra_local.local_fallback_model
+    ultra_local_event = ultra_local.event()
+    assert ultra_local_event["privacyPreset"] == "ultra"
+    assert ultra_local_event["provider"] == "ollama_local"
+    assert ultra_local_event["cloudOnly"] is False
+    assert ultra_local_event["degraded"] is True
+    assert ultra_local_event["continuityState"] == "local_continuity"
 
     with (
         patch.object(models, "is_local_only_lockdown", return_value=False),
@@ -146,7 +171,7 @@ def main() -> int:
             assert field in source
     import agent
     assert callable(agent._resolve_model_config)
-    print("Agent Model Config OK - auto, manuel, local, Ultra Cloud et façade.")
+    print("Agent Model Config OK - auto, manuel, local, Ultra Cloud et continuité.")
     return 0
 
 

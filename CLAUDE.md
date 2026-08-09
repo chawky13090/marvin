@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-09 : **v2.591.0, 363 outils, 391 routes FastAPI**.
+État courant au 2026-08-09 : **v2.593.0, 363 outils, 391 routes FastAPI**.
 
 Ce fichier est le point d'entrée court et portable. Les sources de vérité détaillées sont :
 
@@ -58,6 +58,10 @@ restent actifs. Caractériser le comportement avant toute extraction ou évoluti
 ## Modèles, modes et confidentialité
 
 Les quatre profils de confidentialité sont Normal, Hyper local, Tout cloud et Ultra débridé.
+Depuis v2.593, le profil, le fournisseur effectif et l'état de continuité sont distincts :
+Ultra reste Cloud prioritaire et autorise les données sensibles dans le Cloud, mais une panne
+globale déclenche un repli local annoncé après des tentatives bornées. Le profil et les droits
+ne sont jamais modifiés silencieusement.
 Ils restent distincts des niveaux d'autorisation. Ultra est strictement cloud et ne doit pas
 basculer silencieusement vers un modèle local. Normal et Hyper protègent les données sensibles
 selon leurs contrats. Council consulte cinq familles Ollama Cloud distinctes.

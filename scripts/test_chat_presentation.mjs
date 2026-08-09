@@ -123,8 +123,13 @@ assert.match(
 );
 assert.match(
   messageBubbleSource,
-  /privacyMode === 'ultra_cloud'[\s\S]*?'Cloud strict'/,
+  /privacyMode === 'ultra_cloud'[\s\S]*?'Cloud prioritaire'/,
   'la provenance Ultra Cloud doit être visible dans le chat',
+);
+assert.match(
+  messageBubbleSource,
+  /privacyMode === 'ultra_local_continuity'[\s\S]*?'Ultra · continuité locale'/,
+  'la continuité locale Ultra doit être visible dans le chat',
 );
 assert.match(
   messageBubbleSource,

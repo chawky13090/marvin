@@ -49,6 +49,7 @@ def _privacy_state() -> dict:
         "ultra_unrestricted": cloud_routing.is_ultra_unrestricted(),
         "cloud_only": cloud_routing.is_cloud_only_mode(),
         "privacy_preset": cloud_routing.get_privacy_preset(),
+        "resilience": cloud_routing.get_privacy_resilience(),
     }
 
 
@@ -67,15 +68,14 @@ async def set_privacy_preset(payload: PrivacyPresetRequest):
         )
     else:
         best = cloud_routing.pick_best_cloud_model("general")
-        if not best:
-            raise HTTPException(
-                status_code=409,
-                detail="Aucun modèle Ollama Cloud installé; preset cloud refusé sans repli local.",
-            )
         next_state.update(
             local_only_lockdown=False,
             cloud_enabled=True,
-            cloud_overrides={"agent": best, "chat": best, "analysis": best},
+            cloud_overrides=(
+                {"agent": best, "chat": best, "analysis": best}
+                if best
+                else previous.get("cloud_overrides", {})
+            ),
             ultra_unrestricted=payload.preset == "ultra",
         )
 

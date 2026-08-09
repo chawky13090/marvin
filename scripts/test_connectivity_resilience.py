@@ -98,7 +98,8 @@ def _check_local_fallback_decision() -> None:
         active_model="deepseek-v4-pro:cloud",
         profile_name="agent",
         local_fallback_model="qwen2.5:14b",
-        ultra_cloud_only=False,
+        privacy_preset="normal",
+        local_continuity_allowed=True,
         is_cloud_model=_is_cloud,
         already_attempted=False,
     )
@@ -110,21 +111,32 @@ def _check_local_fallback_decision() -> None:
     assert switch.event["switchReason"] == "cloud_connectivity_unavailable"
     assert switch.event["provider"] == "ollama_local"
 
-    # 2. Contrat Ultra cloud-only : JAMAIS de repli local, la panne reste visible.
-    assert policy.connectivity_local_fallback(**{**base, "ultra_cloud_only": True}) is None
+    # 2. Ultra conserve son profil et rend le repli local explicitement visible.
+    ultra = policy.connectivity_local_fallback(
+        **{**base, "privacy_preset": "ultra"}
+    )
+    assert ultra is not None
+    assert ultra.event["privacyPreset"] == "ultra"
+    assert ultra.event["degraded"] is True
+    assert ultra.event["cloudOnly"] is False
 
-    # 3. Anti-boucle : déjà tenté une fois ce tour, pas de deuxième bascule.
+    # 3. Un contrat qui interdit la continuité locale échoue explicitement.
+    assert policy.connectivity_local_fallback(
+        **{**base, "local_continuity_allowed": False}
+    ) is None
+
+    # 4. Anti-boucle : déjà tenté une fois ce tour, pas de deuxième bascule.
     assert policy.connectivity_local_fallback(**{**base, "already_attempted": True}) is None
 
-    # 4. Modèle déjà local : rien à faire.
+    # 5. Modèle déjà local : rien à faire.
     assert policy.connectivity_local_fallback(
         **{**base, "active_model": "qwen2.5:14b"}
     ) is None
 
-    # 5. Aucun repli configuré : pas de crash, pas de bascule.
+    # 6. Aucun repli configuré : pas de crash, pas de bascule.
     assert policy.connectivity_local_fallback(**{**base, "local_fallback_model": ""}) is None
 
-    # 6. Configuration incohérente (le "repli" est lui-même un modèle Cloud) : refusé.
+    # 7. Configuration incohérente (le "repli" est lui-même un modèle Cloud) : refusé.
     assert policy.connectivity_local_fallback(
         **{**base, "local_fallback_model": "glm-5.2:cloud"}
     ) is None
@@ -157,7 +169,7 @@ def main() -> int:
     _check_wired_after_cloud_retries_exhausted()
     print(
         "Connectivity Resilience OK - panne reseau classifiee, repli local de "
-        "continuite distinct de la confidentialite, contrat Ultra preserve."
+        "continuite distinct de la confidentialite, Ultra degrade explicitement."
     )
     return 0
 

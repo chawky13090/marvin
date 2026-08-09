@@ -19,6 +19,7 @@ import unicodedata
 from enum import StrEnum
 
 import database as db
+from privacy_resilience import policy_for
 
 
 def strip_accents(s: str) -> str:
@@ -376,8 +377,10 @@ def is_local_only_lockdown() -> bool:
 def is_ultra_unrestricted() -> bool:
     """Mode « Ultra débridé » : autorise les données sensibles dans le cloud.
 
-    Depuis v2.243, ce réglage porte aussi un contrat cloud-only pour les appels LLM
-    génératifs. Le garde-fou système de security.py reste indépendant et actif.
+    Le Cloud reste prioritaire pour les appels génératifs. Depuis v2.593, une panne
+    totale peut déclencher un repli local annoncé sans réactiver la protection des
+    données sensibles ni changer le profil. Le garde-fou système de security.py reste
+    indépendant et actif.
     """
     try:
         return bool(db.get_setting("ultra_unrestricted"))
@@ -390,12 +393,22 @@ class CloudOnlyModelUnavailable(RuntimeError):
 
 
 def is_cloud_only_mode() -> bool:
-    """True uniquement quand Ultra est actif et que le coupe-circuit local ne l'est pas.
+    """Indique la destination nominale Ultra, pas une interdiction de continuité.
 
     Si les deux réglages sont accidentellement vrais, Hyper local gagne. Cette priorité
     préserve le garde-fou de défense en profondeur ajouté antérieurement.
     """
     return is_ultra_unrestricted() and not is_local_only_lockdown()
+
+
+def get_privacy_resilience() -> dict[str, object]:
+    """Contrat public et machine-lisible du profil effectivement sélectionné."""
+    return policy_for(get_privacy_preset()).public_contract()
+
+
+def allows_announced_local_continuity() -> bool:
+    """True si une panne Cloud peut être compensée localement et annoncée."""
+    return policy_for(get_privacy_preset()).announced_local_continuity
 
 
 def get_privacy_preset() -> str:
@@ -461,17 +474,19 @@ def resolve_model(requested_model: str | None, profile: str = "agent",
     if lockdown:
         return requested_model if (requested_model and not is_cloud_model(requested_model)) else fallback
 
-    # Ultra est un contrat cloud-only, pas seulement une levée du filtre de sensibilité.
-    # Un choix manuel local, une image ou un modèle cloud retiré sont reroutés vers un
-    # cloud réellement installé. À défaut, on échoue clairement au lieu de masquer un
-    # repli sur qwen/llava local.
+    # Ultra garde le Cloud comme destination nominale et autorise les données sensibles.
+    # Si aucun tag Cloud n'est disponible, la continuité locale est explicite dans les
+    # métadonnées des runtimes appelants; le profil et les permissions ne changent pas.
     if is_cloud_only_mode():
         task = "vision" if has_images else (detect_task(text_for_sensitivity) or {
             "analysis": "reasoning",
             "agent": "agentic",
             "vision": "vision",
         }.get(profile, "general"))
-        return require_cloud_model(task, requested_model=requested_model)
+        try:
+            return require_cloud_model(task, requested_model=requested_model)
+        except CloudOnlyModelUnavailable:
+            return fallback
 
     ultra = is_ultra_unrestricted()
     sensitive = (not ultra) and is_sensitive_text(text_for_sensitivity)

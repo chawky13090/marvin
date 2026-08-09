@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-09 — v2.593.0 — Résilience des quatre profils de confidentialité
+
+Demande : optimiser dynamiquement Normal, Hyper sécurisé, Tout cloud et Ultra débridé pour
+maximiser résilience, portabilité et efficacité, sans réduire l'intelligence ni changer
+silencieusement le profil choisi. Chaque tranche doit être redémarrée et testée réellement.
+
+Constat : Ultra était encore un contrat `cloud-only` strict. Le Runner essayait des modèles
+Cloud alternatifs puis s'arrêtait, et les générateurs internes n'avaient aucun troisième
+repli. Les champs `cloudOnly` confondaient en outre le profil demandé et le fournisseur
+effectivement actif. La documentation de l'interface promettait explicitement l'échec hors
+ligne. Normal et Tout cloud disposaient déjà d'une continuité locale, mais sans contrat
+central partagé par les quatre profils.
+
+Décision : `privacy_resilience.py` devient le contrat déterministe unique des profils. Il
+sépare préférence Cloud, autorisation des données sensibles, obligation locale, continuité
+annoncée et permissions. Ultra reste Cloud prioritaire et conserve sa liberté sur les données
+sensibles; après des tentatives Cloud bornées il peut continuer localement sans devenir Hyper.
+Le Runner, les générateurs internes, l'API Settings et l'interface exposent l'état nominal ou
+dégradé. Aucun profil ni niveau d'autorisation n'est modifié automatiquement. Les retries
+restent bornés afin d'éviter une boucle sur un fournisseur en panne, conformément au principe
+de dégradation contrôlée du circuit breaker.
+
+Validation avant redémarrage : compilation Python; tests `test_privacy_resilience`,
+`test_connectivity_resilience`, `test_agent_model_config`, `test_generation_runtime`,
+`test_cloud_only_routing`, `test_privacy_model_matrix` et `test_agent_loop_policy`; contrôle
+d'architecture à 363 outils, 391 routes et 81 restrictions; ESLint ciblé sans erreur et avec
+quatre avertissements historiques de `MessageBubble.jsx`. Le redémarrage supervisé a atteint
+`ready` en 70,4 secondes avec backend 2.593.0, 363 outils, Ollama, SearXNG, HTTPS et frontend
+HTTP 200. Quatre conversations réelles ont ensuite produit une preuve durable de
+`calculator` : Normal `17*731=12427`, Hyper `17*733=12461`, Tout cloud
+`17*739=12563` et Ultra `17*743=12631` après découverte de l'outil. Les profils Cloud ont
+utilisé Ollama Cloud; Hyper a chargé `qwen3:4b` à 16 384 tokens. Le profil initial a été
+restauré exactement (`cloud_enabled=true`, `ultra_unrestricted=true`, coupe-circuit local
+désactivé et valeur historique `privacy_preset=null`). Le test a aussi établi une limite de
+performance non masquée : le tour Hyper local a pris environ douze minutes. Sa correction
+appartient à la tranche suivante sur le portefeuille local, sans invalider la réussite métier.
+
+Sécurité et logs : les autorisations et `security.py` sont indépendants et inchangés. Aucun
+secret, contenu utilisateur ou valeur sensible n'est ajouté aux logs. Les événements exposent
+uniquement profil, fournisseur, raison technique et état de continuité. Aucun retry infini,
+aucun changement de schéma, aucun téléchargement ni suppression de modèle dans cette tranche.
+
+Rollback : réversion atomique du commit v2.593 puis redémarrage contrôlé de Marvin. Comme les
+tests live restaurent le preset initial en `finally`, aucun rollback de donnée n'est attendu.
+
 ## 2026-08-09 — v2.592.0 — Calibration locale multi-architectures
 
 Demande : rendre les quatre profils de confidentialité résilients et portables, avec test et

@@ -76,7 +76,8 @@ def connectivity_local_fallback(
     active_model: str,
     profile_name: str,
     local_fallback_model: str,
-    ultra_cloud_only: bool,
+    privacy_preset: str,
+    local_continuity_allowed: bool,
     is_cloud_model: Callable[[str], bool],
     already_attempted: bool,
 ) -> ModelSwitch | None:
@@ -86,11 +87,11 @@ def connectivity_local_fallback(
     celui-ci se déclenche sur le CONTENU (donnée sensible), pas sur une panne.
     Avant cette fonction, un essaim de modèles Cloud tous injoignables (panne
     réseau, incident fournisseur) épuisait ses tentatives puis renvoyait une
-    erreur brute — aucun repli automatique n'existait pour la continuité. `Ultra
-    cloud-only` reste un contrat explicite du propriétaire : il n'est jamais
-    contourné, la panne y reste visible plutôt que masquée par un modèle local.
+    erreur brute — aucun repli automatique n'existait pour la continuité. Depuis
+    v2.593, le contrat central autorise aussi Ultra à poursuivre localement, mais
+    uniquement avec un événement dégradé explicite et sans changer le profil.
     """
-    if ultra_cloud_only or already_attempted:
+    if not local_continuity_allowed or already_attempted:
         return None
     if not is_cloud_model(active_model):
         return None
@@ -106,6 +107,12 @@ def connectivity_local_fallback(
             "model": local_fallback_model,
             "label": f"🔌 Repli local · {local_fallback_model}",
             "provider": "ollama_local",
+            "privacyPreset": privacy_preset,
+            "privacyMode": f"{privacy_preset}_local_continuity",
+            "cloudPreferred": privacy_preset in {"cloud_max", "ultra"},
+            "cloudOnly": False,
+            "degraded": True,
+            "continuityState": "local_continuity",
             "switchReason": "cloud_connectivity_unavailable",
             "switchMessage": (
                 "Connexion au Cloud indisponible après plusieurs tentatives : "

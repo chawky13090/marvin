@@ -220,7 +220,11 @@ export function ChatProvider({ children }) {
                     provider: event.provider,
                     privacyMode: event.privacyMode,
                     privacyPreset: event.privacyPreset,
+                    cloudPreferred: Boolean(event.cloudPreferred),
                     cloudOnly: Boolean(event.cloudOnly),
+                    degraded: Boolean(event.degraded),
+                    continuityState: event.continuityState,
+                    switchReason: event.switchReason,
                     sensitive: Boolean(event.sensitive),
                   },
                 };

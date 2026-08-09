@@ -1,4 +1,4 @@
-"""Régressions du contrat Ultra débridé cloud-only."""
+"""Régressions du contrat Ultra débridé cloud prioritaire et résilient."""
 from __future__ import annotations
 
 import asyncio
@@ -35,12 +35,11 @@ def test_resolution() -> None:
         patch.object(cloud_routing, "list_installed_cloud_models", return_value=[]),
         patch.object(cloud_routing, "pick_best_cloud_model", return_value=None),
     ):
-        try:
-            cloud_routing.resolve_model("qwen2.5:14b", profile="agent")
-        except cloud_routing.CloudOnlyModelUnavailable:
-            pass
-        else:
-            raise AssertionError("Ultra ne doit jamais revenir silencieusement au local")
+        assert cloud_routing.resolve_model(
+            "qwen2.5:14b",
+            profile="agent",
+            local_fallback="qwen2.5:14b",
+        ) == "qwen2.5:14b"
 
     # Le coupe-circuit Hyper local reste prioritaire si la base contient un état incohérent.
     with (
@@ -92,7 +91,11 @@ def test_internal_cloud_fallback() -> None:
         "model": "glm-5.2:cloud",
         "provider": "ollama_cloud",
         "privacy_preset": "ultra",
+        "cloud_preferred": True,
         "cloud_only": True,
+        "degraded": False,
+        "continuity_state": "nominal",
+        "switch_reason": None,
     }
     assert calls == ["deepseek-v4-pro:cloud", "glm-5.2:cloud"]
     assert all(cloud_routing.is_cloud_model(model) for model in calls)
@@ -152,6 +155,21 @@ def test_atomic_presets() -> None:
         assert store["ultra_unrestricted"] is False
         assert store["privacy_preset"] == "normal"
 
+    # Un profil Cloud reste sélectionnable hors ligne : il démarre alors en
+    # continuité locale annoncée au lieu de modifier silencieusement le choix.
+    with (
+        patch.object(settings_api.db, "get_setting", side_effect=get_setting),
+        patch.object(settings_api.db, "set_setting", side_effect=set_setting),
+        patch.object(cloud_routing, "pick_best_cloud_model", return_value=None),
+    ):
+        offline_ultra = asyncio.run(
+            settings_api.set_privacy_preset(
+                settings_api.PrivacyPresetRequest(preset="ultra")
+            )
+        )
+    assert offline_ultra["privacy_preset"] == "ultra"
+    assert offline_ultra["resilience"]["announced_local_continuity"] is True
+
 
 def main() -> int:
     test_resolution()
@@ -163,8 +181,8 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     assert "duplicate_poll_blocked" in dispatch_source
     assert "_dispatch_tool" in source
-    assert "Cloud strict · compétence" in source
-    print("Cloud-only OK - chat, vision, outils internes, presets et absence de repli local.")
+    assert "Cloud prioritaire · compétence" in source
+    print("Cloud priority OK - chat, vision, outils internes, presets et continuité locale.")
     return 0
 
 

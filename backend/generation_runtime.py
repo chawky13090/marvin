@@ -23,6 +23,8 @@ class Routing(Protocol):
 
     def is_cloud_only_mode(self) -> bool: ...
 
+    def allows_announced_local_continuity(self) -> bool: ...
+
     def is_cloud_model(self, model: str) -> bool: ...
 
     def get_privacy_preset(self) -> str: ...
@@ -183,16 +185,29 @@ def _record(
         _stats["last_error_type"] = None if error is None else type(error).__name__[:80]
 
 
-def _metadata(text: str, model: str) -> dict[str, Any]:
+def _metadata(
+    text: str,
+    model: str,
+    *,
+    fallback_reason: str | None = None,
+) -> dict[str, Any]:
     assert _routing is not None
+    preset = _routing.get_privacy_preset()
+    provider = "ollama_cloud" if _routing.is_cloud_model(model) else "ollama_local"
+    cloud_preferred = preset in {"cloud_max", "ultra"}
+    if preset == "ultra" and provider == "ollama_local" and not fallback_reason:
+        fallback_reason = "cloud_model_unavailable"
+    degraded = bool(fallback_reason) and provider == "ollama_local"
     return {
         "text": text,
         "model": model,
-        "provider": (
-            "ollama_cloud" if _routing.is_cloud_model(model) else "ollama_local"
-        ),
-        "privacy_preset": _routing.get_privacy_preset(),
-        "cloud_only": _routing.is_cloud_only_mode(),
+        "provider": provider,
+        "privacy_preset": preset,
+        "cloud_preferred": cloud_preferred,
+        "cloud_only": _routing.is_cloud_only_mode() and provider == "ollama_cloud",
+        "degraded": degraded,
+        "continuity_state": "local_continuity" if degraded else "nominal",
+        "switch_reason": fallback_reason,
     }
 
 
@@ -255,19 +270,33 @@ async def generate(
         text_for_sensitivity=prompt,
         has_images=bool(images),
     )
+    try:
+        local_light = _model_profiles.get("chat", {}).get("model") or "qwen2.5:3b"
+    except Exception:
+        local_light = "qwen2.5:3b"
+    fallback_models: list[str] = []
     if _routing.is_cloud_only_mode():
         need = "vision" if images else (_routing.detect_task(prompt) or "general")
         try:
-            light = _routing.require_cloud_model(need, exclude=frozenset({primary}))
+            cloud_alternate = _routing.require_cloud_model(
+                need,
+                exclude=frozenset({primary}),
+            )
+            if cloud_alternate != primary:
+                fallback_models.append(cloud_alternate)
         except _cloud_only_unavailable:
-            light = None
+            pass
+        if (
+            _routing.allows_announced_local_continuity()
+            and local_light
+            and not _routing.is_cloud_model(local_light)
+            and local_light != primary
+        ):
+            fallback_models.append(local_light)
     else:
-        try:
-            light = _model_profiles.get("chat", {}).get("model") or "qwen2.5:3b"
-        except Exception:
-            light = "qwen2.5:3b"
+        if local_light and local_light != primary:
+            fallback_models.append(local_light)
     light_timeout = max(30, min(timeout_value, 60))
-    has_light_fallback = bool(light) and light != primary
 
     attempts = 0
     retried = False
@@ -321,21 +350,31 @@ async def generate(
             except Exception as retry_error:
                 last_error = retry_error
 
-    if has_light_fallback:
+    for fallback_model in fallback_models:
         fallback_used = True
-        final_model = light
+        final_model = fallback_model
         try:
             attempts += 1
             text = await _call(
-                model=light,
+                model=fallback_model,
                 prompt=prompt,
                 images=images,
                 timeout=light_timeout,
             )
-            result = _metadata(text, light) if return_metadata else text
+            fallback_reason = (
+                "cloud_connectivity_unavailable"
+                if _routing.is_cloud_model(primary)
+                and not _routing.is_cloud_model(fallback_model)
+                else None
+            )
+            result = (
+                _metadata(text, fallback_model, fallback_reason=fallback_reason)
+                if return_metadata
+                else text
+            )
             _record(
                 success=True,
-                model=light,
+                model=fallback_model,
                 attempts=attempts,
                 retried=retried,
                 fallback_used=True,

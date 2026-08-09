@@ -239,8 +239,8 @@ export function ModelSettingsPanel({
             const PRESETS = [
               { id: 'normal', icon: '🛡️', label: 'Normal', tagline: 'Sécurisé — vous choisissez', color: '#f59e0b' },
               { id: 'hyper', icon: '🔒', label: 'Hyper sécurisé', tagline: '100% local, verrouillé', color: '#10b981' },
-              { id: 'cloud_max', icon: '☁️', label: 'Tout cloud', tagline: 'Vitesse maximale', color: '#06b6d4' },
-              { id: 'ultra', icon: '☠️', label: 'Ultra débridé', tagline: 'Aucune exception', color: '#ef4444' },
+              { id: 'cloud_max', icon: '☁️', label: 'Tout cloud', tagline: 'Cloud prioritaire, repli local', color: '#06b6d4' },
+              { id: 'ultra', icon: '☠️', label: 'Ultra débridé', tagline: 'Cloud libre, continuité locale', color: '#ef4444' },
             ];
             return (
             <div className="card" style={{ borderLeft: '4px solid #06b6d4', marginTop: '16px' }}>
@@ -280,7 +280,7 @@ export function ModelSettingsPanel({
                   padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)',
                   borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: 'var(--font-xs)', color: 'var(--text-secondary)', lineHeight: 1.6,
                 }}>
-                  ☠️ <strong>Mode Ultra débridé actif — cloud strict</strong> : tous les appels LLM génératifs, y compris vision, compétences et replis, restent dans Ollama Cloud. Si le cloud est indisponible, Marvin échoue explicitement au lieu de basculer sur un modèle local. Emails, SSH, mots de passe et factures peuvent partir au cloud. Le garde-fou système contre les commandes destructrices reste actif.
+                  ☠️ <strong>Mode Ultra débridé actif — cloud prioritaire</strong> : les appels LLM, y compris les données sensibles, utilisent Ollama Cloud en priorité. Après épuisement borné des modèles Cloud, Marvin poursuit avec un modèle local certifié et affiche clairement l’état dégradé. Le profil et les autorisations ne changent pas. Le garde-fou système contre les commandes destructrices reste indépendant.
                 </div>
               )}
 

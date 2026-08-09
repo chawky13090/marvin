@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.592.0, 363 outils, 391 routes.** Architecture dans
+> **État courant : v2.593.0, 363 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.590.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.593.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,21 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.592.0)
+## 9. État actuel (v2.593.0)
+
+**v2.593 (résilience des profils de confidentialité)** : `privacy_resilience.py` sépare le
+profil choisi, le fournisseur réellement utilisé et l'état de continuité. Normal reste
+hybride avec données sensibles locales; Hyper reste intégralement local; Tout cloud garde le
+Cloud prioritaire mais protège les données sensibles en local; Ultra autorise les données
+sensibles dans le Cloud sans devenir un verrou de disponibilité. Après des retries bornés et
+un modèle Cloud secondaire, une panne globale déclenche un repli local annoncé, sans changer
+le profil ni le niveau d'autorisation. Les événements Runner et les métadonnées des
+générations internes exposent `cloudPreferred`, `cloudOnly` effectif, `degraded`,
+`continuityState` et `switchReason`. Un preset Cloud reste sélectionnable hors ligne et reprend
+le Cloud au prochain tour disponible. Aucun garde-fou d'action destructrice n'est modifié.
+Rollback : réversion atomique du commit v2.593; aucune migration de données ni suppression de
+modèle n'est nécessaire.
+
 
 **v2.592 (calibration locale multi-architectures)** : le calcul du cache KV sélectionne
 désormais l'espace de métadonnées texte exact et exclut les tours vision/audio. Les dimensions
