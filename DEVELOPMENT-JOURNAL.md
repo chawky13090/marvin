@@ -43,6 +43,10 @@ de smoke rejoue désormais une seule fois les lectures GET sur un timeout unique
 trace explicite; aucune mutation POST n'est jamais rejouée. Un test négatif prouve que le second
 timeout reste bloquant et qu'une erreur non transitoire n'est pas rejouée. Cette correction
 durcit le runner de validation sans modifier les requêtes ni le comportement runtime de Marvin.
+Après intégration, la gate live complète passe 275/275 en 811 s sur Marvin v2.605 réellement
+servi; contrats HTTP 28/28, parcours pages, rendu chat et vocal sont verts. Le rollback du
+commit fonctionnel `1a8a094` a restitué exactement son parent v2.604 dans un worktree isolé,
+puis l'architecture restaurée a confirmé 364 outils, 391 routes et 364/364 harness.
 
 ## 2026-08-10 — v2.604.0 — Verdict Forge, rollback réel et empreintes portables
 
