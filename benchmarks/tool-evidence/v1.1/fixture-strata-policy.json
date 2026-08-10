@@ -1,0 +1,38 @@
+{
+  "schema": "marvin.fixture-strata/1.0",
+  "status": "preregistered_execution_locked",
+  "source_taxonomy_manifest": "e7-freeze-manifest.json",
+  "direct_fixture_pairs": [
+    "bulk_rename:apply", "bulk_rename:preview", "bulk_rename:rollback",
+    "code_workspace_control:cancel", "code_workspace_control:resume",
+    "code_workspace_start:__default__", "email_send:__default__",
+    "itsm_ticket_create:__default__", "long_task_start:__default__",
+    "memory_delete:__default__", "note_delete:__default__",
+    "pc_process_kill:__default__", "pc_pull_ollama_model:__default__",
+    "project_delete:__default__", "system_restore_point:__default__",
+    "task_delete:__default__", "tweak_debloat_remove:__default__",
+    "vm_lab_install:install", "vm_lab_install:status",
+    "winget_install:__default__", "winget_uninstall:__default__",
+    "winget_upgrade:__default__"
+  ],
+  "bounded_polymorphic_pairs": [
+    "catharsis_clean:__default__", "email_automation_run:__default__",
+    "event_delete:__default__", "file_delete:__default__",
+    "ssh_upload:__default__", "system_cleanup:__default__"
+  ],
+  "arbitrary_executor_pairs": [
+    "pc_gui_click:__default__", "pc_gui_type:__default__",
+    "pc_run_command:__default__", "pc_run_elevated:__default__",
+    "pc_run_powershell:__default__", "ssh_exec:__default__",
+    "ssh_exec_multi:__default__", "ssh_write_and_run:__default__"
+  ],
+  "rules": {
+    "direct_fixture_design_authorized": true,
+    "bounded_P_requires_scenario_refreeze": true,
+    "arbitrary_executor_effect_enumeration_forbidden": true,
+    "arbitrary_executor_requires_H7": true,
+    "H7_never_implies_E7": true,
+    "host_execution_forbidden": true,
+    "tool_execution_authorized": false
+  }
+}

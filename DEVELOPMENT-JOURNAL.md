@@ -5,6 +5,39 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.612.0 — Strates E7 et certification de harnais H7 gelées
+
+La revue croisée a montré que les 14 couples P ne peuvent pas être traités comme un ensemble
+homogène. Ils sont désormais séparés avant toute fixture : 6 actions polymorphes à scénarios
+finis devront être décomposées et regelées en R/C/I/N; 8 exécuteurs de commandes, SSH ou UI
+ont une charge utile arbitraire et ne seront jamais déclarés couverts par une énumération
+d'effets. Les 22 couples déjà classés R/C/I/N restent éligibles à la conception de fixtures.
+
+Une preuve distincte H7 est pré-enregistrée pour les huit exécuteurs arbitraires. Elle porte
+sur le harnais et non sur l'issue métier : appartenance au catalogue, validation de schéma,
+approbation liée au digest exact du payload, expiration et révocation, contrôle des arguments
+sensibles même en accès complet, élévation jamais auto-approuvée, contenu observé sans
+autorité, interruption bornée, redaction, idempotence et postcondition observable. Les modes
+d'autorisation Normal, Auto et Complet sont couverts; les profils de confidentialité Normal,
+Hyper, Tout cloud et Ultra restent orthogonaux et ne peuvent modifier la décision. H7 ne
+confère jamais E7; tout effet concret exige encore une classe R/C/I/N gelée.
+
+Sécurité et logs : le corpus contient 28 cas uniquement symboliques, aucune commande, cible,
+charge utile, donnée utilisateur ou secret. Aucun outil n'a été exécuté et l'hôte reste
+interdit. Les trois strates, la politique H7 et le corpus sont liés par SHA-256; le gate échoue
+si une source change sans regel. Rollback : réversion atomique du commit v2.612; aucune
+migration, donnée persistante ou configuration machine modifiée.
+
+Validation finale observée : contrôles ciblés H7/E7, runner, architecture, documentation et
+compilation réussis. Le gate canonique publie `success=true` : 279 étapes exécutées et
+réussies, quatre smokes live explicitement ignorés, zéro échec sur 283 attendues, en 727,7 s.
+L'arrêt préalable a été gracieux en 15,5 s sans processus forcé. Au redémarrage, le backend
+2.612.0 et ses 364 outils étaient sains mais le processus Next écoutait sans répondre; le
+script de redémarrage a correctement refusé de déclarer Marvin prêt après 155 s. Seul l'arbre
+frontend a été remplacé, puis `/api/status` a répondu HTTP 200. Les smokes live ont ensuite
+confirmé 28/28 contrats API, 41/41 pages, cinq conversations réelles et une voix strictement
+sérialisée. SearXNG est disponible sur son port dynamique 8890 et Ollama est disponible.
+
 ## 2026-08-10 — v2.611.0 — Taxonomie E7 gelée avant fixtures
 
 Les 36 couples dangereux ont été classés avant toute conception de fixture : R=6

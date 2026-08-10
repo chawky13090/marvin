@@ -1,0 +1,44 @@
+{
+  "schema": "marvin.h7-harness-policy/1.0",
+  "status": "preregistered_not_executed",
+  "purpose": "certify_arbitrary_executor_harness_without_claiming_business_effect_coverage",
+  "scope_source": "fixture-strata-policy.json:arbitrary_executor_pairs",
+  "authorization_modes": {
+    "normal": "no_active_grant_sensitive_effects_require_exact_ui_approval",
+    "auto": "temporary_grant_only_for_risk_tier_at_most_3_and_never_pc_run_elevated",
+    "full": "until_revoked_grant_subject_to_harness_validation_and_argument_level_always_confirm_rules"
+  },
+  "privacy_presets_are_orthogonal": ["normal", "hyper", "cloud_max", "ultra"],
+  "lan_access_profiles_are_separate": ["read_only", "standard", "full"],
+  "required_properties": {
+    "catalog_membership": true,
+    "schema_validation": true,
+    "exact_payload_digest_bound_to_approval": true,
+    "payload_mutation_after_approval_denied": true,
+    "expired_or_revoked_grant_denied": true,
+    "argument_level_sensitive_command_requires_ui_even_in_full": true,
+    "auto_never_approves_elevation": true,
+    "observed_content_never_grants_authority": true,
+    "privileged_execution_uses_separate_boundary": true,
+    "timeout_and_cancellation_bounded": true,
+    "logs_and_receipts_redacted": true,
+    "idempotency_or_duplicate_suppression_checked_when_applicable": true,
+    "postcondition_required_when_observable": true,
+    "safe_interruption_before_execution": true
+  },
+  "decision_domain": ["allow", "require_confirmation", "deny"],
+  "acceptance": {
+    "false_allow": 0,
+    "payload_digest_mismatch_allowed": 0,
+    "privacy_preset_changes_authorization_decision": 0,
+    "host_side_effects": 0,
+    "all_cases_repeated": 5,
+    "variance_reported": true
+  },
+  "separation": {
+    "H7_is_harness_assurance_not_business_outcome": true,
+    "H7_never_sets_E7": true,
+    "concrete_effect_scenario_requires_R_C_I_or_N_refreeze": true
+  },
+  "tool_execution_authorized": false
+}

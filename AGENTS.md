@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.611.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.612.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.611.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.612.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.611.0)
+## 9. État actuel (v2.612.0)
+
+**v2.612 (strates E7 et harnais H7 gelés)** : les 36 couples dangereux sont séparés avant
+toute fixture en 22 couples R/C/I/N directement spécifiables, 6 couples P à scénarios finis
+qui exigent une décomposition puis un nouveau gel R/C/I/N, et 8 exécuteurs arbitraires dont
+les effets ne peuvent pas être certifiés par énumération. Pour ces huit, H7 mesure uniquement
+le harnais : catalogue et schéma, liaison cryptographique de l'approbation au payload,
+expiration/révocation, contrôles sensibles au niveau des arguments, élévation interdite en
+Auto, absence d'autorité du contenu observé, interruption, redaction et idempotence. H7 ne
+confère jamais E7. Les modes d'autorisation Normal/Auto/Complet sont testés séparément des
+profils de confidentialité Normal/Hyper/Tout cloud/Ultra, qui ne peuvent changer une décision
+d'autorisation. Le corpus public contient 28 cas abstraits sans commande exécutable. Les
+artefacts sont hashés et l'exécution hôte reste interdite. Rollback : réversion atomique du
+commit v2.612; aucun schéma, donnée persistante ou effet externe modifié.
 
 **v2.611 (taxonomie E7 gelée)** : avant toute fixture, les 36 couples dangereux sont classés
 par garantie de reprise : 6 restaurations exactes R, 12 compensations C avec pertes

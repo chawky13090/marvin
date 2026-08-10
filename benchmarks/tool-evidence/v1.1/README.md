@@ -31,3 +31,13 @@ mesurée), I (irréversibilité intrinsèque confinée), N (aucune mutation) et 
 du payload). `e7-classification.json` couvre exactement les 36 couples de première vague.
 `e7-freeze-manifest.json` lie par SHA-256 politique, classification et candidats. P impose un
 nouveau gel du scénario concret en R/C/I/N et ne peut jamais valider E7 globalement.
+
+## Strates de fixtures et harnais H7
+
+`fixture-strata-policy.json` sépare les 36 couples en 22 couples R/C/I/N directement
+spécifiables, 6 couples P à scénarios finis et 8 exécuteurs arbitraires. Ces derniers ne sont
+pas certifiés par une liste nécessairement incomplète d'effets. `h7-harness-policy.json`
+pré-enregistre une preuve distincte H7 portant sur le harnais d'autorisation et d'exécution.
+H7 ne modifie jamais E7. `h7-adversarial-corpus.json` contient uniquement 28 cas abstraits :
+aucune commande, cible, donnée utilisateur ou charge utile exécutable. Le manifeste SHA-256
+verrouille ces sources avant toute conception de fixture ou exécution de harnais.
