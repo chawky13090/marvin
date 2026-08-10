@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.613.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.614.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.613.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.614.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.613.0)
+## 9. État actuel (v2.614.0)
+
+**v2.614 (dette readiness Code Workspace enregistrée)** : TD-011 conserve la preuve du 503
+transitoire observé immédiatement après le redémarrage v2.613, son risque, son propriétaire
+logique et son critère objectif de fermeture : readiness Code Workspace bornée et cinq
+redémarrages froids consécutifs sans faux état `ready`. Le test documentaire empêche la dette
+de disparaître du registre avant fermeture. Aucun comportement runtime, schéma ou donnée n'est
+modifié. Rollback : réversion atomique du commit v2.614.
 
 **v2.613 (mur H7 et plafond Auto mesurables)** : le corpus symbolique H7 passe de 28 à 30
 cas. Il exige maintenant qu'une commande classée catastrophique par `security.screen_command`

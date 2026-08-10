@@ -5,6 +5,16 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.614.0 — Dette readiness Code Workspace enregistrée
+
+Le 503 Code Workspace observé au premier smoke v2.613 était consigné chronologiquement mais
+absent du registre de dette. TD-011 l'enregistre désormais avec sévérité Moyenne, preuve,
+risque, propriétaire logique et fermeture falsifiable : le lanceur doit inclure une readiness
+Code Workspace bornée, distinguer initialisation et panne, puis réussir cinq redémarrages
+froids consécutifs sans déclarer `ready` avant un HTTP 200 sur `/api/coding/overview`. Le test
+de documentation exige TD-011 et son critère de cinq cycles. Aucun runtime, endpoint, donnée,
+secret ou log n'est modifié. Rollback : réversion atomique du commit v2.614.
+
 ## 2026-08-10 — v2.613.0 — Mur H7 et plafond Auto rendus mesurables
 
 La revue croisée a identifié deux propriétés déclarées mais absentes du corpus H7 : le refus

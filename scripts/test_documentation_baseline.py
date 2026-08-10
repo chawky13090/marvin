@@ -52,7 +52,9 @@ def main() -> int:
 
     assert f'TOOLS["{tool_count} outils"]' in architecture
     assert "aucune route métier" in architecture
-    assert "TD-001" in debt and "TD-007" in debt
+    assert "TD-001" in debt and "TD-007" in debt and "TD-011" in debt
+    assert "Readiness Code Workspace" in debt
+    assert "cinq redémarrages froids consécutifs" in debt
     assert "TECHNICAL-DEBT.md" in readme
     assert "FRONTEND-ARCHITECTURE.md" in readme
 
