@@ -5,6 +5,34 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.611.0 — Taxonomie E7 gelée avant fixtures
+
+Les 36 couples dangereux ont été classés avant toute conception de fixture : R=6
+restaurations exactes, C=12 compensations avec pertes résiduelles, I=2 effets
+intrinsèquement irréversibles confinés, N=2 actions sans mutation et P=14 exécuteurs ou
+actions dont l'effet dépend du payload. Ce dernier cas a été ajouté après lecture des schémas :
+forcer `pc_run_powershell`, `ssh_exec` ou `pc_gui_click` dans une classe unique aurait produit
+une preuve fausse. P ne valide jamais E7; chaque fixture doit d'abord geler son payload et sa
+classe finale R/C/I/N.
+
+Chaque classification expose justification, surface d'observation, delta attendu, chemins de
+restauration examinés et perte résiduelle. Le validateur interdit I quand l'irréversibilité
+n'est pas intrinsèque, exige une perte pour C, l'identité d'état pour R et zéro mutation pour
+N. Le manifeste hashé lie politique, classification et candidats; toute modification impose
+un regel. Aucun outil n'a été appelé, aucune fixture créée et l'exécution hôte reste interdite.
+Logs : seuls compteurs et empreintes non sensibles sont publiés. Sécurité : aucune cible,
+commande, secret ou contenu utilisateur dans les artefacts. Rollback : réversion atomique du
+commit v2.611; aucun schéma ni donnée persistante modifié.
+
+Validation finale observée : test causal du gel réussi avec 36/36 couples et répartition
+R=6, C=12, I=2, N=2, P=14; empreintes du manifeste relues. Architecture `2.611.0`, 364
+outils, 391 routes, 41 pages et harnais 364/364. Le gate canonique contient 282 étapes et
+confirme `success=true` : 278 exécutées et réussies, zéro échec, quatre smokes live
+explicitement ignorés. Compilation de 347 fichiers Python, baseline frontend inchangée et
+build Next.js 16.2.12 Turbopack réussi.
+Après redémarrage officiel, le backend répond `status=ok`, `version=2.611.0`, expose
+364/364 outils, Ollama est disponible et le frontend répond HTTP 200.
+
 ## 2026-08-10 — v2.610.0 — Tri-état des preuves et vague rollback prioritaire
 
 Revue croisée : v2.609 encodait E3, E4, E5 et E7 en `false` alors que les sources disponibles

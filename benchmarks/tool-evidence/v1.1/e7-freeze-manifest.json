@@ -1,0 +1,24 @@
+{
+  "schema": "marvin.e7-freeze-manifest/1.0",
+  "generated_at": "2026-08-10T19:56:13.858943+00:00",
+  "status": "frozen_before_fixture_design",
+  "source_hashes": {
+    "benchmarks/tool-evidence/v1.1/e7-taxonomy-policy.json": "191405fe190c8fdf4bba18552042892966d2cafa80dae376b7bf9ef448df92b6",
+    "benchmarks/tool-evidence/v1.1/e7-classification.json": "ca3aca2edc68853a1168e17bea52c8ea2cf165e05d686c21b57442c00cf918ff",
+    "benchmarks/tool-evidence/v1.1/campaign-b-candidates.json": "5eb8450ef91d03da8cbb37073a1f3daa272d90341acd6360b63723e1864c772e"
+  },
+  "summary": {
+    "classified_pairs": 36,
+    "class_counts": {
+      "C": 12,
+      "I": 2,
+      "N": 2,
+      "P": 14,
+      "R": 6
+    },
+    "execution_authorized": false
+  },
+  "fixture_design_authorized": true,
+  "tool_execution_authorized": false,
+  "refreeze_required_on_source_change": true
+}

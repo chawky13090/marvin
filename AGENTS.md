@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.610.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.611.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.610.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.611.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.610.0)
+## 9. État actuel (v2.611.0)
+
+**v2.611 (taxonomie E7 gelée)** : avant toute fixture, les 36 couples dangereux sont classés
+par garantie de reprise : 6 restaurations exactes R, 12 compensations C avec pertes
+résiduelles mesurables, 2 effets intrinsèquement irréversibles I, 2 lectures N et 14 outils
+polymorphes P dont la classe dépend du payload. P ne peut jamais obtenir E7 au niveau global;
+chaque scénario doit être regelé en R/C/I/N avant exécution. Une absence d'implémentation de
+rollback ne justifie jamais I. Chaque item déclare surface observée, delta attendu, chemins de
+restauration examinés et perte résiduelle. Les trois sources sont hashées dans un manifeste;
+tout changement impose un regel. Exécution hôte et outils restent verrouillés. Rollback :
+réversion atomique du commit v2.611; aucun schéma, donnée active ou effet externe modifié.
 
 **v2.610 (preuve tri-état et priorité rollback)** : v1 reste immuable et l'inventaire v1.1
 distingue maintenant `true`, `false` et `null`. E3, E4, E5 et E7 sont `unassessed` tant

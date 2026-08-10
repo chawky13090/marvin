@@ -1,0 +1,54 @@
+{
+  "schema": "marvin.e7-taxonomy-policy/1.0",
+  "status": "preregistered_not_executed",
+  "unit": "tool_plus_typed_action",
+  "classes": {
+    "R": "exact_state_restoration_replayed",
+    "C": "functional_compensation_with_residual_loss_measured",
+    "I": "intrinsically_irreversible_effect_constrained_to_declared_surface",
+    "N": "non_mutating_action_no_recovery_applicable",
+    "P": "payload_polymorphic_requires_scenario_refinement_before_fixture"
+  },
+  "invariants": {
+    "classification_precedes_fixture_design": true,
+    "classification_change_requires_refreeze": true,
+    "missing_rollback_implementation_never_justifies_I": true,
+    "I_requires_intrinsic_irreversibility": true,
+    "I_requires_predeclared_observation_surface": true,
+    "C_requires_measured_residual_loss": true,
+    "R_requires_pre_state_equals_restored_state": true,
+    "N_requires_no_mutating_branch": true,
+    "P_never_grants_E7_at_tool_action_level": true,
+    "P_scenario_must_freeze_to_R_C_I_or_N_before_execution": true,
+    "host_execution_forbidden": true,
+    "execution_authorized": false
+  },
+  "e7_record": {
+    "status": ["verified", "failed", "unassessed", "not_applicable"],
+    "class": ["R", "C", "I", "N", "P"],
+    "required_dimensions": [
+      "outcome",
+      "recovery",
+      "confinement",
+      "residual_loss",
+      "observation_surface"
+    ],
+    "aggregate_rule": "outcome_verified_and_class_specific_contract_verified",
+    "class_must_remain_visible_with_aggregate": true
+  },
+  "surface_profiles": {
+    "process_scope": ["pid", "process_table", "child_processes", "dependent_services", "listening_sockets"],
+    "filesystem_scope": ["tree", "path_identity", "sha256", "size", "timestamps", "acl"],
+    "database_scope": ["selected_rows", "foreign_keys", "row_counts", "logical_dump_hash"],
+    "software_scope": ["package_inventory", "files", "services", "scheduled_tasks", "user_settings"],
+    "windows_system_scope": ["services", "registry", "scheduled_tasks", "packages", "restore_points", "disk_usage"],
+    "remote_host_scope": ["filesystem", "processes", "services", "listening_sockets", "exit_status"],
+    "external_message_scope": ["sender", "recipients", "content_hash", "attachments_hash", "provider_receipt"],
+    "external_record_scope": ["record_id", "record_fields", "audit_history", "provider_receipt"],
+    "workspace_scope": ["mission_state", "job_state", "worktree_hash", "artifacts", "background_workers"],
+    "ui_scope": ["window_identity", "uia_tree", "focused_control", "control_value", "process_table", "filesystem_and_network_delta"],
+    "model_scope": ["ollama_inventory", "blob_inventory", "disk_usage", "running_models"],
+    "no_mutation_scope": ["input_snapshot", "output_hash", "system_delta"]
+  },
+  "execution_authorized": false
+}

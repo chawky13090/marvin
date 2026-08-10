@@ -23,3 +23,11 @@ $env:PYTHONIOENCODING = 'utf-8'
 
 Le script ouvre SQLite en lecture seule et publie les artefacts atomiquement. V1 reste
 immuable ; v1.1 possède ses propres empreintes et son propre contrat.
+
+## Taxonomie E7 gelée
+
+`e7-taxonomy-policy.json` définit R (restauration exacte), C (compensation avec perte
+mesurée), I (irréversibilité intrinsèque confinée), N (aucune mutation) et P (effet dépendant
+du payload). `e7-classification.json` couvre exactement les 36 couples de première vague.
+`e7-freeze-manifest.json` lie par SHA-256 politique, classification et candidats. P impose un
+nouveau gel du scénario concret en R/C/I/N et ne peut jamais valider E7 globalement.
