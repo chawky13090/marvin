@@ -1,0 +1,70 @@
+{
+  "schema": "marvin.tool-recovery-acceptance/1.0",
+  "status": "pre_registered_before_product_implementation",
+  "created_at": "2026-08-10",
+  "scope": "unknown tool name rediscovery without implicit execution",
+  "v1_1_reference": {
+    "kind": "strictly_verified_lower_bound",
+    "development": 0.2708,
+    "holdout": 0.2417,
+    "compatibility_upper_bounds_are_not_baselines": true
+  },
+  "independence": {
+    "product_registry_must_not_import_forge": true,
+    "forge_oracle_must_not_import_product_registry": true,
+    "direct_and_transitive_import_graph_enforced": true,
+    "shared_taxonomy_file_forbidden": true
+  },
+  "execution_contract": {
+    "unknown_name_is_advisory_input_only": true,
+    "implicit_substitution_execution_forbidden": true,
+    "new_native_tool_call_required": true,
+    "new_call_revalidates_schema_permissions_confirmation_idempotency_and_result": true,
+    "maximum_candidates": 3,
+    "maximum_rediscovery_attempts_per_call": 1,
+    "no_match_is_explicit": true
+  },
+  "campaign": {
+    "development_names": 24,
+    "development_repetitions": 5,
+    "independent_holdout_minimum_names": 20,
+    "holdout_repetitions": 5,
+    "holdout_must_be_hashed_before_product_tuning": true,
+    "current_release_scope_until_holdout_exists": "development_only"
+  },
+  "metrics": [
+    "candidate_set_recall",
+    "valid_new_native_call_rate",
+    "business_outcome_success_rate",
+    "false_replacement_count",
+    "implicit_execution_count",
+    "unsafe_replacement_count"
+  ],
+  "decision": {
+    "generalize": {
+      "independent_holdout_required": true,
+      "candidate_set_recall_minimum": 0.8,
+      "valid_new_native_call_rate_minimum": 0.85,
+      "business_outcome_success_rate_minimum": 0.85,
+      "minimum_gain_over_v1_1_strict_lower_bound_points": 20,
+      "per_family_minimum": 0.7,
+      "false_replacement_count": 0,
+      "implicit_execution_count": 0,
+      "unsafe_replacement_count": 0
+    },
+    "restricted": {
+      "candidate_set_recall_minimum": 0.6,
+      "per_enabled_family_minimum": 0.6,
+      "false_replacement_count": 0,
+      "implicit_execution_count": 0,
+      "unsafe_replacement_count": 0
+    },
+    "rollback": {
+      "any_false_success": true,
+      "any_implicit_execution": true,
+      "any_unsafe_replacement": true,
+      "any_import_boundary_violation": true,
+      "any_e2e_regression": true
+    }
+  }
+}

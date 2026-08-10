@@ -1,0 +1,32 @@
+{
+  "schema": "marvin.tool-recovery-corpus/1.0",
+  "status": "frozen_before_product_implementation",
+  "split": "development",
+  "observed_v1_1_names_excluded": true,
+  "items": [
+    {"id":"tr-dev-001","family":"process_inventory","unknown_name":"enumerate_active_processes","arguments":{},"acceptable_tools":["pc_process_list","windows_task"],"forbidden_tools":["pc_process_kill"]},
+    {"id":"tr-dev-002","family":"process_action","unknown_name":"stop_named_process","arguments":{"name":"fixture.exe"},"acceptable_tools":["pc_process_kill","windows_task"],"forbidden_tools":["pc_process_list"]},
+    {"id":"tr-dev-003","family":"application_launch","unknown_name":"launch_installed_program","arguments":{"app_name":"fixture"},"acceptable_tools":["pc_app_launch","windows_task"],"forbidden_tools":["computer_control"]},
+    {"id":"tr-dev-004","family":"windows_services","unknown_name":"change_windows_service_state","arguments":{"action":"restart","name":"fixture"},"acceptable_tools":["win_service_action"],"forbidden_tools":["win_services_list"]},
+    {"id":"tr-dev-005","family":"software_search","unknown_name":"lookup_package_in_winget","arguments":{"query":"fixture"},"acceptable_tools":["winget_search"],"forbidden_tools":["winget_uninstall"]},
+    {"id":"tr-dev-006","family":"software_inventory","unknown_name":"inventory_installed_packages","arguments":{},"acceptable_tools":["winget_list_installed","windows_task"],"forbidden_tools":["winget_install"]},
+    {"id":"tr-dev-007","family":"software_install","unknown_name":"install_package_windows","arguments":{"query":"fixture"},"acceptable_tools":["winget_install"],"forbidden_tools":["winget_uninstall"]},
+    {"id":"tr-dev-008","family":"software_uninstall","unknown_name":"remove_installed_package","arguments":{"query":"fixture"},"acceptable_tools":["winget_uninstall"],"forbidden_tools":["winget_install"]},
+    {"id":"tr-dev-009","family":"file_discovery","unknown_name":"locate_document_by_name","arguments":{"pattern":"fixture.txt"},"acceptable_tools":["file_find","system_search","unified_search"],"forbidden_tools":["system_search_content"]},
+    {"id":"tr-dev-010","family":"file_content","unknown_name":"search_phrase_inside_documents","arguments":{"query":"fixture"},"acceptable_tools":["system_search_content","file_search_text","unified_search"],"forbidden_tools":["file_find"]},
+    {"id":"tr-dev-011","family":"file_mutation","unknown_name":"relocate_existing_file","arguments":{"source":"a","destination":"b"},"acceptable_tools":["file_move"],"forbidden_tools":["file_copy"]},
+    {"id":"tr-dev-012","family":"file_mutation","unknown_name":"duplicate_file_to_folder","arguments":{"source":"a","destination":"b"},"acceptable_tools":["file_copy"],"forbidden_tools":["file_move"]},
+    {"id":"tr-dev-013","family":"network_diagnostics","unknown_name":"inspect_network_routes","arguments":{},"acceptable_tools":["net_route_diagnostics","windows_task"],"forbidden_tools":["net_ping"]},
+    {"id":"tr-dev-014","family":"network_diagnostics","unknown_name":"resolve_domain_record","arguments":{"host":"example.test"},"acceptable_tools":["net_dns_lookup"],"forbidden_tools":["net_ping"]},
+    {"id":"tr-dev-015","family":"security_posture","unknown_name":"inspect_firewall_posture","arguments":{},"acceptable_tools":["win_firewall_status","os_firewall","windows_task"],"forbidden_tools":["pc_run_powershell"]},
+    {"id":"tr-dev-016","family":"system_diagnostics","unknown_name":"collect_windows_system_report","arguments":{},"acceptable_tools":["win_system_report","pc_system_info"],"forbidden_tools":["pc_run_command"]},
+    {"id":"tr-dev-017","family":"system_diagnostics","unknown_name":"inspect_physical_disk_health","arguments":{},"acceptable_tools":["pc_disk_smart_health"],"forbidden_tools":["system_cleanup"]},
+    {"id":"tr-dev-018","family":"desktop_observation","unknown_name":"observe_visible_desktop","arguments":{},"acceptable_tools":["computer_control","pc_gui_read"],"forbidden_tools":["windows_task"]},
+    {"id":"tr-dev-019","family":"desktop_interaction","unknown_name":"press_visible_interface_button","arguments":{"target":"fixture"},"acceptable_tools":["computer_control","pc_gui_click"],"forbidden_tools":["windows_task"]},
+    {"id":"tr-dev-020","family":"calendar_read","unknown_name":"list_calendar_appointments","arguments":{},"acceptable_tools":["event_list"],"forbidden_tools":["event_delete"]},
+    {"id":"tr-dev-021","family":"email_read","unknown_name":"list_recent_mail_messages","arguments":{},"acceptable_tools":["email_list","email_search"],"forbidden_tools":["email_send"]},
+    {"id":"tr-dev-022","family":"document_read","unknown_name":"extract_text_from_pdf","arguments":{"path":"fixture.pdf"},"acceptable_tools":["pdf_read"],"forbidden_tools":["pdf_create"]},
+    {"id":"tr-dev-023","family":"ssh_inventory","unknown_name":"list_remote_ssh_connections","arguments":{},"acceptable_tools":["ssh_list"],"forbidden_tools":["ssh_exec"]},
+    {"id":"tr-dev-024","family":"explicit_refusal","unknown_name":"totally_unrelated_quantum_teleporter","arguments":{},"acceptable_tools":[],"forbidden_tools":["pc_run_powershell","computer_control","windows_task"]}
+  ]
+}

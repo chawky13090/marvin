@@ -99,26 +99,34 @@ def main() -> int:
     holdout_sources = holdout["source_verification"]
     assert dev_sources["corpus_matches_reference_commit"] is True
     assert holdout_sources["corpus_matches_reference_commit"] is True
-    assert dev_sources["provenance_complete"] is False
-    assert holdout_sources["provenance_complete"] is False
-    assert dev_sources["exact_matches"] == 5
-    assert holdout_sources["exact_matches"] == 6
-    assert {
-        name
-        for name, evidence in dev_sources["sources"].items()
-        if not evidence["matches_reference_commit"]
-    } == {"agent.py", "tools.py", "routing_runner.py"}
-    assert {
-        name
-        for name, evidence in holdout_sources["sources"].items()
-        if not evidence["matches_reference_commit"]
-    } == {"agent.py", "tools.py"}
+    assert dev_sources["provenance_complete"] is True
+    assert holdout_sources["provenance_complete"] is True
+    assert dev_sources["composite_commit"] is True
+    assert holdout_sources["composite_commit"] is False
+    assert dev_sources["routing_measurement_comparable"] is True
+    assert dev_sources["state_counts"] == {
+        "exact_blob_match": 5,
+        "normalized_text_match": 2,
+        "recovered_from_other_commit": 1,
+    }
+    assert holdout_sources["state_counts"] == {
+        "exact_blob_match": 6,
+        "normalized_text_match": 2,
+    }
+    assert (
+        dev_sources["sources"]["routing_runner.py"]["recovered_commit"]
+        == rectifier.DEVELOPMENT_RUNNER_COMMIT
+    )
     assert development["historical_adoption_summary"]["success_rate"] == 0.55
     assert holdout["historical_adoption_summary"]["success_rate"] == 0.4083
     dev_corrected = development["retrospective_tool_name_compatibility"]
     holdout_corrected = holdout["retrospective_tool_name_compatibility"]
     assert dev_corrected["compatible_tool_name_rate"] == 0.7375
     assert holdout_corrected["compatible_tool_name_rate"] == 0.5167
+    assert dev_corrected["strictly_verified_lower_bound_rate"] == 0.2708
+    assert holdout_corrected["strictly_verified_lower_bound_rate"] == 0.2417
+    assert dev_corrected["compatibility_upper_bound_rate"] == 0.7375
+    assert holdout_corrected["compatibility_upper_bound_rate"] == 0.5167
     assert dev_corrected["nonexistent_tool_runs"] == 8
     assert holdout_corrected["nonexistent_tool_runs"] == 8
     assert dev_corrected["by_family"]["file_mutation"]["compatible_tool_name_rate"] == 0.5238

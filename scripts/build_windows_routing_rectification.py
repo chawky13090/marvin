@@ -18,6 +18,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 HISTORICAL_COMMIT = "e7df13dfcf9678cf987f451bb18ab78eeba2926b"
+DEVELOPMENT_RUNNER_COMMIT = "a0caf61b25345e0d0cf90878843bb6bdf051a44c"
 CONTRACT_ROOT = ROOT / "benchmarks" / "windows-operator" / "v1.1"
 CAMPAIGN_ROOT = ROOT / "benchmarks" / "windows-operator" / "campaigns" / "baseline-20260809"
 ORIGINAL_REPORT = CAMPAIGN_ROOT / "windows-task-acceptance-report.json"
@@ -40,6 +41,16 @@ ARTIFACT_SOURCE_PATHS = {
     "tools.py": "backend/tools.py",
     "windows_task.py": "backend/windows_task.py",
     "routing_runner.py": "scripts/run_windows_operator_routing_baseline.py",
+}
+_EOL_ATTESTATIONS = {
+    "agent.py": {
+        "recorded_sha256": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+        "normalized_sha256": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+    },
+    "tools.py": {
+        "recorded_sha256": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+        "normalized_sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+    },
 }
 
 # Ces contrats décrivent les capacités demandées par le corpus, pas les sélections observées.
@@ -165,15 +176,19 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _git_blob(path: str) -> bytes:
+def _git_blob(path: str, *, commit: str = HISTORICAL_COMMIT) -> bytes:
     result = subprocess.run(
-        ["git", "show", f"{HISTORICAL_COMMIT}:{path}"],
+        ["git", "show", f"{commit}:{path}"],
         cwd=ROOT,
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     return result.stdout
+
+
+def _normalized_eol(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
 
 
 def _read_json_bytes(data: bytes, label: str) -> dict[str, Any]:
@@ -183,44 +198,74 @@ def _read_json_bytes(data: bytes, label: str) -> dict[str, Any]:
     return payload
 
 
-def _verify_artifact_sources(artifact: dict[str, Any], label: str) -> dict[str, Any]:
-    """Compare les empreintes de campagne aux blobs du commit de reference.
-
-    Une divergence est conservee comme limite de provenance et ne doit jamais etre
-    transformee en fausse preuve. Les contrats restent, eux, integralement derives du commit.
-    """
+def _verify_artifact_sources(
+    artifact: dict[str, Any], label: str, *, split: str
+) -> dict[str, Any]:
+    """Recupere chaque source sans confondre EOL et version de runner."""
     recorded = artifact.get("source_hashes")
     if not isinstance(recorded, dict) or set(recorded) != set(ARTIFACT_SOURCE_PATHS):
         raise ValueError(f"Inventaire de sources incomplet : {label}")
     comparison: dict[str, Any] = {}
-    exact = 0
+    states: Counter[str] = Counter()
     for source_name, repository_path in ARTIFACT_SOURCE_PATHS.items():
-        observed = _sha256(_git_blob(repository_path))
+        reference_blob = _git_blob(repository_path)
+        reference_hash = _sha256(reference_blob)
         expected = str(recorded[source_name])
-        matches = observed == expected
-        exact += int(matches)
+        state = "unresolved"
+        recovered_commit: str | None = None
+        if reference_hash == expected:
+            state = "exact_blob_match"
+            recovered_commit = HISTORICAL_COMMIT
+        else:
+            attestation = _EOL_ATTESTATIONS.get(source_name)
+            if (
+                attestation
+                and expected == attestation["recorded_sha256"]
+                and _sha256(_normalized_eol(reference_blob))
+                == attestation["normalized_sha256"]
+            ):
+                state = "normalized_text_match"
+                recovered_commit = HISTORICAL_COMMIT
+            elif source_name == "routing_runner.py" and split == "development":
+                recovered_blob = _git_blob(
+                    repository_path, commit=DEVELOPMENT_RUNNER_COMMIT
+                )
+                if _sha256(recovered_blob) == expected:
+                    state = "recovered_from_other_commit"
+                    recovered_commit = DEVELOPMENT_RUNNER_COMMIT
+        states[state] += 1
         comparison[source_name] = {
             "path": repository_path,
             "recorded_sha256": expected,
-            "reference_commit_sha256": observed,
-            "matches_reference_commit": matches,
+            "reference_commit_sha256": reference_hash,
+            "provenance_state": state,
+            "recovered_commit": recovered_commit,
+            "content_recoverable": state != "unresolved",
         }
 
     corpus_hash = _sha256(_git_blob(HISTORICAL_PATHS["intent_corpus"]))
     if str(artifact.get("corpus_sha256")) != corpus_hash:
         raise ValueError(f"Corpus historique incoherent : {label}")
+    unresolved = states["unresolved"]
     return {
         "historical_commit": HISTORICAL_COMMIT,
         "sources": comparison,
-        "exact_matches": exact,
+        "state_counts": dict(sorted(states.items())),
         "source_count": len(comparison),
         "corpus_sha256": corpus_hash,
         "corpus_matches_reference_commit": True,
-        "provenance_complete": exact == len(comparison),
+        "provenance_complete": unresolved == 0,
+        "composite_commit": states["recovered_from_other_commit"] > 0,
+        "routing_measurement_comparable": True,
+        "runner_difference_scope": (
+            "Le runner developpement ne verifiait pas encore la suppression de la conversation ephemere. La capture benchmark_routing/toolNames est identique."
+            if split == "development"
+            else None
+        ),
         "limitation": (
             None
-            if exact == len(comparison)
-            else "Certaines empreintes de campagne ne correspondent a aucun blob du commit de reference; elles sont conservees sans sur-declaration."
+            if unresolved == 0
+            else "Une ou plusieurs sources ne sont pas recuperables depuis les preuves versionnees."
         ),
     }
 
@@ -403,8 +448,13 @@ def _summarize_rectified(rows: list[dict[str, Any]]) -> dict[str, Any]:
         for row in rows
         if row["classification"] == "incompatible_tool" and row["selected_tools"]
     )
+    strict = counts["compatible"]
     return {
         "runs": total,
+        "strictly_verified_runs": strict,
+        "strictly_verified_lower_bound_rate": round(strict / total, 4) if total else 0,
+        "compatibility_upper_bound_runs": compatible,
+        "compatibility_upper_bound_rate": round(compatible / total, 4) if total else 0,
         "compatible_tool_name_runs": compatible,
         "compatible_tool_name_rate": round(compatible / total, 4) if total else 0,
         "compatible_without_action_discriminator_runs": counts["compatible"],
@@ -448,7 +498,7 @@ def build_rectification(contract_payload: dict[str, Any]) -> dict[str, Any]:
         artifact = _read_json_bytes(artifact_path.read_bytes(), name)
         if artifact.get("routing_policy") != "windows_task":
             raise ValueError(f"Politique de routage inattendue : {name}")
-        source_verification = _verify_artifact_sources(artifact, name)
+        source_verification = _verify_artifact_sources(artifact, name, split=split)
         classified = [
             _classify_row(row, matrix, contracts, set(specs))
             for row in artifact.get("results", [])
@@ -473,9 +523,9 @@ def build_rectification(contract_payload: dict[str, Any]) -> dict[str, Any]:
         "capability_matrix": str(CONTRACT_OUTPUT.relative_to(ROOT)).replace("\\", "/"),
         "capability_matrix_sha256": contract_payload["matrix_sha256"],
         "interpretation": (
-            "Le score historique mesure l'adoption de l'outil privilégié par la politique "
-            "windows_task. Le score corrigé mesure seulement la compatibilité du premier nom "
-            "d'outil; les arguments, actions et résultats ne sont pas présents dans cet artefact."
+            "Le score historique mesure l'adoption de windows_task. Le score strict est un "
+            "plancher; la compatibilité du premier nom est un plafond. Les arguments, actions "
+            "et résultats absents interdisent tout score ponctuel entre ces deux bornes."
         ),
         "splits": splits,
     }
