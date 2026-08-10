@@ -35,6 +35,16 @@ compteurs imprimés par les scripts. Rollback code : réversion atomique du comm
 Rollback données : supprimer `data/forge/real-usage-v1` après vérification des deux chemins;
 la base source et le coffre de secrets restent inchangés.
 
+Validation finale observée : Marvin a été arrêté proprement avant la campagne. Le gate
+exhaustif normal a terminé avec `success=true` : 277 étapes exécutées et réussies, zéro
+échec, quatre smokes live explicitement ignorés sur 281 étapes attendues. Il couvre les
+trois nouveaux contrats de preuve, l'architecture (364 outils avec harnais, 391 routes), la
+compilation de 347 fichiers Python, les dépendances, la baseline frontend et le build Next.js
+16.2.12 Turbopack. Les erreurs injectées dans stderr appartiennent aux tests négatifs et le
+rapport atomique les confirme sans échec de gate. Après redémarrage par `start.bat`, le
+backend répond `status=ok`, `version=2.609.0`, `tools_count=364`, Ollama est disponible et le
+frontend répond HTTP 200. Aucun outil dangereux ni effet métier externe n'a été exécuté.
+
 ## 2026-08-10 — v2.608.0 — Plan de gate fixe et skips explicites
 
 Constat : les 275 étapes citées pour v2.605 correspondaient au mode `--live`; les 274 de
