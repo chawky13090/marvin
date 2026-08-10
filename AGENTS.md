@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.604.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.605.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.604.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.605.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,22 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.604.0)
+## 9. État actuel (v2.605.0)
+
+**v2.605 (rectificatif du diagnostic de routage Windows)** : le score historique 55 % en
+développement et 40,83 % en holdout mesurait l'adoption de la politique `windows_task`, pas
+la validité générale du premier outil choisi. Une matrice de 120 intentions, dérivée des
+descriptions du catalogue au commit de référence sans lire les choix du modèle, accepte des
+ensembles d'outils par capacité et distingue outil, action et condition. Le rescoring
+déterministe obtient 73,75 % et 51,67 % de noms compatibles; 132 choix restent non prouvés au
+niveau de l'action et 13 au niveau de leur condition. Seize noms sont inexistants, dont quinze
+concentrés sur la recherche de fichiers. Le verdict E2E reste inchangé : 90 % en développement,
+100 % en holdout et zéro faux succès. Le rapport original est conservé byte-for-byte et le
+rapport primaire pointe vers son erratum. La provenance est honnêtement partielle : le corpus
+et cinq ou six sources sur huit correspondent au commit de référence; les empreintes historiques
+de `agent.py` et `tools.py` ne correspondent pas à un blob récupérable de ce commit. Aucun code
+runtime, outil, modèle, secret ou donnée utilisateur n'est modifié. Rollback : réversion atomique
+du commit v2.605.
 
 **v2.604 (verdict Forge et rollback portable)** : le verdict mécanique est
 `engineering_accepted_with_efficiency_debt` : contrat généralisé satisfait, développement

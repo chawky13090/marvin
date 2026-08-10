@@ -406,6 +406,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_windows_operator_acceptance.py"),
         ),
         Stage(
+            "Rectificatif du routage Forge Windows",
+            (python, "scripts/test_windows_routing_rectification.py"),
+        ),
+        Stage(
             "Operateur Windows type et postconditions",
             (python, "scripts/test_windows_task.py"),
         ),
@@ -556,6 +560,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),
         Stage("Baseline et qualite du frontend", (npm, "run", "check:frontend-baseline")),
+        Stage("Resilience du smoke HTTP", (python, "scripts/test_smoke_api_resilience.py")),
     ]
     if not quick and not live:
         result.append(Stage("Build de production Next.js", (npm, "run", "build")))

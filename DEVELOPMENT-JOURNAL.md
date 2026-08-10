@@ -5,6 +5,45 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.605.0 — Rectificatif reproductible du routage Windows
+
+Demande : corriger l'interprétation de la campagne Forge sans modifier Marvin, construire des
+contrats par capacité et action, inclure des tests d'acceptation et de refus, préserver le
+rapport original et ne revoir TD-010 qu'après un rescoring déterministe.
+
+Constats : les 55 % développement et 40,83 % holdout historiques mesuraient l'adoption du seul
+outil privilégié par famille. Le rapport ne conservait ni arguments ni action. Les contrats
+sont dérivés uniquement de `git show e7df13d` et couvrent 364 outils et 120 intentions. Les
+empreintes du corpus correspondent; cinq sources sur huit en développement et six sur huit en
+holdout correspondent au commit. `agent.py` et `tools.py` ne correspondent pas byte-for-byte
+au blob du commit, et le runner développement provient d'un autre état : cette limite reste
+visible dans la preuve au lieu d'être masquée.
+
+Résultat : la compatibilité rétrospective du premier nom d'outil est 177/240 (73,75 %) en
+développement et 62/120 (51,67 %) en holdout. Seize noms sont inexistants, dont quinze dans la
+recherche de fichiers. Cent trente-deux sélections compatibles demanderaient une action non
+conservée et treize une condition non conservée; elles ne sont donc pas déclarées pleinement
+vérifiées. Les faibles scores holdout restent visibles : découverte 25 %, mutation 22,22 %,
+arrêt de processus, logiciels et services 33,33 %. Les oracles E2E indépendants ne changent
+pas : 90 %, 100 % et zéro faux succès.
+
+Fichiers : `scripts/build_windows_routing_rectification.py`, son test dédié, la matrice gelée,
+le rectificatif, la copie byte-for-byte du rapport original et le caveat du rapport primaire.
+Le gate exhaustif inclut désormais ce contrôle. Aucun runtime, outil, modèle, configuration,
+secret, schéma, donnée utilisateur ou journal métier n'est modifié. Sécurité : aucune nouvelle
+entrée réseau ou exécution LLM; données lues bornées aux artefacts versionnés. Logs : aucun
+événement runtime ajouté. Rollback : réversion atomique du commit v2.605; aucune restauration
+de donnée n'est nécessaire.
+
+Validation complémentaire : deux gates live ont exécuté 274/274 étapes mais ont toutes deux
+échoué uniquement sur le smoke HTTP après accumulation de charge; le premier incident est un
+`GET /api/learning` terminé côté serveur en 20,573 s, juste après le timeout client de 20 s.
+Le même smoke isolé passe 28/28 en 22,7 s et `/api/learning` répond ensuite en 46 ms. Le client
+de smoke rejoue désormais une seule fois les lectures GET sur un timeout uniquement, avec une
+trace explicite; aucune mutation POST n'est jamais rejouée. Un test négatif prouve que le second
+timeout reste bloquant et qu'une erreur non transitoire n'est pas rejouée. Cette correction
+durcit le runner de validation sans modifier les requêtes ni le comportement runtime de Marvin.
+
 ## 2026-08-10 — v2.604.0 — Verdict Forge, rollback réel et empreintes portables
 
 Demande : terminer la tranche Windows selon les seuils pré-enregistrés, prouver le rollback et

@@ -1,0 +1,1085 @@
+{
+  "schema": "marvin.windows-routing-capability-contracts/1.0",
+  "status": "frozen_retrospective_before_rescoring",
+  "methodology": {
+    "historical_commit": "e7df13dfcf9678cf987f451bb18ab78eeba2926b",
+    "retrospective": true,
+    "routing_results_used_to_build_matrix": false,
+    "scope": "compatibilité du premier nom d'outil uniquement",
+    "action_limitation": "Les événements historiques ne conservent pas les arguments. Une action déclarée reste compatible mais non vérifiée."
+  },
+  "historical_sources": {
+    "tools.py": {
+      "path": "backend/tools.py",
+      "sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+    },
+    "capability_discovery.py": {
+      "path": "backend/capability_discovery.py",
+      "sha256": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22"
+    },
+    "capability_catalog.py": {
+      "path": "backend/capability_catalog.py",
+      "sha256": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47"
+    },
+    "intent_corpus": {
+      "path": "benchmarks/windows-operator/v1.1/intent-corpus.json",
+      "sha256": "9f223d59083582b53c1352a0215a9b506b1945f3b49bf4fe220409f46d11241f"
+    }
+  },
+  "catalog_tool_count": 364,
+  "contracts": {
+    "process.inventory": {
+      "family": "process_inventory",
+      "rationale": "La demande porte sur la lecture de l'inventaire des processus, sans mutation.",
+      "accepted": [
+        {
+          "name": "pc_process_list",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Liste les processus actifs sur le PC (top 50 par mémoire).",
+          "catalog_source_line": 3301,
+          "catalog_spec_sha256": "8d34d7d4b525ab07c4ba08dbd4c79d4ac11f23dc1fe71a6b3cf1163dda145980"
+        },
+        {
+          "name": "windows_task",
+          "action": "process.list",
+          "role": "terminal",
+          "catalog_description": "Opérateur Windows typé pour les opérations système et fichiers courantes. À préférer aux outils PC dispersés pour lister les processus/services/logiciels, lire pare-feu ou réseau, lancer une application, arrêter un processus, créer un dossier, renommer ou copier un fichier. Compile l'intention vers un exécuteur connu, n'accepte aucune commande PowerShell libre et ne déclare le succès qu'après preuve. computer_control reste réservé à l'interaction visuelle par capture/UIA.",
+          "catalog_source_line": 4027,
+          "catalog_spec_sha256": "81f0251daef7820a29b137119701a7a3db509803044651e11275c019059d203d"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "process.stop": {
+      "family": "process_action",
+      "rationale": "La capacité attendue doit arrêter un processus puis permettre sa vérification.",
+      "accepted": [
+        {
+          "name": "pc_process_kill",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Arrête un processus par PID ou nom (demande confirmation).",
+          "catalog_source_line": 3304,
+          "catalog_spec_sha256": "36fd5a677518bb7046bac3f11ba52fbdf2ed5251495da16306b163c90c228600"
+        },
+        {
+          "name": "windows_task",
+          "action": "process.stop",
+          "role": "terminal",
+          "catalog_description": "Opérateur Windows typé pour les opérations système et fichiers courantes. À préférer aux outils PC dispersés pour lister les processus/services/logiciels, lire pare-feu ou réseau, lancer une application, arrêter un processus, créer un dossier, renommer ou copier un fichier. Compile l'intention vers un exécuteur connu, n'accepte aucune commande PowerShell libre et ne déclare le succès qu'après preuve. computer_control reste réservé à l'interaction visuelle par capture/UIA.",
+          "catalog_source_line": 4027,
+          "catalog_spec_sha256": "81f0251daef7820a29b137119701a7a3db509803044651e11275c019059d203d"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "application.launch": {
+      "family": "application_launch",
+      "rationale": "La demande lance une application installée, sans interaction visuelle imposée.",
+      "accepted": [
+        {
+          "name": "pc_app_launch",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Lance une application Windows installée par son nom et vérifie le résultat par processus ou fenêtre. Ne jamais l'utiliser pour ouvrir un chemin local : utiliser pc_open_file. Résout via PATH, registre App Paths et menu Démarrer. Pour Tailscale, utilise explicitement l'interface graphique tailscale-ipn.exe. Pour un navigateur (chrome/firefox/msedge/brave/opera), fournir aussi 'url' ouvre directement cette page dans la fenêtre lancée, en un seul appel.",
+          "catalog_source_line": 3097,
+          "catalog_spec_sha256": "400a0df12aa30fb79cc275379287b9edd15d67eae6032828e680455a3f91386f"
+        },
+        {
+          "name": "windows_task",
+          "action": "application.launch",
+          "role": "terminal",
+          "catalog_description": "Opérateur Windows typé pour les opérations système et fichiers courantes. À préférer aux outils PC dispersés pour lister les processus/services/logiciels, lire pare-feu ou réseau, lancer une application, arrêter un processus, créer un dossier, renommer ou copier un fichier. Compile l'intention vers un exécuteur connu, n'accepte aucune commande PowerShell libre et ne déclare le succès qu'après preuve. computer_control reste réservé à l'interaction visuelle par capture/UIA.",
+          "catalog_source_line": 4027,
+          "catalog_spec_sha256": "81f0251daef7820a29b137119701a7a3db509803044651e11275c019059d203d"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "service.change_state": {
+      "family": "windows_services",
+      "rationale": "Les intentions modifient l'état d'un service; service.list ne suffit pas.",
+      "accepted": [
+        {
+          "name": "win_service_action",
+          "action": "start|stop|restart",
+          "role": "terminal",
+          "catalog_description": "Interroge (query) ou pilote un service Windows. 'query' = lecture seule de l'état (sans confirmation) ; start/stop/restart/pause/resume = action (peut nécessiter droits admin).",
+          "catalog_source_line": 4944,
+          "catalog_spec_sha256": "0274011192cc3840cf81f7b605a3ae2ee4cbf1314c7f736dc654159a8db30c8c"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "software.install": {
+      "family": "software_management",
+      "rationale": "Toutes les intentions du corpus installent un logiciel; la résolution du paquet est une étape préparatoire valide.",
+      "accepted": [
+        {
+          "name": "winget_search",
+          "action": null,
+          "role": "preparatory",
+          "catalog_description": "Recherche des logiciels installables via Winget (renvoie nom, ID, version, source).",
+          "catalog_source_line": 3128,
+          "catalog_spec_sha256": "2c968f66432c6326da0ab9380a926583c7f826cda44c3f24fd136d068d40a842"
+        },
+        {
+          "name": "winget_list_installed",
+          "action": null,
+          "role": "preparatory",
+          "catalog_description": "Liste les logiciels INSTALLÉS sur le PC (filtrable par nom) — pour les voir/désinstaller.",
+          "catalog_source_line": 3135,
+          "catalog_spec_sha256": "29a8d11d4c457d59fdc07752e893d946b815fa159fdd540429a2b6d406dcd146"
+        },
+        {
+          "name": "winget_install",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Outil privilégié pour installer un logiciel Windows : installation silencieuse puis vérification dans l'inventaire. Ne jamais lancer un second installateur après un succès vérifié.",
+          "catalog_source_line": 3137,
+          "catalog_spec_sha256": "dd0adff04a0e199af5db78776fcd90b239b17bf4585ef20ad7ebc9c5bfb2b5d0"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "filesystem.search_by_name": {
+      "family": "file_discovery",
+      "rationale": "Les intentions recherchent un nom ou motif sur le PC, pas le contenu interne d'un document.",
+      "accepted": [
+        {
+          "name": "system_search",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "🚀 RECHERCHE ULTRA-RAPIDE sur tout le PC via l'index Windows Search (~50ms). Utilisez cet outil EN PRIORITÉ quand l'utilisateur cherche un fichier ou dossier dont il ne connaît pas l'emplacement exact.",
+          "catalog_source_line": 3053,
+          "catalog_spec_sha256": "1ce67d1eb11b303e4d53b231751ddb5072dbcfd6faf58883710b8f70be7bbb26"
+        },
+        {
+          "name": "file_find",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (très rapide ~50ms) ou os.walk en fallback. Pour chercher sur TOUT le PC, omettez 'path' ou utilisez path='all'. Pour lister UNIQUEMENT le contenu direct d'un dossier précis (ex: « qu'y a-t-il sur mon bureau »), utilisez recursive=false — sinon pattern='*' recurse dans tous les sous-dossiers et peut plafonner sans montrer le premier niveau proprement.",
+          "catalog_source_line": 3046,
+          "catalog_spec_sha256": "5dcf57c486edd4fa933c54c60f12eb40b672c88ba78c3e95815c974bfea3a869"
+        },
+        {
+          "name": "unified_search",
+          "action": null,
+          "role": "broader_valid",
+          "catalog_description": "RECHERCHE UNIFIÉE : cherche le même terme PARTOUT à la fois (documents indexés, fichiers du PC par nom ET par contenu, notes, tâches, agenda, mémoire ; emails et web en option). Pour « retrouve tout ce qui concerne X », « cherche partout Y ».",
+          "catalog_source_line": 4121,
+          "catalog_spec_sha256": "0b0f28607d8ff6f1ae1fdd73680289b00bbb6702d8f369f754d142d00206e3ce"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "filesystem.move": {
+      "family": "file_mutation",
+      "rationale": "Toutes les intentions déplacent une source vers une destination; copie et renommage seuls ne satisfont pas le contrat.",
+      "accepted": [
+        {
+          "name": "file_find",
+          "action": null,
+          "role": "preparatory",
+          "condition": "source_path_unresolved",
+          "catalog_description": "Trouve des fichiers par nom/motif glob. Utilise l'index Windows Search (très rapide ~50ms) ou os.walk en fallback. Pour chercher sur TOUT le PC, omettez 'path' ou utilisez path='all'. Pour lister UNIQUEMENT le contenu direct d'un dossier précis (ex: « qu'y a-t-il sur mon bureau »), utilisez recursive=false — sinon pattern='*' recurse dans tous les sous-dossiers et peut plafonner sans montrer le premier niveau proprement.",
+          "catalog_source_line": 3046,
+          "catalog_spec_sha256": "5dcf57c486edd4fa933c54c60f12eb40b672c88ba78c3e95815c974bfea3a869"
+        },
+        {
+          "name": "file_move",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Déplace un fichier ou un dossier vers un autre emplacement.",
+          "catalog_source_line": 2956,
+          "catalog_spec_sha256": "861d1904fbec5e31a89edc0d1b4179142cd81d14cf14154432d49367eb956e4d"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "system.diagnose": {
+      "family": "system_diagnostics",
+      "rationale": "Un rapport global ou une première collecte de preuve système constitue un premier appel recevable.",
+      "accepted": [
+        {
+          "name": "win_system_report",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "🔍 Rapport diagnostic système COMPLET en un seul appel : OS, uptime, CPU, RAM, disques, top processus, alertes. Idéal pour un support rapide.",
+          "catalog_source_line": 4973,
+          "catalog_spec_sha256": "19d73b9543b6e96bca6744d1e9d86d0de157bee65d35942d89b8872e9863b035"
+        },
+        {
+          "name": "pc_system_info",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Retourne les informations techniques du PC : CPU, RAM, disques, uptime.",
+          "catalog_source_line": 3225,
+          "catalog_spec_sha256": "1f3a137d4035e47223dd0b167265531217e25e775b9eb74b5e45c7731f924797"
+        },
+        {
+          "name": "pc_hardware_specs",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Inventaire matériel complet du PC (fabricant/modèle/n° de série, CPU, RAM, disques, GPU, cartes réseau) avec liens officiels support/pilotes selon le fabricant détecté (Dell, HP, Lenovo, ASUS, Acer, Surface, MSI, GIGABYTE, ASRock, Intel, AMD, NVIDIA, Samsung/WD/Seagate/Crucial).",
+          "catalog_source_line": 3753,
+          "catalog_spec_sha256": "6ba31b0cb377887f02aea7cd92849555dc6664f28e300f58a0e65e109a48873e"
+        },
+        {
+          "name": "pc_event_log_errors",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Erreurs/critiques récentes des journaux d'événements Windows (Système + Application) — détecte des plantages/pilotes en échec/erreurs disque INTERMITTENTS invisibles dans un instantané CPU/RAM/disque. Utilise ceci pour tout diagnostic PC complet, ou si l'utilisateur signale des plantages/lenteurs intermittentes.",
+          "catalog_source_line": 3766,
+          "catalog_spec_sha256": "e22c4276f7d839fe21a33269f5374c23d8ec352d5dcbc4671f6951642bfac596"
+        },
+        {
+          "name": "pc_disk_smart_health",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Santé RÉELLE des disques (compteurs de fiabilité S.M.A.R.T. Windows : usure SSD, erreurs de lecture non corrigées, heures de fonctionnement) — bien plus fiable que le simple statut Healthy/Unhealthy. Utilise ceci pour tout diagnostic PC complet ou si l'utilisateur suspecte un problème de disque.",
+          "catalog_source_line": 3763,
+          "catalog_spec_sha256": "62aa79e841eea98d23007693c6f241ab117f6fafffef7af9082abf0bee1cf552"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "network.diagnose": {
+      "family": "network_diagnostics",
+      "rationale": "Le diagnostic peut commencer par le rapport composite ou par une preuve réseau ciblée pertinente.",
+      "accepted": [
+        {
+          "name": "net_route_diagnostics",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "Diagnostic réseau complet : config locale, DNS, ping internet/cible et traceroute optionnel. Utile pour « pourquoi je n'ai pas internet ».",
+          "catalog_source_line": 3748,
+          "catalog_spec_sha256": "9cda8c606cf23754903cee4ffd3aa608777c7e4160ed499e69ff743df27a13e2"
+        },
+        {
+          "name": "net_dns_lookup",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Résolution DNS d'un nom d'hôte (ou reverse lookup d'une IP).",
+          "catalog_source_line": 3641,
+          "catalog_spec_sha256": "d476ef899f8fa0f82921a2e9ac065fcb530bca0f953fed0afa55ca45bd618590"
+        },
+        {
+          "name": "net_ping",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Ping une adresse IP ou un nom d'hôte pour tester la connectivité.",
+          "catalog_source_line": 3630,
+          "catalog_spec_sha256": "a7059e227367e8a51c613617112a8d76d7c9857c881fd6bfc0bd5d545b9fd56a"
+        },
+        {
+          "name": "net_traceroute",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Affiche le chemin réseau (hops) jusqu'à une adresse IP ou un hôte.",
+          "catalog_source_line": 3646,
+          "catalog_spec_sha256": "09e25c3e93ef70a00644d04fca89d3fd31bb5019651153053f02da3abcdca10a"
+        },
+        {
+          "name": "windows_task",
+          "action": "network.status",
+          "role": "evidence",
+          "catalog_description": "Opérateur Windows typé pour les opérations système et fichiers courantes. À préférer aux outils PC dispersés pour lister les processus/services/logiciels, lire pare-feu ou réseau, lancer une application, arrêter un processus, créer un dossier, renommer ou copier un fichier. Compile l'intention vers un exécuteur connu, n'accepte aucune commande PowerShell libre et ne déclare le succès qu'après preuve. computer_control reste réservé à l'interaction visuelle par capture/UIA.",
+          "catalog_source_line": 4027,
+          "catalog_spec_sha256": "81f0251daef7820a29b137119701a7a3db509803044651e11275c019059d203d"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "security.firewall.inspect": {
+      "family": "security_posture",
+      "rationale": "Les intentions lisent l'état du pare-feu; aucune action d'activation ou désactivation n'est recevable.",
+      "accepted": [
+        {
+          "name": "win_firewall_status",
+          "action": null,
+          "role": "terminal",
+          "catalog_description": "État RÉEL du pare-feu Windows (profils Domaine/Privé/Public actifs, nombre de règles entrantes autorisées) — rendu structuré au lieu de parser du texte PowerShell. Utilise ceci pour tout audit de sécurité poste ou question sur le pare-feu.",
+          "catalog_source_line": 3771,
+          "catalog_spec_sha256": "286b6a78b2b7b68f28a5cedeca3e349a001fdf80cbc42d450d747bae4b7b48cf"
+        },
+        {
+          "name": "os_firewall",
+          "action": "status",
+          "role": "terminal",
+          "catalog_description": "Statut / activation / désactivation du pare-feu Windows Defender (tous profils).",
+          "catalog_source_line": 3195,
+          "catalog_spec_sha256": "593a7d801657a82c794e354411d210ef21f20f7f491b4e4b4dd4d3e5b1e8c08d"
+        },
+        {
+          "name": "windows_task",
+          "action": "security.firewall.status",
+          "role": "terminal",
+          "catalog_description": "Opérateur Windows typé pour les opérations système et fichiers courantes. À préférer aux outils PC dispersés pour lister les processus/services/logiciels, lire pare-feu ou réseau, lancer une application, arrêter un processus, créer un dossier, renommer ou copier un fichier. Compile l'intention vers un exécuteur connu, n'accepte aucune commande PowerShell libre et ne déclare le succès qu'après preuve. computer_control reste réservé à l'interaction visuelle par capture/UIA.",
+          "catalog_source_line": 4027,
+          "catalog_spec_sha256": "81f0251daef7820a29b137119701a7a3db509803044651e11275c019059d203d"
+        }
+      ],
+      "explicit_rejections": []
+    },
+    "desktop.visual_interaction": {
+      "family": "desktop_observation",
+      "rationale": "Les intentions exigent observation, UIA, capture, clic ou saisie sur une interface réellement visible.",
+      "accepted": [
+        {
+          "name": "computer_control",
+          "action": "observe|screenshot|click|type|focus|verify",
+          "role": "terminal",
+          "catalog_description": "Contrôle exclusivement visuel du PC et du navigateur lorsque l'action exige une capture, un élément UIA, un clic, une saisie ou une navigation interactive. Pour les processus, services, logiciels, applications et fichiers, utiliser windows_task. Le LLM conduit librement la boucle Observer → Décider → Agir → Vérifier → Corriger. observe renvoie une capture et des element_ref facultatives. Utilise les coordonnées de frame_id lorsque l'UIA ne suffit pas. action=commit est obligatoire pour le clic final qui réserve, achète, publie ou envoie un formulaire : il demande toujours un clic utilisateur. Pour « ouvre [navigateur] et va sur [site] » : utilise action=open avec target=navigateur ET url=le site, EN UN SEUL APPEL — ne jamais enchaîner action=navigate ensuite, qui pilote un navigateur headless séparé et n'affecte jamais la fenêtre visible ouverte par open.",
+          "catalog_source_line": 4055,
+          "catalog_spec_sha256": "b9696990546acbf5e1c078798b1d8bf39798bc06a6c9854cdfd29f051a1e3915"
+        },
+        {
+          "name": "pc_gui_read",
+          "action": null,
+          "role": "evidence",
+          "catalog_description": "Lit l'arbre des éléments cliquables (boutons/champs/menus/listes) d'une fenêtre Windows via UI Automation — PAS une capture d'écran, une lecture structurée 100% locale. Utilise ceci AVANT tout pc_gui_click/pc_gui_type pour obtenir les identifiants réels des éléments (jamais deviner un automation_id). Sans 'window', lit la fenêtre au premier plan. Échoue proprement si la fenêtre est élevée (admin) — inaccessible depuis ce process.",
+          "catalog_source_line": 3241,
+          "catalog_spec_sha256": "7483326eaef1b3e931a3bac1415834013e97f53b86471c11fa3c711a80f4ffa5"
+        }
+      ],
+      "explicit_rejections": [
+        "windows_task"
+      ]
+    },
+    "text.only": {
+      "family": "text_only_command",
+      "rationale": "L'utilisateur demande explicitement du texte sans aucune exécution.",
+      "accepted": [],
+      "explicit_rejections": [
+        "windows_task",
+        "computer_control",
+        "pc_run_powershell"
+      ]
+    }
+  },
+  "intent_matrix": [
+    {
+      "intent_id": "intent-001",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-002",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-003",
+      "split": "holdout",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-004",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-005",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-006",
+      "split": "holdout",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-007",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-008",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-009",
+      "split": "holdout",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-010",
+      "split": "development",
+      "family": "process_inventory",
+      "capability_id": "process.inventory"
+    },
+    {
+      "intent_id": "intent-011",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-012",
+      "split": "holdout",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-013",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-014",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-015",
+      "split": "holdout",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-016",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-017",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-018",
+      "split": "holdout",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-019",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-020",
+      "split": "development",
+      "family": "process_action",
+      "capability_id": "process.stop"
+    },
+    {
+      "intent_id": "intent-021",
+      "split": "holdout",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-022",
+      "split": "development",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-023",
+      "split": "development",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-024",
+      "split": "holdout",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-025",
+      "split": "development",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-026",
+      "split": "development",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-027",
+      "split": "holdout",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-028",
+      "split": "development",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-029",
+      "split": "development",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-030",
+      "split": "holdout",
+      "family": "application_launch",
+      "capability_id": "application.launch"
+    },
+    {
+      "intent_id": "intent-031",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-032",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-033",
+      "split": "holdout",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-034",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-035",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-036",
+      "split": "holdout",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-037",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-038",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-039",
+      "split": "holdout",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-040",
+      "split": "development",
+      "family": "windows_services",
+      "capability_id": "service.change_state"
+    },
+    {
+      "intent_id": "intent-041",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-042",
+      "split": "holdout",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-043",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-044",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-045",
+      "split": "holdout",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-046",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-047",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-048",
+      "split": "holdout",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-049",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-050",
+      "split": "development",
+      "family": "software_management",
+      "capability_id": "software.install"
+    },
+    {
+      "intent_id": "intent-051",
+      "split": "holdout",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-052",
+      "split": "development",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-053",
+      "split": "development",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-054",
+      "split": "holdout",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-055",
+      "split": "development",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-056",
+      "split": "development",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-057",
+      "split": "holdout",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-058",
+      "split": "development",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-059",
+      "split": "development",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-060",
+      "split": "holdout",
+      "family": "file_discovery",
+      "capability_id": "filesystem.search_by_name"
+    },
+    {
+      "intent_id": "intent-061",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-062",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-063",
+      "split": "holdout",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-064",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-065",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-066",
+      "split": "holdout",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-067",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-068",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-069",
+      "split": "holdout",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-070",
+      "split": "development",
+      "family": "file_mutation",
+      "capability_id": "filesystem.move"
+    },
+    {
+      "intent_id": "intent-071",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-072",
+      "split": "holdout",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-073",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-074",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-075",
+      "split": "holdout",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-076",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-077",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-078",
+      "split": "holdout",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-079",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-080",
+      "split": "development",
+      "family": "system_diagnostics",
+      "capability_id": "system.diagnose"
+    },
+    {
+      "intent_id": "intent-081",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-082",
+      "split": "development",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-083",
+      "split": "development",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-084",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-085",
+      "split": "development",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-086",
+      "split": "development",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-087",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-088",
+      "split": "development",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-089",
+      "split": "development",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-090",
+      "split": "holdout",
+      "family": "network_diagnostics",
+      "capability_id": "network.diagnose"
+    },
+    {
+      "intent_id": "intent-091",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-092",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-093",
+      "split": "holdout",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-094",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-095",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-096",
+      "split": "holdout",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-097",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-098",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-099",
+      "split": "holdout",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-100",
+      "split": "development",
+      "family": "security_posture",
+      "capability_id": "security.firewall.inspect"
+    },
+    {
+      "intent_id": "intent-101",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-102",
+      "split": "holdout",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-103",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-104",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-105",
+      "split": "holdout",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-106",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-107",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-108",
+      "split": "holdout",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-109",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-110",
+      "split": "development",
+      "family": "desktop_observation",
+      "capability_id": "desktop.visual_interaction"
+    },
+    {
+      "intent_id": "intent-111",
+      "split": "holdout",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-112",
+      "split": "development",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-113",
+      "split": "development",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-114",
+      "split": "holdout",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-115",
+      "split": "development",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-116",
+      "split": "development",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-117",
+      "split": "holdout",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-118",
+      "split": "development",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-119",
+      "split": "development",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    },
+    {
+      "intent_id": "intent-120",
+      "split": "holdout",
+      "family": "text_only_command",
+      "capability_id": "text.only"
+    }
+  ],
+  "matrix_sha256": "c06d83d441fd9c1c80e7733b61adc4b1ca4944c72a63ca5d763a3a4099a133a4"
+}

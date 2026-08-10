@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
+import time
 import http.cookiejar
 import urllib.error
 import urllib.request
@@ -18,20 +20,43 @@ OLLAMA = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 HTTP = urllib.request.build_opener(
     urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
 )
+READ_TIMEOUT_SECONDS = 20
+READ_ATTEMPTS = 2
+
+
+def _is_timeout(error: BaseException) -> bool:
+    if isinstance(error, (TimeoutError, socket.timeout)):
+        return True
+    return isinstance(error, urllib.error.URLError) and isinstance(
+        error.reason, (TimeoutError, socket.timeout)
+    )
+
+
+def _fetch_readonly(url: str) -> bytes:
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    for attempt in range(1, READ_ATTEMPTS + 1):
+        try:
+            with HTTP.open(request, timeout=READ_TIMEOUT_SECONDS) as response:
+                if response.status != 200:
+                    raise AssertionError(f"HTTP {response.status} pour {url}")
+                return response.read()
+        except (TimeoutError, socket.timeout, urllib.error.URLError) as error:
+            if not _is_timeout(error) or attempt == READ_ATTEMPTS:
+                raise
+            print(
+                f"  [RETRY] Timeout GET {url} ({attempt}/{READ_ATTEMPTS})",
+                file=sys.stderr,
+            )
+            time.sleep(0.25)
+    raise AssertionError(f"Lecture HTTP impossible pour {url}")
 
 
 def fetch_json(url: str) -> Any:
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with HTTP.open(request, timeout=20) as response:
-        if response.status != 200:
-            raise AssertionError(f"HTTP {response.status} pour {url}")
-        return json.loads(response.read().decode("utf-8"))
+    return json.loads(_fetch_readonly(url).decode("utf-8"))
 
 
 def fetch_ok(url: str) -> None:
-    with HTTP.open(url, timeout=20) as response:
-        if response.status != 200:
-            raise AssertionError(f"HTTP {response.status} pour {url}")
+    _fetch_readonly(url)
 
 
 def post_json(url: str, payload: dict) -> Any:

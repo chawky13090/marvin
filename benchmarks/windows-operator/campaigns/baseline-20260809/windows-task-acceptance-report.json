@@ -339,5 +339,13 @@
     "e2e-windows-task-holdout-source-closed.json": "b7706d63c80b04840cd26f357d5478d36bcc1bf5c60d9b4f835ff7e3ae4f7007",
     "routing-windows-task-normative-candidate.json": "790a80efa4106e45d4c9a7a6bc91a30f679e7048c76f5ff4c8476fe76d6e827b",
     "routing-windows-task-holdout-source-closed.json": "355ec86529f0edab7656e9fa070b2a775012afa83c08a4b1d6b0def955f42794"
+  },
+  "interpretation_caveat": {
+    "status": "superseded_for_general_routing_only",
+    "routing_policy": "windows_task",
+    "original_report_sha256": "004d6fa871a630166542dc2f3d5674d8a8d00fe1590d8e0dac8d62d845f5db14",
+    "preserved_original": "windows-task-acceptance-report.v1.0-original.json",
+    "superseded_by": "windows-task-routing-rectification-v1.json",
+    "e2e_verdict_unchanged": true
   }
 }

@@ -1,0 +1,5690 @@
+{
+  "schema": "marvin.windows-routing-rectification/1.0",
+  "status": "retrospective_corrected_score",
+  "scope": "routing_diagnostic_only",
+  "historical_routing_policy": "windows_task",
+  "e2e_verdict_unchanged": true,
+  "independent_validation_score": null,
+  "independent_validation_required_after_product_change": true,
+  "historical_commit": "e7df13dfcf9678cf987f451bb18ab78eeba2926b",
+  "capability_matrix": "benchmarks/windows-operator/v1.1/routing-capability-contracts-retrospective-v1.json",
+  "capability_matrix_sha256": "c06d83d441fd9c1c80e7733b61adc4b1ca4944c72a63ca5d763a3a4099a133a4",
+  "interpretation": "Le score historique mesure l'adoption de l'outil privilégié par la politique windows_task. Le score corrigé mesure seulement la compatibilité du premier nom d'outil; les arguments, actions et résultats ne sont pas présents dans cet artefact.",
+  "splits": {
+    "development": {
+      "artifact": "routing-windows-task-normative-candidate.json",
+      "artifact_sha256": "790a80efa4106e45d4c9a7a6bc91a30f679e7048c76f5ff4c8476fe76d6e827b",
+      "source_verification": {
+        "historical_commit": "e7df13dfcf9678cf987f451bb18ab78eeba2926b",
+        "sources": {
+          "agent.py": {
+            "path": "backend/agent.py",
+            "recorded_sha256": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+            "reference_commit_sha256": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+            "matches_reference_commit": false
+          },
+          "agent_tool_step.py": {
+            "path": "backend/agent_tool_step.py",
+            "recorded_sha256": "b10b14745b61d1cde3678d6ba5ad434e63464f835ee6de5b4f1c028998ec078a",
+            "reference_commit_sha256": "b10b14745b61d1cde3678d6ba5ad434e63464f835ee6de5b4f1c028998ec078a",
+            "matches_reference_commit": true
+          },
+          "agent_tool_selection.py": {
+            "path": "backend/agent_tool_selection.py",
+            "recorded_sha256": "af085feeddd5108d31de06299b6dec7264a627413068d7eddbde615426d73d98",
+            "reference_commit_sha256": "af085feeddd5108d31de06299b6dec7264a627413068d7eddbde615426d73d98",
+            "matches_reference_commit": true
+          },
+          "capability_catalog.py": {
+            "path": "backend/capability_catalog.py",
+            "recorded_sha256": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+            "reference_commit_sha256": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+            "matches_reference_commit": true
+          },
+          "capability_discovery.py": {
+            "path": "backend/capability_discovery.py",
+            "recorded_sha256": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+            "reference_commit_sha256": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+            "matches_reference_commit": true
+          },
+          "tools.py": {
+            "path": "backend/tools.py",
+            "recorded_sha256": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+            "reference_commit_sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+            "matches_reference_commit": false
+          },
+          "windows_task.py": {
+            "path": "backend/windows_task.py",
+            "recorded_sha256": "e61f1fe59539ac9ee503dbb8c938bfc8a619dbf9f06ce074f6469338608a9934",
+            "reference_commit_sha256": "e61f1fe59539ac9ee503dbb8c938bfc8a619dbf9f06ce074f6469338608a9934",
+            "matches_reference_commit": true
+          },
+          "routing_runner.py": {
+            "path": "scripts/run_windows_operator_routing_baseline.py",
+            "recorded_sha256": "dc94d3597b1928482aa540f2ad5fded25f6f254ecf21659371147d2f4cad2f18",
+            "reference_commit_sha256": "f58b38cc645e476314c8f46d2ee53ad4e577829b63ae65fb06c46da3fda8a395",
+            "matches_reference_commit": false
+          }
+        },
+        "exact_matches": 5,
+        "source_count": 8,
+        "corpus_sha256": "9f223d59083582b53c1352a0215a9b506b1945f3b49bf4fe220409f46d11241f",
+        "corpus_matches_reference_commit": true,
+        "provenance_complete": false,
+        "limitation": "Certaines empreintes de campagne ne correspondent a aucun blob du commit de reference; elles sont conservees sans sur-declaration."
+      },
+      "historical_adoption_summary": {
+        "runs": 240,
+        "passed": 132,
+        "failed": 108,
+        "success_rate": 0.55,
+        "forbidden_route_count": 0,
+        "false_success_measurable": false,
+        "false_success_count": null,
+        "stable_intents": 46,
+        "intent_count": 80,
+        "repeat_stability_rate": 0.575,
+        "median_duration_ms": 14750,
+        "by_family": {
+          "application_launch": {
+            "runs": 18,
+            "passed": 15,
+            "failed": 3,
+            "selected": {
+              "windows_task": 15,
+              "computer_control": 2,
+              "pc_open_app": 1
+            },
+            "success_rate": 0.8333
+          },
+          "desktop_observation": {
+            "runs": 21,
+            "passed": 21,
+            "failed": 0,
+            "selected": {
+              "computer_control": 21
+            },
+            "success_rate": 1.0
+          },
+          "file_discovery": {
+            "runs": 18,
+            "passed": 0,
+            "failed": 18,
+            "selected": {
+              "file_find": 8,
+              "pc_file_search": 4,
+              "pc_find_files": 2,
+              "unified_search": 2,
+              "pc_search_files": 1,
+              "system_search_content": 1
+            },
+            "success_rate": 0.0
+          },
+          "file_mutation": {
+            "runs": 21,
+            "passed": 0,
+            "failed": 21,
+            "selected": {
+              "file_find": 14,
+              "windows_task": 2,
+              "code_workspace_status": 1,
+              "computer_control": 1
+            },
+            "success_rate": 0.0
+          },
+          "network_diagnostics": {
+            "runs": 18,
+            "passed": 7,
+            "failed": 11,
+            "selected": {
+              "windows_task": 8,
+              "net_route_diagnostics": 7,
+              "net_dns_lookup": 6,
+              "net_traceroute": 3,
+              "net_ping": 2,
+              "computer_control": 1
+            },
+            "success_rate": 0.3889
+          },
+          "process_action": {
+            "runs": 21,
+            "passed": 6,
+            "failed": 15,
+            "selected": {
+              "computer_control": 15,
+              "windows_task": 6
+            },
+            "success_rate": 0.2857
+          },
+          "process_inventory": {
+            "runs": 21,
+            "passed": 19,
+            "failed": 2,
+            "selected": {
+              "windows_task": 19,
+              "computer_control": 2
+            },
+            "success_rate": 0.9048
+          },
+          "security_posture": {
+            "runs": 21,
+            "passed": 19,
+            "failed": 2,
+            "selected": {
+              "windows_task": 19,
+              "computer_control": 1,
+              "os_firewall": 1
+            },
+            "success_rate": 0.9048
+          },
+          "software_management": {
+            "runs": 21,
+            "passed": 4,
+            "failed": 17,
+            "selected": {
+              "winget_search": 9,
+              "computer_control": 7,
+              "winget_install": 4,
+              "windows_task": 1
+            },
+            "success_rate": 0.1905
+          },
+          "system_diagnostics": {
+            "runs": 21,
+            "passed": 11,
+            "failed": 10,
+            "selected": {
+              "windows_task": 13,
+              "win_system_report": 11,
+              "pc_event_log_errors": 10,
+              "pc_disk_smart_health": 7,
+              "pc_hardware_specs": 6,
+              "pc_hardware_temps": 6,
+              "pc_health_trend": 5,
+              "pc_system_info": 2,
+              "pc_gpu_status": 1,
+              "pc_installed_software": 1
+            },
+            "success_rate": 0.5238
+          },
+          "text_only_command": {
+            "runs": 18,
+            "passed": 18,
+            "failed": 0,
+            "selected": {},
+            "success_rate": 1.0
+          },
+          "windows_services": {
+            "runs": 21,
+            "passed": 12,
+            "failed": 9,
+            "selected": {
+              "win_service_action": 12,
+              "computer_control": 4,
+              "windows_task": 4,
+              "pc_run_powershell": 1
+            },
+            "success_rate": 0.5714
+          }
+        }
+      },
+      "retrospective_tool_name_compatibility": {
+        "runs": 240,
+        "compatible_tool_name_runs": 177,
+        "compatible_tool_name_rate": 0.7375,
+        "compatible_without_action_discriminator_runs": 65,
+        "action_unverified_runs": 101,
+        "condition_unverified_runs": 11,
+        "nonexistent_tool_runs": 8,
+        "nonexistent_tool_names": {
+          "pc_file_search": 4,
+          "pc_find_files": 2,
+          "pc_open_app": 1,
+          "pc_search_files": 1
+        },
+        "incompatible_tool_runs": 47,
+        "incompatible_tool_names": {
+          "code_workspace_status": 1,
+          "computer_control": 33,
+          "pc_health_trend": 1,
+          "pc_run_powershell": 1,
+          "system_search_content": 1,
+          "windows_task": 10
+        },
+        "missing_selection_runs": 8,
+        "by_family": {
+          "application_launch": {
+            "compatible_name_action_unverified": 15,
+            "nonexistent_tool": 1,
+            "incompatible_tool": 2,
+            "runs": 18,
+            "compatible_tool_name_rate": 0.8333
+          },
+          "desktop_observation": {
+            "compatible_name_action_unverified": 21,
+            "runs": 21,
+            "compatible_tool_name_rate": 1.0
+          },
+          "file_discovery": {
+            "compatible": 10,
+            "nonexistent_tool": 7,
+            "incompatible_tool": 1,
+            "runs": 18,
+            "compatible_tool_name_rate": 0.5556
+          },
+          "file_mutation": {
+            "compatible_name_condition_unverified": 11,
+            "incompatible_tool": 4,
+            "missing_selection": 6,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.5238
+          },
+          "network_diagnostics": {
+            "compatible_name_action_unverified": 8,
+            "compatible": 9,
+            "incompatible_tool": 1,
+            "runs": 18,
+            "compatible_tool_name_rate": 0.9444
+          },
+          "process_action": {
+            "incompatible_tool": 15,
+            "compatible_name_action_unverified": 6,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.2857
+          },
+          "process_inventory": {
+            "compatible_name_action_unverified": 19,
+            "incompatible_tool": 2,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.9048
+          },
+          "security_posture": {
+            "compatible_name_action_unverified": 20,
+            "incompatible_tool": 1,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.9524
+          },
+          "software_management": {
+            "incompatible_tool": 8,
+            "compatible": 13,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.619
+          },
+          "system_diagnostics": {
+            "incompatible_tool": 4,
+            "compatible": 15,
+            "missing_selection": 2,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.7143
+          },
+          "text_only_command": {
+            "compatible": 18,
+            "runs": 18,
+            "compatible_tool_name_rate": 1.0
+          },
+          "windows_services": {
+            "compatible_name_action_unverified": 12,
+            "incompatible_tool": 9,
+            "runs": 21,
+            "compatible_tool_name_rate": 0.5714
+          }
+        }
+      },
+      "results": [
+        {
+          "intent_id": "intent-001",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-001",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-001",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-002",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-002",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-002",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-004",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-004",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-004",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-005",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-005",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-005",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-007",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-007",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-007",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-008",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-008",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-008",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-010",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-010",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-010",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-011",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-011",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-011",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-013",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-013",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-013",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-014",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-014",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-014",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-016",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-016",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-016",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-017",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-017",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-017",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-019",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-019",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-019",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-020",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-020",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-020",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-022",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-022",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-022",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-023",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-023",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-023",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-025",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "pc_open_app"
+          ],
+          "capability_id": "application.launch",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-025",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-025",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-026",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-026",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-026",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-028",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-028",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-028",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-029",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-029",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-029",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-031",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-031",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-031",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-032",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-032",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-032",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-034",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-034",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "pc_run_powershell"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-034",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-035",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-035",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-035",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-037",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-037",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-037",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-038",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-038",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-038",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-040",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-040",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-040",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-041",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-041",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-041",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-043",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-043",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_install"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-043",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_install"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-044",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_install"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-044",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-044",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_install"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-046",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-046",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-046",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-047",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-047",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-047",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-049",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-049",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-049",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-050",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-050",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-050",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-052",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-052",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_find_files"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-052",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-053",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-053",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-053",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-055",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-055",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-055",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-056",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "system_search_content"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-056",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_search_files"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-056",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_find_files"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-058",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-058",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-058",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-059",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "unified_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "broader_valid",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-059",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "unified_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "broader_valid",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-059",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-061",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-061",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-061",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-062",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-062",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-062",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-064",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-064",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-064",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-065",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-065",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-065",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-067",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-067",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-067",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-068",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find",
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-068",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-068",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find",
+            "file_find",
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-070",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "code_workspace_status"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-070",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-070",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-071",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "pc_disk_smart_health",
+            "pc_event_log_errors",
+            "pc_health_trend",
+            "pc_hardware_temps",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-071",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_health_trend",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "pc_disk_smart_health",
+            "pc_event_log_errors",
+            "pc_hardware_temps",
+            "windows_task",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-071",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_event_log_errors",
+            "pc_disk_smart_health",
+            "pc_health_trend"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-073",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-073",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-073",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-074",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "pc_event_log_errors",
+            "windows_task",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-074",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_disk_smart_health",
+            "pc_hardware_temps",
+            "win_system_report",
+            "pc_event_log_errors",
+            "pc_health_trend"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-074",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "pc_event_log_errors",
+            "pc_disk_smart_health",
+            "pc_hardware_temps",
+            "pc_hardware_specs"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-076",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_hardware_specs",
+            "pc_installed_software"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-076",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_hardware_specs"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-076",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_hardware_specs",
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-077",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-077",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-077",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-079",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report",
+            "pc_event_log_errors"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-079",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_disk_smart_health",
+            "pc_gpu_status",
+            "pc_health_trend",
+            "pc_event_log_errors",
+            "win_system_report",
+            "pc_hardware_specs",
+            "pc_system_info",
+            "pc_hardware_temps"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-079",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_hardware_specs",
+            "pc_system_info",
+            "win_system_report",
+            "pc_hardware_temps",
+            "pc_disk_smart_health",
+            "pc_event_log_errors"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-080",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "pc_event_log_errors"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-080",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [],
+          "capability_id": "system.diagnose",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-080",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [],
+          "capability_id": "system.diagnose",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-082",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "net_route_diagnostics",
+            "net_dns_lookup"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-082",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-082",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-083",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_traceroute"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-083",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_traceroute"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-083",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_traceroute"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-085",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "net_dns_lookup",
+            "net_ping"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-085",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "net_dns_lookup",
+            "net_dns_lookup"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-085",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "net_dns_lookup",
+            "net_dns_lookup"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-086",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-086",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-086",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-088",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-088",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_ping"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-088",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-089",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-089",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-089",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "evidence",
+          "required_action": "network.status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-091",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-091",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-091",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-092",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-092",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-092",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-094",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-094",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-094",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-095",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "os_firewall"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "status",
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-095",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-095",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-097",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-097",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-097",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-098",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-098",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-098",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-100",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-100",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-100",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-101",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-101",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-101",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-103",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-103",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-103",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-104",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-104",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-104",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-106",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-106",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-106",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-107",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-107",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-107",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-109",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-109",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-109",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-110",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-110",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-110",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-112",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-112",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-112",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-113",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-113",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-113",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-115",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-115",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-115",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-116",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-116",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-116",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-118",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-118",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-118",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-119",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-119",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-119",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        }
+      ]
+    },
+    "holdout": {
+      "artifact": "routing-windows-task-holdout-source-closed.json",
+      "artifact_sha256": "355ec86529f0edab7656e9fa070b2a775012afa83c08a4b1d6b0def955f42794",
+      "source_verification": {
+        "historical_commit": "e7df13dfcf9678cf987f451bb18ab78eeba2926b",
+        "sources": {
+          "agent.py": {
+            "path": "backend/agent.py",
+            "recorded_sha256": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+            "reference_commit_sha256": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+            "matches_reference_commit": false
+          },
+          "agent_tool_step.py": {
+            "path": "backend/agent_tool_step.py",
+            "recorded_sha256": "b10b14745b61d1cde3678d6ba5ad434e63464f835ee6de5b4f1c028998ec078a",
+            "reference_commit_sha256": "b10b14745b61d1cde3678d6ba5ad434e63464f835ee6de5b4f1c028998ec078a",
+            "matches_reference_commit": true
+          },
+          "agent_tool_selection.py": {
+            "path": "backend/agent_tool_selection.py",
+            "recorded_sha256": "af085feeddd5108d31de06299b6dec7264a627413068d7eddbde615426d73d98",
+            "reference_commit_sha256": "af085feeddd5108d31de06299b6dec7264a627413068d7eddbde615426d73d98",
+            "matches_reference_commit": true
+          },
+          "capability_catalog.py": {
+            "path": "backend/capability_catalog.py",
+            "recorded_sha256": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+            "reference_commit_sha256": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+            "matches_reference_commit": true
+          },
+          "capability_discovery.py": {
+            "path": "backend/capability_discovery.py",
+            "recorded_sha256": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+            "reference_commit_sha256": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+            "matches_reference_commit": true
+          },
+          "tools.py": {
+            "path": "backend/tools.py",
+            "recorded_sha256": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+            "reference_commit_sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+            "matches_reference_commit": false
+          },
+          "windows_task.py": {
+            "path": "backend/windows_task.py",
+            "recorded_sha256": "e61f1fe59539ac9ee503dbb8c938bfc8a619dbf9f06ce074f6469338608a9934",
+            "reference_commit_sha256": "e61f1fe59539ac9ee503dbb8c938bfc8a619dbf9f06ce074f6469338608a9934",
+            "matches_reference_commit": true
+          },
+          "routing_runner.py": {
+            "path": "scripts/run_windows_operator_routing_baseline.py",
+            "recorded_sha256": "f58b38cc645e476314c8f46d2ee53ad4e577829b63ae65fb06c46da3fda8a395",
+            "reference_commit_sha256": "f58b38cc645e476314c8f46d2ee53ad4e577829b63ae65fb06c46da3fda8a395",
+            "matches_reference_commit": true
+          }
+        },
+        "exact_matches": 6,
+        "source_count": 8,
+        "corpus_sha256": "9f223d59083582b53c1352a0215a9b506b1945f3b49bf4fe220409f46d11241f",
+        "corpus_matches_reference_commit": true,
+        "provenance_complete": false,
+        "limitation": "Certaines empreintes de campagne ne correspondent a aucun blob du commit de reference; elles sont conservees sans sur-declaration."
+      },
+      "historical_adoption_summary": {
+        "runs": 120,
+        "passed": 49,
+        "failed": 71,
+        "success_rate": 0.4083,
+        "forbidden_route_count": 0,
+        "false_success_measurable": false,
+        "false_success_count": null,
+        "stable_intents": 20,
+        "intent_count": 40,
+        "repeat_stability_rate": 0.5,
+        "median_duration_ms": 10698,
+        "by_family": {
+          "application_launch": {
+            "runs": 12,
+            "passed": 6,
+            "failed": 6,
+            "selected": {
+              "computer_control": 6,
+              "windows_task": 6
+            },
+            "success_rate": 0.5
+          },
+          "desktop_observation": {
+            "runs": 9,
+            "passed": 6,
+            "failed": 3,
+            "selected": {
+              "computer_control": 6,
+              "pc_gui_read": 2
+            },
+            "success_rate": 0.6667
+          },
+          "file_discovery": {
+            "runs": 12,
+            "passed": 0,
+            "failed": 12,
+            "selected": {
+              "pc_file_search": 5,
+              "file_find": 3,
+              "pc_find_files": 2,
+              "find_files": 1,
+              "system_search_content": 1
+            },
+            "success_rate": 0.0
+          },
+          "file_mutation": {
+            "runs": 9,
+            "passed": 0,
+            "failed": 9,
+            "selected": {
+              "computer_control": 3,
+              "file_find": 2,
+              "file_large_finder": 1,
+              "file_search_text": 1
+            },
+            "success_rate": 0.0
+          },
+          "network_diagnostics": {
+            "runs": 12,
+            "passed": 3,
+            "failed": 9,
+            "selected": {
+              "computer_control": 3,
+              "net_route_diagnostics": 3,
+              "net_traceroute": 3
+            },
+            "success_rate": 0.25
+          },
+          "process_action": {
+            "runs": 9,
+            "passed": 3,
+            "failed": 6,
+            "selected": {
+              "computer_control": 6,
+              "windows_task": 3
+            },
+            "success_rate": 0.3333
+          },
+          "process_inventory": {
+            "runs": 9,
+            "passed": 5,
+            "failed": 4,
+            "selected": {
+              "windows_task": 5,
+              "task_list": 3,
+              "computer_control": 1
+            },
+            "success_rate": 0.5556
+          },
+          "security_posture": {
+            "runs": 9,
+            "passed": 8,
+            "failed": 1,
+            "selected": {
+              "windows_task": 8,
+              "computer_control": 1
+            },
+            "success_rate": 0.8889
+          },
+          "software_management": {
+            "runs": 9,
+            "passed": 0,
+            "failed": 9,
+            "selected": {
+              "windows_task": 4,
+              "winget_search": 3,
+              "computer_control": 2
+            },
+            "success_rate": 0.0
+          },
+          "system_diagnostics": {
+            "runs": 9,
+            "passed": 3,
+            "failed": 6,
+            "selected": {
+              "windows_task": 30,
+              "pc_event_log_errors": 5,
+              "os_power_plan": 3,
+              "win_system_report": 3,
+              "pc_disk_smart_health": 2
+            },
+            "success_rate": 0.3333
+          },
+          "text_only_command": {
+            "runs": 12,
+            "passed": 12,
+            "failed": 0,
+            "selected": {},
+            "success_rate": 1.0
+          },
+          "windows_services": {
+            "runs": 9,
+            "passed": 3,
+            "failed": 6,
+            "selected": {
+              "computer_control": 4,
+              "win_service_action": 3,
+              "windows_task": 2
+            },
+            "success_rate": 0.3333
+          }
+        }
+      },
+      "retrospective_tool_name_compatibility": {
+        "runs": 120,
+        "compatible_tool_name_runs": 62,
+        "compatible_tool_name_rate": 0.5167,
+        "compatible_without_action_discriminator_runs": 29,
+        "action_unverified_runs": 31,
+        "condition_unverified_runs": 2,
+        "nonexistent_tool_runs": 8,
+        "nonexistent_tool_names": {
+          "find_files": 1,
+          "pc_file_search": 5,
+          "pc_find_files": 2
+        },
+        "incompatible_tool_runs": 44,
+        "incompatible_tool_names": {
+          "computer_control": 26,
+          "file_large_finder": 1,
+          "file_search_text": 1,
+          "os_power_plan": 1,
+          "system_search_content": 1,
+          "task_list": 3,
+          "windows_task": 11
+        },
+        "missing_selection_runs": 6,
+        "by_family": {
+          "application_launch": {
+            "compatible_name_action_unverified": 6,
+            "incompatible_tool": 6,
+            "runs": 12,
+            "compatible_tool_name_rate": 0.5
+          },
+          "desktop_observation": {
+            "compatible_name_action_unverified": 6,
+            "compatible": 2,
+            "missing_selection": 1,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.8889
+          },
+          "file_discovery": {
+            "nonexistent_tool": 8,
+            "compatible": 3,
+            "incompatible_tool": 1,
+            "runs": 12,
+            "compatible_tool_name_rate": 0.25
+          },
+          "file_mutation": {
+            "compatible_name_condition_unverified": 2,
+            "incompatible_tool": 5,
+            "missing_selection": 2,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.2222
+          },
+          "network_diagnostics": {
+            "incompatible_tool": 3,
+            "missing_selection": 3,
+            "compatible": 6,
+            "runs": 12,
+            "compatible_tool_name_rate": 0.5
+          },
+          "process_action": {
+            "compatible_name_action_unverified": 3,
+            "incompatible_tool": 6,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.3333
+          },
+          "process_inventory": {
+            "compatible_name_action_unverified": 5,
+            "incompatible_tool": 4,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.5556
+          },
+          "security_posture": {
+            "incompatible_tool": 1,
+            "compatible_name_action_unverified": 8,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.8889
+          },
+          "software_management": {
+            "incompatible_tool": 6,
+            "compatible": 3,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.3333
+          },
+          "system_diagnostics": {
+            "incompatible_tool": 6,
+            "compatible": 3,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.3333
+          },
+          "text_only_command": {
+            "compatible": 12,
+            "runs": 12,
+            "compatible_tool_name_rate": 1.0
+          },
+          "windows_services": {
+            "incompatible_tool": 6,
+            "compatible_name_action_unverified": 3,
+            "runs": 9,
+            "compatible_tool_name_rate": 0.3333
+          }
+        }
+      },
+      "results": [
+        {
+          "intent_id": "intent-003",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-003",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-003",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-006",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-006",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-006",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.list",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-009",
+          "run": 1,
+          "family": "process_inventory",
+          "selected_tools": [
+            "task_list"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-009",
+          "run": 2,
+          "family": "process_inventory",
+          "selected_tools": [
+            "task_list"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-009",
+          "run": 3,
+          "family": "process_inventory",
+          "selected_tools": [
+            "task_list"
+          ],
+          "capability_id": "process.inventory",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-012",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-012",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-012",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-015",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-015",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-015",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-018",
+          "run": 1,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-018",
+          "run": 2,
+          "family": "process_action",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "process.stop",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "process.stop",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-018",
+          "run": 3,
+          "family": "process_action",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "process.stop",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-021",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-021",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-021",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-024",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-024",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-024",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-027",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-027",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-027",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-030",
+          "run": 1,
+          "family": "application_launch",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "application.launch",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "application.launch",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-030",
+          "run": 2,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-030",
+          "run": 3,
+          "family": "application_launch",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "application.launch",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-033",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-033",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-033",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-036",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-036",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-036",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-039",
+          "run": 1,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-039",
+          "run": 2,
+          "family": "windows_services",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-039",
+          "run": 3,
+          "family": "windows_services",
+          "selected_tools": [
+            "win_service_action"
+          ],
+          "capability_id": "service.change_state",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "start|stop|restart",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-042",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-042",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-042",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-045",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-045",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-045",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "winget_search"
+          ],
+          "capability_id": "software.install",
+          "classification": "compatible",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-048",
+          "run": 1,
+          "family": "software_management",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-048",
+          "run": 2,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-048",
+          "run": 3,
+          "family": "software_management",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "software.install",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-051",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-051",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-051",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-054",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-054",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_find_files"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-054",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-057",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_find_files"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-057",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "pc_file_search"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-057",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "find_files"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "nonexistent_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-060",
+          "run": 1,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-060",
+          "run": 2,
+          "family": "file_discovery",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-060",
+          "run": 3,
+          "family": "file_discovery",
+          "selected_tools": [
+            "system_search_content"
+          ],
+          "capability_id": "filesystem.search_by_name",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-063",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-063",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-063",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-066",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_search_text"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-066",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_large_finder"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-066",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [
+            "file_find"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "compatible_name_condition_unverified",
+          "accepted_role": "preparatory",
+          "required_action": null,
+          "required_condition": "source_path_unresolved",
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-069",
+          "run": 1,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-069",
+          "run": 2,
+          "family": "file_mutation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "filesystem.move",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-069",
+          "run": 3,
+          "family": "file_mutation",
+          "selected_tools": [],
+          "capability_id": "filesystem.move",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-072",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-072",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-072",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-075",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "os_power_plan",
+            "windows_task",
+            "pc_disk_smart_health",
+            "pc_event_log_errors"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-075",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "pc_disk_smart_health",
+            "pc_event_log_errors",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-075",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "pc_event_log_errors",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-078",
+          "run": 1,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "win_system_report"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-078",
+          "run": 2,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "os_power_plan",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "windows_task",
+            "pc_event_log_errors"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-078",
+          "run": 3,
+          "family": "system_diagnostics",
+          "selected_tools": [
+            "windows_task",
+            "windows_task",
+            "os_power_plan",
+            "pc_event_log_errors",
+            "windows_task",
+            "windows_task",
+            "windows_task"
+          ],
+          "capability_id": "system.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-081",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-081",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-081",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-084",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [],
+          "capability_id": "network.diagnose",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-084",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [],
+          "capability_id": "network.diagnose",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-084",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [],
+          "capability_id": "network.diagnose",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-087",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-087",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-087",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_route_diagnostics"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "terminal",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-090",
+          "run": 1,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_traceroute"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-090",
+          "run": 2,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_traceroute"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-090",
+          "run": 3,
+          "family": "network_diagnostics",
+          "selected_tools": [
+            "net_traceroute"
+          ],
+          "capability_id": "network.diagnose",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-093",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "incompatible_tool",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-093",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-093",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-096",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-096",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-096",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-099",
+          "run": 1,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-099",
+          "run": 2,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-099",
+          "run": 3,
+          "family": "security_posture",
+          "selected_tools": [
+            "windows_task"
+          ],
+          "capability_id": "security.firewall.inspect",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "security.firewall.status",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-102",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-102",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "pc_gui_read"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-102",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "pc_gui_read"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible",
+          "accepted_role": "evidence",
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-105",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-105",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-105",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-108",
+          "run": 1,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-108",
+          "run": 2,
+          "family": "desktop_observation",
+          "selected_tools": [
+            "computer_control"
+          ],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "compatible_name_action_unverified",
+          "accepted_role": "terminal",
+          "required_action": "observe|screenshot|click|type|focus|verify",
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-108",
+          "run": 3,
+          "family": "desktop_observation",
+          "selected_tools": [],
+          "capability_id": "desktop.visual_interaction",
+          "classification": "missing_selection",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": false
+        },
+        {
+          "intent_id": "intent-111",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-111",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-111",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-114",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-114",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-114",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-117",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-117",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-117",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-120",
+          "run": 1,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-120",
+          "run": 2,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        },
+        {
+          "intent_id": "intent-120",
+          "run": 3,
+          "family": "text_only_command",
+          "selected_tools": [],
+          "capability_id": "text.only",
+          "classification": "compatible",
+          "accepted_role": null,
+          "required_action": null,
+          "required_condition": null,
+          "historical_passed": true
+        }
+      ]
+    }
+  },
+  "original_acceptance_report_sha256": "004d6fa871a630166542dc2f3d5674d8a8d00fe1590d8e0dac8d62d845f5db14"
+}
