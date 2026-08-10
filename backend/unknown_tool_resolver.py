@@ -25,8 +25,9 @@ _GENERIC_TOKENS = {
     "program", "system", "tool", "windows",
 }
 _CONFLICTING_INTENTS = (
-    ({"stop", "kill", "uninstall", "delete", "remove"}, {"list", "inventory", "read", "search"}),
+    ({"stop", "kill", "uninstall", "delete", "remove"}, {"list", "inventory", "read", "search", "install", "create"}),
     ({"list", "inventory", "enumerate", "read", "search"}, {"kill", "delete", "remove", "uninstall"}),
+    ({"install", "create"}, {"uninstall", "delete", "remove"}),
     ({"move", "relocate"}, {"copy", "duplicate"}),
     ({"copy", "duplicate"}, {"move", "relocate"}),
     ({"list", "inventory", "enumerate"}, {"exec", "execute", "run"}),

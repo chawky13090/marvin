@@ -1,0 +1,26 @@
+{
+  "schema": "marvin.tool-recovery-acceptance-erratum/1.0",
+  "status": "corrective_constraint_after_review",
+  "original_policy_sha256": "7ad2245df5d3cc09cde52ab80551a0da9d989d089d1b3ee4fe81ebdfd3e8b1a2",
+  "reason": "The original policy prevented shared taxonomies but did not freeze shared production ranking heuristics.",
+  "shared_production_ranking_baseline_commit": "3ebef3f",
+  "shared_production_source_hashes": {
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/capability_catalog.py": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+    "backend/capability_discovery.py": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+    "backend/tool_router.py": "aa8cc084e9dd19ca6e45bbce3ad72970d59f55c3dbc6abff8a6255f33638f7a2"
+  },
+  "constraints": {
+    "shared_production_ranking_must_match_frozen_hashes": true,
+    "feature_specific_code_may_be_tuned_only_on_development_split": true,
+    "development_score_must_be_labelled_non_generalizable": true,
+    "any_shared_ranking_change_requires_new_baseline_and_new_holdout": true,
+    "existing_holdout_must_not_be_reused_after_shared_ranking_change": true,
+    "no_ranking_lexicon_or_constant_change_after_corpus_freeze_without_regel": true,
+    "minimum_names_per_evaluated_family": 5,
+    "minimum_independent_holdout_names": 20,
+    "full_21_family_holdout_minimum_names": 105,
+    "restricted_release_requires_explicit_enabled_families": true
+  },
+  "effect": "The 25 post-freeze English token aliases are removed. Development evidence must be regenerated without them."
+}

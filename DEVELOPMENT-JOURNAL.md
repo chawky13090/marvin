@@ -5,6 +5,31 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.607.0 — Correction de contamination du classement Forge v1.2
+
+Revue : Claude a démontré que les 25 alias anglais ajoutés avec v2.606 alimentaient le
+classement partagé de production même quand `MARVIN_UNKNOWN_TOOL_REDISCOVERY` était désactivé.
+Seize intentions du corpus de développement recoupaient au moins un de ces synonymes. Le
+score 70,83 % était donc un score ajusté au corpus et ne pouvait pas estimer la généralisation.
+
+Correction : les 25 alias sont retirés sans être déplacés vers un autre lexique. Le fichier
+`tool_capability_ranking.py` retrouve exactement le SHA-256 gelé au commit `3ebef3f`. Un
+erratum séparé préserve la politique originale byte-for-byte, fige les empreintes des quatre
+sources partagées et exige une nouvelle baseline et un nouveau holdout si elles changent.
+Le code spécifique au résolveur peut être ajusté uniquement sur le split développement, dont
+le score doit rester explicitement non généralisable.
+
+Résultat rejoué : 15/24 (62,5 %) sur 120 répétitions, zéro candidat interdit, zéro exécution
+implicite. Le critère restreint reste faux : aucune des 21 familles n'a les cinq noms minimum
+pour rendre son taux interprétable; un holdout complet exige donc au moins 105 noms. Le
+résolveur reste désactivé par défaut. L'étage lexical partagé rejoué sur les 120 intentions
+v1.1 produit zéro différence avant/après. `calendar_list`, non accepté par l'oracle gelé pour
+`tr-dev-020`, est documenté mais non rescored. Les tests du classement normal et de la
+sélection agentique passent avec les anciennes heuristiques restaurées. Sécurité : la règle
+générique d'incompatibilité empêche notamment qu'une demande de désinstallation propose une
+installation; aucun outil n'est exécuté. Logs et données : aucun impact. Rollback : réversion
+atomique du commit v2.607; aucun schéma ni état persistant.
+
 ## 2026-08-10 — v2.606.0 — Redécouverte générique des noms d'outils, développement uniquement
 
 Demande : traiter les noms d'outils plausibles mais inexistants sans coder les cinq noms vus
@@ -17,7 +42,7 @@ par capacité et des synonymes d'intention génériques. Il retourne au plus tro
 n'expose jamais les valeurs d'arguments et n'exécute rien. Un nouvel appel natif reste
 obligatoire. Les imports directs et transitifs entre oracle et registre produit sont testés.
 
-Résultat observé : 17/24 intentions de développement (70,83 %) sur 120 répétitions, zéro
+Résultat initial, invalidé par la revue v2.607 : 17/24 intentions de développement (70,83 %) sur 120 répétitions, zéro
 candidat interdit, zéro remplacement et zéro exécution implicite. Les métriques de nouvel
 appel LLM et de résultat métier restent explicitement non mesurées. Aucun holdout indépendant
 n'étant disponible, `MARVIN_UNKNOWN_TOOL_REDISCOVERY` est désactivé par défaut et la fonction

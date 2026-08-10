@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.606.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.607.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.606.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.607.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,15 +213,28 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.606.0)
+## 9. État actuel (v2.607.0)
+
+**v2.607 (classement partagé restauré)** : la revue croisée a démontré que 25 synonymes
+anglais ajoutés après le gel Forge modifiaient aussi le classement normal de production,
+hors du drapeau v1.2. Ils sont intégralement retirés; `tool_capability_ranking.py` retrouve
+exactement son SHA-256 du commit de pré-enregistrement `3ebef3f`. Un erratum immuable impose
+désormais le gel des quatre sources de classement partagées et exige nouvelle baseline et
+nouveau holdout pour toute évolution. Rejoué sans ces alias, le score développement v1.2 est
+15/24 (62,5 %), zéro candidat interdit et zéro exécution implicite sur 120 répétitions. Il est
+explicitement non généralisable; aucune famille n'a les cinq cas indépendants minimum. Le
+rejeu de l'étage lexical partagé sur les 120 intentions v1.1 donne zéro classement modifié.
+Le résolveur reste désactivé. Rollback : réversion atomique
+du commit v2.607; aucune donnée persistante ni migration.
 
 **v2.606 (redécouverte bornée, non généralisée)** : un nom d'outil inconnu peut être
 traité comme une requête consultative contre les 364 contrats réels, avec trois candidats
 maximum. Aucun alias observé n'est codé en dur, aucune valeur d'argument n'entre dans la
 recherche et aucune substitution n'est exécutée : le LLM doit émettre un nouvel appel natif,
 qui repasse par schéma, permissions, confirmation, idempotence et vérification. Forge v1.2 a
-été pré-enregistré dans un commit antérieur au produit. Le split développement obtient 17/24
-(70,83 %) et 0 exécution implicite/interdite sur 120 répétitions. Faute de holdout fourni par
+été pré-enregistré dans un commit antérieur au produit. Après retrait des heuristiques
+partagées postérieures au gel, le split développement obtient 15/24 (62,5 %) et 0 exécution
+implicite/interdite sur 120 répétitions. Faute de holdout fourni par
 un évaluateur indépendant, la fonction reste désactivée par défaut et ne peut être activée
 qu'en développement avec `MARVIN_UNKNOWN_TOOL_REDISCOVERY=1`. Rollback : réversion atomique
 du commit v2.606; aucune donnée persistante ni migration.

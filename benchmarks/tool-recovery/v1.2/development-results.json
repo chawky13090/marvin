@@ -5,18 +5,178 @@
   "generalization_allowed": false,
   "repetitions": 5,
   "runs": 120,
-  "candidate_set_recall": 0.7083,
+  "candidate_set_recall": 0.625,
   "false_replacement_count": 0,
   "implicit_execution_count": 0,
   "valid_new_native_call_rate": null,
   "business_outcome_success_rate": null,
+  "family_metrics": {
+    "process_inventory": {
+      "names": 1,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "process_action": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "application_launch": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "windows_services": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "software_search": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "software_inventory": {
+      "names": 1,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "software_install": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "software_uninstall": {
+      "names": 1,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "file_discovery": {
+      "names": 1,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "file_content": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "file_mutation": {
+      "names": 2,
+      "accepted_names": 1,
+      "rate": 0.5,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "network_diagnostics": {
+      "names": 2,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "security_posture": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "system_diagnostics": {
+      "names": 2,
+      "accepted_names": 2,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "desktop_observation": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "desktop_interaction": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "calendar_read": {
+      "names": 1,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "email_read": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "document_read": {
+      "names": 1,
+      "accepted_names": 0,
+      "rate": 0.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": false
+    },
+    "ssh_inventory": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    },
+    "explicit_refusal": {
+      "names": 1,
+      "accepted_names": 1,
+      "rate": 1.0,
+      "sample_sufficient": false,
+      "meets_restricted_rate": true
+    }
+  },
+  "eligible_restricted_families": [],
+  "restricted_candidate_layer_pass": false,
+  "restricted_candidate_layer_reason": "Aucune famille ne dispose des cinq noms independants minimum requis par l'erratum v1.1.",
+  "known_oracle_limitations": [
+    {
+      "id": "tr-dev-020",
+      "candidate": "calendar_list",
+      "status": "not_rescored",
+      "reason": "Le candidat parait fonctionnellement recevable mais n'est pas accepte par l'oracle gele; le score historique reste inchange."
+    }
+  ],
   "unmeasured_metrics_reason": "Aucun holdout LLM et aucun parcours metier independant n'ont encore ete executes.",
   "source_hashes": {
     "benchmarks/tool-recovery/v1.2/acceptance-policy.json": "7ad2245df5d3cc09cde52ab80551a0da9d989d089d1b3ee4fe81ebdfd3e8b1a2",
     "benchmarks/tool-recovery/v1.2/development-corpus.json": "8f988f44d9b96b4418b2d8d6e81184b36ca3f5036aa12a1c748ac8c36cd23be2",
-    "backend/unknown_tool_resolver.py": "93a54bddb87871354febb7db4dbb28b33931b5a9049babfe7395289a9d942dad",
+    "backend/unknown_tool_resolver.py": "6086fff9f607624178a44fa7e5bb0c35c5fa6d09fb6426d4674f949f665f827f",
     "backend/capability_catalog.py": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
-    "backend/tool_capability_ranking.py": "bc4bea432e56c693304d441283d5cdd487d21d4618f90287d261ce1d3f7d3808",
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
     "scripts/forge_v12_oracle.py": "1c85fcfb260bed0cf20b3e7d558e124c427b2fddd80e57328c4e009609299d50"
   },
   "items": [
@@ -24,10 +184,10 @@
       "id": "tr-dev-001",
       "family": "process_inventory",
       "candidate_names": [
-        "pc_process_list",
-        "windows_task"
+        "net_snmp_query",
+        "os_network_adapters"
       ],
-      "accepted": true,
+      "accepted": false,
       "forbidden_candidates": [],
       "executed": false
     },
@@ -108,9 +268,9 @@
       "family": "software_uninstall",
       "candidate_names": [
         "tweak_debloat_remove",
-        "winget_uninstall"
+        "net_snmp_query"
       ],
-      "accepted": true,
+      "accepted": false,
       "forbidden_candidates": [],
       "executed": false
     },
@@ -130,9 +290,9 @@
       "id": "tr-dev-010",
       "family": "file_content",
       "candidate_names": [
-        "system_search_content",
         "search_semantic",
-        "unified_search"
+        "unified_search",
+        "system_search_content"
       ],
       "accepted": true,
       "forbidden_candidates": [],
@@ -143,8 +303,8 @@
       "family": "file_mutation",
       "candidate_names": [
         "file_extract",
-        "file_move",
-        "file_read"
+        "file_read",
+        "file_move"
       ],
       "accepted": true,
       "forbidden_candidates": [],
@@ -154,9 +314,9 @@
       "id": "tr-dev-012",
       "family": "file_mutation",
       "candidate_names": [
-        "file_duplicate_finder",
         "file_create_folder",
-        "file_convert_docx_to_pdf"
+        "file_convert_docx_to_pdf",
+        "file_duplicate_finder"
       ],
       "accepted": false,
       "forbidden_candidates": [],
@@ -227,7 +387,8 @@
       "family": "desktop_observation",
       "candidate_names": [
         "computer_control",
-        "pc_gui_read"
+        "event_create",
+        "ocr_extract"
       ],
       "accepted": true,
       "forbidden_candidates": [],
@@ -250,8 +411,8 @@
       "family": "calendar_read",
       "candidate_names": [
         "calendar_list",
-        "calendar_create",
-        "calendar_subscribe"
+        "billing_catalog_list",
+        "billing_client_list"
       ],
       "accepted": false,
       "forbidden_candidates": [],
@@ -262,8 +423,8 @@
       "family": "email_read",
       "candidate_names": [
         "email_list",
-        "billing_client_list",
-        "billing_catalog_list"
+        "billing_catalog_list",
+        "billing_client_list"
       ],
       "accepted": true,
       "forbidden_candidates": [],
