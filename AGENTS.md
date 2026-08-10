@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.609.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.610.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.609.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.610.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.609.0)
+## 9. État actuel (v2.610.0)
+
+**v2.610 (preuve tri-état et priorité rollback)** : v1 reste immuable et l'inventaire v1.1
+distingue maintenant `true`, `false` et `null`. E3, E4, E5 et E7 sont `unassessed` tant
+qu'aucun artefact explicite ne peut les évaluer; l'activité automatisée historique n'est donc
+plus présentée à tort comme absente. La campagne B reste verrouillée et sa première vague
+couvre exactement les 36 couples marqués dangereux, visibles du LLM et sans rollback E7
+vérifié. Les 19 outils totalement vierges deviennent la vague suivante. Aucune action n'est
+exécutée sur l'hôte; fixtures isolées, oracles indépendants et restauration rejouée restent
+des préconditions. Rollback : réversion atomique du commit v2.610; les artefacts v1 restent
+inchangés et les artefacts v1.1 peuvent être supprimés sans toucher aux données actives.
 
 **v2.609 (surface de preuve complète des outils)** : un inventaire en lecture seule couvre
 les 364 outils et leurs 436 couples `outil + action` selon huit niveaux E0–E7. Une exécution

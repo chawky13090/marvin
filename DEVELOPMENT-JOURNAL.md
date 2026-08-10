@@ -5,6 +5,35 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.610.0 — Tri-état des preuves et vague rollback prioritaire
+
+Revue croisée : v2.609 encodait E3, E4, E5 et E7 en `false` alors que les sources disponibles
+ne permettaient pas de les évaluer. Cela présentait notamment l'absence de preuve attribuable
+d'automatisme E5 comme une preuve d'absence. V1 est conservé byte-for-byte; v1.1 publie la
+sémantique `true=verified`, `false=assessed absent`, `null=unassessed`. Le tableau expose les
+trois compteurs pour chaque niveau. `null` ne vaut jamais autorisation ni rollback.
+
+La priorité de campagne B est corrigée sans exécution : la première vague contient exactement
+les 36 couples `dangerous=true`, visibles du LLM et sans E7 vérifié. Les 19 outils totalement
+vierges restent gelés comme vague suivante. Un premier calcul trop large par `risk_tier>=4`
+avait inclus 26 actions conditionnelles sensibles; il a été refusé avant publication. La
+politique interdit toujours l'hôte, les destinataires/publications/achats réels et exige
+snapshot, fixture, oracle indépendant, teardown et restauration rejouée. Aucun effet métier,
+secret, schéma, routage ou catalogue n'est modifié. Rollback : réversion atomique du commit
+v2.610 et suppression optionnelle de `benchmarks/tool-evidence/v1.1`; v1 et SQLite restent
+inchangés.
+
+Validation finale observée : tests causaux inventaire et campagne B réussis, architecture
+`2.610.0` avec 364 outils, 391 routes, 41 pages, harnais 364/364 et 82 restrictions, puis gate
+exhaustif `success=true` avec 277 étapes réussies, zéro échec et quatre smokes live
+explicitement ignorés sur 281 attendues. La gate couvre 347 fichiers Python, 121 sources
+frontend, 37 avertissements inchangés, zéro exception historique et le build Next.js 16.2.12
+Turbopack. Une première campagne a été interrompue par fermeture manuelle de sa fenêtre CMD;
+le test causal concerné a réussi isolément et la campagne complète journalisée a ensuite
+fourni le verdict ci-dessus. Aucun ancien rapport n'a été réutilisé comme preuve.
+Après redémarrage officiel, `/api/health` répond `status=ok`, `version=2.610.0`, expose
+364/364 outils, Ollama est disponible et le frontend répond HTTP 200.
+
 ## 2026-08-10 — v2.609.0 — Surface de preuve E0–E7 des outils
 
 Demande : compter les capacités non testées et les outils non utilisés sans confondre usage

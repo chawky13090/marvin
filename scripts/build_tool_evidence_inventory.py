@@ -36,7 +36,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "benchmarks" / "tool-evidence" / "v1" / "inventory.json",
+        default=ROOT / "benchmarks" / "tool-evidence" / "v1.1" / "inventory.json",
     )
     args = parser.parse_args()
     payload = build_inventory(args.database)

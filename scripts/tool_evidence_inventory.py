@@ -192,16 +192,18 @@ def _usage(database_path: Path) -> tuple[dict[tuple[str, str], dict[str, Any]], 
 
 def _flags(
     *, harness: bool, automated_test: bool, usage: dict[str, Any]
-) -> dict[str, bool]:
+) -> dict[str, bool | None]:
     return {
         "E0": True,
         "E1": harness,
         "E2": automated_test,
-        "E3": False,
-        "E4": False,
-        "E5": False,
+        # None signifie non évaluable depuis les sources de cette version. Il ne
+        # doit jamais être interprété comme une preuve d'absence.
+        "E3": None,
+        "E4": None,
+        "E5": None,
         "E6": usage.get("successful_human_message_count", 0) > 0,
-        "E7": False,
+        "E7": None,
     }
 
 
@@ -228,9 +230,9 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
                 usage=usage,
             )
             risk_tier, risk_basis = _risk(tool_name, action)
-            missing = [level for level, present in evidence.items() if not present]
-            priority = risk_tier * (1 + int(not evidence["E4"])) * (
-                1 + int(not evidence["E7"])
+            missing = [level for level, present in evidence.items() if present is not True]
+            priority = risk_tier * (1 + int(evidence["E4"] is not True)) * (
+                1 + int(evidence["E7"] is not True)
             )
             rows.append(
                 {
@@ -248,12 +250,20 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
                     "missing_evidence": missing,
                     "usage": usage,
                     "verification_priority": priority,
-                    "rollback_verified": evidence["E7"],
+                    "rollback_verified": evidence["E7"] is True,
                 }
             )
     unknown_pairs = sorted(set(usage_by_pair) - known_pairs)
     by_level = {
-        level: sum(bool(row["evidence"][level]) for row in rows)
+        level: sum(row["evidence"][level] is True for row in rows)
+        for level in EVIDENCE_LEVELS
+    }
+    assessment_by_level = {
+        level: {
+            "verified": sum(row["evidence"][level] is True for row in rows),
+            "absent": sum(row["evidence"][level] is False for row in rows),
+            "unassessed": sum(row["evidence"][level] is None for row in rows),
+        }
         for level in EVIDENCE_LEVELS
     }
     never_executed = sum(not row["usage"].get("executions") for row in rows)
@@ -261,7 +271,7 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
         not row["usage"].get("distinct_human_message_count") for row in rows
     )
     return {
-        "schema_version": 1,
+        "schema_version": "1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "database": {
             "path": database_path.name,
@@ -278,7 +288,7 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
             "limitations": [
                 "Historical executions do not identify automation versus Forge when their conversation was deleted.",
                 "success=1 proves executor completion, not the requested business outcome.",
-                "E3, E4, E5 and E7 require new explicit evidence artifacts and are never inferred here.",
+                "E3, E4, E5 and E7 are unassessed until an explicit evidence artifact evaluates them.",
                 "Risk tier is a conservative inventory heuristic, not an authorization decision.",
             ],
         },
@@ -286,6 +296,7 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
             "catalog_tools": len(specifications),
             "tool_action_pairs": len(rows),
             "evidence_by_level": by_level,
+            "evidence_assessment_by_level": assessment_by_level,
             "never_executed_pairs": never_executed,
             "without_human_linked_execution_pairs": human_unused,
             "usage_totals": usage_totals,

@@ -59,7 +59,13 @@ def main() -> int:
     assert stopped["usage"]["orphan_or_ephemeral_executions"] == 1
     assert stopped["usage"]["distinct_human_message_count"] == 0
     assert stopped["evidence"]["E6"] is False
-    assert stopped["evidence"]["E7"] is False
+    assert stopped["evidence"]["E5"] is None
+    assert stopped["evidence"]["E7"] is None
+    assert report["summary"]["evidence_assessment_by_level"]["E5"] == {
+        "verified": 0,
+        "absent": 0,
+        "unassessed": report["summary"]["tool_action_pairs"],
+    }
     assert items[("file_find", DEFAULT_ACTION)]["llm_visible"] is True
     assert json.dumps(report, ensure_ascii=False)
     print("Tool Evidence Inventory OK - lecture seule, E0-E7 et exclusion éphémère.")

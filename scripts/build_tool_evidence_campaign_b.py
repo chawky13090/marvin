@@ -12,7 +12,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "benchmarks" / "tool-evidence" / "v1"
+BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.1"
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -68,7 +68,7 @@ def main() -> int:
             continue
         if not tool_never_executed and int(item.get("risk_tier", 0)) < 4:
             continue
-        if item.get("evidence", {}).get("E4") or item.get("evidence", {}).get("E7"):
+        if item.get("evidence", {}).get("E4") is True or item.get("evidence", {}).get("E7") is True:
             continue
         executions = int(item.get("usage", {}).get("executions", 0))
         candidates.append(
@@ -77,6 +77,7 @@ def main() -> int:
                 "action": item["action"],
                 "risk_tier": item["risk_tier"],
                 "risk_basis": item["risk_basis"],
+                "dangerous": bool(item.get("dangerous")),
                 "action_never_executed": executions == 0,
                 "tool_never_executed": tool_never_executed,
                 "historical_execution_count": executions,
@@ -92,16 +93,20 @@ def main() -> int:
         )
     candidates.sort(
         key=lambda item: (
-            not item["tool_never_executed"],
-            not item["action_never_executed"],
             -int(item["risk_tier"]),
+            not item["action_never_executed"],
+            not item["tool_never_executed"],
             str(item["tool"]),
             str(item["action"]),
         )
     )
-    first_wave_tools = sorted(
+    never_executed_tools = sorted(
         {item["tool"] for item in candidates if item["tool_never_executed"]}
     )
+    first_wave = [
+        item for item in candidates
+        if item["dangerous"] and "E7" in item["missing_evidence"]
+    ]
     payload = {
         "schema": "marvin.tool-evidence-campaign-b-candidates/1.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -112,14 +117,16 @@ def main() -> int:
         },
         "summary": {
             "candidate_tool_action_pairs": len(candidates),
-            "first_wave_never_executed_tools": len(first_wave_tools),
+            "first_wave_dangerous_tool_action_pairs": len(first_wave),
+            "next_wave_never_executed_tools": len(never_executed_tools),
             "never_executed_actions_on_partially_exercised_tools": sum(
                 item["action_never_executed"] and not item["tool_never_executed"]
                 for item in candidates
             ),
             "execution_authorized": False,
         },
-        "first_wave_tools": first_wave_tools,
+        "first_wave": first_wave,
+        "next_wave_never_executed_tools": never_executed_tools,
         "candidates": candidates,
     }
     _write_atomic(BASE / "campaign-b-candidates.json", payload)
