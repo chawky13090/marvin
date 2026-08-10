@@ -30,6 +30,11 @@ générique d'incompatibilité empêche notamment qu'une demande de désinstalla
 installation; aucun outil n'est exécuté. Logs et données : aucun impact. Rollback : réversion
 atomique du commit v2.607; aucun schéma ni état persistant.
 
+Validation finale : arrêt gracieux sans processus forcé, puis gate exhaustive réussie
+`274/274`, incluant compilation Python, frontend, sécurité, persistance, 364 harness d'outils
+et build Next.js 16.2.12/Turbopack. Après redémarrage détaché, backend v2.607.0 HTTP 200,
+364 outils, Ollama disponible et frontend HTTP 200.
+
 ## 2026-08-10 — v2.606.0 — Redécouverte générique des noms d'outils, développement uniquement
 
 Demande : traiter les noms d'outils plausibles mais inexistants sans coder les cinq noms vus
