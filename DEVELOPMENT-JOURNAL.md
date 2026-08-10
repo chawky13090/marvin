@@ -28,8 +28,13 @@ Sécurité et logs : aucun nouvel accès réseau, privilège, secret ou journal 
 invalide est bornée à 120 caractères et rejetée; seules les clés d'arguments participent à la
 requête. Rollback : réversion atomique du commit v2.606; aucun schéma ni donnée persistante.
 Validation ciblée : contrat Forge, campagne déterministe, exécution agent, catalogue,
-découverte, lots séquentiels/parallèles et architecture passent. La gate exhaustive est
-requise avant livraison finale.
+découverte, lots séquentiels/parallèles et architecture passent. La gate exhaustive a validé
+273 étapes sur 274; son unique blocage était volontaire, car Turbopack tournait pendant le
+build. Après arrêt gracieux, `npm run build` Next.js 16.2.12/Turbopack a compilé toutes les
+routes. Un premier redémarrage attaché au shell a laissé Next en écoute mais bloqué lorsque le
+shell a expiré; un second arrêt gracieux puis un lancement détaché ont corrigé cet état.
+Résultat final observé : backend v2.606.0 HTTP 200, 364 outils, Ollama disponible, et trois
+requêtes frontend successives HTTP 200. Aucun processus n'a exigé de terminaison forcée.
 
 ## 2026-08-10 — v2.605.0 — Rectificatif reproductible du routage Windows
 
