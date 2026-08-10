@@ -20,6 +20,14 @@ exécutées + 1 skip build; quick = 273 exécutées + 5 skips. Le test du runner
 ensembles de noms et leurs nombres de skips. Sécurité/logs/données : aucune action métier,
 secret, réseau ou persistance modifiée. Rollback : réversion atomique du commit v2.608.
 
+Validation finale observée : arrêt gracieux en 8,7 secondes sans processus forcé, gate
+exhaustif normal réussi avec `success=true`, 274 étapes exécutées et réussies, quatre smokes
+live explicitement ignorés et zéro échec sur 278 étapes attendues. Le build de production
+Next.js 16.2.12 Turbopack et la compilation des 347 fichiers Python sont inclus dans cette
+campagne. Après redémarrage par `start.bat`, le backend répond `ok` en v2.608.0 et le frontend
+répond HTTP 200. Les journaux d'erreurs simulées observés pendant le gate proviennent des
+tests négatifs attendus et n'ont pas rendu la campagne défaillante.
+
 ## 2026-08-10 — v2.607.0 — Correction de contamination du classement Forge v1.2
 
 Revue : Claude a démontré que les 25 alias anglais ajoutés avec v2.606 alimentaient le
