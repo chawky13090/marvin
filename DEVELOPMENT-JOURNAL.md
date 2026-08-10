@@ -17824,3 +17824,16 @@ incomplètes désactivées, sans erreur console ni envoi. Le rapport atomique co
 `success=true`, 251/251 étapes réussies et zéro échec en 654,2 secondes : 363/363 outils avec
 harnais, 391 routes, 41/41 pages, cinq conversations réelles et voix navigateur sérialisée.
 La dette TD-001 est fermée sans effet externe ni migration.
+## 2026-08-11 — v2.615.0 — 22 contrats de fixtures E7 gelés avant implémentation
+
+Les 22 couples directs de la vague B disposent désormais de contrats symboliques complets :
+isolation, préconditions, pré-image, observation avant/après, oracle indépendant, récupération,
+delta autorisé et effets interdits. Le pilote corrigé couvre six surfaces distinctes avec
+`long_task_start`, sans dépendre de Code Workspace ni de TD-011. Un invariant mécanique interdit
+au système sous test, au registre d'outils et à tout outil public Marvin de construire, vérifier
+ou restaurer sa propre fixture. `bulk_rename:apply` utilise une pré-image indépendante et la
+fixture de `bulk_rename:rollback` est construite sans appeler `apply`. Les cinq sources et
+artefacts sont hashés avant implémentation; le gate vérifie 22/22 contrats et maintient
+`tool_execution_authorized=false` et `host_execution_forbidden=true`. Aucun outil métier,
+secret, donnée utilisateur, réseau externe ou journal runtime n'est touché. Rollback : réversion
+atomique du commit v2.615; aucune migration ni donnée persistante à restaurer.

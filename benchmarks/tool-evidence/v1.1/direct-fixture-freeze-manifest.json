@@ -1,0 +1,30 @@
+{
+  "schema": "marvin.direct-fixture-freeze-manifest/1.0",
+  "status": "frozen_before_fixture_implementation",
+  "fixture_implementation_authorized": true,
+  "tool_execution_authorized": false,
+  "host_execution_forbidden": true,
+  "files": {
+    "e7-classification.json": {
+      "sha256": "ca3aca2edc68853a1168e17bea52c8ea2cf165e05d686c21b57442c00cf918ff",
+      "bytes": 17738
+    },
+    "fixture-strata-policy.json": {
+      "sha256": "b6e40deba2e8aa743a0371d4c1581259ab20059e98514c1e6d929b03811794fd",
+      "bytes": 1723
+    },
+    "h7-fixture-strategy-manifest.json": {
+      "sha256": "5fa63085520ed68e568d01265fb0cb159bb4c0110790042eed2487e3544d95e6",
+      "bytes": 1126
+    },
+    "direct-fixture-contracts.json": {
+      "sha256": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+      "bytes": 48642
+    },
+    "direct-fixture-pilot.json": {
+      "sha256": "f60b4712fa226f8c125c6b59f2ec92b0dc133581b868d9871f1a835342dedfa7",
+      "bytes": 1100
+    }
+  },
+  "rollback": "revert the atomic v2.615 commit; no fixture or tool execution and no persistent data mutation occurred"
+}

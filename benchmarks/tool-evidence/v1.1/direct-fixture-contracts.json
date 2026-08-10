@@ -1,0 +1,1424 @@
+{
+  "schema": "marvin.direct-fixture-contracts/1.0",
+  "status": "designed_frozen_execution_locked",
+  "source_taxonomy_manifest": "e7-freeze-manifest.json",
+  "source_fixture_strategy_manifest": "h7-fixture-strategy-manifest.json",
+  "tool_execution_authorized": false,
+  "host_execution_forbidden": true,
+  "invariants": {
+    "fixture_builder_never_calls_system_under_test": true,
+    "system_under_test_never_verifies_or_restores_itself": true,
+    "no_public_marvin_tool_in_setup_oracle_or_recovery": true,
+    "oracle_and_recovery_use_fixture_harness_only": true,
+    "R_requires_exact_identity_restore": true,
+    "C_requires_declared_residual_loss": true,
+    "I_requires_predeclared_observation_surface_and_confinement": true,
+    "N_requires_zero_observable_mutation": true,
+    "bulk_rename_apply_never_uses_bulk_rename_rollback_for_recovery": true,
+    "bulk_rename_rollback_fixture_is_constructed_without_bulk_rename_apply": true
+  },
+  "contracts": [
+    {
+      "id": "direct-note_delete---default--",
+      "tool": "note_delete",
+      "action": "__default__",
+      "class": "R",
+      "surface_profile": "database_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "note row and related constraints",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_sqlite_clone",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.database_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.database_scope",
+        "fields": [
+          "selected_rows",
+          "foreign_keys",
+          "row_counts",
+          "logical_dump_hash"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.database_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.database_preimage_restore",
+        "mechanism": "database_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "exact_identity",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "note row and related constraints",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-task_delete---default--",
+      "tool": "task_delete",
+      "action": "__default__",
+      "class": "R",
+      "surface_profile": "database_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "task row and related constraints",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_sqlite_clone",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.database_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.database_scope",
+        "fields": [
+          "selected_rows",
+          "foreign_keys",
+          "row_counts",
+          "logical_dump_hash"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.database_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.database_preimage_restore",
+        "mechanism": "database_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "exact_identity",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "task row and related constraints",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-memory_delete---default--",
+      "tool": "memory_delete",
+      "action": "__default__",
+      "class": "R",
+      "surface_profile": "database_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "memory record and vector index entry",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_memory_store",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.database_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.database_scope",
+        "fields": [
+          "selected_rows",
+          "foreign_keys",
+          "row_counts",
+          "logical_dump_hash"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.database_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.database_and_vector_preimage_restore",
+        "mechanism": "database_and_vector_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "exact_identity",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "memory record and vector index entry",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-project_delete---default--",
+      "tool": "project_delete",
+      "action": "__default__",
+      "class": "R",
+      "surface_profile": "database_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "project row while conversations remain unchanged",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_sqlite_clone",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.database_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.database_scope",
+        "fields": [
+          "selected_rows",
+          "foreign_keys",
+          "row_counts",
+          "logical_dump_hash"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.database_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.database_preimage_restore",
+        "mechanism": "database_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "exact_identity",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "project row while conversations remain unchanged",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-bulk_rename-apply",
+      "tool": "bulk_rename",
+      "action": "apply",
+      "class": "R",
+      "surface_profile": "filesystem_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "declared rename set only",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_temp_volume",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.filesystem_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.filesystem_scope",
+        "fields": [
+          "tree",
+          "path_identity",
+          "sha256",
+          "size",
+          "timestamps",
+          "acl"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.filesystem_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.filesystem_preimage_restore",
+        "mechanism": "filesystem_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "exact_identity",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "declared rename set only",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-bulk_rename-rollback",
+      "tool": "bulk_rename",
+      "action": "rollback",
+      "class": "R",
+      "surface_profile": "filesystem_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "prebuilt post-apply tree and manifest",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_temp_volume",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "prebuilt_bulk_rename_rollback_fixture",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.filesystem_scope",
+        "fields": [
+          "tree",
+          "path_identity",
+          "sha256",
+          "size",
+          "timestamps",
+          "acl"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.filesystem_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.filesystem_preimage_restore",
+        "mechanism": "filesystem_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "exact_identity",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "prebuilt post-apply tree and manifest",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-tweak_debloat_remove---default--",
+      "tool": "tweak_debloat_remove",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "software_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "declared fixture package set only",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "disposable_windows_vm",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.software_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.software_scope",
+        "fields": [
+          "package_inventory",
+          "files",
+          "services",
+          "scheduled_tasks",
+          "user_settings"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.software_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_restore",
+        "mechanism": "hypervisor_checkpoint_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "declared fixture package set only",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-winget_uninstall---default--",
+      "tool": "winget_uninstall",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "software_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one fixture package removed",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "disposable_windows_vm",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.software_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.software_scope",
+        "fields": [
+          "package_inventory",
+          "files",
+          "services",
+          "scheduled_tasks",
+          "user_settings"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.software_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_restore",
+        "mechanism": "hypervisor_checkpoint_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one fixture package removed",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-winget_install---default--",
+      "tool": "winget_install",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "software_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one pinned fixture package added",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "disposable_windows_vm",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.software_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.software_scope",
+        "fields": [
+          "package_inventory",
+          "files",
+          "services",
+          "scheduled_tasks",
+          "user_settings"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.software_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_restore",
+        "mechanism": "hypervisor_checkpoint_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one pinned fixture package added",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-winget_upgrade---default--",
+      "tool": "winget_upgrade",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "software_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one pinned fixture package upgraded",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "disposable_windows_vm",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.software_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.software_scope",
+        "fields": [
+          "package_inventory",
+          "files",
+          "services",
+          "scheduled_tasks",
+          "user_settings"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.software_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_restore",
+        "mechanism": "hypervisor_checkpoint_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one pinned fixture package upgraded",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-itsm_ticket_create---default--",
+      "tool": "itsm_ticket_create",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "external_record_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one test ticket and one provider receipt",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_protocol_double",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.external_record_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.external_record_scope",
+        "fields": [
+          "record_id",
+          "record_fields",
+          "audit_history",
+          "provider_receipt"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.external_record_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.protocol_double_reset",
+        "mechanism": "protocol_double_reset",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one test ticket and one provider receipt",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-system_restore_point---default--",
+      "tool": "system_restore_point",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "windows_system_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one named restore point",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "disposable_windows_vm",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.windows_system_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.windows_system_scope",
+        "fields": [
+          "services",
+          "registry",
+          "scheduled_tasks",
+          "packages",
+          "restore_points",
+          "disk_usage"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.windows_system_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_restore",
+        "mechanism": "hypervisor_checkpoint_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one named restore point",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-vm_lab_install-install",
+      "tool": "vm_lab_install",
+      "action": "install",
+      "class": "C",
+      "surface_profile": "windows_system_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one fixture VM definition",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "nested_virtualization_test_host",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.windows_system_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.windows_system_scope",
+        "fields": [
+          "services",
+          "registry",
+          "scheduled_tasks",
+          "packages",
+          "restore_points",
+          "disk_usage"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.windows_system_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_restore",
+        "mechanism": "hypervisor_checkpoint_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one fixture VM definition",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-pc_pull_ollama_model---default--",
+      "tool": "pc_pull_ollama_model",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "model_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one fixture model tag and its blobs",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_ollama_instance",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.model_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.model_scope",
+        "fields": [
+          "ollama_inventory",
+          "blob_inventory",
+          "disk_usage",
+          "running_models"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.model_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.ollama_data_preimage_restore",
+        "mechanism": "ollama_data_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one fixture model tag and its blobs",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-code_workspace_start---default--",
+      "tool": "code_workspace_start",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "workspace_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one fixture mission and worktree",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_workspace_runtime",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.workspace_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.workspace_scope",
+        "fields": [
+          "mission_state",
+          "job_state",
+          "worktree_hash",
+          "artifacts",
+          "background_workers"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.workspace_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.workspace_preimage_restore",
+        "mechanism": "workspace_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one fixture mission and worktree",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-code_workspace_control-resume",
+      "tool": "code_workspace_control",
+      "action": "resume",
+      "class": "C",
+      "surface_profile": "workspace_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one prebuilt paused fixture mission",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_workspace_runtime",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.workspace_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.workspace_scope",
+        "fields": [
+          "mission_state",
+          "job_state",
+          "worktree_hash",
+          "artifacts",
+          "background_workers"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.workspace_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.workspace_preimage_restore",
+        "mechanism": "workspace_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one prebuilt paused fixture mission",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-code_workspace_control-cancel",
+      "tool": "code_workspace_control",
+      "action": "cancel",
+      "class": "C",
+      "surface_profile": "workspace_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one prebuilt running fixture mission",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_workspace_runtime",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.workspace_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.workspace_scope",
+        "fields": [
+          "mission_state",
+          "job_state",
+          "worktree_hash",
+          "artifacts",
+          "background_workers"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.workspace_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.workspace_preimage_restore",
+        "mechanism": "workspace_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one prebuilt running fixture mission",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-long_task_start---default--",
+      "tool": "long_task_start",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "workspace_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one fixture long task and worker",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_task_runtime",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.workspace_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.workspace_scope",
+        "fields": [
+          "mission_state",
+          "job_state",
+          "worktree_hash",
+          "artifacts",
+          "background_workers"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.workspace_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.workspace_preimage_restore",
+        "mechanism": "workspace_preimage_restore",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "functional_with_declared_residual_loss",
+        "residual_loss": "declared_by_frozen_e7_classification"
+      },
+      "allowed_delta": "one fixture long task and worker",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-pc_process_kill---default--",
+      "tool": "pc_process_kill",
+      "action": "__default__",
+      "class": "I",
+      "surface_profile": "process_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "exact fixture PID only",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "disposable_windows_vm",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.process_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.process_scope",
+        "fields": [
+          "pid",
+          "process_table",
+          "child_processes",
+          "dependent_services",
+          "listening_sockets"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.process_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.hypervisor_checkpoint_teardown",
+        "mechanism": "hypervisor_checkpoint_teardown",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "not_restorable_confinement_required",
+        "residual_loss": "intrinsic_volatile_or_external_state"
+      },
+      "allowed_delta": "exact fixture PID only",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "direct-email_send---default--",
+      "tool": "email_send",
+      "action": "__default__",
+      "class": "I",
+      "surface_profile": "external_message_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "one declared SMTP envelope only",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_smtp_protocol_double",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.external_message_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": true
+      },
+      "observation": {
+        "component": "fixture_observer.external_message_scope",
+        "fields": [
+          "sender",
+          "recipients",
+          "content_hash",
+          "attachments_hash",
+          "provider_receipt"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.external_message_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.protocol_double_teardown",
+        "mechanism": "protocol_double_teardown",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "not_restorable_confinement_required",
+        "residual_loss": "intrinsic_volatile_or_external_state"
+      },
+      "allowed_delta": "one declared SMTP envelope only",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-bulk_rename-preview",
+      "tool": "bulk_rename",
+      "action": "preview",
+      "class": "N",
+      "surface_profile": "no_mutation_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "zero observable mutation",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "isolated_temp_volume",
+        "clean_checkpoint_required": false,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.no_mutation_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": false
+      },
+      "observation": {
+        "component": "fixture_observer.no_mutation_scope",
+        "fields": [
+          "input_snapshot",
+          "output_hash",
+          "system_delta"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.no_mutation_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.not_applicable",
+        "mechanism": "not_applicable",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "no_mutation",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "zero observable mutation",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 90
+    },
+    {
+      "id": "direct-vm_lab_install-status",
+      "tool": "vm_lab_install",
+      "action": "status",
+      "class": "N",
+      "surface_profile": "no_mutation_scope",
+      "execution_authorized": false,
+      "host_execution_forbidden": true,
+      "input_fixture": {
+        "kind": "symbolic_valid_payload",
+        "target": "zero observable mutation",
+        "contains_secret": false,
+        "contains_real_recipient_or_tenant": false
+      },
+      "isolation": {
+        "kind": "nested_virtualization_test_host",
+        "clean_checkpoint_required": true,
+        "network": "isolated_or_fixture_endpoints_only"
+      },
+      "setup": {
+        "component": "fixture_builder.no_mutation_scope",
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "calls_system_under_test": false,
+        "preimage_required": false
+      },
+      "observation": {
+        "component": "fixture_observer.no_mutation_scope",
+        "fields": [
+          "input_snapshot",
+          "output_hash",
+          "system_delta"
+        ],
+        "capture_before_and_after": true,
+        "uses_tool_registry": false,
+        "public_tools_used": []
+      },
+      "oracle": {
+        "component": "fixture_oracle.no_mutation_scope",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "pass_condition": "expected_delta_only_and_no_forbidden_delta",
+        "false_success_forbidden": true
+      },
+      "recovery": {
+        "component": "fixture_recovery.not_applicable",
+        "mechanism": "not_applicable",
+        "independent_from_executor": true,
+        "uses_tool_registry": false,
+        "public_tools_used": [],
+        "expected_fidelity": "no_mutation",
+        "residual_loss": "none"
+      },
+      "allowed_delta": "zero observable mutation",
+      "forbidden_deltas": [
+        "undeclared_target",
+        "unrelated_process_service_socket",
+        "unrelated_file_database_or_provider_record"
+      ],
+      "timeout_seconds": 300
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema": "marvin.direct-fixture-pilot/1.0",
+  "status": "designed_frozen_execution_locked",
+  "purpose": "validate_fixture_method_across_six_distinct_surfaces_and_four_e7_classes",
+  "tool_execution_authorized": false,
+  "host_execution_forbidden": true,
+  "contracts": [
+    {
+      "tool": "note_delete",
+      "action": "__default__",
+      "class": "R",
+      "surface_profile": "database_scope"
+    },
+    {
+      "tool": "bulk_rename",
+      "action": "apply",
+      "class": "R",
+      "surface_profile": "filesystem_scope"
+    },
+    {
+      "tool": "winget_uninstall",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "software_scope"
+    },
+    {
+      "tool": "long_task_start",
+      "action": "__default__",
+      "class": "C",
+      "surface_profile": "workspace_scope"
+    },
+    {
+      "tool": "pc_process_kill",
+      "action": "__default__",
+      "class": "I",
+      "surface_profile": "process_scope"
+    },
+    {
+      "tool": "bulk_rename",
+      "action": "preview",
+      "class": "N",
+      "surface_profile": "no_mutation_scope"
+    }
+  ]
+}

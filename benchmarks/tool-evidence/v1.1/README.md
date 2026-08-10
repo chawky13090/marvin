@@ -43,3 +43,11 @@ dont le refus absolu d'une commande catastrophique malgré l'accès Complet et u
 valide, ainsi que le plafond Auto de risque 3 sur une action non élevée :
 aucune commande, cible, donnée utilisateur ou charge utile exécutable. Le manifeste SHA-256
 verrouille ces sources avant toute conception de fixture ou exécution de harnais.
+# Contrats directs gelés
+
+`direct-fixture-contracts.json` décrit les 22 couples directs sans les exécuter. Le setup,
+l'oracle et la récupération appartiennent exclusivement au harnais de fixtures et ne peuvent
+ni appeler un outil public Marvin, ni réutiliser le système sous test. Le pilote de
+`direct-fixture-pilot.json` couvre six surfaces distinctes et les classes N, R, C et I.
+`direct-fixture-freeze-manifest.json` gèle les sources et contrats avant l'implémentation des
+fixtures. Toute exécution d'outil et toute exécution sur l'hôte restent interdites.

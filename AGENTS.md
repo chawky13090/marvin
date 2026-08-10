@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.614.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.615.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.614.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.615.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.614.0)
+## 9. État actuel (v2.615.0)
+
+**v2.615 (contrats directs E7 gelés avant implémentation)** : les 22 couples directs de la
+première vague possèdent un contrat symbolique explicite couvrant isolation, pré-image,
+surface observée, delta autorisé, oracle indépendant et récupération. Aucun setup, oracle ou
+rollback ne peut appeler le registre d'outils Marvin ni le système sous test. Le pilote couvre
+six surfaces distinctes et les quatre classes N/R/C/I; `bulk_rename:apply` restaure une
+pré-image de fichiers sans appeler `bulk_rename:rollback`, tandis que la fixture de rollback
+est construite directement. Les empreintes sont gelées avant toute fixture exécutable et le
+gate refuse toute dérive. Aucune action métier ou destructive n'est autorisée sur l'hôte.
+Rollback : réversion atomique du commit v2.615; aucune donnée persistante n'a été modifiée.
 
 **v2.614 (dette readiness Code Workspace enregistrée)** : TD-011 conserve la preuve du 503
 transitoire observé immédiatement après le redémarrage v2.613, son risque, son propriétaire
