@@ -371,6 +371,8 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Boucle agentique LLM native", (python, "scripts/test_native_agent_runtime.py")),
         Stage("Chemin natif du Runner", (python, "scripts/test_native_agent_path.py")),
         Stage("Execution deterministe des outils LLM", (python, "scripts/test_agent_execution.py")),
+        Stage("Redecouverte bornee des outils inconnus", (python, "scripts/test_unknown_tool_rediscovery.py")),
+        Stage("Independance de Forge v1.2", (python, "scripts/test_forge_v12_contract.py")),
         Stage("Préparation des étapes d'outils", (python, "scripts/test_agent_tool_step.py")),
         Stage("Politique de dispatch des outils", (python, "scripts/test_agent_tool_dispatch.py")),
         Stage("Post-validation des résultats d'outils", (python, "scripts/test_agent_tool_postprocess.py")),

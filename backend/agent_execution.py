@@ -18,7 +18,8 @@ from typing import Any
 
 from action_replay import execute_once, should_guard
 from config import DANGEROUS_TOOLS
-from tools import TOOLS_REGISTRY
+from tools import TOOLS_REGISTRY, TOOLS_SPEC
+from unknown_tool_resolver import rediscovery_enabled, resolve_unknown_tool
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,6 +81,8 @@ async def execute_registered_tool(
     active_registry = TOOLS_REGISTRY if registry is None else registry
     executor = active_registry.get(tool_name)
     if not executor:
+        if rediscovery_enabled():
+            return resolve_unknown_tool(tool_name, tool_args, TOOLS_SPEC)
         return {"error": f"Outil inconnu : {tool_name}"}
 
     async def operation() -> Any:

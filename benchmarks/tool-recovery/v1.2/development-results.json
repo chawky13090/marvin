@@ -1,0 +1,305 @@
+{
+  "schema": "marvin.tool-recovery-development-result/1.0",
+  "scope": "development_only",
+  "holdout_independent": false,
+  "generalization_allowed": false,
+  "repetitions": 5,
+  "runs": 120,
+  "candidate_set_recall": 0.7083,
+  "false_replacement_count": 0,
+  "implicit_execution_count": 0,
+  "valid_new_native_call_rate": null,
+  "business_outcome_success_rate": null,
+  "unmeasured_metrics_reason": "Aucun holdout LLM et aucun parcours metier independant n'ont encore ete executes.",
+  "source_hashes": {
+    "benchmarks/tool-recovery/v1.2/acceptance-policy.json": "7ad2245df5d3cc09cde52ab80551a0da9d989d089d1b3ee4fe81ebdfd3e8b1a2",
+    "benchmarks/tool-recovery/v1.2/development-corpus.json": "8f988f44d9b96b4418b2d8d6e81184b36ca3f5036aa12a1c748ac8c36cd23be2",
+    "backend/unknown_tool_resolver.py": "93a54bddb87871354febb7db4dbb28b33931b5a9049babfe7395289a9d942dad",
+    "backend/capability_catalog.py": "5601701eac5eb95f4f92f54de04ae901b55e8489f0c46fbc34006b8e2ceaae47",
+    "backend/tool_capability_ranking.py": "bc4bea432e56c693304d441283d5cdd487d21d4618f90287d261ce1d3f7d3808",
+    "scripts/forge_v12_oracle.py": "1c85fcfb260bed0cf20b3e7d558e124c427b2fddd80e57328c4e009609299d50"
+  },
+  "items": [
+    {
+      "id": "tr-dev-001",
+      "family": "process_inventory",
+      "candidate_names": [
+        "pc_process_list",
+        "windows_task"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-002",
+      "family": "process_action",
+      "candidate_names": [
+        "pc_process_kill",
+        "long_task_stop",
+        "windows_task"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-003",
+      "family": "application_launch",
+      "candidate_names": [
+        "pc_app_launch",
+        "win_quick_launch",
+        "win_quick_launch_list"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-004",
+      "family": "windows_services",
+      "candidate_names": [
+        "win_service_action",
+        "doc_generate_change",
+        "net_service_detect"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-005",
+      "family": "software_search",
+      "candidate_names": [
+        "winget_install",
+        "winget_list_installed",
+        "winget_search"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-006",
+      "family": "software_inventory",
+      "candidate_names": [
+        "net_inventory_annotate",
+        "net_inventory_list",
+        "net_inventory_scan"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-007",
+      "family": "software_install",
+      "candidate_names": [
+        "winget_install",
+        "vm_lab_install",
+        "winget_search"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-008",
+      "family": "software_uninstall",
+      "candidate_names": [
+        "tweak_debloat_remove",
+        "winget_uninstall"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-009",
+      "family": "file_discovery",
+      "candidate_names": [
+        "document_forget",
+        "document_ask",
+        "document_generate"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-010",
+      "family": "file_content",
+      "candidate_names": [
+        "system_search_content",
+        "search_semantic",
+        "unified_search"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-011",
+      "family": "file_mutation",
+      "candidate_names": [
+        "file_extract",
+        "file_move",
+        "file_read"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-012",
+      "family": "file_mutation",
+      "candidate_names": [
+        "file_duplicate_finder",
+        "file_create_folder",
+        "file_convert_docx_to_pdf"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-013",
+      "family": "network_diagnostics",
+      "candidate_names": [
+        "os_network_adapters",
+        "tweak_network_harden",
+        "win_network_config"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-014",
+      "family": "network_diagnostics",
+      "candidate_names": [
+        "screen_record_gif",
+        "ssh_exec",
+        "ssh_write_and_run"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-015",
+      "family": "security_posture",
+      "candidate_names": [
+        "os_firewall",
+        "win_firewall_status",
+        "doc_asset_create"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-016",
+      "family": "system_diagnostics",
+      "candidate_names": [
+        "win_system_report",
+        "doc_generate_report",
+        "ops_validation_report_generate"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-017",
+      "family": "system_diagnostics",
+      "candidate_names": [
+        "pc_disk_smart_health",
+        "client_health_compute",
+        "client_health_get"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-018",
+      "family": "desktop_observation",
+      "candidate_names": [
+        "computer_control",
+        "pc_gui_read"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-019",
+      "family": "desktop_interaction",
+      "candidate_names": [
+        "computer_control",
+        "image_compress",
+        "event_create"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-020",
+      "family": "calendar_read",
+      "candidate_names": [
+        "calendar_list",
+        "calendar_create",
+        "calendar_subscribe"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-021",
+      "family": "email_read",
+      "candidate_names": [
+        "email_list",
+        "billing_client_list",
+        "billing_catalog_list"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-022",
+      "family": "document_read",
+      "candidate_names": [
+        "cmd_extract_from_text",
+        "text_extract",
+        "text_summarize"
+      ],
+      "accepted": false,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-023",
+      "family": "ssh_inventory",
+      "candidate_names": [
+        "ssh_list",
+        "ssh_list_dir",
+        "ssh_download"
+      ],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    },
+    {
+      "id": "tr-dev-024",
+      "family": "explicit_refusal",
+      "candidate_names": [],
+      "accepted": true,
+      "forbidden_candidates": [],
+      "executed": false
+    }
+  ]
+}

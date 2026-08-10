@@ -35,6 +35,32 @@ _TOKEN_ALIASES = {
     "renommer": "rename",
     "restaurer": "restore",
     "supprimer": "delete",
+    # Variantes anglaises courantes emises par les modeles. Elles decrivent des
+    # intentions generiques et ne redirigent jamais vers un nom d'outil donne.
+    "appointments": "event",
+    "calendar": "event",
+    "desktop": "gui",
+    "document": "file",
+    "documents": "file",
+    "duplicate": "copy",
+    "enumerate": "list",
+    "inventory": "list",
+    "locate": "find",
+    "mail": "email",
+    "messages": "email",
+    "observe": "read",
+    "package": "winget",
+    "packages": "winget",
+    "press": "click",
+    "processes": "process",
+    "program": "app",
+    "relocate": "move",
+    "remove": "uninstall",
+    "resolve": "dns",
+    "record": "lookup",
+    "routes": "route",
+    "inspect": "diagnostics",
+    "installed": "winget",
 }
 
 

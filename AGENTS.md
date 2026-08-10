@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.605.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.606.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.605.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.606.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.605.0)
+## 9. État actuel (v2.606.0)
+
+**v2.606 (redécouverte bornée, non généralisée)** : un nom d'outil inconnu peut être
+traité comme une requête consultative contre les 364 contrats réels, avec trois candidats
+maximum. Aucun alias observé n'est codé en dur, aucune valeur d'argument n'entre dans la
+recherche et aucune substitution n'est exécutée : le LLM doit émettre un nouvel appel natif,
+qui repasse par schéma, permissions, confirmation, idempotence et vérification. Forge v1.2 a
+été pré-enregistré dans un commit antérieur au produit. Le split développement obtient 17/24
+(70,83 %) et 0 exécution implicite/interdite sur 120 répétitions. Faute de holdout fourni par
+un évaluateur indépendant, la fonction reste désactivée par défaut et ne peut être activée
+qu'en développement avec `MARVIN_UNKNOWN_TOOL_REDISCOVERY=1`. Rollback : réversion atomique
+du commit v2.606; aucune donnée persistante ni migration.
 
 **v2.605 (rectificatif du diagnostic de routage Windows)** : le score historique 55 % en
 développement et 40,83 % en holdout mesurait l'adoption de la politique `windows_task`, pas

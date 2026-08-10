@@ -25,6 +25,23 @@ def _imports(path: Path) -> set[str]:
     return names
 
 
+def _local_import_closure(entry: Path, root: Path) -> set[str]:
+    pending = [entry]
+    visited: set[Path] = set()
+    modules: set[str] = set()
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        for module in _imports(path):
+            candidate = root / f"{module}.py"
+            if candidate.is_file():
+                modules.add(module)
+                pending.append(candidate)
+    return modules
+
+
 def main() -> int:
     policy = json.loads((CONTRACT / "acceptance-policy.json").read_text(encoding="utf-8"))
     corpus = json.loads((CONTRACT / "development-corpus.json").read_text(encoding="utf-8"))
@@ -46,6 +63,17 @@ def main() -> int:
         "tools", "capability_catalog", "capability_discovery", "tool_router",
         "unknown_tool_resolver", "agent_execution"
     } & imports
+
+    product_closure = _local_import_closure(
+        ROOT / "backend/unknown_tool_resolver.py",
+        ROOT / "backend",
+    )
+    assert not {"forge_v12_oracle", "test_forge_v12_contract"} & product_closure
+    oracle_closure = _local_import_closure(oracle, ROOT / "scripts")
+    assert not {
+        "unknown_tool_resolver", "agent_execution", "capability_catalog",
+        "capability_discovery", "tool_capability_ranking",
+    } & oracle_closure
 
     print("Forge v1.2 contract OK - 24 noms inedits, seuils geles et oracle independant.")
     return 0

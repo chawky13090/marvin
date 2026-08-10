@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.606.0 — Redécouverte générique des noms d'outils, développement uniquement
+
+Demande : traiter les noms d'outils plausibles mais inexistants sans coder les cinq noms vus
+dans Forge v1.1, préserver le tool-calling natif et empêcher l'oracle Forge de partager la
+taxonomie du produit.
+
+Décision : le contrat et les seuils Forge v1.2 ont été gelés dans le commit `3ebef3f`, avant
+le code produit. `unknown_tool_resolver.py` utilise seulement les schémas réels, le classement
+par capacité et des synonymes d'intention génériques. Il retourne au plus trois suggestions,
+n'expose jamais les valeurs d'arguments et n'exécute rien. Un nouvel appel natif reste
+obligatoire. Les imports directs et transitifs entre oracle et registre produit sont testés.
+
+Résultat observé : 17/24 intentions de développement (70,83 %) sur 120 répétitions, zéro
+candidat interdit, zéro remplacement et zéro exécution implicite. Les métriques de nouvel
+appel LLM et de résultat métier restent explicitement non mesurées. Aucun holdout indépendant
+n'étant disponible, `MARVIN_UNKNOWN_TOOL_REDISCOVERY` est désactivé par défaut et la fonction
+n'est pas généralisée. Le rectificatif v1.1 publie désormais les intervalles stricts/plafonds
+et récupère toute la provenance, y compris le runner développement composite.
+
+Sécurité et logs : aucun nouvel accès réseau, privilège, secret ou journal métier. Une entrée
+invalide est bornée à 120 caractères et rejetée; seules les clés d'arguments participent à la
+requête. Rollback : réversion atomique du commit v2.606; aucun schéma ni donnée persistante.
+Validation ciblée : contrat Forge, campagne déterministe, exécution agent, catalogue,
+découverte, lots séquentiels/parallèles et architecture passent. La gate exhaustive est
+requise avant livraison finale.
+
 ## 2026-08-10 — v2.605.0 — Rectificatif reproductible du routage Windows
 
 Demande : corriger l'interprétation de la campagne Forge sans modifier Marvin, construire des

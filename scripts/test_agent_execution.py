@@ -41,10 +41,20 @@ async def _exercise_execution() -> None:
     assert received == [{"value": 7}]
     assert execute_once.await_count == 1
 
-    unknown = await execution.execute_registered_tool(
+    with patch.object(execution, "rediscovery_enabled", return_value=True):
+        unknown = await execution.execute_registered_tool(
+            "missing", {}, "conversation-1", None, registry={}
+        )
+        assert unknown["error"] == "Outil inconnu : missing"
+        assert unknown["unknown_tool"] is True
+        assert unknown["executed"] is False
+        assert unknown["rediscovery"]["implicit_execution"] is False
+        assert len(unknown["rediscovery"]["candidates"]) <= 3
+
+    disabled = await execution.execute_registered_tool(
         "missing", {}, "conversation-1", None, registry={}
     )
-    assert unknown == {"error": "Outil inconnu : missing"}
+    assert disabled == {"error": "Outil inconnu : missing"}
 
     failing = AsyncMock(
         side_effect=RuntimeError("secret-interne C:\\chemin\\prive token=abc")
