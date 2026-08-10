@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.607.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.608.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.607.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.608.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.607.0)
+## 9. État actuel (v2.608.0)
+
+**v2.608 (plan de validation canonique)** : `check_marvin.py` conserve désormais exactement
+278 étapes dans tous les modes. Normal exécute 274 étapes et marque les quatre smokes live
+`skipped`; `--live` exécute 277 étapes et marque le build concurrent `skipped`; `--quick`
+exécute 273 étapes et expose cinq skips. Chaque motif est écrit dans le rapport JSON. Le
+runner échoue si le plan ne contient plus exactement 278 étapes, empêchant un rétrécissement
+silencieux. La comparaison 275 live v2.605 / 274 normal v2.607 mélangeait deux modes; aucune
+des quatre vérifications frontend n'avait été supprimée. Rollback : réversion atomique du
+commit v2.608; aucun état persistant.
 
 **v2.607 (classement partagé restauré)** : la revue croisée a démontré que 25 synonymes
 anglais ajoutés après le gel Forge modifiaient aussi le classement normal de production,

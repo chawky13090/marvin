@@ -61,6 +61,15 @@ try:
     stopped = check_marvin.execute_stages(selected, fail_fast=True)
     assert [item.name for item in stopped] == ["ok-1", "bad"]
 
+    skipped = check_marvin.execute_stages(
+        [check_marvin.Stage("skip", ("fake",), skip_reason="condition absente")],
+        fail_fast=False,
+    )
+    assert len(skipped) == 1
+    assert skipped[0].success is True
+    assert skipped[0].skipped is True
+    assert skipped[0].reason == "condition absente"
+
     report_path = ROOT / "artifacts" / "runner-contract-test.json"
     check_marvin.write_report(
         exhaustive,
@@ -72,6 +81,7 @@ try:
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["executed_stages"] == 3
+    assert report["skipped"] == 0
     assert report["failed"] == 1
     assert report["success"] is False
     report_path.unlink()
@@ -90,5 +100,14 @@ try:
         pass
 finally:
     check_marvin.run_stage = original_run_stage
+
+normal = check_marvin.stages(quick=False, live=False)
+quick = check_marvin.stages(quick=True, live=False)
+live = check_marvin.stages(quick=False, live=True)
+assert len(normal) == len(quick) == len(live) == check_marvin.EXPECTED_STAGE_COUNT
+assert sum(stage.skip_reason is not None for stage in normal) == 4
+assert sum(stage.skip_reason is not None for stage in quick) == 5
+assert sum(stage.skip_reason is not None for stage in live) == 1
+assert {stage.name for stage in normal} == {stage.name for stage in quick} == {stage.name for stage in live}
 
 print("Check Marvin exhaustive runner tests passed.")

@@ -5,6 +5,21 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.608.0 — Plan de gate fixe et skips explicites
+
+Constat : les 275 étapes citées pour v2.605 correspondaient au mode `--live`; les 274 de
+v2.607 correspondaient au mode normal avec build. Le code ne supprimait aucune vérification :
+les quatre smokes live étaient conditionnels et donc absents du rapport normal. Cette forme
+rendait néanmoins les campagnes difficiles à comparer et pouvait masquer un futur retrait.
+
+Correction : le plan contient toujours 278 identités d'étapes et sa taille est verrouillée.
+Les modes ne retirent plus d'étape : ils lui donnent un `skip_reason`. Le rapport distingue
+`expected_stages`, `executed_stages`, `succeeded`, `failed` et `skipped`, et chaque ligne porte
+`passed`, `failed` ou `skipped` avec motif. Normal = 274 exécutées + 4 skips live; live = 277
+exécutées + 1 skip build; quick = 273 exécutées + 5 skips. Le test du runner compare les trois
+ensembles de noms et leurs nombres de skips. Sécurité/logs/données : aucune action métier,
+secret, réseau ou persistance modifiée. Rollback : réversion atomique du commit v2.608.
+
 ## 2026-08-10 — v2.607.0 — Correction de contamination du classement Forge v1.2
 
 Revue : Claude a démontré que les 25 alias anglais ajoutés avec v2.606 alimentaient le

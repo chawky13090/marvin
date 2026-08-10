@@ -24,6 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
+EXPECTED_STAGE_COUNT = 278
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class Stage:
     command: tuple[str, ...] | None = None
     action: str | None = None
     timeout_seconds: int = 180
+    skip_reason: str | None = None
 
     def __post_init__(self) -> None:
         if not 10 <= self.timeout_seconds <= 900:
@@ -43,6 +45,8 @@ class StageResult:
     name: str
     success: bool
     duration_seconds: float
+    skipped: bool = False
+    reason: str | None = None
 
 
 def npm_command() -> str:
@@ -90,6 +94,10 @@ def run_stage(stage: Stage) -> tuple[bool, float]:
 def execute_stages(selected: list[Stage], *, fail_fast: bool) -> list[StageResult]:
     results: list[StageResult] = []
     for stage in selected:
+        if stage.skip_reason:
+            print(f"[SKIP] {stage.name}: {stage.skip_reason}", flush=True)
+            results.append(StageResult(stage.name, True, 0.0, True, stage.skip_reason))
+            continue
         success, duration = run_stage(stage)
         results.append(StageResult(stage.name, success, duration))
         if fail_fast and not success:
@@ -117,15 +125,17 @@ def write_report(
         "generated_at": datetime.now(UTC).isoformat(),
         "mode": {"quick": quick, "live": live, "fail_fast": fail_fast},
         "expected_stages": expected_count,
-        "executed_stages": len(results),
-        "succeeded": sum(item.success for item in results),
-        "failed": sum(not item.success for item in results),
+        "executed_stages": sum(not item.skipped for item in results),
+        "skipped": sum(item.skipped for item in results),
+        "succeeded": sum(item.success and not item.skipped for item in results),
+        "failed": sum(not item.success and not item.skipped for item in results),
         "success": bool(results) and len(results) == expected_count and all(item.success for item in results),
         "stages": [
             {
                 "name": item.name,
-                "status": "passed" if item.success else "failed",
+                "status": "skipped" if item.skipped else ("passed" if item.success else "failed"),
                 "duration_seconds": round(item.duration_seconds, 3),
+                "reason": item.reason,
             }
             for item in results
         ],
@@ -564,16 +574,24 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Baseline et qualite du frontend", (npm, "run", "check:frontend-baseline")),
         Stage("Resilience du smoke HTTP", (python, "scripts/test_smoke_api_resilience.py")),
     ]
-    if not quick and not live:
-        result.append(Stage("Build de production Next.js", (npm, "run", "build")))
-    if live:
-        result.extend(
-            [
-                Stage("Contrats HTTP des services", (python, "scripts/smoke_test_api.py")),
-                Stage("Parcours des pages", (python, "scripts/smoke_test_pages.py")),
-                Stage("Rendu du chat", (python, "scripts/smoke_test_chat.py")),
-                Stage("Sérialisation vocale navigateur", (python, "scripts/smoke_test_voice.py")),
-            ]
+    build_skip = None
+    if quick:
+        build_skip = "Mode quick : build de production explicitement exclu."
+    elif live:
+        build_skip = "Mode live : le frontend actif interdit un build Next.js concurrent."
+    result.append(Stage("Build de production Next.js", (npm, "run", "build"), skip_reason=build_skip))
+    live_skip = None if live else "Services Marvin non requis dans ce mode; utiliser --live."
+    result.extend(
+        [
+            Stage("Contrats HTTP des services", (python, "scripts/smoke_test_api.py"), skip_reason=live_skip),
+            Stage("Parcours des pages", (python, "scripts/smoke_test_pages.py"), skip_reason=live_skip),
+            Stage("Rendu du chat", (python, "scripts/smoke_test_chat.py"), skip_reason=live_skip),
+            Stage("Sérialisation vocale navigateur", (python, "scripts/smoke_test_voice.py"), skip_reason=live_skip),
+        ]
+    )
+    if len(result) != EXPECTED_STAGE_COUNT:
+        raise RuntimeError(
+            f"Plan de validation incomplet : {len(result)} etapes au lieu de {EXPECTED_STAGE_COUNT}."
         )
     return result
 
@@ -604,12 +622,14 @@ def main() -> int:
 
     print(f"\n{'=' * 68}\nSYNTHESE\n{'=' * 68}")
     for result in results:
-        print(f"[{'OK' if result.success else 'ECHEC'}] {result.name} ({result.duration_seconds:.1f}s)")
+        label = "SKIP" if result.skipped else ("OK" if result.success else "ECHEC")
+        suffix = f" - {result.reason}" if result.reason else ""
+        print(f"[{label}] {result.name} ({result.duration_seconds:.1f}s){suffix}")
 
     try:
         write_report(
             results,
-            expected_count=len(selected),
+            expected_count=EXPECTED_STAGE_COUNT,
             quick=args.quick,
             live=args.live,
             fail_fast=args.fail_fast,
@@ -619,11 +639,13 @@ def main() -> int:
         print(f"ECHEC: rapport non ecrit: {exc}", file=sys.stderr)
         return 1
 
-    if not results or len(results) != len(selected) or not all(result.success for result in results):
-        failures = sum(not result.success for result in results)
+    if not results or len(results) != EXPECTED_STAGE_COUNT or not all(result.success for result in results):
+        failures = sum(not result.success and not result.skipped for result in results)
         print(f"Validation Marvin en echec - {failures} etape(s) en echec sur {len(results)} executee(s).")
         return 1
-    print(f"Validation Marvin OK - {len(results)} etapes.")
+    executed = sum(not result.skipped for result in results)
+    skipped = sum(result.skipped for result in results)
+    print(f"Validation Marvin OK - {executed} executees, {skipped} ignorees sur {EXPECTED_STAGE_COUNT} attendues.")
     return 0
 
 
