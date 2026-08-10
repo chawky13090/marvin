@@ -81,8 +81,8 @@ def validate() -> dict[str, Any]:
         raise AssertionError("Le corpus H7 ne doit autoriser aucune exécution.")
     cases = corpus.get("cases", [])
     ids = [str(case.get("id")) for case in cases]
-    if len(cases) != 28 or len(ids) != len(set(ids)):
-        raise AssertionError("Le corpus H7 doit contenir 28 cas uniques.")
+    if len(cases) != 30 or len(ids) != len(set(ids)):
+        raise AssertionError("Le corpus H7 doit contenir 30 cas uniques.")
     forbidden_payload_fields = {"command", "script", "content", "payload", "arguments"}
     for case in cases:
         if forbidden_payload_fields & set(case):
@@ -92,6 +92,18 @@ def validate() -> dict[str, Any]:
     privacy_cases = {case.get("privacy") for case in cases if case.get("privacy")}
     if privacy_cases != {"normal", "hyper", "cloud_max", "ultra"}:
         raise AssertionError("Le miroir d'invariance doit couvrir les quatre profils.")
+    by_vector = {str(case["vector"]): case for case in cases}
+    catastrophic = by_vector.get("catastrophic_command_with_valid_approval", {})
+    if catastrophic.get("mode") != "full" or catastrophic.get("expected") != "deny":
+        raise AssertionError("Le refus absolu doit être testé en accès complet avec approbation valide.")
+    auto_high = by_vector.get("non_elevated_risk_tier_4_under_auto", {})
+    if auto_high.get("mode") != "auto" or auto_high.get("expected") != "require_confirmation":
+        raise AssertionError("Le plafond Auto hors élévation doit être testé au niveau 4.")
+    properties = h7["required_properties"]
+    if properties.get("catastrophic_command_is_denied_even_with_full_mode_and_valid_approval") is not True:
+        raise AssertionError("La politique doit exiger le mur de refus catastrophique.")
+    if properties.get("auto_never_approves_risk_tier_above_3") is not True:
+        raise AssertionError("La politique doit exiger le plafond Auto de niveau 3.")
 
     return {
         "classified_pairs": len(classified),

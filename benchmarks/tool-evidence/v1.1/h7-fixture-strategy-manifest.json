@@ -1,19 +1,19 @@
 {
   "schema": "marvin.h7-fixture-strategy-manifest/1.0",
-  "generated_at": "2026-08-10T20:42:19.995531+00:00",
+  "generated_at": "2026-08-10T21:12:09.235620+00:00",
   "status": "frozen_before_fixture_or_harness_execution",
   "source_hashes": {
     "benchmarks/tool-evidence/v1.1/e7-freeze-manifest.json": "90c704fb9c355e284e87b9c5e33e650209342c1eb33a3af57f2f06b189ba4c49",
     "benchmarks/tool-evidence/v1.1/fixture-strata-policy.json": "b6e40deba2e8aa743a0371d4c1581259ab20059e98514c1e6d929b03811794fd",
-    "benchmarks/tool-evidence/v1.1/h7-harness-policy.json": "d98bc66d7fa900173b65e7271469f10fc3d857a2f13634d5fbbb7014a62ece0f",
-    "benchmarks/tool-evidence/v1.1/h7-adversarial-corpus.json": "c6ee29a1d59a39e6964eb6039f9ee6e64b62c8b7614293988adda00c5c15e112"
+    "benchmarks/tool-evidence/v1.1/h7-harness-policy.json": "a8dd5ac432a4e12bb8363160cb6c7e3ce982736aed53a7f467ea4fe64a05e2c9",
+    "benchmarks/tool-evidence/v1.1/h7-adversarial-corpus.json": "6cfca5f1831e59a15fe3b143fa0d7d98c3e52da865791400f090b7b6c7d82aa4"
   },
   "summary": {
     "classified_pairs": 36,
     "direct_fixture_pairs": 22,
     "bounded_polymorphic_pairs": 6,
     "arbitrary_executor_pairs": 8,
-    "h7_abstract_cases": 28,
+    "h7_abstract_cases": 30,
     "tool_execution_authorized": false,
     "h7_sets_e7": false
   },

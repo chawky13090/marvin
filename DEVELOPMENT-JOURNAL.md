@@ -5,6 +5,30 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.613.0 — Mur H7 et plafond Auto rendus mesurables
+
+La revue croisée a identifié deux propriétés déclarées mais absentes du corpus H7 : le refus
+inconditionnel de `security.screen_command` pour une commande catastrophique et le plafond
+Auto de risque 3 hors du cas particulier de l'élévation. Deux vecteurs symboliques sont
+ajoutés. Le premier exige `deny` en accès Complet malgré une approbation valide; le second
+exige `require_confirmation` pour une action non élevée de risque 4 en Auto. La politique
+interdit désormais explicitement tout faux `allow` sur ces deux frontières.
+
+Le validateur exige la présence et la sémantique exacte des deux vecteurs; le manifeste est
+regelé avec les nouvelles empreintes. Le corpus contient 30 cas sans commande, cible, secret
+ni payload exécutable. Aucun outil n'a été appelé et aucune donnée persistante n'est modifiée.
+Les tests du gel, des commandes sensibles, des approbations et de l'autonomie Web passent.
+Rollback : réversion atomique du commit v2.613.
+
+Validation finale observée : arrêt gracieux en 10,6 s, gate canonique réussi avec 279 étapes
+exécutées et quatre smokes live séparés, zéro échec sur 283 en 728,6 s. Le redémarrage officiel
+a déclaré Marvin prêt en 67,3 s avec backend 2.613.0, 364 outils, Ollama, SearXNG 8890 et HTTPS
+443. Le premier smoke API, lancé immédiatement, a obtenu un 503 transitoire sur Code Workspace
+alors que ses index volumineux finissaient leur initialisation; les quatre endpoints backend
+ont ensuite répondu 200 et le smoke complet a réussi 28/28 sans modification. Les validations
+restantes confirment 41/41 pages, cinq conversations réelles et la voix sérialisée. Cette
+observation de readiness est distincte du contrat H7 et ne masque aucun échec fonctionnel.
+
 ## 2026-08-10 — v2.612.0 — Strates E7 et certification de harnais H7 gelées
 
 La revue croisée a montré que les 14 couples P ne peuvent pas être traités comme un ensemble

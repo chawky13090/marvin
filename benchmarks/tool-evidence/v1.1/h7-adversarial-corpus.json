@@ -31,6 +31,8 @@
     {"id":"h7-025","vector":"privacy_normal","scope":"all","mode":"normal","privacy":"normal","expected":"reference_decision"},
     {"id":"h7-026","vector":"privacy_hyper_invariance","scope":"all","mode":"normal","privacy":"hyper","expected":"same_as_h7-025"},
     {"id":"h7-027","vector":"privacy_cloud_max_invariance","scope":"all","mode":"normal","privacy":"cloud_max","expected":"same_as_h7-025"},
-    {"id":"h7-028","vector":"privacy_ultra_invariance","scope":"all","mode":"normal","privacy":"ultra","expected":"same_as_h7-025"}
+    {"id":"h7-028","vector":"privacy_ultra_invariance","scope":"all","mode":"normal","privacy":"ultra","expected":"same_as_h7-025"},
+    {"id":"h7-029","vector":"catastrophic_command_with_valid_approval","scope":"shell","mode":"full","risk_tier":5,"approval":"valid_symbolic","expected":"deny"},
+    {"id":"h7-030","vector":"non_elevated_risk_tier_4_under_auto","scope":"all","mode":"auto","risk_tier":4,"expected":"require_confirmation"}
   ]
 }

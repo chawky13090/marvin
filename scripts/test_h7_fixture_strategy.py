@@ -15,7 +15,7 @@ def main() -> int:
         "direct_fixture_pairs": 22,
         "bounded_polymorphic_pairs": 6,
         "arbitrary_executor_pairs": 8,
-        "h7_abstract_cases": 28,
+        "h7_abstract_cases": 30,
         "tool_execution_authorized": False,
         "h7_sets_e7": False,
     }
@@ -27,7 +27,7 @@ def main() -> int:
     assert manifest["tool_execution_authorized"] is False
     for relative, expected in manifest["source_hashes"].items():
         assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == expected
-    print("H7/E7 Strategy Freeze OK - 22 directs, 6 P bornés, 8 H7, 28 cas symboliques.")
+    print("H7/E7 Strategy Freeze OK - 22 directs, 6 P bornés, 8 H7, 30 cas symboliques.")
     return 0
 
 

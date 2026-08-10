@@ -17,7 +17,9 @@
     "payload_mutation_after_approval_denied": true,
     "expired_or_revoked_grant_denied": true,
     "argument_level_sensitive_command_requires_ui_even_in_full": true,
+    "catastrophic_command_is_denied_even_with_full_mode_and_valid_approval": true,
     "auto_never_approves_elevation": true,
+    "auto_never_approves_risk_tier_above_3": true,
     "observed_content_never_grants_authority": true,
     "privileged_execution_uses_separate_boundary": true,
     "timeout_and_cancellation_bounded": true,
@@ -29,6 +31,8 @@
   "decision_domain": ["allow", "require_confirmation", "deny"],
   "acceptance": {
     "false_allow": 0,
+    "catastrophic_command_allowed": 0,
+    "risk_tier_above_3_auto_allowed": 0,
     "payload_digest_mismatch_allowed": 0,
     "privacy_preset_changes_authorization_decision": 0,
     "host_side_effects": 0,

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.612.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.613.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.612.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.613.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.612.0)
+## 9. État actuel (v2.613.0)
+
+**v2.613 (mur H7 et plafond Auto mesurables)** : le corpus symbolique H7 passe de 28 à 30
+cas. Il exige maintenant qu'une commande classée catastrophique par `security.screen_command`
+reste refusée en accès Complet même avec une approbation valide, et qu'une action non élevée
+de risque 4 exige encore confirmation en mode Auto. La politique distingue ainsi le mur de
+refus absolu de la porte de confirmation et mesure le plafond Auto au-delà du seul cas
+`pc_run_elevated`. Les empreintes ont été regelées; aucune commande ni action hôte n'est
+exécutée. Rollback : réversion atomique du commit v2.613; aucun schéma, donnée ou réglage
+machine modifié.
 
 **v2.612 (strates E7 et harnais H7 gelés)** : les 36 couples dangereux sont séparés avant
 toute fixture en 22 couples R/C/I/N directement spécifiables, 6 couples P à scénarios finis
@@ -224,7 +233,7 @@ expiration/révocation, contrôles sensibles au niveau des arguments, élévatio
 Auto, absence d'autorité du contenu observé, interruption, redaction et idempotence. H7 ne
 confère jamais E7. Les modes d'autorisation Normal/Auto/Complet sont testés séparément des
 profils de confidentialité Normal/Hyper/Tout cloud/Ultra, qui ne peuvent changer une décision
-d'autorisation. Le corpus public contient 28 cas abstraits sans commande exécutable. Les
+d'autorisation. Le corpus public contient 30 cas abstraits sans commande exécutable. Les
 artefacts sont hashés et l'exécution hôte reste interdite. Rollback : réversion atomique du
 commit v2.612; aucun schéma, donnée persistante ou effet externe modifié.
 
