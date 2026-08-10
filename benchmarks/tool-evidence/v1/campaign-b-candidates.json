@@ -1,0 +1,1158 @@
+{
+  "schema": "marvin.tool-evidence-campaign-b-candidates/1.0",
+  "generated_at": "2026-08-10T18:17:58.787053+00:00",
+  "status": "frozen_candidates_execution_locked",
+  "source_hashes": {
+    "benchmarks/tool-evidence/v1/inventory.json": "2d269e7839de38080d0320ccd40283f9617336663e01ce51f661314879c92d2d",
+    "benchmarks/tool-evidence/v1/campaign-b-policy.json": "1c34ad88172c8caebd16fc94e50e4ec997ceb7695b998df0844ff6f3d9090d39"
+  },
+  "summary": {
+    "candidate_tool_action_pairs": 70,
+    "first_wave_never_executed_tools": 19,
+    "never_executed_actions_on_partially_exercised_tools": 24,
+    "execution_authorized": false
+  },
+  "first_wave_tools": [
+    "billing_client_create",
+    "billing_invoice_create",
+    "billing_quote_create",
+    "conversation_export",
+    "itsm_ticket_create",
+    "note_create",
+    "note_delete",
+    "note_update",
+    "pc_clipboard_set",
+    "pc_process_kill",
+    "ssh_connection_save",
+    "ssh_exec_multi",
+    "ssh_upload",
+    "system_restore_point",
+    "task_delete",
+    "tweak_debloat_remove",
+    "vm_lab_install",
+    "winget_uninstall",
+    "winget_upgrade"
+  ],
+  "candidates": [
+    {
+      "tool": "note_delete",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_process_kill",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "task_delete",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "tweak_debloat_remove",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "winget_uninstall",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "itsm_ticket_create",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "controlled_external_double",
+      "execution_authorized": false
+    },
+    {
+      "tool": "ssh_exec_multi",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "debian_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "ssh_upload",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "debian_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "system_restore_point",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "vm_lab_install",
+      "action": "install",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "vm_lab_install",
+      "action": "status",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "winget_upgrade",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_clipboard_set",
+      "action": "__default__",
+      "risk_tier": 3,
+      "risk_basis": "secure_profile_blocked",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "billing_client_create",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "controlled_external_double",
+      "execution_authorized": false
+    },
+    {
+      "tool": "billing_invoice_create",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "controlled_external_double",
+      "execution_authorized": false
+    },
+    {
+      "tool": "billing_quote_create",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "controlled_external_double",
+      "execution_authorized": false
+    },
+    {
+      "tool": "conversation_export",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "note_create",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "note_update",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "ssh_connection_save",
+      "action": "__default__",
+      "risk_tier": 1,
+      "risk_basis": "catalog_default_read_or_low_impact_unverified",
+      "action_never_executed": true,
+      "tool_never_executed": true,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "debian_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "bulk_rename",
+      "action": "apply",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "bulk_rename",
+      "action": "preview",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "code_workspace_control",
+      "action": "cancel",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "commit",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "double_click",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "drag",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "keypress",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "move",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "right_click",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "scroll",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_dark_mode",
+      "action": "dark",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_dark_mode",
+      "action": "light",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_dark_mode",
+      "action": "toggle",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_firewall",
+      "action": "off",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_firewall",
+      "action": "on",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_hibernation",
+      "action": "off",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_hibernation",
+      "action": "on",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_network_adapters",
+      "action": "disable",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_network_adapters",
+      "action": "enable",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "os_power_plan",
+      "action": "set",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "tweak_network_harden",
+      "action": "apply",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "tweak_telemetry",
+      "action": "disable",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "tweak_telemetry",
+      "action": "enable",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "windows_task",
+      "action": "process.stop",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": true,
+      "tool_never_executed": false,
+      "historical_execution_count": 0,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "event_delete",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 3,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "file_delete",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 2,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "memory_delete",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 1,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "project_delete",
+      "action": "__default__",
+      "risk_tier": 5,
+      "risk_basis": "dangerous_destructive_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 3,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "bulk_rename",
+      "action": "rollback",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 2,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "catharsis_clean",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 1,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "code_workspace_control",
+      "action": "resume",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 2,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "code_workspace_start",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 2,
+      "human_message_count": 2,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "click",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 29,
+      "human_message_count": 13,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "focus",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 12,
+      "human_message_count": 9,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "navigate",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 6,
+      "human_message_count": 6,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "open",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 14,
+      "human_message_count": 12,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "computer_control",
+      "action": "type",
+      "risk_tier": 4,
+      "risk_basis": "conditional_sensitive_action",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 18,
+      "human_message_count": 11,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "email_automation_run",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 2,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "controlled_external_double",
+      "execution_authorized": false
+    },
+    {
+      "tool": "email_send",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 21,
+      "human_message_count": 20,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "controlled_external_double",
+      "execution_authorized": false
+    },
+    {
+      "tool": "long_task_start",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 8,
+      "human_message_count": 2,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_gui_click",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 1,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_gui_type",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 1,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_pull_ollama_model",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 1,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_run_command",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 24,
+      "human_message_count": 6,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_run_elevated",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 1,
+      "human_message_count": 1,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "pc_run_powershell",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 99,
+      "human_message_count": 32,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "ssh_exec",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 3,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "debian_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "ssh_write_and_run",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 4,
+      "human_message_count": 0,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "debian_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "system_cleanup",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 12,
+      "human_message_count": 6,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    },
+    {
+      "tool": "winget_install",
+      "action": "__default__",
+      "risk_tier": 4,
+      "risk_basis": "dangerous_tool",
+      "action_never_executed": false,
+      "tool_never_executed": false,
+      "historical_execution_count": 10,
+      "human_message_count": 8,
+      "missing_evidence": [
+        "E4",
+        "E7"
+      ],
+      "required_environment": "windows_test_vm",
+      "execution_authorized": false
+    }
+  ]
+}

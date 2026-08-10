@@ -1,0 +1,23 @@
+{
+  "schema": "marvin.real-usage-private-extraction/1.0",
+  "generated_at": "2026-08-10T18:17:59.850713+00:00",
+  "status": "private_extraction_not_labeled_not_frozen",
+  "unit": "distinct_persisted_user_message_with_linked_tool_execution",
+  "message_count": 392,
+  "conversation_count": 129,
+  "text_records_sha256": "e0a47d0346b49e5caca925dcbd0dab1996f84185acdc3a560679525603d8248e",
+  "provenance_records_sha256": "607b6fc34681e4c63c7a94b396b92cd67aca645aa3d89300c7035bdfb6ea6be1",
+  "privacy": {
+    "plaintext_in_public_artifact": false,
+    "tool_history_separated_from_labeling_text": true,
+    "private_storage": "DPAPI CurrentUser",
+    "portable": false
+  },
+  "labeling_authorized": false,
+  "freeze_authorized": false,
+  "limitations": [
+    "The historical schema does not identify whether a linked execution was initiated by an automation inside a persisted conversation.",
+    "No capability family is inferred from historical tool names.",
+    "Texts remain private and must be pseudonymized before any benchmark publication."
+  ]
+}

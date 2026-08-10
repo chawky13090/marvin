@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.608.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.609.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.608.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.609.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.608.0)
+## 9. État actuel (v2.609.0)
+
+**v2.609 (surface de preuve complète des outils)** : un inventaire en lecture seule couvre
+les 364 outils et leurs 436 couples `outil + action` selon huit niveaux E0–E7. Une exécution
+SQLite réussie ne vaut jamais oracle métier ou rollback. Sur l'état réel, 63 couples n'ont
+aucune exécution, 327 aucune exécution liée à un message humain persistant et 10 113 des
+12 476 exécutions sont orphelines ou éphémères. Les 19 outils entièrement jamais exécutés
+forment la première vague de campagne B; ses 70 candidats restent tous verrouillés jusqu'au
+gel de fixtures, oracles et rollbacks en VM ou doubles externes. Les 392 messages outillés
+réels de 129 conversations sont extraits en lecture seule dans deux enveloppes DPAPI séparant
+texte et provenance; le manifeste public ne contient aucun contenu et interdit encore
+l'étiquetage et le gel. Le gate canonique contient désormais 281 étapes. Rollback : réversion
+atomique du commit v2.609 et suppression optionnelle de `data/forge/real-usage-v1`; aucune
+modification du routage, du catalogue ou du schéma SQLite.
 
 **v2.608 (plan de validation canonique)** : `check_marvin.py` conserve désormais exactement
 278 étapes dans tous les modes. Normal exécute 274 étapes et marque les quatre smokes live

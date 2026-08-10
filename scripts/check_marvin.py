@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 278
+EXPECTED_STAGE_COUNT = 281
 
 
 @dataclass(frozen=True)
@@ -186,6 +186,9 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("SLO roulant et budget d'erreur", (python, "scripts/test_runtime_slo.py")),
         Stage("Inventaire des consommateurs d'outils", (python, "scripts/test_tool_consumer_inventory.py")),
         Stage("Disponibilite reseau des 364 outils", (python, "scripts/test_tool_availability.py")),
+        Stage("Inventaire E0-E7 des outils", (python, "scripts/test_tool_evidence_inventory.py")),
+        Stage("Pré-inscription de la campagne B", (python, "scripts/test_tool_evidence_campaign_b.py")),
+        Stage("Extraction privée des demandes réelles", (python, "scripts/test_real_usage_corpus.py")),
         Stage("Inventaire des données personnelles", (python, "scripts/test_privacy_inventory.py")),
         Stage("Export chiffré des données personnelles", (python, "scripts/test_privacy_rights.py")),
         Stage("Runtime commun des outils", (python, "scripts/test_tool_runtime.py")),

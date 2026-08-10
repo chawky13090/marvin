@@ -5,6 +5,36 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-10 — v2.609.0 — Surface de preuve E0–E7 des outils
+
+Demande : compter les capacités non testées et les outils non utilisés sans confondre usage
+humain, campagnes Forge, automatismes et simple succès technique. L'inventaire v1 ouvre
+SQLite en lecture seule et projette les 364 outils en 436 couples `outil + action`. E0–E2
+décrivent catalogue, harnais et référence de test; E3–E5 et E7 restent faux tant qu'un
+artefact explicite ne les prouve. E6 exige une exécution réussie liée au message utilisateur
+persistant immédiatement antérieur. Une conversation supprimée ne compte jamais comme usage
+humain. La mesure initiale trouve 63 couples jamais exécutés, 327 sans usage humain lié et
+19 outils entièrement vierges. Les exécutions éphémères dominent l'historique, ce qui confirme
+qu'un simple comptage de `tool_executions` surestimait fortement l'usage réel.
+
+La campagne B est pré-enregistrée mais son exécution est verrouillée. Sa première vague couvre
+les 19 outils entièrement vierges; les autres candidats sont admis par risque et déficit E4/E7.
+Chaque action réelle exigera snapshot propre, setup, oracle indépendant, teardown et rollback
+en VM Windows/Debian ou double externe; le poste hôte, les destinataires réels, publications et
+achats sont interdits. Aucune action dangereuse n'a été exécutée dans cette tranche.
+
+Pour la campagne A, 392 messages utilisateur outillés issus de 129 conversations persistées
+sont extraits dans deux enveloppes DPAPI distinctes : texte pour le futur étiquetage et
+provenance historique inaccessible à cet étiqueteur. Le manifeste Git ne contient aucun texte,
+nom d'outil historique ou identifiant personnel. Étiquetage, pseudonymisation publique et gel
+restent interdits jusqu'au gel de la rubrique et d'un contrôle anti-fuite. Les deux enveloppes
+locales sont relues après chiffrement. Sécurité : lecture SQLite `mode=ro`, publication atomique,
+bornes de taille, intégrité SHA-256 et DPAPI CurrentUser; limite documentée, ce corpus n'est pas
+portable vers une autre identité Windows. Logs : aucun contenu n'est journalisé, seulement les
+compteurs imprimés par les scripts. Rollback code : réversion atomique du commit v2.609.
+Rollback données : supprimer `data/forge/real-usage-v1` après vérification des deux chemins;
+la base source et le coffre de secrets restent inchangés.
+
 ## 2026-08-10 — v2.608.0 — Plan de gate fixe et skips explicites
 
 Constat : les 275 étapes citées pour v2.605 correspondaient au mode `--live`; les 274 de

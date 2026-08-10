@@ -1,0 +1,37 @@
+{
+  "schema": "marvin.real-usage-campaign-a/1.0",
+  "status": "private_extraction_complete_labeling_locked",
+  "source": {
+    "database": "data/secretary.db",
+    "unit": "distinct_persisted_user_message",
+    "requires_linked_tool_execution": true,
+    "deleted_or_missing_conversations_excluded": true,
+    "benchmark_ephemeral_never_counts_as_human_usage": true
+  },
+  "privacy": {
+    "raw_text_publication_forbidden": true,
+    "private_text_envelope": "DPAPI CurrentUser",
+    "historical_tool_provenance_separate": true,
+    "labeler_must_not_receive_historical_tools": true,
+    "stable_typed_pseudonymization_required_before_freeze": true,
+    "plaintext_secret_or_personal_identifier_gate_required": true
+  },
+  "labeling": {
+    "authorized": false,
+    "reason": "capability rubric and pseudonymization gate are not frozen yet",
+    "text_only": true,
+    "family_minimum_distinct_messages": 5,
+    "historical_tool_name_forbidden": true,
+    "historical_result_forbidden": true,
+    "uncertain_label": "unclassified",
+    "multi_intent_message_must_be_split_before_counting": true
+  },
+  "release": {
+    "narrow_certification_only": true,
+    "explicit_enabled_families_required": true,
+    "unmeasured_families_remain_disabled": true,
+    "periodic_growth_from_new_real_usage": true,
+    "synthetic_supplement_must_be_a_separate_campaign": true
+  },
+  "freeze_authorized": false
+}

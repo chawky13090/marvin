@@ -1,0 +1,39 @@
+{
+  "schema": "marvin.tool-evidence-campaign-b/1.0",
+  "status": "preregistered_not_executed",
+  "unit": "tool_plus_typed_action",
+  "purpose": "certify_high_risk_evidence_gaps_without_using_the_primary_workstation",
+  "priority_formula": "risk_tier * missing_e4_factor * missing_e7_factor",
+  "admission": {
+    "llm_visible": true,
+    "first_wave_all_never_executed_tools": true,
+    "additional_candidates_risk_tier_minimum": 4,
+    "requires_missing_any": ["E4", "E7"],
+    "never_executed_first": true
+  },
+  "mandatory_fixture_contract": {
+    "environment": ["windows_test_vm", "debian_test_vm", "controlled_external_double"],
+    "host_execution_forbidden": true,
+    "clean_snapshot_required": true,
+    "setup_automated": true,
+    "oracle_independent_from_executor": true,
+    "teardown_automated": true,
+    "snapshot_restore_required": true,
+    "interrupted_run_discarded": true,
+    "proof_bundle_required": true
+  },
+  "external_effects": {
+    "real_recipient_forbidden": true,
+    "real_publication_forbidden": true,
+    "real_purchase_forbidden": true,
+    "test_tenant_or_protocol_double_required": true
+  },
+  "outcomes": {
+    "verified": "oracle_passes_and_rollback_is_replayed",
+    "restricted": "safe_subset_only_is_proven",
+    "non_verified": "fixture_or_independent_oracle_is_unavailable",
+    "rollback": "false_success_or_forbidden_side_effect"
+  },
+  "execution_authorized": false,
+  "unlock_condition": "fixtures_oracles_and_rollbacks_hashed_before_first_run"
+}
