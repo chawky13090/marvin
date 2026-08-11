@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.619.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.620.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.619.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.620.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.619.0)
+## 9. État actuel (v2.620.0)
+
+**v2.620 (readiness lourde avant état prêt)** : le statut runtime ne confond plus ports ouverts
+et service utilisable. Après santé backend/frontend, Code Workspace et VM Lab doivent répondre
+sur leurs contrats réels; sinon l'état reste `initializing`, distinct de `stopped_or_failed`.
+Le délai du superviseur réutilise le timeout global borné au lieu d'ajouter quinze secondes
+insuffisantes. Cinq redémarrages froids consécutifs ont obtenu HTTP 200 sur les deux endpoints
+avant `ready`, en 123,2 s, 122,2 s, 118,9 s, 117,8 s et 184,5 s. La preuve anonymisée est
+versionnée et contrôlée par le gate. TD-011 est fermé. Rollback : réversion atomique v2.620.
 
 **v2.619 (implémentations des six fixtures pilotes E7)** : les plans gelés possèdent désormais
 des adaptateurs autonomes de snapshot, oracle et restauration pour volumes temporaires, clone

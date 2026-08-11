@@ -1,0 +1,18 @@
+{
+  "schema": "marvin.cold-start-readiness/1.0",
+  "generated_at": "2026-08-11T10:26:25.5037114Z",
+  "cycles": [
+    {"cycle": 1, "state": "ready", "duration_ms": 123183, "code_workspace_http": 200, "vm_lab_http": 200},
+    {"cycle": 2, "state": "ready", "duration_ms": 122159, "code_workspace_http": 200, "vm_lab_http": 200},
+    {"cycle": 3, "state": "ready", "duration_ms": 118852, "code_workspace_http": 200, "vm_lab_http": 200},
+    {"cycle": 4, "state": "ready", "duration_ms": 117755, "code_workspace_http": 200, "vm_lab_http": 200},
+    {"cycle": 5, "state": "ready", "duration_ms": 184463, "code_workspace_http": 200, "vm_lab_http": 200}
+  ],
+  "passed": true,
+  "acceptance": {
+    "required_consecutive_cycles": 5,
+    "ready_requires_code_workspace_http_200": true,
+    "ready_requires_vm_lab_http_200": true,
+    "timeout_was_not_increased": true
+  }
+}

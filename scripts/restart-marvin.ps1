@@ -51,7 +51,7 @@ if ($null -eq $Backend -or -not $FrontendReady) {
 }
 
 $Status = $null
-$StatusDeadline = (Get-Date).AddSeconds(15)
+$StatusDeadline = $Deadline
 do {
     $StatusJson = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
         -File (Join-Path $PSScriptRoot 'get-marvin-runtime-status.ps1')
@@ -67,6 +67,7 @@ $FinalSuccess = $null -ne $Status -and $Status.overall -in @('ready', 'degraded'
     version = [string]$Backend.version
     tools = [int]$Backend.tools_count
     dependencies = $Status.dependencies
+    readiness = $Status.readiness
     lan = $Status.lan
     duration_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
 } | ConvertTo-Json -Compress -Depth 6

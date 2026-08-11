@@ -5,6 +5,22 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.620.0 — TD-011 fermé par readiness réelle et cinq cycles froids
+
+Le redémarrage v2.619 avait encore produit un HTTP 503 transitoire sur VM Lab après avoir
+déclaré Marvin prêt, reproduisant la classe de défaut observée auparavant sur Code Workspace.
+Le statut runtime sonde désormais `/api/coding/overview` et `/api/vm-lab/status`. Lorsque le
+socle répond mais qu'un composant lourd dépasse sa sonde bornée, l'état devient `initializing`
+et non `ready` ni `failed`. Le redémarreur réutilise son deadline global de 180 secondes; aucun
+timeout supplémentaire ni infini n'est introduit.
+
+La campagne réelle de cinq redémarrages froids consécutifs a réussi : 123183, 122159, 118852,
+117755 et 184463 ms. Chaque cycle a obtenu HTTP 200 sur Code Workspace et VM Lab avant l'état
+`ready`. Le rapport sans secret est versionné sous `benchmarks/runtime-readiness` et un test de
+gate vérifie les cinq cycles ainsi que les invariants du superviseur. TD-011 est fermé. Aucun
+outil métier, fixture E7, donnée utilisateur ou configuration persistante n'est modifié.
+Rollback : réversion atomique du commit v2.620; le rapport historique peut rester archivé.
+
 ## 2026-08-11 — v2.619.0 — Six fixtures pilotes E7 implémentées sans exécution métier
 
 Les six plans gelés sont reliés à des implémentations indépendantes. Les volumes temporaires

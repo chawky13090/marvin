@@ -17,6 +17,8 @@ function Invoke-SafeJsonProbe {
 $Health = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:8005/api/health'
 $Lan = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:8005/api/auth/lan/status'
 $Frontend = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:3000/api/status'
+$CodingOverview = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:8005/api/coding/overview' -TimeoutSeconds 5
+$VmLab = Invoke-SafeJsonProbe -Uri 'http://127.0.0.1:8005/api/vm-lab/status' -TimeoutSeconds 5
 $HttpsPort = 8443
 $HttpsStatePath = Join-Path $Root 'runtime\https\state.json'
 if (Test-Path -LiteralPath $HttpsStatePath -PathType Leaf) {
@@ -52,8 +54,17 @@ $Searxng = $SearxngPort -gt 0 -and $null -ne (
 )
 
 $CoreReady = $null -ne $Health -and $null -ne $Frontend
-$Degraded = $CoreReady -and (-not $Ollama -or -not $Searxng -or -not $Https)
-$Overall = if (-not $CoreReady) { 'stopped_or_failed' } elseif ($Degraded) { 'degraded' } else { 'ready' }
+$HeavyReady = $null -ne $CodingOverview -and $null -ne $VmLab
+$Degraded = $CoreReady -and $HeavyReady -and (-not $Ollama -or -not $Searxng -or -not $Https)
+$Overall = if (-not $CoreReady) {
+    'stopped_or_failed'
+} elseif (-not $HeavyReady) {
+    'initializing'
+} elseif ($Degraded) {
+    'degraded'
+} else {
+    'ready'
+}
 
 [ordered]@{
     timestamp = (Get-Date).ToUniversalTime().ToString('o')
@@ -71,6 +82,18 @@ $Overall = if (-not $CoreReady) { 'stopped_or_failed' } elseif ($Degraded) { 'de
         searxng_port = $SearxngPort
         https = $Https
         https_port = $HttpsPort
+    }
+    readiness = [ordered]@{
+        code_workspace = [ordered]@{
+            ready = $null -ne $CodingOverview
+            state = if ($null -ne $CodingOverview) { 'ready' } else { 'initializing' }
+            endpoint = '/api/coding/overview'
+        }
+        vm_lab = [ordered]@{
+            ready = $null -ne $VmLab
+            state = if ($null -ne $VmLab) { 'ready' } else { 'initializing' }
+            endpoint = '/api/vm-lab/status'
+        }
     }
     lan = [ordered]@{
         authenticated = $null -ne $Lan -and $Lan.authenticated -eq $true

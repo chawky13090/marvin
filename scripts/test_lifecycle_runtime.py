@@ -40,6 +40,9 @@ def test_contract_files() -> None:
     status = (ROOT / "scripts" / "get-marvin-runtime-status.ps1").read_text(
         encoding="utf-8-sig"
     )
+    cold_starts = (ROOT / "scripts" / "verify-marvin-cold-starts.ps1").read_text(
+        encoding="utf-8-sig"
+    )
     assert "New-ShutdownRequest -Name 'backend.shutdown'" in stop
     assert "New-ShutdownRequest -Name 'frontend.shutdown'" in stop
     assert "Get-MarvinListeners" in stop
@@ -51,6 +54,10 @@ def test_contract_files() -> None:
     assert "MarvinHttpsGateway" in stop
     assert "$null -eq $HttpsService" in stop
     assert "https_port" in status
+    assert "/api/coding/overview" in status
+    assert "/api/vm-lab/status" in status
+    assert "'initializing'" in status
+    assert "$HeavyReady" in status
     assert "frontend.shutdown" in frontend
     assert "child.kill('SIGTERM')" in frontend
     assert "stopping ? 0" in frontend
@@ -70,8 +77,14 @@ def test_contract_files() -> None:
     assert "get-marvin-runtime-status.ps1" in restart
     assert "startup_timeout_or_exit" in restart
     assert "dependencies = $Status.dependencies" in restart
+    assert "readiness = $Status.readiness" in restart
+    assert "$StatusDeadline = $Deadline" in restart
     assert "$FinalSuccess" in restart
     assert "if (-not $FinalSuccess) { exit 1 }" in restart
+    assert "[ValidateRange(1, 10)][int]$Cycles = 5" in cold_starts
+    assert "cold-start-readiness-report.json" in cold_starts
+    assert "code_workspace_http" in cold_starts and "vm_lab_http" in cold_starts
+    assert "-Confirm:$false" not in cold_starts
 
 
 if __name__ == "__main__":
