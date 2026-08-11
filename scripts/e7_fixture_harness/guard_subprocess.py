@@ -180,7 +180,10 @@ def main() -> int:
         return 5
     if args.mode == "signed-system-binary":
         process = attested[0]
-        env = {name: os.environ[name] for name in process["allowed_environment"] if name in os.environ}
+        env = {
+            name: os.path.expandvars(os.environ[name])
+            for name in process["allowed_environment"] if name in os.environ
+        }
         completed = subprocess.run(
             list(process["allowed_argv"][0]), cwd=PACKAGE_ROOT.parent, env=env,
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False,

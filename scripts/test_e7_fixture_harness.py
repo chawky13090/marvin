@@ -41,8 +41,9 @@ def _run_canary(mode: str) -> subprocess.CompletedProcess[str]:
     env = {"PYTHONIOENCODING": "utf-8", "PYTHONPATH": str(ROOT / "scripts")}
     if os.name == "nt":
         for name in (
-            "LOCALAPPDATA", "PATH", "ProgramFiles", "ProgramFiles(x86)",
-            "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE", "WINDIR",
+            "ALLUSERSPROFILE", "LOCALAPPDATA", "PATH", "ProgramData", "ProgramFiles",
+            "ProgramFiles(x86)", "SYSTEMDRIVE", "SYSTEMROOT", "TEMP", "TMP",
+            "USERPROFILE", "WINDIR",
         ):
             if name in os.environ:
                 env[name] = os.environ[name]
@@ -125,7 +126,7 @@ def main() -> int:
     assert by_pair[("bulk_rename", "preview")]["permitted_executables"] == ()
     winget_permission = by_pair[("winget_uninstall", "__default__")]["permitted_executables"][0]
     assert winget_permission["shell"] is False
-    assert {"LOCALAPPDATA", "PATH", "TEMP", "SYSTEMROOT"} <= set(winget_permission["allowed_environment"])
+    assert {"LOCALAPPDATA", "PATH", "TEMP", "SYSTEMROOT", "ProgramData", "SYSTEMDRIVE"} <= set(winget_permission["allowed_environment"])
     process_permission = by_pair[("pc_process_kill", "__default__")]["permitted_executables"][0]
     assert process_permission["isolated_flag"] == "-I"
     assert process_permission["forbid_dash_c"] is True
