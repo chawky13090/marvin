@@ -1,0 +1,43 @@
+{
+  "schema": "marvin.e7-apply-execution-assessment/1.0",
+  "source_result_sha256": "41ae2fb9230cef9f76ef633b6e669a42efea025e021cbcc54dbdfc1a61e5b757",
+  "source_result_modified": false,
+  "verdict": "FAILED_LOCKED",
+  "cycles": {
+    "required": 5,
+    "completed": 5,
+    "tool_success_count": 5,
+    "exact_independent_restoration_count": 5,
+    "added_acl_rights_count": 0,
+    "declared_delta_failure_count": 5
+  },
+  "observed_cause": {
+    "kind": "tool_owned_rollback_metadata_inside_observed_fixture_tree",
+    "stable_paths": [
+      ".marvin-rollback",
+      ".marvin-rollback/bulk-rename-<run-id>.json"
+    ],
+    "interpretation": "The frozen R contract allowed only declared rename pairs; tool-owned rollback metadata is therefore a collateral delta.",
+    "not_a_c_candidate": true,
+    "reason_not_c": "C requires zero collateral paths before considering residual identity loss."
+  },
+  "instrumentation_limit": {
+    "normalized_cycles_identical_reported": false,
+    "cause": "The frozen runner retained the random rollback manifest identifier in normalized collateral paths.",
+    "effect_on_final_verdict": "none",
+    "reason": "Every individual cycle independently failed the zero-collateral predicate before intercycle equivalence was evaluated.",
+    "future_change_requires_new_runner_freeze": true
+  },
+  "fixture_cleanup": {
+    "temporary_campaign_directories_remaining_after_run": 0,
+    "user_data_used": false,
+    "persistent_host_data_modified": false
+  },
+  "taxonomy": {
+    "changed_by_runner": false,
+    "bulk_rename_apply_remains": "R_unverified",
+    "execution_lock_remains": true
+  },
+  "next_step": "Design a distinct contract for rollback metadata placement or observation scope, freeze it before any replay, and never reinterpret this raw run.",
+  "rollback": "Preserve raw evidence; code rollback is git revert of the result publication commit."
+}

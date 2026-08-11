@@ -5,6 +5,37 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.630.0 — `bulk_rename:apply` exécuté cinq fois, verrou maintenu
+
+Après le commit séparé du runner gelé, l'unique campagne autorisée a exécuté cinq cycles dans
+un volume temporaire. Les cinq appels métier réussissent, les deux fichiers sont renommés et
+la restauration indépendante par renommage inverse retrouve exactement chaque pré-image.
+Les identités NTFS, timestamps, contenus et ACL sont préservés; aucun droit ACL n'est ajouté.
+
+Le verdict mécanique est néanmoins `FAILED_LOCKED` sur les cinq cycles. L'outil écrit un
+répertoire `.marvin-rollback` et un manifeste `bulk-rename-<run-id>.json` dans la racine
+observée. Ces chemins ne figuraient pas parmi les paires de renommage autorisées et constituent
+donc un delta collatéral selon le contrat R gelé. Ils ont été observés avant nettoyage, puis
+retirés uniquement pour permettre la restauration indépendante. Aucun critère n'a été modifié
+après le résultat et le runner n'a pas reclassé la taxonomie.
+
+La comparaison intercycle du runner est fausse parce qu'elle conserve l'UUID propre à chaque
+manifeste dans les chemins collatéraux. Cette limite instrumentale n'affecte pas le verdict :
+chaque cycle avait déjà échoué individuellement sur le prédicat zéro chemin collatéral. Elle
+est enregistrée sous TD-012 et exigera un nouveau gel avant tout rejeu. L'artefact brut a pour
+SHA-256 `41ae2fb9230cef9f76ef633b6e669a42efea025e021cbcc54dbdfc1a61e5b757`;
+aucun dossier temporaire de campagne ne subsiste. Rollback : préserver les preuves; réversion
+atomique du commit v2.630 pour le code et la documentation seulement.
+
+Validation exhaustive finale : 291 étapes exécutées, 4 contrôles live différés et 295 étapes
+attendues, zéro échec en 772,1 secondes; compilation Python, baseline frontend et build
+Next.js 16.2.12 Turbopack réussis. Les contrôles live sont rejoués séquentiellement après le
+redémarrage de Marvin afin d'éviter toute contamination d'état entre smokes.
+
+Marvin 2.630.0 atteint ensuite `ready` en 123 701 ms avec 364 outils, Ollama, SearXNG,
+HTTPS, Code Workspace et VM Lab disponibles. Les smokes live séquentiels passent API 28/28,
+pages 41/41, chat 5/5 et voix strictement sérialisée.
+
 ## 2026-08-12 — v2.629.0 — Runner E7 apply gelé avant première mutation
 
 Le runner observateur de `bulk_rename:apply` est maintenant séparé de la taxonomie. Sa

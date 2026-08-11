@@ -1,0 +1,207 @@
+{
+  "schema": "marvin.e7-apply-execution-result/1.0",
+  "generated_at": "2026-08-11T22:28:32.638024+00:00",
+  "status": "observed_taxonomy_unchanged",
+  "contract": "bulk_rename:apply",
+  "source_commit": "93233ae1da2dc6b997c7d79bb701004347b7e67d",
+  "policy_sha256": "9a86948fde3627b482c922591b960a566330644b252a6c84586948366404b33b",
+  "authorization_sha256": "6422a193890f3d20c7934c60f34494817e8a5332e4c4af0a6071caaa9b270a39",
+  "final_verdict": "FAILED_LOCKED",
+  "runner_reclassified_taxonomy": false,
+  "cycles_required": 5,
+  "cycles_completed": 5,
+  "normalized_cycles_identical": false,
+  "business_tools_invoked": [
+    {
+      "tool": "bulk_rename",
+      "action": "apply",
+      "count": 5
+    }
+  ],
+  "all_other_business_tools_invoked": false,
+  "fixture_contains_user_data": false,
+  "persistent_host_paths_used": false,
+  "cycles": [
+    {
+      "cycle": 1,
+      "verdict": "FAILED_LOCKED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": false,
+      "declared_delta_error": "fixture_rename_collateral_delta",
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          ".marvin-rollback",
+          ".marvin-rollback/bulk-rename-56c1ac045a164307aef0de473eb800f3.json",
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "collateral_paths": [
+        ".marvin-rollback",
+        ".marvin-rollback/bulk-rename-56c1ac045a164307aef0de473eb800f3.json"
+      ],
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "exact_identity_restored": true,
+      "independent_recovery_error": null,
+      "tool_metadata_removed_during_cleanup": [
+        ".marvin-rollback/bulk-rename-56c1ac045a164307aef0de473eb800f3.json"
+      ],
+      "preimage_sha256": "fe7c4a1c4c022eb6156157327e2ccf5cb57165818d317a2bb3ea6b8b4d69749f",
+      "post_apply_sha256": "af401ac294768cc409b23a5989c466b494217cc66a1c3a88992040c0ceb1dd53",
+      "restored_sha256": "fe7c4a1c4c022eb6156157327e2ccf5cb57165818d317a2bb3ea6b8b4d69749f"
+    },
+    {
+      "cycle": 2,
+      "verdict": "FAILED_LOCKED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": false,
+      "declared_delta_error": "fixture_rename_collateral_delta",
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          ".marvin-rollback",
+          ".marvin-rollback/bulk-rename-3cb437a5354d47e4af30374fb0c42508.json",
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "collateral_paths": [
+        ".marvin-rollback",
+        ".marvin-rollback/bulk-rename-3cb437a5354d47e4af30374fb0c42508.json"
+      ],
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "exact_identity_restored": true,
+      "independent_recovery_error": null,
+      "tool_metadata_removed_during_cleanup": [
+        ".marvin-rollback/bulk-rename-3cb437a5354d47e4af30374fb0c42508.json"
+      ],
+      "preimage_sha256": "3f92fb3b59e6aa7d71057ab382d10e0a61e779b301bbf318f27ec99b5f746b24",
+      "post_apply_sha256": "4c0e4511f2d4240c58b367676d0a5839165a302105c04c83b08ff42673d04648",
+      "restored_sha256": "3f92fb3b59e6aa7d71057ab382d10e0a61e779b301bbf318f27ec99b5f746b24"
+    },
+    {
+      "cycle": 3,
+      "verdict": "FAILED_LOCKED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": false,
+      "declared_delta_error": "fixture_rename_collateral_delta",
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          ".marvin-rollback",
+          ".marvin-rollback/bulk-rename-f90e92911edd48d0ab2f0d6106aae04f.json",
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "collateral_paths": [
+        ".marvin-rollback",
+        ".marvin-rollback/bulk-rename-f90e92911edd48d0ab2f0d6106aae04f.json"
+      ],
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "exact_identity_restored": true,
+      "independent_recovery_error": null,
+      "tool_metadata_removed_during_cleanup": [
+        ".marvin-rollback/bulk-rename-f90e92911edd48d0ab2f0d6106aae04f.json"
+      ],
+      "preimage_sha256": "8476d06d1b4865f781659335edef073194a7f25b316b6aa43e574e8c4f775a43",
+      "post_apply_sha256": "3fd90347d67dfab3bc84c24f4a54077e94498278594a3eaf363335773ea11712",
+      "restored_sha256": "8476d06d1b4865f781659335edef073194a7f25b316b6aa43e574e8c4f775a43"
+    },
+    {
+      "cycle": 4,
+      "verdict": "FAILED_LOCKED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": false,
+      "declared_delta_error": "fixture_rename_collateral_delta",
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          ".marvin-rollback",
+          ".marvin-rollback/bulk-rename-3f7a814fa3974b84b817387589438e3e.json",
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "collateral_paths": [
+        ".marvin-rollback",
+        ".marvin-rollback/bulk-rename-3f7a814fa3974b84b817387589438e3e.json"
+      ],
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "exact_identity_restored": true,
+      "independent_recovery_error": null,
+      "tool_metadata_removed_during_cleanup": [
+        ".marvin-rollback/bulk-rename-3f7a814fa3974b84b817387589438e3e.json"
+      ],
+      "preimage_sha256": "78cdb5b8780e0c1b00d43d6d02352c776e7a39a424a9808c42f873e5c47a7afe",
+      "post_apply_sha256": "5ddf87de6dcc16b5e0b662a1c07d904f54a9b7af8efba568aea95800a4377aa8",
+      "restored_sha256": "78cdb5b8780e0c1b00d43d6d02352c776e7a39a424a9808c42f873e5c47a7afe"
+    },
+    {
+      "cycle": 5,
+      "verdict": "FAILED_LOCKED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": false,
+      "declared_delta_error": "fixture_rename_collateral_delta",
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          ".marvin-rollback",
+          ".marvin-rollback/bulk-rename-ddd28622a4aa423da367af6cc193e1df.json",
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "collateral_paths": [
+        ".marvin-rollback",
+        ".marvin-rollback/bulk-rename-ddd28622a4aa423da367af6cc193e1df.json"
+      ],
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "exact_identity_restored": true,
+      "independent_recovery_error": null,
+      "tool_metadata_removed_during_cleanup": [
+        ".marvin-rollback/bulk-rename-ddd28622a4aa423da367af6cc193e1df.json"
+      ],
+      "preimage_sha256": "2678c32b6b585cd63652cc166ecaca2565b737184a40b92052d0c2ad9383dc00",
+      "post_apply_sha256": "386fbb3775df42e7558385aefbade9892dc6674368289f7361d4e024e1aba52e",
+      "restored_sha256": "2678c32b6b585cd63652cc166ecaca2565b737184a40b92052d0c2ad9383dc00"
+    }
+  ],
+  "next_action": {
+    "taxonomy_change": "none",
+    "next_step": "keep_execution_locked_investigate_without_relaxing_this_policy"
+  },
+  "rollback": "delete_this_result_artifact; all temporary fixtures were independently restored and removed",
+  "content_sha256": "854becd7421365b2a63c87eb1bbc8cb02c39df4c8e90edb13fb9588c1bdd0347"
+}

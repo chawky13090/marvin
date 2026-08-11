@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.629.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.630.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.629.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.630.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.629.0)
+## 9. État actuel (v2.630.0)
+
+**v2.630 (premier résultat E7-R apply)** : les cinq invocations isolées de
+`bulk_rename:apply` réussissent et la restauration indépendante retrouve exactement chaque
+pré-image, sans ajout de droit ACL. Le verdict reste néanmoins `FAILED_LOCKED` : chaque appel
+crée `.marvin-rollback/bulk-rename-<run-id>.json` dans l'arbre observé, alors que le contrat R
+gelé n'autorisait que les paires de renommage déclarées. Le runner n'a ni reclassé ni modifié
+la taxonomie. Sa normalisation conserve aussi l'identifiant aléatoire du manifeste; cette
+limite instrumentale n'affecte pas le verdict, déjà imposé individuellement par les cinq
+deltas collatéraux. Le résultat brut et son assessment hashé restent immuables. Rollback code :
+réversion atomique du commit v2.630; la preuve publiée doit être conservée pour l'audit.
 
 **v2.629 (runner E7-R gelé avant exécution)** : le runner de `bulk_rename:apply`, sa politique,
 son autorisation et leurs empreintes sont versionnés séparément avant toute mutation. Cinq
