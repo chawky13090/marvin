@@ -1,0 +1,28 @@
+{
+  "schema": "marvin.e7-apply-execution-authorization/1.0",
+  "status": "authorized_once_after_freeze",
+  "single_use": true,
+  "execution_authorized": true,
+  "authorized_contracts": [
+    "bulk_rename:apply"
+  ],
+  "authorized_cycles": 5,
+  "maximum_business_tool_invocations_per_cycle": 1,
+  "maximum_total_business_tool_invocations": 5,
+  "all_other_business_tools_authorized": false,
+  "host_persistent_paths_forbidden": true,
+  "temporary_fixture_user_data_forbidden": true,
+  "network_access_authorized": false,
+  "result_artifact_authorized": true,
+  "taxonomy_mutation_authorized": false,
+  "policy_sha256": "9a86948fde3627b482c922591b960a566330644b252a6c84586948366404b33b",
+  "frozen_hashes": {
+    "scripts/run_e7_apply_campaign.py": "7294118e8d427af3d396511a4df45d5ff7c41a604e1ce259364d5a4eeb076391",
+    "scripts/e7_apply_fixture.py": "200a31b9feb4ab33ef87e5902c72f7d9d8fc2a44ce15646b7d83fc9d2e892ad7",
+    "benchmarks/tool-evidence/v1.1/e7-apply-preregistration.json": "0aed82e75da372cf1d7bbd950e0fb4704ce9af696581cac6ef22a206f9743ee5",
+    "benchmarks/tool-evidence/v1.1/e7-apply-execution-policy.json": "9a86948fde3627b482c922591b960a566330644b252a6c84586948366404b33b",
+    "backend/tool_domains/filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180"
+  },
+  "authorization_expires_when": "result_artifact_exists_or_any_frozen_hash_changes",
+  "rollback": "delete_authorization_only_before_execution; after execution preserve authorization with raw result"
+}

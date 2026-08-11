@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.629.0 — Runner E7 apply gelé avant première mutation
+
+Le runner observateur de `bulk_rename:apply` est maintenant séparé de la taxonomie. Sa
+politique, son autorisation unique et son manifeste d'empreintes sont gelés avant exécution.
+Le périmètre est limité à cinq fixtures temporaires sans donnée utilisateur, réseau ni chemin
+persistant, avec exactement une invocation maximale par cycle. Toute autre action métier est
+interdite.
+
+Les trois verdicts sont mécaniques. `R_CONFIRMED` exige le résultat métier, le seul delta de
+renommage déclaré, zéro chemin collatéral, une restauration identique à la pré-image et cinq
+cycles normalisés identiques. `R_INVALID_C_CANDIDATE` n'autorise que les différences
+`file_identity` et `created_ns`, sans droit ACL ajouté; il ne modifie jamais la taxonomie.
+Tout autre cas produit `FAILED_LOCKED`. La différence d'ACE est calculée comme ensemble après
+moins ensemble avant, sans appréciation de danger. Le résultat brut est le seul artefact que
+l'autorisation permet de publier.
+
+Sécurité, logs et rollback : le runner refuse toute source gelée modifiée ou non commitée,
+n'écrit aucun payload dans les logs et n'utilise que le domaine temporaire. L'autorisation
+expire dès la création du résultat ou au premier changement d'empreinte. Cette tranche ne
+réalise encore aucune mutation métier. Rollback : réversion atomique du commit v2.629 avant
+exécution; aucune restauration de donnée n'est nécessaire.
+
 ## 2026-08-11 — v2.628.0 — Politique E7-R apply gelée sans exécution métier
 
 La tranche revient à la campagne E7 après la stabilisation frontend v2.624-v2.627. Le contrat

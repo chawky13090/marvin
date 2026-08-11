@@ -1,0 +1,79 @@
+{
+  "schema": "marvin.e7-apply-execution-policy/1.0",
+  "status": "frozen_before_execution",
+  "authorized_contract": "bulk_rename:apply",
+  "required_class": "R",
+  "cycles": 5,
+  "maximum_business_tool_invocations_per_cycle": 1,
+  "maximum_total_business_tool_invocations": 5,
+  "verdicts": [
+    "R_CONFIRMED",
+    "R_INVALID_C_CANDIDATE",
+    "FAILED_LOCKED"
+  ],
+  "runner_may_reclassify_taxonomy": false,
+  "r_predicate": {
+    "business_outcome_reached": true,
+    "declared_relative_rename_delta_only": true,
+    "collateral_delta_count": 0,
+    "restored_snapshot_equals_own_preimage": true,
+    "acl_sddl_exact": true,
+    "all_five_normalized_cycles_identical": true
+  },
+  "c_candidate_predicate": {
+    "business_outcome_reached": true,
+    "declared_target_only": true,
+    "collateral_delta_count": 0,
+    "independent_compensation_completed": true,
+    "allowed_residual_fields": [
+      "file_identity",
+      "created_ns"
+    ],
+    "all_other_observed_fields_must_equal_preimage": true,
+    "any_added_acl_right_fails_locked": true,
+    "acl_comparison_rule": "after_ace_set_minus_preimage_ace_set_must_be_empty",
+    "all_five_normalized_cycles_same_residual_class": true,
+    "empty_residual_set_is_not_a_c_candidate": true
+  },
+  "failed_locked_predicate": {
+    "any_unlisted_residual_field": true,
+    "any_added_acl_right": true,
+    "any_collateral_path": true,
+    "incomplete_or_failed_recovery": true,
+    "non_identical_normalized_cycles": true,
+    "business_tool_error": true,
+    "cycle_count_not_five": true
+  },
+  "verdict_actions": {
+    "R_CONFIRMED": {
+      "taxonomy_change": "none",
+      "next_step": "record_R_evidence_only"
+    },
+    "R_INVALID_C_CANDIDATE": {
+      "taxonomy_change": "forbidden_in_this_run",
+      "next_step": "preserve_R_artifacts_publish_raw_observation_create_distinct_supersession_and_refreeze_before_replay"
+    },
+    "FAILED_LOCKED": {
+      "taxonomy_change": "none",
+      "next_step": "keep_execution_locked_investigate_without_relaxing_this_policy"
+    }
+  },
+  "isolation": {
+    "fresh_temporary_workspace_per_campaign": true,
+    "fresh_fixture_per_cycle": true,
+    "user_data_forbidden": true,
+    "persistent_host_path_forbidden": true,
+    "network_access": false,
+    "independent_cleanup_required": true
+  },
+  "governed_source_hashes": {
+    "scripts/run_e7_apply_campaign.py": "7294118e8d427af3d396511a4df45d5ff7c41a604e1ce259364d5a4eeb076391",
+    "scripts/e7_apply_fixture.py": "200a31b9feb4ab33ef87e5902c72f7d9d8fc2a44ce15646b7d83fc9d2e892ad7",
+    "benchmarks/tool-evidence/v1.1/e7-apply-preregistration.json": "0aed82e75da372cf1d7bbd950e0fb4704ce9af696581cac6ef22a206f9743ee5",
+    "benchmarks/tool-evidence/v1.1/e7-taxonomy-policy.json": "191405fe190c8fdf4bba18552042892966d2cafa80dae376b7bf9ef448df92b6",
+    "benchmarks/tool-evidence/v1.1/e7-classification.json": "ca3aca2edc68853a1168e17bea52c8ea2cf165e05d686c21b57442c00cf918ff",
+    "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+    "backend/tool_domains/filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180"
+  },
+  "rollback": "revert_freeze_commit_before_execution; no business data changed by policy freeze"
+}

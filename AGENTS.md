@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.628.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.629.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.628.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.629.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.628.0)
+## 9. État actuel (v2.629.0)
+
+**v2.629 (runner E7-R gelé avant exécution)** : le runner de `bulk_rename:apply`, sa politique,
+son autorisation et leurs empreintes sont versionnés séparément avant toute mutation. Cinq
+cycles temporaires seulement sont autorisés, avec une invocation métier maximale par cycle.
+Le runner observe sans reclasser et ne peut produire que `R_CONFIRMED`,
+`R_INVALID_C_CANDIDATE` ou `FAILED_LOCKED`. Le candidat C n'admet que les pertes résiduelles
+`file_identity` et `created_ns`; toute ACE ajoutée, chemin collatéral, restauration incomplète
+ou variation intercycle impose `FAILED_LOCKED`. Une éventuelle reclassification exige un
+artefact de supersession distinct et un nouveau gel. Rollback avant exécution : réversion
+atomique du commit v2.629; aucune donnée métier n'a encore muté.
 
 **v2.628 (pré-enregistrement E7-R de `bulk_rename:apply`)** : une politique gelée impose cinq
 cycles indépendants, une invocation métier maximale par cycle, une fixture neuve et une

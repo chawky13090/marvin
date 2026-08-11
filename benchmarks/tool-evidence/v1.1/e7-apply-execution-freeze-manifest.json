@@ -1,0 +1,17 @@
+{
+  "schema": "marvin.e7-apply-execution-freeze-manifest/1.0",
+  "status": "frozen_and_authorized_before_first_execution",
+  "contract": "bulk_rename:apply",
+  "execution_scope": "five_isolated_temporary_cycles_only",
+  "taxonomy_mutation_authorized": false,
+  "frozen_hashes": {
+    "scripts/run_e7_apply_campaign.py": "7294118e8d427af3d396511a4df45d5ff7c41a604e1ce259364d5a4eeb076391",
+    "scripts/test_e7_apply_campaign_contract.py": "0777d3a1d055d0357665792e23674d2112bf2196b38a8230de75be6670266ef0",
+    "scripts/e7_apply_fixture.py": "200a31b9feb4ab33ef87e5902c72f7d9d8fc2a44ce15646b7d83fc9d2e892ad7",
+    "benchmarks/tool-evidence/v1.1/e7-apply-preregistration.json": "0aed82e75da372cf1d7bbd950e0fb4704ce9af696581cac6ef22a206f9743ee5",
+    "benchmarks/tool-evidence/v1.1/e7-apply-execution-policy.json": "9a86948fde3627b482c922591b960a566330644b252a6c84586948366404b33b",
+    "benchmarks/tool-evidence/v1.1/e7-apply-execution-authorization.json": "6422a193890f3d20c7934c60f34494817e8a5332e4c4af0a6071caaa9b270a39",
+    "backend/tool_domains/filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180"
+  },
+  "rollback": "revert_freeze_commit_before_execution; preserve this manifest after execution"
+}
