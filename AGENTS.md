@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.618.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.619.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.618.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.619.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.618.0)
+## 9. État actuel (v2.619.0)
+
+**v2.619 (implémentations des six fixtures pilotes E7)** : les plans gelés possèdent désormais
+des adaptateurs autonomes de snapshot, oracle et restauration pour volumes temporaires, clone
+SQLite et store de tâche. Les deux surfaces Windows produisent uniquement des bundles VM
+verrouillés, liés au checkpoint propre et à la permission d'exécutable; aucune commande métier
+n'est lancée. Les tests synthétiques vérifient zéro mutation en preview, le delta exact d'un
+renommage, la restauration exacte de l'arborescence, la suppression/restauration d'une ligne
+dans un clone SQLite, le store de tâche et le refus d'un checkpoint dangereux. Une poignée
+SQLite oubliée a été détectée sur Windows puis fermée explicitement avant remplacement
+atomique. La fenêtre d'attestation pré-garde et PowerShell System32 comme racine de confiance
+Windows assumée sont maintenant inscrits dans le manifeste. Rollback : réversion atomique du
+commit v2.619; aucune donnée Marvin n'est modifiée.
 
 **v2.618 (attestation des exécutables Windows du harnais E7)** : la permission déclarative
 `windows_signed_system_binary` est désormais exécutable sans ouvrir la garde globalement.

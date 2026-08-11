@@ -63,8 +63,8 @@ def _run_canary(mode: str) -> subprocess.CompletedProcess[str]:
 def main() -> int:
     files = sorted(PACKAGE.glob("*.py"))
     assert {p.name for p in files} == {
-        "__init__.py", "core.py", "pilot_fixtures.py", "guard_subprocess.py",
-        "windows_executable_policy.py",
+        "__init__.py", "core.py", "pilot_fixtures.py", "pilot_implementations.py",
+        "guard_subprocess.py", "surface_runtime.py", "windows_executable_policy.py",
     }
     for path in files:
         imports, calls = _imports_and_calls(path)
@@ -81,7 +81,7 @@ def main() -> int:
 
     allowed = _run_canary("allowed")
     assert allowed.returncode == 0, allowed.stderr
-    assert json.loads(allowed.stdout) == {"accepted": True, "plans": 6}
+    assert json.loads(allowed.stdout) == {"accepted": True, "plans": 6, "implementations": 6}
     denied_import = _run_canary("forbidden-import")
     assert denied_import.returncode != 0
     assert "fixture_import_denied:backend" in denied_import.stderr

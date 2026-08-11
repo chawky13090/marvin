@@ -67,3 +67,9 @@ La v2.618 matérialise la branche `windows_signed_system_binary` : elle résout 
 le package App Installer réel, exige une signature Authenticode valide et l'éditeur Microsoft,
 puis borne séparément chemin, arguments et environnement. Le probe sûr est `winget --version`;
 aucune fixture métier, désinstallation ou mutation n'est autorisée.
+
+La v2.619 implémente les six fixtures sans ouvrir leur exécution métier. Les surfaces locales
+disposent de snapshots, oracles et restaurations testés sur données synthétiques; Winget et le
+processus factice ne produisent que des bundles VM avec `execution_authorized: false`. Le
+manifeste précise que l'attestation précède nécessairement l'audit hook et que PowerShell sous
+System32 constitue la racine de confiance Windows assumée pour lire Authenticode.

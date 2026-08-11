@@ -5,6 +5,26 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.619.0 — Six fixtures pilotes E7 implémentées sans exécution métier
+
+Les six plans gelés sont reliés à des implémentations indépendantes. Les volumes temporaires
+ont des snapshots déterministes, oracles zéro-delta et renommage borné, ainsi qu'une
+restauration depuis préimage. Le clone SQLite est ouvert en lecture seule pour l'observation,
+contrôle intégrité, clés étrangères, compteurs, dump logique et SHA-256, puis se restaure par
+publication atomique d'une préimage préalablement vérifiée. Le store de tâche valide son
+schéma et ses compteurs. Winget et le processus factice restent des bundles VM verrouillés :
+checkpoint propre, surface, deltas, payload symbolique et exécutables permis, sans commande.
+
+Le premier test a révélé que le context manager SQLite ne ferme pas la poignée Windows; la
+restauration échouait avec WinError 32. Les connexions sont désormais fermées explicitement
+dans tous les chemins avant `os.replace`. Les tests synthétiques couvrent les quatre surfaces
+locales et le refus d'un identifiant de checkpoint dangereux. Le manifeste documente aussi
+la fenêtre pré-garde nécessaire à l'attestation et PowerShell System32 comme racine de
+confiance Windows assumée; liste blanche statique et empreinte du manifeste couvrent cette
+phase. Aucun outil Marvin, secret, réseau, donnée utilisateur ou fixture métier n'est appelé.
+Rollback : réversion atomique du commit v2.619; seuls des répertoires temporaires auto-nettoyés
+ont été créés pendant les tests.
+
 ## 2026-08-11 — v2.618.0 — Exécutable Windows E7 attesté et borné par contrat
 
 La revue croisée a confirmé que la v2.617 savait protéger les enfants Python mais refusait

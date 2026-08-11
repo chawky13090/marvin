@@ -25,29 +25,49 @@
     "system_binary_hash_is_evidence_not_acceptance": true,
     "windows_system_binary_requires_authenticode_and_publisher": true,
     "environment_allow_list_is_per_executable_contract": true,
+    "attestation_runs_before_runtime_guard": true,
+    "pre_guard_window_constrained_by_static_allow_list_and_manifest_hash": true,
+    "system32_powershell_is_assumed_windows_trust_root": true,
+    "powershell_attestation_script_is_manifest_hashed": true,
     "fixture_owned_script_hash_required": true,
     "audit_hook_never_installed_in_backend": true
   },
   "files": {
     "scripts/e7_fixture_harness/__init__.py": {
-      "sha256": "864946cb4e03a7cd8ea052ab90fd443ac29de515af4ddc9af69c6f33aa166158",
-      "bytes": 194
+      "sha256": "ce3b476a9e69530d62b91283f32c580708e48fea2bbeec65accb1c069b62382e",
+      "bytes": 288
     },
     "scripts/e7_fixture_harness/core.py": {
       "sha256": "9d0042c7567b92b901ba81ab2e9148bc315d86c9de9de466ebf716f70c5548f3",
       "bytes": 3362
     },
     "scripts/e7_fixture_harness/guard_subprocess.py": {
-      "sha256": "e54d54158ff81938de1850a075e53fff2df23908ca1da06b9e4695290d8f6ad4",
-      "bytes": 8673
+      "sha256": "d856cce62a8891f502d68dfe4fc31c698d8001e21b13b8059b801e58fa749dde",
+      "bytes": 8799
     },
     "scripts/e7_fixture_harness/pilot_fixtures.py": {
       "sha256": "90aaf2969d5bb669b8f1a4e842899bbe59637c4a0e9725004d8c02e2e54d9bae",
       "bytes": 6766
     },
+    "scripts/e7_fixture_harness/pilot_implementations.py": {
+      "sha256": "d593e36bfcb08b5344375e188427e9f44650ee4247b3edb5ecfa4b190e90344a",
+      "bytes": 2458
+    },
+    "scripts/e7_fixture_harness/surface_runtime.py": {
+      "sha256": "8b2b1fb571e9ff87135c0a6cf205c63f2820a079d40a83d3523c69b59b42f735",
+      "bytes": 6939
+    },
     "scripts/e7_fixture_harness/windows_executable_policy.py": {
       "sha256": "78e57c8a1437cd1c0918cc152f5ca1dcab6f95569f678e76323be4352657a228",
       "bytes": 2560
+    },
+    "scripts/test_e7_fixture_harness.py": {
+      "sha256": "8959300a1b8a62e3d6c470308b91f8a0bebd88ef32c6e7464162276e7c95c775",
+      "bytes": 6664
+    },
+    "scripts/test_e7_fixture_implementations.py": {
+      "sha256": "45fce15d1e5a8d882ad67797aa705137cc3ec2352441ba9ec8692768f1e50430",
+      "bytes": 4597
     },
     "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": {
       "sha256": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
@@ -58,5 +78,11 @@
       "bytes": 1100
     }
   },
-  "rollback": "revert the atomic v2.618 commit; no fixture or Marvin tool was executed"
+  "fixture_implementations": {
+    "plans": 6,
+    "local_surfaces_executable_on_synthetic_data_only": 4,
+    "vm_execution_bundles_locked": 2,
+    "marvin_tool_execution": false
+  },
+  "rollback": "revert the atomic v2.619 commit; no Marvin tool or business fixture was executed"
 }

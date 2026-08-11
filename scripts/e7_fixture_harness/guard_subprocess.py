@@ -147,9 +147,10 @@ def main() -> int:
         attested = (evidence,)
     install_runtime_guard(permitted_commands=permitted, attested_processes=attested)
     if args.mode == "allowed":
-        from e7_fixture_harness import build_pilot_plans
+        from e7_fixture_harness import build_pilot_implementations, build_pilot_plans
         plans = build_pilot_plans()
-        print(json.dumps({"accepted": True, "plans": len(plans)}))
+        implementations = build_pilot_implementations()
+        print(json.dumps({"accepted": True, "plans": len(plans), "implementations": len(implementations)}))
         return 0
     if args.mode == "forbidden-import":
         __import__("backend.tools")
