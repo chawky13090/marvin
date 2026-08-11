@@ -5,6 +5,31 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.623.0 — Lectures Hyper-V et apprentissage non bloquantes
+
+Après le redémarrage v2.622 déclaré `ready`, le smoke API a obtenu 27/28 : 503 transitoire
+sur le proxy VM Lab et retry sur `/api/learning`. La sonde isolée répondait ensuite en 2,1 s,
+ce qui excluait une configuration Hyper-V cassée. La cause était l'appel de fonctions
+synchrones lourdes depuis des routes FastAPI `async`, donc sur la boucle événementielle.
+
+Les états VM Lab, job VM et snapshot d'apprentissage sont désormais calculés dans un thread
+dédié borné par les appels internes existants. Le snapshot d'apprentissage reste séquentiel
+pour ne pas ouvrir plusieurs consommateurs concurrents de la base vectorielle. Le gate ajoute
+un test positif et vérifie que les fonctions Hyper-V sont réellement données à
+`asyncio.to_thread`. Aucun timeout n'est augmenté et aucun 503 n'est masqué.
+
+Rollback : réversion atomique du commit v2.623; aucune migration, donnée persistante, secret,
+VM, checkpoint ou configuration réseau n'est modifié.
+
+Validations réelles : gate exhaustif vert avec 285 étapes exécutées et 4 contrôles live
+différés sur 289 attendues, zéro échec et build Next.js/Turbopack réussi. Après
+redémarrage officiel, Marvin est `ready` en 2.623.0; Code Workspace, VM Lab, Ollama,
+SearXNG et HTTPS sont prêts. Le cycle a duré 112 006 ms, dont 107 255 ms d'attente de
+démarrage et 4 740 ms d'arrêt. Les smokes séquentiels donnent API 28/28 sans retry,
+pages 41/41, chat sans erreur console ou HTTP et voix strictement sérialisée. Un premier
+essai parallèle pages/chat/voix a été rejeté comme mesure contaminée : le smoke voix
+supprimait sa conversation éphémère pendant sa lecture par le smoke chat.
+
 ## 2026-08-11 — v2.622.0 — Gate E7 déterministe et preuve readiness clarifiée
 
 Revue croisée : Claude a reproduit l'échec du test de qualification E7 lorsque la RAM libre

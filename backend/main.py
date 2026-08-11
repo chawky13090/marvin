@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.622 — qualification E7 déterministe et préflight mémoire séparé
+# v2.623 — routes de lecture lourdes sorties de la boucle FastAPI
 # v2.584 — sauvegarde portable chiffrée, inventaire réel fermé et restauration isolée
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement

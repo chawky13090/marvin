@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.622.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.623.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.622.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.623.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.622.0)
+## 9. État actuel (v2.623.0)
+
+**v2.623 (lectures lourdes non bloquantes)** : le smoke live post-readiness a reproduit un
+HTTP 503 transitoire sur VM Lab et un ralentissement de `/api/learning`. Les routes `async`
+appelaient directement l'inventaire Hyper-V PowerShell/CIM et les magasins d'apprentissage
+synchrones, bloquant la boucle FastAPI. Ces lectures passent maintenant par `asyncio.to_thread`;
+les opérations restent séquentielles à l'intérieur de chaque snapshot et aucun schéma HTTP,
+outil, autorisation ou donnée n'est modifié. Un test de gate vérifie le déport effectif.
+Rollback : réversion atomique v2.623.
 
 **v2.622 (qualification E7 stable et chronométrage readiness explicite)** : la configuration
 Hyper-V stable (VM arrêtée, génération, checkpoint, mémoire dynamique, réseau) reste bloquante

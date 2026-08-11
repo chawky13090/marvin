@@ -1,5 +1,7 @@
 """Routes d'apprentissage, configuration matérielle, Telegram et audit."""
 
+import asyncio
+
 from typing import Literal
 
 from fastapi import APIRouter, Body, HTTPException
@@ -11,6 +13,15 @@ import audit
 
 
 router = APIRouter(tags=["runtime-config"])
+
+
+def _learning_snapshot(learning_module) -> dict:
+    """Read the local learning stores away from the asynchronous event loop."""
+    return {
+        "counts": learning_module.count_learned(),
+        "facts": learning_module.list_learned("facts", 200),
+        "qa": learning_module.list_learned("qa", 100),
+    }
 
 
 @router.get("/api/telegram")
@@ -46,11 +57,7 @@ async def test_telegram():
 async def learning_list():
     import learning
 
-    return {
-        "counts": learning.count_learned(),
-        "facts": learning.list_learned("facts", 200),
-        "qa": learning.list_learned("qa", 100),
-    }
+    return await asyncio.to_thread(_learning_snapshot, learning)
 
 
 @router.get("/api/learning/recall")

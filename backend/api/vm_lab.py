@@ -1,4 +1,5 @@
 """Read-only VM lab state and explicit ISO integrity verification."""
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -21,7 +22,9 @@ class InstallRequest(BaseModel):
 
 @router.get("/status")
 async def vm_lab_status():
-    return vm_lab.status()
+    # Hyper-V inventory invokes PowerShell/CIM and must never block FastAPI's
+    # event loop while unrelated chat and configuration requests are served.
+    return await asyncio.to_thread(vm_lab.status)
 
 
 @router.post("/verify-isos")
@@ -34,7 +37,7 @@ async def vm_lab_verify_isos(payload: VerifyRequest):
 
 @router.get("/install")
 async def vm_lab_install_status():
-    return vm_lab_jobs.status()
+    return await asyncio.to_thread(vm_lab_jobs.status)
 
 
 @router.post("/install", responses=IDEMPOTENCY_RESPONSES)
