@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import atexit
 import sys
+import uuid
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -16,7 +17,7 @@ import database as db  # noqa: E402
 
 
 BASE_URL = "http://localhost:3000"
-VOICE_FIXTURE_PREFIX = "[SMOKE:voice]"
+VOICE_FIXTURE_PREFIX = "[SMOKE:voice:"
 
 
 async def navigate_with_marvin_menu(page, label: str, path: str) -> None:
@@ -34,28 +35,16 @@ async def navigate_with_marvin_menu(page, label: str, path: str) -> None:
     await page.wait_for_url(BASE_URL + path, timeout=10_000)
 
 
-def create_voice_fixture() -> str:
+def create_voice_fixture(run_id: str) -> str:
     """Cree une conversation bornee, sans LLM ni donnee utilisateur."""
     conversation = db.create_conversation(
-        f"{VOICE_FIXTURE_PREFIX} Test temporaire de serialisation vocale"
+        f"{VOICE_FIXTURE_PREFIX}{run_id}] Test temporaire de serialisation vocale"
     )
     conversation_id = str(conversation["id"])
     db.create_message(conversation_id, "user", "Test audio temporaire.")
     db.create_message(conversation_id, "assistant", "Premiere reponse de test.")
     db.create_message(conversation_id, "assistant", "Deuxieme reponse de test.")
     return conversation_id
-
-
-def cleanup_orphan_voice_fixtures() -> int:
-    candidates = db.search_conversations(VOICE_FIXTURE_PREFIX, limit=100)
-    orphan_ids = [
-        str(item["id"])
-        for item in candidates
-        if str(item.get("title") or "").startswith(VOICE_FIXTURE_PREFIX)
-    ]
-    for conversation_id in orphan_ids:
-        db.delete_conversation(conversation_id)
-    return len(orphan_ids)
 
 
 async def open_voice_ready_conversation(page, conversation_id: str) -> bool:
@@ -69,8 +58,9 @@ async def open_voice_ready_conversation(page, conversation_id: str) -> bool:
 
 
 async def main() -> int:
-    cleanup_orphan_voice_fixtures()
-    fixture_id = create_voice_fixture()
+    # Chaque run possede sa ressource. Ne jamais balayer les fixtures des autres
+    # processus : les smokes peuvent etre lances en parallele par la CI.
+    fixture_id = create_voice_fixture(uuid.uuid4().hex)
     atexit.register(db.delete_conversation, fixture_id)
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(channel="chrome")

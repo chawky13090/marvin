@@ -1,0 +1,26 @@
+{
+  "schema": "marvin.e7-preview-execution-policy/1.0",
+  "generated_at": "2026-08-11T15:29:23.442287+00:00",
+  "status": "preregistered_not_executed",
+  "authorized_contracts": [
+    "bulk_rename:preview"
+  ],
+  "all_other_pilot_contracts_authorized": false,
+  "maximum_business_tool_invocations": 1,
+  "host_persistent_path_forbidden": true,
+  "isolation": "isolated_temp_volume",
+  "required_e7_class": "N",
+  "required_outcome": {
+    "confirmation_preview_returned": true,
+    "observable_mutation_count": 0,
+    "before_after_snapshot_identical": true
+  },
+  "result_path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-result.json",
+  "governed_source_hashes": {
+    "benchmarks/tool-evidence/v1.1/direct-fixture-pilot.json": "f60b4712fa226f8c125c6b59f2ec92b0dc133581b868d9871f1a835342dedfa7",
+    "scripts/e7_fixture_harness/surface_runtime.py": "8b2b1fb571e9ff87135c0a6cf205c63f2820a079d40a83d3523c69b59b42f735",
+    "scripts/run_e7_preview_campaign.py": "9f6d3179c5d60940a427a62dd36929b33026f638e78507545daa6a98896b655e",
+    "backend/tool_domains/filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180"
+  },
+  "rollback": "delete_result_artifact_and_revert_preregistration_commit"
+}

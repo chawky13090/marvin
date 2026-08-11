@@ -1,6 +1,6 @@
 # Registre de dette technique de Marvin
 
-État vérifié le 2026-08-11 pour Marvin 2.623.0. Ce registre interdit de présenter le projet
+État vérifié le 2026-08-11 pour Marvin 2.624.0. Ce registre interdit de présenter le projet
 comme « sans dette » lorsque les preuves ne le permettent pas. Une ligne n'est fermée
 qu'après correction, test de non-régression et preuve dans `DEVELOPMENT-JOURNAL.md`.
 

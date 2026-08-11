@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.624.0 — Smokes isolés et pilote E7 preview pré-enregistré
+
+La revue croisée a confirmé que l'échec parallèle chat/voix était une contamination du
+banc : le smoke vocal supprimait globalement des conversations `[SMOKE:voice]` que le smoke
+chat pouvait avoir sélectionnées. Chaque run vocal possède désormais un identifiant unique,
+ne nettoie que sa propre conversation et le smoke chat exclut toute fixture de son
+échantillon. Un test de gate interdit le retour du balayage global.
+
+La première exécution E7 est pré-enregistrée mais pas encore lancée dans ce commit. Elle
+autorise uniquement `bulk_rename:preview`, une invocation, sur un volume temporaire sans
+donnée utilisateur. Le runner refuse toute source gouvernée modifiée ou non commitée,
+exige la projection de confirmation et compare deux instantanés indépendants identiques.
+Les cinq autres contrats restent verrouillés.
+
+Rollback : supprimer `e7-preview-execution-result.json` s'il existe puis révertir le commit
+v2.624. Aucun schéma, secret, VM, checkpoint, fichier utilisateur ou réglage réseau n'est
+modifié.
+
 ## 2026-08-11 — v2.623.0 — Lectures Hyper-V et apprentissage non bloquantes
 
 Après le redémarrage v2.622 déclaré `ready`, le smoke API a obtenu 27/28 : 503 transitoire

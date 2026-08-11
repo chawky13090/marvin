@@ -157,6 +157,11 @@ async def main() -> int:
             title = sample.get("title")
             if not conversation_id or not title or conversation_id in sampled_ids:
                 continue
+            # Les conversations de fixture appartiennent a leur smoke createur.
+            # Les ignorer empeche un test concurrent de prendre une ressource
+            # ephemere comme echantillon utilisateur.
+            if title.startswith("[SMOKE:"):
+                continue
             response = await page.request.get(
                 f"http://127.0.0.1:8005/api/conversations/{conversation_id}"
             )
