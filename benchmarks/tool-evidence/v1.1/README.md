@@ -62,3 +62,8 @@ La frontière de processus v2.617 surveille les événements d'audit de spawn. L
 Python passe obligatoirement par le bootstrap `-I`, qui réinstalle la garde avant tout module
 de fixture. Un spawn non déclaré ou `python -c/-m` échoue fermé. Aucun spawn métier n'est
 autorisé par le manifeste : seuls les canaris inoffensifs du harnais sont exécutés.
+
+La v2.618 matérialise la branche `windows_signed_system_binary` : elle résout Winget depuis
+le package App Installer réel, exige une signature Authenticode valide et l'éditeur Microsoft,
+puis borne séparément chemin, arguments et environnement. Le probe sûr est `winget --version`;
+aucune fixture métier, désinstallation ou mutation n'est autorisée.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import sysconfig
@@ -38,6 +39,13 @@ def _imports_and_calls(path: Path) -> tuple[set[str], set[str]]:
 
 def _run_canary(mode: str) -> subprocess.CompletedProcess[str]:
     env = {"PYTHONIOENCODING": "utf-8", "PYTHONPATH": str(ROOT / "scripts")}
+    if os.name == "nt":
+        for name in (
+            "LOCALAPPDATA", "PATH", "ProgramFiles", "ProgramFiles(x86)",
+            "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE", "WINDIR",
+        ):
+            if name in os.environ:
+                env[name] = os.environ[name]
     return subprocess.run(
         [sys.executable, "-I", str(PACKAGE / "guard_subprocess.py"), mode],
         cwd=ROOT,
@@ -53,7 +61,10 @@ def _run_canary(mode: str) -> subprocess.CompletedProcess[str]:
 
 def main() -> int:
     files = sorted(PACKAGE.glob("*.py"))
-    assert {p.name for p in files} == {"__init__.py", "core.py", "pilot_fixtures.py", "guard_subprocess.py"}
+    assert {p.name for p in files} == {
+        "__init__.py", "core.py", "pilot_fixtures.py", "guard_subprocess.py",
+        "windows_executable_policy.py",
+    }
     for path in files:
         imports, calls = _imports_and_calls(path)
         assert not (imports - ALLOWED_LOCAL - ALLOWED_STDLIB), (path, imports)
@@ -84,6 +95,14 @@ def main() -> int:
     child_result = json.loads(recursive_child.stdout)
     assert child_result["child_guard_active"] is True
     assert "fixture_import_denied:backend" in child_result["denied"]
+    if sys.platform == "win32":
+        signed = _run_canary("signed-system-binary")
+        assert signed.returncode == 0, signed.stderr
+        signed_result = json.loads(signed.stdout)
+        assert signed_result["accepted"] is True
+        assert signed_result["id"] == "windows.winget"
+        assert signed_result["status"] == "Valid"
+        assert "Microsoft Corporation" in signed_result["publisher"]
 
     sys.path.insert(0, str(ROOT / "scripts"))
     from e7_fixture_harness import build_pilot_plans
@@ -104,7 +123,9 @@ def main() -> int:
         assert plan["host_execution_forbidden"] is True
     by_pair = {(p["tool"], p["action"]): p for p in plans}
     assert by_pair[("bulk_rename", "preview")]["permitted_executables"] == ()
-    assert by_pair[("winget_uninstall", "__default__")]["permitted_executables"][0]["shell"] is False
+    winget_permission = by_pair[("winget_uninstall", "__default__")]["permitted_executables"][0]
+    assert winget_permission["shell"] is False
+    assert {"LOCALAPPDATA", "PATH", "TEMP", "SYSTEMROOT"} <= set(winget_permission["allowed_environment"])
     process_permission = by_pair[("pc_process_kill", "__default__")]["permitted_executables"][0]
     assert process_permission["isolated_flag"] == "-I"
     assert process_permission["forbid_dash_c"] is True
@@ -118,7 +139,7 @@ def main() -> int:
         assert path.stat().st_size == evidence["bytes"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == evidence["sha256"]
 
-    print("E7 Pilot Fixture Harness OK - 6 plans, import/code/spawn guards and recursive child canaries.")
+    print("E7 Pilot Fixture Harness OK - 6 plans, guarded Python child and attested Winget probe.")
     return 0
 
 

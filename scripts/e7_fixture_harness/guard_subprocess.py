@@ -61,7 +61,11 @@ def _permitted_command_keys(argv: tuple[str, ...]) -> set[tuple[str, ...]]:
     return {_command_key(argv), ("raw", subprocess.list2cmdline(list(argv)))}
 
 
-def install_runtime_guard(*, permitted_commands: tuple[tuple[str, ...], ...] = ()) -> None:
+def install_runtime_guard(
+    *,
+    permitted_commands: tuple[tuple[str, ...], ...] = (),
+    attested_processes: tuple[dict, ...] = (),
+) -> None:
     sys.meta_path.insert(0, AllowListFinder())
 
     # sys.addaudithook est irréversible dans ce processus. Cette garde doit rester
@@ -97,13 +101,27 @@ def install_runtime_guard(*, permitted_commands: tuple[tuple[str, ...], ...] = (
                 resolved_executable = command[1]
             else:
                 resolved_executable = sys.executable
-            executable_matches = _normalize_path(resolved_executable) == Path(sys.executable).resolve()
+            resolved_path = _normalize_path(resolved_executable)
             permitted_keys = set().union(*(_permitted_command_keys(item) for item in permitted_commands)) if permitted_commands else set()
-            if not executable_matches or command not in permitted_keys:
+            allowed_env = {"PYTHONIOENCODING", "SYSTEMROOT", "WINDIR"}
+            executable_matches = resolved_path == Path(sys.executable).resolve() and command in permitted_keys
+            for process in attested_processes:
+                process_keys = set().union(*(
+                    _permitted_command_keys(tuple(item)) for item in process.get("allowed_argv", ())
+                )) if process.get("allowed_argv") else set()
+                path_matches = resolved_path == Path(process["path"]).resolve()
+                # Sous Windows, l'événement d'audit peut fournir la ligne de
+                # commande canonique sans executable séparé. L'égalité exacte
+                # avec une commande attestée suffit alors à lier son binaire.
+                if command in process_keys and (path_matches or command[0] == "raw"):
+                    executable_matches = True
+                    allowed_env = set(process.get("allowed_environment", ()))
+                    break
+            if not executable_matches:
                 raise RuntimeError("fixture_spawn_denied:subprocess.Popen")
             if cwd is not None and _normalize_path(cwd) != PACKAGE_ROOT.parent.resolve():
                 raise RuntimeError("fixture_spawn_denied:cwd")
-            if env is not None and set(env) - {"PYTHONIOENCODING", "SYSTEMROOT", "WINDIR"}:
+            if env is not None and set(env) - allowed_env:
                 raise RuntimeError("fixture_spawn_denied:environment")
             return
         if event in {"os.system", "os.exec", "os.posix_spawn", "os.spawn"}:
@@ -116,11 +134,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=(
         "allowed", "forbidden-import", "forbidden-dynamic-code",
-        "recursive-child", "child-probe", "forbidden-spawn",
+        "recursive-child", "child-probe", "forbidden-spawn", "signed-system-binary",
     ))
     args = parser.parse_args()
     permitted = (tuple(_guarded_child_command()),) if args.mode == "recursive-child" else ()
-    install_runtime_guard(permitted_commands=permitted)
+    attested = ()
+    if args.mode == "signed-system-binary":
+        from e7_fixture_harness import build_pilot_plans
+        from e7_fixture_harness.windows_executable_policy import attest_winget
+        plan = next(item for item in build_pilot_plans() if item["tool"] == "winget_uninstall")
+        evidence = attest_winget(plan["permitted_executables"][0])
+        attested = (evidence,)
+    install_runtime_guard(permitted_commands=permitted, attested_processes=attested)
     if args.mode == "allowed":
         from e7_fixture_harness import build_pilot_plans
         plans = build_pilot_plans()
@@ -153,6 +178,23 @@ def main() -> int:
     if args.mode == "forbidden-spawn":
         subprocess.run([sys.executable, "-c", "print('denied')"], check=False)
         return 5
+    if args.mode == "signed-system-binary":
+        process = attested[0]
+        env = {name: os.environ[name] for name in process["allowed_environment"] if name in os.environ}
+        completed = subprocess.run(
+            list(process["allowed_argv"][0]), cwd=PACKAGE_ROOT.parent, env=env,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError("fixture_system_binary_probe_failed")
+        print(json.dumps({
+            "accepted": True,
+            "id": process["id"],
+            "status": process["authenticode_status"],
+            "publisher": process["publisher_subject"],
+            "version": completed.stdout.strip(),
+        }))
+        return 0
     source = "result = 1"
     exec(compile(source, "<fixture-canary>", "exec"), {})
     return 3

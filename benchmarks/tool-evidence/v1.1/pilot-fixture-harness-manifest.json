@@ -23,6 +23,8 @@
     "recursive_child_guard_canary_required": true,
     "python_child_requires_isolated_bootstrap": true,
     "system_binary_hash_is_evidence_not_acceptance": true,
+    "windows_system_binary_requires_authenticode_and_publisher": true,
+    "environment_allow_list_is_per_executable_contract": true,
     "fixture_owned_script_hash_required": true,
     "audit_hook_never_installed_in_backend": true
   },
@@ -36,12 +38,16 @@
       "bytes": 3362
     },
     "scripts/e7_fixture_harness/guard_subprocess.py": {
-      "sha256": "7257d6342140564352c3125f82222ab0e4af387b5a505062d11a7bda3156c00a",
-      "bytes": 6434
+      "sha256": "9239af45650ab13c4037d3e5cd2294ac6264a25bd0087a57a39ed9b06eda875f",
+      "bytes": 8619
     },
     "scripts/e7_fixture_harness/pilot_fixtures.py": {
-      "sha256": "ad552df24aa1573e4c1d88aaa5b614060c4819202de10db6a37feaeb0f052610",
-      "bytes": 6502
+      "sha256": "c7446dc64a1c01a191e42b9782442366acac7c63b75d01015fdb87ac411e3086",
+      "bytes": 6701
+    },
+    "scripts/e7_fixture_harness/windows_executable_policy.py": {
+      "sha256": "78e57c8a1437cd1c0918cc152f5ca1dcab6f95569f678e76323be4352657a228",
+      "bytes": 2560
     },
     "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": {
       "sha256": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
@@ -52,5 +58,5 @@
       "bytes": 1100
     }
   },
-  "rollback": "revert the atomic v2.617 commit; no fixture or Marvin tool was executed"
+  "rollback": "revert the atomic v2.618 commit; no fixture or Marvin tool was executed"
 }

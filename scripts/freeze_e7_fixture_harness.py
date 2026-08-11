@@ -37,11 +37,13 @@ def main() -> int:
             "recursive_child_guard_canary_required": True,
             "python_child_requires_isolated_bootstrap": True,
             "system_binary_hash_is_evidence_not_acceptance": True,
+            "windows_system_binary_requires_authenticode_and_publisher": True,
+            "environment_allow_list_is_per_executable_contract": True,
             "fixture_owned_script_hash_required": True,
             "audit_hook_never_installed_in_backend": True,
         },
         "files": {},
-        "rollback": "revert the atomic v2.617 commit; no fixture or Marvin tool was executed",
+        "rollback": "revert the atomic v2.618 commit; no fixture or Marvin tool was executed",
     }
     for path in sources:
         relative = path.relative_to(ROOT).as_posix()

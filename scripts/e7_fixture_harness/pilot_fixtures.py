@@ -74,6 +74,10 @@ PILOT_FIXTURES = (
             "shell": False,
             "arguments_schema": "winget_uninstall_fixture_v1",
             "hash_is_evidence_not_acceptance": True,
+            "allowed_environment": (
+                "LOCALAPPDATA", "PATH", "ProgramFiles", "ProgramFiles(x86)",
+                "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE", "WINDIR",
+            ),
         },),
     ),
     FixturePlan(

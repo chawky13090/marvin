@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.618.0 — Exécutable Windows E7 attesté et borné par contrat
+
+La revue croisée a confirmé que la v2.617 savait protéger les enfants Python mais refusait
+encore tout binaire système, malgré la permission Winget déclarée. L'alias utilisateur
+`WindowsApps\winget.exe` n'est pas retenu : la résolution cible le binaire du package réel
+`Microsoft.DesktopAppInstaller`. Avant installation de l'audit hook, une attestation exige
+une signature Authenticode `Valid` et un sujet contenant `Microsoft Corporation`; la garde
+lie ensuite le chemin résolu, l'argument exact `--version` et la liste de variables
+d'environnement propre à cette permission. Le SHA-256 reste une preuve et non un gate afin
+de ne pas casser après une mise à jour Windows légitime.
+
+Le test négatif continue de refuser tout spawn non déclaré. Le canari positif exécute
+uniquement `winget --version`; aucun outil Marvin, aucune désinstallation et aucune fixture
+métier ne sont exécutés. La politique reste fermée par défaut et l'environnement n'est jamais
+élargi globalement. Les impacts logs, secrets, données personnelles, réseau et schéma sont
+nuls; seules des métadonnées publiques de signature et de version sont observées. Rollback :
+réversion atomique du commit v2.618; aucune donnée persistante à restaurer.
+
 ## 2026-08-10 — v2.614.0 — Dette readiness Code Workspace enregistrée
 
 Le 503 Code Workspace observé au premier smoke v2.613 était consigné chronologiquement mais
