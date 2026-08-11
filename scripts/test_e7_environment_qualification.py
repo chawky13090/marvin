@@ -8,6 +8,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from qualify_e7_pilot_environments import _memory_preflight
 
 
 def main() -> int:
@@ -33,9 +36,16 @@ def main() -> int:
         assert report["pilot_implementation_count"] == 6
         assert report["local_isolation"]["qualified"] is True
         assert report["windows_vm_isolation"]["qualified"] is True
+        assert report["windows_vm_isolation"]["configuration_qualified"] is True
         assert report["windows_vm_isolation"]["state"] == "Off"
         assert report["windows_vm_isolation"]["checkpoint_name"] == "Marvin-Clean"
+        memory = report["windows_vm_isolation"]["campaign_memory_preflight"]
+        assert memory["status"] in {"ready", "blocked_transient_host_memory"}
+        assert memory["gate_blocking"] is False
+        assert memory["must_be_rechecked_immediately_before_vm_start"] is True
         assert "qualification_does_not_set_E7" in report["limitations"]
+        assert _memory_preflight({"host_free_memory_bytes": 3, "startup_bytes": 4})["status"] == "blocked_transient_host_memory"
+        assert _memory_preflight({"host_free_memory_bytes": 4, "startup_bytes": 4})["status"] == "ready"
     print("E7 Environment Qualification OK - local isolation and locked Windows VM qualified without tool execution.")
     return 0
 

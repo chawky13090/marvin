@@ -28,6 +28,21 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _memory_preflight(observed: dict) -> dict:
+    available = int(observed.get("host_free_memory_bytes") or 0)
+    required = int(observed.get("startup_bytes") or 0)
+    ready = available >= required
+    return {
+        "status": "ready" if ready else "blocked_transient_host_memory",
+        "ready": ready,
+        "required_bytes": required,
+        "available_bytes": available,
+        "evaluated_at_qualification_time": True,
+        "gate_blocking": False,
+        "must_be_rechecked_immediately_before_vm_start": True,
+    }
+
+
 def _local_qualification() -> dict:
     with tempfile.TemporaryDirectory(prefix="marvin-e7-qualification-") as temporary:
         root = Path(temporary)
@@ -101,7 +116,7 @@ $switches = @(Get-VMNetworkAdapter -VMName $vm.Name | ForEach-Object {{ $_.Switc
     if completed.returncode:
         return {"qualified": False, "error": (completed.stderr or completed.stdout).strip()[:1000]}
     observed = json.loads(completed.stdout)
-    qualified = bool(
+    configuration_qualified = bool(
         observed.get("state") == "Off"
         and observed.get("generation") == 2
         and observed.get("checkpoint_name") == CHECKPOINT_NAME
@@ -110,10 +125,14 @@ $switches = @(Get-VMNetworkAdapter -VMName $vm.Name | ForEach-Object {{ $_.Switc
         and 3 * 1024**3 <= int(observed.get("minimum_bytes") or 0)
         and int(observed.get("startup_bytes") or 0) == 4 * 1024**3
         and int(observed.get("maximum_bytes") or 0) == 6 * 1024**3
-        and int(observed.get("host_free_memory_bytes") or 0) >= int(observed.get("startup_bytes") or 0)
         and "Default Switch" in observed.get("switches", [])
     )
-    return {"qualified": qualified, **observed}
+    return {
+        "qualified": configuration_qualified,
+        "configuration_qualified": configuration_qualified,
+        **observed,
+        "campaign_memory_preflight": _memory_preflight(observed),
+    }
 
 
 def build_report() -> dict:
@@ -140,6 +159,7 @@ def build_report() -> dict:
             "qualification_does_not_execute_any_marvin_business_tool",
             "qualification_does_not_set_E7",
             "vm_checkpoint_restore_must_be_replayed_by_the_execution_campaign",
+            "host_free_memory_is_volatile_and_is_rechecked_by_campaign_preflight_not_the_gate",
         ],
     }
 

@@ -10,12 +10,15 @@ $StartedAt = Get-Date
 
 if (-not $PSCmdlet.ShouldProcess('Marvin', 'Redémarrage vérifié')) { exit 0 }
 
+$StopStartedAt = Get-Date
 $StopOutput = @(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
     -File (Join-Path $PSScriptRoot 'stop-marvin.ps1'))
 if ($LASTEXITCODE -ne 0) {
     throw "L'arrêt Marvin a échoué : $($StopOutput -join ' ')"
 }
+$StopDurationMs = [math]::Round(((Get-Date) - $StopStartedAt).TotalMilliseconds)
 
+$StartupStartedAt = Get-Date
 $StartProcess = Start-Process -FilePath $env:ComSpec `
     -ArgumentList @('/d', '/c', ("call `"{0}`"" -f (Join-Path $Root 'start.bat'))) `
     -WorkingDirectory $Root -WindowStyle Normal -PassThru
@@ -46,6 +49,9 @@ if ($null -eq $Backend -or -not $FrontendReady) {
         reason = 'startup_timeout_or_exit'
         launcher_exit_code = if ($StartProcess.HasExited) { $StartProcess.ExitCode } else { $null }
         duration_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
+        cycle_total_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
+        stop_duration_ms = $StopDurationMs
+        startup_wait_ms = [math]::Round(((Get-Date) - $StartupStartedAt).TotalMilliseconds)
     } | ConvertTo-Json -Compress
     exit 1
 }
@@ -70,5 +76,8 @@ $FinalSuccess = $null -ne $Status -and $Status.overall -in @('ready', 'degraded'
     readiness = $Status.readiness
     lan = $Status.lan
     duration_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
+    cycle_total_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
+    stop_duration_ms = $StopDurationMs
+    startup_wait_ms = [math]::Round(((Get-Date) - $StartupStartedAt).TotalMilliseconds)
 } | ConvertTo-Json -Compress -Depth 6
 if (-not $FinalSuccess) { exit 1 }

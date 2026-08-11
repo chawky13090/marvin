@@ -1,0 +1,18 @@
+{
+  "schema": "marvin.cold-start-readiness-erratum/1.1",
+  "source_report": "cold-start-v2.620.json",
+  "source_report_sha256": "28e80d6b60a1933b6a9745fb50cdd8a1bdde0583aea806549ecdf7ea5a4ca03a",
+  "corrections": {
+    "duration_ms_semantics": "cycle_total_ms_including_stop_restart_and_post_restart_http_probes",
+    "startup_wait_ms": "not_separately_recorded_in_v2.620",
+    "timeout_scope": "the_180_second_deadline_started_after_stop_and_bounded_startup_readiness_only",
+    "accepted_state": "ready_only",
+    "cycle_5_interpretation": "cycle_total_exceeded_180_seconds_but_the_bounded_startup_wait_succeeded_before_its_internal_deadline"
+  },
+  "historical_report_modified": false,
+  "prospective_instrumentation": {
+    "cycle_total_ms": true,
+    "stop_duration_ms": true,
+    "startup_wait_ms": true
+  }
+}

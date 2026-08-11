@@ -1,6 +1,6 @@
 {
   "schema": "marvin.e7-pilot-environment-qualification/1.0",
-  "generated_at": "2026-08-11T10:53:15.388978+00:00",
+  "generated_at": "2026-08-11T11:44:07.587178+00:00",
   "status": "qualified_no_business_tool_execution",
   "tool_execution_authorized": false,
   "host_execution_forbidden": true,
@@ -24,6 +24,7 @@
   },
   "windows_vm_isolation": {
     "qualified": true,
+    "configuration_qualified": true,
     "vm_name": "Marvin-Windows11-TestForge",
     "state": "Off",
     "generation": 2,
@@ -33,14 +34,24 @@
     "startup_bytes": 4294967296,
     "minimum_bytes": 3221225472,
     "maximum_bytes": 6442450944,
-    "host_free_memory_bytes": 5785944064,
+    "host_free_memory_bytes": 4817096704,
     "switches": [
       "Default Switch"
-    ]
+    ],
+    "campaign_memory_preflight": {
+      "status": "ready",
+      "ready": true,
+      "required_bytes": 4294967296,
+      "available_bytes": 4817096704,
+      "evaluated_at_qualification_time": true,
+      "gate_blocking": false,
+      "must_be_rechecked_immediately_before_vm_start": true
+    }
   },
   "limitations": [
     "qualification_does_not_execute_any_marvin_business_tool",
     "qualification_does_not_set_E7",
-    "vm_checkpoint_restore_must_be_replayed_by_the_execution_campaign"
+    "vm_checkpoint_restore_must_be_replayed_by_the_execution_campaign",
+    "host_free_memory_is_volatile_and_is_rechecked_by_campaign_preflight_not_the_gate"
   ]
 }

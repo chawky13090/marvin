@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.621.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.622.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.621.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.622.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.621.0)
+## 9. État actuel (v2.622.0)
+
+**v2.622 (qualification E7 stable et chronométrage readiness explicite)** : la configuration
+Hyper-V stable (VM arrêtée, génération, checkpoint, mémoire dynamique, réseau) reste bloquante
+dans le gate. La RAM libre instantanée est désormais un préflight de campagne tri-état,
+non bloquant pour le gate, et doit être recontrôlée juste avant le démarrage de la VM. Le
+runner de redémarrages froids n'accepte plus `degraded` pour fermer TD-011 et les futurs
+rapports séparent `cycle_total_ms`, `stop_duration_ms` et `startup_wait_ms`. La preuve v2.620
+reste immuable; un erratum hashé explique que ses anciens `duration_ms` mesuraient le cycle
+complet et non le seul délai de démarrage. Rollback : réversion atomique v2.622.
 
 **v2.621 (qualification des environnements E7)** : les six fixtures pilotes disposent
 désormais d'une qualification reproductible distincte de leur exécution. Les volumes
@@ -231,8 +240,10 @@ et service utilisable. Après santé backend/frontend, Code Workspace et VM Lab 
 sur leurs contrats réels; sinon l'état reste `initializing`, distinct de `stopped_or_failed`.
 Le délai du superviseur réutilise le timeout global borné au lieu d'ajouter quinze secondes
 insuffisantes. Cinq redémarrages froids consécutifs ont obtenu HTTP 200 sur les deux endpoints
-avant `ready`, en 123,2 s, 122,2 s, 118,9 s, 117,8 s et 184,5 s. La preuve anonymisée est
-versionnée et contrôlée par le gate. TD-011 est fermé. Rollback : réversion atomique v2.620.
+avant `ready`. Les durées 123,2 s, 122,2 s, 118,9 s, 117,8 s et 184,5 s mesurent le cycle
+complet (arrêt, démarrage et sondes); le délai de démarrage interne est resté borné à 180 s.
+La preuve et son erratum v1.1 sont contrôlés par le gate. TD-011 est fermé. Rollback :
+réversion atomique v2.620 puis v2.622 pour l'instrumentation prospective.
 
 **v2.619 (implémentations des six fixtures pilotes E7)** : les plans gelés possèdent désormais
 des adaptateurs autonomes de snapshot, oracle et restauration pour volumes temporaires, clone

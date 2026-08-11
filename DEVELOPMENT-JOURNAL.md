@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.622.0 — Gate E7 déterministe et preuve readiness clarifiée
+
+Revue croisée : Claude a reproduit l'échec du test de qualification E7 lorsque la RAM libre
+de l'hôte passait sous 4 Gio. La configuration Hyper-V était inchangée; seule une mesure de
+charge instantanée faisait rougir le gate. La qualification sépare désormais les invariants
+stables de la VM du préflight mémoire de campagne. Ce dernier publie `ready` ou
+`blocked_transient_host_memory`, ne bloque jamais la gate et doit être rejoué immédiatement
+avant tout démarrage de VM.
+
+La preuve historique TD-011 n'est pas réécrite. Un erratum lié par SHA-256 précise que
+`duration_ms` incluait arrêt, redémarrage et sondes HTTP. Le runner prospectif exige l'état
+exact `ready` et enregistre séparément cycle total, arrêt et attente de démarrage. Les tests
+couvrent aussi artificiellement les deux états mémoire afin que le résultat ne dépende plus
+de la charge réelle du poste.
+
+Rollback : réversion atomique du commit v2.622; aucune donnée utilisateur, VM, checkpoint,
+secret ou outil métier n'est modifié par cette correction.
+
 ## 2026-08-11 — v2.621.0 — Environnements pilotes E7 qualifiés sans exécution métier
 
 Demande : poursuivre la campagne E7 après l'implémentation du harnais et fermer les

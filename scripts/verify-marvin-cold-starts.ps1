@@ -24,7 +24,7 @@ for ($Cycle = 1; $Cycle -le $Cycles; $Cycle++) {
         -Uri 'http://127.0.0.1:8005/api/coding/overview' -TimeoutSec 10
     $VmLab = Invoke-WebRequest -UseBasicParsing `
         -Uri 'http://127.0.0.1:8005/api/vm-lab/status' -TimeoutSec 10
-    if ($Status.state -notin @('ready', 'degraded') -or
+    if ($Status.state -ne 'ready' -or
         $Status.readiness.code_workspace.ready -ne $true -or
         $Status.readiness.vm_lab.ready -ne $true -or
         $Coding.StatusCode -ne 200 -or $VmLab.StatusCode -ne 200) {
@@ -33,7 +33,9 @@ for ($Cycle = 1; $Cycle -le $Cycles; $Cycle++) {
     $Results += [ordered]@{
         cycle = $Cycle
         state = $Status.state
-        duration_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
+        cycle_total_ms = [math]::Round(((Get-Date) - $StartedAt).TotalMilliseconds)
+        startup_wait_ms = [int64]$Status.startup_wait_ms
+        stop_duration_ms = [int64]$Status.stop_duration_ms
         code_workspace_http = $Coding.StatusCode
         vm_lab_http = $VmLab.StatusCode
     }
