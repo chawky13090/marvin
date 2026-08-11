@@ -7,6 +7,7 @@ import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
 import { fetchWithBackendFallback as fetchBackendFallback } from '@/lib/backendFallback.mjs';
+import { reportMutationFailure } from '@/lib/mutationOutcomeUi.mjs';
 import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
 import { fetchWorkspaceSnapshot } from '@/lib/workspaceRefresh.mjs';
 import {
@@ -364,8 +365,9 @@ export default function ChatPage() {
       setNewProjectName('');
       setShowProjectInput(false);
       fetchData();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
+      toast.error('Création impossible', 'Le projet n’a pas été créé.');
     }
   };
 
@@ -381,8 +383,14 @@ export default function ChatPage() {
       }
       await fetchData();
       if (showArchived) await loadArchivedConversations();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
+      reportMutationFailure(toast, error, {
+        action: 'Suppression',
+        fallbackMessage: 'La conversation est conservée.',
+        onVerify: fetchData,
+        verifyLabel: 'Actualiser les conversations',
+      });
     }
   };
 
@@ -401,8 +409,13 @@ export default function ChatPage() {
         setInitialMessages([]);
       }
       await fetchData();
-    } catch {
-      toast.error('Archivage impossible', 'La conversation est restée active.');
+    } catch (error) {
+      reportMutationFailure(toast, error, {
+        action: 'Archivage',
+        fallbackMessage: 'La conversation est restée active.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier dans la liste',
+      });
     }
   };
 
@@ -421,8 +434,13 @@ export default function ChatPage() {
       setLastArchivedConversation(null);
       await fetchData();
       if (showArchived) await loadArchivedConversations();
-    } catch {
-      toast.error('Restauration impossible', 'La conversation reste disponible dans les archives.');
+    } catch (error) {
+      reportMutationFailure(toast, error, {
+        action: 'Restauration',
+        fallbackMessage: 'La conversation reste disponible dans les archives.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier dans la liste',
+      });
     }
   };
 
@@ -467,8 +485,13 @@ export default function ChatPage() {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success('Export prÃªt', `${payload.name} a Ã©tÃ© gÃ©nÃ©rÃ© et vÃ©rifiÃ©.`);
-    } catch {
-      toast.error('Export impossible', 'La conversation n’a pas été téléchargée.');
+    } catch (error) {
+      reportMutationFailure(toast, error, {
+        action: 'Export',
+        fallbackMessage: 'La conversation n’a pas été téléchargée.',
+        onVerify: () => window.location.assign('/documents'),
+        verifyLabel: 'Ouvrir Documents',
+      });
     }
   };
 
@@ -479,8 +502,14 @@ export default function ChatPage() {
       const response = await fetchWithBackendFallback(`/api/projects/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error(`Suppression projet HTTP ${response.status}`);
       fetchData();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
+      reportMutationFailure(toast, error, {
+        action: 'Suppression du projet',
+        fallbackMessage: 'Le projet reste affiché.',
+        onVerify: fetchData,
+        verifyLabel: 'Actualiser les projets',
+      });
     }
   };
 
@@ -502,8 +531,14 @@ export default function ChatPage() {
       if (!response.ok) throw new Error(`Projet HTTP ${response.status}`);
       setEditingProjectId(null);
       fetchData();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
+      reportMutationFailure(toast, error, {
+        action: 'Enregistrement des instructions',
+        fallbackMessage: 'Les instructions locales restent ouvertes.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier le projet',
+      });
     }
   };
 
@@ -555,8 +590,14 @@ export default function ChatPage() {
       }
       cancelProjectRename();
       await fetchData();
-    } catch {
+    } catch (error) {
       setProjectNameError('Renommage impossible. Le nom précédent est conservé.');
+      reportMutationFailure(toast, error, {
+        action: 'Renommage du projet',
+        fallbackMessage: 'Le nom précédent est conservé.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier le projet',
+      });
     } finally {
       setProjectNameSaving(false);
     }
@@ -571,8 +612,14 @@ export default function ChatPage() {
       });
       if (!response.ok) throw new Error(`Affectation HTTP ${response.status}`);
       fetchData();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
+      reportMutationFailure(toast, error, {
+        action: 'Affectation au projet',
+        fallbackMessage: 'La conversation conserve son classement précédent.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier le classement',
+      });
     }
   };
 
@@ -583,7 +630,15 @@ export default function ChatPage() {
       const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: t }) });
       if (!response.ok) throw new Error(`Renommage HTTP ${response.status}`);
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (error) {
+      console.error(error);
+      reportMutationFailure(toast, error, {
+        action: 'Renommage de la conversation',
+        fallbackMessage: 'Le titre précédent est conservé.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier le titre',
+      });
+    }
   };
 
   // v2.171 — épinglage (pattern Claude/ChatGPT) : garder une conversation en haut de la
@@ -593,7 +648,15 @@ export default function ChatPage() {
       const response = await fetchWithBackendFallback(`/api/conversations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinned: !pinned }) });
       if (!response.ok) throw new Error(`Épinglage HTTP ${response.status}`);
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (error) {
+      console.error(error);
+      reportMutationFailure(toast, error, {
+        action: 'Épinglage',
+        fallbackMessage: 'La position précédente est conservée.',
+        onVerify: fetchData,
+        verifyLabel: 'Vérifier la liste',
+      });
+    }
   };
 
   // v2.171 — recherche FULL-TEXT (titre + contenu des messages) côté backend, débounced.

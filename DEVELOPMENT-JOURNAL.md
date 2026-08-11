@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.626.0 — Mutation à transport unique et résultat ambigu explicite
+
+La revue croisée a montré que le repli ajouté en v2.625 ne protégeait les mutations que sur
+HTTP 500. Une mutation recevait encore un second appel direct après 502/503/504 ou après
+l'expiration locale de huit secondes. Les routes Next.js de conversations et projets avaient
+elles-mêmes un délai de huit secondes : le navigateur pouvait donc abandonner le premier saut
+pendant que FastAPI exécutait encore l'action, puis la relancer directement.
+
+`lib/backendFallback.mjs` sépare désormais strictement les transports. GET/HEAD conservent le
+repli borné Next.js vers FastAPI. Toute autre méthode vise FastAPI dès le premier appel et ne
+possède aucun second transport. Une exception réseau ou une réponse 502/503/504 produit
+`MUTATION_OUTCOME_UNKNOWN`; les réponses applicatives, notamment 409 et 422 des contrats
+d'idempotence serveur, sont retournées telles quelles. La présence d'un en-tête
+`Idempotency-Key` n'est jamais assimilée à une garantie si la route ne l'exploite pas.
+
+L'interface ne masque plus cette incertitude : un toast persistant « Résultat non confirmé »
+explique que Marvin n'a pas rejoué l'action et propose une vérification contextuelle
+(actualisation des conversations/projets ou ouverture de Documents pour un export). Le toast
+générique accepte maintenant une action optionnelle, sans modifier les appels existants.
+
+Sécurité, journalisation et concurrence : cette tranche réduit le risque de double effet et
+n'ajoute aucun retry, endpoint, secret, donnée personnelle, stockage ou événement de log. Les
+erreurs restent limitées à la console de diagnostic existante; aucune charge utile ou clé
+d'idempotence n'est journalisée. Le transport direct conserve le pont navigateur existant qui
+ajoute cookie de session, credentials et jeton CSRF aux mutations FastAPI. Les routes Next.js
+ne sont contournées que par le helper de la page Chat après cartographie de leurs mutations;
+aucune généralisation globale aux autres pages n'est faite.
+
+Tests ciblés réels : HTTP 500, 502, 503, 504, exception réseau, lecture récupérable, transport
+unique des mutations, conservation d'une clé existante, réponses 409/422 sans rejeu et présence
+de l'action UI. ESLint ciblé passe sans avertissement. Rollback : réversion atomique du commit
+v2.626; aucune migration ni restauration de données n'est nécessaire. Le premier contrôle
+frontend a refusé `app/page.js` à 1 204 lignes; la présentation de l'incertitude a alors été
+extraite dans `lib/mutationOutcomeUi.mjs`, puis la baseline est redevenue verte sans exception.
+
+Validations réelles finales : test ciblé et ESLint ciblé verts; architecture Marvin 2.626.0,
+364 outils, 391 routes et harness 364/364; documentation cohérente; baseline frontend de 121
+sources avec les 37 avertissements historiques inchangés et zéro exception; build Next.js
+16.2.12 Turbopack réussi. Le gate exhaustif est vert en 764,6 s avec 288 étapes exécutées et
+4 contrôles live différés sur 292 attendues, zéro échec. Après redémarrage, Marvin atteint
+`ready` en 162 303 ms avec Ollama, SearXNG, HTTPS, Code Workspace et VM Lab disponibles. Les
+smokes live donnent API 28/28, pages 41/41, chat 5/5 et voix strictement sérialisée. Un parcours
+Chrome réel a créé un projet temporaire, appliqué un PUT direct FastAPI via le pont navigateur,
+vérifié le nouvel état puis supprimé la fixture; HTTP 200 et zéro résidu.
+
 ## 2026-08-11 — v2.625.0 — Conversation volumineuse résiliente et preuve E7 publiée
 
 Après le redémarrage v2.624, le smoke chat a observé un `500` Next.js sur une conversation

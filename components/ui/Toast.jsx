@@ -29,6 +29,14 @@ function ToastItem({ toast, onClose }) {
     setTimeout(() => onClose(toast.id), 280);
   }, [onClose, toast.id]);
 
+  const handleAction = useCallback(() => {
+    try {
+      toast.onAction?.();
+    } finally {
+      handleClose();
+    }
+  }, [handleClose, toast]);
+
   useAutoClose(toast.duration || 4000, handleClose);
 
   return (
@@ -40,6 +48,11 @@ function ToastItem({ toast, onClose }) {
       <div className="toast-body">
         {toast.title && <div className="toast-title">{toast.title}</div>}
         {toast.message && <div className="toast-message">{toast.message}</div>}
+        {toast.actionLabel && toast.onAction && (
+          <button className="toast-action" type="button" onClick={handleAction}>
+            {toast.actionLabel}
+          </button>
+        )}
       </div>
       <button className="toast-close" onClick={handleClose} aria-label="Fermer">
         ✕
@@ -65,9 +78,9 @@ function useAutoClose(delay, callback) {
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback(({ type = 'info', title, message, duration }) => {
+  const addToast = useCallback(({ type = 'info', title, message, duration, actionLabel, onAction }) => {
     const id = ++toastId;
-    setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+    setToasts((prev) => [...prev, { id, type, title, message, duration, actionLabel, onAction }]);
     return id;
   }, []);
 
@@ -77,10 +90,10 @@ export function ToastProvider({ children }) {
 
   const toast = useMemo(
     () => ({
-      success: (title, message) => addToast({ type: 'success', title, message }),
-      error: (title, message) => addToast({ type: 'error', title, message }),
-      warning: (title, message) => addToast({ type: 'warning', title, message }),
-      info: (title, message) => addToast({ type: 'info', title, message }),
+      success: (title, message, options = {}) => addToast({ ...options, type: 'success', title, message }),
+      error: (title, message, options = {}) => addToast({ ...options, type: 'error', title, message }),
+      warning: (title, message, options = {}) => addToast({ ...options, type: 'warning', title, message }),
+      info: (title, message, options = {}) => addToast({ ...options, type: 'info', title, message }),
     }),
     [addToast]
   );
