@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.616.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.617.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.616.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.617.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.616.0)
+## 9. État actuel (v2.617.0)
+
+**v2.617 (frontière de création de processus du harnais E7)** : les plans logiciel et
+processus déclarent leurs exécutables permis par politique positive. Les binaires Windows
+sont identifiés par chemin résolu, signature Authenticode et éditeur; leur SHA-256 est une
+preuve de campagne, pas un verrou fragile après mise à jour. Les artefacts appartenant aux
+fixtures exigent leur empreinte. Un enfant Python n'est admis que via le bootstrap courant,
+`-I`, sans `-c` ni `-m`. L'audit refuse tout spawn non déclaré et couvre `subprocess.Popen`,
+`os.system`, `os.exec`, `os.posix_spawn` et `os.spawn`. Le canari récursif prouve que l'enfant
+réinstalle la garde avant de refuser un import Marvin. Les arguments Windows sous forme liste
+ou ligne de commande sont normalisés contre la commande exacte. Aucun processus de fixture,
+outil ou effet métier n'est exécuté. Rollback : réversion atomique du commit v2.617.
 
 **v2.616 (harnais isolé des six fixtures pilotes E7)** : six plans symboliques implémentent
 les surfaces no-mutation, fichiers, base, workspace, logiciel et processus sans appeler le

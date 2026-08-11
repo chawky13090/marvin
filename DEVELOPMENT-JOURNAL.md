@@ -17851,3 +17851,17 @@ la dépendance a été retirée plutôt que d'affaiblir la garde. Les sources et
 hashés dans un manifeste; exécution d'outil et hôte restent interdits. Aucun secret, donnée,
 réseau externe, outil métier ou log runtime n'est touché. Rollback : réversion atomique du
 commit v2.616; aucune migration ni restauration de données nécessaire.
+## 2026-08-11 — v2.617.0 — Frontière récursive de création de processus E7
+
+Le harnais surveille désormais les créations de processus en plus des imports et du code
+dynamique. Les plans logiciel et processus déclarent une politique positive : identité du
+binaire, arguments typés, `shell=false`, environnement et répertoire bornés. Les binaires
+Windows utilisent chemin résolu, signature Authenticode et éditeur; leur hash reste une preuve
+de campagne. Les scripts propres aux fixtures exigent leur SHA-256. Python enfant est admis
+uniquement via le bootstrap courant sous `-I`, sans `-c` ni `-m`; le bootstrap installe la
+garde avant tout module enfant. Les événements `subprocess.Popen`, `os.system`, `os.exec`,
+`os.posix_spawn` et `os.spawn` sont contrôlés. Les canaris prouvent qu'un spawn non déclaré est
+refusé et qu'un enfant déclaré refuse encore `backend.tools`. Le test a aussi couvert la forme
+Windows où les arguments d'audit arrivent en chaîne : elle est normalisée contre la commande
+exacte gelée. Aucun processus factice, winget, VM, outil Marvin ou effet métier n'est exécuté.
+Rollback : réversion atomique du commit v2.617; aucune donnée persistante à restaurer.

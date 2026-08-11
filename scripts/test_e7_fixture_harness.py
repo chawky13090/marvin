@@ -76,6 +76,14 @@ def main() -> int:
     denied_dynamic = _run_canary("forbidden-dynamic-code")
     assert denied_dynamic.returncode != 0
     assert "fixture_dynamic_code_denied:compile" in denied_dynamic.stderr
+    denied_spawn = _run_canary("forbidden-spawn")
+    assert denied_spawn.returncode != 0
+    assert "fixture_spawn_denied:subprocess.Popen" in denied_spawn.stderr
+    recursive_child = _run_canary("recursive-child")
+    assert recursive_child.returncode == 0, recursive_child.stderr
+    child_result = json.loads(recursive_child.stdout)
+    assert child_result["child_guard_active"] is True
+    assert "fixture_import_denied:backend" in child_result["denied"]
 
     sys.path.insert(0, str(ROOT / "scripts"))
     from e7_fixture_harness import build_pilot_plans
@@ -94,6 +102,13 @@ def main() -> int:
         assert plan["allowed_delta"] == frozen["allowed_delta"]
         assert plan["execution_authorized"] is False
         assert plan["host_execution_forbidden"] is True
+    by_pair = {(p["tool"], p["action"]): p for p in plans}
+    assert by_pair[("bulk_rename", "preview")]["permitted_executables"] == ()
+    assert by_pair[("winget_uninstall", "__default__")]["permitted_executables"][0]["shell"] is False
+    process_permission = by_pair[("pc_process_kill", "__default__")]["permitted_executables"][0]
+    assert process_permission["isolated_flag"] == "-I"
+    assert process_permission["forbid_dash_c"] is True
+    assert process_permission["forbid_dash_m"] is True
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     assert manifest["tool_execution_authorized"] is False
@@ -103,7 +118,7 @@ def main() -> int:
         assert path.stat().st_size == evidence["bytes"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == evidence["sha256"]
 
-    print("E7 Pilot Fixture Harness OK - 6 plans, allow-list, meta_path and audit canaries.")
+    print("E7 Pilot Fixture Harness OK - 6 plans, import/code/spawn guards and recursive child canaries.")
     return 0
 
 

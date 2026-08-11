@@ -56,3 +56,9 @@ fixtures. Toute exécution d'outil et toute exécution sur l'hôte restent inter
 paquet `scripts/e7_fixture_harness` n'importe aucun module produit, s'exécute sous `python -I`
 avec une liste blanche `meta_path` et bloque `exec/compile` par audit local. L'audit hook reste
 strictement confiné au sous-processus. Les canaris positif et négatifs sont obligatoires.
+
+La frontière de processus v2.617 surveille les événements d'audit de spawn. Les plans
+`winget_uninstall` et `pc_process_kill` portent une politique positive d'exécutables. Un enfant
+Python passe obligatoirement par le bootstrap `-I`, qui réinstalle la garde avant tout module
+de fixture. Un spawn non déclaré ou `python -c/-m` échoue fermé. Aucun spawn métier n'est
+autorisé par le manifeste : seuls les canaris inoffensifs du harnais sont exécutés.

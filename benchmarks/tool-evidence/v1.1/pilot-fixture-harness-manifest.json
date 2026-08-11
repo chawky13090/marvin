@@ -12,6 +12,18 @@
     "positive_canary_required": true,
     "negative_import_canary_required": true,
     "negative_dynamic_code_canary_required": true,
+    "spawn_events_checked": [
+      "subprocess.Popen",
+      "os.system",
+      "os.exec",
+      "os.posix_spawn",
+      "os.spawn"
+    ],
+    "undeclared_spawn_canary_required": true,
+    "recursive_child_guard_canary_required": true,
+    "python_child_requires_isolated_bootstrap": true,
+    "system_binary_hash_is_evidence_not_acceptance": true,
+    "fixture_owned_script_hash_required": true,
     "audit_hook_never_installed_in_backend": true
   },
   "files": {
@@ -20,16 +32,16 @@
       "bytes": 194
     },
     "scripts/e7_fixture_harness/core.py": {
-      "sha256": "d5cfc860372f599029b00195d6defe041d01aefcec1780345e98f737f7e416bc",
-      "bytes": 3181
+      "sha256": "9d0042c7567b92b901ba81ab2e9148bc315d86c9de9de466ebf716f70c5548f3",
+      "bytes": 3362
     },
     "scripts/e7_fixture_harness/guard_subprocess.py": {
-      "sha256": "f4cc2b8c316c4084a89013c7396266c08757cb68355e1293a14c25c0f5c3da9c",
-      "bytes": 3016
+      "sha256": "7257d6342140564352c3125f82222ab0e4af387b5a505062d11a7bda3156c00a",
+      "bytes": 6434
     },
     "scripts/e7_fixture_harness/pilot_fixtures.py": {
-      "sha256": "f30c7c52a4f1b411a0cb3fcdef8d4b0fef1790a8a06b369aa9f46487e7087758",
-      "bytes": 5661
+      "sha256": "ad552df24aa1573e4c1d88aaa5b614060c4819202de10db6a37feaeb0f052610",
+      "bytes": 6502
     },
     "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": {
       "sha256": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
@@ -40,5 +52,5 @@
       "bytes": 1100
     }
   },
-  "rollback": "revert the atomic v2.616 commit; no fixture or Marvin tool was executed"
+  "rollback": "revert the atomic v2.617 commit; no fixture or Marvin tool was executed"
 }

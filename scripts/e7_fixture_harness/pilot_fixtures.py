@@ -65,6 +65,16 @@ PILOT_FIXTURES = (
         oracle=component("fixture_oracle.software_scope", "offline_vm_inventory", "assert_selected_package_only"),
         recovery=component("fixture_recovery.hypervisor_checkpoint_restore", "vm_checkpoint_adapter", "functional", "declare_settings_loss"),
         allowed_delta="one fixture package removed", forbidden_deltas=COMMON_FORBIDDEN,
+        permitted_executables=({
+            "id": "windows.winget",
+            "identity": "windows_signed_system_binary",
+            "resolved_path_required": True,
+            "authenticode_status": "Valid",
+            "publisher": "Microsoft Corporation",
+            "shell": False,
+            "arguments_schema": "winget_uninstall_fixture_v1",
+            "hash_is_evidence_not_acceptance": True,
+        },),
     ),
     FixturePlan(
         contract_id="direct-pc_process_kill-__default__",
@@ -76,6 +86,17 @@ PILOT_FIXTURES = (
         oracle=component("fixture_oracle.process_scope", "surface_diff", "assert_exact_target_pid_only"),
         recovery=component("fixture_recovery.hypervisor_checkpoint_teardown", "vm_checkpoint_adapter", "confinement", "teardown"),
         allowed_delta="exact fixture PID only", forbidden_deltas=COMMON_FORBIDDEN,
+        permitted_executables=({
+            "id": "fixture.python_guarded_child",
+            "identity": "parent_python_interpreter",
+            "isolated_flag": "-I",
+            "entrypoint": "guard_subprocess.py",
+            "script_mode_only": True,
+            "forbid_dash_c": True,
+            "forbid_dash_m": True,
+            "fixture_script_sha256_required": True,
+            "shell": False,
+        },),
     ),
 )
 

@@ -32,10 +32,16 @@ def main() -> int:
             "positive_canary_required": True,
             "negative_import_canary_required": True,
             "negative_dynamic_code_canary_required": True,
+            "spawn_events_checked": ["subprocess.Popen", "os.system", "os.exec", "os.posix_spawn", "os.spawn"],
+            "undeclared_spawn_canary_required": True,
+            "recursive_child_guard_canary_required": True,
+            "python_child_requires_isolated_bootstrap": True,
+            "system_binary_hash_is_evidence_not_acceptance": True,
+            "fixture_owned_script_hash_required": True,
             "audit_hook_never_installed_in_backend": True,
         },
         "files": {},
-        "rollback": "revert the atomic v2.616 commit; no fixture or Marvin tool was executed",
+        "rollback": "revert the atomic v2.617 commit; no fixture or Marvin tool was executed",
     }
     for path in sources:
         relative = path.relative_to(ROOT).as_posix()

@@ -21,7 +21,7 @@ class FixturePlan:
     __slots__ = (
         "contract_id", "tool", "action", "e7_class", "surface_profile", "isolation",
         "symbolic_payload", "setup", "observer", "oracle", "recovery", "allowed_delta",
-        "forbidden_deltas", "execution_authorized", "host_execution_forbidden",
+        "forbidden_deltas", "permitted_executables", "execution_authorized", "host_execution_forbidden",
     )
 
     def __init__(
@@ -40,6 +40,7 @@ class FixturePlan:
         recovery: HarnessComponent,
         allowed_delta: str,
         forbidden_deltas: tuple[str, ...],
+        permitted_executables: tuple[Mapping[str, Any], ...] = (),
     ) -> None:
         self.contract_id = contract_id
         self.tool = tool
@@ -54,6 +55,7 @@ class FixturePlan:
         self.recovery = recovery
         self.allowed_delta = allowed_delta
         self.forbidden_deltas = forbidden_deltas
+        self.permitted_executables = tuple(dict(item) for item in permitted_executables)
         self.execution_authorized = False
         self.host_execution_forbidden = True
 
