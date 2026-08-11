@@ -51,3 +51,8 @@ ni appeler un outil public Marvin, ni réutiliser le système sous test. Le pilo
 `direct-fixture-pilot.json` couvre six surfaces distinctes et les classes N, R, C et I.
 `direct-fixture-freeze-manifest.json` gèle les sources et contrats avant l'implémentation des
 fixtures. Toute exécution d'outil et toute exécution sur l'hôte restent interdites.
+
+`pilot-fixture-harness-manifest.json` gèle l'implémentation symbolique des six pilotes. Le
+paquet `scripts/e7_fixture_harness` n'importe aucun module produit, s'exécute sous `python -I`
+avec une liste blanche `meta_path` et bloque `exec/compile` par audit local. L'audit hook reste
+strictement confiné au sous-processus. Les canaris positif et négatifs sont obligatoires.

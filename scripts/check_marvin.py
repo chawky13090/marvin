@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 284
+EXPECTED_STAGE_COUNT = 285
 
 
 @dataclass(frozen=True)
@@ -191,6 +191,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Gel de la taxonomie E7 R/C/I/N/P", (python, "scripts/test_e7_taxonomy_freeze.py")),
         Stage("Gel des strates E7 et du harnais H7", (python, "scripts/test_h7_fixture_strategy.py")),
         Stage("Gel des 22 contrats de fixtures E7", (python, "scripts/test_direct_fixture_contracts.py")),
+        Stage("Harnais isolé des six fixtures E7", (python, "scripts/test_e7_fixture_harness.py")),
         Stage("Extraction privée des demandes réelles", (python, "scripts/test_real_usage_corpus.py")),
         Stage("Inventaire des données personnelles", (python, "scripts/test_privacy_inventory.py")),
         Stage("Export chiffré des données personnelles", (python, "scripts/test_privacy_rights.py")),

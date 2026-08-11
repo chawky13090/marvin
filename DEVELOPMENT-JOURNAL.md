@@ -17837,3 +17837,17 @@ artefacts sont hashés avant implémentation; le gate vérifie 22/22 contrats et
 `tool_execution_authorized=false` et `host_execution_forbidden=true`. Aucun outil métier,
 secret, donnée utilisateur, réseau externe ou journal runtime n'est touché. Rollback : réversion
 atomique du commit v2.615; aucune migration ni donnée persistante à restaurer.
+## 2026-08-11 — v2.616.0 — Harnais indépendant des six fixtures pilotes E7
+
+Les six fixtures pilotes possèdent désormais des plans symboliques concrets pour six surfaces
+distinctes, sans aucune exécution. Builders, observateurs, oracles et récupérations utilisent
+uniquement des adaptateurs du harnais et restent recroisés avec les contrats gelés v2.615. Le
+graphe d'import est fermé par liste blanche; un sous-processus Python isolé installe une garde
+`meta_path`, puis un audit refuse `exec/compile` venant du paquet. L'audit hook irréversible est
+documenté et ne peut jamais être installé dans le backend. Deux canaris fautifs prouvent le
+refus d'un import Marvin et du code dynamique; un canari positif prouve que les six plans
+restent utilisables. L'essai initial a montré que `dataclasses` génère du code dynamiquement :
+la dépendance a été retirée plutôt que d'affaiblir la garde. Les sources et contrats sont
+hashés dans un manifeste; exécution d'outil et hôte restent interdits. Aucun secret, donnée,
+réseau externe, outil métier ou log runtime n'est touché. Rollback : réversion atomique du
+commit v2.616; aucune migration ni restauration de données nécessaire.

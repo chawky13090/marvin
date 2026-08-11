@@ -1,0 +1,44 @@
+{
+  "schema": "marvin.pilot-fixture-harness-manifest/1.0",
+  "status": "implementation_frozen_execution_locked",
+  "fixture_plans": 6,
+  "tool_execution_authorized": false,
+  "host_execution_forbidden": true,
+  "runtime_guard": {
+    "process_isolation_required": true,
+    "meta_path_allow_list": true,
+    "stdlib_origin_validation": true,
+    "dynamic_exec_compile_denied": true,
+    "positive_canary_required": true,
+    "negative_import_canary_required": true,
+    "negative_dynamic_code_canary_required": true,
+    "audit_hook_never_installed_in_backend": true
+  },
+  "files": {
+    "scripts/e7_fixture_harness/__init__.py": {
+      "sha256": "864946cb4e03a7cd8ea052ab90fd443ac29de515af4ddc9af69c6f33aa166158",
+      "bytes": 194
+    },
+    "scripts/e7_fixture_harness/core.py": {
+      "sha256": "d5cfc860372f599029b00195d6defe041d01aefcec1780345e98f737f7e416bc",
+      "bytes": 3181
+    },
+    "scripts/e7_fixture_harness/guard_subprocess.py": {
+      "sha256": "f4cc2b8c316c4084a89013c7396266c08757cb68355e1293a14c25c0f5c3da9c",
+      "bytes": 3016
+    },
+    "scripts/e7_fixture_harness/pilot_fixtures.py": {
+      "sha256": "f30c7c52a4f1b411a0cb3fcdef8d4b0fef1790a8a06b369aa9f46487e7087758",
+      "bytes": 5661
+    },
+    "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": {
+      "sha256": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+      "bytes": 48642
+    },
+    "benchmarks/tool-evidence/v1.1/direct-fixture-pilot.json": {
+      "sha256": "f60b4712fa226f8c125c6b59f2ec92b0dc133581b868d9871f1a835342dedfa7",
+      "bytes": 1100
+    }
+  },
+  "rollback": "revert the atomic v2.616 commit; no fixture or Marvin tool was executed"
+}

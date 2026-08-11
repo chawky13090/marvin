@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.615.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.616.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.615.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.616.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.615.0)
+## 9. État actuel (v2.616.0)
+
+**v2.616 (harnais isolé des six fixtures pilotes E7)** : six plans symboliques implémentent
+les surfaces no-mutation, fichiers, base, workspace, logiciel et processus sans appeler le
+runtime Marvin. Une liste blanche statique borne les imports; un sous-processus `-I` installe
+un finder `meta_path` qui refuse tout module hors paquet ou bibliothèque standard. Un audit
+local refuse `compile` et `exec` provenant du harnais. `sys.addaudithook`, irréversible dans
+un processus, reste explicitement confiné au sous-processus et n'est jamais installé dans le
+backend. Les canaris prouvent un chemin autorisé, un import Marvin refusé et du code dynamique
+refusé. Les plans sont recroisés avec les contrats gelés puis hashés. Aucun outil ni fixture
+n'est exécuté; hôte et effets métier restent verrouillés. Rollback : réversion atomique du
+commit v2.616; aucune donnée persistante n'a été modifiée.
 
 **v2.615 (contrats directs E7 gelés avant implémentation)** : les 22 couples directs de la
 première vague possèdent un contrat symbolique explicite couvrant isolation, pré-image,
