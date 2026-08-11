@@ -14,7 +14,12 @@ def main() -> int:
     assert "search_conversations(VOICE_FIXTURE_PREFIX" not in voice
     assert "atexit.register(db.delete_conversation, fixture_id)" in voice
     assert 'title.startswith("[SMOKE:")' in chat
-    print("Smoke Resource Isolation OK - fixture unique, nettoyage local et echantillonnage protege.")
+    assert "with browser_smoke_lock():" in voice
+    assert "with browser_smoke_lock():" in chat
+    lock = (ROOT / "scripts" / "smoke_run_lock.py").read_text(encoding="utf-8")
+    assert "LK_NBLCK" in lock and "LOCK_EX | fcntl.LOCK_NB" in lock
+    assert "browser_smoke_lock_timeout" in lock
+    print("Smoke Resource Isolation OK - fixture unique, nettoyage local et execution serialisee.")
     return 0
 
 

@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 291
+EXPECTED_STAGE_COUNT = 292
 
 
 @dataclass(frozen=True)
@@ -453,6 +453,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Tours chat durables et detachables", (python, "scripts/test_chat_turn_runtime.py")),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
         Stage("Reprise des lectures backend frontend", ("node", "scripts/test_backend_read.mjs")),
+        Stage("Repli frontend des conversations volumineuses", ("node", "scripts/test_backend_fallback.mjs")),
         Stage("Normalisation des listes de conversations", ("node", "scripts/test_conversation_payload.mjs")),
         Stage("Résilience du rafraîchissement des conversations", ("node", "scripts/test_workspace_refresh.mjs")),
         Stage("Domaine d'outils Fichiers", (python, "scripts/test_tool_domain_filesystem.py")),

@@ -21,6 +21,8 @@ import sys
 
 from playwright.async_api import async_playwright
 
+from smoke_run_lock import browser_smoke_lock
+
 BASE_URL = "http://localhost:3000"
 # Nombre de conversations de la sidebar à ouvrir (les plus récentes).
 SAMPLE_SIZE = 5
@@ -213,4 +215,5 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    with browser_smoke_lock():
+        sys.exit(asyncio.run(main()))

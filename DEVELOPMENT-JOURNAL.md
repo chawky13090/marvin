@@ -5,6 +5,42 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.625.0 — Conversation volumineuse résiliente et preuve E7 publiée
+
+Après le redémarrage v2.624, le smoke chat a observé un `500` Next.js sur une conversation
+persistée de 4 344 888 octets. FastAPI a restitué cette même conversation cinq fois avec
+HTTP 200. Une sonde authentifiée du proxy Next l'a ensuite relue douze fois séquentiellement
+et huit fois en parallèle, toujours avec HTTP 200. Le défaut restant était néanmoins réel :
+le repli direct du frontend couvrait 404/502/503/504 mais pas un `500` interne transitoire de
+Next.js.
+
+Le repli est maintenant isolé dans `lib/backendFallback.mjs` et couvre `500` uniquement pour
+les lectures sûres GET/HEAD. Une mutation recevant `500` conserve sa réponse et n'est jamais
+rejouée, car le backend peut avoir appliqué l'effet avant la perte de réponse. Le test simule
+les deux branches et empêche à la fois la disparition de conversation et le double effet.
+
+La preuve E7 du contrat gelé `bulk_rename:preview` est publiée : exactement un outil métier,
+zéro mutation observable, empreintes avant/après identiques, aucun autre pilote exécuté et
+suppression du volume temporaire. Les smokes chat et voix utilisent désormais chacun une
+fixture unique et un verrou interprocessus portable; la contrainte de sérialisation appartient
+au harnais plutôt qu'à une consigne humaine.
+
+Journalisation et sécurité : aucune charge utile de conversation n'est ajoutée aux logs ou aux
+preuves versionnées; les erreurs restent catégorisées sans contenu utilisateur. Aucun endpoint,
+secret, schéma, autorisation, VM ou réglage réseau n'est modifié. Rollback : réversion atomique
+du commit v2.625, qui retire le helper et la preuve E7 sans toucher aux données persistantes.
+
+Validations réelles : gate exhaustif vert en 755,1 s avec 288 étapes exécutées et 4 contrôles
+live différés sur 292 attendues, zéro échec, 347 fichiers Python compilés, baseline frontend
+121 sources/37 avertissements et build Next.js 16.2.12 Turbopack réussi. Le redémarrage
+contrôlé aboutit à `ready` en 117 955 ms, Marvin 2.625.0, 364 outils, Code Workspace, VM Lab,
+Ollama, SearXNG et HTTPS prêts. Les smokes donnent API 28/28, pages 41/41, conversation de
+4 344 888 octets et 49 messages rendue sans erreur console, chat 5/5 et voix strictement
+sérialisée. Les commandes chat/voix ont été lancées simultanément : le verrou les a ordonnées
+et les deux ont réussi. Une lecture `/api/learning` a utilisé son unique retry borné pendant le
+parcours des pages puis a répondu normalement; aucun état vide ni perte de conversation n'a
+été observé.
+
 ## 2026-08-11 — v2.624.0 — Smokes isolés et pilote E7 preview pré-enregistré
 
 La revue croisée a confirmé que l'échec parallèle chat/voix était une contamination du
@@ -24,6 +60,21 @@ pas configuré dans le processus de campagne. Aucun résultat n'a été publié 
 temporaire a été supprimé. La politique 1.0 reste immuable. Une politique 1.1 la remplace,
 liée par SHA-256, et le runner injecte un resolver local qui refuse tout chemin hors du
 volume temporaire. Cette correction est de nouveau commitée avant le second essai.
+
+Le rejeu chat/voix en parallèle ne produit plus de 404 de fixture, mais a révélé un 503
+projets et un 500 conversations sous deux navigateurs et leurs pollers simultanés. Une sonde
+directe de 60 requêtes backend concurrentes n'a produit aucun échec : le signal n'établit pas
+une régression du repository. Comme ces smokes partagent volontairement le même runtime live,
+un verrou interprocessus portable les sérialise désormais. Un lancement parallèle attend le
+verrou au lieu de contaminer la mesure; les fixtures restent uniques par run.
+
+Résultat E7 observé après le second gel : `verified`, source `ee16d33`, exactement un appel
+`bulk_rename:preview`, prévisualisation d'un renommage factice, zéro autre pilote invoqué,
+zéro mutation et empreintes avant/après identiques
+(`d7c3e544555d9f03dd85a6259e1466292050855d815c8adcc24fa3e31fd523d8`). Le volume
+temporaire a été supprimé automatiquement. Le lancement simultané des commandes chat et
+voix a ensuite réussi : le verrou les a sérialisées, chat sans erreur HTTP/console et voix
+sans chevauchement.
 
 Rollback : supprimer `e7-preview-execution-result.json` s'il existe puis révertir le commit
 v2.624. Aucun schéma, secret, VM, checkpoint, fichier utilisateur ou réglage réseau n'est

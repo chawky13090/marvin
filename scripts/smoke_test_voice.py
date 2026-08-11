@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 import database as db  # noqa: E402
+from smoke_run_lock import browser_smoke_lock  # noqa: E402
 
 
 BASE_URL = "http://localhost:3000"
@@ -159,4 +160,5 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    with browser_smoke_lock():
+        sys.exit(asyncio.run(main()))

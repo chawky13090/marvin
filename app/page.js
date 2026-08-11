@@ -6,6 +6,7 @@ import ConversationRow from '@/components/chat/sidebar/ConversationRow';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
+import { fetchWithBackendFallback as fetchBackendFallback } from '@/lib/backendFallback.mjs';
 import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
 import { fetchWorkspaceSnapshot } from '@/lib/workspaceRefresh.mjs';
 import {
@@ -16,20 +17,7 @@ import {
 } from '@/lib/chatNavigation.mjs';
 
 async function fetchWithBackendFallback(path, options) {
-  const withTimeout = (timeout) => ({
-    ...(options || {}),
-    signal: options?.signal || AbortSignal.timeout(timeout),
-  });
-  try {
-    const localResponse = await fetch(path, withTimeout(8000));
-    if (
-      localResponse.ok
-      || ![404, 502, 503, 504].includes(localResponse.status)
-    ) return localResponse;
-  } catch {
-    // Repli direct si le proxy Next est momentanément lent ou injoignable.
-  }
-  return fetch(`${BACKEND_URL}${path}`, withTimeout(12000));
+  return fetchBackendFallback(path, options, { backendUrl: BACKEND_URL });
 }
 
 export default function ChatPage() {
