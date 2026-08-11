@@ -19,6 +19,12 @@ donnée utilisateur. Le runner refuse toute source gouvernée modifiée ou non c
 exige la projection de confirmation et compare deux instantanés indépendants identiques.
 Les cinq autres contrats restent verrouillés.
 
+Première tentative après gel : refus avant opération, car le domaine filesystem n'était
+pas configuré dans le processus de campagne. Aucun résultat n'a été publié et le volume
+temporaire a été supprimé. La politique 1.0 reste immuable. Une politique 1.1 la remplace,
+liée par SHA-256, et le runner injecte un resolver local qui refuse tout chemin hors du
+volume temporaire. Cette correction est de nouveau commitée avant le second essai.
+
 Rollback : supprimer `e7-preview-execution-result.json` s'il existe puis révertir le commit
 v2.624. Aucun schéma, secret, VM, checkpoint, fichier utilisateur ou réglage réseau n'est
 modifié.

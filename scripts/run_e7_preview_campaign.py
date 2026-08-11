@@ -15,13 +15,13 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.1"
-POLICY_PATH = BASE / "e7-preview-execution-policy.json"
+POLICY_PATH = BASE / "e7-preview-execution-policy-v1.1.json"
 DEFAULT_OUTPUT = BASE / "e7-preview-execution-result.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "backend"))
 
 from e7_fixture_harness.surface_runtime import assert_zero_delta, snapshot_tree  # noqa: E402
-from tool_domains.filesystem import bulk_rename  # noqa: E402
+from tool_domains import filesystem as filesystem_domain  # noqa: E402
 
 
 class CampaignRefused(RuntimeError):
@@ -46,7 +46,7 @@ def _git(*args: str) -> str:
 
 
 def validate_policy(policy: dict[str, Any]) -> tuple[str, ...]:
-    if policy.get("schema") != "marvin.e7-preview-execution-policy/1.0":
+    if policy.get("schema") != "marvin.e7-preview-execution-policy/1.1":
         raise CampaignRefused("e7_preview_policy_schema_invalid")
     if policy.get("authorized_contracts") != ["bulk_rename:preview"]:
         raise CampaignRefused("e7_preview_scope_not_unique")
@@ -92,7 +92,18 @@ async def run_campaign(output: Path) -> dict[str, Any]:
         (fixture_root / "stable.txt").write_text("stable", encoding="utf-8")
         before = snapshot_tree(fixture_root)
 
-        result = await bulk_rename({
+        def resolve_fixture_path(raw: str) -> str:
+            resolved = Path(raw).resolve()
+            if resolved == workspace or workspace not in resolved.parents:
+                raise CampaignRefused("e7_preview_path_outside_temp_volume")
+            return str(resolved)
+
+        # Configuration locale au processus de campagne uniquement. Le resolver
+        # refuse tout chemin qui ne descend pas du volume temporaire possede par
+        # cette execution; il ne reutilise jamais le resolver de production.
+        filesystem_domain.configure(resolve_path=resolve_fixture_path)
+
+        result = await filesystem_domain.bulk_rename({
             "folder": str(fixture_root),
             "pattern": "old",
             "replace": "new",

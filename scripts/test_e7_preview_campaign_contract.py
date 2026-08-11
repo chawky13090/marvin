@@ -14,8 +14,11 @@ from run_e7_preview_campaign import CampaignRefused, validate_policy  # noqa: E4
 
 
 def main() -> int:
-    policy_path = BASE / "e7-preview-execution-policy.json"
+    policy_path = BASE / "e7-preview-execution-policy-v1.1.json"
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    previous = BASE / policy["supersedes"]
+    assert previous.name == "e7-preview-execution-policy.json"
+    assert policy["superseded_policy_sha256"] == hashlib.sha256(previous.read_bytes()).hexdigest()
     governed = validate_policy(policy)
     assert "scripts/run_e7_preview_campaign.py" in governed
 

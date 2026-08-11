@@ -9,7 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.1"
-OUTPUT = BASE / "e7-preview-execution-policy.json"
+PREVIOUS = BASE / "e7-preview-execution-policy.json"
+OUTPUT = BASE / "e7-preview-execution-policy-v1.1.json"
 GOVERNED = (
     "benchmarks/tool-evidence/v1.1/direct-fixture-pilot.json",
     "scripts/e7_fixture_harness/surface_runtime.py",
@@ -31,9 +32,12 @@ def main() -> int:
     if len(preview) != 1 or preview[0]["class"] != "N":
         raise RuntimeError("Le contrat bulk_rename:preview gele est absent ou ambigu.")
     policy = {
-        "schema": "marvin.e7-preview-execution-policy/1.0",
+        "schema": "marvin.e7-preview-execution-policy/1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": "preregistered_not_executed",
+        "supersedes": PREVIOUS.name,
+        "superseded_policy_sha256": _sha256(PREVIOUS),
+        "correction": "inject_temp_volume_bounded_filesystem_resolver",
         "authorized_contracts": ["bulk_rename:preview"],
         "all_other_pilot_contracts_authorized": False,
         "maximum_business_tool_invocations": 1,
