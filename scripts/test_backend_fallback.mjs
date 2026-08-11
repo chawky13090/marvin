@@ -5,6 +5,7 @@ import {
   isMutationOutcomeUnknown,
   shouldFallbackToBackend,
 } from '../lib/backendFallback.mjs';
+import { postChatSetting } from '../lib/chatSettingsMutations.mjs';
 
 assert.equal(shouldFallbackToBackend(500), true, 'un GET doit contourner un 500 Next transitoire');
 assert.equal(shouldFallbackToBackend(500, { method: 'HEAD' }), true);
@@ -125,10 +126,68 @@ assert.deepEqual(readCalls, [
   'http://127.0.0.1:8005/api/conversations/read-id',
 ]);
 
+const settingCalls = [];
+const settingResponse = await postChatSetting('set_model', 'qwen3:4b', {
+  fetchImpl: async (url, init) => {
+    settingCalls.push({ url: String(url), init });
+    return new Response('{"success":true}', { status: 200 });
+  },
+});
+assert.equal(settingResponse.status, 200);
+assert.equal(settingCalls.length, 1);
+assert.equal(settingCalls[0].url, '/api/settings');
+assert.deepEqual(JSON.parse(settingCalls[0].init.body), { action: 'set_model', modelName: 'qwen3:4b' });
+
+for (const status of [502, 503, 504]) {
+  let callsForStatus = 0;
+  await assert.rejects(
+    postChatSetting('pull_model', 'qwen3:4b', {
+      fetchImpl: async () => {
+        callsForStatus += 1;
+        return new Response('{"error":"unknown"}', { status });
+      },
+    }),
+    isMutationOutcomeUnknown,
+  );
+  assert.equal(callsForStatus, 1, `le réglage HTTP ${status} ne doit pas être rejoué`);
+}
+
+let failedSettingCalls = 0;
+await assert.rejects(
+  postChatSetting('set_model', 'invalid', {
+    fetchImpl: async () => {
+      failedSettingCalls += 1;
+      return new Response('{"error":"invalid"}', { status: 400 });
+    },
+  }),
+  (error) => !isMutationOutcomeUnknown(error) && /HTTP 400/.test(error.message),
+);
+assert.equal(failedSettingCalls, 1);
+
+let disconnectedSettingCalls = 0;
+await assert.rejects(
+  postChatSetting('pull_model', 'qwen3:4b', {
+    fetchImpl: async () => {
+      disconnectedSettingCalls += 1;
+      throw new TypeError('Failed to fetch');
+    },
+  }),
+  isMutationOutcomeUnknown,
+);
+assert.equal(disconnectedSettingCalls, 1);
+
 const chatPageSource = readFileSync(new URL('../app/page.js', import.meta.url), 'utf8');
 const toastSource = readFileSync(new URL('../components/ui/Toast.jsx', import.meta.url), 'utf8');
 const mutationUiSource = readFileSync(new URL('../lib/mutationOutcomeUi.mjs', import.meta.url), 'utf8');
 assert.match(chatPageSource, /reportMutationFailure/);
+assert.doesNotMatch(chatPageSource, /fetch\('\/api\/projects'/);
+assert.doesNotMatch(chatPageSource, /fetch\('\/api\/settings'/);
+assert.match(chatPageSource, /postChatSetting\('set_model'/);
+assert.match(chatPageSource, /postChatSetting\('pull_model'/);
+assert.ok(
+  chatPageSource.indexOf("postChatSetting('set_model'") < chatPageSource.indexOf('setActiveModel(modelName)', chatPageSource.indexOf("postChatSetting('set_model'")),
+  'le modele visible ne doit changer qu apres confirmation du serveur',
+);
 assert.match(chatPageSource, /window\.location\.assign\('\/documents'\)/);
 assert.match(mutationUiSource, /Résultat non confirmé/);
 assert.match(mutationUiSource, /Marvin ne l’a pas relancée automatiquement/);

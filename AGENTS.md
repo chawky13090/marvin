@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.626.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.627.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.626.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.627.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.626.0)
+## 9. État actuel (v2.627.0)
+
+**v2.627 (faux succès frontend fermés)** : la création de projet utilise le transport direct
+à appel unique de v2.626, vérifie la réponse HTTP et conserve le formulaire sur échec. Les
+actions Next-only `set_model` et `pull_model` restent sur leur route métier dédiée, sans repli
+ni retry, mais contrôlent désormais tous les statuts. 502/503/504 et erreurs de transport sont
+présentés comme résultats non confirmés; un 4xx reste un échec ferme. Le modèle affiché ne
+change qu'après confirmation serveur et le téléchargement possède un état visuel `unknown`.
+Le balayage des clients confirme que le helper de repli n'est consommé que par la page Chat;
+les 52 autres fichiers clients porteurs de méthodes HTTP n'ont pas de second transport
+automatique. Rollback : réversion atomique du commit v2.627 puis redémarrage frontend.
 
 **v2.626 (mutations frontend à transport unique)** : le repli Next.js vers FastAPI reste
 autorisé uniquement pour les lectures GET/HEAD. Toute mutation du chat vise directement

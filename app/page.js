@@ -7,6 +7,7 @@ import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useToast } from '@/components/ui/Toast';
 import { BACKEND_URL } from '@/lib/backend';
 import { fetchWithBackendFallback as fetchBackendFallback } from '@/lib/backendFallback.mjs';
+import { postChatSetting } from '@/lib/chatSettingsMutations.mjs';
 import { reportMutationFailure } from '@/lib/mutationOutcomeUi.mjs';
 import { conversationListFromPayload } from '@/lib/conversationPayload.mjs';
 import { fetchWorkspaceSnapshot } from '@/lib/workspaceRefresh.mjs';
@@ -300,17 +301,17 @@ export default function ChatPage() {
   }, []);
 
   const switchModel = async (modelName) => {
-    setActiveModel(modelName);
     setShowModelDropdown(false);
     try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'set_model', modelName })
-      });
+      await postChatSetting('set_model', modelName);
+      setActiveModel(modelName);
       fetchStatus();
-    } catch (err) {
-      console.error('Erreur changement modèle:', err);
+    } catch (error) {
+      console.error('Erreur changement modèle:', error);
+      reportMutationFailure(toast, error, {
+        action: 'Changement de modèle', fallbackMessage: 'Le modèle précédent reste actif.',
+        onVerify: fetchStatus, verifyLabel: 'Vérifier le modèle actif',
+      });
     }
   };
 
@@ -319,20 +320,16 @@ export default function ChatPage() {
     if (!pullModelName.trim()) return;
     setPullStatus('downloading');
     try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pull_model', modelName: pullModelName.trim() })
+      await postChatSetting('pull_model', pullModelName.trim());
+      setPullStatus('started');
+      setPullModelName('');
+      setTimeout(() => { setPullStatus(null); fetchStatus(); }, 5000);
+    } catch (error) {
+      setPullStatus(error?.code === 'MUTATION_OUTCOME_UNKNOWN' ? 'unknown' : 'error');
+      reportMutationFailure(toast, error, {
+        action: 'Téléchargement du modèle', fallbackMessage: 'Le téléchargement n’a pas démarré.',
+        onVerify: fetchStatus, verifyLabel: 'Actualiser les modèles',
       });
-      if (res.ok) {
-        setPullStatus('started');
-        setPullModelName('');
-        setTimeout(() => { setPullStatus(null); fetchStatus(); }, 5000);
-      } else {
-        setPullStatus('error');
-      }
-    } catch {
-      setPullStatus('error');
     }
   };
 
@@ -357,17 +354,21 @@ export default function ChatPage() {
     if (e) e.preventDefault();
     if (!newProjectName.trim()) return;
     try {
-      await fetch('/api/projects', {
+      const response = await fetchWithBackendFallback('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newProjectName.trim() })
       });
+      if (!response.ok) throw new Error(`Création projet HTTP ${response.status}`);
       setNewProjectName('');
       setShowProjectInput(false);
       fetchData();
     } catch (error) {
       console.error(error);
-      toast.error('Création impossible', 'Le projet n’a pas été créé.');
+      reportMutationFailure(toast, error, {
+        action: 'Création du projet', fallbackMessage: 'Le projet n’a pas été créé.',
+        onVerify: fetchData, verifyLabel: 'Vérifier les projets',
+      });
     }
   };
 
@@ -1126,6 +1127,7 @@ export default function ChatPage() {
                     </button>
                   </form>
                   {pullStatus === 'started' && <div style={{ fontSize: '10px', color: '#22c55e', marginTop: '4px' }}>✅ Téléchargement lancé en arrière-plan !</div>}
+                  {pullStatus === 'unknown' && <div style={{ fontSize: '10px', color: 'var(--warning)', marginTop: '4px' }}>Résultat non confirmé — actualisez les modèles.</div>}
                   {pullStatus === 'error' && <div style={{ fontSize: '10px', color: '#ef4444', marginTop: '4px' }}>❌ Erreur de téléchargement</div>}
                 </div>
                 <div style={{ borderTop: '1px solid var(--border)', marginTop: '8px', paddingTop: '8px' }}>

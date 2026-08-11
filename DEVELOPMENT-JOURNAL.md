@@ -5,6 +5,41 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.627.0 — Faux succès restants de la page Chat fermés
+
+La revue de v2.626 a identifié trois mutations brutes dans `app/page.js`. La création de projet
+ignorait `response.ok`, vidait le formulaire et fermait l'éditeur même après un échec serveur.
+Elle passe désormais par le transport direct FastAPI à appel unique, vérifie le statut et
+utilise la même présentation « Résultat non confirmé » que les autres mutations.
+
+`set_model` et `pull_model` restent volontairement sur `/api/settings` Next.js : cette route
+valide les noms, écrit le réglage backend et lance le processus Ollama; elle n'a pas de contrat
+FastAPI strictement équivalent. Le nouveau module `lib/chatSettingsMutations.mjs` conserve ce
+transport unique, interdit tout retry, transforme seulement 502/503/504 et les erreurs réseau
+en résultat ambigu, et traite les 4xx comme échecs fermes. Le modèle visible n'est mis à jour
+qu'après HTTP réussi. Un téléchargement incertain affiche `unknown` au lieu d'affirmer un
+échec ou un succès.
+
+Le balayage `app`, `components` et `lib` trouve 52 fichiers clients contenant une option HTTP
+`method`, mais aucun autre consommateur du helper de repli. Le défaut précis de double saut
+Next.js vers FastAPI n'existe donc pas ailleurs. Ce constat ne prétend pas certifier toutes les
+mutations métier de ces 52 fichiers; il borne uniquement la classe de régression corrigée.
+
+Sécurité et logs : aucun endpoint, secret, journal, schéma ou donnée persistante n'est ajouté.
+Les noms de modèles restent validés côté Next.js; aucune charge utile n'est journalisée. Le
+test couvre succès, 400 ferme, 502/503/504 ambigus, exception réseau, absence de rejeu, ordre de
+mise à jour visuelle et absence de `fetch()` brut pour projets/réglages dans la page Chat.
+Rollback : réversion atomique du commit v2.627, sans migration de données.
+
+Validations réelles finales : test ciblé du transport et ESLint ciblé verts; architecture
+Marvin 2.627.0, 364 outils, 391 routes et harness 364/364; documentation cohérente; baseline
+frontend de 121 sources avec les 37 avertissements historiques inchangés et zéro exception;
+build Next.js 16.2.12 Turbopack réussi. Le gate exhaustif est vert en 774 secondes avec 288
+étapes exécutées et 4 contrôles live différés sur 292 attendues, zéro échec. Après redémarrage,
+Marvin atteint `ready` en 121 324 ms avec Ollama, SearXNG, HTTPS, Code Workspace et VM Lab
+disponibles. Les smokes live séquentiels donnent API 28/28, pages 41/41, chat 5/5 et voix
+strictement sérialisée.
+
 ## 2026-08-11 — v2.626.0 — Mutation à transport unique et résultat ambigu explicite
 
 La revue croisée a montré que le repli ajouté en v2.625 ne protégeait les mutations que sur
