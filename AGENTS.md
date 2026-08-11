@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.627.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.628.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.627.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.628.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.627.0)
+## 9. État actuel (v2.628.0)
+
+**v2.628 (pré-enregistrement E7-R de `bulk_rename:apply`)** : une politique gelée impose cinq
+cycles indépendants, une invocation métier maximale par cycle, une fixture neuve et une
+restauration exacte depuis la pré-image. Le graphe de renommage du pilote est volontairement
+borné : paires bijectives simples, même volume, aucune chaîne, aucun cycle, aucune collision
+Windows insensible à la casse et aucun écrasement. Une ACL explicitement protégée sert de
+canari : elle survit au renommage inverse mais détecte une future suppression-recréation.
+L'identité observée couvre chemins relatifs, identités de fichiers, SHA-256, tailles,
+horodatages et SDDL. La comparaison intercycles porte sur les verdicts et deltas relatifs,
+jamais sur les chemins temporaires ou dates absolues. La fixture autonome a validé cinq
+restaurations simulées sans outil public Marvin. L'exécution de `bulk_rename:apply` et la
+publication d'un résultat restent interdites jusqu'au gel séparé du runner et de son
+autorisation. Rollback : réversion atomique du commit v2.628; aucune donnée métier n'a muté.
 
 **v2.627 (faux succès frontend fermés)** : la création de projet utilise le transport direct
 à appel unique de v2.626, vérifie la réponse HTTP et conserve le formulaire sur échec. Les

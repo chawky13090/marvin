@@ -17,6 +17,7 @@ def main() -> int:
     assert "/api/coding/overview" in status and "/api/vm-lab/status" in status
     assert "$HeavyReady" in status and "'initializing'" in status
     assert "$StatusDeadline = $Deadline" in restart
+    assert "$StableStatusChecks -ge 2" in restart
     assert "readiness = $Status.readiness" in restart
     assert "[ValidateRange(1, 10)][int]$Cycles = 5" in runner
     assert "$Status.state -ne 'ready'" in runner

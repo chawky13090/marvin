@@ -65,6 +65,10 @@ class LinuxResultSessionRequest(BaseModel):
 
 @router.get("/overview")
 async def coding_overview():
+    return await asyncio.to_thread(_coding_overview_payload)
+
+
+def _coding_overview_payload():
     missions = coding_mission.list_missions(limit=1000)
     radar = engineering_radar.context(list(language_registry.PROFILES), max_chars=200_000)
     return {

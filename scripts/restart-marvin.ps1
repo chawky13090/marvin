@@ -58,15 +58,21 @@ if ($null -eq $Backend -or -not $FrontendReady) {
 
 $Status = $null
 $StatusDeadline = $Deadline
+$StableStatusChecks = 0
 do {
     $StatusJson = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
         -File (Join-Path $PSScriptRoot 'get-marvin-runtime-status.ps1')
     $Status = $StatusJson | ConvertFrom-Json
-    if ($Status.overall -in @('ready', 'degraded')) { break }
+    if ($Status.overall -in @('ready', 'degraded')) {
+        $StableStatusChecks++
+        if ($StableStatusChecks -ge 2) { break }
+    } else {
+        $StableStatusChecks = 0
+    }
     Start-Sleep -Seconds 1
 } while ((Get-Date) -lt $StatusDeadline)
 
-$FinalSuccess = $null -ne $Status -and $Status.overall -in @('ready', 'degraded')
+$FinalSuccess = $null -ne $Status -and $Status.overall -in @('ready', 'degraded') -and $StableStatusChecks -ge 2
 [pscustomobject]@{
     success = $FinalSuccess
     state = if ($null -ne $Status) { $Status.overall } else { 'failed' }

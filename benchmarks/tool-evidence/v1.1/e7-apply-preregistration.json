@@ -1,0 +1,108 @@
+{
+  "schema": "marvin.e7-apply-preregistration/1.0",
+  "generated_at": "2026-08-11T20:41:20.2769925Z",
+  "status": "preregistered_execution_locked",
+  "contract": "bulk_rename:apply",
+  "required_e7_class": "R",
+  "tool_execution_authorized": false,
+  "host_execution_forbidden": true,
+  "all_other_pilot_contracts_authorized": false,
+  "cycles": 5,
+  "maximum_business_tool_invocations_per_cycle": 1,
+  "maximum_total_business_tool_invocations": 5,
+  "isolation": {
+    "kind": "isolated_temp_volume",
+    "fixture_user_data_forbidden": true,
+    "network_required": false,
+    "persistent_host_path_forbidden": true,
+    "fresh_fixture_per_cycle": true,
+    "complete_cleanup_between_cycles": true
+  },
+  "fixture": {
+    "rename_graph": "simple_bijective_pairs_only",
+    "same_volume_required": true,
+    "single_path_segment_required": true,
+    "chains_and_cycles_forbidden": true,
+    "casefold_collisions_forbidden": true,
+    "existing_destination_forbidden": true,
+    "overwrite_forbidden": true,
+    "distinct_acl_canary_required": true,
+    "acl_canary_purpose": "detect_replacement_of_inverse_rename_by_delete_and_recreate",
+    "acl_canary_removal_requires_refreeze": true
+  },
+  "observation": {
+    "capture_before_mutation_after_mutation_and_after_recovery": true,
+    "fields": [
+      "relative_tree",
+      "path_identity",
+      "device",
+      "file_identity",
+      "size",
+      "sha256",
+      "created_ns",
+      "modified_ns",
+      "acl_sddl"
+    ],
+    "forbidden_delta": "anything_outside_declared_relative_rename_pairs"
+  },
+  "recovery": {
+    "mechanism": "preimage_driven_inverse_rename",
+    "public_marvin_tools_used": [],
+    "bulk_rename_rollback_forbidden": true,
+    "delete_and_recreate_forbidden": true,
+    "overwrite_forbidden": true,
+    "expected_fidelity": "exact_identity",
+    "residual_loss": "none"
+  },
+  "per_cycle_acceptance": {
+    "business_tool_invocation_count": 1,
+    "declared_relative_delta_only": true,
+    "collateral_delta_count": 0,
+    "recovery_matches_own_preimage_exactly": true,
+    "acl_canary_preserved": true,
+    "fixture_cleanup_verified": true
+  },
+  "intercycle_equivalence": {
+    "compare_normalized_verdicts_and_relative_deltas_only": true,
+    "absolute_paths_excluded": true,
+    "absolute_timestamps_excluded": true,
+    "temporary_identifiers_excluded": true,
+    "required_equal_fields": [
+      "verdict",
+      "relative_rename_set",
+      "relative_observed_delta",
+      "exact_identity_restored",
+      "collateral_delta_count",
+      "business_tool_invocation_count"
+    ]
+  },
+  "publication": {
+    "requires_all_five_cycles": true,
+    "requires_identical_normalized_cycle_verdicts": true,
+    "requires_zero_false_success": true,
+    "requires_zero_residual_fixture": true,
+    "result_artifact_authorized": false,
+    "reason": "execution_runner_and_its_hashes_are_not_frozen_in_this_preregistration"
+  },
+  "next_phase": {
+    "runner_must_be_frozen_before_authorization": true,
+    "runner_must_enforce_committed_governed_sources": true,
+    "authorization_must_be_a_separate_versioned_artifact": true,
+    "no_execution_from_this_policy_alone": true
+  },
+  "governed_source_hashes": {
+    "scripts/e7_apply_fixture.py": "200a31b9feb4ab33ef87e5902c72f7d9d8fc2a44ce15646b7d83fc9d2e892ad7",
+    "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+    "benchmarks/tool-evidence/v1.1/direct-fixture-freeze-manifest.json": "803bbde25577c8b1daf7bfd127455b1ba48f1e697f2d4f8fa27a4db73afd5711",
+    "benchmarks/tool-evidence/v1.1/pilot-fixture-harness-manifest.json": "890bbf7df16454c99157519653da0e05175580b7ff42045c408b2e16dfdd8a3d",
+    "backend/tool_domains/filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180"
+  },
+  "security_and_logging": {
+    "secrets_or_user_data": "forbidden",
+    "payload_logging": "forbidden",
+    "network_access": "none",
+    "public_tool_use_during_fixture_self_test": false,
+    "business_tool_execution_in_this_phase": false
+  },
+  "rollback": "revert_preregistration_commit; no business mutation or persistent data migration exists"
+}

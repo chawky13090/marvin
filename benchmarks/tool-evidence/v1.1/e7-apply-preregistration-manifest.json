@@ -1,0 +1,23 @@
+{
+  "schema": "marvin.e7-apply-preregistration-manifest/1.0",
+  "generated_at": "2026-08-11T20:41:20.2769925Z",
+  "status": "frozen_execution_locked",
+  "contract": "bulk_rename:apply",
+  "tool_execution_authorized": false,
+  "files": {
+    "benchmarks/tool-evidence/v1.1/e7-apply-preregistration.json": "0aed82e75da372cf1d7bbd950e0fb4704ce9af696581cac6ef22a206f9743ee5",
+    "scripts/e7_apply_fixture.py": "200a31b9feb4ab33ef87e5902c72f7d9d8fc2a44ce15646b7d83fc9d2e892ad7",
+    "scripts/test_e7_apply_fixture_preregistration.py": "eb6a016fd45e5ea4442026fdd923c3b1e0da91954e0cdcdfa61f3e3193dabb4d",
+    "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+    "benchmarks/tool-evidence/v1.1/direct-fixture-freeze-manifest.json": "803bbde25577c8b1daf7bfd127455b1ba48f1e697f2d4f8fa27a4db73afd5711",
+    "benchmarks/tool-evidence/v1.1/pilot-fixture-harness-manifest.json": "890bbf7df16454c99157519653da0e05175580b7ff42045c408b2e16dfdd8a3d",
+    "backend/tool_domains/filesystem.py": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180"
+  },
+  "invariants": {
+    "manifest_change_requires_refreeze": true,
+    "policy_change_requires_refreeze": true,
+    "fixture_change_requires_refreeze": true,
+    "business_tool_execution_forbidden_until_separate_authorization": true
+  },
+  "rollback": "revert_preregistration_commit"
+}

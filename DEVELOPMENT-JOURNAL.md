@@ -5,6 +5,54 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.628.0 — Politique E7-R apply gelée sans exécution métier
+
+La tranche revient à la campagne E7 après la stabilisation frontend v2.624-v2.627. Le contrat
+gelé de `bulk_rename:apply` exige une identité exacte incluant timestamps et ACL. Le helper
+historique `restore_tree_from_preimage` recrée les fichiers et ne pouvait donc pas constituer
+la restauration de cette campagne. Il reste inchangé afin de préserver les empreintes de la
+preuve `preview`. Une fixture autonome réalise une restauration pré-image par renommage
+inverse, sans appeler `bulk_rename:rollback` ni aucun outil public Marvin.
+
+La politique pré-enregistrée impose cinq cycles indépendants avec une fixture neuve, une seule
+invocation métier maximale par cycle et nettoyage complet. Le pilote refuse avant mutation
+les chemins non relatifs simples, chaînes, cycles, collisions après `casefold`, destinations
+existantes et écrasements. Une DACL explicitement protégée sur un fichier sert de canari
+discriminant : elle prouve la conservation du descripteur Windows et ferait échouer une future
+restauration par suppression-recréation. L'oracle compare chemin relatif, volume et identité
+de fichier, taille, SHA-256, création, modification et SDDL. Entre cycles, seuls verdicts et
+deltas relatifs sont comparés; les chemins temporaires et timestamps absolus sont exclus.
+
+Un premier essai de placement dans `e7_fixture_harness` a été refusé par l'empreinte du
+manifeste historique. La fixture a donc été isolée dans `scripts/e7_apply_fixture.py`; l'ancien
+paquet et son test retrouvent exactement leurs octets gelés. Le nouveau manifeste SHA-256
+gouverne séparément politique, fixture, test, contrats historiques et domaine filesystem.
+
+Le premier smoke live suivant le redémarrage a ensuite exposé un 503 transitoire sur
+`/api/coding/overview`, alors que la même route répondait ensuite en environ quatre secondes.
+La route `async` exécutait ses inventaires synchrones lourds sur la boucle FastAPI. Le calcul
+est désormais déporté avec `asyncio.to_thread`; le test non bloquant couvre explicitement Code
+Workspace. Le redémarrage exige aussi deux états runtime lourds consécutifs avant d'annoncer
+`ready` ou `degraded`, au lieu d'accepter un succès ponctuel. Le smoke API rejoué dans les
+mêmes conditions passe 28/28. Aucun timeout n'a été augmenté et TD-011 ne change pas de
+critère : le correctif retire un blocage de boucle et durcit la stabilité observée.
+
+Sécurité, données et logs : zéro outil métier exécuté, zéro chemin utilisateur, secret,
+réseau, base ou journal modifié. Les cinq cycles de test ne font que simuler l'état post-apply
+avec `os.rename` dans des répertoires temporaires, puis vérifier l'inverseur indépendant. La
+politique conserve `tool_execution_authorized: false`, interdit l'hôte et interdit tout
+artefact de résultat. Le futur runner devra être gelé et autorisé par un artefact versionné
+séparé. Rollback : réversion atomique du commit v2.628; aucune restauration de donnée n'est
+requise.
+
+Validations finales réelles : gate exhaustif vert en 735,6 secondes avec 289 étapes exécutées,
+4 contrôles live différés et 293 attendues; build Next.js 16.2.12 Turbopack réussi. Après
+redémarrage contrôlé, Marvin 2.628.0 atteint `ready` en 127 425 ms avec 364 outils, Ollama,
+SearXNG, HTTPS, Code Workspace et VM Lab disponibles. Les smokes séquentiels passent API
+28/28, pages 41/41, chat 5/5 et voix strictement sérialisée. Le premier gate lancé Marvin
+actif avait correctement refusé le build concurrent; Marvin a ensuite été arrêté proprement
+et la preuve finale a été produite hors ligne, sans abaisser aucun seuil.
+
 ## 2026-08-11 — v2.627.0 — Faux succès restants de la page Chat fermés
 
 La revue de v2.626 a identifié trois mutations brutes dans `app/page.js`. La création de projet
