@@ -5,6 +5,31 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-11 — v2.621.0 — Environnements pilotes E7 qualifiés sans exécution métier
+
+Demande : poursuivre la campagne E7 après l'implémentation du harnais et fermer les
+préconditions avant toute exécution des six outils pilotes.
+
+Constats et décisions : la VM Windows et `Marvin-Clean` existaient, mais son seuil de
+démarrage de 6 Go dépassait momentanément les 5,7 Go libres. Le seuil a été ramené à 4 Go,
+minimum 3 Go et maximum 6 Go, configuration conforme au minimum Windows 11 et adaptative.
+La qualification vérifie les surfaces locales jetables et l'état Hyper-V sans lancer aucun
+outil Marvin, sans démarrer la VM et sans produire de statut E7.
+
+Fichiers : `backend/vm_lab.py`, `scripts/install-windows-vm-lab.ps1`,
+`scripts/provision-vm-lab.ps1`, `scripts/qualify_e7_pilot_environments.py`,
+`scripts/test_e7_environment_qualification.py` et
+`benchmarks/tool-evidence/v1.1/e7-pilot-environment-qualification.json`.
+
+Validations réelles : qualification locale vraie, SQLite `integrity_check=ok`, VM éteinte,
+génération 2, checkpoint `Marvin-Clean`, mémoire dynamique 3–6 Go, seuil 4 Go, Default
+Switch présent; tests qualification et implémentations E7 verts. Aucun secret, texte
+utilisateur, outil métier, mutation hôte hors paramètre mémoire VM ou nouveau log n'est
+introduit.
+
+Rollback : réversion atomique du commit v2.621; pour la VM existante, remettre le seuil
+6 Go avec `Set-VMMemory` comme documenté dans `AGENTS.md`.
+
 ## 2026-08-11 — v2.620.0 — TD-011 fermé par readiness réelle et cinq cycles froids
 
 Le redémarrage v2.619 avait encore produit un HTTP 503 transitoire sur VM Lab après avoir

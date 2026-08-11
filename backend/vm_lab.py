@@ -21,7 +21,8 @@ PROFILES: Final[dict[str, dict[str, Any]]] = {
         "iso_name": "Win11_25H2_French_x64_v2.iso",
         "hash_algorithm": "sha256",
         "expected_hash": "A02693BEB8EB166AFDFDB7DB49176A2B547F81E61030A695FE172277DB6A1977",
-        "memory_bytes": 6 * 1024**3,
+        "memory_bytes": 4 * 1024**3,
+        "memory_maximum_bytes": 6 * 1024**3,
         "processors": 4,
         "disk_bytes": 80 * 1024**3,
         "minimum_free_bytes": 80 * 1024**3,
@@ -38,6 +39,7 @@ PROFILES: Final[dict[str, dict[str, Any]]] = {
             "D0AFCA1D456AAA9408CEB6B8527521FF7B6B5D62FDBE6F8C5FAAF8DF56A96292"
         ),
         "memory_bytes": 4 * 1024**3,
+        "memory_maximum_bytes": 4 * 1024**3,
         "processors": 4,
         "disk_bytes": 40 * 1024**3,
         "minimum_free_bytes": 25 * 1024**3,

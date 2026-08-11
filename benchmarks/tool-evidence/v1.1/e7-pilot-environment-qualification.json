@@ -1,0 +1,46 @@
+{
+  "schema": "marvin.e7-pilot-environment-qualification/1.0",
+  "generated_at": "2026-08-11T10:53:15.388978+00:00",
+  "status": "qualified_no_business_tool_execution",
+  "tool_execution_authorized": false,
+  "host_execution_forbidden": true,
+  "business_tools_invoked": [],
+  "pilot_contract_count": 6,
+  "pilot_implementation_count": 6,
+  "source_hashes": {
+    "contracts": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+    "implementations": "d593e36bfcb08b5344375e188427e9f44650ee4247b3edb5ecfa4b190e90344a"
+  },
+  "local_isolation": {
+    "qualified": true,
+    "filesystem_atomic_replace": true,
+    "sqlite_integrity": "ok",
+    "task_store_schema": [
+      "artifacts",
+      "tasks",
+      "workers"
+    ],
+    "workspace_removed_after_probe": true
+  },
+  "windows_vm_isolation": {
+    "qualified": true,
+    "vm_name": "Marvin-Windows11-TestForge",
+    "state": "Off",
+    "generation": 2,
+    "checkpoint_name": "Marvin-Clean",
+    "checkpoint_type": "ProductionOnly",
+    "dynamic_memory": true,
+    "startup_bytes": 4294967296,
+    "minimum_bytes": 3221225472,
+    "maximum_bytes": 6442450944,
+    "host_free_memory_bytes": 5785944064,
+    "switches": [
+      "Default Switch"
+    ]
+  },
+  "limitations": [
+    "qualification_does_not_execute_any_marvin_business_tool",
+    "qualification_does_not_set_E7",
+    "vm_checkpoint_restore_must_be_replayed_by_the_execution_campaign"
+  ]
+}

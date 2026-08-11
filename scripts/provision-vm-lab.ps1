@@ -74,7 +74,8 @@ function New-MarvinLabVM {
             -NewVHDSizeBytes $Definition.DiskBytes -SwitchName $SwitchName
         $created = $true
         Set-VM -VM $vm -ProcessorCount $Definition.Processors -DynamicMemory `
-            -MemoryMinimumBytes 2GB -MemoryMaximumBytes $Definition.MemoryBytes `
+            -MemoryMinimumBytes $Definition.MemoryMinimumBytes `
+            -MemoryMaximumBytes $Definition.MemoryMaximumBytes `
             -AutomaticCheckpointsEnabled $false -CheckpointType ProductionOnly
         $dvd = Add-VMDvdDrive -VMName $Definition.Name -Path $Definition.Iso -Passthru
         Set-VMFirmware -VMName $Definition.Name -EnableSecureBoot On `
@@ -115,7 +116,7 @@ $definitions = @{
         Iso = Join-Path $root 'library\iso\windows\Win11_25H2_French_x64_v2.iso'
         HashAlgorithm = 'SHA256'
         ExpectedHash = 'A02693BEB8EB166AFDFDB7DB49176A2B547F81E61030A695FE172277DB6A1977'
-        MemoryBytes = 6GB; DiskBytes = 80GB; MinimumFreeBytes = 80GB; Processors = 4
+        MemoryBytes = 4GB; MemoryMinimumBytes = 3GB; MemoryMaximumBytes = 6GB; DiskBytes = 80GB; MinimumFreeBytes = 80GB; Processors = 4
         SecureBootTemplate = 'MicrosoftWindows'; EnableTPM = $true
     }
     Debian13 = @{
@@ -124,7 +125,7 @@ $definitions = @{
         Iso = Join-Path $root 'library\iso\linux\debian-13.6.0-amd64-netinst.iso'
         HashAlgorithm = 'SHA512'
         ExpectedHash = 'CE0EEEE7B51FDCDBED1E5116668C1FEE27E528767BDF488E5F115A67B225E5DFD0AFCA1D456AAA9408CEB6B8527521FF7B6B5D62FDBE6F8C5FAAF8DF56A96292'
-        MemoryBytes = 4GB; DiskBytes = 40GB; MinimumFreeBytes = 25GB; Processors = 4
+        MemoryBytes = 4GB; MemoryMinimumBytes = 2GB; MemoryMaximumBytes = 4GB; DiskBytes = 40GB; MinimumFreeBytes = 25GB; Processors = 4
         SecureBootTemplate = 'MicrosoftUEFICertificateAuthority'; EnableTPM = $false
     }
 }

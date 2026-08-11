@@ -116,7 +116,7 @@ try {
 
     New-Item -ItemType Directory -Path $vmDirectory -Force | Out-Null
     $vhd = Join-Path $vmDirectory ($vmName + '.vhdx')
-    $vm = New-VM -Name $vmName -Generation 2 -Path $vmDirectory -MemoryStartupBytes 6GB `
+    $vm = New-VM -Name $vmName -Generation 2 -Path $vmDirectory -MemoryStartupBytes 4GB `
         -NewVHDPath $vhd -NewVHDSizeBytes 80GB -SwitchName $SwitchName
     $created = $true
     Set-VM -VM $vm -ProcessorCount 4 -DynamicMemory -MemoryMinimumBytes 3GB `

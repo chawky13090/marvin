@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.620.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.621.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.620.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.621.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.620.0)
+## 9. État actuel (v2.621.0)
+
+**v2.621 (qualification des environnements E7)** : les six fixtures pilotes disposent
+désormais d'une qualification reproductible distincte de leur exécution. Les volumes
+temporaires, l'échange atomique, le clone SQLite et le magasin de tâches sont vérifiés dans
+un espace jetable; la VM Windows doit être éteinte, génération 2, reliée au `Default Switch`,
+porter le checkpoint de production `Marvin-Clean` et disposer de la mémoire nécessaire.
+Le seuil de démarrage Windows devient 4 Go avec mémoire dynamique 3–6 Go afin de rester
+portable sur l'hôte actuel sans diminuer le maximum disponible. L'artefact publié interdit
+explicitement tout outil métier et ne produit aucune preuve E7. Rollback code : réversion
+atomique v2.621. Rollback machine : `Set-VMMemory -VMName Marvin-Windows11-TestForge
+-DynamicMemoryEnabled $true -StartupBytes 6GB -MinimumBytes 3GB -MaximumBytes 6GB`.
 
 **v2.620 (readiness lourde avant état prêt)** : le statut runtime ne confond plus ports ouverts
 et service utilisable. Après santé backend/frontend, Code Workspace et VM Lab doivent répondre
