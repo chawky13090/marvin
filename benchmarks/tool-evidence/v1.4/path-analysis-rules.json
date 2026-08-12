@@ -1,0 +1,32 @@
+{
+  "schema": "marvin.e7-path-analysis-rules/1.0",
+  "status": "frozen_before_implementation",
+  "argument_sources": {
+    "action": ["args.get:action"],
+    "confirmed": ["args.get:confirmed"]
+  },
+  "default_values": {
+    "action": "__default__",
+    "confirmed": false
+  },
+  "truth_lattice": ["TRUE", "FALSE", "UNKNOWN"],
+  "condition_operators": ["eq", "not_eq", "in", "not_in", "is", "is_not", "and", "or", "not"],
+  "effects": {
+    "read_only_operations": ["READ", "OBSERVE"],
+    "mutating_operations": ["CREATE", "UPDATE", "DELETE", "EXECUTE", "EXTERNAL_WRITE"],
+    "unknown_operation": "UNKNOWN"
+  },
+  "process_semantics": {
+    "psutil_observation_calls": ["pid_exists", "process_iter", "Process", "is_running", "status", "create_time", "children", "connections", "net_connections"],
+    "psutil_mutation_calls": ["terminate", "kill", "suspend", "resume", "wait_procs"],
+    "subprocess_calls_are": "EXECUTE"
+  },
+  "invariants": {
+    "no_business_contract_name_in_rules": true,
+    "no_special_case_by_tool_or_action": true,
+    "scenario_incompatible_effect_never_proves_under_declaration": true,
+    "scenario_unknown_effect_never_proves_absence": true,
+    "read_or_observe_never_counts_as_mutation": true,
+    "v1_3_result_is_never_rewritten": true
+  }
+}

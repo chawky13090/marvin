@@ -1,0 +1,90 @@
+{
+  "schema": "marvin.e7-path-analysis-preregistration/1.0",
+  "status": "designed_frozen_before_implementation",
+  "created_at": "2026-08-12",
+  "source_version": "v1.3",
+  "scope": {
+    "contracts": 22,
+    "contracts_path": "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json",
+    "product_sources": "git_tracked_backend_python_only",
+    "tool_execution_authorized": false,
+    "contract_mutation_authorized": false,
+    "persistent_data_mutation_authorized": false
+  },
+  "scenario_constraints": {
+    "derive_from_contract_action": true,
+    "derive_confirmed_from_contract_fixture": true,
+    "apply_declared_argument_defaults": true,
+    "propagate_across_internal_calls": true,
+    "incompatible_branch_state": "UNREACHABLE_FOR_SCENARIO",
+    "unresolved_condition_state": "UNKNOWN",
+    "unknown_never_means_false": true
+  },
+  "control_flow": {
+    "if_and_ifexp": true,
+    "early_return": true,
+    "boolean_and_or_not": true,
+    "equality_and_membership": true,
+    "local_constant_assignments": true,
+    "maximum_loop_unrolling": 0,
+    "loops_are_conservative": true,
+    "exceptions_are_conservative": true
+  },
+  "effect_operations": [
+    "READ",
+    "OBSERVE",
+    "CREATE",
+    "UPDATE",
+    "DELETE",
+    "EXECUTE",
+    "EXTERNAL_WRITE",
+    "UNKNOWN"
+  ],
+  "result_states": [
+    "CONFIRMED",
+    "CONFIRMED_UNDER_DECLARED",
+    "GUARDED_OR_SCENARIO_DEPENDENT",
+    "UNKNOWN"
+  ],
+  "decision_rules": {
+    "confirmed_under_declared": "a_mutating_effect_compatible_with_the_frozen_scenario_is_outside_the_declared_surface",
+    "guarded_or_scenario_dependent": "an_extra_effect_exists_only_on_an_incompatible_or_unresolved_guarded_path",
+    "unknown": "a_scenario_compatible_effectful_path_or_condition_cannot_be_resolved_safely",
+    "confirmed": "all_scenario_compatible_mutations_are_declared_and_no_compatible_effectful_path_is_unknown"
+  },
+  "prospective_canaries": {
+    "source": "scripts/fixtures/e7_path_analysis_prospective_canaries.py",
+    "cases": [
+      "early_return_excludes_later_mutation",
+      "matching_action_reaches_nested_mutation",
+      "nonmatching_action_excludes_nested_mutation",
+      "confirmed_false_excludes_mutation",
+      "confirmed_true_reaches_mutation",
+      "dynamic_condition_remains_unknown",
+      "process_observation_is_not_process_mutation"
+    ],
+    "business_tool_names_forbidden": true,
+    "derived_from_v1_3_contract_results": false
+  },
+  "unknown_transition_policy": {
+    "all_v1_3_unknown_contracts_must_be_reported": true,
+    "every_transition_requires_paths_constraints_and_reason": true,
+    "silent_transition_forbidden": true,
+    "unresolved_transition_remains_unknown": true
+  },
+  "retrospective_validation": {
+    "performed_only_after_v1_4_publication": true,
+    "stored_separately": true,
+    "v1_3_artifact_immutable": true,
+    "may_not_change_v1_4_rules_or_results": true
+  },
+  "publication": {
+    "result_path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+    "comparison_path": "benchmarks/tool-evidence/v1.4/v1.3-v1.4-transition-report.json",
+    "all_contracts_required": true,
+    "path_constraints_required": true,
+    "excluded_paths_required": true,
+    "source_hashes_required": true
+  },
+  "rollback": "Revert this preregistration commit before implementation; no runtime, contract or persistent data is changed."
+}
