@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "benchmarks" / "tool-evidence" / "v1.3" / "surface-analysis-preregistration.json"
+RULES = ROOT / "benchmarks" / "tool-evidence" / "v1.3" / "surface-analysis-rules.json"
 
 
 def sha256(path: Path) -> str:
@@ -38,6 +39,12 @@ def main() -> int:
     contracts = json.loads((ROOT / scope["source"]).read_text(encoding="utf-8"))["contracts"]
     assert len(contracts) == 22
     assert any(item["tool"] == "note_delete" for item in contracts)
+    rules = json.loads(RULES.read_text(encoding="utf-8"))
+    assert set(rules["declared_surface_effects"]["database_scope"]) == {"sqlite"}
+    assert rules["unknown_rules"]["dynamic_import"] is True
+    assert rules["unknown_rules"]["unresolved_project_call"] is True
+    assert "note_delete" not in RULES.read_text(encoding="utf-8")
+    assert len(rules["sink_rules"]) >= 10
     print("E7 Surface Analysis Preregistration OK - 22 contracts, execution locked")
     return 0
 

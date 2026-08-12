@@ -1,0 +1,48 @@
+{
+  "schema": "marvin.e7-surface-analysis-rules/1.0",
+  "status": "frozen_before_analyzer_implementation",
+  "declared_surface_effects": {
+    "database_scope": ["sqlite"],
+    "filesystem_scope": ["filesystem"],
+    "software_scope": ["filesystem", "process", "registry", "service"],
+    "external_record_scope": ["external_provider", "network"],
+    "windows_system_scope": ["filesystem", "process", "registry", "service"],
+    "model_scope": ["filesystem", "network", "process"],
+    "workspace_scope": ["filesystem", "process", "sqlite"],
+    "process_scope": ["process", "service", "network"],
+    "external_message_scope": ["external_provider", "network"],
+    "no_mutation_scope": []
+  },
+  "sink_rules": [
+    {"effect": "sqlite", "module_prefixes": ["database"], "call_patterns": ["*"]},
+    {"effect": "qdrant", "module_prefixes": ["vector_store"], "call_patterns": ["*"]},
+    {"effect": "audit_log", "module_prefixes": ["audit", "structured_logging", "evidence"], "call_patterns": ["*"]},
+    {"effect": "registry", "module_prefixes": ["winreg"], "call_patterns": ["*"]},
+    {"effect": "network", "module_prefixes": ["requests", "httpx", "aiohttp", "urllib", "socket"], "call_patterns": ["*"]},
+    {"effect": "process", "module_prefixes": ["subprocess"], "call_patterns": ["*"]},
+    {"effect": "filesystem", "module_prefixes": ["shutil"], "call_patterns": ["*"]},
+    {"effect": "filesystem", "module_prefixes": ["os"], "call_patterns": ["remove", "unlink", "rename", "replace", "mkdir", "makedirs", "rmdir", "removedirs"]},
+    {"effect": "filesystem", "module_prefixes": ["pathlib.Path"], "call_patterns": ["write_text", "write_bytes", "unlink", "rename", "replace", "mkdir", "rmdir", "touch", "open"]},
+    {"effect": "filesystem", "module_prefixes": ["builtins"], "call_patterns": ["open"]},
+    {"effect": "service", "module_prefixes": ["windows_task", "computer_runtime"], "call_patterns": ["service.*", "*_service*"]},
+    {"effect": "external_provider", "module_prefixes": ["email_manager", "calendar_manager", "itsm", "google_calendar"], "call_patterns": ["*"]}
+  ],
+  "unknown_rules": {
+    "dynamic_import": true,
+    "getattr_callable": true,
+    "subscript_callable": true,
+    "exec_or_eval": true,
+    "unresolved_project_call": true,
+    "maximum_call_depth_reached": true
+  },
+  "read_only_exceptions": {
+    "database": ["get_*", "list_*", "search_*", "count_*", "load_*"],
+    "vector_store": ["search", "search_*", "get_*", "list_*", "health_check", "collection_count"]
+  },
+  "invariants": {
+    "rules_are_data_not_python_special_cases": true,
+    "known_truth_special_case_forbidden_in_rules": true,
+    "under_declared_precedes_unknown_when_confirmed_extra_effect_exists": true,
+    "over_declared_requires_proven_absence": true
+  }
+}
