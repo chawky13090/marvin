@@ -58,7 +58,13 @@ def _build_conversation_response(cid: str) -> JSONResponse:
             last_asst = next((m for m in reversed(formatted) if m["role"] == "assistant"), None)
             if last_asst:
                 try:
-                    results = json.loads(msg["content"]) if isinstance(msg["content"], str) else msg["content"]
+                    results = msg.get("tool_results")
+                    if not isinstance(results, list):
+                        results = (
+                            json.loads(msg["content"])
+                            if isinstance(msg["content"], str)
+                            else msg["content"]
+                        )
                     if isinstance(results, list):
                         for result in results:
                             for invocation in last_asst.get("toolInvocations", []):

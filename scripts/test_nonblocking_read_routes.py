@@ -78,12 +78,19 @@ def main() -> int:
                             {
                                 "toolCallId": "call-1",
                                 "toolName": "file_find",
-                                "result": {"files": ["rapport.pdf"]},
-                                "evidence": {"verified": True},
+                                "result": {"_marvin_projection": {"truncated": True}},
                             }
                         ]
                     ),
                     "tool_calls": None,
+                    "tool_results": [
+                        {
+                            "toolCallId": "call-1",
+                            "toolName": "file_find",
+                            "result": {"files": ["rapport.pdf"]},
+                            "evidence": {"verified": True},
+                        }
+                    ],
                 },
             ]
 
@@ -129,6 +136,41 @@ def main() -> int:
         assert heartbeat_ticks >= 5, heartbeat_ticks
         assert worker_thread_ids
         assert all(thread_id != main_thread_id for thread_id in worker_thread_ids)
+
+        legacy_messages = get_messages("legacy")
+        legacy_messages[1].pop("tool_results")
+        legacy_messages[1]["content"] = json.dumps(
+            [
+                {
+                    "toolCallId": "call-1",
+                    "toolName": "file_find",
+                    "result": {"files": ["archive-legacy.pdf"]},
+                    "evidence": {"legacy": True},
+                }
+            ]
+        )
+        with (
+            patch.object(
+                conversations_api.db,
+                "get_conversation",
+                return_value={"id": "legacy", "title": "Historique"},
+            ),
+            patch.object(
+                conversations_api.db,
+                "get_messages_by_conversation",
+                return_value=legacy_messages,
+            ),
+            patch.object(
+                conversations_api.chat_turn_runtime,
+                "incomplete_tool_calls",
+                return_value={},
+            ),
+        ):
+            legacy_response = await conversations_api.get_conversation("legacy")
+        legacy_payload = json.loads(legacy_response.body)
+        assert legacy_payload["messages"][0]["toolInvocations"][0]["result"] == {
+            "files": ["archive-legacy.pdf"]
+        }
 
         with patch.object(conversations_api.db, "get_conversation", return_value=None):
             try:

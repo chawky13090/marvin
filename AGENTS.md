@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.638.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.639.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.638.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.639.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.638.0)
+## 9. État actuel (v2.639.0)
+
+**v2.639 (source unique des résultats d'outils)** : les nouveaux messages d'outils stockent
+le reçu complet uniquement dans `tool_results`; `content` contient une projection JSON valide
+et strictement bornée. Les champs critiques scalaires et un aperçu restent disponibles sans
+permettre à un champ `result` imbriqué de contourner la borne. La lecture UI utilise désormais
+`tool_results` en priorité et conserve un repli sur `content` pour les 1 976 lignes historiques.
+Aucune migration n'est exécutée dans cette tranche : les données existantes restent intactes
+et lisibles. Rollback : réversion atomique du commit v2.639 puis redémarrage backend; les
+nouveaux messages restent compatibles avec l'ancien lecteur grâce à leur enveloppe `content`.
 
 **v2.638 (lectures lourdes non bloquantes)** : la route de consultation d'une conversation
 exécute désormais dans un thread de travail la lecture SQLite, la reconstruction des appels

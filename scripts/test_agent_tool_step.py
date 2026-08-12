@@ -117,7 +117,8 @@ def main() -> int:
     projected = json.loads(compact_tool_result(large, max_chars=100))
     assert projected["success"] is True
     assert projected["message"] == "message complet"
-    assert "projection de contexte" in projected["blob"]
+    assert projected["_marvin_projection"]["truncated"] is True
+    assert len(compact_tool_result(large, max_chars=100)) <= 256
     pdf_result = {
         "success": True,
         "text": "contenu intégral " * 350,
@@ -130,7 +131,7 @@ def main() -> int:
     assert projected_pdf == pdf_result
     assert "projection de contexte" not in projected_pdf["text"]
     assert projected_pdf["truncated"] is False
-    assert projected["items"][-1] == "…+10 éléments"
+    assert "items" not in projected
 
     file_page = {
         "success": True,
@@ -162,6 +163,15 @@ def main() -> int:
     assert "path" not in projected_files["files"][0]
     assert len(json.dumps(projected_files, ensure_ascii=False)) <= 1_000
 
+    critical_nested = {
+        "success": True,
+        "result": {"payload": "z" * 50_000},
+        "message": "résultat complet conservé dans tool_results",
+    }
+    bounded_critical = compact_tool_result(critical_nested, max_chars=4_000)
+    assert len(bounded_critical) <= 4_000
+    assert json.loads(bounded_critical)["_marvin_projection"]["truncated"] is True
+
     computer_result = {
         "success": True,
         "result": {
@@ -186,6 +196,16 @@ def main() -> int:
         projected_computer["result"]["ui"]["elements"][0]["element_ref"]
         == "el_test"
     )
+    huge_computer = {
+        "success": True,
+        "result": {"image": "A" * 100_000, "tree": "B" * 40_000},
+    }
+    bounded_computer = compact_tool_result(
+        huge_computer,
+        tool_name="computer_control",
+    )
+    assert len(bounded_computer) <= 16_000
+    assert json.loads(bounded_computer)["_marvin_projection"]["truncated"] is True
 
     print(
         "Agent Tool Step OK - alias, JSON, contexte interne, PDF complet et projection bornée."

@@ -5,6 +5,39 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.639.0 — reçu d'outil unique et projection persistée bornée
+
+La seconde tranche de TD-015 corrige la croissance future sans toucher aux 1 976 lignes
+historiques. `agent_tool_batch` conserve le résultat et sa preuve complets dans la colonne
+`tool_results`, mais n'en recopie plus la sérialisation intégrale dans `content`. Cette colonne
+reçoit l'enveloppe habituelle avec une projection du résultat; l'identifiant et le nom d'outil
+restent présents pour la compatibilité des anciens lecteurs.
+
+`compact_tool_result` garantit désormais une sortie JSON valide et une borne calculable :
+4 000 caractères par défaut, 16 000 pour PDF et observation PC. Les valeurs imbriquées dans
+les champs historiquement critiques ne peuvent plus contourner cette borne. En cas de dépassement,
+les scalaires critiques, la taille originale et un aperçu borné sont conservés; le reçu complet
+n'est jamais tronqué dans `tool_results`. Les images `computer_control` restent exclues de la
+projection et présentes uniquement dans le reçu autoritatif.
+
+La route de lecture utilise `tool_results` en priorité. Si une ancienne ligne n'en possède pas,
+elle décode encore `content`; cette compatibilité est testée séparément. Les tests ciblés
+vérifient les projections génériques, PDF, fichiers et PC, un champ `result` de 50 000
+caractères, une observation de 140 000 caractères, la séparation réelle lors de la persistance,
+la lecture autoritative et le repli historique. Aucune migration SQLite, donnée utilisateur,
+permission, dépendance, route ou schéma n'est modifié dans cette tranche.
+
+Validation exhaustive observée : arrêt gracieux sans processus forcé, Ollama préservé, puis
+gate complète en 685,6 secondes avec 297 étapes réussies, 4 smokes live ignorés et zéro échec
+sur 301 attendues. Le build de production Next.js 16.2.12, la compilation Python, les 364
+outils, les 391 routes, les 41 pages et les contrôles de sécurité/persistance restent verts.
+
+Sécurité et journalisation : la réduction minimise les données dupliquées sans modifier le
+reçu durable ni les exports techniques; aucun contenu n'est ajouté aux logs. Les événements
+HTTP existants suffisent et conservent leurs politiques de rotation/rétention. Rollback :
+réversion atomique du commit v2.639 puis redémarrage backend. Les messages créés pendant la
+fenêtre v2.639 restent lisibles par v2.638 grâce à l'enveloppe JSON compatible de `content`.
+
 ## 2026-08-12 — v2.638.0 — isolation complète des lectures de conversation lourdes
 
 TD-015 a été réévaluée depuis la base SQLite ouverte en lecture seule. La conversation la

@@ -184,16 +184,34 @@ async def _finalize_call_result(
     }
     # Persistance au fil de l'eau : une coupure pendant le prochain outil
     # ne doit jamais faire réapparaître cet appel terminé comme `state=call`.
+    projected_result_text = compact_tool_result(result, tool_name=tool_name)
+    try:
+        projected_result = json.loads(projected_result_text)
+    except (json.JSONDecodeError, TypeError):
+        projected_result = str(projected_result_text)
+    projected_persisted_result = {
+        "toolCallId": tool_call_id,
+        "toolName": tool_name,
+        "result": projected_result,
+        "evidence": evidence,
+    }
+    projected_content = json.dumps([projected_persisted_result], ensure_ascii=False)
+    if len(projected_content) > 20_000:
+        projected_persisted_result["evidence"] = {
+            "projection_truncated": True,
+            "full_evidence_in_tool_results": True,
+        }
+        projected_content = json.dumps([projected_persisted_result], ensure_ascii=False)
     create_message(
         conversation_id,
         "tool",
-        json.dumps([persisted_result]),
+        projected_content,
         tool_results=[persisted_result],
     )
     ollama_messages.append(
         {
             "role": "tool",
-            "content": compact_tool_result(result, tool_name=tool_name),
+            "content": projected_result_text,
         }
     )
     if tool_name in _UNTRUSTED_WEB_TOOLS:

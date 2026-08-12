@@ -41,6 +41,56 @@ class PreparedToolCall:
     canonicalized_from: str = ""
 
 
+def _bounded_json_projection(value: Any, max_chars: int) -> str:
+    """Encode toujours un JSON valide et strictement borné.
+
+    Les champs scalaires critiques restent visibles quand le reçu complet dépasse le
+    budget. Le contenu complet demeure dans ``tool_results`` et n'est jamais tronqué ici.
+    """
+    budget = max(256, int(max_chars))
+    serialized = json.dumps(value, ensure_ascii=False, default=str)
+    if len(serialized) <= budget:
+        return serialized
+
+    projection: dict[str, Any] = {
+        "_marvin_projection": {
+            "truncated": True,
+            "original_chars": len(serialized),
+        }
+    }
+    if isinstance(value, dict):
+        for key in _CRITICAL_RESULT_FIELDS:
+            child = value.get(key)
+            if isinstance(child, (bool, int, float)) or child is None:
+                if key in value:
+                    projection[key] = child
+            elif isinstance(child, str):
+                projection[key] = child[:160]
+
+    projection["preview"] = ""
+    encoded = json.dumps(projection, ensure_ascii=False)
+    available = max(0, budget - len(encoded) - 2)
+    projection["preview"] = serialized[:available]
+    encoded = json.dumps(projection, ensure_ascii=False)
+    while len(encoded) > budget and projection["preview"]:
+        overflow = len(encoded) - budget
+        projection["preview"] = projection["preview"][: max(0, len(projection["preview"]) - overflow)]
+        encoded = json.dumps(projection, ensure_ascii=False)
+    if len(encoded) <= budget:
+        return encoded
+
+    # Un budget minimal peut encore être dépassé par plusieurs champs critiques.
+    return json.dumps(
+        {
+            "_marvin_projection": {
+                "truncated": True,
+                "original_chars": len(serialized),
+            }
+        },
+        ensure_ascii=False,
+    )
+
+
 # v2.526 — Incident réel reproduit (conversation « PowerPoint article Windows
 # RDP ») : le modèle a appelé `pptx_create` avec `slides` comme CHAÎNE contenant
 # du JSON (`"[{...}]"`) au lieu d'un tableau — rejeté par le validateur, IDENTIQUE
@@ -453,7 +503,7 @@ def compact_tool_result(
                 projection["files_omitted"] = len(entries) - len(projection["files"])
                 projection["files_projection_complete"] = False
                 break
-        return json.dumps(projection, ensure_ascii=False)
+        return _bounded_json_projection(projection, projection_budget)
     if tool_name == "pdf_read":
         max_chars = max(max_chars, 16_000)
     if tool_name == "computer_control" and isinstance(result, dict):
@@ -469,15 +519,12 @@ def compact_tool_result(
             return value
 
         projected = without_images(result)
-        serialized = json.dumps(projected, ensure_ascii=False)
-        if len(serialized) <= 16_000:
-            return serialized
-        return serialized[:16_000] + "…[observation visuelle réduite]"
+        return _bounded_json_projection(projected, 16_000)
     if len(serialized) <= max_chars:
         return serialized
     try:
         if not isinstance(result, dict):
-            return serialized[:max_chars] + "…[tronqué]"
+            return _bounded_json_projection(result, max_chars)
         compact: dict[str, Any] = {}
         for key, value in result.items():
             if key in _CRITICAL_RESULT_FIELDS:
@@ -492,6 +539,6 @@ def compact_tool_result(
                 compact[key] = value[:20] + [f"…+{len(value) - 20} éléments"]
             else:
                 compact[key] = value
-        return json.dumps(compact, ensure_ascii=False)
+        return _bounded_json_projection(compact, max_chars)
     except (TypeError, ValueError):
-        return serialized[:max_chars] + "…[tronqué]"
+        return _bounded_json_projection(str(result), max_chars)

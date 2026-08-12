@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import time
 from pathlib import Path
@@ -166,6 +167,13 @@ async def main() -> int:
     assert persisted[0][1]["tool_calls"][0]["toolCallId"] == "tool-call-1"
     assert persisted[1][1]["tool_results"][0]["result"]["production_ready"] is True
     assert persisted[1][1]["tool_results"][0]["evidence"]["record_hash"] == "b" * 64
+    projected_persistence = json.loads(persisted[1][0][2])
+    assert projected_persistence[0]["toolCallId"] == "tool-call-1"
+    assert projected_persistence[0]["result"] == "compact:True"
+    assert persisted[1][0][2] != json.dumps(
+        persisted[1][1]["tool_results"],
+        ensure_ascii=False,
+    )
 
     async def slow_dispatch(_request, *, validate, execute):
         await asyncio.sleep(5)
