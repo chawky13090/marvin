@@ -5,6 +5,23 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.632.0 — runner et oracle E7 apply v1.2 gelés
+
+Le runner historique reste immuable et n'est pas réutilisé : il supposait que le manifeste
+était sous l'arbre utilisateur. Le runner v1.2 injecte un `DATA_DIR` temporaire avant tout
+import produit, refuse le véritable magasin de Marvin, observe séparément l'arbre de fixture
+et le manifeste central v2, puis restaure les noms par l'oracle indépendant et sans outil
+public Marvin. Les chemins absolus et identifiants temporaires ne participent pas à
+l'équivalence intercycle.
+
+La politique conserve les trois verdicts mécaniques `R_CONFIRMED`,
+`R_INVALID_C_CANDIDATE` et `FAILED_LOCKED`; le runner constate mais ne modifie jamais la
+taxonomie. L'autorisation est bornée à cinq cycles, une invocation métier par cycle, aucun
+réseau, aucune donnée utilisateur et aucune écriture dans le `data/` réel. Runner, oracle,
+fixture, produit, test et pré-enregistrement central sont liés par SHA-256. Aucun cycle n'a
+été exécuté dans cette tranche. Rollback : réversion atomique du commit de gel, avant toute
+campagne; aucune donnée métier ou preuve de résultat n'a été créée.
+
 ## 2026-08-12 — v2.631.0 — rollbacks `bulk_rename` sortis des dossiers utilisateur
 
 Complément de gouvernance : TD-013 rend désormais la compatibilité `.marvin-rollback`

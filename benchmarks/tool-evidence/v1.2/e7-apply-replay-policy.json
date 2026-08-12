@@ -1,0 +1,52 @@
+{
+  "schema": "marvin.e7-apply-replay-policy/1.0",
+  "status": "frozen_before_replay",
+  "authorized_contract": "bulk_rename:apply",
+  "required_class": "R",
+  "cycles": 5,
+  "maximum_business_tool_invocations_per_cycle": 1,
+  "maximum_total_business_tool_invocations": 5,
+  "runner_may_reclassify_taxonomy": false,
+  "verdicts": ["R_CONFIRMED", "R_INVALID_C_CANDIDATE", "FAILED_LOCKED"],
+  "r_predicate": {
+    "business_outcome_reached": true,
+    "declared_relative_rename_delta_only": true,
+    "collateral_delta_count_in_user_tree": 0,
+    "central_manifest_schema_v2_and_applied": true,
+    "central_manifest_outside_user_tree": true,
+    "restored_snapshot_equals_own_preimage": true,
+    "acl_sddl_exact": true,
+    "all_five_normalized_cycles_identical": true
+  },
+  "c_candidate_predicate": {
+    "business_outcome_reached": true,
+    "declared_target_only": true,
+    "collateral_delta_count": 0,
+    "independent_compensation_completed": true,
+    "allowed_residual_fields": ["file_identity", "created_ns"],
+    "all_other_observed_fields_must_equal_preimage": true,
+    "any_added_acl_right_fails_locked": true,
+    "empty_residual_set_is_not_a_c_candidate": true
+  },
+  "isolation": {
+    "fresh_temporary_workspace_per_campaign": true,
+    "fresh_fixture_per_cycle": true,
+    "temporary_data_dir_injected_before_product_import": true,
+    "real_marvin_data_dir_forbidden": true,
+    "user_data_forbidden": true,
+    "network_access": false,
+    "independent_inverse_rename_recovery_required": true,
+    "bulk_rename_rollback_tool_forbidden": true
+  },
+  "verdict_actions": {
+    "R_CONFIRMED": "publish_R_evidence_without_taxonomy_change",
+    "R_INVALID_C_CANDIDATE": "preserve_raw_result_propose_distinct_taxonomy_supersession_and_refreeze_before_replay",
+    "FAILED_LOCKED": "keep_execution_locked_investigate_without_relaxing_policy"
+  },
+  "historical_result": {
+    "path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-result.json",
+    "sha256": "41ae2fb9230cef9f76ef633b6e669a42efea025e021cbcc54dbdfc1a61e5b757",
+    "must_remain_immutable": true
+  },
+  "rollback": "revert_freeze_commit_before_execution; no business data changed by policy freeze"
+}

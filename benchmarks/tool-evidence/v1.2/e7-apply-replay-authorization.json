@@ -1,0 +1,25 @@
+{
+  "schema": "marvin.e7-apply-replay-authorization/1.0",
+  "status": "frozen_and_authorized_before_replay",
+  "execution_authorized": true,
+  "result_artifact_authorized": true,
+  "authorized_contracts": ["bulk_rename:apply"],
+  "authorized_cycles": 5,
+  "maximum_business_tool_invocations_per_cycle": 1,
+  "maximum_total_business_tool_invocations": 5,
+  "taxonomy_mutation_authorized": false,
+  "real_marvin_data_dir_forbidden": true,
+  "host_user_tree_mutation_forbidden": true,
+  "policy_sha256": "b0a5d854aef891512920749be1da8c322f1320fd4d1c316a297e4175c22b47ec",
+  "frozen_hashes": {
+    "scripts/run_e7_apply_campaign_v12.py": "74648f80fc4b78d2dd3bea372b61975d8a926a25d8cb8fc9c1e741b7e9bfd3d4",
+    "scripts/e7_apply_oracle_v12.py": "5baba0a8e942468600b229cce467b8a02d66d367c8d20a984f91aba814b9eebf",
+    "scripts/e7_apply_fixture.py": "200a31b9feb4ab33ef87e5902c72f7d9d8fc2a44ce15646b7d83fc9d2e892ad7",
+    "scripts/test_e7_apply_replay_v12.py": "c9b85ebc614b5308d50dc8f7330c1ac35ed94c9503fdbb2f7897464ec6c71490",
+    "backend/tool_domains/filesystem.py": "e7a50da58c40636c9e294e50b39cd7ff7619213d2cd40838ca9791dd6ef4fb73",
+    "backend/bulk_rename_rollback_store.py": "cfbde17673572055996e62a8c8de04908a5cfc62b71cbd18b0f3ab1c0634b422",
+    "benchmarks/tool-evidence/v1.2/bulk-rename-central-store-preregistration.json": "00654f24f34c06f6d8f90050bfcdf0347b5f73e5e4992e24ac8517bcb15d8f69"
+  },
+  "authorization_expires_when": "result_artifact_exists_or_any_frozen_hash_changes",
+  "rollback": "revert_this_freeze_commit_before_execution; preserve after result publication"
+}

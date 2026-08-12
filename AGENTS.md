@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.631.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.632.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.631.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.632.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.631.0)
+## 9. État actuel (v2.632.0)
+
+**v2.632 (gel du rejeu E7 `bulk_rename:apply`)** : le runner v1.2 et son oracle
+indépendant sont distincts du produit. Le runner injecte un `DATA_DIR` temporaire avant tout
+import métier, vérifie séparément l'arbre renommé et le manifeste central v2, puis restaure
+par renommage inverse sans appeler un outil Marvin. Les cinq cycles, l'unique invocation par
+cycle, les trois verdicts mécaniques et l'interdiction de reclasser la taxonomie sont hashés
+avant exécution. Le résultat n'existe pas encore; toute divergence de source refuse la
+campagne. Rollback : réversion atomique du commit de gel avant exécution.
 
 **v2.631 (magasin central des rollbacks de renommage)** : `bulk_rename` ne dépose plus de
 métadonnées dans les dossiers de l'utilisateur. Les manifestes versionnés vivent sous
