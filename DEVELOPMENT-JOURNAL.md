@@ -5,6 +5,44 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.635.0 — registre de sécurité mesurable et source unique
+
+La demande est de rendre Marvin parfait et sécurisé sans reconduire des statuts historiques
+non démontrés. Le registre `SECURITY-DEBT-REGISTER.md` existait déjà; le défaut réel était son
+contrôle trop faible : la gate vérifiait seulement le fichier, quelques identifiants et un
+titre. Le commit distinct `185c26b` a donc pré-enregistré et gelé la politique de
+réévaluation avant toute modification du registre.
+
+Les 24 états historiques restent visibles. La mesure courante repart honnêtement à
+`VERIFIED=0`, `MITIGATED=3`, `UNKNOWN=21` : ce changement ne réduit pas la sécurité du produit,
+il rend seulement visible la part encore non attestée. Une promotion `VERIFIED` exige un
+commit Git existant, au moins un test nommé présent et un rollback non vide. Pour une entrée
+Critique ou Élevée, une preuve runtime existante est obligatoire; si une exécution sûre exige
+un environnement isolé encore indisponible, l'état reste `UNKNOWN`. TD-007 reprend le résumé
+calculé du registre au lieu de maintenir un second état manuel.
+
+Le nouveau contrôle refuse les identifiants non continus, doublons, statuts invalides,
+raisons absentes et promotions privées de commit, test, rollback ou preuve runtime. Des
+canaris positifs et négatifs exercent réellement ces refus. La politique, le parseur et son
+test sont désormais des fichiers obligatoires de l'architecture. Les critères de gate sont
+formulés par prédicats calculables; une condition non mesurable produit `UNKNOWN`.
+
+Sécurité et données : aucune commande de sécurité, aucun outil Marvin et aucune mutation de
+donnée persistante ne sont exécutés dans cette tranche. Le registre ne contient ni secret ni
+donnée personnelle. Journalisation : aucun flux runtime ni format de log n'est modifié; la
+preuve est portée par Git, les tests nommés et les artefacts versionnés, sans dupliquer de
+contenu sensible. Rollback : réversion atomique du commit v2.635; la politique gelée du commit
+`185c26b` reste un artefact historique inerte et peut être révertie séparément si nécessaire.
+
+Validation observée : compilation Python des deux nouveaux scripts, contrat du registre,
+architecture, consolidation frontière et test du runner principal réussis. La gate exhaustive
+passe en 794,8 secondes avec 295 étapes exécutées et 4 smokes live différés sur 299 attendues,
+zéro échec et build Next.js Turbopack réussi. Après redémarrage supervisé en 88,3 secondes,
+Marvin publie `ready` en v2.635.0 avec 364 outils; Ollama, SearXNG, Code Workspace et VM Lab
+sont prêts. Les smokes séquentiels passent : API 28/28, pages 41/41, cinq conversations
+persistées et voix strictement sérialisée (`max=1`). Un premier timeout de lecture sur
+`/api/learning` a été repris une fois puis a réussi, sans échec final.
+
 ## 2026-08-12 — v2.634.0 — `bulk_rename:apply` confirmé et appareil de preuve conservé
 
 Après le commit distinct `1d317a1` qui gelait runner, oracle, politique et autorisation, la

@@ -15,7 +15,7 @@ persistances, ses privilèges, son exposition réseau, ses secrets, ses logs et 
 
 ## Registre actif au 2026-08-02
 
-| ID | Sévérité | État | Périmètre | Constat et traitement obligatoire |
+| ID | Sévérité | État historique déclaré | Périmètre | Constat et traitement obligatoire |
 |---|---|---|---|---|
 | SEC-001 | Critique | MITIGATED | API FastAPI et Next.js | Les v2.465–2.466 imposent session HMAC, CSRF et capacités; v2.480–2.481 isolent les listeners locaux derrière Caddy. La v2.579 valide réellement le service Windows automatique sous `LocalService`, TCP/443, pare-feu Domaine/Privé, confiance par empreinte, journal borné, cycle arrêt/redémarrage et rollback désinstallation/réinstallation. Windows exige volontairement une confirmation système pour retirer une racine; le ciblage exact a été observé sans suppression acceptée. Les parcours de confiance/révocation Android, iOS, macOS et Linux restent à automatiser avant `VERIFIED`. |
 | SEC-002 | Élevée | VERIFIED | Identifiants globaux | Les secrets globaux historiques sont migrés de SQLite vers DPAPI utilisateur, relus avant nettoyage, masqués dans l'API et couverts par corruption, concurrence et rollback. La base logique contient zéro secret global historique après migration v2.401. |
@@ -41,6 +41,43 @@ persistances, ses privilèges, son exposition réseau, ses secrets, ses logs et 
 | SEC-022 | Moyenne | VERIFIED | Disponibilité LLM local et Hyper-V | La v2.433 supprime le préchauffage local en mode Cloud afin d'éviter l'épuisement RAM, sans désinstaller le repli confidentiel. Les runners Debian/Windows contrôlent la mémoire avant démarrage. Les smokes natifs prouvent checkpoints restaurés, secrets DPAPI, moindre privilège invité et politiques réseau sans modification de l'hôte. |
 | SEC-023 | Élevée | VERIFIED | Boucle de réparation Code Workspace | Les diagnostics, check-ups et validations rejoignent le registre de preuves expurgé de la Coding Mission. Les contenus observés et documentations restent balisés non fiables, les sources sont limitées aux transports/domaines officiels du Radar, un candidat refusé reste hors du worktree, et seule la Definition of Done déterministe autorise la livraison. |
 | SEC-024 | Élevée | MITIGATED | Sauvegarde globale | Les v2.461–2.463 couvrent bundle local DPAPI, restauration compensée et réplication vérifiée. La v2.584 ajoute un format portable AES-256-GCM/scrypt excluant explicitement les secrets DPAPI et démontre un aller-retour réel de 1 733 fichiers/618 281 759 octets. L'inventaire réel est fermé et distingue autorités, caches et état machine. Restent avant `VERIFIED` : copie puis restauration sur stockage physiquement distinct ou immuable, application contrôlée sur un second poste et intégration UX/installateur. |
+
+## Réévaluation machine au 2026-08-12
+
+Cette table ne réécrit pas l'historique. `UNKNOWN` signifie que l'état historique n'a pas
+encore satisfait le contrat de preuve v1, pas que la sécurité du produit a régressé. Une
+promotion à `VERIFIED` exige un commit et des tests existants, un rollback non vide et, pour
+les sévérités Critique ou Élevée, un artefact de preuve runtime existant. Une validation
+runtime dangereuse reste `UNKNOWN` jusqu'à son exécution dans un environnement isolé.
+
+| ID | État réévalué | Motif calculable | Commit | Tests nommés | Rollback | Preuve runtime |
+|---|---|---|---|---|---|---|
+| SEC-001 | MITIGATED | traitement_multi_plateforme_incomplet | — | — | — | — |
+| SEC-002 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-003 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-004 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-005 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-006 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-007 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-008 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-009 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-010 | MITIGATED | expiration_rollback_et_ux_incompletes | — | — | — | — |
+| SEC-011 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-012 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-013 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-014 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-015 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-016 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-017 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-018 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-019 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-020 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-021 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-022 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-023 | UNKNOWN | attestation_machine_v1_en_attente | — | — | — | — |
+| SEC-024 | MITIGATED | restauration_hors_machine_incomplete | — | — | — | — |
+
+Résumé dérivé : `SECURITY_REGISTER_SUMMARY: VERIFIED=0; MITIGATED=3; UNKNOWN=21; OPEN=0; ACCEPTED=0`.
 
 ## Critère de fermeture
 

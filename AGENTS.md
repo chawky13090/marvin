@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.634.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.635.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.634.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.635.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -210,10 +210,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
   identifiable, procédure de retour exacte et réversibilité vérifiée. Une réversion Git suffit
   uniquement si la tranche ne modifie ni schéma ni donnée persistante ; sinon fournir et tester
   une migration descendante ou une restauration contrôlée.
+- Prédicats de gate calculables : aucun critère de livraison ne doit dépendre d'un adjectif
+  d'appréciation ou d'un jugement après observation. Toute décision doit être calculable à
+  partir de valeurs observables, versionnées et reproductibles. Une condition non calculable
+  produit `UNKNOWN`, jamais un succès implicite.
 
 ---
 
-## 9. État actuel (v2.634.0)
+## 9. État actuel (v2.635.0)
+
+**v2.635 (registre de sécurité réévalué)** : les 24 entrées SEC conservent leur état
+historique déclaré, mais leur état courant est désormais recalculé depuis des preuves
+versionnées. Un statut `VERIFIED` exige un commit existant, des tests nommés présents et un
+rollback; les sévérités Critique et Élevée exigent aussi une preuve runtime existante. Toute
+preuve absente produit `UNKNOWN`. Le résumé de TD-007 est dérivé du registre et la gate refuse
+les identifiants discontinus, les statuts invalides et les promotions sans preuve. Cette
+tranche n'exécute aucune action de sécurité et ne modifie aucune donnée persistante.
+Rollback : réversion atomique du commit v2.635; la politique de mesure gelée reste un artefact
+historique sans effet runtime.
 
 **v2.634 (couverture E7 post-publication fermée)** : la gate conserve séparément la preuve
 du résultat et celle de l'appareil qui l'a produit. Le contrôle post-résultat recalcule les
