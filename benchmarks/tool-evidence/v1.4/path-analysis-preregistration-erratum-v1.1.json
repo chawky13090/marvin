@@ -1,0 +1,20 @@
+{
+  "schema": "marvin.e7-path-analysis-preregistration-erratum/1.1",
+  "status": "frozen_before_analyzer_execution",
+  "supersedes_only": "prospective_canaries.process_observation_is_not_process_mutation",
+  "original_policy_sha256": "e88f1aef968c34b13408629bbc5e723bf4cde95ffaa216ffb5d900bc5752fe30",
+  "finding": "The original process_observation canary calls os.path.exists and therefore cannot discriminate psutil observation from process mutation.",
+  "supplemental_source": "scripts/fixtures/e7_path_analysis_process_canary.py",
+  "required_behavior": {
+    "psutil.pid_exists": "OBSERVE",
+    "psutil.Process.create_time": "OBSERVE",
+    "psutil.Process.terminate": "EXECUTE"
+  },
+  "invariants": {
+    "original_policy_immutable": true,
+    "original_canary_immutable": true,
+    "supplement_added_before_analyzer_execution": true,
+    "business_tool_names_forbidden": true
+  },
+  "rollback": "Revert this erratum commit before analyzer execution; the original preregistration remains historical and unchanged."
+}
