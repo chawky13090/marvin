@@ -5,6 +5,43 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.640.0 — fin des répétitions après canonisation d'un outil requis
+
+Le test réel de la projection v2.639 a révélé un défaut distinct : une demande imposant
+`pc_process_list` exécutait correctement `windows_task` avec l'action `process.list`, mais
+`RunnerState` ne mémorisait que le nom canonique. Le matérialiseur déterministe considérait
+donc l'ancien nom toujours absent et réinjectait la même opération jusqu'au budget du tour.
+
+Le point unique de finalisation enregistre maintenant le nom réellement exécuté et, lorsqu'il
+existe, `canonicalized_from`. Cette règle vaut pour toutes les canonisations présentes et
+futures, sans alias codé pour le cas observé. Les échecs sont également marqués exécutés,
+comme les outils canoniques, afin de ne jamais transformer une panne en boucle de rejeu.
+
+Le premier rejeu live a révélé une seconde frontière : le dispatch comparait encore le nom
+canonique à la liste explicite contenant l'alias et refusait `windows_task` avant exécution.
+La correction finale ajoute le nom canonique aux listes explicites/requises uniquement lorsque
+`canonicalized_from` appartient déjà à cette liste. Elle ne donne donc accès à aucun outil
+supplémentaire hors de l'équivalence que le préparateur vient lui-même de compiler.
+
+Les tests ciblés vérifient la double satisfaction et l'absence de nouvelle injection d'un
+outil requis déjà canonisé. Sécurité et journalisation : aucune autorisation n'est élargie,
+aucun appel supplémentaire n'est créé, aucune donnée personnelle ou secrète n'est journalisée;
+la correction réduit au contraire la répétition d'actions sur le PC. Rollback : réversion
+atomique du commit v2.640 puis redémarrage backend; aucun schéma ni état persistant n'est modifié.
+
+Validation exhaustive avant redémarrage : arrêt gracieux en 12,7 secondes sans processus
+forcé et avec Ollama préservé, puis gate complète en 722,7 secondes avec 297 étapes réussies,
+4 smokes live explicitement ignorés et zéro échec sur 301 attendues. Le build Next.js 16.2.12,
+la compilation de 348 fichiers Python, les 364 outils, les 391 routes et tous les contrôles
+de sécurité, persistance, restauration et architecture restent verts.
+
+Validation live finale : une demande Cortex en mode exécution imposant `pc_process_list` a
+produit exactement un `tool_start` et un `tool_end` sur `windows_task/process.list`, avec
+`canonicalizedFrom=pc_process_list`, `success=true`, zéro blocage explicite, zéro événement
+`error` et une fin normale. La conversation temporaire a été supprimée (HTTP 200). Après ce
+rejeu, le code final a repassé la gate complète en 722,6 secondes : 297 réussites, 4 smokes
+live ignorés et zéro échec sur 301 étapes attendues.
+
 ## 2026-08-12 — v2.639.0 — reçu d'outil unique et projection persistée bornée
 
 La seconde tranche de TD-015 corrige la croissance future sans toucher aux 1 976 lignes

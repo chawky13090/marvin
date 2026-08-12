@@ -22,12 +22,14 @@ class Runner:
     def __init__(self) -> None:
         self.tool_count = 0
         self.blocking: list[tuple] = []
+        self.executed_tool_names: set[str] = set()
 
     def update_blocking_outcome(self, name, result) -> None:
         self.blocking.append((name, result))
 
     def record_tool(self, name, arguments, result, *, tooling_failure) -> bool:
         self.tool_count += 1
+        self.executed_tool_names.add(name)
         assert name == "ai_test_forge"
         assert arguments["conversation_id"] == "conv"
         assert tooling_failure is False
@@ -62,6 +64,8 @@ async def main() -> int:
 
     async def dispatch(request, *, validate, execute):
         assert request.name == "ai_test_forge"
+        assert request.explicit_names == {"legacy_test_forge", "ai_test_forge"}
+        assert request.required_names == {"legacy_test_forge", "ai_test_forge"}
         assert validate("ai_test_forge", request.arguments) is None
         return SimpleNamespace(
             result=await execute(request.name, request.arguments, None, None),
@@ -112,8 +116,8 @@ async def main() -> int:
             user_query="teste",
             active_model="cloud:model",
             permission_level=2,
-            explicit_tool_names=set(),
-            required_tool_names={"ai_test_forge"},
+            explicit_tool_names={"legacy_test_forge"},
+            required_tool_names={"legacy_test_forge"},
             command_text_only=False,
             read_signatures=read_signatures,
             runner_state=runner,
@@ -158,6 +162,7 @@ async def main() -> int:
     assert events[0]["canonicalizedFrom"] == "legacy_test_forge"
     assert read_signatures == {"forge:project"}
     assert runner.blocking[0][0] == "ai_test_forge"
+    assert runner.executed_tool_names == {"ai_test_forge", "legacy_test_forge"}
     assert long_chains == [("teste", 1)]
     assert len(observed) == 1
     assert observed[0].duration_ms == 125

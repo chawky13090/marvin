@@ -137,6 +137,16 @@ def main() -> int:
     )
     assert not satisfied.injected
 
+    canonicalized_alias_satisfied = inject_required_tool_calls(
+        required_names={"pc_process_list"},
+        executed_names={"windows_task", "pc_process_list"},
+        tool_calls=[],
+        step=9,
+        max_steps=10,
+        context=context,
+    )
+    assert not canonicalized_alias_satisfied.injected
+
     delivery_waits_for_forge = inject_required_tool_calls(
         required_names={"file_write"},
         executed_names=set(),

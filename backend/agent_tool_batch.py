@@ -19,6 +19,19 @@ import tool_activity
 _MAX_PARALLEL_TOOLS = 4
 
 
+def _authorized_canonical_names(
+    names: set[str],
+    *,
+    canonical_name: str,
+    canonicalized_from: str,
+) -> set[str]:
+    """Ajoute uniquement l'équivalent canonique d'un alias déjà autorisé."""
+    authorized = set(names)
+    if canonicalized_from and canonicalized_from in authorized:
+        authorized.add(canonical_name)
+    return authorized
+
+
 # v2.516 — Les outils Web rapportent du contenu public non fiable dans le contexte
 # du modèle. Research Swarm encapsulait déjà ses sources ; les outils Web directs
 # ne le faisaient pas. Ce rappel borné reprend le motif déjà appliqué aux
@@ -89,6 +102,7 @@ async def _finalize_call_result(
     *,
     tool_call_id: str,
     tool_name: str,
+    canonicalized_from: str,
     arguments: dict[str, Any],
     result: Any,
     duration_ms: int,
@@ -170,6 +184,13 @@ async def _finalize_call_result(
         result,
         tooling_failure=is_tooling_failure(result),
     )
+    # A required legacy/public alias is satisfied by the canonical tool that
+    # actually executed.  Without this second name the deterministic required
+    # tool injector sees the alias as missing forever and replays the same
+    # canonical action until the turn budget is exhausted.
+    executed_names = getattr(runner_state, "executed_tool_names", None)
+    if canonicalized_from and isinstance(executed_names, set):
+        executed_names.add(canonicalized_from)
     if long_chain_started:
         try:
             record_long_chain(user_query, runner_state.tool_count)
@@ -323,6 +344,9 @@ async def _execute_parallel_group(
 
             async def run_dispatch():
                 with tool_activity.bind(publish_progress):
+                    canonicalized_from = (
+                        getattr(prepared, "canonicalized_from", "") or ""
+                    )
                     return await dispatch_tool(
                         ToolDispatchRequest(
                             name=tool_name,
@@ -332,8 +356,16 @@ async def _execute_parallel_group(
                             permission_level=permission_level,
                             read_signature=prepared.read_signature,
                             seen_read_signatures=read_signatures,
-                            explicit_names=explicit_tool_names,
-                            required_names=required_tool_names,
+                            explicit_names=_authorized_canonical_names(
+                                explicit_tool_names,
+                                canonical_name=tool_name,
+                                canonicalized_from=canonicalized_from,
+                            ),
+                            required_names=_authorized_canonical_names(
+                                required_tool_names,
+                                canonical_name=tool_name,
+                                canonicalized_from=canonicalized_from,
+                            ),
                             command_text_only=command_text_only,
                         ),
                         validate=validate_tool_args,
@@ -438,6 +470,7 @@ async def _execute_parallel_group(
         async for _finalize_event in _finalize_call_result(
             tool_call_id=tool_call_id,
             tool_name=tool_name,
+            canonicalized_from=getattr(prepared, "canonicalized_from", "") or "",
             arguments=outcome["arguments"],
             result=outcome["result"],
             duration_ms=outcome["duration_ms"],
@@ -621,8 +654,16 @@ async def execute_tool_batch(
                         permission_level=permission_level,
                         read_signature=read_signature,
                         seen_read_signatures=read_signatures,
-                        explicit_names=explicit_tool_names,
-                        required_names=required_tool_names,
+                        explicit_names=_authorized_canonical_names(
+                            explicit_tool_names,
+                            canonical_name=tool_name,
+                            canonicalized_from=canonicalized_from,
+                        ),
+                        required_names=_authorized_canonical_names(
+                            required_tool_names,
+                            canonical_name=tool_name,
+                            canonicalized_from=canonicalized_from,
+                        ),
                         command_text_only=command_text_only,
                     ),
                     validate=validate_tool_args,
@@ -703,6 +744,7 @@ async def execute_tool_batch(
         async for _finalize_event in _finalize_call_result(
             tool_call_id=tool_call_id,
             tool_name=tool_name,
+            canonicalized_from=canonicalized_from or "",
             arguments=arguments,
             result=result,
             duration_ms=duration_ms,
