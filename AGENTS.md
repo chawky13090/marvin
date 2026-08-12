@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.635.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.636.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.635.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.636.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.635.0)
+## 9. État actuel (v2.636.0)
+
+**v2.636 (analyse des surfaces E7)** : une spécification, les règles de sinks et leurs
+extensions ont été gelées dans trois commits distincts avant l'implémentation. L'analyseur
+importe zéro module backend et n'exécute aucun outil : il parcourt les AST des seuls fichiers
+Python suivis par Git, résout alias, imports locaux, appels transitifs, dépendances injectées
+et enveloppes `asyncio.to_thread`. Les 22 contrats directs produisent 2 `CONFIRMED`, 7
+`UNDER_DECLARED` et 13 `UNKNOWN`. Le test connu `note_delete` retrouve génériquement SQLite
+et Qdrant. Ces résultats sont un inventaire de décision, pas une autorisation automatique de
+modifier les contrats; les branches dépendantes des paramètres exigent encore une analyse
+scénarisée ou runtime. Rollback : réversion atomique du commit v2.636; aucun runtime, contrat
+E7 ni donnée persistante modifié.
 
 **v2.635 (registre de sécurité réévalué)** : les 24 entrées SEC conservent leur état
 historique déclaré, mais leur état courant est désormais recalculé depuis des preuves

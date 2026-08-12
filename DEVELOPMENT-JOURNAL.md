@@ -5,6 +5,54 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.636.0 — inventaire statique des 22 surfaces E7
+
+La demande est d'éviter de découvrir contrat par contrat des magasins persistants oubliés.
+La spécification a été gelée avant l'implémentation dans `873a955`, les règles de surfaces et
+sinks dans `b3984fe`, leur frontière terminale dans `b8d8491`, puis `psutil` et
+`asyncio.to_thread` dans `9b41a6b`. Aucun de ces commits n'autorise une exécution d'outil,
+une modification de contrat ou une mutation persistante.
+
+L'analyseur v1.3 lit uniquement les AST des fichiers `backend/**/*.py` suivis par Git. Il
+n'importe pas le backend, ne touche pas Qdrant/SQLite et n'appelle aucun outil Marvin. Il
+résout les alias du registre, imports de module et de fonction, imports locaux, helpers
+transitifs, dépendances configurées au runtime et appels encapsulés. Une cible dynamique,
+injectée ou non résolue produit `UNKNOWN`; elle n'est jamais assimilée à une absence d'effet.
+Les sinks gelés couvrent SQLite, Qdrant, fichiers, registre, réseau, audit, processus,
+services et fournisseurs externes.
+
+Les canaris donnent `CONFIRMED` pour SQLite seul et pour une fonction pure, puis `UNKNOWN`
+pour un dispatch par souscription. Le cas d'acceptation connu retrouve sans cas particulier
+`note_delete → productivity.note_delete → _delete_note_index → vector_store.delete_document` :
+SQLite et Qdrant sont confirmés face au seul `database_scope`, donc `UNDER_DECLARED`.
+L'inventaire complet, immuable et lié par empreintes obtient 2 `CONFIRMED`, 7
+`UNDER_DECLARED` et 13 `UNKNOWN` sur 22 contrats. Les contrats v1.1 restent identiques.
+
+Limite explicite : l'analyse est conservative et non sensible à toutes les valeurs de payload.
+Une branche de mutation atteignable n'établit pas encore qu'elle est prise par le scénario
+gelé `preview/status`; aucune supersession automatique n'est donc autorisée. TD-014 suit la
+résolution par scénario avant la prochaine modification groupée des contrats.
+
+Validation réelle : tests ciblés de pré-enregistrement, analyseur et résultat verts;
+architecture `2.636.0`, 364 outils, 391 routes; gate exhaustif vert avec 296 étapes
+exécutées et 4 smokes live ignorés sur 300 attendues; compilation de 348 fichiers Python,
+build Next.js 16.2.12 et baseline frontend 37/37 sans nouvelle exception. Après redémarrage,
+les smokes live obtiennent API 28/28, pages 41/41 et voix sérialisée. Le premier smoke
+chat a déclenché le repli sur une conversation historique de 38 876 507 octets dont la lecture
+FastAPI froide a pris 54,4 s; le rejeu isolé passe ensuite sur 5/5 conversations sans erreur.
+Ce fait de performance n'est ni causé ni masqué par l'analyseur.
+
+Le superviseur de redémarrage a correctement refusé l'état `ready` après 126,8 s : le
+backend, Code Workspace, VM Lab, Ollama, SearXNG et HTTPS répondent, mais les préconditions
+VM restent indisponibles avec environ 3,2 Gio de RAM libre pour 4 Gio requis et 15,6 Gio de
+disque libre pour 112,7 Gio combinés. Aucun seuil n'a été abaissé et aucune VM lancée.
+
+Sécurité : analyse en lecture seule, sources limitées à Git, aucune donnée utilisateur,
+secret, réseau ou sous-processus métier. Journalisation : aucun flux runtime modifié; le
+rapport versionné contient chemins de code, empreintes et limites, pas de valeurs métier.
+Rollback : réversion atomique du commit v2.636; les quatre commits de pré-enregistrement
+restent des preuves historiques inertes et peuvent être révertis séparément avant réanalyse.
+
 ## 2026-08-12 — v2.635.0 — registre de sécurité mesurable et source unique
 
 La demande est de rendre Marvin parfait et sécurisé sans reconduire des statuts historiques
