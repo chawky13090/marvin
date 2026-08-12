@@ -31,6 +31,11 @@ rétention, confidentialité 17/17, inventaire JSONL 16/16, sauvegarde globale, 
 runner exhaustif et parcours réel `apply → rollback` sans création de `.marvin-rollback`.
 La gate exhaustive finale passe 292 étapes, en diffère 4 live sur 296 attendues, zéro échec
 en 733,9 secondes; le build Next.js 16.2.12 Turbopack passe avec Marvin arrêté.
+Après redémarrage, `/api/health` publie `ok` en v2.631.0 et le frontend répond HTTP 200.
+Les smokes live ont ensuite été rejoués strictement en séquence : contrats API 28/28,
+pages 41/41, cinq conversations persistées correctement rendues et voix navigateur
+strictement sérialisée (`max=1`). Code Workspace et VM Lab répondent également; les deux
+VM de validation restent volontairement arrêtées avec leurs checkpoints disponibles.
 
 ## 2026-08-12 — v2.630.0 — `bulk_rename:apply` exécuté cinq fois, verrou maintenu
 
