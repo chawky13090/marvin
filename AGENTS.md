@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.640.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.641.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.640.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.641.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.640.0)
+## 9. État actuel (v2.641.0)
+
+**v2.641 (borne persistée absolue)** : la couche de persistance vérifie elle-même la borne de
+20 000 caractères, indépendamment de `compact_tool_result`. Si un compacteur régressif renvoie
+encore un résultat volumineux, `content` reçoit un marqueur calculable renvoyant vers le reçu
+complet inchangé dans `tool_results`; un second dépassement échoue fermé. Un test injecte un
+résultat de 1 Mio et vérifie la borne, les marqueurs et l'identité du reçu. Rollback : réversion
+atomique du commit v2.641 puis redémarrage backend; aucune donnée existante n'est modifiée.
 
 **v2.640 (alias canonisés sans répétition)** : lorsqu'un ancien nom d'outil public ou requis
 est converti vers son opérateur canonique, l'état du tour enregistre désormais les deux noms.

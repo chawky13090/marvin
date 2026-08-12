@@ -180,6 +180,68 @@ async def main() -> int:
         ensure_ascii=False,
     )
 
+    large_persisted: list[tuple] = []
+    large_result = {"success": True, "payload": "X" * 1_048_576}
+
+    async def dispatch_large(request, *, validate, execute):
+        return SimpleNamespace(result=large_result, arguments=request.arguments)
+
+    large_events = [
+        event
+        async for event in execute_tool_batch(
+            tool_calls=[{"function": {"name": "calculator", "arguments": {}}}],
+            assistant_content="Je teste une sortie volumineuse.",
+            ollama_messages=[],
+            conversation_id="large-conv",
+            request_id="large-request",
+            user_query="test volumineux",
+            active_model="cloud:model",
+            permission_level=2,
+            explicit_tool_names=set(),
+            required_tool_names=set(),
+            command_text_only=False,
+            read_signatures=set(),
+            runner_state=SimpleNamespace(
+                tool_count=0,
+                executed_tool_names=set(),
+                update_blocking_outcome=lambda *_args: None,
+                record_tool=lambda *_args, **_kwargs: False,
+            ),
+            dangerous_tools=set(),
+            prepare_tool_call=lambda name, arguments: SimpleNamespace(
+                name=name,
+                arguments=dict(arguments),
+                read_signature="",
+                canonicalized_from="",
+            ),
+            inject_internal_context=lambda _name, arguments, _conversation_id: arguments,
+            dispatch_tool=dispatch_large,
+            validate_tool_args=lambda *_args: None,
+            execute_registered_tool=execute,
+            postprocess_tool_result=lambda **kwargs: asyncio.sleep(0, result=kwargs["result"]),
+            critique_action=lambda *_args, **_kwargs: None,
+            scan_document=lambda *_args, **_kwargs: [],
+            record_tool_observation=observe,
+            record_long_chain=lambda *_args: None,
+            is_tooling_failure=lambda _result: False,
+            # Simule une régression du compacteur : la borne de persistance doit
+            # rester absolue même si la couche précédente renvoie 1 Mio.
+            compact_tool_result=lambda _result, **_kwargs: json.dumps(large_result),
+            create_message=lambda *args, **kwargs: large_persisted.append((args, kwargs)),
+            clock=time.monotonic,
+        )
+    ]
+    assert large_events[-1]["result"]["payload"] == large_result["payload"]
+    large_tool_message = large_persisted[-1]
+    large_content = large_tool_message[0][2]
+    large_receipt = large_tool_message[1]["tool_results"][0]["result"]
+    assert len(large_content) <= 20_000
+    assert large_receipt == large_result
+    large_projection = json.loads(large_content)[0]
+    assert large_projection["evidence"]["projection_truncated"] is True
+    assert large_projection["result"]["_marvin_projection"]["truncated"] is True
+    assert large_projection["result"]["_marvin_projection"]["full_result_in_tool_results"] is True
+
     async def slow_dispatch(_request, *, validate, execute):
         await asyncio.sleep(5)
         raise AssertionError("L'outil lent aurait dû être annulé.")

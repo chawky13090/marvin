@@ -5,6 +5,29 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.641.0 — borne finale de persistance éprouvée à 1 Mio
+
+La revue croisée a identifié l'absence d'un test direct sur la branche protégeant les résultats
+d'outils volumineux. L'inspection a révélé un défaut plus précis : si `compact_tool_result`
+régressait et renvoyait lui-même une chaîne supérieure à 20 000 caractères, la persistance ne
+remplaçait que la preuve et conservait encore le résultat surdimensionné dans `content`.
+
+La persistance remplace désormais aussi ce résultat par un marqueur `_marvin_projection`
+calculable (`truncated`, motif, taille projetée originale et localisation du reçu complet),
+puis vérifie une seconde fois la borne et échoue fermé si elle reste dépassée. Le reçu complet
+et sa preuve restent inchangés dans `tool_results`.
+
+Le test injecte un résultat fictif de 1 048 576 caractères et simule volontairement un
+compacteur défaillant. Il vérifie `len(content) <= 20_000`, les marqueurs de troncature et
+l'égalité exacte du reçu autoritatif avec l'entrée de 1 Mio. Aucun contenu utilisateur réel,
+schéma, permission, secret, route ou dépendance n'est modifié. Aucun nouveau contenu n'est
+journalisé. Rollback : réversion atomique du commit v2.641 puis redémarrage backend.
+
+Validation exhaustive observée après arrêt gracieux : gate complète en 804,9 secondes avec
+297 étapes réussies, 4 smokes live explicitement ignorés et zéro échec sur 301 attendues. Le
+build Next.js 16.2.12, la compilation des 348 fichiers Python, les 364 outils, les 391 routes,
+les contrôles de sécurité, de persistance et de restauration restent verts.
+
 ## 2026-08-12 — v2.640.0 — fin des répétitions après canonisation d'un outil requis
 
 Le test réel de la projection v2.639 a révélé un défaut distinct : une demande imposant

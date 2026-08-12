@@ -218,11 +218,21 @@ async def _finalize_call_result(
     }
     projected_content = json.dumps([projected_persisted_result], ensure_ascii=False)
     if len(projected_content) > 20_000:
+        projected_persisted_result["result"] = {
+            "_marvin_projection": {
+                "truncated": True,
+                "reason": "persisted_content_limit",
+                "original_projected_chars": len(projected_result_text),
+                "full_result_in_tool_results": True,
+            }
+        }
         projected_persisted_result["evidence"] = {
             "projection_truncated": True,
             "full_evidence_in_tool_results": True,
         }
         projected_content = json.dumps([projected_persisted_result], ensure_ascii=False)
+    if len(projected_content) > 20_000:
+        raise RuntimeError("La projection persistée dépasse encore sa borne stricte.")
     create_message(
         conversation_id,
         "tool",
