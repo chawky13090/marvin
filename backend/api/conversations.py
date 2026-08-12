@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 import database as db
@@ -40,8 +41,12 @@ async def search_conversations_endpoint(q: str, limit: int = 50):
     return db.search_conversations(q, limit)
 
 
-@router.get("/api/conversations/{cid}")
-async def get_conversation(cid: str):
+def _build_conversation_response(cid: str) -> JSONResponse:
+    """Lit et sérialise une conversation hors de la boucle d'événements.
+
+    ``JSONResponse`` encode immédiatement son contenu en octets. Cette fonction doit donc
+    rester synchrone et être appelée par ``asyncio.to_thread`` depuis la route FastAPI.
+    """
     conv = db.get_conversation(cid)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation introuvable")
@@ -119,7 +124,12 @@ async def get_conversation(cid: str):
                 if state and invocation.get("state") == "call":
                     invocation.update(state)
 
-    return {"conversation": conv, "messages": formatted}
+    return JSONResponse(content={"conversation": conv, "messages": formatted})
+
+
+@router.get("/api/conversations/{cid}")
+async def get_conversation(cid: str):
+    return await asyncio.to_thread(_build_conversation_response, cid)
 
 
 @router.post("/api/conversations/{cid}/exports")

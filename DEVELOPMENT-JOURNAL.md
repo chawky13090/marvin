@@ -5,6 +5,51 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.638.0 — isolation complète des lectures de conversation lourdes
+
+TD-015 a été réévaluée depuis la base SQLite ouverte en lecture seule. La conversation la
+plus lourde contient 43 104 049 caractères dans `content`; 1 976 messages de rôle `tool`
+portent une copie strictement identique dans `content` et `tool_results`, pour 152 540 711
+caractères dupliqués. Le navigateur renvoie également l'historique complet à `/api/chat`,
+dont la validation est bornée à 32 Mio. Cette tranche ne modifie encore ni ce format ni les
+données historiques : elle isole d'abord la contamination de la boucle FastAPI.
+
+`backend/api/conversations.py` construit maintenant la réponse complète dans
+`asyncio.to_thread`. La lecture SQLite, la reconstruction des appels d'outils et l'encodage
+immédiat par `JSONResponse` sont tous effectués dans le thread de travail; la route retourne
+un corps déjà sérialisé. Le contrat JSON existant, la fusion des résultats d'outils et le
+HTTP 404 restent inchangés.
+
+Le test de non-régression ralentit volontairement la lecture simulée et maintient en parallèle
+un heartbeat asyncio. Il vérifie que la boucle continue de progresser, que les accès base et
+la construction de `JSONResponse` n'utilisent pas le thread principal, que le résultat d'outil
+reste rattaché à son appel et qu'une conversation absente produit toujours 404. Les tests
+ciblés observés sont verts : compilation Python, routes non bloquantes, repository des
+conversations, erreurs API expurgées et architecture 364 outils/391 routes. Une première gate
+a exécuté toutes les étapes mais a refusé le build parce que le frontend Turbopack était actif;
+ce refus protecteur n'a pas été masqué. Après arrêt gracieux de Marvin, sans processus forcé et
+avec Ollama préservé, le build Next.js 16.2.12 passe puis la gate exhaustive publie 297 étapes
+réussies, 4 smokes live ignorés et zéro échec sur 301 attendues en 674,8 secondes.
+
+Sécurité : aucun corps, titre, identifiant de conversation ou résultat d'outil n'est ajouté
+aux journaux. Le middleware HTTP existant conserve seulement route normalisée, statut,
+durée et identifiant de corrélation, avec rotation et rétention déjà définies; aucun nouvel
+événement n'est nécessaire pour ce changement d'ordonnancement. Aucune permission, donnée,
+configuration, dépendance ou surface réseau ne change.
+
+TD-015 reste ouverte. Les prochaines tranches rendront `tool_results` autoritatif, borneront
+strictement `content`, reconstruiront l'historique côté serveur et publieront une erreur
+explicite pour toute limite restante avant une migration SQLite hors ligne sauvegardée.
+Rollback : réversion atomique du commit v2.638 puis redémarrage backend; aucune migration
+descendante n'est nécessaire puisque cette tranche n'écrit aucune donnée.
+
+Validation live post-commit : Marvin redémarre en v2.638.0 avec 364 outils, Ollama, SearXNG
+et VM Lab disponibles; le superviseur reste honnêtement `initializing` après 194 secondes
+pour Code Workspace uniquement. La conversation réelle la plus lourde retourne 38 876 507
+octets en 1 599,44 ms. Pendant sa lecture, six sondes `/api/health` répondent toutes 200,
+avec 37,18 ms au p95 et 368,08 ms au maximum. Les smokes séquentiels obtiennent ensuite API
+28/28, pages 41/41, chat 5/5 — conversation lourde comprise — et voix strictement sérialisée.
+
 ## 2026-08-12 — v2.637.0 — analyse E7 v1.4 sensible aux chemins
 
 La demande est de poursuivre l'inventaire des effets E7 sans ajuster l'analyseur aux trois
