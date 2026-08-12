@@ -1,0 +1,163 @@
+{
+  "schema": "marvin.e7-apply-replay-result/1.0",
+  "generated_at": "2026-08-12T07:42:52.893550+00:00",
+  "contract": "bulk_rename:apply",
+  "source_commit": "1d317a148b3c594d2129ffd06f084c6bec36c713",
+  "policy_sha256": "b0a5d854aef891512920749be1da8c322f1320fd4d1c316a297e4175c22b47ec",
+  "authorization_sha256": "0a530a98b2a0459ffe05fcc1303e190f2ae8e5840c582c53ba5a558b7cc385c2",
+  "final_verdict": "R_CONFIRMED",
+  "runner_reclassified_taxonomy": false,
+  "cycles_required": 5,
+  "cycles_completed": 5,
+  "normalized_cycles_identical": true,
+  "business_tools_invoked": [
+    {
+      "tool": "bulk_rename",
+      "action": "apply",
+      "count": 5
+    }
+  ],
+  "fixture_contains_user_data": false,
+  "real_marvin_data_dir_used": false,
+  "persistent_host_paths_used": false,
+  "cycles": [
+    {
+      "cycle": 1,
+      "verdict": "R_CONFIRMED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": true,
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "identity_preserved_during_apply": true,
+      "central_manifest_verified": true,
+      "exact_identity_restored": true,
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "independent_recovery_error": null,
+      "preimage_sha256": "7b34a749ec1afd8eac8000433c7f4c6b62adf34b0f0d4257b2580cbb5caa8151",
+      "post_apply_sha256": "e797ca4bc5bbf41e722d456a087c40e2894fd5f932d5d9bad4dc13bfd30ba754",
+      "restored_sha256": "7b34a749ec1afd8eac8000433c7f4c6b62adf34b0f0d4257b2580cbb5caa8151"
+    },
+    {
+      "cycle": 2,
+      "verdict": "R_CONFIRMED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": true,
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "identity_preserved_during_apply": true,
+      "central_manifest_verified": true,
+      "exact_identity_restored": true,
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "independent_recovery_error": null,
+      "preimage_sha256": "9339032327b6b52b76e4553cfa1f214564042e35829de6c884436e59e1174a57",
+      "post_apply_sha256": "9480b76a7ad05016f9ed301e8ce86441e4c8593a7b82423cb5467d5275bbd2a7",
+      "restored_sha256": "9339032327b6b52b76e4553cfa1f214564042e35829de6c884436e59e1174a57"
+    },
+    {
+      "cycle": 3,
+      "verdict": "R_CONFIRMED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": true,
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "identity_preserved_during_apply": true,
+      "central_manifest_verified": true,
+      "exact_identity_restored": true,
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "independent_recovery_error": null,
+      "preimage_sha256": "a606c10f721fe7fcb841caf4fa502a64f561a44b9118ca1ed14da69a91cfa9a4",
+      "post_apply_sha256": "01cfb6aad6fae10493150a1224746e5134f8734bb94f0c405488c843572d1edd",
+      "restored_sha256": "a606c10f721fe7fcb841caf4fa502a64f561a44b9118ca1ed14da69a91cfa9a4"
+    },
+    {
+      "cycle": 4,
+      "verdict": "R_CONFIRMED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": true,
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "identity_preserved_during_apply": true,
+      "central_manifest_verified": true,
+      "exact_identity_restored": true,
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "independent_recovery_error": null,
+      "preimage_sha256": "87953b7c986ee8061e1fd11f59d388b7fda9e4555227f02fe53280837eb3992e",
+      "post_apply_sha256": "6731222feb279f5cee8abc31bf42d81fcef7ea9f372f3677190531c27d382efe",
+      "restored_sha256": "87953b7c986ee8061e1fd11f59d388b7fda9e4555227f02fe53280837eb3992e"
+    },
+    {
+      "cycle": 5,
+      "verdict": "R_CONFIRMED",
+      "business_tool_invocations": 1,
+      "tool_success": true,
+      "declared_delta_valid": true,
+      "relative_observed_delta": {
+        "removed": [
+          "old-alpha.txt",
+          "old-beta.txt"
+        ],
+        "added": [
+          "new-alpha.txt",
+          "new-beta.txt"
+        ],
+        "changed": []
+      },
+      "identity_preserved_during_apply": true,
+      "central_manifest_verified": true,
+      "exact_identity_restored": true,
+      "acl_added_rights": {},
+      "residual_fields": [],
+      "independent_recovery_error": null,
+      "preimage_sha256": "c10c6366cc1cb3bef3f4f6b91a984cdcd142aa5ac8f28aef60e2ea35eb236465",
+      "post_apply_sha256": "826db81cd77f4a3171e743600da8b04ed5664c220d7814a17e6642bd26e40695",
+      "restored_sha256": "c10c6366cc1cb3bef3f4f6b91a984cdcd142aa5ac8f28aef60e2ea35eb236465"
+    }
+  ],
+  "next_action": "publish_R_evidence_without_taxonomy_change",
+  "rollback": "delete_this_result_artifact; all isolated fixtures and manifests were independently removed",
+  "content_sha256": "1b0197a53921e58360bca8a8a071b1eca6ce9eb7752ac0a8c97eb66cb2cd5d57"
+}

@@ -5,6 +5,31 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.633.0 — `bulk_rename:apply` confirmé en classe R
+
+Après le commit distinct `1d317a1` qui gelait runner, oracle, politique et autorisation, la
+campagne v1.2 a exécuté exactement cinq cycles. Chaque cycle utilise une fixture neuve, une
+seule invocation `bulk_rename:apply` et un magasin `data/rollback/bulk-rename` entièrement
+temporaire injecté avant l'import du produit. Le véritable `data/` de Marvin n'est jamais lu
+ou écrit et aucun réseau n'est utilisé.
+
+Les cinq cycles atteignent `R_CONFIRMED`. Le delta observé contient uniquement les deux
+renommages déclarés; le manifeste central est en schéma v2 et statut `applied`; l'identité
+des fichiers est préservée pendant l'application. La restauration indépendante retrouve pour
+chaque cycle sa propre pré-image exacte : contenu, identité NTFS, timestamps et ACL, sans
+droit ajouté ni perte résiduelle. Les verdicts normalisés sont identiques et le runner n'a
+pas modifié la taxonomie. TD-012 est fermée. La preuve brute est conservée sous
+`benchmarks/tool-evidence/v1.2/e7-apply-replay-result.json` avec SHA-256
+`cc0861024baaf4902a8a422ec4322ed1f73eee29f549e8eb5bbe98cb8734fb53`.
+Rollback : préserver la preuve; réversion atomique du commit de publication pour les seuls
+tests et documents, aucune donnée métier à restaurer.
+
+Validation finale observée : gate exhaustive 293 étapes exécutées, 4 smokes live différés
+sur 297 attendues, zéro échec en 730,5 secondes et build Next.js Turbopack réussi. Après
+redémarrage, Marvin publie `ok` en v2.633.0, Code Workspace répond avec six projets et le
+frontend répond HTTP 200. Les smokes live séquentiels passent ensuite : API 28/28, pages
+41/41, cinq conversations persistées et voix strictement sérialisée (`max=1`).
+
 ## 2026-08-12 — v2.632.0 — runner et oracle E7 apply v1.2 gelés
 
 Le runner historique reste immuable et n'est pas réutilisé : il supposait que le manifeste
