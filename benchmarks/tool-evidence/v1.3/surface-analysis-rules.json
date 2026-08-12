@@ -41,6 +41,7 @@
   },
   "invariants": {
     "rules_are_data_not_python_special_cases": true,
+    "matched_sink_is_a_terminal_semantic_boundary": true,
     "known_truth_special_case_forbidden_in_rules": true,
     "under_declared_precedes_unknown_when_confirmed_extra_effect_exists": true,
     "over_declared_requires_proven_absence": true
