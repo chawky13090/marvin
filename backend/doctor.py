@@ -377,6 +377,22 @@ async def run_diagnostics() -> dict:
         add("mcp", "Serveur MCP", "info", f"Non vérifié : {str(e)[:80]}")
 
     # ── Score ──────────────────────────────────────────────────────────────────
+    try:
+        import bulk_rename_rollback_store as rollback_store
+        rollback_state = rollback_store.status()
+        if rollback_state["alerts"]:
+            add(
+                "bulk_rename_abandoned",
+                "Rollbacks de renommage",
+                "warning",
+                f"{len(rollback_state['alerts'])} renommage(s) interrompu(s) disposent encore d'un rollback.",
+                details={"alerts": rollback_state["alerts"]},
+            )
+        else:
+            add("bulk_rename_abandoned", "Rollbacks de renommage", "ok", "Aucun renommage interrompu en attente.")
+    except Exception as exc:
+        add("bulk_rename_abandoned", "Rollbacks de renommage", "error", f"État des rollbacks indisponible : {type(exc).__name__}.")
+
     score = 100
     for c in checks:
         score -= {"error": 10, "warning": 3, "info": 1}.get(c["level"], 0)

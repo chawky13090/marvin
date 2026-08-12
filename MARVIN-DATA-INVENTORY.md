@@ -20,6 +20,14 @@ Le manifeste exécutable vit dans `backend/full_backup.py`. Tout nouveau fichier
 de premier niveau sous `data/` doit être ajouté explicitement à une classe; sinon la création
 du bundle échoue. Les fichiers `.lock`, `.tmp` et `.partial` ne sont jamais archivés.
 
+## Rollbacks de renommage centralisés
+
+Les manifestes `data/rollback/bulk-rename/*.json` contiennent les chemins et noms nécessaires
+à une restauration. Ils sont inclus dans la sauvegarde chiffrée globale. Un manifeste clos
+est retenu 30 jours; un manifeste interrompu est retenu au moins 90 jours et n'est supprimé
+qu'après acquittement de son alerte. La migration historique ne consulte que la racine
+explicitement fournie; aucun disque ni profil utilisateur n'est balayé.
+
 ## Format et garanties
 
 - archive ZIP interne uniquement après copie en staging bornée ;

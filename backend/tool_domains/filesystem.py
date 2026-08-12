@@ -1100,19 +1100,12 @@ def _validate_filename(name: str) -> str:
 
 
 def _load_rename_manifest(raw_path: str) -> tuple[Path, dict[str, Any], Path]:
-    manifest_path = Path(_resolve(raw_path)).resolve()
-    if not manifest_path.is_file() or manifest_path.suffix.lower() != ".json":
-        raise ValueError(f"Manifeste de rollback introuvable : {manifest_path}")
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if payload.get("version") != 1 or payload.get("tool") != "bulk_rename":
-        raise ValueError("Manifeste bulk_rename invalide ou incompatible.")
-    root = Path(str(payload.get("root") or "")).resolve()
-    expected_parent = (root / ".marvin-rollback").resolve()
-    if manifest_path.parent != expected_parent:
-        raise ValueError("Le manifeste doit appartenir au dossier .marvin-rollback de la cible.")
-    operations = payload.get("operations")
-    if not root.is_dir() or not isinstance(operations, list) or not operations:
-        raise ValueError("Le manifeste ne contient aucune opération valide.")
+    import bulk_rename_rollback_store as rollback_store
+
+    manifest_path, payload, root = rollback_store.load(raw_path)
+    operations = payload["operations"]
+    if not root.is_dir():
+        raise ValueError("La racine du manifeste n'existe plus.")
     for operation in operations:
         if not isinstance(operation, dict):
             raise ValueError("Opération de rollback invalide.")
@@ -1180,17 +1173,19 @@ def _apply_bulk_rename(
     manifest_path: Path,
     manifest: dict[str, Any],
 ) -> None:
-    _atomic_json(manifest_path, manifest)
+    import bulk_rename_rollback_store as rollback_store
+
+    rollback_store.set_status(manifest_path, manifest, "applying")
     staged: list[dict[str, str]] = []
     try:
         for operation in operations:
             (root / operation["old"]).rename(root / operation["temporary"])
             staged.append(operation)
+            rollback_store.heartbeat(manifest_path, manifest)
         for operation in operations:
             (root / operation["temporary"]).rename(root / operation["new"])
-        manifest["status"] = "applied"
-        manifest["applied_at"] = time.time()
-        _atomic_json(manifest_path, manifest)
+            rollback_store.heartbeat(manifest_path, manifest)
+        rollback_store.set_status(manifest_path, manifest, "applied", applied_at=time.time())
     except OSError:
         try:
             _restore_rename_operations(root, operations)
@@ -1198,8 +1193,7 @@ def _apply_bulk_rename(
         except OSError as rollback_error:
             manifest["status"] = "recovery_required"
             manifest["recovery_error"] = str(rollback_error)
-        manifest["failed_at"] = time.time()
-        _atomic_json(manifest_path, manifest)
+        rollback_store.set_status(manifest_path, manifest, str(manifest["status"]), failed_at=time.time())
         raise
 
 
@@ -1228,9 +1222,8 @@ async def bulk_rename(args: dict[str, Any]) -> dict[str, Any]:
             await asyncio.to_thread(
                 _restore_rename_operations, root, manifest["operations"]
             )
-            manifest["status"] = "rolled_back"
-            manifest["rolled_back_at"] = time.time()
-            await asyncio.to_thread(_atomic_json, manifest_path, manifest)
+            import bulk_rename_rollback_store as rollback_store
+            await asyncio.to_thread(rollback_store.set_status, manifest_path, manifest, "rolled_back", rolled_back_at=time.time())
             return {
                 "success": True,
                 "folder": str(root),
@@ -1238,7 +1231,7 @@ async def bulk_rename(args: dict[str, Any]) -> dict[str, Any]:
                 "rollback_manifest": str(manifest_path),
                 "rollback_available": False,
             }
-        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (OSError, RuntimeError, TypeError, ValueError, json.JSONDecodeError) as exc:
             return {"error": str(exc), "rollback_manifest": rollback_manifest}
 
     folder = str(args.get("folder") or "").strip()
@@ -1329,15 +1322,9 @@ async def bulk_rename(args: dict[str, Any]) -> dict[str, Any]:
                 "preview_truncated": len(preview) > 10,
             }
 
-        manifest_path = root / ".marvin-rollback" / f"bulk-rename-{run_id}.json"
-        manifest = {
-            "version": 1,
-            "tool": "bulk_rename",
-            "status": "planned",
-            "created_at": time.time(),
-            "root": str(root),
-            "operations": operations,
-        }
+        import bulk_rename_rollback_store as rollback_store
+        migrated_legacy = await asyncio.to_thread(rollback_store.migrate_legacy_for_root, root)
+        manifest_path, manifest = await asyncio.to_thread(rollback_store.create, root, operations, run_id)
         await asyncio.to_thread(
             _apply_bulk_rename, root, operations, manifest_path, manifest
         )
@@ -1350,9 +1337,12 @@ async def bulk_rename(args: dict[str, Any]) -> dict[str, Any]:
             "files_truncated": len(preview) > 50,
             "rollback_available": True,
             "rollback_manifest": str(manifest_path),
+            "legacy_manifests_migrated": len(migrated_legacy),
+            "rollback_retention_days": 30,
         }
     except (
         OSError,
+        RuntimeError,
         TypeError,
         ValueError,
         safe_regex.error,

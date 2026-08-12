@@ -58,6 +58,7 @@ AUTHORITATIVE_DIRECTORIES = frozenset({
     "generated_docs",
     "engineering_radar",
     "logos",
+    "rollback",
     "maintenance",
     "screenshots",
     "skills",

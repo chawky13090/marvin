@@ -26,7 +26,9 @@ def main() -> int:
     assert actual == expected, {"missing": sorted(expected - actual), "extra": sorted(actual - expected)}
     assert len(actual) == len(privacy_inventory.STREAMS) == 16
     allowed_classes = {"indirect_identifier", "free_text", "public_reference", "technical_metadata"}
-    for stream in privacy_inventory.STREAMS:
+    assert len(privacy_inventory.PERSONAL_STATE_STREAMS) == 1
+    assert privacy_inventory.PERSONAL_STATE_STREAMS[0].file_pattern == "rollback/bulk-rename/*.json"
+    for stream in privacy_inventory.STREAMS + privacy_inventory.PERSONAL_STATE_STREAMS:
         assert stream.data_class in allowed_classes
         assert stream.export_strategy
         assert stream.erasure_strategy
@@ -35,9 +37,9 @@ def main() -> int:
         if stream.erasure_strategy == "rechain_required":
             assert stream.subject_selectors
     public = privacy_inventory.public_inventory()
-    assert len(public) == 16
+    assert len(public) == 17
     assert all("records" not in row and "values" not in row for row in public)
-    print("Privacy inventory OK - 16/16 flux classifiés, sélecteurs et stratégie explicites.")
+    print("Privacy inventory OK - 17/17 flux classifiés, sélecteurs et stratégie explicites.")
     return 0
 
 

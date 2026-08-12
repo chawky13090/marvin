@@ -35,7 +35,11 @@ STREAMS: tuple[PrivacyStream, ...] = (
     PrivacyStream("backend/truth_ledger.py", "truth_ledger.jsonl", "free_text", ("claims[].claim", "claims[].sources"), ("id", "conversation_id", "claims[].id"), "exact_selector", "rechain_required"),
 )
 
+PERSONAL_STATE_STREAMS: tuple[PrivacyStream, ...] = (
+    PrivacyStream("backend/bulk_rename_rollback_store.py", "rollback/bulk-rename/*.json", "free_text", ("root", "operations[].old", "operations[].new", "legacy.source_path"), ("run_id", "root_fingerprint"), "encrypted_full_backup_or_exact_manifest", "retention_or_confirmed_rollback"),
+)
+
 
 def public_inventory() -> list[dict[str, object]]:
     """Expose uniquement la classification, jamais les enregistrements métier."""
-    return [asdict(stream) for stream in STREAMS]
+    return [asdict(stream) for stream in STREAMS + PERSONAL_STATE_STREAMS]

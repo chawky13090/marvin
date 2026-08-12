@@ -5,6 +5,33 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.631.0 — rollbacks `bulk_rename` sortis des dossiers utilisateur
+
+Le défaut révélé par la campagne E7 est corrigé sans modifier sa preuve : le résultat v1.1
+`FAILED_LOCKED` reste immuable. Les manifestes v2 vivent sous `data/rollback/bulk-rename`,
+jamais sous la racine renommée. Ils portent révision optimiste, PID et heure de création du
+propriétaire, bail et heartbeat rafraîchi dans les boucles. Les écritures sont atomiques et
+sérialisées par verrou interprocessus. Un propriétaire disparu ou un bail expiré devient
+`abandoned`.
+
+Les opérations closes sont retenues 30 jours. Une interruption est retenue 90 jours, remonte
+dans Doctor avec rappels J-30/J-7/J-1 et n'est jamais supprimée sans acquittement; la rétention
+peut être prolongée jusqu'à 365 jours. Les anciens manifestes v1 sont migrés uniquement depuis
+une racine explicitement fournie. Aucun balayage global n'existe. La migration conserve les
+octets originaux afin que `rollback-migration` restaure exactement le fichier pendant 30 jours.
+
+Le magasin est classé comme donnée personnelle et inclus dans le bundle chiffré global. Un
+pré-enregistrement E7 v1.2 lie les nouvelles sources et interdit tout rejeu. La prochaine étape
+est le gel séparé du nouveau runner et de son oracle. Rollback code : réversion atomique du
+commit v2.631. Rollback données : `scripts/manage-bulk-rename-rollbacks.py rollback-migration
+--manifest <chemin>` dans la fenêtre déclarée.
+
+Validations ciblées observées : compilation Python, magasin central/lease/CAS/migration/
+rétention, confidentialité 17/17, inventaire JSONL 16/16, sauvegarde globale, architecture,
+runner exhaustif et parcours réel `apply → rollback` sans création de `.marvin-rollback`.
+La gate exhaustive finale passe 292 étapes, en diffère 4 live sur 296 attendues, zéro échec
+en 733,9 secondes; le build Next.js 16.2.12 Turbopack passe avec Marvin arrêté.
+
 ## 2026-08-12 — v2.630.0 — `bulk_rename:apply` exécuté cinq fois, verrou maintenu
 
 Après le commit séparé du runner gelé, l'unique campagne autorisée a exécuté cinq cycles dans

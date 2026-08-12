@@ -1,0 +1,31 @@
+{
+  "schema": "marvin.e7-bulk-rename-central-store/1.0",
+  "status": "preregistered_execution_locked",
+  "created_at": "2026-08-12T00:00:00Z",
+  "supersedes_measurement_contract": "benchmarks/tool-evidence/v1.1/e7-apply-execution-policy.json",
+  "reason": "The immutable v1.1 result discovered rollback metadata inside the observed user tree. Product storage changed independently of the oracle.",
+  "historical_result_preserved": {"path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-result.json", "sha256": "41ae2fb9230cef9f76ef633b6e669a42efea025e021cbcc54dbdfc1a61e5b757", "verdict": "FAILED_LOCKED"},
+  "historical_assessment_preserved": {"path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-assessment.json", "sha256": "edf1abf85afefed6ee28c94a3c32d97f427184218d771308c6cdcef6304ddaee"},
+  "historical_preview_preserved": {"policy_path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-policy-v1.1.json", "policy_sha256": "2b9acb19a13e159daec2e31d9f5c34b4ba8f56a378170ec0dcd1740ecaf05568", "result_path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-result.json", "result_sha256": "d20f0188821b78dfb32f23277513ce80f15d64414bece13d392d5eab78bcb297"},
+  "previous_governed_source_sha256": "fe2225fc8ab2a0619a84c814b034d2944572ccc004c20638212aa39ffede4180",
+  "current_governed_sources": {
+    "backend/tool_domains/filesystem.py": "e7a50da58c40636c9e294e50b39cd7ff7619213d2cd40838ca9791dd6ef4fb73",
+    "backend/bulk_rename_rollback_store.py": "cfbde17673572055996e62a8c8de04908a5cfc62b71cbd18b0f3ab1c0634b422",
+    "scripts/test_bulk_rename_rollback_store.py": "d37bc88a7c3e993454f86cd1180a00fc9829c258131ad23fdb76710a37d6223f"
+  },
+  "product_invariants": {
+    "rollback_metadata_outside_user_tree": true,
+    "legacy_migration_requires_explicit_root": true,
+    "global_disk_scan_forbidden": true,
+    "active_requires_matching_pid_start_time_and_fresh_heartbeat": true,
+    "abandoned_retention_days": 90,
+    "completed_retention_days": 30,
+    "unacknowledged_abandoned_deletion_forbidden": true,
+    "privacy_inventory_and_encrypted_backup_required": true
+  },
+  "tool_execution_authorized": false,
+  "campaign_replay_authorized": false,
+  "taxonomy_mutation_authorized": false,
+  "next_phase": "freeze_new_runner_and_oracle_hashes_before_any_replay",
+  "rollback": "revert product commit; restore legacy manifests with manage-bulk-rename-rollbacks.py during the 30-day compatibility window"
+}

@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 295
+EXPECTED_STAGE_COUNT = 296
 
 
 @dataclass(frozen=True)
@@ -189,9 +189,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Inventaire E0-E7 des outils", (python, "scripts/test_tool_evidence_inventory.py")),
         Stage("Pré-inscription de la campagne B", (python, "scripts/test_tool_evidence_campaign_b.py")),
         Stage("Gel de la taxonomie E7 R/C/I/N/P", (python, "scripts/test_e7_taxonomy_freeze.py")),
-        Stage("Preregistration E7 apply reversible", (python, "scripts/test_e7_apply_fixture_preregistration.py")),
-        Stage("Runner E7 apply gelé et borné", (python, "scripts/test_e7_apply_campaign_contract.py")),
+        Stage("Preregistration E7 apply reversible supersédée", (python, "scripts/test_e7_bulk_rename_central_store_preregistration.py")),
+        Stage("Runner E7 apply historique préservé", (python, "scripts/test_e7_bulk_rename_central_store_preregistration.py")),
         Stage("Résultat E7 apply immuable et verrouillé", (python, "scripts/test_e7_apply_execution_result.py")),
+        Stage("Stockage central des rollbacks bulk rename", (python, "scripts/test_bulk_rename_rollback_store.py")),
         Stage("Gel des strates E7 et du harnais H7", (python, "scripts/test_h7_fixture_strategy.py")),
         Stage("Gel des 22 contrats de fixtures E7", (python, "scripts/test_direct_fixture_contracts.py")),
         Stage("Harnais isolé des six fixtures E7", (python, "scripts/test_e7_fixture_harness.py")),
@@ -200,7 +201,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Qualification des environnements pilotes E7", (python, "scripts/test_e7_environment_qualification.py")),
         Stage("Routes de lecture bloquantes externalisées", (python, "scripts/test_nonblocking_read_routes.py")),
         Stage("Isolation des ressources temporaires des smokes", (python, "scripts/test_smoke_resource_isolation.py")),
-        Stage("Pré-inscription du pilote E7 sans mutation", (python, "scripts/test_e7_preview_campaign_contract.py")),
+        Stage("Pilote E7 preview historique préservé", (python, "scripts/test_e7_bulk_rename_central_store_preregistration.py")),
         Stage("Extraction privée des demandes réelles", (python, "scripts/test_real_usage_corpus.py")),
         Stage("Inventaire des données personnelles", (python, "scripts/test_privacy_inventory.py")),
         Stage("Export chiffré des données personnelles", (python, "scripts/test_privacy_rights.py")),

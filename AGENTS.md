@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.630.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.631.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.630.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.631.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -213,7 +213,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.630.0)
+## 9. État actuel (v2.631.0)
+
+**v2.631 (magasin central des rollbacks de renommage)** : `bulk_rename` ne dépose plus de
+métadonnées dans les dossiers de l'utilisateur. Les manifestes versionnés vivent sous
+`data/rollback/bulk-rename`, sont inclus dans la sauvegarde chiffrée et dans l'inventaire de
+confidentialité. Un bail associe PID, heure de création du processus et heartbeat rafraîchi
+pendant les boucles. Un propriétaire mort ou un bail expiré produit un état `abandoned`,
+conservé 90 jours et visible dans Doctor; aucune suppression n'a lieu avant acquittement.
+La migration v1 est uniquement opportuniste sur une racine explicitement fournie, réversible
+à l'octet pendant 30 jours et n'effectue aucun balayage global. L'ancien résultat E7 v1.1
+reste immuable; le pré-enregistrement v1.2 interdit tout rejeu avant un nouveau gel du runner.
 
 **v2.630 (premier résultat E7-R apply)** : les cinq invocations isolées de
 `bulk_rename:apply` réussissent et la restauration indépendante retrouve exactement chaque
