@@ -1,0 +1,97 @@
+{
+  "schema": "marvin.e7-surface-analysis-preregistration/1.0",
+  "status": "designed_frozen_analysis_not_run",
+  "created_at": "2026-08-12",
+  "source_commit": "22b46c26d756b21bea3a3fd51c2b14b9cf9ddd1e",
+  "scope": {
+    "contracts": 22,
+    "source": "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json",
+    "product_files": "backend/**/*.py",
+    "tool_execution_authorized": false,
+    "contract_mutation_authorized": false,
+    "persistent_data_mutation_authorized": false
+  },
+  "analysis_contract": {
+    "resolve_registry_aliases": true,
+    "resolve_import_aliases": true,
+    "resolve_transitive_calls": true,
+    "resolve_function_local_imports": true,
+    "maximum_call_depth": 32,
+    "cycles_are_reported": true,
+    "dynamic_or_unresolved_effectful_calls_produce_unknown": true,
+    "unknown_never_means_absent": true,
+    "no_business_tool_execution": true,
+    "no_import_of_backend_runtime": true
+  },
+  "effect_kinds": [
+    "sqlite",
+    "qdrant",
+    "filesystem",
+    "registry",
+    "network",
+    "audit_log",
+    "process",
+    "service",
+    "external_provider",
+    "unknown"
+  ],
+  "result_states": [
+    "CONFIRMED",
+    "UNDER_DECLARED",
+    "OVER_DECLARED",
+    "UNKNOWN"
+  ],
+  "comparison_rules": {
+    "confirmed": "all_observed_effect_kinds_are_declared_and_no_effectful_path_is_unknown",
+    "under_declared": "at_least_one_confirmed_effect_kind_is_not_covered_by_the_declared_surface",
+    "over_declared": "declared_surface_contains_a_kind_proven_absent_and_no_unknown_path_can_reach_it",
+    "unknown": "at_least_one_reachable_effectful_path_cannot_be_resolved_safely"
+  },
+  "canaries": {
+    "positive": {
+      "fixture": "static_fixture_sqlite_only",
+      "expected_state": "CONFIRMED",
+      "expected_effects": ["sqlite"]
+    },
+    "negative": {
+      "fixture": "static_fixture_pure_function",
+      "expected_state": "CONFIRMED",
+      "expected_effects": []
+    },
+    "ambiguous": {
+      "fixture": "static_fixture_dynamic_dispatch",
+      "expected_state": "UNKNOWN",
+      "expected_effects": ["unknown"]
+    }
+  },
+  "known_truth_acceptance": {
+    "tool": "note_delete",
+    "action": "__default__",
+    "declared_surface": "database_scope",
+    "expected_state": "UNDER_DECLARED",
+    "expected_confirmed_effects": ["sqlite", "qdrant"],
+    "required_path_fragments": [
+      "backend/tools.py:execute_note_delete",
+      "backend/tool_domains/productivity.py:note_delete",
+      "backend/tool_domains/productivity.py:_delete_note_index",
+      "backend/vector_store.py:delete_document"
+    ],
+    "special_case_in_analyzer_forbidden": true
+  },
+  "publication": {
+    "inventory_path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+    "all_22_contracts_required": true,
+    "per_contract_paths_required": true,
+    "unresolved_paths_required": true,
+    "source_hashes_required": true,
+    "contracts_must_remain_byte_identical_until_publication": true
+  },
+  "frozen_source_sha256": {
+    "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+    "backend/tools.py": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+    "backend/tool_domains/productivity.py": "76c48e01fff1552fef1af52cf6e8f02359841346334a752bcc3e557cf4f01881",
+    "backend/database.py": "d7d6ce3fafe7fbbf9007dd7bf137c02d89d841fb28badfa467be7351a0e5a600",
+    "backend/vector_store.py": "34700052676e75b9d53f206f80c627e99f17405ebb8d262d892bff578a6b64b0"
+  },
+  "rollback": "Revert the preregistration commit before analysis; no runtime or persistent data is changed."
+}
