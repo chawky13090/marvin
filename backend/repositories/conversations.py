@@ -229,6 +229,39 @@ class ConversationRepository:
             ).fetchall()
         return [self._parse_message(row_to_dict(row)) for row in rows]
 
+    def get_message(self, message_id: str) -> dict | None:
+        with self._connection_scope() as connection:
+            row = connection.execute(
+                "SELECT rowid AS _message_rowid, * FROM messages WHERE id = ?",
+                (message_id,),
+            ).fetchone()
+        return self._parse_message(row_to_dict(row))
+
+    def get_messages_page(
+        self,
+        conversation_id: str,
+        *,
+        before_rowid: int | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        safe_limit = max(1, min(int(limit), 1_000))
+        with self._connection_scope() as connection:
+            if before_rowid is None:
+                rows = connection.execute(
+                    """SELECT rowid AS _message_rowid, * FROM messages
+                       WHERE conversation_id = ?
+                       ORDER BY rowid DESC LIMIT ?""",
+                    (conversation_id, safe_limit),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """SELECT rowid AS _message_rowid, * FROM messages
+                       WHERE conversation_id = ? AND rowid < ?
+                       ORDER BY rowid DESC LIMIT ?""",
+                    (conversation_id, int(before_rowid), safe_limit),
+                ).fetchall()
+        return [self._parse_message(row_to_dict(row)) for row in reversed(rows)]
+
     def get_recent_user_messages(self, limit: int = 120) -> list[str]:
         with self._connection_scope() as connection:
             rows = connection.execute(
@@ -274,4 +307,6 @@ update_conversation_project = repository.update_conversation_project
 delete_conversation = repository.delete_conversation
 create_message = repository.create_message
 get_messages_by_conversation = repository.get_messages_by_conversation
+get_messages_page = repository.get_messages_page
+get_message = repository.get_message
 get_recent_user_messages = repository.get_recent_user_messages

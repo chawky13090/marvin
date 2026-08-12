@@ -18617,3 +18617,13 @@ refusé et qu'un enfant déclaré refuse encore `backend.tools`. Le test a aussi
 Windows où les arguments d'audit arrivent en chaîne : elle est normalisée contre la commande
 exacte gelée. Aucun processus factice, winget, VM, outil Marvin ou effet métier n'est exécuté.
 Rollback : réversion atomique du commit v2.617; aucune donnée persistante à restaurer.
+## 2026-08-13 — v2.642.0 — historique serveur autoritatif sans purge
+
+La conversation existante n'est plus retransmise par le navigateur à chaque tour. SQLite
+redevient l'autorité; le backend fusionne le message courant avec un historique globalement
+borné et publie les omissions dans le flux SSE. L'ouverture utilise une page pondérée et
+projette les reçus volumineux; une route de détail masquée refuse toute liaison croisée entre
+conversations. Les données historiques, le corpus Forge et les preuves E6 restent inchangés.
+Tests ciblés : compilation Python, test de projection 1 Mio, liaison négative du détail,
+runner exhaustif et ESLint. Sécurité : aucune écriture nouvelle, aucun reçu journalisé,
+masquage identique aux exports. Rollback : réversion atomique du commit v2.642 et redémarrage.

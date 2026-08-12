@@ -12,7 +12,8 @@ from pydantic import BaseModel
 
 import database as db
 import chat_turn_runtime
-from conversation_exports import ConversationExportError, export_conversation
+from conversation_exports import ConversationExportError, export_conversation, _redact
+from conversation_history import ui_page
 from storage_layout import roots
 
 
@@ -41,7 +42,7 @@ async def search_conversations_endpoint(q: str, limit: int = 50):
     return db.search_conversations(q, limit)
 
 
-def _build_conversation_response(cid: str) -> JSONResponse:
+def _build_conversation_response(cid: str, before_rowid: int | None = None) -> JSONResponse:
     """Lit et sérialise une conversation hors de la boucle d'événements.
 
     ``JSONResponse`` encode immédiatement son contenu en octets. Cette fonction doit donc
@@ -50,7 +51,9 @@ def _build_conversation_response(cid: str) -> JSONResponse:
     conv = db.get_conversation(cid)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation introuvable")
-    messages_raw = db.get_messages_by_conversation(cid)
+    raw_page = db.get_messages_page(cid, before_rowid=before_rowid, limit=120)
+    page = ui_page(raw_page)
+    messages_raw = page["messages"]
 
     formatted = []
     for msg in messages_raw:
@@ -72,6 +75,11 @@ def _build_conversation_response(cid: str) -> JSONResponse:
                                     invocation["state"] = "result"
                                     invocation["result"] = result.get("result")
                                     invocation["evidence"] = result.get("evidence")
+                                    if result.get("detail_message_id"):
+                                        invocation["detailRef"] = {
+                                            "messageId": result["detail_message_id"],
+                                            "toolCallId": result.get("toolCallId"),
+                                        }
                             for part in last_asst.get("parts", []):
                                 if (
                                     part.get("type") == "tool-invocation"
@@ -81,6 +89,11 @@ def _build_conversation_response(cid: str) -> JSONResponse:
                                     part["toolInvocation"]["state"] = "result"
                                     part["toolInvocation"]["result"] = result.get("result")
                                     part["toolInvocation"]["evidence"] = result.get("evidence")
+                                    if result.get("detail_message_id"):
+                                        part["toolInvocation"]["detailRef"] = {
+                                            "messageId": result["detail_message_id"],
+                                            "toolCallId": result.get("toolCallId"),
+                                        }
                 except Exception:
                     pass
             continue
@@ -130,12 +143,34 @@ def _build_conversation_response(cid: str) -> JSONResponse:
                 if state and invocation.get("state") == "call":
                     invocation.update(state)
 
-    return JSONResponse(content={"conversation": conv, "messages": formatted})
+    oldest = min((int(m.get("_message_rowid") or 0) for m in raw_page), default=0)
+    return JSONResponse(content={
+        "conversation": conv,
+        "messages": formatted,
+        "page": {
+            "beforeRowid": oldest or None,
+            "hasMore": bool(oldest and page["omitted_messages"] > 0),
+            "usedBytes": page["used_bytes"],
+            "omittedMessages": page["omitted_messages"],
+        },
+    })
 
 
 @router.get("/api/conversations/{cid}")
-async def get_conversation(cid: str):
-    return await asyncio.to_thread(_build_conversation_response, cid)
+async def get_conversation(cid: str, before_rowid: int | None = None):
+    return await asyncio.to_thread(_build_conversation_response, cid, before_rowid)
+
+
+@router.get("/api/conversations/{cid}/messages/{message_id}/tool-results/{tool_call_id}")
+async def get_tool_result_detail(cid: str, message_id: str, tool_call_id: str):
+    """Retourne un reçu masqué, strictement lié à sa conversation et son appel."""
+    message = await asyncio.to_thread(db.get_message, message_id)
+    if not message or message.get("conversation_id") != cid or message.get("role") != "tool":
+        raise HTTPException(status_code=404, detail="Résultat d'outil introuvable")
+    for receipt in message.get("tool_results") or []:
+        if isinstance(receipt, dict) and str(receipt.get("toolCallId") or "") == tool_call_id:
+            return {"result": _redact(receipt.get("result")), "evidence": _redact(receipt.get("evidence"))}
+    raise HTTPException(status_code=404, detail="Résultat d'outil introuvable")
 
 
 @router.post("/api/conversations/{cid}/exports")

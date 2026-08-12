@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, model_validator
 import chat_turn_runtime
 import database as db
 import agent_autonomy
+from conversation_history import model_history
 import forge_runtime_lock
 from action_replay import IdempotencyMismatchError
 import tool_gateway
@@ -181,10 +182,36 @@ async def chat(request: ChatRequest):
                 status_code=409,
                 detail="Cette action approuvée a déjà été poursuivie ou ne correspond pas à la conversation.",
             )
+
+    agent_messages = request.messages
+    history_metadata = {
+        "source": "client_new_conversation",
+        "selected_messages": len(agent_messages),
+        "omitted_messages": 0,
+        "truncation_visible": False,
+    }
+    if request.conversationId and not request.benchmarkEphemeral:
+        stored = await __import__("asyncio").to_thread(
+            db.get_messages_by_conversation, request.conversationId, 1_000
+        )
+        incoming = request.messages
+        if internal_continuation and stored and incoming:
+            last_stored = stored[-1]
+            last_incoming = incoming[-1]
+            if (
+                last_stored.get("role") == last_incoming.get("role") == "user"
+                and str(last_stored.get("content") or "")
+                == str(last_incoming.get("content") or "")
+            ):
+                incoming = []
+        agent_messages, history_metadata = model_history(stored, incoming)
+
+    history_event = {"type": "history_context", **history_metadata}
     if not request.requestId:
 
         async def event_stream():
             try:
+                yield f"data: {json.dumps(history_event, ensure_ascii=False)}\n\n"
                 if benchmark_conversation_id:
                     event = {
                         "type": "conv_id",
@@ -193,7 +220,7 @@ async def chat(request: ChatRequest):
                     }
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                 async for chunk in run_agent(
-                    request.messages,
+                    agent_messages,
                     benchmark_conversation_id or request.conversationId,
                     request.model,
                     request.cortex,
@@ -221,15 +248,19 @@ async def chat(request: ChatRequest):
         )
 
         def producer():
-            return run_agent(
-                request.messages,
-                request.conversationId,
-                request.model,
-                request.cortex,
-                request_id=request.requestId,
-                internal_continuation=internal_continuation,
-                benchmark_ephemeral=request.benchmarkEphemeral,
-            )
+            async def stream():
+                yield f"data: {json.dumps(history_event, ensure_ascii=False)}\n\n"
+                async for item in run_agent(
+                    agent_messages,
+                    request.conversationId,
+                    request.model,
+                    request.cortex,
+                    request_id=request.requestId,
+                    internal_continuation=internal_continuation,
+                    benchmark_ephemeral=request.benchmarkEphemeral,
+                ):
+                    yield item
+            return stream()
 
         async def event_stream():
             try:

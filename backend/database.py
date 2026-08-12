@@ -36,6 +36,8 @@ from repositories.conversations import (
     delete_conversation,
     get_conversation,
     get_messages_by_conversation,
+    get_messages_page,
+    get_message,
     get_recent_user_messages,
     list_conversations,
     search_conversations,

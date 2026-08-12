@@ -161,9 +161,13 @@ export function ChatProvider({ children }) {
 
     try {
       const allMessages = [...messagesRef.current, userMsg];
+      // Une conversation existante est reconstruite depuis SQLite par le backend.
+      // Le navigateur n'envoie que le delta courant : les longues sessions ne sont
+      // plus limitées par la taille du payload HTTP et SQLite reste autoritaire.
+      const outboundMessages = conversationIdRef.current ? [userMsg] : allMessages;
 
       const requestPayload = {
-          messages: allMessages.map(m => {
+          messages: outboundMessages.map(m => {
             const msgText = extractText(m);
             let content;
             if (m.role === 'user' && m.images && m.images.length > 0) {

@@ -12,7 +12,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req, { params }) {
   try {
     const { id } = await params;
-    const r = await fetchBackendRead(`${BACKEND}/api/conversations/${id}`);
+    const query = new URL(req.url).searchParams;
+    const before = query.get('before_rowid');
+    const suffix = before && /^\d+$/.test(before) ? `?before_rowid=${before}` : '';
+    const r = await fetchBackendRead(`${BACKEND}/api/conversations/${id}${suffix}`);
     if (r.status === 404) {
       return NextResponse.json({ error: 'Conversation non trouvée' }, { status: 404 });
     }

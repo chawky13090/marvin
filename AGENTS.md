@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.641.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.642.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.641.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.642.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.641.0)
+## 9. État actuel (v2.642.0)
+
+**v2.642 (historique serveur autoritatif)** : pour une conversation existante, le navigateur
+n'envoie plus que le message courant. Le backend recharge SQLite, applique un budget cumulatif
+de 512 Kio en conservant le tour courant et signale toute omission par l'événement SSE
+`history_context`. L'ouverture projette les reçus d'outils lourds sous un budget de 768 Kio;
+le détail complet reste intact en base et n'est servi, après masquage, que si conversation,
+message et appel correspondent. Aucun schéma ni contenu historique n'est modifié. Rollback :
+réversion atomique du commit v2.642 puis redémarrage frontend/backend.
 
 **v2.641 (borne persistée absolue)** : la couche de persistance vérifie elle-même la borne de
 20 000 caractères, indépendamment de `compact_tool_result`. Si un compacteur régressif renvoie

@@ -110,8 +110,8 @@ def main() -> int:
                 patch.object(conversations_api.db, "get_conversation", side_effect=get_conversation),
                 patch.object(
                     conversations_api.db,
-                    "get_messages_by_conversation",
-                    side_effect=get_messages,
+                    "get_messages_page",
+                    side_effect=lambda cid, **_kwargs: get_messages(cid),
                 ),
                 patch.object(
                     conversations_api.chat_turn_runtime,
@@ -157,7 +157,7 @@ def main() -> int:
             ),
             patch.object(
                 conversations_api.db,
-                "get_messages_by_conversation",
+                "get_messages_page",
                 return_value=legacy_messages,
             ),
             patch.object(

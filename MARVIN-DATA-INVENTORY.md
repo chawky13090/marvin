@@ -40,6 +40,11 @@ explicitement fournie; aucun disque ni profil utilisateur n'est balayé.
   publication du point de récupération ;
 - trois bundles globaux locaux conservés par défaut.
 
+La consultation d'une conversation projette les résultats d'outils volumineux. Le reçu
+complet reste dans SQLite et n'est accessible qu'à travers une route liée à l'identifiant de
+conversation, de message et d'appel; la réponse réutilise le masquage des exports. Cette route
+ne crée aucun nouveau stockage et ne journalise pas le reçu.
+
 Le bundle est protégé au repos mais lié au compte Windows courant. Il ne constitue pas encore
 une copie hors machine ou immuable. Une exportation portable devra utiliser une clé dérivée
 d'une phrase secrète, un KDF standard audité et une procédure de récupération distincte.
