@@ -1,0 +1,58 @@
+{
+  "schema": "marvin.security-register-reverification-policy/1.0",
+  "status": "frozen_before_reverification_implementation",
+  "source_of_truth": "SECURITY-DEBT-REGISTER.md",
+  "scope": {
+    "first_id": "SEC-001",
+    "last_id": "SEC-024",
+    "expected_entries": 24
+  },
+  "historical_preservation": {
+    "historical_status_is_immutable": true,
+    "reverified_status_is_separate": true,
+    "downgrade_never_rewrites_history": true,
+    "downgrade_is_measurement_correction_not_security_regression": true
+  },
+  "allowed_statuses": [
+    "OPEN",
+    "MITIGATED",
+    "VERIFIED",
+    "ACCEPTED",
+    "UNKNOWN"
+  ],
+  "verified_predicate": {
+    "all_severities_require": [
+      "existing_git_commit",
+      "existing_named_tests",
+      "nonempty_rollback_reference"
+    ],
+    "critical_or_high_additionally_require": [
+      "existing_runtime_evidence_artifact"
+    ],
+    "missing_required_evidence_yields": "UNKNOWN",
+    "unsafe_runtime_validation_yields": "UNKNOWN_until_isolated_environment_exists"
+  },
+  "gate_predicates": {
+    "ids_are_unique": true,
+    "ids_are_contiguous": true,
+    "states_are_enumerated": true,
+    "no_subjective_gate_predicate": true,
+    "td_007_summary_is_derived": true,
+    "promotion_without_evidence_is_denied": true,
+    "negative_canary_missing_commit_is_denied": true,
+    "negative_canary_missing_test_is_denied": true,
+    "negative_canary_missing_rollback_is_denied": true,
+    "negative_canary_missing_required_runtime_evidence_is_denied": true,
+    "positive_canary_complete_entry_is_accepted": true
+  },
+  "e7_reuse": {
+    "windows_vm": "Marvin-Windows11-TestForge",
+    "clean_checkpoint": "Marvin-Clean",
+    "fixture_harness_may_be_reused": true,
+    "host_dangerous_execution_forbidden": true,
+    "e7_result_never_implies_security_verification": true
+  },
+  "execution_authorized": false,
+  "persistent_data_mutation_authorized": false,
+  "rollback": "revert this policy commit; no runtime execution and no persistent data mutation occurred"
+}
