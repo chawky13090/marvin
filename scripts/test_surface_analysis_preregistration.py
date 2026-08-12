@@ -44,7 +44,8 @@ def main() -> int:
     assert rules["unknown_rules"]["dynamic_import"] is True
     assert rules["unknown_rules"]["unresolved_project_call"] is True
     assert "note_delete" not in RULES.read_text(encoding="utf-8")
-    assert len(rules["sink_rules"]) >= 10
+    assert len(rules["sink_rules"]) >= 11
+    assert rules["transparent_call_wrappers"] == ["asyncio.to_thread"]
     assert rules["invariants"]["matched_sink_is_a_terminal_semantic_boundary"] is True
     print("E7 Surface Analysis Preregistration OK - 22 contracts, execution locked")
     return 0

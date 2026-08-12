@@ -20,6 +20,7 @@
     {"effect": "registry", "module_prefixes": ["winreg"], "call_patterns": ["*"]},
     {"effect": "network", "module_prefixes": ["requests", "httpx", "aiohttp", "urllib", "socket"], "call_patterns": ["*"]},
     {"effect": "process", "module_prefixes": ["subprocess"], "call_patterns": ["*"]},
+    {"effect": "process", "module_prefixes": ["psutil"], "call_patterns": ["terminate", "kill", "wait_procs", "Process.terminate", "Process.kill"]},
     {"effect": "filesystem", "module_prefixes": ["shutil"], "call_patterns": ["*"]},
     {"effect": "filesystem", "module_prefixes": ["os"], "call_patterns": ["remove", "unlink", "rename", "replace", "mkdir", "makedirs", "rmdir", "removedirs"]},
     {"effect": "filesystem", "module_prefixes": ["pathlib.Path"], "call_patterns": ["write_text", "write_bytes", "unlink", "rename", "replace", "mkdir", "rmdir", "touch", "open"]},
@@ -35,6 +36,7 @@
     "unresolved_project_call": true,
     "maximum_call_depth_reached": true
   },
+  "transparent_call_wrappers": ["asyncio.to_thread"],
   "read_only_exceptions": {
     "database": ["get_*", "list_*", "search_*", "count_*", "load_*"],
     "vector_store": ["search", "search_*", "get_*", "list_*", "health_check", "collection_count"]
