@@ -5,7 +5,7 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
-## 2026-08-12 — v2.633.0 — `bulk_rename:apply` confirmé en classe R
+## 2026-08-12 — v2.634.0 — `bulk_rename:apply` confirmé et appareil de preuve conservé
 
 Après le commit distinct `1d317a1` qui gelait runner, oracle, politique et autorisation, la
 campagne v1.2 a exécuté exactement cinq cycles. Chaque cycle utilise une fixture neuve, une
@@ -29,6 +29,24 @@ sur 297 attendues, zéro échec en 730,5 secondes et build Next.js Turbopack ré
 redémarrage, Marvin publie `ok` en v2.633.0, Code Workspace répond avec six projets et le
 frontend répond HTTP 200. Les smokes live séquentiels passent ensuite : API 28/28, pages
 41/41, cinq conversations persistées et voix strictement sérialisée (`max=1`).
+
+Rectificatif de couverture : la publication ne remplace plus le contrôle de l'appareil par
+celui du résultat. La gate possède deux étapes distinctes. La première recalcule après
+publication les empreintes gelées du runner, de l'oracle, de la fixture, du produit et du test
+pré-exécution, vérifie l'absence d'import produit dans l'oracle et les liaisons
+politique/autorisation/résultat. La seconde vérifie le verdict et l'immuabilité de la preuve.
+Le test pré-exécution historique reste volontairement identique à l'octet près parce que son
+SHA-256 est dans l'autorisation; il est remplacé après campagne par le contrôle post-résultat,
+pas modifié a posteriori.
+
+Validation du rectificatif : le gate exhaustif passe avec 294 étapes exécutées et 4 smokes
+live différés sur 298 attendues, zéro échec en 729,6 secondes, dont le build Next.js
+Turbopack. Le premier redémarrage a révélé un registre de routes Turbopack périmé après le
+build : le manifeste contenait `/api/status`, mais le processus de développement encore actif
+servait une 404. Aucun code métier n'a été modifié pour masquer cet état. Un redémarrage propre
+après la fin du build a retrouvé `ready`, v2.634.0, 364 outils, Code Workspace et VM Lab prêts.
+Les smokes séquentiels réels passent ensuite : API 28/28, pages 41/41, cinq conversations
+persistées et voix strictement sérialisée (`max=1`).
 
 ## 2026-08-12 — v2.632.0 — runner et oracle E7 apply v1.2 gelés
 
