@@ -1,0 +1,86 @@
+{
+  "schema": "marvin.e7-path-analysis-retrospective-check/1.0",
+  "status": "evaluated_after_v1_4_publication_without_rule_change",
+  "v1_4_sha256": "840ad9ae9333e3df76993dfeaf3c8301b4c520a15e48bcf8bdb221712fb3a8ed",
+  "analyzer_special_cases_forbidden": true,
+  "checks": {
+    "known_multistore_delete": {
+      "state": "CONFIRMED_UNDER_DECLARED",
+      "effects": {
+        "total": 2,
+        "sha256": "32467926a0c67a3daa845a52a3c1b7a4a0873122394bd398700594d2b799dd98",
+        "truncated": false,
+        "items": [
+          {
+            "effect": "sqlite",
+            "operation": "DELETE",
+            "target": "database.delete_note",
+            "path": [
+              "backend/tool_domains/productivity.py:note_delete",
+              "sink:database.delete_note"
+            ],
+            "constraints": "TRUE"
+          },
+          {
+            "effect": "qdrant",
+            "operation": "DELETE",
+            "target": "vector_store.delete_document",
+            "path": [
+              "backend/tool_domains/productivity.py:note_delete",
+              "backend/tool_domains/productivity.py:_delete_note_index",
+              "sink:vector_store.delete_document"
+            ],
+            "constraints": "TRUE"
+          }
+        ]
+      }
+    },
+    "known_preview_with_early_return": {
+      "state": "UNKNOWN",
+      "compatible_mutations": {
+        "total": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "truncated": false,
+        "items": []
+      },
+      "interpretation": "no_compatible_mutation_static_unknown_remains_and_prior_e7_runtime_certification_is_not_superseded"
+    },
+    "known_status_with_reconciliation": {
+      "state": "CONFIRMED_UNDER_DECLARED",
+      "effects": {
+        "total": 2,
+        "sha256": "961c4497a0fa1118ae68c8112910e62a939310ae6fc5673cdead5c17d92a4cce",
+        "truncated": false,
+        "items": [
+          {
+            "effect": "process",
+            "operation": "EXECUTE",
+            "target": "subprocess.run",
+            "path": [
+              "backend/tools.py:execute_vm_lab_install",
+              "backend/vm_lab_jobs.py:status",
+              "backend/vm_lab_jobs.py:_reconcile",
+              "backend/vm_lab_jobs.py:_pid_is_running",
+              "sink:subprocess.run"
+            ],
+            "constraints": "TRUE AND (action == 'status') AND CONSERVATIVE_BLOCK"
+          },
+          {
+            "effect": "filesystem",
+            "operation": "UPDATE",
+            "target": "os.replace",
+            "path": [
+              "backend/tools.py:execute_vm_lab_install",
+              "backend/vm_lab_jobs.py:status",
+              "backend/vm_lab_jobs.py:_reconcile",
+              "backend/vm_lab_jobs.py:_write_state",
+              "sink:os.replace"
+            ],
+            "constraints": "TRUE AND (action == 'status') AND CONSERVATIVE_BLOCK"
+          }
+        ]
+      },
+      "required_write_target": "os.replace"
+    }
+  }
+}

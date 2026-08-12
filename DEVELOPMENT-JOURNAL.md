@@ -5,6 +5,57 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-12 — v2.637.0 — analyse E7 v1.4 sensible aux chemins
+
+La demande est de poursuivre l'inventaire des effets E7 sans ajuster l'analyseur aux trois
+cas déjà connus. La politique générale et ses canaris prospectifs ont été gelés dans
+`e6ec50f` avant l'implémentation. Le canari de processus initial utilisait une observation
+de fichier au lieu de `psutil`; il a été conservé, puis corrigé par l'erratum immuable
+`175214d` avant toute exécution de l'analyseur. Les règles et l'analyseur ne nomment aucun
+outil métier de Marvin.
+
+L'analyseur v1.4 reste statique et en lecture seule. Il propage les valeurs symboliques du
+payload, distingue les branches compatibles, gardées et exclues, traite les retours anticipés,
+comparaisons, constantes locales et appels transitifs, et sépare les observations `psutil`
+des mutations de processus. Les cibles dynamiques, callbacks et chemins non résolus restent
+`UNKNOWN`; ils ne sont jamais transformés en absence d'effet. Les preuves détaillées sont
+bornées, hashées et conservent leurs totaux afin d'éviter un artefact démesuré sans perdre
+la détection de modification.
+
+Résultat publié sur les 22 contrats : 5 `CONFIRMED_UNDER_DECLARED` et 17 `UNKNOWN`.
+`bulk_rename:preview` ne porte plus de mutation compatible, ce qui réconcilie l'analyse
+statique avec sa preuve E7 N. `note_delete` retrouve toujours les écritures SQLite et Qdrant.
+`vm_lab_install:status` expose l'écriture atomique de son état; l'exécution de sous-processus
+associée reste distinguée de l'observation métier. Les 13 `UNKNOWN` historiques sont tous
+comptabilisés dans le rapport de transition, sans basculement silencieux. Les contrôles
+rétrospectifs sont publiés séparément après le résultat; ils ne pilotent pas l'analyseur.
+
+Aucun contrat E7, outil, donnée persistante ou runtime n'a été modifié ou exécuté. TD-014
+reste ouvert : les cinq sous-déclarations doivent être rapprochées des implémentations et des
+preuves runtime avant une supersession groupée; les 17 inconnues ne sont pas masquées.
+
+Validation réelle : compilation des six scripts v1.4; pré-enregistrement, erratum, sept
+canaris prospectifs, résultat immuable et compatibilité v1.3 verts; architecture `2.637.0`,
+364 outils, 391 routes et harness 364/364. Le gate exhaustif s'achève en 852,9 s avec 297
+étapes exécutées, 4 smokes live ignorés et zéro échec sur 301 attendues. Il inclut la
+compilation du backend, la baseline frontend 37/37 et le build de production Next.js 16.2.12.
+
+Après redémarrage, `/api/health` répond 200 en v2.637.0 avec 364/364 outils, Ollama et
+SearXNG disponibles. Le superviseur reste honnêtement `initializing` après 134,7 s car Code
+Workspace n'atteint pas sa readiness; VM Lab est `ready`. Les smokes live obtiennent API
+28/28, pages 41/41 et sérialisation vocale verte. Le chat affiche 5/5 conversations, mais
+échoue sur des 500/503 intermittents du proxy Next. La mesure directe isole une conversation
+historique de 38 876 507 octets : lecture FastAPI froide en 58,35 s puis HTTP 200. Deux rejeux
+chat reproduisent encore un puis deux 5xx malgré l'affichage correct. Ce défaut préexistant,
+sans lien avec l'analyse statique v1.4, est enregistré sous TD-015 plutôt que masqué.
+
+Sécurité : analyse hors processus backend, zéro donnée utilisateur, secret, réseau ou appel
+métier; les entrées sont les fichiers Python suivis par Git et les contrats gelés.
+Journalisation : aucun flux runtime changé; seuls des artefacts de preuve versionnés, bornés
+et sans contenu utilisateur sont ajoutés. Rollback : réversion atomique du commit v2.637;
+les pré-enregistrements restent des preuves historiques inertes et peuvent être révertis
+séparément avant toute nouvelle campagne.
+
 ## 2026-08-12 — v2.636.0 — inventaire statique des 22 surfaces E7
 
 La demande est d'éviter de découvrir contrat par contrat des magasins persistants oubliés.

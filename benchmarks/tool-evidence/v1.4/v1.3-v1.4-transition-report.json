@@ -1,0 +1,356 @@
+{
+  "schema": "marvin.e7-v1.3-v1.4-transition-report/1.0",
+  "status": "published_after_v1_4_result",
+  "v1_3_sha256": "2b50334d8c82e53f73b614da0b29e9501534ad00831932243412d9525c8fabb4",
+  "v1_4_sha256": "840ad9ae9333e3df76993dfeaf3c8301b4c520a15e48bcf8bdb221712fb3a8ed",
+  "contracts": 22,
+  "v1_3_unknown_contracts": [
+    "direct-bulk_rename-apply",
+    "direct-bulk_rename-rollback",
+    "direct-email_send---default--",
+    "direct-itsm_ticket_create---default--",
+    "direct-long_task_start---default--",
+    "direct-pc_process_kill---default--",
+    "direct-pc_pull_ollama_model---default--",
+    "direct-system_restore_point---default--",
+    "direct-tweak_debloat_remove---default--",
+    "direct-vm_lab_install-install",
+    "direct-winget_install---default--",
+    "direct-winget_uninstall---default--",
+    "direct-winget_upgrade---default--"
+  ],
+  "v1_3_unknown_contracts_accounted_for": 13,
+  "silent_transitions": 0,
+  "transitions": [
+    {
+      "contract_id": "direct-bulk_rename-apply",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 5,
+      "unresolved_evidence_total": 46,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "5a66d45c199204452f841a071c195104826e9caa6ae04a8eafd357da311dccf3",
+        "unresolved": "e3ddf8cbb657fb04cd4d1d5f6448db21605564fa6f4937c0ef19c8f8afea8943"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-bulk_rename-preview",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "UNKNOWN",
+      "changed": true,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 13,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "c94ac98aaa57142c435626fa8c4a16160ffbd0f44a16f8d6bc5bbca5d0501652"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-bulk_rename-rollback",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 5,
+      "unresolved_evidence_total": 46,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "5a66d45c199204452f841a071c195104826e9caa6ae04a8eafd357da311dccf3",
+        "unresolved": "e3ddf8cbb657fb04cd4d1d5f6448db21605564fa6f4937c0ef19c8f8afea8943"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-cancel",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "CONFIRMED_UNDER_DECLARED",
+      "changed": true,
+      "compatible_evidence_total": 17,
+      "guarded_evidence_total": 494,
+      "unresolved_evidence_total": 3774,
+      "evidence_sha256": {
+        "compatible": "796098baae2510ea3fa3058b823620ccbb835f9d7b20230fa102b5ba310f43c9",
+        "guarded": "0eba903d3c7055848025a4d04760007b981ff8efe25288de2988cd0f99b1b28a",
+        "unresolved": "7e438d732a7c416758f517aff41aef041a4ca90035fa502f807299cb5526d276"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-resume",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "CONFIRMED_UNDER_DECLARED",
+      "changed": true,
+      "compatible_evidence_total": 17,
+      "guarded_evidence_total": 494,
+      "unresolved_evidence_total": 3774,
+      "evidence_sha256": {
+        "compatible": "796098baae2510ea3fa3058b823620ccbb835f9d7b20230fa102b5ba310f43c9",
+        "guarded": "0eba903d3c7055848025a4d04760007b981ff8efe25288de2988cd0f99b1b28a",
+        "unresolved": "7e438d732a7c416758f517aff41aef041a4ca90035fa502f807299cb5526d276"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-code_workspace_start---default--",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "UNKNOWN",
+      "changed": true,
+      "compatible_evidence_total": 8,
+      "guarded_evidence_total": 530,
+      "unresolved_evidence_total": 3993,
+      "evidence_sha256": {
+        "compatible": "ae29b419b74af247c732b95e3568ec9b0d7f30477b25b3fe29495ce770b6c362",
+        "guarded": "df6c64e85542728a73db331ead056c3214e4d67254d19af51aaf5b7a9b823637",
+        "unresolved": "31818adc4e71edc75437b4337ae004cbe705c63eae9025daa3e3ae24297e76a1"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-email_send---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 14,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "62ed28e32e0383bad715913fadf15aed2440fb9b6d13ed4054a3e3f1dc862994"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-itsm_ticket_create---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 8,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "33cde97fc4409539001363ca0038bdb6d78d46b24bf515096b32ad675398dbe1"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-long_task_start---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 14,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "5638e3bd3c41c6989c7c70c70cd70de2fc7f8c3e14c2e6c34f15c9da4adcae64"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-memory_delete---default--",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "CONFIRMED_UNDER_DECLARED",
+      "changed": true,
+      "compatible_evidence_total": 2,
+      "guarded_evidence_total": 1,
+      "unresolved_evidence_total": 11,
+      "evidence_sha256": {
+        "compatible": "633aa0590e136aecbee913ec9bab459c52e898f2d5cacc22d87ea07204c2bf24",
+        "guarded": "1aafd713a1f05b205b9198e257e8b7a1fc8e3adb8f1a35ea43dc4f42f8c20008",
+        "unresolved": "d4803f73c6fe5761c0920e46770b2f9d1d2e6dd39b8d989b952b0cbae4366b38"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-note_delete---default--",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "CONFIRMED_UNDER_DECLARED",
+      "changed": true,
+      "compatible_evidence_total": 2,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 2,
+      "evidence_sha256": {
+        "compatible": "32467926a0c67a3daa845a52a3c1b7a4a0873122394bd398700594d2b799dd98",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "ed3632875e66757b3283f6b31d6b33a1a88b038979248fc01b30788aa772703c"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-pc_process_kill---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 1,
+      "unresolved_evidence_total": 6,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "91ef42f7ce9e3eb50851aa8e5a9ef00606c223f7a8e6ee30beef4ffaec7003b4",
+        "unresolved": "41d412445c8973588dda4927451c456f7c46b1e24076e4c4a89577fd6262109a"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-pc_pull_ollama_model---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 1,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "d684fc3b10dc3877292e507d501139a64f036a0a417a046c969a2d212f3899ac"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-project_delete---default--",
+      "v1_3_state": "CONFIRMED",
+      "v1_4_state": "UNKNOWN",
+      "changed": true,
+      "compatible_evidence_total": 1,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 8,
+      "evidence_sha256": {
+        "compatible": "03e1bbf0875ba77051be2e586776aa3dc73c676373b9d4a4c34d48ac7b0da0e9",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "cf2c6d6136ef5191031f47a2785593880b15625a0d6f6b737db155db4295b46b"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-system_restore_point---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 3,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "35cafd9e70a06dec422384ebe3d22dc15d3b4dbff50f491d9a942ed085f13074"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-task_delete---default--",
+      "v1_3_state": "CONFIRMED",
+      "v1_4_state": "UNKNOWN",
+      "changed": true,
+      "compatible_evidence_total": 1,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 2,
+      "evidence_sha256": {
+        "compatible": "aeb44c1dcfc147cf55d27661efadf4b2ec1a0e024201f39ae9c7389500b86aef",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "e032029211a34464f9d7d696985c66efca55b71f9f7527e266a7073081a54977"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-tweak_debloat_remove---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 0,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 4,
+      "evidence_sha256": {
+        "compatible": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "5ed096230f55e04fddcc862409430bb009cd050bebc9ef13c6a88d84bad0377d"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-vm_lab_install-install",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 9,
+      "guarded_evidence_total": 2,
+      "unresolved_evidence_total": 64,
+      "evidence_sha256": {
+        "compatible": "fa5ee00c105f9b148a843cb6f5f2959d52aa364fcb159d8005dd3b584cc3bdb4",
+        "guarded": "2a097dff8edfd30b3c33796b190447f5be96e350452f535e9934c712aceb1d75",
+        "unresolved": "daac83a67790e27da8606a0e4e46991d624a30c07111c372ddefb8f7fe846dc9"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-vm_lab_install-status",
+      "v1_3_state": "UNDER_DECLARED",
+      "v1_4_state": "CONFIRMED_UNDER_DECLARED",
+      "changed": true,
+      "compatible_evidence_total": 2,
+      "guarded_evidence_total": 1,
+      "unresolved_evidence_total": 15,
+      "evidence_sha256": {
+        "compatible": "961c4497a0fa1118ae68c8112910e62a939310ae6fc5673cdead5c17d92a4cce",
+        "guarded": "62548d3693a0912c84adeec10999bf6eed46da30485f6233b0db38d612b9c1a9",
+        "unresolved": "cbab58657643caf4a7423542e736e57dcf1f9fa4e69d2cbb1bd33e9a5cb0b1d5"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-winget_install---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 4,
+      "guarded_evidence_total": 2,
+      "unresolved_evidence_total": 39,
+      "evidence_sha256": {
+        "compatible": "f82891af9e0b8e29a2bbf8e6739c68c5824387b6dc23894a9b02ec9dc78938b3",
+        "guarded": "4458c01e48c40cbf0381fd5f76eb8d9c647fda853046284ace4e327ee927eb73",
+        "unresolved": "752ab333808e9cb4978fd96e9cc83196837cc5216d746ff8e0e5c13d58f372ad"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-winget_uninstall---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 4,
+      "guarded_evidence_total": 2,
+      "unresolved_evidence_total": 37,
+      "evidence_sha256": {
+        "compatible": "96d650c18bb808747c9295750e4057326f5003a38da80121bab2c6b63201a1e9",
+        "guarded": "b623e8c2624b83c0b26b063264111be87bc198adcf4db792ab0b983876f0ddfc",
+        "unresolved": "764a45d47b7a7102b6f484e73b8fb97ba5715fece9f45f0e38ea8ae983fe5f3c"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    },
+    {
+      "contract_id": "direct-winget_upgrade---default--",
+      "v1_3_state": "UNKNOWN",
+      "v1_4_state": "UNKNOWN",
+      "changed": false,
+      "compatible_evidence_total": 2,
+      "guarded_evidence_total": 0,
+      "unresolved_evidence_total": 5,
+      "evidence_sha256": {
+        "compatible": "340c555c3261e352d96949471b4a5cef16a0739948c312e27f1805abbd092bf1",
+        "guarded": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "unresolved": "1de408db4059aceef381c4450dda172e3a1e06039664ebeb66894aacbcc3b45f"
+      },
+      "reason": "path_sensitive_reanalysis_with_explicit_scenario_constraints"
+    }
+  ]
+}

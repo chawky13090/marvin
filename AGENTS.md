@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.636.0, 364 outils, 391 routes.** Architecture dans
+> **État courant : v2.637.0, 364 outils, 391 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.636.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.637.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.636.0)
+## 9. État actuel (v2.637.0)
+
+**v2.637 (analyse E7 sensible aux chemins)** : une politique générique et ses canaris ont
+été gelés avant l'implémentation; un erratum immuable remplace seulement un canari de processus
+qui n'exerçait pas réellement `psutil`. L'analyseur propage les valeurs symboliques du payload,
+les retours anticipés, conditions et appels transitifs sans importer le backend ni exécuter un
+outil. Les 22 contrats produisent 5 sous-déclarations confirmées et 17 `UNKNOWN`. Le faux
+positif de `bulk_rename:preview` est retiré, `note_delete` conserve la preuve SQLite+Qdrant et
+`vm_lab_install:status` expose l'écriture de son état. Les résultats, transitions v1.3→v1.4 et
+contrôles rétrospectifs sont liés par SHA-256; aucune supersession de contrat n'est autorisée.
+Rollback : réversion atomique du commit v2.637; aucune donnée, configuration ou exécution
+métier n'est concernée.
+
+**v2.636 (analyse des surfaces E7)** : une spécification, les règles de sinks et leurs
 
 **v2.636 (analyse des surfaces E7)** : une spécification, les règles de sinks et leurs
 extensions ont été gelées dans trois commits distincts avant l'implémentation. L'analyseur
