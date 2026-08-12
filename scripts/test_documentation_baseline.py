@@ -53,6 +53,9 @@ def main() -> int:
     assert f'TOOLS["{tool_count} outils"]' in architecture
     assert "aucune route métier" in architecture
     assert "TD-001" in debt and "TD-007" in debt and "TD-011" in debt
+    assert "TD-013" in debt and "2026-11-10" in debt
+    assert "zéro nouveau manifeste hérité" in debt
+    assert "read_compatibility_until" in debt and "interdiction de balayage global" in debt
     assert "Readiness Code Workspace" in debt
     assert "cinq redémarrages froids consécutifs" in debt
     assert "TECHNICAL-DEBT.md" in readme

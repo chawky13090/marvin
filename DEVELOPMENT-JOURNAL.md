@@ -7,6 +7,13 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
 ## 2026-08-12 — v2.631.0 — rollbacks `bulk_rename` sortis des dossiers utilisateur
 
+Complément de gouvernance : TD-013 rend désormais la compatibilité `.marvin-rollback`
+réellement temporaire. Revue obligatoire au 10 novembre 2026; retrait permis seulement après
+30 jours sans nouvelle migration héritée et expiration de toutes les fenêtres
+`read_compatibility_until`. Une échéance non satisfaite doit être justifiée et replanifiée;
+l'interdiction de tout balayage global reste permanente. Le test documentaire échoue si cet
+engagement, sa date ou ses critères disparaissent.
+
 Le défaut révélé par la campagne E7 est corrigé sans modifier sa preuve : le résultat v1.1
 `FAILED_LOCKED` reste immuable. Les manifestes v2 vivent sous `data/rollback/bulk-rename`,
 jamais sous la racine renommée. Ils portent révision optimiste, PID et heure de création du
