@@ -1,0 +1,91 @@
+{
+  "schema": "marvin.e7-direct-surface-contract-supersession/1.0",
+  "status": "published_after_product_validation_before_e7_execution",
+  "product_source_commit": "2c2bfeac9360072560d24508d49711a41f1483f5",
+  "tool_execution_performed": false,
+  "fixture_execution_performed": false,
+  "e7_verification_granted": false,
+  "historical_artifacts_modified": false,
+  "sources": {
+    "preregistration_sha256": "b02f9d2ce7b28df0d24f6255dbe185cdd6504d18b0fc50e033cab9c6115baf51",
+    "v1_4_analysis_sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+    "v1_1_contracts_sha256": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc",
+    "v1_1_classification_sha256": "ca3aca2edc68853a1168e17bea52c8ea2cf165e05d686c21b57442c00cf918ff"
+  },
+  "invariants": {
+    "classification_is_unchanged": true,
+    "surface_expansion_never_implies_e7_success": true,
+    "each_store_has_an_independent_observation": true,
+    "recovery_never_uses_the_public_tool_under_test": true,
+    "cancel_and_resume_are_scored_by_action": true,
+    "unknown_effects_remain_unknown": true
+  },
+  "superseded_contracts": [
+    {
+      "contract_id": "direct-note_delete---default--",
+      "class": "R",
+      "previous_surface_profile": "database_scope",
+      "surface_profile": "sqlite_qdrant_scope",
+      "stores": {
+        "sqlite": ["selected_row", "foreign_keys", "row_counts", "logical_dump_hash"],
+        "qdrant": ["point_id", "original_id", "text_sha256", "payload_content_sha256", "vector_size"]
+      },
+      "allowed_delta": "only_selected_note_removed_then_all_declared_stores_restored",
+      "recovery": "independent_sqlite_preimage_restore_then_independent_qdrant_reindex",
+      "verification": "UNVERIFIED_PENDING_E7_FIXTURE"
+    },
+    {
+      "contract_id": "direct-memory_delete---default--",
+      "class": "R",
+      "previous_surface_profile": "database_scope",
+      "surface_profile": "sqlite_qdrant_memory_mesh_scope",
+      "stores": {
+        "sqlite": ["selected_row", "row_counts", "logical_dump_hash", "plaintext_content_sha256"],
+        "qdrant": ["point_id", "original_id", "payload_content_sha256", "vector_size"],
+        "memory_mesh": ["record", "content_sha256", "source_history", "contradictions"]
+      },
+      "allowed_delta": "only_selected_memory_removed_then_all_declared_stores_restored",
+      "recovery": "independent_sqlite_preimage_restore_and_projection_rebuild",
+      "verification": "UNVERIFIED_PENDING_E7_FIXTURE"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-resume",
+      "class": "C",
+      "previous_surface_profile": "workspace_scope",
+      "surface_profile": "workspace_process_network_scope",
+      "stores": {
+        "workspace": ["mission_state", "job_state", "worktree_hash", "artifacts"],
+        "process": ["background_workers", "child_processes"],
+        "network": ["declared_endpoint", "request_count", "status_class", "response_sha256"]
+      },
+      "allowed_delta": "only_declared_mission_resume_effects_and_fixture_network_endpoints",
+      "recovery": "workspace_preimage_restore_with_consumed_compute_reported_as_residual_loss",
+      "verification": "UNVERIFIED_PENDING_E7_FIXTURE"
+    }
+  ],
+  "retained_contracts": [
+    {
+      "contract_id": "direct-code_workspace_control-cancel",
+      "class": "C",
+      "surface_profile": "workspace_scope",
+      "reason": "action_dispatch_proof_calls_cancel_job_only_and_never_resume_job",
+      "v1_4_finding": "SUPERSEDED_STATIC_FALSE_POSITIVE",
+      "verification": "CONTRACT_RETAINED_E7_STILL_UNVERIFIED"
+    },
+    {
+      "contract_id": "direct-vm_lab_install-status",
+      "class": "N",
+      "surface_profile": "no_mutation_scope",
+      "reason": "status_uses_in_process_observation_and_non_persistent_reconciliation",
+      "v1_4_finding": "PRODUCT_DEFECT_CORRECTED",
+      "verification": "CONTRACT_RETAINED_E7_STILL_UNVERIFIED"
+    }
+  ],
+  "remaining_scope": {
+    "direct_contracts_total": 22,
+    "contracts_superseded_here": 3,
+    "contracts_retained_here": 2,
+    "static_unknowns_not_converted_to_absent": 17,
+    "previous_e7_verified_contracts_unchanged": 2
+  }
+}

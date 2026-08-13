@@ -1,0 +1,67 @@
+{
+  "schema": "marvin.e7-multistore-correction-assessment/1.0",
+  "status": "product_corrections_validated_contracts_superseded_e7_unverified",
+  "product_source_commit": "2c2bfeac9360072560d24508d49711a41f1483f5",
+  "tool_execution_performed": false,
+  "fixture_execution_performed": false,
+  "e7_verification_granted": false,
+  "source_result_modified": false,
+  "preregistration_sha256": "b02f9d2ce7b28df0d24f6255dbe185cdd6504d18b0fc50e033cab9c6115baf51",
+  "supersession_sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+  "product_source_sha256": {
+    "backend/note_lifecycle.py": "982e9bdedf00d89310b3fcddc64e304eaa1b4b3abd2ac0232c94e080fad8d5dc",
+    "backend/memory_lifecycle.py": "fd4a3566ae2f6d6697b2bea851a206f9bb88101162d75acfffbcc713eaab4234",
+    "backend/vm_lab_jobs.py": "a39ed65695b018bb95d63f0ebbfda1248e8838b25278d7bdc3ab7b6e03226f9e",
+    "backend/coding_service.py": "847ce74dfa433e26e1d3f0553270d4832f5040f192dde52ea7a40f00442e3c3b",
+    "backend/coding_jobs.py": "ba61eb4c669ff221f6ae18bac9d7552d67270d50a457ba9eab8caa0b875391b9"
+  },
+  "test_source_sha256": {
+    "scripts/test_note_lifecycle.py": "ec2499f7e9d0983a251da0e5538f9016e187af39e18d47e46a6d2e9dcd55cda7",
+    "scripts/test_memory_lifecycle.py": "99c2413b86b09da604846e906e971cbac97dbfe27cec42edda7882486e5b568c",
+    "scripts/test_vm_lab_jobs.py": "146eb49c7b79c0b9b6da5f68e60eec25291c8bc224216e442b282bad0f7cf58b",
+    "scripts/test_td014_action_surfaces.py": "5ab5031e924ee0a786622326c37d558bb8c4b1bd9bb2a294a7301d6e6749e08e"
+  },
+  "cases": [
+    {
+      "contract_id": "direct-note_delete---default--",
+      "product_validation": "PASSED_FAILURE_INJECTION_AND_COMPENSATION",
+      "contract_decision": "SUPERSEDED_SURFACE_CLASS_R_UNCHANGED",
+      "e7_state": "UNVERIFIED"
+    },
+    {
+      "contract_id": "direct-memory_delete---default--",
+      "product_validation": "PASSED_THREE_STORE_FAILURE_INJECTION_AND_COMPENSATION",
+      "contract_decision": "SUPERSEDED_SURFACE_CLASS_R_UNCHANGED",
+      "e7_state": "UNVERIFIED"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-resume",
+      "product_validation": "ACTION_BRANCH_CONFIRMED",
+      "contract_decision": "SUPERSEDED_SURFACE_CLASS_C_UNCHANGED",
+      "e7_state": "UNVERIFIED"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-cancel",
+      "product_validation": "ACTION_BRANCH_CONFIRMED_NO_RESUME_DISPATCH",
+      "contract_decision": "V1_1_CONTRACT_RETAINED",
+      "e7_state": "UNVERIFIED"
+    },
+    {
+      "contract_id": "direct-vm_lab_install-status",
+      "product_validation": "PASSED_READ_ONLY_PREIMAGE_AND_NO_CHILD_PROCESS",
+      "contract_decision": "V1_1_CONTRACT_RETAINED_CLASS_N",
+      "e7_state": "UNVERIFIED"
+    }
+  ],
+  "limits": {
+    "runtime_e7_fixture_not_executed": true,
+    "static_v1_4_unknowns_remaining": 17,
+    "no_claim_about_external_program_internal_effects": true,
+    "no_security_register_entry_promoted": true
+  },
+  "rollback": {
+    "product": "revert_commit_2c2bfeac_then_restart_frontend_and_backend",
+    "contracts": "preserve_this_assessment_and_supersession_then_publish_a_new_versioned_supersession",
+    "persistent_data_migration": false
+  }
+}

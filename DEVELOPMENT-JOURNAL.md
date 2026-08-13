@@ -47,6 +47,14 @@ Le contrôle OpenAPI, resté hors du gate avec une baseline v2.464 périmée, es
 326 chemins, 391 opérations et 67 familles, puis réintégré comme étape obligatoire. Cette
 réconciliation ne crée ni route ni effet runtime; elle rend à nouveau la dérive mesurable.
 
+Après le commit produit `2c2bfeac`, la supersession v1.5 élargit trois contrats sans modifier
+leur classe : notes vers SQLite+Qdrant, mémoire vers SQLite+Qdrant+Memory Mesh, et `resume`
+vers workspace+processus+réseau. Un test de dispatch distinct prouve que `cancel` n'appelle
+jamais la branche `resume`; son contrat v1.1 est donc retenu. Le statut VM conserve la classe
+N après comparaison de pré-image et refus de sous-processus. Ces validations ne déclenchent
+aucun outil métier et n'accordent aucune preuve E7 : les cinq cas restent `UNVERIFIED`, les
+17 inconnus statiques restent inconnus, et les artefacts v1.1-v1.4 ne sont pas réécrits.
+
 ## 2026-08-13 — v2.646.0 — chaîne de preuve indépendante de `core.autocrlf`
 
 La revue croisée a démontré que le correctif v2.645 était trop local : six manifestes gelés

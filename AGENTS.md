@@ -235,8 +235,10 @@ la vivacité est observée par `psutil` avec contrôle de réutilisation du PID.
 ne journalisent ni contenu de note ni souvenir. La page Notes envoie ses mutations directement
 à FastAPI, sans rejeu, et distingue un échec certain d'un résultat réseau indéterminé. La
 baseline OpenAPI est réconciliée à 326 chemins / 391 opérations et son test est revenu dans le
-gate exhaustif. Rollback : réversion atomique de v2.647 puis redémarrage backend/frontend;
-aucun schéma ni contenu persistant n'est migré.
+gate exhaustif. Une supersession v1.5 élargit les surfaces notes, mémoire et `resume`, conserve
+`cancel` et le statut VM, et laisse explicitement les cinq contrats `UNVERIFIED` tant que leurs
+fixtures E7 n'ont pas tourné. Rollback : réversion atomique de v2.647 puis redémarrage
+backend/frontend; aucun schéma ni contenu persistant n'est migré.
 
 **v2.646 (preuves reproductibles hors du poste de développement)** : les sources textuelles
 et artefacts de preuve suivis sont normalisés en UTF-8 sans BOM et LF dans Git; seuls les

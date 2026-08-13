@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 308
+EXPECTED_STAGE_COUNT = 311
 
 
 @dataclass(frozen=True)
@@ -201,6 +201,14 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Pré-enregistrement TD-014 multi-magasins",
             (python, "scripts/test_multistore_correction_preregistration.py"),
+        ),
+        Stage(
+            "Branches TD-014 resume et cancel",
+            (python, "scripts/test_td014_action_surfaces.py"),
+        ),
+        Stage(
+            "Supersession TD-014 sans promotion E7",
+            (python, "scripts/test_multistore_correction_assessment.py"),
         ),
         Stage("Résultat E7 apply immuable et verrouillé", (python, "scripts/test_e7_apply_execution_result.py")),
         Stage("Stockage central des rollbacks bulk rename", (python, "scripts/test_bulk_rename_rollback_store.py")),
@@ -583,6 +591,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Chemins portables et Known Folders Windows", (python, "scripts/test_platform_paths.py")),
         Stage("Bibliotheque locale et exports Marvin", (python, "scripts/test_storage_layout.py")),
         Stage("VM Lab et integrite des ISO", (python, "scripts/test_vm_lab.py")),
+        Stage("Jobs VM Lab persistants et lecture seule", (python, "scripts/test_vm_lab_jobs.py")),
         Stage("Cortex Search et vérificateurs spécialisés", (python, "scripts/test_cortex_search.py")),
         Stage("Model Market et Research Swarm", (python, "scripts/test_model_market.py")),
         Stage("Evolution Lab et Mission Canvas", (python, "scripts/test_evolution_canvas.py")),
