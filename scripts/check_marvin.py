@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 311
+EXPECTED_STAGE_COUNT = 312
 
 
 @dataclass(frozen=True)
@@ -209,6 +209,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Supersession TD-014 sans promotion E7",
             (python, "scripts/test_multistore_correction_assessment.py"),
+        ),
+        Stage(
+            "Erratum TD-014 avant rejeu runtime",
+            (python, "scripts/test_multistore_assessment_erratum.py"),
         ),
         Stage("Résultat E7 apply immuable et verrouillé", (python, "scripts/test_e7_apply_execution_result.py")),
         Stage("Stockage central des rollbacks bulk rename", (python, "scripts/test_bulk_rename_rollback_store.py")),

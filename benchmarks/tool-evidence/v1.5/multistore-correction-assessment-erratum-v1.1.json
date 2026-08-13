@@ -1,0 +1,52 @@
+{
+  "schema": "marvin.e7-multistore-correction-assessment-erratum/1.0",
+  "status": "published_before_corrected_runtime_replay",
+  "supersedes_interpretation_not_source": "multistore-correction-assessment.json",
+  "source_assessment_sha256": "b99065adb4de2ee96a11f65a8bd144570193beed1816c25bfd10faffa9a6ae61",
+  "source_supersession_sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+  "source_assessment_modified": false,
+  "corrective_commit": "31a4306a4ad1a84132d3b1b100df83e7dfa87f53",
+  "tool_execution_performed": false,
+  "runtime_replay_authorized": true,
+  "finding": {
+    "contract_id": "direct-note_delete---default--",
+    "phase": "first_live_create_after_v2_647_gate",
+    "observed_result": "consistency_degraded",
+    "symbolic_warning": "qdrant_index:NameError",
+    "source_database_mutated": true,
+    "fixture_cleanup_attempted": true,
+    "e7_state": "UNVERIFIED",
+    "cause": "vector_store.index_note_referenced_hashlib_without_import",
+    "why_unit_tests_missed_it": "failure_injection_mocked_the_index_boundary"
+  },
+  "correction": {
+    "backend/vector_store.py": "hashlib_import_added",
+    "scripts/test_note_lifecycle.py": "real_index_note_called_with_only_external_upsert_mocked",
+    "vector_store_sha256": "cfef6ebcf674cd47b65d54e0a4aa3661dcad592d5bed76402caa84a9e93776c1",
+    "test_sha256": "4f1820b679bbe19e808fdee9ac1af86bd4ed877014050b41ca1a80ef46e8cfac"
+  },
+  "replay_acceptance": {
+    "cold_restart_version": "2.648.0",
+    "note_create_consistency": "complete",
+    "note_update_consistency": "complete",
+    "note_delete_requires_confirmation": true,
+    "note_delete_confirmed": true,
+    "memory_create_consistency": "complete",
+    "memory_delete_confirmed": true,
+    "vm_status_reads": 5,
+    "vm_state_sha256_unchanged": true,
+    "full_gate_required": true,
+    "live_smokes_required": true
+  },
+  "interpretation": {
+    "v1_5_contract_supersession_remains_valid": true,
+    "v1_5_product_assessment_was_incomplete_at_external_index_boundary": true,
+    "corrected_runtime_result_must_be_published_separately": true,
+    "no_e7_promotion_from_replay": true
+  },
+  "privacy": {
+    "fixture_identifiers_published": false,
+    "fixture_content_published": false,
+    "user_data_used": false
+  }
+}
