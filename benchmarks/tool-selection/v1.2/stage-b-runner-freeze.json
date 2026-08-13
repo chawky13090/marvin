@@ -1,0 +1,50 @@
+{
+  "schema": "marvin.tool-selection-stage-b-runner-freeze/1.0",
+  "status": "frozen_before_benchmark_model_invocation",
+  "source_commit": "3155dfa5238e5089af31ecb1bcd4b103fb62d24c",
+  "frozen_hashes": {
+    "scripts/run_tool_selection_stage_b.py": "d79106725b9fcae2b6e730859b1c45de1bba1366119f31dadb773d7384329770",
+    "scripts/test_tool_selection_stage_b_runner.py": "aec3fbac7f6c10d3a915a5c872c841034c5518405915ed4e1372acec2f8281b9",
+    "scripts/run_tool_selection_ablation.py": "ce0d90e5a400f5a84c6200b4e509b2ee3dc48ce86df5a3ca63694efed539e946",
+    "benchmarks/tool-selection/v1.2/stage-b-preregistration.json": "aa286d009a367bd62e3a07d1654af81901e7958e37847837ffd61d5a332d7b30",
+    "benchmarks/tool-selection/v1.2/holdout-freeze-manifest.json": "a592639112f74b4e8e6b06eae047c01358e2e823d378566bae9b4f60444491c6",
+    "benchmarks/tool-selection/v1.2/holdout-corpus.json": "ac1cd39e334051a11e77f2933b4dfb4714f7b9a5942f3c0b63605f8fc07d68fe",
+    "benchmarks/tool-selection/v1.2/holdout-oracle.json": "384b806cfd19dfd56c0c2272905b4d4663bb716e1d18ca377f1c1a2e41f0deec"
+  },
+  "preflight": {
+    "record_count": 30,
+    "candidate_matrix_cells": 270,
+    "candidate_matrix_sha256": "4272c345b100fb6f4910a72a3729c8a9a52632c92c151eb3b43f338ecf3d7385",
+    "system_prompt_sha256": "e2a7ad212bc21071b407398d0bd54e23497c413dc6811a85dc8e09fddfdf1f61",
+    "tool_index_fingerprint": "ae3cc5733294f7ba58e61cda32b37c69b4212f4ca335a35242625f23eeae92b6",
+    "embedding_model": "nomic-embed-text:latest",
+    "embedding_digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+    "single_batch_exact_equality": true,
+    "route_control_exact_equality": true,
+    "benchmark_model_invocation_count": 0,
+    "business_tool_execution_count": 0
+  },
+  "execution_contract": {
+    "expected_model_calls": 810,
+    "configurations": ["K+L+S", "K+S", "S"],
+    "modes": ["eco", "balanced", "performance"],
+    "repetitions": 3,
+    "concurrency_maximum": 3,
+    "transport_attempts_maximum": 3,
+    "same_payload_and_seed_on_transport_retry": true,
+    "exactly_one_native_tool_call_required_for_accepted_choice": true,
+    "zero_or_multiple_calls_are_not_accepted": true,
+    "argument_schema_validity_denominator": "exactly_one_candidate_member_call_only",
+    "raw_model_content_publication_forbidden": true,
+    "content_sha256_only": true,
+    "business_tool_execution_forbidden": true,
+    "host_side_effect_forbidden": true,
+    "partial_result_publication_forbidden": true,
+    "existing_result_overwrite_forbidden": true
+  },
+  "authorization": {
+    "benchmark_model_execution_authorized": false,
+    "separate_single_use_authorization_required": true
+  },
+  "rollback": "Preserve this freeze; revert the later authorization or runner execution commit. No product or persistent user data changed."
+}
