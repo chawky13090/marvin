@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.643.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.644.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.643.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.644.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.643.0)
+## 9. État actuel (v2.644.0)
+
+**v2.644 (TD-015 fermée par preuve froide)** : une première campagne avortée a révélé que
+le proxy Next abandonnait une lecture historique après 6 secondes puis pouvait la rejouer
+quatre fois, tandis que les threads FastAPI déjà engagés continuaient. La route lourde utilise
+désormais une seule tentative bornée à 30 secondes. Les gels v1-v3 et les abandons v1-v2
+restent immuables; les seuils n'ont jamais été abaissés. La campagne v3 a obtenu trois cycles
+froids `ready`, 94 messages uniques sur deux pages, zéro doublon, détail 200, liaison croisée
+404 et quinze ouvertures UI sans 5xx ni erreur console. Aucun message historique, schéma ou
+identifiant en clair n'a été modifié ou publié. Rollback produit : restaurer uniquement
+`app/api/conversations/[id]/route.js` depuis le parent de `de52d88`, conserver les preuves,
+rebuild frontend puis redémarrer; aucune migration descendante n'est nécessaire.
 
 **v2.643 (pagination et détail historiques)** : la lecture pondérée retourne un suffixe
 chronologique contigu; elle ne saute plus un message exclu par le budget. L'existence de

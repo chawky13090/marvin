@@ -5,6 +5,39 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.644.0 — TD-015 fermée sans perte de données
+
+La clôture a été pré-enregistrée avant exécution : trois redémarrages froids consécutifs,
+état `ready`, conversation persistée la plus lourde, pagination complète, reçu détaillé lié,
+chat 5/5, zéro HTTP 5xx et zéro erreur console. La première tentative n'a publié aucun résultat
+et a révélé un 503 Next sans 5xx FastAPI. Les métriques backend montraient des lectures entre
+6,879 et 19,672 secondes : le proxy les abandonnait après 6 secondes et pouvait lancer jusqu'à
+quatre threads identiques qui continuaient après l'abandon.
+
+Deux solutions ont été comparées. Augmenter globalement délais et retries aurait conservé
+l'amplification. La route de conversation lourde utilise donc une seule tentative bornée à
+30 secondes, cohérente avec la borne fonctionnelle déjà gelée. Les campagnes v1 et v2 restent
+versionnées comme abandonnées; v3 ajoute une preuve d'échec expurgée et ne change aucun seuil.
+
+Résultat v3 observé sur trois cold starts : `ready` 3/3; attentes de démarrage de 84,331 à
+108,268 secondes; première page de 367 208 octets en 3,564 à 7,205 secondes; 94 messages
+uniques sur deux pages, zéro doublon, curseur strictement décroissant et historique épuisé;
+détail HTTP 200, liaison croisée HTTP 404; chat 15/15, zéro 5xx et zéro erreur console.
+Le résultat ne publie que le SHA-256 de la conversation cible. Les 1 976 messages d'outil et
+leurs 290,9 Mio restent inchangés; aucune migration, suppression, exécution métier ou nouvelle
+donnée personnelle n'a eu lieu. Les rapports de smoke ne contiennent que des compteurs et des
+routes dont les UUID et requêtes sont retirés. La politique de journalisation reste inchangée.
+
+Rollback : conserver les preuves historiques, restaurer la route Next depuis le parent du
+commit `de52d88`, rebuild frontend et redémarrer. Le changement ne touche ni schéma ni donnée
+persistante. Validation avant publication : contrat TD-015, canaris de doublon/curseur,
+contrat de lecture backend et trois campagnes froides. La première gate a correctement refusé
+le build pendant que Turbopack tournait. Après arrêt gracieux en 8,9 secondes sans processus
+forcé, la gate exhaustive a obtenu 300 étapes exécutées, 4 smokes explicitement ignorés et
+zéro échec sur 304 attendues, build Next.js 16 inclus. Redémarrage final `ready` en 158,9
+secondes sur `2.644.0 / 364 outils / 392 routes`, puis smokes live : 28/28 contrats API,
+41/41 pages, chat 5/5 et voix strictement sérialisée.
+
 ## 2026-08-12 — v2.641.0 — borne finale de persistance éprouvée à 1 Mio
 
 La revue croisée a identifié l'absence d'un test direct sur la branche protégeant les résultats

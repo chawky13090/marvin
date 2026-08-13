@@ -1,0 +1,151 @@
+﻿{
+    "schema":  "marvin.td015-closure-result/1.0",
+    "generated_at":  "2026-08-13T10:56:39.4124905Z",
+    "policy_sha256":  "192b5e0de6343e3b0bafee20cec8a3b4f1ccfa4075b8a03273c0b1e2a47fab4d",
+    "freeze_sha256":  "9821dc2d68168371a4e7f943957c78b868fa63fabe9eac6ac204bbe26c30a64d",
+    "source_commit":  "e288f6a699450cba889bf7b2325d3d843629df47",
+    "cycles":  [
+                   {
+                       "cycle":  1,
+                       "state":  "ready",
+                       "cycle_total_ms":  152717,
+                       "startup_wait_ms":  108268,
+                       "stop_duration_ms":  7336,
+                       "code_workspace_http":  200,
+                       "vm_lab_http":  200,
+                       "functional":  {
+                                          "cycle":  1,
+                                          "target_id_sha256":  "3fc205d2e6bee148996cdc2fc0c167a9883ec65006060062f1386dd4d98c843c",
+                                          "target_stored_bytes":  86195785,
+                                          "page_chain":  {
+                                                             "pages":  2,
+                                                             "unique_display_messages":  94,
+                                                             "duplicate_message_ids":  0,
+                                                             "cursor_strictly_decreasing":  true,
+                                                             "final_has_older_rows":  false
+                                                         },
+                                          "first_page_duration_ms":  7205,
+                                          "first_page_transport_bytes":  367208,
+                                          "details_available":  49,
+                                          "detail_http":  200,
+                                          "detail_transport_bytes":  1216425,
+                                          "detail_duration_ms":  152,
+                                          "cross_conversation_http":  404,
+                                          "cross_conversation_duration_ms":  22,
+                                          "frontend_http":  200,
+                                          "frontend_duration_ms":  351,
+                                          "chat_smoke":  {
+                                                             "schema":  "marvin.chat-smoke/1.0",
+                                                             "sample_count":  5,
+                                                             "failed_conversations":  0,
+                                                             "console_error_count":  0,
+                                                             "http_error_count":  0,
+                                                             "server_error_count":  0,
+                                                             "server_error_routes":  [
+
+                                                                                     ],
+                                                             "passed":  true,
+                                                             "returncode":  0
+                                                         },
+                                          "server_5xx_count":  0,
+                                          "passed":  true
+                                      }
+                   },
+                   {
+                       "cycle":  2,
+                       "state":  "ready",
+                       "cycle_total_ms":  142537,
+                       "startup_wait_ms":  84331,
+                       "stop_duration_ms":  8370,
+                       "code_workspace_http":  200,
+                       "vm_lab_http":  200,
+                       "functional":  {
+                                          "cycle":  2,
+                                          "target_id_sha256":  "3fc205d2e6bee148996cdc2fc0c167a9883ec65006060062f1386dd4d98c843c",
+                                          "target_stored_bytes":  86195785,
+                                          "page_chain":  {
+                                                             "pages":  2,
+                                                             "unique_display_messages":  94,
+                                                             "duplicate_message_ids":  0,
+                                                             "cursor_strictly_decreasing":  true,
+                                                             "final_has_older_rows":  false
+                                                         },
+                                          "first_page_duration_ms":  3564,
+                                          "first_page_transport_bytes":  367208,
+                                          "details_available":  49,
+                                          "detail_http":  200,
+                                          "detail_transport_bytes":  1216425,
+                                          "detail_duration_ms":  122,
+                                          "cross_conversation_http":  404,
+                                          "cross_conversation_duration_ms":  37,
+                                          "frontend_http":  200,
+                                          "frontend_duration_ms":  349,
+                                          "chat_smoke":  {
+                                                             "schema":  "marvin.chat-smoke/1.0",
+                                                             "sample_count":  5,
+                                                             "failed_conversations":  0,
+                                                             "console_error_count":  0,
+                                                             "http_error_count":  0,
+                                                             "server_error_count":  0,
+                                                             "server_error_routes":  [
+
+                                                                                     ],
+                                                             "passed":  true,
+                                                             "returncode":  0
+                                                         },
+                                          "server_5xx_count":  0,
+                                          "passed":  true
+                                      }
+                   },
+                   {
+                       "cycle":  3,
+                       "state":  "ready",
+                       "cycle_total_ms":  150440,
+                       "startup_wait_ms":  94122,
+                       "stop_duration_ms":  11219,
+                       "code_workspace_http":  200,
+                       "vm_lab_http":  200,
+                       "functional":  {
+                                          "cycle":  3,
+                                          "target_id_sha256":  "3fc205d2e6bee148996cdc2fc0c167a9883ec65006060062f1386dd4d98c843c",
+                                          "target_stored_bytes":  86195785,
+                                          "page_chain":  {
+                                                             "pages":  2,
+                                                             "unique_display_messages":  94,
+                                                             "duplicate_message_ids":  0,
+                                                             "cursor_strictly_decreasing":  true,
+                                                             "final_has_older_rows":  false
+                                                         },
+                                          "first_page_duration_ms":  4716,
+                                          "first_page_transport_bytes":  367208,
+                                          "details_available":  49,
+                                          "detail_http":  200,
+                                          "detail_transport_bytes":  1216425,
+                                          "detail_duration_ms":  122,
+                                          "cross_conversation_http":  404,
+                                          "cross_conversation_duration_ms":  26,
+                                          "frontend_http":  200,
+                                          "frontend_duration_ms":  361,
+                                          "chat_smoke":  {
+                                                             "schema":  "marvin.chat-smoke/1.0",
+                                                             "sample_count":  5,
+                                                             "failed_conversations":  0,
+                                                             "console_error_count":  0,
+                                                             "http_error_count":  0,
+                                                             "server_error_count":  0,
+                                                             "server_error_routes":  [
+
+                                                                                     ],
+                                                             "passed":  true,
+                                                             "returncode":  0
+                                                         },
+                                          "server_5xx_count":  0,
+                                          "passed":  true
+                                      }
+                   }
+               ],
+    "required_consecutive_cycles":  3,
+    "data_modified":  false,
+    "conversation_identifier_plaintext_published":  false,
+    "passed":  true
+}
