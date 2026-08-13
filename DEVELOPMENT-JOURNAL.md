@@ -5,6 +5,25 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.649.0 — cache borné des motifs de sélection
+
+La campagne d'ablation a révélé que la sélection recompilait les mêmes frontières regex à
+chaque outil, chaque couche et chaque mode. Une politique distincte a gelé avant correction
+le code source, l'abandon sans résultat et les prédicats d'équivalence. La solution retenue
+est un cache LRU borné à 4 096 motifs internes. Précompiler seulement les mots-clés aurait
+laissé les noms d'outils explicites sur le chemin lent; mémoriser les résultats par texte
+aurait au contraire retenu des entrées utilisateur et consommé une mémoire non bornée. Le
+cache porte donc uniquement sur le vocabulaire interne, jamais sur le contenu utilisateur.
+
+Sécurité et données : aucun texte, résultat, secret, log ou état persistant supplémentaire.
+Les motifs proviennent uniquement du catalogue et des constantes internes; le texte utilisateur
+reste la valeur recherchée, jamais une expression compilée. Le cache est borné et ne modifie
+ni autorisation, ni disponibilité, ni confirmation. Validation requise : zéro divergence du
+prédicat et des ensembles de mots-clés sur les corpus publics et les 392 demandes DPAPI si
+présentes, canaris positifs/négatifs, mesure comparative locale, tests de sélection existants,
+gate exhaustif puis redémarrage froid et smokes. Rollback : réversion atomique du commit
+v2.649 et redémarrage backend; aucune donnée à restaurer.
+
 ## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
 
 Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier

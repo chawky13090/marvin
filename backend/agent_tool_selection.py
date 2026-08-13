@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 import cloud_routing as _cr
 import database as db
@@ -610,6 +611,16 @@ _VISUAL_CONTROL_TERMS_NORM = tuple(
 _CAPABILITY_CATALOG = build_catalog(TOOLS_SPEC)
 
 
+@lru_cache(maxsize=4096)
+def _keyword_pattern(keyword: str) -> re.Pattern[str]:
+    """Compile une seule fois chaque motif interne de frontière de mot."""
+
+    escaped = re.escape(keyword).replace(r"\ ", r"\s+")
+    left = r"(?<![a-z0-9])" if keyword[0].isalnum() else ""
+    right = r"(?![a-z0-9])" if keyword[-1].isalnum() else ""
+    return re.compile(left + escaped + right)
+
+
 def _keyword_present(keyword: str, text: str) -> bool:
     """Matche un terme metier complet, jamais une sous-chaine accidentelle.
 
@@ -622,10 +633,7 @@ def _keyword_present(keyword: str, text: str) -> bool:
     normalized = str(keyword or "").strip()
     if not normalized:
         return False
-    escaped = re.escape(normalized).replace(r"\ ", r"\s+")
-    left = r"(?<![a-z0-9])" if normalized[0].isalnum() else ""
-    right = r"(?![a-z0-9])" if normalized[-1].isalnum() else ""
-    return re.search(left + escaped + right, text) is not None
+    return _keyword_pattern(normalized).search(text) is not None
 
 
 async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list:
