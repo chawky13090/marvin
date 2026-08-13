@@ -1,0 +1,23 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.10",
+  "status": "frozen_after_aggregate_survivor_diagnostic_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "efdc85907c8e853bdaad39de04b7f4d9d6135a2b2a85c6ac79e410060773ba2d"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0,
+    "only_aggregate_survivor_counts_observed": true,
+    "survivors_by_family": {"file_discovery": 6, "file_mutation": 8, "application_launch": 9, "process_inventory": 3, "process_action": 8, "software_management": 7},
+    "individual_prompts_and_decisions_not_used_for_selection": true
+  },
+  "authorized_change": {
+    "author_calls_batched_by_family": true,
+    "authored_candidates_per_family": 32,
+    "selected_holdout_per_family_remains": 5,
+    "selection_order_remains_author_order_after_all_filters": true,
+    "all_filters_models_prompts_parameters_and_decision_rules_unchanged": true,
+    "no_manual_case_selection": true
+  },
+  "rationale": "A fixed larger pool makes the strict four-filter pipeline statistically robust without weakening any predicate or inspecting individual cases.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
