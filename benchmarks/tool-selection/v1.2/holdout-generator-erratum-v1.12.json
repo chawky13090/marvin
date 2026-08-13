@@ -1,0 +1,30 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.12",
+  "status": "frozen_after_author_batch_truncation_before_holdout_freeze",
+  "source_generator": {
+    "path": "scripts/generate_tool_selection_stage_b_holdout.py",
+    "sha256": "c7ed485dfb4bd2e01f501c04aa87844f9398290fd104fd38758d0e6d0986d742"
+  },
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0,
+    "published_candidate_artifact_count": 0,
+    "failure_class": "cloud_author_returned_fewer_than_64_items_in_a_single_large_batch",
+    "observed_returned_item_count": 53,
+    "individual_prompts_and_reviewer_decisions_not_used_for_selection": true
+  },
+  "authorized_change": {
+    "authored_candidates_per_family": 64,
+    "batch_size": 16,
+    "batches_per_family": 4,
+    "same_partition_for_author_oracles_adjudicator_and_critic": true,
+    "stable_global_ids_assigned_after_author_batches": true,
+    "selected_holdout_per_family_remains": 5,
+    "selection_order_remains_author_batch_then_item_order_after_all_filters": true,
+    "all_filters_models_prompts_parameters_and_decision_rules_unchanged": true,
+    "no_manual_case_selection": true
+  },
+  "rationale": "Bounded 16-item exchanges prevent output truncation while preserving the pre-registered 64-item pool and all acceptance predicates uniformly across families and roles.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
