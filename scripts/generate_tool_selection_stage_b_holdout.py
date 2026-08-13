@@ -24,6 +24,7 @@ import real_usage_corpus
 from tools import TOOLS_SPEC
 
 POLICY = ROOT / "benchmarks/tool-selection/v1.2/stage-b-preregistration.json"
+ADJUDICATOR_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.3.json"
 OUTPUT_DIR = ROOT / "benchmarks/tool-selection/v1.2"
 CORPUS = OUTPUT_DIR / "holdout-corpus.json"
 ORACLE = OUTPUT_DIR / "holdout-oracle.json"
@@ -169,10 +170,24 @@ def _consensus(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> list[
         result.append({"tool": key[0], "action": key[1], "constraints": [left_constraints[item] for item in sorted(set(left_constraints) & set(right_constraints))]})
     return result
 
+def _adjudications(value: Any, valid_ids: set[str]) -> dict[str, bool]:
+    rows = value.get("items") if isinstance(value, dict) else None
+    if not isinstance(rows, list): raise ValueError("Adjudication sans liste items.")
+    output: dict[str, bool] = {}
+    for row in rows:
+        if not isinstance(row, dict): continue
+        identity = str(row.get("id") or "")
+        valid = row.get("valid")
+        if identity in valid_ids and isinstance(valid, bool) and identity not in output:
+            output[identity] = valid
+    if set(output) != valid_ids: raise ValueError("Adjudication incomplète ou dupliquée.")
+    return output
+
 async def run() -> dict[str, Any]:
     if any(path.exists() for path in (CORPUS, ORACLE, REPORT)):
         raise RuntimeError("Artefact Stage B déjà présent; écrasement interdit.")
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    adjudicator_policy = json.loads(ADJUDICATOR_POLICY.read_text(encoding="utf-8"))
     if policy["status"] != "frozen_before_holdout_generation": raise RuntimeError("Politique Stage B non gelée.")
     models = await _models()
     for role in ("author", "oracle_a", "oracle_b", "benchmark"):
@@ -180,6 +195,11 @@ async def run() -> dict[str, Any]:
         observed = models.get(expected["model"])
         if not observed or str(observed.get("digest") or "") != expected["digest"] or not observed.get("remote_host"):
             raise RuntimeError(f"Provenance Cloud invalide pour {role}.")
+    adjudicator_contract = adjudicator_policy["authorized_change"]
+    adjudicator_model = str(adjudicator_contract["adjudicator_model"])
+    adjudicator_row = models.get(adjudicator_model)
+    if not adjudicator_row or str(adjudicator_row.get("digest") or "") != adjudicator_contract["adjudicator_digest"] or not adjudicator_row.get("remote_host"):
+        raise RuntimeError("Provenance Cloud invalide pour l'adjudicateur.")
 
     catalog_json = json.dumps(TOOLS_SPEC, ensure_ascii=False, separators=(",", ":"))
     family_counts = {name: 8 for name in ALLOWED_FAMILIES}
@@ -212,13 +232,37 @@ async def run() -> dict[str, Any]:
         oracle_values[role] = _normalize_oracle(raw, {row["id"] for row in candidates}, {str(item["function"]["name"]) for item in TOOLS_SPEC})
         oracle_meta[role] = meta
 
+    consensus_by_id = {
+        row["id"]: _consensus(
+            oracle_values["oracle_a"][row["id"]],
+            oracle_values["oracle_b"][row["id"]],
+        )
+        for row in candidates
+    }
+    adjudicator_input = [
+        {"id": row["id"], "family": row["family"], "prompt": row["prompt"], "consensus_calls": consensus_by_id[row["id"]]}
+        for row in candidates
+    ]
+    adjudicator_raw, adjudicator_meta = await _chat(
+        adjudicator_model,
+        "Tu es un adjudicateur indépendant. Tu peux seulement accepter ou exclure; JSON strict, sans Markdown.",
+        "Retourne {items:[{id,valid}]}, exactement une décision par item. valid=true uniquement si le texte "
+        "implique réellement la famille déclarée ET si au moins un consensus_call accomplit précisément la "
+        "demande avec ses contraintes. Une ambiguïté ou une action relevant d'une autre famille impose false. "
+        "Ne corrige et ne réécris jamais un item. Catalogue de référence:\n" + catalog_json
+        + "\nITEMS:\n" + json.dumps(adjudicator_input, ensure_ascii=False, separators=(",", ":")),
+        seed=2654,
+    )
+    adjudicated = _adjudications(adjudicator_raw, {row["id"] for row in candidates})
+
     old_public, private = _old_public_texts(), _private_texts(policy)
     maximum = float(policy["holdout"]["novelty"]["token_jaccard_maximum"])
     selected, oracle_rows, excluded = [], [], Counter()
     by_family: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in candidates:
-        accepted = _consensus(oracle_values["oracle_a"][row["id"]], oracle_values["oracle_b"][row["id"]])
+        accepted = consensus_by_id[row["id"]]
         if not accepted: excluded["oracle_no_consensus"] += 1; continue
+        if not adjudicated[row["id"]]: excluded["adjudicator_rejected"] += 1; continue
         max_public = max((_jaccard(row["prompt"], text) for text in old_public), default=0.0)
         max_private = max((_jaccard(row["prompt"], text) for text in private), default=0.0)
         if max(max_public, max_private) > maximum: excluded["novelty"] += 1; continue
@@ -238,7 +282,7 @@ async def run() -> dict[str, Any]:
     report = {
         "schema": "marvin.tool-selection-stage-b-generation-report/1.0", "status": "complete",
         "policy_sha256": _sha256(POLICY), "generator_sha256": _sha256(Path(__file__)),
-        "models": {"author": author_meta, **oracle_meta},
+        "models": {"author": author_meta, **oracle_meta, "adjudicator": adjudicator_meta},
         "counts": {"authored": len(candidates), "selected": len(selected), "excluded": dict(excluded), "families": dict(Counter(row["family"] for row in selected))},
         "novelty": {"public_reference_count": len(old_public), "private_reference_count": len(private), "maximum_token_jaccard": maximum, "private_details_published": False},
         "privacy": {"synthetic_only": True, "raw_model_responses_published": False, "personal_data_patterns_passed": True},

@@ -15,6 +15,8 @@ def main() -> None:
     assert "real_external_recipient" not in text
     assert "raw_response_sha256" in text and "raw_model_responses_published" in text
     assert "oracle_a" in text and "oracle_b" in text and "_consensus" in text
+    assert "ADJUDICATOR_POLICY" in text and "_adjudications" in text
+    assert "adjudicator_rejected" in text
     assert "family_ordinals" in text and "family_ordinals[family] += 1" in text
     assert '"prompt": prompt})' in text
     assert "private_details_published" in text and "_jaccard" in text
