@@ -1,0 +1,29 @@
+{
+  "schema": "marvin.td015-result-format-erratum/1.0",
+  "published_at": "2026-08-13",
+  "reason": "Windows PowerShell 5.1 Set-Content -Encoding UTF8 a ajouté un BOM UTF-8 au résultat v3, ce qui empêchait sa lecture avec un décodeur UTF-8 strict.",
+  "historical_blob": {
+    "commit": "5259268006725d9423b88b2fd440eda08932cdeb",
+    "path": "benchmarks/conversation-history/td015-closure-result.json",
+    "git_blob_sha256": "aa08a8b1f952b55f8911674adff3f231c28a67dd3371a1d9ed89fe9cb3a3ddde",
+    "observed_windows_worktree_sha256": "7a2420a86c60b533cf06d9afeb7cbd71066f93f13d5a03fd38311e49ef895d93",
+    "utf8_bom": true,
+    "recoverable_with_git_show": true
+  },
+  "canonical_result": {
+    "path": "benchmarks/conversation-history/td015-closure-result.json",
+    "semantic_sha256": "a4c8a7c11e343f8f7e5de4d3220a7443cb94072761b9f658b0e84edeeacb6b51",
+    "encoding": "UTF-8",
+    "utf8_bom": false,
+    "standard_json_parser_compatible": true
+  },
+  "semantic_payload_identical": true,
+  "line_endings_excluded_from_semantic_identity": true,
+  "campaign_rerun": false,
+  "campaign_measurements_changed": false,
+  "data_modified": false,
+  "rollback": {
+    "command": "git show 5259268006725d9423b88b2fd440eda08932cdeb:benchmarks/conversation-history/td015-closure-result.json",
+    "effect": "Restaure exactement le blob historique avec BOM; aucune donnée Marvin n'est concernée."
+  }
+}

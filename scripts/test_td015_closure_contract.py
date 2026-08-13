@@ -15,8 +15,14 @@ FREEZE_V1 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze
 FREEZE_V2 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze-v2.json"
 FREEZE = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze-v3.json"
 RESULT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-result.json"
+FORMAT_ERRATUM = ROOT / "benchmarks" / "conversation-history" / "td015-closure-result-format-erratum.json"
 ABORT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-v1-abort.json"
 ABORT_V2 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-v2-abort.json"
+HISTORICAL_RESULT_COMMIT = "5259268006725d9423b88b2fd440eda08932cdeb"
+HISTORICAL_GIT_BLOB_SHA256 = "aa08a8b1f952b55f8911674adff3f231c28a67dd3371a1d9ed89fe9cb3a3ddde"
+HISTORICAL_WINDOWS_WORKTREE_SHA256 = "7a2420a86c60b533cf06d9afeb7cbd71066f93f13d5a03fd38311e49ef895d93"
+SEMANTIC_RESULT_SHA256 = "a4c8a7c11e343f8f7e5de4d3220a7443cb94072761b9f658b0e84edeeacb6b51"
+UTF8_BOM = b"\xef\xbb\xbf"
 
 
 def _sha256(path: Path) -> str:
@@ -24,7 +30,54 @@ def _sha256(path: Path) -> str:
 
 
 def _load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+    payload = path.read_bytes()
+    assert not payload.startswith(UTF8_BOM), f"BOM UTF-8 interdit : {path}"
+    return json.loads(payload.decode("utf-8"))
+
+
+def _historical_result_blob() -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{HISTORICAL_RESULT_COMMIT}:benchmarks/conversation-history/td015-closure-result.json"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+
+
+def _assert_result_format_erratum(result: dict) -> None:
+    erratum = _load_json(FORMAT_ERRATUM)
+    historical = _historical_result_blob()
+    canonical = RESULT.read_bytes()
+    assert historical.startswith(UTF8_BOM)
+    assert hashlib.sha256(historical).hexdigest() == HISTORICAL_GIT_BLOB_SHA256
+    semantic = json.dumps(
+        result, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    assert hashlib.sha256(semantic).hexdigest() == SEMANTIC_RESULT_SHA256
+    assert erratum["schema"] == "marvin.td015-result-format-erratum/1.0"
+    assert erratum["historical_blob"]["commit"] == HISTORICAL_RESULT_COMMIT
+    assert erratum["historical_blob"]["git_blob_sha256"] == HISTORICAL_GIT_BLOB_SHA256
+    assert (
+        erratum["historical_blob"]["observed_windows_worktree_sha256"]
+        == HISTORICAL_WINDOWS_WORKTREE_SHA256
+    )
+    assert erratum["historical_blob"]["utf8_bom"] is True
+    assert erratum["canonical_result"]["semantic_sha256"] == SEMANTIC_RESULT_SHA256
+    assert erratum["canonical_result"]["utf8_bom"] is False
+    assert erratum["semantic_payload_identical"] is True
+    assert erratum["line_endings_excluded_from_semantic_identity"] is True
+    assert json.loads(historical.decode("utf-8-sig")) == result
+
+
+def _assert_powershell_writer_contract() -> None:
+    source = (ROOT / "scripts" / "run_td015_closure.ps1").read_text(encoding="utf-8")
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    assert "System.Text.UTF8Encoding($false)" in source
+    assert "Write-JsonAtomicUtf8NoBom" in source
+    assert "System.IO.File]::WriteAllText" in source
+    assert "Set-Content -LiteralPath $Temporary -Encoding UTF8" not in source
+    assert "Set-Content -LiteralPath $AbortPath -Encoding UTF8" not in source
+    assert "benchmarks/conversation-history/*.json text eol=lf" in attributes
 
 
 def _load_cycle_module():
@@ -203,7 +256,10 @@ def main() -> None:
         freeze = _load_json(FREEZE)
         _assert_freeze(freeze)
         if RESULT.exists():
-            _assert_result(_load_json(RESULT), policy, freeze)
+            result = _load_json(RESULT)
+            _assert_result(result, policy, freeze)
+            _assert_result_format_erratum(result)
+            _assert_powershell_writer_contract()
     elif RESULT.exists():
         raise AssertionError("Un résultat TD-015 existe sans manifeste de gel.")
     print("TD-015 closure contract OK")

@@ -5,6 +5,37 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.645.0 — preuves JSON portables sur Windows
+
+La revue croisée a reproduit un défaut de portabilité dans le résultat de clôture TD-015 :
+`Set-Content -Encoding UTF8` de Windows PowerShell 5.1 avait ajouté les octets `EF BB BF`.
+Un parseur Python ouvert explicitement en `utf-8` échouait donc avant le premier caractère.
+Deux approches ont été comparées. Tolérer `utf-8-sig` partout aurait propagé une exception de
+lecture propre à l'artefact; réécrire silencieusement la preuve aurait effacé son identité
+historique. La solution retenue conserve le blob original au commit `52592680`, publie un
+erratum avec ses empreintes brutes, et normalise uniquement la copie canonique sans modifier
+la charge JSON, les mesures ou la campagne.
+
+Le runner TD-015 n'utilise plus `Set-Content` pour les JSON. Une fonction unique écrit dans
+un temporaire avec `System.Text.UTF8Encoding(false)`, déplace atomiquement le fichier, puis
+nettoie le temporaire en `finally`; elle couvre résultat et abandon. Le contrat lit désormais
+tous les artefacts en UTF-8 strict, refuse un BOM, vérifie le blob historique depuis Git,
+compare les charges sémantiques canonisées et contrôle le générateur PowerShell. Les fins de
+ligne ne participent pas à l'identité sémantique et Git impose LF aux preuves JSON de ce
+domaine, ce qui évite une empreinte dépendante du poste Windows.
+
+Sécurité et journalisation : aucune donnée personnelle, conversation, secret, journal
+runtime, mesure ou nouvelle destination réseau n'est ajouté. L'erratum ne contient que des
+chemins de dépôt, commits, empreintes et booléens. Rollback : réversion atomique du commit
+v2.645; le blob historique reste récupérable par `git show` et aucune restauration de données
+n'est nécessaire. Validation ciblée : contrat TD-015, parseur JSON UTF-8 strict, syntaxe
+Windows PowerShell 5.1 et contrôle de diff. La gate exhaustive a obtenu 300 étapes exécutées,
+4 smokes live explicitement ignorés et zéro échec sur 304 attendues, build Next.js 16 inclus.
+Marvin a ensuite redémarré `ready` en 84,2 secondes sur `2.645.0 / 364 outils / 392 routes`;
+Ollama, SearXNG, HTTPS, Code Workspace et VM Lab étaient disponibles. Les smokes séquentiels
+ont obtenu 28/28 contrats API, 41/41 pages, chat 5/5 et voix strictement sérialisée. Aucun
+processus n'a été forcé pendant l'arrêt préalable.
+
 ## 2026-08-13 — v2.644.0 — TD-015 fermée sans perte de données
 
 La clôture a été pré-enregistrée avant exécution : trois redémarrages froids consécutifs,

@@ -10,6 +10,26 @@ $PolicyPath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-pol
 $FreezePath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-freeze-v3.json'
 $ResultPath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-result.json'
 $Python = Join-Path $Root 'backend\.venv\Scripts\python.exe'
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-JsonAtomicUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)][object]$Value,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][int]$Depth
+    )
+
+    $TemporaryPath = "$Path.$PID.tmp"
+    try {
+        $Json = $Value | ConvertTo-Json -Depth $Depth
+        [System.IO.File]::WriteAllText($TemporaryPath, $Json, $script:Utf8NoBom)
+        Move-Item -LiteralPath $TemporaryPath -Destination $Path -Force
+    } finally {
+        if (Test-Path -LiteralPath $TemporaryPath) {
+            Remove-Item -LiteralPath $TemporaryPath -Force
+        }
+    }
+}
 
 if (-not $PSCmdlet.ShouldProcess('Marvin', '3 redémarrages froids et validation TD-015')) { exit 0 }
 if (-not (Test-Path -LiteralPath $FreezePath)) { throw 'Le gel TD-015 est absent.' }
@@ -82,18 +102,17 @@ try {
         conversation_identifier_plaintext_published = $false
         passed = @($Cycles).Count -eq [int]$Policy.cold_start.required_consecutive_cycles
     }
-    $Temporary = "$ResultPath.tmp"
-    $Report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Temporary -Encoding UTF8
-    Move-Item -LiteralPath $Temporary -Destination $ResultPath
+    Write-JsonAtomicUtf8NoBom -Value $Report -Path $ResultPath -Depth 12
     $Report | ConvertTo-Json -Compress -Depth 12
 } catch {
     $AbortPath = Join-Path $RunRoot 'aborted.json'
-    [ordered]@{
+    $Abort = [ordered]@{
         schema = 'marvin.td015-closure-abort/1.0'
         generated_at = (Get-Date).ToUniversalTime().ToString('o')
         completed_cycles = @($Cycles).Count
         error = $_.Exception.Message
         result_published = $false
-    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $AbortPath -Encoding UTF8
+    }
+    Write-JsonAtomicUtf8NoBom -Value $Abort -Path $AbortPath -Depth 6
     throw
 }

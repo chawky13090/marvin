@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.644.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.645.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.644.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.645.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.644.0)
+## 9. État actuel (v2.645.0)
+
+**v2.645 (preuves JSON portables)** : le résultat TD-015 reste sémantiquement identique,
+mais son BOM UTF-8 ajouté par Windows PowerShell 5.1 est retiré de la copie canonique. Le
+blob historique reste récupérable au commit `52592680` et un erratum lie commit, empreintes
+brutes et empreinte JSON canonique indépendante des fins de ligne. Le runner écrit désormais
+résultats et abandons atomiquement avec `UTF8Encoding(false)`; le contrat refuse tout BOM et
+prouve la lecture par un décodeur UTF-8 strict. Les JSON de preuve de conversation sont
+normalisés LF dans Git. Rollback : réversion atomique de v2.645; aucune donnée Marvin,
+campagne, mesure ou configuration n'est modifiée.
 
 **v2.644 (TD-015 fermée par preuve froide)** : une première campagne avortée a révélé que
 le proxy Next abandonnait une lecture historique après 6 secondes puis pouvait la rejouer
