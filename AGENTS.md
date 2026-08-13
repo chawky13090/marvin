@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.647.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.648.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.647.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.648.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -221,7 +221,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.647.0)
+## 9. État actuel (v2.648.0)
+
+**v2.648 (frontière réelle d'indexation des notes)** : le premier cycle API réel après le gate
+v2.647 a correctement refusé de présenter l'indexation comme complète et a exposé
+`qdrant_index:NameError`. La cause était un import `hashlib` absent dans `index_note`, chemin
+que les injections de panne remplaçaient par un mock. L'import est restauré et le test appelle
+désormais la vraie fonction `index_note`, en ne simulant que l'upsert Qdrant externe; il vérifie
+notamment l'empreinte du contenu. L'assessment v1.5 reste historique et un rectificatif séparé
+doit lier le rejeu runtime au nouveau commit. Rollback : réversion atomique de v2.648 puis
+redémarrage backend; aucune donnée existante ni aucun schéma n'est modifié.
 
 **v2.647 (cohérence notes/mémoires et statut VM en lecture seule)** : les créations et mises
 à jour de notes conservent SQLite comme source autoritative et exposent explicitement un état

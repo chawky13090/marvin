@@ -5,6 +5,21 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
+
+Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier
+cycle API réel a créé la fixture SQLite mais a honnêtement renvoyé `consistency=degraded` avec
+`qdrant_index:NameError`. La fixture a été supprimée par le `finally`; aucune donnée utilisateur
+n'a été utilisée. La cause primaire est un import `hashlib` absent dans `vector_store.index_note`.
+Les tests v2.647 simulaient `_index` pour injecter les pannes multi-magasins et ne traversaient
+donc pas cette frontière réelle.
+
+La correction minimale importe `hashlib`. Le test Notes appelle maintenant la vraie fonction
+`index_note` et ne remplace que l'upsert Qdrant externe; il vérifie le SHA-256 transmis. Aucun
+secret, contenu personnel, nouveau log, schéma ou format persistant n'est ajouté. Rollback :
+réversion atomique du commit v2.648 puis redémarrage backend. L'assessment v1.5 déjà publié
+reste immuable; le résultat live corrigé sera lié par un rectificatif versionné distinct.
+
 ## 2026-08-13 — v2.647.0 — cohérence multi-magasins et lecture VM sans mutation
 
 TD-014 identifiait cinq surfaces sous-déclarées. Un pré-enregistrement séparé a gelé les

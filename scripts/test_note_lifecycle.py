@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 import note_lifecycle
+import vector_store
 from api import notes as notes_api
 from fastapi import HTTPException
 
@@ -28,6 +29,23 @@ NOTE = {
 
 
 async def _run() -> None:
+    with patch.object(
+        vector_store,
+        "upsert_document",
+        AsyncMock(return_value=True),
+    ) as upsert:
+        assert await vector_store.index_note(
+            "note-1",
+            "Runbook",
+            "Contenu fixture",
+            ["ops"],
+        ) is True
+    indexed_text = "Runbook\nContenu fixture"
+    indexed_metadata = upsert.await_args.args[3]
+    assert indexed_metadata["content_sha256"] == __import__("hashlib").sha256(
+        indexed_text.encode("utf-8")
+    ).hexdigest()
+
     with (
         patch.object(note_lifecycle.db, "create_note", return_value=NOTE),
         patch.object(note_lifecycle, "_index", AsyncMock()),

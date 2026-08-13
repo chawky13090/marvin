@@ -3,6 +3,7 @@ SecretaryAI Backend — Qdrant vector store (mode local, sans Docker).
 Utilise Ollama nomic-embed-text pour les embeddings.
 """
 import atexit
+import hashlib
 import json
 import re as _re
 import time as _time
