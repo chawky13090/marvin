@@ -78,17 +78,26 @@ async def _chat(model: str, system: str, user: str, *, seed: int) -> tuple[dict[
         "options": {"temperature": 0.1, "top_p": 0.9, "seed": seed, "num_predict": 12288},
     }
     assert "num_ctx" not in payload["options"]
-    async with httpx.AsyncClient(timeout=600, trust_env=False) as client:
-        response = await client.post(f"{OLLAMA}/api/chat", json=payload); response.raise_for_status()
-    body = response.json()
-    content = str((body.get("message") or {}).get("content") or "")
-    parsed = json.loads(content)
-    return parsed, {
-        "requested_model": model, "observed_model": str(body.get("model") or ""),
-        "raw_response_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-        "prompt_eval_count": int(body.get("prompt_eval_count") or 0),
-        "eval_count": int(body.get("eval_count") or 0), "client_num_ctx": None,
-    }
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            async with httpx.AsyncClient(timeout=600, trust_env=False) as client:
+                response = await client.post(f"{OLLAMA}/api/chat", json=payload); response.raise_for_status()
+            body = response.json()
+            content = str((body.get("message") or {}).get("content") or "")
+            parsed = json.loads(content)
+            return parsed, {
+                "requested_model": model, "observed_model": str(body.get("model") or ""),
+                "raw_response_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                "prompt_eval_count": int(body.get("prompt_eval_count") or 0),
+                "eval_count": int(body.get("eval_count") or 0), "client_num_ctx": None,
+                "attempts": attempt,
+            }
+        except (httpx.HTTPError, json.JSONDecodeError, ValueError, TypeError) as exc:
+            last_error = exc
+            if attempt < 3:
+                await asyncio.sleep(float(attempt))
+    raise RuntimeError(f"Réponse Cloud JSON indisponible après trois tentatives : {model}") from last_error
 
 def _old_public_texts() -> list[str]:
     result: list[str] = []
