@@ -65,6 +65,15 @@ modifie aucune politique ni preuve : la version portable devient 2.649 et l'empr
 est comparée au blob `git show` du commit source, comme les cinq sources produit. Le résultat
 316/318 reste enregistré comme échec et une gate exhaustive neuve est obligatoire.
 
+Validation finale observée : la seconde gate exhaustive obtient 314 étapes exécutées, quatre
+smokes live différés et zéro échec sur 318 attendues en 668,3 secondes, build Next.js inclus.
+Le redémarrage froid borné atteint `ready` en 131 662 ms, dont 127 680 ms d'attente de démarrage;
+il expose v2.649.0, 364 outils, Ollama, SearXNG, HTTPS, Code Workspace et VM Lab prêts. Les smokes
+séquentiels obtiennent API 28/28, pages 41/41, chat 5/5 et voix à concurrence maximale 1. La
+santé post-charge reste `ok`. Marvin reste démarré. Le prochain changement de routage est
+interdit jusqu'au gel d'un nouveau holdout Stage B indépendant; le résultat de cette tranche
+ne justifie ni retrait d'une couche, ni façade, ni réduction du mode max.
+
 ## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
 
 Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier
