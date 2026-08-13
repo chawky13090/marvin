@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 303
+EXPECTED_STAGE_COUNT = 304
 
 
 @dataclass(frozen=True)
@@ -203,6 +203,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Harnais isolé des six fixtures E7", (python, "scripts/test_e7_fixture_harness.py")),
         Stage("Implémentations des six fixtures E7", (python, "scripts/test_e7_fixture_implementations.py")),
         Stage("Readiness de démarrage prouvée", (python, "scripts/test_startup_readiness_contract.py")),
+        Stage("Clôture reproductible de TD-015", (python, "scripts/test_td015_closure_contract.py")),
         Stage("Qualification des environnements pilotes E7", (python, "scripts/test_e7_environment_qualification.py")),
         Stage("Routes de lecture bloquantes externalisées", (python, "scripts/test_nonblocking_read_routes.py")),
         Stage("Isolation des ressources temporaires des smokes", (python, "scripts/test_smoke_resource_isolation.py")),

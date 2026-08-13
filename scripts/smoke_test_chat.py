@@ -16,8 +16,11 @@ ce script se contente de piloter Chrome vers l'instance déjà démarrée par l'
 Nécessite Playwright (déjà dans backend/.venv, channel="chrome").
 """
 import asyncio
+import json
+import os
 import re
 import sys
+from pathlib import Path
 
 from playwright.async_api import async_playwright
 
@@ -114,18 +117,22 @@ async def check_conversation(page, title_snippet: str, conversation_id: str) -> 
 async def main() -> int:
     console_errors: list[str] = []
     http_errors: list[str] = []
+    server_errors: list[str] = []
+
+    def capture_response(response) -> None:
+        if response.status < 400:
+            return
+        event = f"HTTP {response.status} {response.url}"
+        http_errors.append(event)
+        if response.status >= 500:
+            server_errors.append(event)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome")
         page = await browser.new_page(viewport={"width": 1280, "height": 1400})
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
         page.on("pageerror", lambda exc: console_errors.append(str(exc)))
-        page.on(
-            "response",
-            lambda response: http_errors.append(
-                f"HTTP {response.status} {response.url}"
-            ) if response.status >= 400 else None,
-        )
+        page.on("response", capture_response)
 
         # La page possède des pollers à 10/15 s : `networkidle` n'est donc pas
         # un contrat de disponibilité et devient aléatoire sous charge. Attendre
@@ -209,7 +216,26 @@ async def main() -> int:
         for error in http_errors[:20]:
             print(f"  - {error[:300]}")
 
-    ok = not failed and not console_errors
+    ok = not failed and not console_errors and not server_errors
+    report_path = os.environ.get("MARVIN_SMOKE_REPORT_PATH")
+    if report_path:
+        destination = Path(report_path).resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        report = {
+            "schema": "marvin.chat-smoke/1.0",
+            "sample_count": len(results),
+            "failed_conversations": len(failed),
+            "console_error_count": len(console_errors),
+            "http_error_count": len(http_errors),
+            "server_error_count": len(server_errors),
+            "passed": ok,
+        }
+        temporary = destination.with_suffix(destination.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(destination)
     print(f"\nRésultat global : {'OK' if ok else 'ECHEC'}")
     return 0 if ok else 1
 

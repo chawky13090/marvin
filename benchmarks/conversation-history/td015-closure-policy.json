@@ -1,0 +1,54 @@
+{
+  "schema": "marvin.td015-closure-policy/1.0",
+  "campaign": "td015-conversation-history-closure-v1",
+  "product_version": "2.643.0",
+  "execution_authorized": false,
+  "result_publication_authorized": false,
+  "target_selector": {
+    "method": "largest_persisted_conversation_by_stored_bytes",
+    "minimum_stored_bytes": 33554432,
+    "plaintext_identifier_in_result_forbidden": true
+  },
+  "cold_start": {
+    "required_consecutive_cycles": 3,
+    "startup_timeout_seconds": 180,
+    "state_must_equal": "ready",
+    "code_workspace_http": 200,
+    "vm_lab_http": 200,
+    "frontend_http": 200
+  },
+  "conversation": {
+    "maximum_first_page_duration_ms": 30000,
+    "maximum_first_page_transport_bytes": 1048576,
+    "maximum_pages": 10,
+    "minimum_pages": 2,
+    "minimum_unique_display_messages": 80,
+    "cursor_must_strictly_decrease": true,
+    "duplicate_message_ids_allowed": 0,
+    "final_has_older_rows": false,
+    "allowed_cutoff_reasons": ["row_limit", "byte_budget", "none"]
+  },
+  "detail": {
+    "minimum_available_receipts": 1,
+    "same_conversation_http": 200,
+    "cross_conversation_http": 404,
+    "automatic_retry_allowed": false
+  },
+  "chat_smoke": {
+    "required_conversations": 5,
+    "required_exit_code": 0,
+    "maximum_http_5xx": 0,
+    "maximum_console_errors": 0
+  },
+  "integrity": {
+    "conversation_write_allowed": false,
+    "database_migration_allowed": false,
+    "tool_execution_allowed": false,
+    "result_must_be_written_atomically": true,
+    "partial_success_forbidden": true
+  },
+  "rollback": {
+    "method": "revert_preregistration_commits_before_execution",
+    "persistent_data_changed": false
+  }
+}
