@@ -1,0 +1,37 @@
+{
+  "schema": "marvin.td015-closure-freeze/1.0",
+  "generated_at": "2026-08-13T10:39:33.9265988Z",
+  "source_commit": "8589802ffeecddee848b3ae819868e4c2980cc6a",
+  "policy_sha256": "192b5e0de6343e3b0bafee20cec8a3b4f1ccfa4075b8a03273c0b1e2a47fab4d",
+  "supersedes_freeze_sha256": "be8a056fa23da8bdb2cbe6e542a5cdd4b469ad7482159b047a9bfc42d8f2df7a",
+  "supersession_reason": "Le proxy Next abandonnait puis rejouait une lecture lourde, ce qui amplifiait la charge. Les seuils d'acceptation sont inchangés.",
+  "acceptance_criteria_changed": false,
+  "execution_authorized": true,
+  "result_publication_authorized": true,
+  "source_hashes": {
+    "benchmarks/conversation-history/td015-closure-policy.json": "192b5e0de6343e3b0bafee20cec8a3b4f1ccfa4075b8a03273c0b1e2a47fab4d",
+    "benchmarks/conversation-history/td015-closure-freeze.json": "be8a056fa23da8bdb2cbe6e542a5cdd4b469ad7482159b047a9bfc42d8f2df7a",
+    "benchmarks/conversation-history/td015-closure-v1-abort.json": "f8aa4a74da0c091ea6441c3e286b6a75dc523c909f196255a5e98f0efbc78ae6",
+    "scripts/verify_td015_cycle.py": "af6a883940de374d384b4e54af9b86e938f52838b8983c73b0d58d15d553cb23",
+    "scripts/run_td015_closure.ps1": "648c17ba5f021ae41afe2874b512c8a7616a0680c7a751e5fa647a0fa002d2ec",
+    "scripts/test_td015_closure_contract.py": "12a3508f55b5e03733cbf61eb2cc5b15ee0fab816e9727d7f2bee04add73e268",
+    "scripts/smoke_test_chat.py": "d9f211e8f7ed344972f14913afdd1bfc31cd1da9e48f3b45ae467351f525613e",
+    "scripts/smoke_run_lock.py": "924d77c03a0ddf91593527fee0bafa1f7179c82f1cdbdec88282fab870dcf31c",
+    "scripts/restart-marvin.ps1": "7e76b7a2344c7925de7b31696934bd25febafaa1d298e22f7e9a69d7fd579f12",
+    "scripts/test_backend_read.mjs": "d86e571b4a5e82c9a26533506e2967f15082288954e4a38ba14d804327d8f633",
+    "backend/api/conversations.py": "96f918737a802d17d3a16f68c8cdb98f47c934512ff09c7c15fa32dd19def67a",
+    "backend/conversation_history.py": "2ede2765b0bcbfaeb0f42c2b6775e93cccebb4505bd94b63af3377bd617d6d74",
+    "backend/repositories/conversations.py": "903d1b4dd7bdd948456c906a871ebdb6a81c3baa7d88a66a7fb31de4e6e373e5",
+    "components/chat/ChatContainer.jsx": "e00290dc9bc8018f392b3289099f02a4797a709365c759b6764b19103d59aa2c",
+    "components/chat/MessageBubble.jsx": "b21e8871cd38cd0f7c59e9872a32c371c5c9e24c205247b56bf877d6d5ec1b3e",
+    "lib/backendRead.mjs": "5d7cc172cd34d4fb099ebccc5113728ecd7422ec7404141a7d07cde2b56925e7",
+    "app/api/conversations/[id]/route.js": "e89ebe5b8b0b849e59b8f2f282a0ffdaa94d71fb4e6f344e631c8afbca756052"
+  },
+  "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run_td015_closure.ps1",
+  "scope": {
+    "cold_restart_cycles": 3,
+    "persistent_data_write_allowed": false,
+    "conversation_plaintext_identifier_publication_allowed": false,
+    "partial_result_publication_allowed": false
+  }
+}
