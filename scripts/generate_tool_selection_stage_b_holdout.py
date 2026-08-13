@@ -25,6 +25,7 @@ from tools import TOOLS_SPEC
 
 POLICY = ROOT / "benchmarks/tool-selection/v1.2/stage-b-preregistration.json"
 ADJUDICATOR_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.3.json"
+CRITIC_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.5.json"
 OUTPUT_DIR = ROOT / "benchmarks/tool-selection/v1.2"
 CORPUS = OUTPUT_DIR / "holdout-corpus.json"
 ORACLE = OUTPUT_DIR / "holdout-oracle.json"
@@ -192,11 +193,40 @@ def _adjudications(value: Any, valid_ids: set[str]) -> dict[str, bool]:
     if set(output) != valid_ids: raise ValueError("Adjudication incomplète ou dupliquée.")
     return output
 
+def _schema_valid_calls(calls: list[dict[str, Any]], catalog: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    output = []
+    for call in calls:
+        specification = catalog.get(call["tool"])
+        if not specification: continue
+        schema = specification.get("function", {}).get("parameters") or {}
+        properties = schema.get("properties") or {}
+        action = call.get("action")
+        if action is not None:
+            action_schema = properties.get("action") or {}
+            if action not in (action_schema.get("enum") or []): continue
+        valid = True
+        for constraint in call.get("constraints") or []:
+            field = properties.get(constraint["argument"])
+            if not isinstance(field, dict): valid = False; break
+            if constraint["operator"] == "equals":
+                value, expected = constraint.get("value"), field.get("type")
+                type_ok = (
+                    (expected == "string" and isinstance(value, str))
+                    or (expected == "integer" and isinstance(value, int) and not isinstance(value, bool))
+                    or (expected == "number" and isinstance(value, (int, float)) and not isinstance(value, bool))
+                    or (expected == "boolean" and isinstance(value, bool))
+                    or expected not in {"string", "integer", "number", "boolean"}
+                )
+                if not type_ok or (field.get("enum") and value not in field["enum"]): valid = False; break
+        if valid: output.append(call)
+    return output
+
 async def run() -> dict[str, Any]:
     if any(path.exists() for path in (CORPUS, ORACLE, REPORT)):
         raise RuntimeError("Artefact Stage B déjà présent; écrasement interdit.")
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     adjudicator_policy = json.loads(ADJUDICATOR_POLICY.read_text(encoding="utf-8"))
+    critic_policy = json.loads(CRITIC_POLICY.read_text(encoding="utf-8"))
     if policy["status"] != "frozen_before_holdout_generation": raise RuntimeError("Politique Stage B non gelée.")
     models = await _models()
     for role in ("author", "oracle_a", "oracle_b", "benchmark"):
@@ -209,6 +239,11 @@ async def run() -> dict[str, Any]:
     adjudicator_row = models.get(adjudicator_model)
     if not adjudicator_row or str(adjudicator_row.get("digest") or "") != adjudicator_contract["adjudicator_digest"] or not adjudicator_row.get("remote_host"):
         raise RuntimeError("Provenance Cloud invalide pour l'adjudicateur.")
+    critic_contract = critic_policy["authorized_change"]
+    critic_model = str(critic_contract["critic_model"])
+    critic_row = models.get(critic_model)
+    if not critic_row or str(critic_row.get("digest") or "") != critic_contract["critic_digest"] or not critic_row.get("remote_host"):
+        raise RuntimeError("Provenance Cloud invalide pour le critique.")
 
     catalog_json = json.dumps(TOOLS_SPEC, ensure_ascii=False, separators=(",", ":"))
     family_counts = {name: 8 for name in ALLOWED_FAMILIES}
@@ -241,11 +276,12 @@ async def run() -> dict[str, Any]:
         oracle_values[role] = _normalize_oracle(raw, {row["id"] for row in candidates}, {str(item["function"]["name"]) for item in TOOLS_SPEC})
         oracle_meta[role] = meta
 
+    catalog_by_name = {str(item["function"]["name"]): item for item in TOOLS_SPEC}
     consensus_by_id = {
-        row["id"]: _consensus(
+        row["id"]: _schema_valid_calls(_consensus(
             oracle_values["oracle_a"][row["id"]],
             oracle_values["oracle_b"][row["id"]],
-        )
+        ), catalog_by_name)
         for row in candidates
     }
     adjudicator_input = [
@@ -263,6 +299,17 @@ async def run() -> dict[str, Any]:
         seed=2654,
     )
     adjudicated = _adjudications(adjudicator_raw, {row["id"] for row in candidates})
+    critic_raw, critic_meta = await _chat(
+        critic_model,
+        "Tu es un critique adversarial indépendant. Tu peux seulement accepter ou exclure; JSON strict, sans Markdown.",
+        "Retourne {items:[{id,valid}]}, exactement une décision par item. Cherche les faux positifs: outil qui "
+        "n'accomplit qu'une partie de la demande, différence nom/contenu, direct/récursif, application/fichier, "
+        "processus/service, installé/disponible, lecture/mutation. valid=true seulement si au moins un "
+        "consensus_call couvre la demande entière avec le schéma fourni. Ne corrige rien. Catalogue:\n"
+        + catalog_json + "\nITEMS:\n" + json.dumps(adjudicator_input, ensure_ascii=False, separators=(",", ":")),
+        seed=2655,
+    )
+    criticized = _adjudications(critic_raw, {row["id"] for row in candidates})
 
     old_public, private = _old_public_texts(), _private_texts(policy)
     maximum = float(policy["holdout"]["novelty"]["token_jaccard_maximum"])
@@ -272,6 +319,7 @@ async def run() -> dict[str, Any]:
         accepted = consensus_by_id[row["id"]]
         if not accepted: excluded["oracle_no_consensus"] += 1; continue
         if not adjudicated[row["id"]]: excluded["adjudicator_rejected"] += 1; continue
+        if not criticized[row["id"]]: excluded["critic_rejected"] += 1; continue
         max_public = max((_jaccard(row["prompt"], text) for text in old_public), default=0.0)
         max_private = max((_jaccard(row["prompt"], text) for text in private), default=0.0)
         if max(max_public, max_private) > maximum: excluded["novelty"] += 1; continue
@@ -291,7 +339,7 @@ async def run() -> dict[str, Any]:
     report = {
         "schema": "marvin.tool-selection-stage-b-generation-report/1.0", "status": "complete",
         "policy_sha256": _sha256(POLICY), "generator_sha256": _sha256(Path(__file__)),
-        "models": {"author": author_meta, **oracle_meta, "adjudicator": adjudicator_meta},
+        "models": {"author": author_meta, **oracle_meta, "adjudicator": adjudicator_meta, "critic": critic_meta},
         "counts": {"authored": len(candidates), "selected": len(selected), "excluded": dict(excluded), "families": dict(Counter(row["family"] for row in selected))},
         "novelty": {"public_reference_count": len(old_public), "private_reference_count": len(private), "maximum_token_jaccard": maximum, "private_details_published": False},
         "privacy": {"synthetic_only": True, "raw_model_responses_published": False, "personal_data_patterns_passed": True},

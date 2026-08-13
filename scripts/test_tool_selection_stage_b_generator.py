@@ -17,6 +17,8 @@ def main() -> None:
     assert "oracle_a" in text and "oracle_b" in text and "_consensus" in text
     assert "ADJUDICATOR_POLICY" in text and "_adjudications" in text
     assert "adjudicator_rejected" in text
+    assert "CRITIC_POLICY" in text and "_schema_valid_calls" in text
+    assert "critic_rejected" in text and "processus/service" in text
     assert "for attempt in range(1, 4)" in text and '"attempts": attempt' in text
     assert "family_ordinals" in text and "family_ordinals[family] += 1" in text
     assert '"prompt": prompt})' in text
