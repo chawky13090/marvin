@@ -116,16 +116,18 @@ def _private_texts(policy: dict[str, Any]) -> list[str]:
 
 def _validate_author(items: Any, policy: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(items, list): raise ValueError("Réponse auteur sans liste items.")
-    output, ids = [], set()
+    output = []
+    family_ordinals: Counter[str] = Counter()
     for row in items:
         if not isinstance(row, dict): continue
-        identity, family, prompt = str(row.get("id") or ""), str(row.get("family") or ""), str(row.get("prompt") or "").strip()
+        family, prompt = str(row.get("family") or ""), str(row.get("prompt") or "").strip()
         facts = row.get("argument_facts")
-        if not re.fullmatch(r"sb-[a-z0-9-]{5,60}", identity) or identity in ids: continue
         if family not in ALLOWED_FAMILIES or not 20 <= len(prompt) <= 600 or not isinstance(facts, dict): continue
         if any(pattern.search(prompt) for pattern in FORBIDDEN_PERSONAL): continue
         if any(not isinstance(key, str) or not isinstance(value, (str, int, float, bool, type(None))) for key, value in facts.items()): continue
-        ids.add(identity); output.append({"id": identity, "family": family, "prompt": prompt, "argument_facts": facts})
+        family_ordinals[family] += 1
+        identity = f"sb-{family.replace('_', '-')}-{family_ordinals[family]:02d}"
+        output.append({"id": identity, "family": family, "prompt": prompt, "argument_facts": facts})
     required = int(policy["holdout"]["minimum_per_family"])
     counts = Counter(row["family"] for row in output)
     if any(counts[family] < required for family in ALLOWED_FAMILIES):

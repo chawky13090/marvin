@@ -15,6 +15,7 @@ def main() -> None:
     assert "real_external_recipient" not in text
     assert "raw_response_sha256" in text and "raw_model_responses_published" in text
     assert "oracle_a" in text and "oracle_b" in text and "_consensus" in text
+    assert "family_ordinals" in text and "family_ordinals[family] += 1" in text
     assert "private_details_published" in text and "_jaccard" in text
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
     assert any(isinstance(call.func, ast.Name) and call.func.id == "_atomic" for call in calls)
