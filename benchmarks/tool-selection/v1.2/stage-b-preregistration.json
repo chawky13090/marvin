@@ -1,0 +1,84 @@
+{
+  "schema": "marvin.tool-selection-stage-b-preregistration/1.0",
+  "status": "frozen_before_holdout_generation",
+  "source_commit": "dcf7006a72ffe9b16a396e5e428c0f91cd5bbafe",
+  "purpose": "measure final LLM tool choice and isolated business outcome for the three Stage A survivors before any routing product change",
+  "authorization": {
+    "holdout_generation_cloud_calls": true,
+    "holdout_oracle_cloud_calls": true,
+    "benchmark_llm_calls": false,
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "routing_product_change": false,
+    "canonical_capability_facade": false
+  },
+  "stage_a": {
+    "result": {"path": "benchmarks/tool-selection/v1.1/ablation-result.json", "sha256": "5e001bf893712b683c5b451d51a502dde747cc9f5ac757fbe870278c8b3eabc5"},
+    "assessment": {"path": "benchmarks/tool-selection/v1.1/ablation-assessment.json", "sha256": "b539b1d74acf85827722d16487bbf22b6a09d615c6ea13efc1c682a55a07446e"},
+    "burned_inputs_never_used_as_stage_b_labels": true
+  },
+  "independent_roles": {
+    "author": {"model": "qwen3.5:397b-cloud", "digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca", "provider_declared_max_context_tokens": 262144, "may_see": ["family_contract", "catalog_descriptions", "argument_schemas"], "must_not_see": ["stage_a_failures", "stage_a_selected_tools", "benchmark_model_outputs"]},
+    "oracle_a": {"model": "glm-5.2:cloud", "digest": "ce8fd6f94793a6786f6858717b38067feba631861e3b35e8122cb6635004cd4a", "provider_declared_max_context_tokens": 1000000},
+    "oracle_b": {"model": "deepseek-v4-pro:cloud", "digest": "22bfd5026abd64524341f1f90c4885c91a879767c39e3e39a4a3f000b3d0815f", "provider_declared_max_context_tokens": 1048576},
+    "benchmark": {"model": "mistral-large-3:675b-cloud", "digest": "3130fd5a5a1eb4b208be74bf0273357c14c3576c6ba8d78f98b960e91919d77b", "provider_declared_max_context_tokens": 262144},
+    "client_num_ctx_forbidden": true,
+    "cloud_provenance_must_be_reverified_from_ollama_remote_host": true,
+    "cross_role_model_family_reuse_forbidden": true,
+    "oracle_consensus_required": true,
+    "oracle_disagreement_action": "exclude_before_freeze_and_report_count"
+  },
+  "holdout": {
+    "target_intents": 30,
+    "families": {"file_discovery": 5, "file_mutation": 5, "application_launch": 5, "process_inventory": 5, "process_action": 5, "software_management": 5},
+    "minimum_per_family": 5,
+    "synthetic_data_only": true,
+    "real_personal_data_forbidden": true,
+    "real_external_recipient_forbidden": true,
+    "stable_typed_placeholders_required": true,
+    "accepted_target": "tool_plus_action_plus_argument_constraints",
+    "multiple_valid_tools_allowed": true,
+    "single_preferred_tool_oracle_forbidden": true,
+    "novelty": {"exact_normalized_overlap_with_stage_a_forbidden": true, "token_jaccard_maximum": 0.55, "private_stage_a_text_compared_locally_only": true, "private_text_or_similarity_detail_publication_forbidden": true},
+    "freeze_requires": ["corpus_sha256", "oracle_sha256", "generation_transcript_sha256", "model_digests_reverified", "family_counts_exact", "novelty_gate_passed", "secret_and_personal_data_gate_passed"]
+  },
+  "experiment": {
+    "configurations": ["K+L+S", "K+S", "S"],
+    "modes": {"eco": 18, "balanced": 40, "performance": 80},
+    "repetitions_per_intent": 3,
+    "temperature": 0.1,
+    "top_p": 0.9,
+    "seed": 2651,
+    "seed_if_unsupported": "record_unavailable_and_keep_three_repetitions",
+    "concurrency_maximum": 3,
+    "configuration_order": "deterministic_balanced_rotation_per_intent",
+    "candidate_signals_computed_once_then_reused_across_repetitions": true,
+    "security_guards_never_ablated": true,
+    "tool_catalog_membership_enforced_before_any_execution": true
+  },
+  "layers": {
+    "B1": {"description": "full prompt plus native benchmark model tool choice; no business execution", "metrics": ["accepted_tool_action_rate_by_family", "tool_name_validity", "argument_schema_validity", "text_only_rate", "repeat_stability", "confirmation_count", "step_count", "latency_ms", "prompt_schema_bytes", "candidate_count"]},
+    "B2": {"description": "execute only a frozen accepted call against an isolated fixture and independent state oracle", "host_execution_forbidden": true, "requires_separate_fixture_freeze_and_one_use_authorization": true, "metrics": ["end_to_end_success", "false_success", "collateral_delta_count", "rollback_or_confinement_result", "redundant_confirmation_count"]}
+  },
+  "decision": {
+    "safety_gate": {"false_success_maximum": 0, "invalid_public_tool_name_maximum": 0, "host_side_effect_maximum": 0},
+    "generalize_configuration_if": {"global_end_to_end_success_minimum": 0.9, "per_evaluated_family_success_minimum": 0.8, "repeat_stability_minimum": 0.8, "argument_schema_validity_minimum": 0.98, "no_family_regression_vs_K_plus_L_plus_S_greater_than_points": 0.0667, "median_prompt_schema_bytes_improvement_minimum_for_simpler_path": 0.15},
+    "restricted_family_if": {"family_success_minimum": 0.7, "zero_false_success": true, "explicit_enabled_families_required": true},
+    "retain_current_K_plus_L_plus_S_if": ["no_simpler_configuration_meets_all_generalization_predicates", "evidence_incomplete", "oracle_or_fixture_drift"],
+    "product_change_before_final_assessment_forbidden": true,
+    "global_average_never_masks_family_failure": true,
+    "unrepresented_or_unexecutable_family_state": "UNASSESSED"
+  },
+  "product_sources_sha256": {
+    "backend/agent_tool_selection.py": "98dc6e797ab97d9ed822b338600b5f5c0c9232bdfeb5b1de9db76ebaf83338d6",
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/tool_router.py": "aa8cc084e9dd19ca6e45bbce3ad72970d59f55c3dbc6abff8a6255f33638f7a2",
+    "backend/agent_prompt.py": "e735855dc2820a0b77ce19382317241b40eb6060e011ff6866993ac59bab0131",
+    "backend/agent_model_step.py": "eacb9b6035aafdef90b4efaed3c8d492d65e81cae1840cce0e45d7ad91db7331",
+    "backend/agent_transport.py": "c2b93ffe802e36296bc55949830bb3640b83a585bb5a34cc565fbf2124007d6b",
+    "backend/agent_tool_step.py": "0acc635088457c7411c30551f7c1259653b05f6ca68a1b56cbd0f25d08fe0b9a",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "logging_and_privacy": {"public_raw_model_response_forbidden": true, "public_prompt_text_allowed_only_after_synthetic_data_gate": true, "private_stage_a_text_never_logged": true, "structured_run_id_required": true, "interrupted_run_discarded": true, "partial_result_publication_forbidden": true},
+  "rollback": {"preregistration": "atomic_git_revert", "persistent_data_mutation": false, "product_runtime_unchanged": true, "published_raw_observations_must_be_preserved": true}
+}
