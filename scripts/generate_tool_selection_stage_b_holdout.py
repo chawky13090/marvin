@@ -25,7 +25,7 @@ from tools import TOOLS_SPEC
 
 POLICY = ROOT / "benchmarks/tool-selection/v1.2/stage-b-preregistration.json"
 ADJUDICATOR_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.3.json"
-CRITIC_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.5.json"
+CRITIC_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.6.json"
 OUTPUT_DIR = ROOT / "benchmarks/tool-selection/v1.2"
 CORPUS = OUTPUT_DIR / "holdout-corpus.json"
 ORACLE = OUTPUT_DIR / "holdout-oracle.json"
