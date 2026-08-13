@@ -32,6 +32,14 @@ de gate portable. Le résultat est lié au commit v2.649 et autorise un nouveau 
 à regrouper au plus 32 embeddings Ollama. Un canari exige l'identité exacte entre embedding
 isolé et batch; toutes les limites Qdrant et les règles de décision v1.0 restent inchangées.
 
+Le runner v1.1 applique ce seul changement de méthode : embeddings par lots bornés, puis les
+mêmes recherches Qdrant (8 outils à 0,40; 5 retours appris à 0,72) et les mêmes post-traitements.
+Il refuse l'écrasement d'un résultat, vérifie les deux politiques et toutes les empreintes, et
+nettoie les deux sorties si leur publication échoue. Avant gel du runner, cinq requêtes publiques
+ont produit des vecteurs strictement identiques entre exécution unitaire et lot, puis des signaux
+semantic/learned/scores strictement identiques au chemin `route_tools` de production. Aucun
+outil métier, LLM de conversation, donnée persistante ou sortie partielle n'a été créé.
+
 ## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
 
 Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier
