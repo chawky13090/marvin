@@ -192,7 +192,7 @@ async def chat(request: ChatRequest):
     }
     if request.conversationId and not request.benchmarkEphemeral:
         stored = await __import__("asyncio").to_thread(
-            db.get_messages_by_conversation, request.conversationId, 1_000
+            db.get_messages_for_context, request.conversationId, 1_000
         )
         incoming = request.messages
         if internal_continuation and stored and incoming:

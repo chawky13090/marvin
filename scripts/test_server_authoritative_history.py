@@ -41,6 +41,28 @@ assert projection["detail_message_id"] == "t1"
 assert projection["result"]["projection_truncated"] is True
 assert "A" * 1000 not in json.dumps(projection)
 
+# La borne d'octets doit produire un suffixe contigu : aucun message plus ancien
+# ne peut être sauté puis rendu inaccessible par le curseur suivant.
+weighted = [
+    {"id": f"m{index}", "role": "user", "content": "X" * 900, "_message_rowid": index}
+    for index in range(1, 11)
+]
+weighted_page = ui_page(weighted, max_bytes=4_000)
+weighted_ids = [item["id"] for item in weighted_page["messages"]]
+first_weighted = int(weighted_ids[0][1:])
+assert weighted_ids == [f"m{index}" for index in range(first_weighted, 11)], weighted_ids
+assert weighted_page["deferred_messages"] == first_weighted - 1
+assert weighted_page["next_before_rowid"] == first_weighted
+
+# Un assistant et son reçu constituent une unité de pagination indivisible.
+paired = [
+    {"id": "older", "role": "user", "content": "ancien", "_message_rowid": 1},
+    {"id": "assistant", "role": "assistant", "content": "", "tool_calls": [{"toolCallId": "c", "toolName": "file_find", "args": {}}], "_message_rowid": 2},
+    {"id": "tool", "role": "tool", "content": "", "tool_results": [{"toolCallId": "c", "toolName": "file_find", "result": {"files": ["a"]}}], "_message_rowid": 3},
+]
+paired_page = ui_page(paired, max_bytes=300)
+assert [item["id"] for item in paired_page["messages"]] == ["assistant", "tool"]
+
 incoming = [{"role": "user", "content": "Que vois-tu maintenant ?"}]
 history, metadata = model_history(stored, incoming)
 assert history[-1] == incoming[0]
@@ -59,7 +81,8 @@ async def verify_detail_binding() -> None:
             "tool_results": [large_receipt],
         }
         detail = await api_conversations.get_tool_result_detail("conv-a", "t1", "call-large")
-        assert detail["result"]["ok"] is True
+        detail_payload = json.loads(detail.body)
+        assert detail_payload["result"]["ok"] is True
         try:
             await api_conversations.get_tool_result_detail("conv-b", "t1", "call-large")
         except api_conversations.HTTPException as error:

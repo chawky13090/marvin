@@ -38,6 +38,8 @@ from repositories.conversations import (
     get_messages_by_conversation,
     get_messages_page,
     get_message,
+    has_messages_before,
+    get_messages_for_context,
     get_recent_user_messages,
     list_conversations,
     search_conversations,

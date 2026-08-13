@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useChat } from '@/lib/contexts/ChatContext';
 import MessageBubble from '@/components/chat/MessageBubble';
@@ -9,6 +9,11 @@ import QuietWelcome from '@/components/chat/QuietWelcome';
 import ConversationViewToolbar from '@/components/chat/ConversationViewToolbar';
 import { BACKEND_URL } from '@/lib/backend';
 import { isLiveConversation } from '@/lib/chatNavigation.mjs';
+import {
+  conversationPageIsCurrent,
+  mergeOlderConversationMessages,
+  preservePrependScrollTop,
+} from '@/lib/conversationPaging.mjs';
 import {
   conversationAuditToMarkdown,
   createConversationAudit,
@@ -43,6 +48,7 @@ function getGreeting() {
 export default function ChatContainer({
   conversationId,
   initialMessages = [],
+  initialHistoryPage = null,
   onConversationCreated,
   onStreamFinish,
   onWorkspaceChanged,
@@ -53,6 +59,14 @@ export default function ChatContainer({
   const [toolbarHost, setToolbarHost] = useState(null);
   const [toolbarHostResolved, setToolbarHostResolved] = useState(false);
   const scrollRef = useRef(null);
+  const conversationIdRef = useRef(conversationId);
+  conversationIdRef.current = conversationId;
+  const historyRequestRef = useRef(0);
+  const historyAbortRef = useRef(null);
+  const pendingScrollAnchorRef = useRef(null);
+  const [historyPage, setHistoryPage] = useState(initialHistoryPage);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   // v2.183 — "coller au bas" façon Claude/ChatGPT : l'ancien effet forçait scrollTop=scrollHeight
   // à CHAQUE frappe de token pendant le streaming, kidnappant le scroll dès que l'utilisateur
   // remontait pour relire un passage. Ne force plus le scroll que si l'utilisateur était déjà
@@ -72,6 +86,14 @@ export default function ChatContainer({
     const key = `marvin:chat-draft:${conversationId || 'new'}`;
     setLocalInput((window.sessionStorage.getItem(key) || '').slice(0, 20000));
   }, [conversationId]);
+
+  useEffect(() => {
+    historyAbortRef.current?.abort();
+    historyRequestRef.current += 1;
+    setHistoryPage(initialHistoryPage);
+    setHistoryLoading(false);
+    setHistoryError('');
+  }, [conversationId, initialHistoryPage]);
 
   useEffect(() => {
     const key = `marvin:chat-draft:${conversationId || 'new'}`;
@@ -235,6 +257,59 @@ export default function ChatContainer({
     });
     return () => cancelAnimationFrame(raf);
   }, [messages, isLoading]);
+
+  useLayoutEffect(() => {
+    const anchor = pendingScrollAnchorRef.current;
+    const element = scrollRef.current;
+    if (!anchor || !element) return;
+    pendingScrollAnchorRef.current = null;
+    element.scrollTop = preservePrependScrollTop({
+      scrollTop: anchor.scrollTop,
+      scrollHeight: anchor.scrollHeight,
+      nextScrollHeight: element.scrollHeight,
+    });
+  }, [messages]);
+
+  const loadOlderMessages = useCallback(async () => {
+    const cursor = historyPage?.nextBeforeRowid;
+    if (!conversationId || !historyPage?.hasOlderRows || !cursor || historyLoading) return;
+    const requestSequence = ++historyRequestRef.current;
+    historyAbortRef.current?.abort();
+    const controller = new AbortController();
+    historyAbortRef.current = controller;
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await fetch(
+        `/api/conversations/${encodeURIComponent(conversationId)}?before_rowid=${encodeURIComponent(cursor)}`,
+        { signal: controller.signal, cache: 'no-store' },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      if (!conversationPageIsCurrent({
+        requestSequence,
+        latestSequence: historyRequestRef.current,
+        requestedConversationId: conversationId,
+        activeConversationId: conversationIdRef.current,
+      })) return;
+      const older = Array.isArray(payload.messages) ? payload.messages : [];
+      const element = scrollRef.current;
+      if (element) {
+        pendingScrollAnchorRef.current = {
+          scrollHeight: element.scrollHeight,
+          scrollTop: element.scrollTop,
+        };
+      }
+      setMessages((current) => mergeOlderConversationMessages(older, current));
+      setHistoryPage(payload.page || null);
+    } catch (error) {
+      if (error?.name !== 'AbortError' && requestSequence === historyRequestRef.current) {
+        setHistoryError('Les messages précédents restent conservés mais sont temporairement indisponibles.');
+      }
+    } finally {
+      if (requestSequence === historyRequestRef.current) setHistoryLoading(false);
+    }
+  }, [conversationId, historyLoading, historyPage, setMessages]);
 
   // Détecte un scroll manuel de l'utilisateur : à moins de 80px du bas → on reste collé
   // (comportement historique) ; plus haut → on laisse sa position tranquille, même en
@@ -404,6 +479,24 @@ export default function ChatContainer({
         style={{ flex: 1, overflowY: 'auto' }}
       >
         <div className={`marvin-chat-stream${messages.length === 0 ? ' marvin-chat-stream--welcome' : ''}`}>
+        {messages.length > 0 && historyPage?.hasOlderRows && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '10px 0 18px' }}>
+            <button
+              type="button"
+              onClick={loadOlderMessages}
+              disabled={historyLoading}
+              style={{ padding: '7px 14px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--bg-glass)', color: 'var(--text-primary)', cursor: historyLoading ? 'wait' : 'pointer' }}
+            >
+              {historyLoading ? 'Chargement…' : 'Charger les messages précédents'}
+            </button>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              {historyPage.cutoffReason === 'byte_budget'
+                ? 'Fenêtre limitée par le poids des résultats techniques.'
+                : 'Une page plus ancienne reste disponible.'}
+            </span>
+          </div>
+        )}
+        {historyError && <div role="status" style={{ color: 'var(--warning)', fontSize: 12, textAlign: 'center', padding: 8 }}>{historyError}</div>}
         {messages.length === 0 ? (
           <QuietWelcome
             greeting={getGreeting()}
@@ -420,6 +513,7 @@ export default function ChatContainer({
             <MessageBubble
               key={`${msg.id || index}-${index}`}
               message={msg}
+              conversationId={conversationId}
               viewMode={viewMode}
               showMissionTracker={index === lastCodingMissionMessageIndex}
               onConfirmTool={handleConfirmTool}

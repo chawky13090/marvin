@@ -143,15 +143,27 @@ def _build_conversation_response(cid: str, before_rowid: int | None = None) -> J
                 if state and invocation.get("state") == "call":
                     invocation.update(state)
 
-    oldest = min((int(m.get("_message_rowid") or 0) for m in raw_page), default=0)
+    next_before_rowid = page["next_before_rowid"]
+    has_older_rows = bool(
+        next_before_rowid
+        and db.has_messages_before(cid, next_before_rowid)
+    )
+    cutoff_reason = (
+        "byte_budget" if page["deferred_messages"] > 0
+        else "row_limit" if has_older_rows
+        else "none"
+    )
     return JSONResponse(content={
         "conversation": conv,
         "messages": formatted,
         "page": {
-            "beforeRowid": oldest or None,
-            "hasMore": bool(oldest and page["omitted_messages"] > 0),
-            "usedBytes": page["used_bytes"],
-            "omittedMessages": page["omitted_messages"],
+            "returnedMessages": len(messages_raw),
+            "returnedBytes": page["used_bytes"],
+            "nextBeforeRowid": next_before_rowid,
+            "hasOlderRows": has_older_rows,
+            "cutoffReason": cutoff_reason,
+            "deferredMessages": page["deferred_messages"],
+            "detailsAvailable": page["details_available"],
         },
     })
 
@@ -161,16 +173,28 @@ async def get_conversation(cid: str, before_rowid: int | None = None):
     return await asyncio.to_thread(_build_conversation_response, cid, before_rowid)
 
 
-@router.get("/api/conversations/{cid}/messages/{message_id}/tool-results/{tool_call_id}")
-async def get_tool_result_detail(cid: str, message_id: str, tool_call_id: str):
-    """Retourne un reçu masqué, strictement lié à sa conversation et son appel."""
-    message = await asyncio.to_thread(db.get_message, message_id)
+def _build_tool_result_detail(
+    cid: str, message_id: str, tool_call_id: str
+) -> JSONResponse:
+    """Lit, masque et sérialise le détail hors de la boucle FastAPI."""
+    message = db.get_message(message_id)
     if not message or message.get("conversation_id") != cid or message.get("role") != "tool":
         raise HTTPException(status_code=404, detail="Résultat d'outil introuvable")
     for receipt in message.get("tool_results") or []:
         if isinstance(receipt, dict) and str(receipt.get("toolCallId") or "") == tool_call_id:
-            return {"result": _redact(receipt.get("result")), "evidence": _redact(receipt.get("evidence"))}
+            return JSONResponse(content={
+                "result": _redact(receipt.get("result")),
+                "evidence": _redact(receipt.get("evidence")),
+            })
     raise HTTPException(status_code=404, detail="Résultat d'outil introuvable")
+
+
+@router.get("/api/conversations/{cid}/messages/{message_id}/tool-results/{tool_call_id}")
+async def get_tool_result_detail(cid: str, message_id: str, tool_call_id: str):
+    """Retourne un reçu masqué, strictement lié à sa conversation et son appel."""
+    return await asyncio.to_thread(
+        _build_tool_result_detail, cid, message_id, tool_call_id
+    )
 
 
 @router.post("/api/conversations/{cid}/exports")

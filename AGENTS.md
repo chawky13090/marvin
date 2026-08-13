@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.642.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.643.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.642.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.643.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -217,7 +217,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.642.0)
+## 9. État actuel (v2.643.0)
+
+**v2.643 (pagination et détail historiques)** : la lecture pondérée retourne un suffixe
+chronologique contigu; elle ne saute plus un message exclu par le budget. L'existence de
+lignes antérieures est calculée séparément et la réponse distingue `row_limit`, `byte_budget`
+et `none`. L'interface charge une seule page à la fois, déduplique les identifiants, conserve
+l'ancre de défilement et ignore une réponse arrivée après un changement de conversation. Les
+reçus projetés disposent d'un chargement explicite; un 404 termine avec un message clair et
+aucun retry automatique. Lecture, masquage et sérialisation du détail s'exécutent hors de la
+boucle FastAPI. Rollback : réversion atomique du commit v2.643 puis redémarrage; aucune donnée
+ni migration n'est concernée.
 
 **v2.642 (historique serveur autoritatif)** : pour une conversation existante, le navigateur
 n'envoie plus que le message courant. Le backend recharge SQLite, applique un budget cumulatif

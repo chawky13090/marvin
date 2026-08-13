@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 302
+EXPECTED_STAGE_COUNT = 303
 
 
 @dataclass(frozen=True)
@@ -417,6 +417,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Itération modèle typée", (python, "scripts/test_agent_model_step.py")),
         Stage("Lot d'outils observé et persistant", (python, "scripts/test_agent_tool_batch.py")),
         Stage("Historique de chat serveur autoritatif", (python, "scripts/test_server_authoritative_history.py")),
+        Stage("Pagination UI des conversations", ("node", "scripts/test_conversation_paging_ui.mjs")),
         Stage("Finalisation commune du tour", (python, "scripts/test_agent_turn_completion.py")),
         Stage("Politiques et budget du Runner", (python, "scripts/test_agent_loop_policy.py")),
         Stage("Revue indépendante des réponses et actions", (python, "scripts/test_agent_review.py")),

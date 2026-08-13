@@ -28,6 +28,8 @@ EXPORTED = {
     "get_messages_by_conversation",
     "get_messages_page",
     "get_message",
+    "has_messages_before",
+    "get_messages_for_context",
     "get_recent_user_messages",
     "list_conversations",
     "search_conversations",
@@ -138,6 +140,14 @@ def _check_repository(path: Path) -> None:
     assert len(recent_window) == 100
     assert recent_window[0]["content"] == "reponse-005"
     assert recent_window[-1]["content"] == "reponse-104"
+    page = repository.get_messages_page(long_conversation["id"], limit=20)
+    assert page[0]["content"] == "reponse-085"
+    assert repository.has_messages_before(
+        long_conversation["id"], page[0]["_message_rowid"]
+    ) is True
+    context_rows = repository.get_messages_for_context(long_conversation["id"])
+    assert len(context_rows) == 105
+    assert all("tool_results" not in item for item in context_rows)
     repository.delete_conversation(long_conversation["id"])
 
     repository.delete_conversation(first["id"])

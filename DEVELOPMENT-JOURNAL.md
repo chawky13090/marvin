@@ -18627,3 +18627,25 @@ conversations. Les données historiques, le corpus Forge et les preuves E6 reste
 Tests ciblés : compilation Python, test de projection 1 Mio, liaison négative du détail,
 runner exhaustif et ESLint. Sécurité : aucune écriture nouvelle, aucun reçu journalisé,
 masquage identique aux exports. Rollback : réversion atomique du commit v2.642 et redémarrage.
+## 2026-08-13 — v2.643.0 — pagination contiguë et détail historique explicite
+
+La page pondérée s'arrête au premier groupe qui dépasserait la borne : aucun message plus
+ancien n'est sauté, et un assistant reste lié à son reçu d'outil. `hasOlderRows` provient
+d'une requête `EXISTS` distincte; `cutoffReason` sépare limite de lignes et limite d'octets.
+L'interface charge les pages précédentes séquentiellement, déduplique, conserve l'ancre et
+rejette les réponses périmées après navigation. Les reçus complets ne sont chargés que sur
+clic; 404 et erreur temporaire ont des états explicites sans retry. Le détail est lu, masqué
+et sérialisé dans un worker. Aucun historique, schéma ou réglage n'est modifié. Aucun nouveau
+log n'est nécessaire et aucun reçu n'est journalisé. Rollback : réversion atomique du commit
+v2.643 puis redémarrage frontend/backend.
+
+Validation observée : gate complète avec 299 réussites, 0 échec et 4 smokes live
+explicitement différés sur 303 étapes attendues; build Next.js et architecture
+`2.643.0 / 364 outils / 392 routes` verts. Après redémarrage, la conversation historique
+de 43 millions de caractères s'ouvre en 2,7 s et 241 198 octets projetés. Ses deux pages
+retournent 65 puis 29 messages, zéro identifiant dupliqué et un curseur strictement
+décroissant. Le détail réel traverse FastAPI et le proxy Next en HTTP 200; un 404 simulé
+produit un message explicite et une seule requête, sans retry. Les smokes live terminent
+avec 28/28 contrats API, 41/41 pages, chat 5/5 et voix strictement sérialisée. Le premier
+redémarrage a atteint les deux endpoints de readiness en HTTP 200 mais reste insuffisant
+pour fermer TD-015, qui exige encore trois redémarrages froids reproductibles.

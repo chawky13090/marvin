@@ -260,7 +260,53 @@ class ConversationRepository:
                        ORDER BY rowid DESC LIMIT ?""",
                     (conversation_id, int(before_rowid), safe_limit),
                 ).fetchall()
+            if rows and rows[-1]["role"] == "tool":
+                boundary = connection.execute(
+                    """SELECT rowid AS _message_rowid, * FROM messages
+                       WHERE conversation_id = ? AND rowid < ?
+                       ORDER BY rowid DESC LIMIT 1""",
+                    (conversation_id, int(rows[-1]["_message_rowid"])),
+                ).fetchone()
+                if boundary is not None and boundary["role"] == "assistant":
+                    rows = [*rows, boundary]
         return [self._parse_message(row_to_dict(row)) for row in reversed(rows)]
+
+    def has_messages_before(self, conversation_id: str, before_rowid: int) -> bool:
+        with self._connection_scope() as connection:
+            row = connection.execute(
+                """SELECT EXISTS(
+                       SELECT 1 FROM messages
+                       WHERE conversation_id = ? AND rowid < ?
+                   ) AS present""",
+                (conversation_id, int(before_rowid)),
+            ).fetchone()
+        return bool(row and row["present"])
+
+    def get_messages_for_context(
+        self, conversation_id: str, limit: int = 1_000
+    ) -> list[dict]:
+        """Charge le contexte sans désérialiser les reçus complets ``tool_results``."""
+        safe_limit = max(1, min(int(limit), 2_000))
+        with self._connection_scope() as connection:
+            rows = connection.execute(
+                """SELECT * FROM (
+                       SELECT rowid AS _message_rowid, id, conversation_id, role,
+                              content, tool_calls, created_at, client_request_id
+                       FROM messages WHERE conversation_id = ?
+                       ORDER BY rowid DESC LIMIT ?
+                   ) ORDER BY _message_rowid ASC""",
+                (conversation_id, safe_limit),
+            ).fetchall()
+        result: list[dict] = []
+        for row in rows:
+            item = row_to_dict(row)
+            if item.get("tool_calls") and isinstance(item["tool_calls"], str):
+                try:
+                    item["tool_calls"] = json.loads(item["tool_calls"])
+                except (json.JSONDecodeError, TypeError):
+                    item["tool_calls"] = None
+            result.append(item)
+        return result
 
     def get_recent_user_messages(self, limit: int = 120) -> list[str]:
         with self._connection_scope() as connection:
@@ -309,4 +355,6 @@ create_message = repository.create_message
 get_messages_by_conversation = repository.get_messages_by_conversation
 get_messages_page = repository.get_messages_page
 get_message = repository.get_message
+has_messages_before = repository.has_messages_before
+get_messages_for_context = repository.get_messages_for_context
 get_recent_user_messages = repository.get_recent_user_messages

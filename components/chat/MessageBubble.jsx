@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import styles from './MessageBubble.module.css';
 import SpeakButton from './SpeakButton';
 import CortexTrace from './CortexTrace';
@@ -9,7 +9,7 @@ import { BACKEND_URL } from '@/lib/backend';
 import { renderToolResult } from './ToolResultContent';
 import { renderSafeMarkdown } from '@/lib/chat/markdown';
 
-export default function MessageBubble({ message, viewMode = 'reading', showMissionTracker = true, onConfirmTool, onCancelTool, onRetryTool }) {
+export default function MessageBubble({ message, conversationId, viewMode = 'reading', showMissionTracker = true, onConfirmTool, onCancelTool, onRetryTool }) {
   const isUser = message.role === 'user';
   const isToolResult = message.role === 'tool';
   const [showReasoning, setShowReasoning] = useState(false);
@@ -191,6 +191,13 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
           )}
           <CortexTrace message={message} compact />
         </div>
+        {viewMode === 'reading' && toolInvocations.some((tool) => tool.detailRef) && (
+          <div style={{ marginLeft: 40, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {toolInvocations.filter((tool) => tool.detailRef).map((tool) => (
+              <ToolDetailControl key={tool.toolCallId} tool={tool} conversationId={conversationId} compact />
+            ))}
+          </div>
+        )}
         {codingMissionTool && showMissionTracker && (
           <div style={{ marginLeft: '40px', width: 'calc(100% - 40px)' }}>
             <CodingMissionTracker result={codingMissionTool.result} />
@@ -202,6 +209,7 @@ export default function MessageBubble({ message, viewMode = 'reading', showMissi
               <ToolCallInline
                 key={tool.toolCallId || i}
                 tool={tool}
+                conversationId={conversationId}
                 viewMode={viewMode}
                 onConfirm={onConfirmTool}
                 onCancel={onCancelTool}
@@ -488,7 +496,7 @@ function getToolIcon(toolName) {
 // retombaient sur le JSON générique malgré des résultats riches et structurés (sources,
 // réponses par modèle, sous-tâches, checklist) — exactement le genre de détail que le
 // bandeau de mode (v2.146) donne envie d'explorer une fois la carte dépliée.
-function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMissionTracker = true }) {
+function ToolCallInline({ tool, conversationId, viewMode, onConfirm, onCancel, onRetry, showMissionTracker = true }) {
   // v2.148 — chrono en direct pendant l'exécution (voir ChatContext.jsx::tool_start pour
   // l'horodatage `startedAt`). Hook appelé INCONDITIONNELLEMENT avant le early-return
   // `if (!tool)` ci-dessous (règle des hooks React) — la garde se fait à l'intérieur.
@@ -903,6 +911,9 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMiss
           )}
         </div>
       )}
+      {tool.detailRef && (
+        <ToolDetailControl tool={tool} conversationId={conversationId} />
+      )}
 
       {/* Boutons de confirmation */}
       {needsConfirmation && (
@@ -944,6 +955,55 @@ function ToolCallInline({ tool, viewMode, onConfirm, onCancel, onRetry, showMiss
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ToolDetailControl({ tool, conversationId, compact = false }) {
+  const [state, setState] = useState('available');
+  const [detail, setDetail] = useState(null);
+  const controllerRef = useRef(null);
+  useEffect(() => () => controllerRef.current?.abort(), [controllerRef]);
+  useEffect(() => {
+    controllerRef.current?.abort();
+    setState('available');
+    setDetail(null);
+  }, [conversationId, tool?.detailRef?.messageId, tool?.detailRef?.toolCallId]);
+  const load = async () => {
+    if (!conversationId || !tool?.detailRef || state === 'loading') return;
+    controllerRef.current?.abort();
+    controllerRef.current = new AbortController();
+    setState('loading');
+    try {
+      const { messageId, toolCallId } = tool.detailRef;
+      const response = await fetch(
+        `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/tool-results/${encodeURIComponent(toolCallId)}`,
+        { signal: controllerRef.current.signal, cache: 'no-store' },
+      );
+      if (response.status === 404) {
+        setState('unavailable');
+        return;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      setDetail(payload.result);
+      setState('loaded');
+    } catch (error) {
+      if (error?.name !== 'AbortError') setState('error');
+    }
+  };
+  if (state === 'unavailable') {
+    return <div role="status" style={{ marginTop: compact ? 0 : 8, color: 'var(--text-muted)', fontSize: 12 }}>Le résultat détaillé n’est plus disponible. Le résumé conservé reste accessible.</div>;
+  }
+  return (
+    <div style={{ marginTop: compact ? 0 : 8 }}>
+      {state !== 'loaded' && (
+        <button type="button" onClick={load} disabled={state === 'loading'} style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-glass)', color: 'var(--text-primary)', cursor: state === 'loading' ? 'wait' : 'pointer', fontSize: 12 }}>
+          {state === 'loading' ? 'Chargement du détail…' : state === 'error' ? 'Réessayer de charger le détail' : `Charger le détail de ${tool.toolName || 'l’outil'}`}
+        </button>
+      )}
+      {state === 'error' && <div role="status" style={{ color: 'var(--warning)', fontSize: 11, marginTop: 4 }}>Le détail est temporairement indisponible. Aucun nouvel essai n’a été lancé automatiquement.</div>}
+      {state === 'loaded' && <div style={{ marginTop: 6 }}>{renderToolResult(tool.toolName || '', detail)}</div>}
     </div>
   );
 }

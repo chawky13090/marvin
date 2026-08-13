@@ -34,6 +34,7 @@ export default function ChatPage() {
   const preserveStoredSelectionRef = useRef(false);
   const workspaceRefreshRef = useRef(null);
   const [initialMessages, setInitialMessages] = useState([]);
+  const [historyPage, setHistoryPage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [conversationAvailability, setConversationAvailability] = useState('loading');
   const [newProjectName, setNewProjectName] = useState('');
@@ -93,6 +94,7 @@ export default function ChatPage() {
       }
       setActiveConversationId(null);
       setInitialMessages([]);
+      setHistoryPage(null);
       setShowConv(false);
     };
     window.addEventListener('marvin:new-conversation', onNewConv);
@@ -219,6 +221,7 @@ export default function ChatPage() {
         }
         const data = await response.json();
         setInitialMessages(Array.isArray(data.messages) ? data.messages : []);
+        setHistoryPage(data.page || null);
         setActiveConversationId(savedId);
       } catch (error) {
         if (
@@ -262,6 +265,7 @@ export default function ChatPage() {
     }
     if (!id) {
       setInitialMessages([]);
+      setHistoryPage(null);
       setActiveConversationId(null);
       return;
     }
@@ -274,6 +278,7 @@ export default function ChatPage() {
       const data = await res.json();
       if (requestSequence !== navigationRequestRef.current) return;
       setInitialMessages(Array.isArray(data.messages) ? data.messages : []);
+      setHistoryPage(data.page || null);
       setActiveConversationId(id);
     } catch (err) {
       if (requestSequence !== navigationRequestRef.current) return;
@@ -381,6 +386,7 @@ export default function ChatPage() {
         // Clear the chat view when deleting the active conversation
         setActiveConversationId(null);
         setInitialMessages([]);
+        setHistoryPage(null);
       }
       await fetchData();
       if (showArchived) await loadArchivedConversations();
@@ -408,6 +414,7 @@ export default function ChatPage() {
       if (activeConversationId === id) {
         setActiveConversationId(null);
         setInitialMessages([]);
+        setHistoryPage(null);
       }
       await fetchData();
     } catch (error) {
@@ -764,6 +771,7 @@ export default function ChatPage() {
               navigationRequestRef.current += 1;
               setActiveConversationId(null);
               setInitialMessages([]);
+              setHistoryPage(null);
               setShowConv(false);
             }}
             style={{
@@ -1149,6 +1157,7 @@ export default function ChatPage() {
           <ChatContainer
             conversationId={activeConversationId}
             initialMessages={initialMessages}
+            initialHistoryPage={historyPage}
             activeModel={activeModel}
             onConversationCreated={(newId) => {
               if (newId) {
