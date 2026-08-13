@@ -134,6 +134,7 @@ from repositories.notes import (
     delete_note,
     get_note,
     list_notes,
+    restore_note,
     update_note,
 )
 from repositories.operations import (

@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 306
+EXPECTED_STAGE_COUNT = 308
 
 
 @dataclass(frozen=True)
@@ -177,6 +177,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         ),
         Stage("Activation locale de l'avatar", (python, "scripts/test_avatar_api.py")),
         Stage("Invariants d'architecture", (python, "scripts/check_architecture.py")),
+        Stage(
+            "Inventaire contractuel OpenAPI",
+            (python, "scripts/test_api_contract_inventory.py"),
+        ),
         Stage(
             "Contrat de consolidation globale",
             (python, "scripts/test_frontier_consolidation_contract.py"),
@@ -536,6 +540,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Domaine d'outils Quiz", (python, "scripts/test_tool_domain_quiz.py")),
         Stage("Domaine d'outils Base IT", (python, "scripts/test_tool_domain_it_knowledge.py")),
         Stage("Domaine d'outils Tâches et Notes", (python, "scripts/test_tool_domain_productivity.py")),
+        Stage("Cohérence SQLite-Qdrant des notes", (python, "scripts/test_note_lifecycle.py")),
         Stage("Domaine d'outils Mémoire", (python, "scripts/test_tool_domain_memory.py")),
         Stage(
             "Cycle de vie cohérent de la mémoire",

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.646.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.647.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.646.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.647.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -221,7 +221,22 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.646.0)
+## 9. État actuel (v2.647.0)
+
+**v2.647 (cohérence notes/mémoires et statut VM en lecture seule)** : les créations et mises
+à jour de notes conservent SQLite comme source autoritative et exposent explicitement un état
+`degraded` si Qdrant est indisponible. Une suppression ne touche plus SQLite tant que l'index
+ne peut pas être nettoyé; une panne SQLite après suppression vectorielle restaure la pré-image
+exacte et réindexe par une voie indépendante. Les routes UI utilisent le même cycle de vie et
+la suppression exige une confirmation côté serveur. L'oubli mémoire vérifie désormais le
+retour Qdrant et tente une compensation des projections Mesh/Qdrant sur panne intermédiaire.
+`vm_lab_install:status` ne réécrit plus le fichier d'état et n'exécute plus `tasklist.exe` :
+la vivacité est observée par `psutil` avec contrôle de réutilisation du PID. Les pannes injectées
+ne journalisent ni contenu de note ni souvenir. La page Notes envoie ses mutations directement
+à FastAPI, sans rejeu, et distingue un échec certain d'un résultat réseau indéterminé. La
+baseline OpenAPI est réconciliée à 326 chemins / 391 opérations et son test est revenu dans le
+gate exhaustif. Rollback : réversion atomique de v2.647 puis redémarrage backend/frontend;
+aucun schéma ni contenu persistant n'est migré.
 
 **v2.646 (preuves reproductibles hors du poste de développement)** : les sources textuelles
 et artefacts de preuve suivis sont normalisés en UTF-8 sans BOM et LF dans Git; seuls les

@@ -2,6 +2,22 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { LoadingRow } from '@/components/ui/Spinner';
 import { marked } from 'marked';
+import { getBackendUrl } from '@/lib/backend';
+import {
+  fetchWithBackendFallback,
+  isMutationOutcomeUnknown,
+} from '@/lib/backendFallback.mjs';
+
+function fetchNotes(path, options) {
+  return fetchWithBackendFallback(path, options, { backendUrl: getBackendUrl() });
+}
+
+function mutationFailureMessage(error, fallback) {
+  if (isMutationOutcomeUnknown(error)) {
+    return 'Résultat non confirmé : vérifiez la liste avant de relancer l’action.';
+  }
+  return fallback;
+}
 
 function renderMarkdown(text) {
   try {
@@ -75,9 +91,10 @@ export default function NotesPage() {
   const loadNotes = useCallback(async (q) => {
     try {
       const params = q ? `?q=${encodeURIComponent(q)}` : '';
-      const res = await fetch(`/api/notes${params}`);
+      const res = await fetchNotes(`/api/notes${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setNotes(data.notes || []);
+      setNotes(Array.isArray(data) ? data : (data.notes || []));
     } catch {
       setError('Impossible de charger les notes.');
     } finally {
@@ -111,18 +128,24 @@ export default function NotesPage() {
       if (!isDirtyRef.current) return;
       setSaving(true);
       try {
-        await fetch('/api/notes', {
-          method: 'POST',
+        const saveResponse = await fetchNotes(`/api/notes/${encodeURIComponent(id)}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update', id, title, content }),
+          body: JSON.stringify({ title, content }),
         });
+        const saveResult = await saveResponse.json();
+        if (!saveResponse.ok || saveResult?.error) throw new Error(saveResult?.error || `HTTP ${saveResponse.status}`);
         isDirtyRef.current = false;
+        if (saveResult?.note?.consistency === 'degraded') {
+          setError('Note enregistrée, mais sa recherche sémantique doit être réparée.');
+        }
         // Refresh note list silently
-        const res = await fetch('/api/notes');
+        const res = await fetchNotes('/api/notes');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        setNotes(data.notes || []);
-      } catch {
-        setError('Sauvegarde échouée.');
+        setNotes(Array.isArray(data) ? data : (data.notes || []));
+      } catch (saveError) {
+        setError(mutationFailureMessage(saveError, 'Sauvegarde échouée.'));
       } finally {
         setSaving(false);
       }
@@ -143,50 +166,54 @@ export default function NotesPage() {
 
   async function createNote() {
     try {
-      const res = await fetch('/api/notes', {
+      const res = await fetchNotes('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', title: 'Nouvelle note', content: '', tags: [] }),
+        body: JSON.stringify({ title: 'Nouvelle note', content: '', tags: [] }),
       });
       const data = await res.json();
-      if (data.note) {
+      if (!res.ok || data?.error) throw new Error(data?.error || `HTTP ${res.status}`);
+      if (data?.id) {
         await loadNotes(search);
-        setSelectedId(data.note.id);
+        setSelectedId(data.id);
       }
-    } catch {
-      setError('Création échouée.');
+    } catch (createError) {
+      setError(mutationFailureMessage(createError, 'Création échouée.'));
     }
   }
 
   async function deleteNote(id) {
     if (!confirm('Supprimer cette note ?')) return;
     try {
-      await fetch('/api/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', id }),
-      });
+      const response = await fetchNotes(
+        `/api/notes/${encodeURIComponent(id)}?confirmed=true`,
+        { method: 'DELETE' },
+      );
+      const result = await response.json();
+      if (!response.ok || result?.error) throw new Error(result?.error || `HTTP ${response.status}`);
       if (selectedId === id) {
         setSelectedId(null);
         setEditTitle('');
         setEditContent('');
       }
       loadNotes(search);
-    } catch {
-      setError('Suppression échouée.');
+    } catch (deleteError) {
+      setError(mutationFailureMessage(deleteError, 'Suppression échouée.'));
     }
   }
 
   async function togglePin(id, currentPinned) {
     try {
-      await fetch('/api/notes', {
-        method: 'POST',
+      const response = await fetchNotes(`/api/notes/${encodeURIComponent(id)}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update', id, pinned: !currentPinned }),
+        body: JSON.stringify({ pinned: !currentPinned }),
       });
-      loadNotes(search);
-    } catch {
-      setError('Mise à jour échouée.');
+      const result = await response.json();
+      if (!response.ok || result?.error) throw new Error(result?.error || `HTTP ${response.status}`);
+      await loadNotes(search);
+    } catch (pinError) {
+      setError(mutationFailureMessage(pinError, 'Mise à jour échouée.'));
     }
   }
 

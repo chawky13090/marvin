@@ -48,7 +48,8 @@ export async function POST(req) {
       return NextResponse.json({ success: true, note });
     }
     if (action === 'delete') {
-      const r = await fetch(`${BACKEND}/api/notes/${data.id}`, { method: 'DELETE', signal: AbortSignal.timeout(8000) });
+      const id = encodeURIComponent(String(data.id || ''));
+      const r = await fetch(`${BACKEND}/api/notes/${id}?confirmed=true`, { method: 'DELETE', signal: AbortSignal.timeout(8000) });
       if (!r.ok) throw new Error(`Backend ${r.status}`);
       return NextResponse.json(await r.json());
     }

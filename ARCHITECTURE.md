@@ -93,6 +93,7 @@ flowchart LR
 | `swarm_jobs.py` | Exécutions Research Swarm persistantes, annulables et reprenables |
 | `evolution_lab.py` | Expériences bornées, comparaison baseline/candidate, promotion et rollback |
 | `vector_store.py` | Embeddings et stockage Qdrant dans le processus backend |
+| `note_lifecycle.py` | Source SQLite des notes, projection Qdrant qualifiée et suppression compensée |
 | `doctor.py` | Diagnostics déterministes et réparations contrôlées |
 | `app_version.py` | Source unique de la version publique |
 

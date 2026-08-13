@@ -8,7 +8,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +89,46 @@ class VMLabJobsTest(unittest.TestCase):
         self.assertEqual(observed["status"], "completed")
         self.assertFalse(observed["active"])
         self.assertEqual(observed["result"]["vm_name"], "Marvin-Windows11-TestForge")
+
+    def test_status_is_read_only_and_does_not_spawn_tasklist(self) -> None:
+        started_at = time.time() - 10
+        state = {
+            "job_id": "vm-lab-fixture",
+            "profile": "windows11",
+            "status": "running",
+            "pid": 424242,
+            "started_at": started_at,
+            "process_started_at": started_at,
+            "log_path": str(vm_lab_jobs.LOG_ROOT / "fixture.log"),
+        }
+        vm_lab_jobs.STATE_PATH.write_text(json.dumps(state), encoding="utf-8")
+        vm_lab_jobs._RESULTS["windows11"].write_text(
+            json.dumps({"status": "completed", "vm_name": "Fixture"}),
+            encoding="utf-8",
+        )
+        preimage = vm_lab_jobs.STATE_PATH.read_bytes()
+        with (
+            patch.object(
+                vm_lab_jobs.psutil,
+                "Process",
+                side_effect=vm_lab_jobs.psutil.NoSuchProcess(424242),
+            ),
+            patch.object(vm_lab_jobs, "_write_state") as write_state,
+            patch.object(vm_lab_jobs.subprocess, "run") as child_process,
+        ):
+            observed = vm_lab_jobs.status()
+        self.assertEqual(observed["status"], "completed")
+        self.assertEqual(vm_lab_jobs.STATE_PATH.read_bytes(), preimage)
+        write_state.assert_not_called()
+        child_process.assert_not_called()
+
+    def test_pid_reuse_is_rejected_by_start_time(self) -> None:
+        observed = Mock()
+        observed.is_running.return_value = True
+        observed.status.return_value = "running"
+        observed.create_time.return_value = 100.0
+        with patch.object(vm_lab_jobs.psutil, "Process", return_value=observed):
+            self.assertFalse(vm_lab_jobs._pid_is_running(42, 200.0))
 
 
 if __name__ == "__main__":

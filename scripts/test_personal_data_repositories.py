@@ -110,6 +110,11 @@ def main() -> int:
         assert updated_note["content"] == "Procédure validée"
         assert updated_note["pinned"] is False
         assert notes.update("missing", {"title": "absente"}) is None
+        note_preimage = dict(updated_note)
+        notes.delete("note-1")
+        assert notes.get("note-1") is None
+        restored_note = notes.restore(note_preimage)
+        assert restored_note == note_preimage
 
         with db(path) as connection:
             connection.execute("UPDATE tasks SET tags='invalid-json' WHERE id='task-1'")
@@ -154,6 +159,7 @@ def main() -> int:
         "list_notes": note_module.list_notes,
         "update_note": note_module.update_note,
         "delete_note": note_module.delete_note,
+        "restore_note": note_module.restore_note,
     }
     for name, function in expected.items():
         assert getattr(database, name) is function, name

@@ -30,7 +30,8 @@ def validate_category(category: str) -> str:
 async def _delete_index(memory_id: str) -> None:
     from vector_store import delete_document
 
-    await delete_document("memories", memory_id)
+    if await delete_document("memories", memory_id) is not True:
+        raise RuntimeError("Index mémoire indisponible.")
 
 
 async def _index(memory_id: str, content: str, category: str) -> None:
@@ -119,6 +120,21 @@ async def forget(memory_id: str) -> dict[str, Any]:
     l'appelant reçoit un échec réessayable : aucun oubli partiel n'est présenté
     comme réussi.
     """
+    memory = next(
+        (
+            item for item in db.get_memories()
+            if str(item.get("id") or "") == str(memory_id)
+        ),
+        None,
+    )
+    if memory is None:
+        return {
+            "success": False,
+            "forgotten": False,
+            "stage": "database",
+            "error_type": "NotFound",
+            "compensated": True,
+        }
     try:
         await _delete_index(memory_id)
     except Exception as exc:
@@ -127,24 +143,31 @@ async def forget(memory_id: str) -> dict[str, Any]:
             "forgotten": False,
             "stage": "index",
             "error_type": type(exc).__name__,
+            "compensated": True,
         }
     try:
         memory_mesh.remove(memory_id)
     except Exception as exc:
+        compensation = await refresh(memory, source="delete_compensation")
         return {
             "success": False,
             "forgotten": False,
             "stage": "mesh",
             "error_type": type(exc).__name__,
+            "compensated": compensation["consistency"] == "complete",
+            "compensation_warnings": compensation["warnings"],
         }
     try:
         db.delete_memory(memory_id)
     except Exception as exc:
+        compensation = await refresh(memory, source="delete_compensation")
         return {
             "success": False,
             "forgotten": False,
             "stage": "database",
             "error_type": type(exc).__name__,
+            "compensated": compensation["consistency"] == "complete",
+            "compensation_warnings": compensation["warnings"],
         }
     return {"success": True, "forgotten": True, "id": memory_id}
 

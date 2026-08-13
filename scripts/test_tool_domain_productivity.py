@@ -53,14 +53,21 @@ async def _run() -> None:
     delete.assert_called_once_with("t1")
 
     note = {"id": "n1", "title": "Runbook", "content": "Contenu", "tags": ["ops"]}
-    index = AsyncMock(return_value=None)
-    with (
-        patch.object(productivity.db, "create_note", return_value=note),
-        patch.object(productivity, "_index_note", index),
-    ):
+    with patch.object(
+        productivity.note_lifecycle,
+        "create",
+        AsyncMock(return_value={
+            "success": True,
+            "note": note,
+            "consistency": "complete",
+            "warnings": [],
+        }),
+    ) as create_note:
         created = await productivity.note_create({"title": "Runbook", "tags": "ops"})
     assert created["success"] is True
-    index.assert_awaited_once_with(note)
+    create_note.assert_awaited_once_with(
+        title="Runbook", content="", tags=["ops"], pinned=False
+    )
 
     with patch.object(productivity.db, "list_notes", return_value=[note]) as listing:
         result = await productivity.note_list({"tag": "ops", "pinned": True})
@@ -68,23 +75,38 @@ async def _run() -> None:
     listing.assert_called_once_with(search="ops", pinned=True)
 
     with (
-        patch.object(productivity.db, "update_note", return_value=note) as update,
-        patch.object(productivity, "_index_note", AsyncMock(return_value=None)),
+        patch.object(
+            productivity.note_lifecycle,
+            "update",
+            AsyncMock(return_value={
+                "success": True,
+                "note": note,
+                "consistency": "complete",
+                "warnings": [],
+            }),
+        ) as update,
     ):
         updated = await productivity.note_update({"id": "n1", "tags": "ops, doc"})
     assert updated["success"] is True
     assert update.call_args.args[1]["tags"] == ["ops", "doc"]
 
-    remove_index = AsyncMock(return_value=None)
     with (
         patch.object(productivity.db, "get_note", return_value=note),
-        patch.object(productivity.db, "delete_note") as delete,
-        patch.object(productivity, "_delete_note_index", remove_index),
+        patch.object(
+            productivity.note_lifecycle,
+            "delete",
+            AsyncMock(return_value={
+                "success": True,
+                "deleted": True,
+                "id": "n1",
+                "title": "Runbook",
+                "consistency": "complete",
+            }),
+        ) as delete,
     ):
         deleted = await productivity.note_delete({"id": "n1", "confirmed": True})
     assert deleted["success"] is True
-    delete.assert_called_once_with("n1")
-    remove_index.assert_awaited_once_with("n1")
+    delete.assert_awaited_once_with("n1")
 
 
 def main() -> int:

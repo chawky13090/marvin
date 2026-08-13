@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 import database as db
+import note_lifecycle
 
 
 router = APIRouter(tags=["notes"])
@@ -23,7 +24,8 @@ class NoteCreate(BaseModel):
 
 @router.post("/api/notes")
 async def create_note(body: NoteCreate):
-    return db.create_note(body.title, body.content, body.tags, body.pinned)
+    result = await note_lifecycle.create(body.title, body.content, body.tags, body.pinned)
+    return {**result["note"], "consistency": result["consistency"], "warnings": result["warnings"]}
 
 
 class NoteUpdate(BaseModel):
@@ -35,13 +37,19 @@ class NoteUpdate(BaseModel):
 
 @router.put("/api/notes/{nid}")
 async def update_note(nid: str, body: NoteUpdate):
-    note = db.update_note(nid, body.model_dump(exclude_none=True))
-    if not note:
+    result = await note_lifecycle.update(nid, body.model_dump(exclude_none=True))
+    if result.get("error") == "not_found":
         raise HTTPException(status_code=404, detail="Note introuvable")
-    return note
+    return {**result["note"], "consistency": result["consistency"], "warnings": result["warnings"]}
 
 
 @router.delete("/api/notes/{nid}")
-async def delete_note(nid: str):
-    db.delete_note(nid)
-    return {"success": True}
+async def delete_note(nid: str, confirmed: bool = False):
+    if not confirmed:
+        raise HTTPException(status_code=409, detail="Confirmation explicite requise")
+    result = await note_lifecycle.delete(nid)
+    if result.get("error") == "not_found":
+        raise HTTPException(status_code=404, detail="Note introuvable")
+    if not result.get("success"):
+        raise HTTPException(status_code=503, detail=result)
+    return result

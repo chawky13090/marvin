@@ -364,6 +364,7 @@ async def upsert_document(
             payload={"text": text, **(metadata or {}), "original_id": doc_id},
         )]
     )
+    _BM25_CACHE.pop(collection, None)
     return True
 
 
@@ -442,12 +443,13 @@ async def search(
     return _reranker.rerank(query, results, text_key="text", top_k=limit)
 
 
-async def delete_document(collection: str, doc_id: str):
+async def delete_document(collection: str, doc_id: str) -> bool:
     client = get_client()
     if client is None:
-        return
+        return False
     client.delete(collection_name=collection, points_selector=[_safe_id(doc_id)])
     _BM25_CACHE.pop(collection, None)
+    return True
 
 
 def _safe_id(raw_id: str) -> str:
@@ -486,9 +488,19 @@ async def index_memory(memory_id: str, content: str, category: str):
     return True
 
 
-async def index_note(note_id: str, title: str, content: str, tags: list):
+async def index_note(note_id: str, title: str, content: str, tags: list) -> bool:
     text = f"{title}\n{content}"
-    await upsert_document("notes", note_id, text, {"title": title, "tags": tags, "original_id": note_id})
+    return await upsert_document(
+        "notes",
+        note_id,
+        text,
+        {
+            "title": title,
+            "tags": tags,
+            "original_id": note_id,
+            "content_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        },
+    )
 
 
 async def index_file(path: str, content: str):

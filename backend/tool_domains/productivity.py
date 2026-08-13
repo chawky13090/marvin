@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import database as db
+import note_lifecycle
 
 
 def parse_tags(raw: Any) -> list[str]:
@@ -89,34 +90,24 @@ async def task_delete(args: dict[str, Any]) -> dict[str, Any]:
         return {"error": str(exc)}
 
 
-async def _index_note(note: dict[str, Any]) -> None:
-    try:
-        from vector_store import index_note
-
-        await index_note(note["id"], note["title"], note["content"], note.get("tags", []))
-    except Exception:
-        pass
-
-
-async def _delete_note_index(note_id: str) -> None:
-    try:
-        from vector_store import delete_document
-
-        await delete_document("notes", note_id)
-    except Exception:
-        pass
-
-
 async def note_create(args: dict[str, Any]) -> dict[str, Any]:
     try:
-        note = db.create_note(
+        result = await note_lifecycle.create(
             title=args["title"],
             content=args.get("content", ""),
             tags=parse_tags(args.get("tags", [])),
             pinned=args.get("pinned", False),
         )
-        await _index_note(note)
-        return {"success": True, "message": f"Note créée : « {note['title']} »", "note": note}
+        note = result["note"]
+        if result["consistency"] == "degraded":
+            return {
+                **result,
+                "message": (
+                    f"Note « {note['title']} » enregistrée, mais sa recherche sémantique "
+                    "doit être réparée."
+                ),
+            }
+        return {**result, "message": f"Note créée : « {note['title']} »"}
     except Exception as exc:
         return {"error": str(exc)}
 
@@ -138,11 +129,15 @@ async def note_update(args: dict[str, Any]) -> dict[str, Any]:
         update_args = dict(args)
         if "tags" in update_args:
             update_args["tags"] = parse_tags(update_args["tags"])
-        note = db.update_note(note_id, update_args)
-        if not note:
+        result = await note_lifecycle.update(note_id, update_args)
+        if result.get("error") == "not_found":
             return {"error": f"Note introuvable : {note_id}"}
-        await _index_note(note)
-        return {"success": True, "message": "Note mise à jour", "note": note}
+        if result["consistency"] == "degraded":
+            return {
+                **result,
+                "message": "Note mise à jour; recherche sémantique à réparer.",
+            }
+        return {**result, "message": "Note mise à jour"}
     except Exception as exc:
         return {"error": str(exc)}
 
@@ -162,8 +157,12 @@ async def note_delete(args: dict[str, Any]) -> dict[str, Any]:
         note = db.get_note(note_id)
         if not note:
             return {"error": f"Note introuvable : {note_id}"}
-        db.delete_note(note_id)
-        await _delete_note_index(note_id)
-        return {"success": True, "message": f"Note « {note['title']} » supprimée"}
+        result = await note_lifecycle.delete(note_id)
+        if not result.get("success"):
+            return {
+                "error": "La suppression n'est pas complète; la note reste autoritative.",
+                **result,
+            }
+        return {**result, "message": f"Note « {note['title']} » supprimée"}
     except Exception as exc:
         return {"error": str(exc)}

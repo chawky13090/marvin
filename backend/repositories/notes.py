@@ -112,6 +112,41 @@ class NoteRepository:
         with self._connection_scope() as connection:
             connection.execute("DELETE FROM notes WHERE id = ?", (note_id,))
 
+    def restore(self, note: dict) -> dict:
+        """Restaure exactement une pré-image possédée par l'appelant."""
+        required = {"id", "title", "content", "created_at", "updated_at"}
+        if not required.issubset(note):
+            raise ValueError("Pré-image de note incomplète.")
+        with self._connection_scope() as connection:
+            connection.execute(
+                """INSERT INTO notes (id, title, content, tags, pinned, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET
+                     title = excluded.title,
+                     content = excluded.content,
+                     tags = excluded.tags,
+                     pinned = excluded.pinned,
+                     created_at = excluded.created_at,
+                     updated_at = excluded.updated_at""",
+                (
+                    str(note["id"]),
+                    str(note["title"]),
+                    str(note.get("content") or ""),
+                    json.dumps(note.get("tags") or []),
+                    int(bool(note.get("pinned"))),
+                    str(note["created_at"]),
+                    str(note["updated_at"]),
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM notes WHERE id = ?",
+                (str(note["id"]),),
+            ).fetchone()
+        restored = _parse_note(row_to_dict(row))
+        if restored is None:
+            raise RuntimeError("La pré-image de note restaurée est introuvable.")
+        return restored
+
 
 repository = NoteRepository()
 create_note = repository.create
@@ -119,3 +154,4 @@ get_note = repository.get
 list_notes = repository.list
 update_note = repository.update
 delete_note = repository.delete
+restore_note = repository.restore

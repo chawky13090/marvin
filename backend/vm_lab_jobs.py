@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import vm_lab
+import psutil
 from config import DATA_DIR
 
 
@@ -44,21 +45,19 @@ def _write_state(value: dict[str, Any]) -> None:
     os.replace(temporary, STATE_PATH)
 
 
-def _pid_is_running(pid: int) -> bool:
+def _pid_is_running(pid: int, expected_start_time: float) -> bool:
     if pid <= 0:
         return False
     process = _PROCESSES.get(str(pid))
     if process is not None:
         return process.poll() is None
     try:
-        observed = subprocess.run(
-            ["tasklist.exe", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=10, check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+        observed = psutil.Process(pid)
+        if not observed.is_running() or observed.status() == psutil.STATUS_ZOMBIE:
+            return False
+        return abs(float(observed.create_time()) - float(expected_start_time)) <= 2.0
+    except (psutil.Error, OSError, ValueError, TypeError):
         return False
-    return observed.returncode == 0 and str(pid) in observed.stdout and "INFO:" not in observed.stdout
 
 
 def _tail(path: Path, limit: int = 12_000) -> str:
@@ -80,14 +79,19 @@ def _result_after_start(profile: str, started_at: float) -> dict[str, Any] | Non
         return None
 
 
-def _reconcile(state: dict[str, Any]) -> dict[str, Any]:
+def _reconcile(state: dict[str, Any], *, persist: bool = True) -> dict[str, Any]:
     if not state or state.get("status") not in {"queued", "running"}:
         return state
+    state = dict(state)
     pid = int(state.get("pid") or 0)
-    if _pid_is_running(pid):
+    expected_start_time = float(
+        state.get("process_started_at") or state.get("started_at") or 0.0
+    )
+    if _pid_is_running(pid, expected_start_time):
         if state.get("status") != "running":
             state["status"] = "running"
-            _write_state(state)
+            if persist:
+                _write_state(state)
         return state
     result = _result_after_start(str(state["profile"]), float(state["started_at"]))
     state["finished_at"] = time.time()
@@ -97,13 +101,16 @@ def _reconcile(state: dict[str, Any]) -> dict[str, Any]:
         state["error"] = "Le processus s est arrêté sans preuve d installation exploitable."
     elif result.get("status") != "completed":
         state["error"] = str(result.get("error") or "Installation VM Lab échouée.")
-    _write_state(state)
+    if persist:
+        _write_state(state)
     return state
 
 
 def status() -> dict[str, Any]:
     with _LOCK:
-        state = _reconcile(_read_state())
+        # Une lecture de statut ne réécrit jamais l'état. Les transitions durables
+        # appartiennent au watcher et à la frontière d'une nouvelle installation.
+        state = _reconcile(_read_state(), persist=False)
         if not state:
             return {"status": "idle", "active": False}
         public = dict(state)
@@ -165,9 +172,12 @@ def start(profile: str, *, confirmed: bool) -> dict[str, Any]:
         except OSError:
             log_stream.close()
             raise
+        started_at = time.time()
         state = {
             "job_id": job_id, "profile": profile, "status": "running", "pid": process.pid,
-            "started_at": time.time(), "log_path": str(log_path),
+            "started_at": started_at,
+            "process_started_at": started_at,
+            "log_path": str(log_path),
             "destructive_scope": f"recreate:{vm_lab.PROFILES[profile]['vm_name']}",
             "host_network_policy": lab["host_network_policy"],
         }

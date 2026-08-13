@@ -5,6 +5,48 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.647.0 — cohérence multi-magasins et lecture VM sans mutation
+
+TD-014 identifiait cinq surfaces sous-déclarées. Un pré-enregistrement séparé a gelé les
+prédicats et les empreintes au commit `6b75d13` avant toute correction produit. La lecture du
+code a distingué trois natures : les notes avalaient réellement les pannes Qdrant, l'oubli
+mémoire signalait les pannes mais pouvait laisser ses projections dégradées, et le statut VM
+réconciliait son fichier tout en lançant `tasklist.exe`. Le chemin `resume` de Code Workspace
+utilise réellement réseau et sous-processus; `cancel` ne suit pas cette branche et reste un
+candidat faux positif de l'analyse statique v1.4.
+
+Deux stratégies ont été comparées pour les notes. Annuler toute création lorsque Qdrant est
+hors ligne aurait préservé une atomicité apparente au prix de rendre la prise de notes
+indisponible. Conserver silencieusement une projection absente reproduisait le défaut. SQLite
+reste donc autoritatif : création et mise à jour réussissent en mode explicitement `degraded`,
+tandis que la suppression, exigence de confidentialité, échoue fermée avant SQLite si Qdrant
+ne peut être nettoyé. Une panne SQLite après nettoyage vectoriel restaure exactement la ligne
+et réindexe. API, outils et interface utilisent la même orchestration; l'interface vérifie les
+statuts et la suppression exige aussi `confirmed=true` côté FastAPI.
+
+L'oubli mémoire vérifie désormais le booléen de suppression Qdrant et régénère Mesh/Qdrant
+depuis la source SQLite sur panne intermédiaire. Le statut VM calcule sa réconciliation en
+mémoire sans persister; le watcher ou la frontière d'une nouvelle installation restent seuls
+autorisés à écrire. `psutil` remplace le processus `tasklist.exe` et compare l'heure de création
+au démarrage enregistré afin de refuser un PID réutilisé.
+
+Sécurité et journalisation : aucune nouvelle donnée ni file persistante n'est créée. Les
+résultats de panne exposent uniquement magasin, type d'erreur et état de compensation; aucun
+contenu de note ou souvenir n'entre dans les nouveaux signaux. Le journal d'audit d'outil
+existant reste la source bornée et expurgée. Le rollback est une réversion Git atomique suivie
+du redémarrage; aucun schéma ni donnée existante n'est transformé. Les validations ciblées
+injectent les pannes Qdrant, Mesh, SQLite et compensation, vérifient la pré-image exacte des
+notes, la confirmation API, l'absence d'écriture et de sous-processus pour le statut VM, puis
+seront complétées par le gate exhaustif et les smokes après redémarrage.
+
+La revue du chemin UI a fermé un second faux signal : les mutations Notes ne traversent plus
+le proxy Next borné à huit secondes. Elles utilisent le transport direct FastAPI à invocation
+unique; un 502/503/504 ou une erreur de transport devient « résultat non confirmé » et demande
+une vérification, tandis qu'un 4xx reste un échec ferme. Les lectures gardent leur repli sûr.
+Le contrôle OpenAPI, resté hors du gate avec une baseline v2.464 périmée, est réconcilié sur
+326 chemins, 391 opérations et 67 familles, puis réintégré comme étape obligatoire. Cette
+réconciliation ne crée ni route ni effet runtime; elle rend à nouveau la dérive mesurable.
+
 ## 2026-08-13 — v2.646.0 — chaîne de preuve indépendante de `core.autocrlf`
 
 La revue croisée a démontré que le correctif v2.645 était trop local : six manifestes gelés

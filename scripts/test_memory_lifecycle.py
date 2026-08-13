@@ -166,6 +166,7 @@ async def _exercise(mesh_path: Path) -> None:
             order.append("database")
 
         with (
+            patch.object(memory_lifecycle.db, "get_memories", return_value=[created]),
             patch.object(memory_lifecycle, "_delete_index", delete_index),
             patch.object(memory_lifecycle.memory_mesh, "remove", remove_mesh),
             patch.object(memory_lifecycle.db, "delete_memory", delete_database),
@@ -212,6 +213,15 @@ async def _exercise(mesh_path: Path) -> None:
 
         with (
             patch.object(
+                memory_lifecycle.db,
+                "get_memories",
+                return_value=[{
+                    "id": "memory-2",
+                    "content": "Fixture",
+                    "category": "fact",
+                }],
+            ),
+            patch.object(
                 memory_lifecycle,
                 "_delete_index",
                 AsyncMock(side_effect=RuntimeError("Qdrant indisponible")),
@@ -225,9 +235,55 @@ async def _exercise(mesh_path: Path) -> None:
             "forgotten": False,
             "stage": "index",
             "error_type": "RuntimeError",
+            "compensated": True,
         }
         remove.assert_not_called()
         delete.assert_not_called()
+
+        source = {"id": "memory-3", "content": "Fixture", "category": "fact"}
+        with (
+            patch.object(memory_lifecycle.db, "get_memories", return_value=[source]),
+            patch.object(memory_lifecycle, "_delete_index", AsyncMock()),
+            patch.object(
+                memory_lifecycle.memory_mesh,
+                "remove",
+                side_effect=OSError("mesh indisponible"),
+            ),
+            patch.object(
+                memory_lifecycle,
+                "refresh",
+                AsyncMock(return_value={"consistency": "complete", "warnings": []}),
+            ) as compensate,
+            patch.object(memory_lifecycle.db, "delete_memory") as delete,
+        ):
+            mesh_failure = await memory_lifecycle.forget("memory-3")
+        assert mesh_failure["compensated"] is True
+        assert mesh_failure["stage"] == "mesh"
+        compensate.assert_awaited_once_with(source, source="delete_compensation")
+        delete.assert_not_called()
+
+        with (
+            patch.object(memory_lifecycle.db, "get_memories", return_value=[source]),
+            patch.object(memory_lifecycle, "_delete_index", AsyncMock()),
+            patch.object(memory_lifecycle.memory_mesh, "remove", return_value=True),
+            patch.object(
+                memory_lifecycle.db,
+                "delete_memory",
+                side_effect=OSError("sqlite indisponible"),
+            ),
+            patch.object(
+                memory_lifecycle,
+                "refresh",
+                AsyncMock(return_value={
+                    "consistency": "degraded",
+                    "warnings": ["index:RuntimeError"],
+                }),
+            ),
+        ):
+            database_failure = await memory_lifecycle.forget("memory-3")
+        assert database_failure["stage"] == "database"
+        assert database_failure["compensated"] is False
+        assert database_failure["compensation_warnings"] == ["index:RuntimeError"]
 
         with (
             patch.object(memory_lifecycle.db, "get_memories", return_value=[
