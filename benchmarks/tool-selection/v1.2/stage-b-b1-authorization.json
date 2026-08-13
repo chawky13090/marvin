@@ -1,0 +1,20 @@
+{
+  "schema": "marvin.tool-selection-stage-b-b1-authorization/1.0",
+  "status": "single_use_authorized_before_execution",
+  "source_commit": "2502aa9a",
+  "runner_freeze_sha256": "ea4a86cdd7a78597c59c54c42591600e480ac75c954392ac87f6342df53a039b",
+  "benchmark_model": "mistral-large-3:675b-cloud",
+  "benchmark_model_digest": "3130fd5a5a1eb4b208be74bf0273357c14c3576c6ba8d78f98b960e91919d77b",
+  "benchmark_model_execution_authorized": true,
+  "maximum_model_calls": 810,
+  "business_tool_execution_authorized": false,
+  "host_side_effect_authorized": false,
+  "result_path": "benchmarks/tool-selection/v1.2/stage-b-b1-result.json",
+  "result_must_not_exist_before_execution": true,
+  "authorization_consumed_when_result_exists": true,
+  "candidate_matrix_sha256": "4272c345b100fb6f4910a72a3729c8a9a52632c92c151eb3b43f338ecf3d7385",
+  "system_prompt_sha256": "e2a7ad212bc21071b407398d0bd54e23497c413dc6811a85dc8e09fddfdf1f61",
+  "backend_port_8005_must_not_listen_during_qdrant_preflight": true,
+  "interrupted_or_incomplete_run_action": "discard_without_publication_and_issue_new_versioned_authorization",
+  "rollback": "Delete no evidence. Before execution, revert this commit. After publication, preserve the result and supersede through a new version."
+}
