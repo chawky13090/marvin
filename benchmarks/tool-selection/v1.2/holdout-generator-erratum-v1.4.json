@@ -1,0 +1,17 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.4",
+  "status": "frozen_after_third_aborted_generation_before_any_artifact",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "35491d7749365bad4d6a4a9ddb139dd583145806f17afa2521b675d1d870669c"},
+  "observation": {"published_artifact_count": 0, "business_tool_execution_count": 0, "failure_stage": "cloud_oracle_empty_or_invalid_json", "semantic_content_was_not_scored": true},
+  "authorized_change": {
+    "maximum_attempts_per_cloud_role": 3,
+    "same_model_prompt_seed_temperature_and_top_p_required": true,
+    "retry_only_on_transport_http_or_json_contract_failure": true,
+    "semantic_validation_failure_is_not_retryable": true,
+    "attempt_count_must_be_published": true,
+    "partial_artifact_publication_forbidden": true,
+    "all_generation_oracle_adjudication_novelty_privacy_and_decision_rules_unchanged": true
+  },
+  "failure": "fail_closed_after_third_attempt",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
