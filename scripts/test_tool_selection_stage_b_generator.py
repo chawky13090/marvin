@@ -1,6 +1,7 @@
 """Contrôle structurel du générateur Stage B avant son exécution Cloud."""
 from __future__ import annotations
 import ast
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,13 @@ def main() -> None:
     assert "private_details_published" in text and "_jaccard" in text
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
     assert any(isinstance(call.func, ast.Name) and call.func.id == "_atomic" for call in calls)
+    spec = importlib.util.spec_from_file_location("stage_b_generator_under_test", SOURCE)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    assert module._adjudications({"items": [{"id": "a", "valid": True}]}, {"a", "b"}) == {"a": True, "b": False}
+    assert module._adjudications({"items": [{"id": "a", "valid": True}, {"id": "a", "valid": True}]}, {"a"}) == {"a": False}
+    assert module._adjudications({"items": [{"id": "a", "valid": "true"}]}, {"a"}) == {"a": False}
     print("Stage B generator OK - no Stage A labels, dual oracle, private novelty local only.")
 
 if __name__ == "__main__":

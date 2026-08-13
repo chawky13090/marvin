@@ -185,15 +185,17 @@ def _consensus(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> list[
 def _adjudications(value: Any, valid_ids: set[str]) -> dict[str, bool]:
     rows = value.get("items") if isinstance(value, dict) else None
     if not isinstance(rows, list): raise ValueError("Adjudication sans liste items.")
-    output: dict[str, bool] = {}
+    observed: dict[str, list[bool]] = defaultdict(list)
     for row in rows:
         if not isinstance(row, dict): continue
         identity = str(row.get("id") or "")
         valid = row.get("valid")
-        if identity in valid_ids and isinstance(valid, bool) and identity not in output:
-            output[identity] = valid
-    if set(output) != valid_ids: raise ValueError("Adjudication incomplète ou dupliquée.")
-    return output
+        if identity in valid_ids and isinstance(valid, bool):
+            observed[identity].append(valid)
+    return {
+        identity: observed.get(identity) == [True]
+        for identity in valid_ids
+    }
 
 def _schema_valid_calls(calls: list[dict[str, Any]], catalog: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     output = []
