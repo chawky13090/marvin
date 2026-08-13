@@ -1,0 +1,16 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.9",
+  "status": "frozen_after_insufficient_family_survivors_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "6458f3c9c708e5c666b79615429c71e839e8ad9b86215fe20128d82002457bbb"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {"business_tool_execution_count": 0, "benchmark_model_call_count": 0, "known_result": "application_launch_has_fewer_than_five_survivors", "individual_acceptance_results_not_published_or_used": true},
+  "authorized_change": {
+    "authored_candidates_per_family": 12,
+    "selected_holdout_per_family_remains": 5,
+    "selection_order_remains_author_order_after_all_filters": true,
+    "all_oracle_schema_adjudication_critic_novelty_privacy_and_decision_rules_unchanged": true,
+    "no_manual_case_selection": true
+  },
+  "rationale": "Oversampling supplies enough independently filtered candidates without relaxing any acceptance predicate or selecting cases by observed benchmark behavior.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
