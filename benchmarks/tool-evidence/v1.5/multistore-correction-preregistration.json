@@ -1,0 +1,88 @@
+{
+  "schema": "marvin.e7-multistore-correction-preregistration/1.0",
+  "status": "frozen_before_product_change",
+  "source_commit": "70db1fd75635fc748a843cd911b27bb7e5816cbe",
+  "tool_execution_authorized": false,
+  "fixture_execution_authorized": false,
+  "product_change_authorized": true,
+  "contract_supersession_authorized_after_validation": true,
+  "historical_artifacts_must_remain_immutable": true,
+  "baseline_sha256": {
+    "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+    "benchmarks/tool-evidence/v1.1/e7-classification.json": "ca3aca2edc68853a1168e17bea52c8ea2cf165e05d686c21b57442c00cf918ff",
+    "benchmarks/tool-evidence/v1.1/direct-fixture-contracts.json": "3029b0d30dd07913e4d1f4aa1191a32f31e457ea5e3800827b2c50184ca8f5fc"
+  },
+  "governed_product_sources": {
+    "backend/tool_domains/productivity.py": "76c48e01fff1552fef1af52cf6e8f02359841346334a752bcc3e557cf4f01881",
+    "backend/memory_lifecycle.py": "1b0a41f57643745a3a7b37550c85697330853a20e1da065a142eb49af1823a65",
+    "backend/vm_lab_jobs.py": "2d538b13e5f3befbc6c1bbef12a887e56db4d975434322e00b896cc0dfbc154c",
+    "backend/coding_service.py": "847ce74dfa433e26e1d3f0553270d4832f5040f192dde52ea7a40f00442e3c3b",
+    "backend/coding_jobs.py": "ba61eb4c669ff221f6ae18bac9d7552d67270d50a457ba9eab8caa0b875391b9"
+  },
+  "general_invariants": {
+    "derived_store_failure_never_produces_unqualified_success": true,
+    "destructive_multistore_success_requires_all_declared_stores": true,
+    "partial_failure_reports_stage_and_compensation": true,
+    "read_only_status_performs_no_persistent_write_or_child_process_spawn": true,
+    "action_specific_paths_are_evaluated_independently": true,
+    "unresolved_effect_remains_unknown": true,
+    "contract_change_requires_versioned_supersession": true
+  },
+  "cases": [
+    {
+      "contract_id": "direct-note_delete---default--",
+      "baseline_finding": "CONFIRMED_UNDER_DECLARED",
+      "source_audit": "confirmed_product_defect",
+      "required_effects": ["sqlite", "qdrant"],
+      "acceptance": "create_update_delete_never_hide_qdrant_failure_and_compensation_is_reported"
+    },
+    {
+      "contract_id": "direct-memory_delete---default--",
+      "baseline_finding": "CONFIRMED_UNDER_DECLARED",
+      "source_audit": "confirmed_contract_gap_and_degraded_failure_path",
+      "required_effects": ["sqlite", "qdrant", "filesystem"],
+      "acceptance": "failed_delete_repairs_authoritative_projections_or_reports_compensation_failure"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-resume",
+      "baseline_finding": "CONFIRMED_UNDER_DECLARED",
+      "source_audit": "confirmed_contract_gap",
+      "required_effects": ["filesystem", "process", "sqlite", "network"],
+      "acceptance": "network_surface_and_fixture_endpoints_are_observed_without_weakening_existing_guards"
+    },
+    {
+      "contract_id": "direct-code_workspace_control-cancel",
+      "baseline_finding": "CONFIRMED_UNDER_DECLARED",
+      "source_audit": "candidate_static_false_positive",
+      "required_effects": ["filesystem", "process", "sqlite"],
+      "acceptance": "cancel_path_is_scored_without_following_resume_branch_and_unknown_never_becomes_absent"
+    },
+    {
+      "contract_id": "direct-vm_lab_install-status",
+      "baseline_finding": "CONFIRMED_UNDER_DECLARED",
+      "source_audit": "confirmed_product_read_mutation",
+      "required_effects": [],
+      "acceptance": "status_remains_class_N_by_using_in_process_observation_and_non_persistent_reconciliation"
+    }
+  ],
+  "validation_requirements": {
+    "negative_failure_injection_per_mutated_store": true,
+    "compensation_failure_test": true,
+    "read_only_filesystem_preimage_postimage_equality": true,
+    "no_real_user_data": true,
+    "no_real_external_recipient": true,
+    "full_gate_required": true,
+    "cold_restart_and_live_smoke_required": true
+  },
+  "logging_decision": {
+    "existing_tool_audit_event_remains_authoritative": true,
+    "failure_results_must_expose_only_symbolic_stage_and_error_type": true,
+    "note_or_memory_content_in_logs_forbidden": true,
+    "new_persistent_log_store": false
+  },
+  "rollback": {
+    "code": "atomic_git_revert_before_any_contract_supersession",
+    "persistent_schema_change": false,
+    "historical_evidence_preserved": true
+  }
+}
