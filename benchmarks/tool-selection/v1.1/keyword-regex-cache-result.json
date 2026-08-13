@@ -1,0 +1,40 @@
+{
+  "schema": "marvin.tool-selection-keyword-regex-cache-result/1.0",
+  "status": "BEHAVIOR_EQUIVALENT_PERFORMANCE_IMPROVED",
+  "source_commit": "cbac62e816f6f95f16a9feba51c9be5ee53f5b19",
+  "source_policy_sha256": "4208ed6382dbfcf3e294c8579f09a5f778c9c20fdd19b2867526428712595958",
+  "implementation": {
+    "path": "backend/agent_tool_selection.py",
+    "sha256": "98dc6e797ab97d9ed822b338600b5f5c0c9232bdfeb5b1de9db76ebaf83338d6",
+    "cache_maximum_entries": 4096,
+    "cached_value": "compiled_internal_keyword_boundary_pattern",
+    "user_text_cached": false
+  },
+  "verification": {
+    "test_path": "scripts/test_tool_selection_keyword_cache.py",
+    "test_sha256": "85a558e2f2f7f804d3708d62c3c1d623cf83d456e77cb3af859f666bed7a49c3",
+    "query_count": 536,
+    "private_query_count": 392,
+    "vocabulary_count": 1668,
+    "predicate_mismatch_count": 0,
+    "keyword_hit_set_mismatch_count": 0,
+    "boundary_canaries_passed": 6
+  },
+  "host_specific_performance": {
+    "measurement_is_portable_gate": false,
+    "repetitions": 28,
+    "uncached_ms": 1869.099,
+    "cached_ms": 36.781,
+    "speedup": 50.817,
+    "acceptance_speedup_minimum": 5.0,
+    "accepted": true
+  },
+  "product_change": {
+    "keywords_changed": false,
+    "catalog_changed": false,
+    "ranking_changed": false,
+    "security_guards_changed": false,
+    "persistent_data_changed": false
+  },
+  "rollback": "git revert cbac62e816f6f95f16a9feba51c9be5ee53f5b19 then restart backend"
+}

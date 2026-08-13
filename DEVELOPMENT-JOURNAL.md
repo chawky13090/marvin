@@ -24,6 +24,14 @@ présentes, canaris positifs/négatifs, mesure comparative locale, tests de sél
 gate exhaustif puis redémarrage froid et smokes. Rollback : réversion atomique du commit
 v2.649 et redémarrage backend; aucune donnée à restaurer.
 
+Résultat ciblé observé : 536 demandes, dont les 392 demandes privées déchiffrées localement,
+et 1 668 motifs produisent zéro divergence de prédicat et zéro divergence d'ensemble. Le
+balayage comparatif de 28 répétitions passe de 1 869,099 ms sans cache à 36,781 ms avec cache,
+soit 50,817 fois plus rapide sur cette machine. Cette durée est une preuve locale, pas un seuil
+de gate portable. Le résultat est lié au commit v2.649 et autorise un nouveau runner d'ablation
+à regrouper au plus 32 embeddings Ollama. Un canari exige l'identité exacte entre embedding
+isolé et batch; toutes les limites Qdrant et les règles de décision v1.0 restent inchangées.
+
 ## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
 
 Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier

@@ -1,0 +1,51 @@
+{
+  "schema": "marvin.tool-selection-ablation-reauthorization/1.1",
+  "status": "frozen_after_behavior_equivalent_product_optimization",
+  "source_commit": "cbac62e816f6f95f16a9feba51c9be5ee53f5b19",
+  "inherits": {
+    "path": "benchmarks/tool-selection/v1.0/ablation-preregistration.json",
+    "sha256": "bbfb02423947df05613bab2026579adb7d1cff4fdb3d8909c17a3fa3eb5ea5b9",
+    "all_datasets_modes_configurations_metrics_and_decision_rules_unchanged": true
+  },
+  "optimization_proof": {
+    "path": "benchmarks/tool-selection/v1.1/keyword-regex-cache-result.json",
+    "sha256": "5a7be17d64843f89d1bdebeb11c5e72602833b4089e00e8fa4d5e389c0d219da",
+    "predicate_mismatch_count": 0,
+    "keyword_hit_set_mismatch_count": 0
+  },
+  "product_sources_sha256": {
+    "backend/agent_tool_selection.py": "98dc6e797ab97d9ed822b338600b5f5c0c9232bdfeb5b1de9db76ebaf83338d6",
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/tool_router.py": "aa8cc084e9dd19ca6e45bbce3ad72970d59f55c3dbc6abff8a6255f33638f7a2",
+    "backend/auto_config.py": "2cc69c2489133d9294b7eef0bac105ce822a042c8ba0c4f14a7a35cad683efed",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "runner_v1_1_authorization": {
+    "original_runner_sha256": "ea499412aff7edeb207f39c01319e291391d394477e330bcab5c77911e7b987a",
+    "authorized_changes": [
+      "load_this_reauthorization_and_inherited_policy",
+      "batch_ollama_embeddings_up_to_32_inputs",
+      "publish_progress_and_phase_durations",
+      "write_v1_1_result_and_public_cache_paths"
+    ],
+    "other_runner_semantics_change_forbidden": true,
+    "embedding_batch_maximum": 32,
+    "single_and_batch_embedding_exact_equality_required": true,
+    "control_query_minimum": 5,
+    "qdrant_thresholds_and_limits_unchanged": true,
+    "candidate_postprocessors_unchanged": true,
+    "private_join_order_unchanged": true,
+    "private_plaintext_output_forbidden": true
+  },
+  "outputs": {
+    "public_cache": "benchmarks/tool-selection/v1.1/public-semantic-signal-cache.json",
+    "result": "benchmarks/tool-selection/v1.1/ablation-result.json",
+    "partial_output_forbidden": true
+  },
+  "product_decision_authorized": false,
+  "rollback": {
+    "runner_and_outputs": "atomic_git_revert",
+    "product_runtime_unchanged_by_campaign": true,
+    "persistent_data_mutation": false
+  }
+}
