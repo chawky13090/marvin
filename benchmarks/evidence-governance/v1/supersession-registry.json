@@ -1,0 +1,853 @@
+{
+  "schema": "marvin.evidence-supersession-registry/1.0",
+  "status": "current",
+  "generated_at": "2026-08-13T19:26:12.994914+00:00",
+  "preregistration": {
+    "path": "benchmarks/evidence-governance/v1/supersession-preregistration.json",
+    "sha256": "d166b42d95778a1b7ffb88df2fb6c42bfde61df2f610c5a38b5d8ec2d6daf773"
+  },
+  "preregistration_commit": "6627e64a411bdeb68b1c7232a44e41b3e11c5d30",
+  "historical_artifacts_modified": false,
+  "subject_granularity": true,
+  "subjects": [
+    {
+      "subject": "tool_evidence_inventory:global",
+      "revisions": [
+        {
+          "id": "inventory-v1",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1/inventory.json",
+            "sha256": "2d269e7839de38080d0320ccd40283f9617336663e01ce51f661314879c92d2d"
+          },
+          "successor": "inventory-v1.1"
+        },
+        {
+          "id": "inventory-v1.1",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.1/inventory.json",
+            "sha256": "3b3ff7ae57f63b8cc7fd42830441b81d32c5c0a1bc6eb10ef065b7a7363777af"
+          },
+          "successor": "inventory-v1.2"
+        },
+        {
+          "id": "inventory-v1.2",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.2/inventory.json",
+            "sha256": "24b44f9ecdd3ab442382dbc4228d32e91b2accafd67c334257239b2b31829211"
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-note_delete---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-note_delete---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-note_delete---default--"
+            }
+          },
+          "successor": "surface-v1.5"
+        },
+        {
+          "id": "surface-v1.5",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.5/direct-surface-supersession.json",
+            "sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+            "selector": {
+              "collection": "superseded_contracts",
+              "key": "contract_id",
+              "value": "direct-note_delete---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-task_delete---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-task_delete---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-task_delete---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-memory_delete---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-memory_delete---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-memory_delete---default--"
+            }
+          },
+          "successor": "surface-v1.5"
+        },
+        {
+          "id": "surface-v1.5",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.5/direct-surface-supersession.json",
+            "sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+            "selector": {
+              "collection": "superseded_contracts",
+              "key": "contract_id",
+              "value": "direct-memory_delete---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-project_delete---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-project_delete---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-project_delete---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-bulk_rename-apply",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-bulk_rename-apply"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-bulk_rename-apply"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-bulk_rename-rollback",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-bulk_rename-rollback"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-bulk_rename-rollback"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-tweak_debloat_remove---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-tweak_debloat_remove---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-tweak_debloat_remove---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-winget_uninstall---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-winget_uninstall---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-winget_uninstall---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-winget_install---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-winget_install---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-winget_install---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-winget_upgrade---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-winget_upgrade---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-winget_upgrade---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-itsm_ticket_create---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-itsm_ticket_create---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-itsm_ticket_create---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-system_restore_point---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-system_restore_point---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-system_restore_point---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-vm_lab_install-install",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-vm_lab_install-install"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-vm_lab_install-install"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-pc_pull_ollama_model---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-pc_pull_ollama_model---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-pc_pull_ollama_model---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-code_workspace_start---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-code_workspace_start---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-code_workspace_start---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-code_workspace_control-resume",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-code_workspace_control-resume"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-code_workspace_control-resume"
+            }
+          },
+          "successor": "surface-v1.5"
+        },
+        {
+          "id": "surface-v1.5",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.5/direct-surface-supersession.json",
+            "sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+            "selector": {
+              "collection": "superseded_contracts",
+              "key": "contract_id",
+              "value": "direct-code_workspace_control-resume"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-code_workspace_control-cancel",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-code_workspace_control-cancel"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-code_workspace_control-cancel"
+            }
+          },
+          "successor": "surface-v1.5"
+        },
+        {
+          "id": "surface-v1.5",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.5/direct-surface-supersession.json",
+            "sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+            "selector": {
+              "collection": "retained_contracts",
+              "key": "contract_id",
+              "value": "direct-code_workspace_control-cancel"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-long_task_start---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-long_task_start---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-long_task_start---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-pc_process_kill---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-pc_process_kill---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-pc_process_kill---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-email_send---default--",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-email_send---default--"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-email_send---default--"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-bulk_rename-preview",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-bulk_rename-preview"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-bulk_rename-preview"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_direct_surface_contract:direct-vm_lab_install-status",
+      "revisions": [
+        {
+          "id": "surface-v1.3",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+            "sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-vm_lab_install-status"
+            }
+          },
+          "successor": "surface-v1.4"
+        },
+        {
+          "id": "surface-v1.4",
+          "state": "superseded",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+            "sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+            "selector": {
+              "collection": "results",
+              "key": "contract_id",
+              "value": "direct-vm_lab_install-status"
+            }
+          },
+          "successor": "surface-v1.5"
+        },
+        {
+          "id": "surface-v1.5",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.5/direct-surface-supersession.json",
+            "sha256": "474221dccf86ab10ef5a7ba7f07cbb6839a0815ba91b5930f6dec7341a5563e0",
+            "selector": {
+              "collection": "retained_contracts",
+              "key": "contract_id",
+              "value": "direct-vm_lab_install-status"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_runtime_verdict:bulk_rename:preview",
+      "revisions": [
+        {
+          "id": "preview-result-v1.1",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-result.json",
+            "sha256": "be40756af372ba8866624a10834a45b2b25e7b32fb3c6fa69d81a510f7bd5499"
+          }
+        }
+      ]
+    },
+    {
+      "subject": "e7_runtime_verdict:bulk_rename:apply",
+      "revisions": [
+        {
+          "id": "apply-result-v1.2",
+          "state": "current",
+          "artifact": {
+            "path": "benchmarks/tool-evidence/v1.2/e7-apply-replay-result.json",
+            "sha256": "d295e3ea344bef1de8bec1a15cbbb2e02df13f9fafed4ce46e5954128d0973a1"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "subjects": 25,
+    "surface_subjects": 22,
+    "partially_superseded_surface_subjects": 5,
+    "surface_subjects_remaining_on_v1_4": 17,
+    "explicit_e7_verified_pairs": 2
+  },
+  "rollback": "Preserve historical evidence; revert registry, resolver, current inventory and gate wiring atomically. No persistent data migration is involved."
+}

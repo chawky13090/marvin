@@ -191,7 +191,7 @@ def _usage(database_path: Path) -> tuple[dict[tuple[str, str], dict[str, Any]], 
 
 
 def _flags(
-    *, harness: bool, automated_test: bool, usage: dict[str, Any]
+    *, harness: bool, automated_test: bool, usage: dict[str, Any], e7_verified: bool
 ) -> dict[str, bool | None]:
     return {
         "E0": True,
@@ -203,11 +203,17 @@ def _flags(
         "E4": None,
         "E5": None,
         "E6": usage.get("successful_human_message_count", 0) > 0,
-        "E7": None,
+        "E7": True if e7_verified else None,
     }
 
 
-def build_inventory(database_path: Path) -> dict[str, Any]:
+def build_inventory(
+    database_path: Path,
+    *,
+    explicit_e7: dict[tuple[str, str], dict[str, Any]] | None = None,
+    schema_version: str = "1.1",
+) -> dict[str, Any]:
+    explicit_e7 = explicit_e7 or {}
     static_report = build_static_coverage()
     static_by_name = {row["name"]: row for row in static_report["tools"]}
     usage_by_pair, usage_totals = _usage(database_path)
@@ -228,6 +234,7 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
                 harness=bool(static.get("harness")),
                 automated_test=bool(static.get("automated_test")),
                 usage=usage,
+                e7_verified=pair in explicit_e7,
             )
             risk_tier, risk_basis = _risk(tool_name, action)
             missing = [level for level, present in evidence.items() if present is not True]
@@ -251,6 +258,9 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
                     "usage": usage,
                     "verification_priority": priority,
                     "rollback_verified": evidence["E7"] is True,
+                    "explicit_evidence": {
+                        "E7": explicit_e7[pair]
+                    } if pair in explicit_e7 else {},
                 }
             )
     unknown_pairs = sorted(set(usage_by_pair) - known_pairs)
@@ -271,7 +281,7 @@ def build_inventory(database_path: Path) -> dict[str, Any]:
         not row["usage"].get("distinct_human_message_count") for row in rows
     )
     return {
-        "schema_version": "1.1",
+        "schema_version": schema_version,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "database": {
             "path": database_path.name,

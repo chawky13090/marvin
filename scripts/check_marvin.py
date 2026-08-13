@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 319
+EXPECTED_STAGE_COUNT = 320
 
 
 @dataclass(frozen=True)
@@ -194,6 +194,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Pré-enregistrement du registre canonique de supersession",
             (python, "scripts/test_evidence_supersession_preregistration.py"),
+        ),
+        Stage(
+            "Registre canonique des preuves courantes",
+            (python, "scripts/test_evidence_supersession_registry.py"),
         ),
         Stage("Pré-inscription de la campagne B", (python, "scripts/test_tool_evidence_campaign_b.py")),
         Stage("Gel de la taxonomie E7 R/C/I/N/P", (python, "scripts/test_e7_taxonomy_freeze.py")),
