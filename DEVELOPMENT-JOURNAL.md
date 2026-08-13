@@ -36,6 +36,15 @@ jamais leur correction. Texte et provenance restent séparés jusqu'après le ca
 aucun agrégat par outil/message privé n'est publiable, et l'absence des enveloppes DPAPI sur une
 autre machine ne fait pas échouer le gate portable. Aucune garde de sécurité n'est ablatée.
 
+Le runner déterministe est gelé dans un commit distinct avant son exécution. Il vérifie les
+empreintes des cinq sources produit et des cinq entrées publiques, refuse de reconstruire un
+index Qdrant absent ou périmé, calcule chaque signal sémantique une seule fois puis rejoue les
+sept combinaisons avec les post-traitements de production inchangés. Les coûts sont isolés par
+panel et par requête; la provenance privée n'est déchiffrée qu'après le calcul complet de tous
+les ensembles candidats. Validation pré-exécution : compilation Python, `git diff --check` et
+correspondance exacte des cinq empreintes produit. Rollback : réversion atomique du commit du
+runner; aucune donnée persistante ni configuration produit n'est modifiée.
+
 ## 2026-08-13 — v2.647.0 — cohérence multi-magasins et lecture VM sans mutation
 
 TD-014 identifiait cinq surfaces sous-déclarées. Un pré-enregistrement séparé a gelé les
