@@ -23,7 +23,10 @@ def main() -> None:
     assert "RELEVANT_PREFIXES" in text and "RELEVANT_EXACT" in text
     assert "for family_index, family in enumerate(ALLOWED_FAMILIES)" in text
     assert "family_counts = {name: 64 for name in ALLOWED_FAMILIES}" in text
-    assert "minimum=64" in text
+    assert "for batch_index in range(4)" in text
+    assert "Produis exactement 16 items" in text and "minimum=16" in text
+    assert "enumerate(_chunks(family_rows), start=1)" in text
+    assert "stable_global_ids" not in text
     assert "expected_family=family" in text
     assert "for attempt in range(1, 4)" in text and '"attempts": attempt' in text
     assert "family_ordinals" in text and "family_ordinals[family] += 1" in text
