@@ -255,7 +255,7 @@ async def run() -> dict[str, Any]:
         or str(item["function"]["name"]).startswith(RELEVANT_PREFIXES)
     ]
     catalog_json = json.dumps(relevant_spec, ensure_ascii=False, separators=(",", ":"))
-    family_counts = {name: 8 for name in ALLOWED_FAMILIES}
+    family_counts = {name: 12 for name in ALLOWED_FAMILIES}
     author_user = (
         "Crée un corpus inédit de demandes Windows en français. Retourne un objet JSON {items:[...]}. "
         f"Produis exactement {family_counts}. Chaque item contient seulement id, family et prompt. "
