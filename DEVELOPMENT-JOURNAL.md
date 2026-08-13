@@ -45,6 +45,16 @@ les ensembles candidats. Validation pré-exécution : compilation Python, `git d
 correspondance exacte des cinq empreintes produit. Rollback : réversion atomique du commit du
 runner; aucune donnée persistante ni configuration produit n'est modifiée.
 
+La première exécution a été interrompue sans résultat ni cache publié après au moins 900
+secondes. La sortie progressive du processus était tamponnée : aucun nombre de signaux traités
+n'est donc affirmé. Le nettoyage des deux processus Python restés après l'arrêt du shell a été
+vérifié. Un profil indépendant avec signaux déjà cachés localise le coût : 28 sélections pour
+une requête prennent 2 471 à 2 532 ms hors profileur; le profilage observe 35 721 compilations
+de regex et 7 707 ms cumulées dans leur compilation. Qdrant ne prend que 5 et 16 ms sur les
+deux collections après un embedding froid de 2 250 ms. La correction autorisée est strictement
+un cache borné à 4 096 motifs; tout mot-clé, catalogue, score, garde ou effet persistant reste
+interdit. L'équivalence exacte sera prouvée avant un nouveau gel de l'ablation.
+
 ## 2026-08-13 — v2.647.0 — cohérence multi-magasins et lecture VM sans mutation
 
 TD-014 identifiait cinq surfaces sous-déclarées. Un pré-enregistrement séparé a gelé les

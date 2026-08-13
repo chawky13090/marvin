@@ -1,0 +1,43 @@
+{
+  "schema": "marvin.tool-selection-ablation-aborted/1.0",
+  "status": "ABORTED_WITHOUT_RESULT",
+  "source_commit": "37f9f87aea3ce8213f9f2900794f36e24be2bb25",
+  "source_policy_sha256": "bbfb02423947df05613bab2026579adb7d1cff4fdb3d8909c17a3fa3eb5ea5b9",
+  "runner_sha256": "ea499412aff7edeb207f39c01319e291391d394477e330bcab5c77911e7b987a",
+  "observations": {
+    "elapsed_lower_bound_seconds": 900,
+    "result_artifact_written": false,
+    "public_cache_written": false,
+    "business_tool_executions": 0,
+    "chat_llm_calls": 0,
+    "product_data_mutation": false,
+    "stdout_progress_interpretation": "UNASSESSED_BECAUSE_PROCESS_OUTPUT_DELIVERY_WAS_BUFFERED"
+  },
+  "termination": {
+    "requested_by": "campaign_operator",
+    "reason": "sequential_runner_latency_was_not_suitable_for_a_portable_gate",
+    "initial_shell_termination_left_child_processes": true,
+    "verified_child_process_cleanup": true,
+    "remaining_runner_processes": 0
+  },
+  "independent_profile": {
+    "scenario": "one_query_28_cached_signal_candidate_selections",
+    "normal_duration_ms_min": 2471,
+    "normal_duration_ms_max": 2532,
+    "profiled_duration_ms": 8254,
+    "profiled_function_calls": 16487586,
+    "keyword_present_calls": 37728,
+    "regex_compilations": 35721,
+    "regex_search_cumulative_ms": 7798,
+    "regex_compile_cumulative_ms": 7707,
+    "qdrant_points": {
+      "tool_index": 698,
+      "routing_feedback": 4591
+    },
+    "single_embedding_cold_ms": 2250,
+    "single_tool_index_query_ms": 5,
+    "single_routing_feedback_query_ms": 16
+  },
+  "conclusion": "candidate_keyword_boundary_regexes_are_recompiled_and_dominate_the_cached_selection_path",
+  "superseded_by": "../v1.1/keyword-regex-cache-preregistration.json"
+}

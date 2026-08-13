@@ -1,0 +1,48 @@
+{
+  "schema": "marvin.tool-selection-keyword-regex-cache-preregistration/1.0",
+  "status": "frozen_before_product_optimization",
+  "source_commit": "37f9f87aea3ce8213f9f2900794f36e24be2bb25",
+  "source_agent_tool_selection_sha256": "af085feeddd5108d31de06299b6dec7264a627413068d7eddbde615426d73d98",
+  "source_runner_sha256": "ea499412aff7edeb207f39c01319e291391d394477e330bcab5c77911e7b987a",
+  "aborted_observation": {
+    "path": "benchmarks/tool-selection/v1.0/ablation-run-aborted-v1.json",
+    "sha256": "1060d4c6c7669c33a00f500f083287c53ca3c80df34483235a2413bcc96ff70f"
+  },
+  "authorized_change": {
+    "scope": "compile_and_cache_keyword_boundary_patterns",
+    "cache_maximum_entries": 4096,
+    "keyword_addition_or_removal": false,
+    "tool_catalog_change": false,
+    "ranking_score_change": false,
+    "semantic_or_learned_route_change": false,
+    "security_guard_change": false,
+    "persistent_data_change": false
+  },
+  "semantic_equivalence": {
+    "old_and_new_keyword_predicate_mismatch_maximum": 0,
+    "frozen_public_queries": [
+      "benchmarks/windows-operator/v1.1/intent-corpus.json",
+      "benchmarks/tool-recovery/v1.2/development-corpus.json"
+    ],
+    "private_queries": "392_dpapi_messages_aggregate_mismatch_count_only",
+    "private_plaintext_output_forbidden": true,
+    "boundary_canaries_required": true,
+    "keyword_hit_sets_must_be_identical": true
+  },
+  "performance_acceptance": {
+    "measurement_is_host_specific_not_a_portable_gate": true,
+    "same_query_and_28_configuration_calls": true,
+    "warm_median_speedup_minimum": 5.0,
+    "new_median_must_be_lower_than_old_median": true
+  },
+  "ablation_replay": {
+    "original_v1_0_result_forbidden": true,
+    "new_source_hash_requires_v1_1_reauthorization": true,
+    "same_datasets_modes_configurations_and_decision_rules": true,
+    "stage_a_product_decision_still_forbidden": true
+  },
+  "rollback": {
+    "method": "atomic_git_revert_then_backend_restart",
+    "data_restore_required": false
+  }
+}
