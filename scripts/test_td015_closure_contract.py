@@ -8,6 +8,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from evidence_portability import matches_frozen_bytes, matches_frozen_sha256
+
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "benchmarks" / "conversation-history" / "td015-closure-policy.json"
@@ -77,7 +79,7 @@ def _assert_powershell_writer_contract() -> None:
     assert "System.IO.File]::WriteAllText" in source
     assert "Set-Content -LiteralPath $Temporary -Encoding UTF8" not in source
     assert "Set-Content -LiteralPath $AbortPath -Encoding UTF8" not in source
-    assert "benchmarks/conversation-history/*.json text eol=lf" in attributes
+    assert "*.json text eol=lf" in attributes
 
 
 def _load_cycle_module():
@@ -178,7 +180,7 @@ def _assert_freeze(freeze: dict) -> None:
     )
     assert commit.returncode == 0
     for relative, expected in freeze["source_hashes"].items():
-        if _sha256(ROOT / relative) == expected:
+        if matches_frozen_sha256(ROOT / relative, expected):
             continue
         blob = subprocess.run(
             ["git", "show", f'{freeze["source_commit"]}:{relative}'],
@@ -186,7 +188,7 @@ def _assert_freeze(freeze: dict) -> None:
             check=True,
             capture_output=True,
         ).stdout
-        assert hashlib.sha256(blob).hexdigest() == expected, relative
+        assert matches_frozen_bytes(relative, blob, expected), relative
 
 
 def _assert_abort(abort: dict, freeze: dict, freeze_path: Path) -> None:

@@ -1,0 +1,743 @@
+{
+  "schema": "marvin.evidence-line-ending-erratum/1.0",
+  "generated_at": "2026-08-13T13:55:34.034094+00:00",
+  "source_commit": "358363bb641a944e8e9dee708d2dab4a59e02d98",
+  "hash_mode": "canonical_utf8_lf_v1",
+  "historical_manifests_modified": false,
+  "semantic_content_changed": false,
+  "manifest_count": 6,
+  "reference_count": 50,
+  "unique_path_count": 25,
+  "normalized_file_count": 65,
+  "files": [
+    {
+      "path": "backend/agent.py",
+      "historical_sha256": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+      "canonical_lf_sha256": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/config.py",
+      "historical_sha256": "4b3695f0e62cc3c1274f357fbac32f47ee415d5ed73b6ee0c8f1eb456d38dfe2",
+      "canonical_lf_sha256": "150d6c1a913f26fc8782e190d8a3d512cb91ba58611fb2323103c29bc8da9872",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/repositories/command_safety.py",
+      "historical_sha256": "8632d62fcb892483eabe2006eb9ede5ed414bb4f94f4b0818ffc3765d40547d7",
+      "canonical_lf_sha256": "88e10ac196087a9e42a3026f42855ba3c8035e6e0757ab5ab954266aed1624cd",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/repositories/command_safety_rules.py",
+      "historical_sha256": "10d0fb2d113f9e7f1042e971bc33a27d192fda5560e0cfbbe0a3efa148ad5788",
+      "canonical_lf_sha256": "659d951b0305b4b72f7e32111b7e74d7f6c35b2cc06fb7a99bfdde7ceaec1ddb",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/skills.py",
+      "historical_sha256": "370d8fc5139a8ba6638efae2932cc8e52cac962fdc7d8a78c2bcbe97d08005d0",
+      "canonical_lf_sha256": "1113698166308262e0f839a97891c4cad5301bf3173a5a0e9ab71da80d562558",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/billing.py",
+      "historical_sha256": "673f45216407949f0fc6a2d83fca761134bf87a0dfc248cc8b3b1a0b54d8f7b4",
+      "canonical_lf_sha256": "7e60d82ac4566e5b830f7a045ca5e0e28c6983b03e7dd917e39c62e4642fcd9c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/catharsis.py",
+      "historical_sha256": "7e0faf4fb501c3292870f7af7af4fa9afee03f70c4d1a4c41c036340d03b2d75",
+      "canonical_lf_sha256": "dd81a6445effcd036e5a5f36065d55e6673e01043bc541fd5fbeaed93011603d",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/client_health.py",
+      "historical_sha256": "48e602ec0b1dd8bc6d440760d97343f8d2e329b13f971b9049a2829ca0745c5b",
+      "canonical_lf_sha256": "326638bad3f5bbaedb51f578613e39417a49e6aa4be3b1053516bfb60e6af123",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/command_safety.py",
+      "historical_sha256": "554b51fb33a38ccc88f7f77005fef073a2741018abcb7cae4038fd0295f45df9",
+      "canonical_lf_sha256": "3a5dd61ce42ff10f68d234365d2509c1e3206b9e05667b40c4a40b0d65a1fddd",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/documents.py",
+      "historical_sha256": "ffbb27e4caa1cbc11eb65dd4c4e8c46eae24c03aa14ea70065bba7826e22ef67",
+      "canonical_lf_sha256": "23d391547da7ca885542b65bd8737521fdd7494654aa326c3d9749a5c7071153",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/intervention_docs.py",
+      "historical_sha256": "a412a0bccf13dabc0abfc13d0a3966712dd017ad48d16247d586b9404f6acc0c",
+      "canonical_lf_sha256": "e68063f1afbce356e0d80e4e99850c4d9de6a1770594638714a45a9653651f97",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/network.py",
+      "historical_sha256": "8316735e7cea14620ea3f89c645b988efb1101a5a88efa14404dfdb1afd8ef04",
+      "canonical_lf_sha256": "9b0701a5f00a1f0e7d67bd67302ddcb875cbbc6e90e40ffa67c65d422b7fd823",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/ocr.py",
+      "historical_sha256": "6075126f853a4000d2a4fc35a48a118724fa47c24cb7e54747b988095e5325c9",
+      "canonical_lf_sha256": "b4f5470f5ab95bfa83c6bf722c95216e61867988ac61f32a1ec0fce197b30016",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/operations_safety.py",
+      "historical_sha256": "26e741d534f32ce036f78eee326305a3c874f8698a4ecf50197b2b3236995f50",
+      "canonical_lf_sha256": "e8d1ac5df791501da4b77e9351550fa68f284bb4259fe53f68a20ab6ece843e6",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/pc_control.py",
+      "historical_sha256": "d94ba1010635ad2071dd8e2ec7568c612e024ebdd2098e006c21a1657b316fa1",
+      "canonical_lf_sha256": "136f6581de7a34e881d8e264651e6e3726b4e1e18e668adc4e1e789f04a66acd",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/pc_diagnostics.py",
+      "historical_sha256": "57a287652c5bd9f13af1938a3daa6dda8249806bdcc913a4d48a985b56ab093f",
+      "canonical_lf_sha256": "68c3395ea7b780c4e0e20e00c9cb0a35303499822d791531a3bc48213e4295a3",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/text_processing.py",
+      "historical_sha256": "dbf1969a91175a57b10cfe8c00939b12bfc54907a9c185d6f7c413e6da4d3271",
+      "canonical_lf_sha256": "9495c062dba2146fd62d2d9631efcef675ab2dda2edc3c258d8dbd39d19fcc64",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/windows.py",
+      "historical_sha256": "a889e9ef56dd48462389fb17a3b39dcbf53bff81d070be7aa26a1c831eb32892",
+      "canonical_lf_sha256": "e68ff2a79b69c2b03283c6cc059e9020bd6769835eead46f595093c9dae9f9fc",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/windows_registry.py",
+      "historical_sha256": "12291b7dd965d4f31995da9e496b1434d25b867dd4595299b6fe29cdc0775199",
+      "canonical_lf_sha256": "d5c21438a0fedb59c42359ed52353a7ea91b4df5ee546b506a68528ca8e248e4",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/windows_settings.py",
+      "historical_sha256": "823d7a60218623621ca990c340fa27aa7329d15a1997aef428607e3bceae4295",
+      "canonical_lf_sha256": "6fbb6f2ee64d540bd7b3cbcb5bf0c5e885b6de18c4a89879294f7dcb4c75de7c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/windows_tweaks.py",
+      "historical_sha256": "73d5ba74882b90bd4f9218e55b4d43f0de294be9344ab6f16174d4191ab67997",
+      "canonical_lf_sha256": "b7abbe4e1a2f57e724524afda7bebe7122406b15dac5e9e347cddff5deb04443",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tool_domains/winget.py",
+      "historical_sha256": "0586ae818a75c22d1854aba6de4b4e134335e42bf645d7471df543b34f57387f",
+      "canonical_lf_sha256": "c46cc07b1716f38a3b4a2b1273688d2e75e8cd75400256e09edaa6c7c5fdcdb4",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "backend/tools.py",
+      "historical_sha256": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+      "canonical_lf_sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/conversation-history/td015-closure-result.json",
+      "historical_sha256": "9266d243ab583a58d42e717c0c57faa38ce90f4533052a69cb3c7db583b7a91e",
+      "canonical_lf_sha256": "01c5da1c8111a5b20d9eac18c032426c16e44a3509901ccf446efb901e9afe70",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-authorization.json",
+      "historical_sha256": "6422a193890f3d20c7934c60f34494817e8a5332e4c4af0a6071caaa9b270a39",
+      "canonical_lf_sha256": "f7bf5a1ef99834216770118285f5e7764d96a978875024804471499ef2bd0468",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-result.json",
+      "historical_sha256": "41ae2fb9230cef9f76ef633b6e669a42efea025e021cbcc54dbdfc1a61e5b757",
+      "canonical_lf_sha256": "a8f984c0eb36898f85a597b71a355ef95004112af616134a8e3c329003d4f210",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-pilot-environment-qualification.json",
+      "historical_sha256": "070db774ea033b307d5448b73bf78a18ddaeda571d2fe2eb8eda3ab3fc46d73c",
+      "canonical_lf_sha256": "730849927caf28d0b7f95e036b03ebf060088bffd39c97e5f1904abe1c63599e",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-policy-v1.1.json",
+      "historical_sha256": "2b9acb19a13e159daec2e31d9f5c34b4ba8f56a378170ec0dcd1740ecaf05568",
+      "canonical_lf_sha256": "b55d7ac78d7ac6369c26f4edfae9e5e6806dcca5a8640c3c7d71a9fcbde0a403",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-policy.json",
+      "historical_sha256": "f07a8eea030626ae9dce1a2e3e4286713abe37a7665b5649f03299ad526a9773",
+      "canonical_lf_sha256": "b919127a3f813d8625b9f4dcdea7d813058eb01a8f08ad949dbf3ba0f8afc5ea",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-preview-execution-result.json",
+      "historical_sha256": "d20f0188821b78dfb32f23277513ce80f15d64414bece13d392d5eab78bcb297",
+      "canonical_lf_sha256": "be40756af372ba8866624a10834a45b2b25e7b32fb3c6fa69d81a510f7bd5499",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.2/e7-apply-replay-result.json",
+      "historical_sha256": "cc0861024baaf4902a8a422ec4322ed1f73eee29f549e8eb5bbe98cb8734fb53",
+      "canonical_lf_sha256": "d295e3ea344bef1de8bec1a15cbbb2e02df13f9fafed4ce46e5954128d0973a1",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+      "historical_sha256": "2b50334d8c82e53f73b614da0b29e9501534ad00831932243412d9525c8fabb4",
+      "canonical_lf_sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+      "historical_sha256": "840ad9ae9333e3df76993dfeaf3c8301b4c520a15e48bcf8bdb221712fb3a8ed",
+      "canonical_lf_sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.4/retrospective-known-case-check.json",
+      "historical_sha256": "b4037ddbdd2c69d9d650e63d1233bd3b2b7d5f1085b28bb8d5159123708ee5eb",
+      "canonical_lf_sha256": "0adbc26d2db64d8393dde5b1682435f47e5e079b97d6f3c50afbaf7cb14c220d",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.4/v1.3-v1.4-transition-report.json",
+      "historical_sha256": "77e94ce535ba0ca7f0c914e1e35d614c1a820597d5c7ebd4f18beff3025333ce",
+      "canonical_lf_sha256": "84a312db1b5886e6a84b36631153f710e54edcec92139ffbdb99617baadf8ddb",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-recovery/v1.2/development-results.json",
+      "historical_sha256": "39614bd6c7c0c17aadf1ccc98f3a672798acd79d8baf11ad1396fb4f4fac545f",
+      "canonical_lf_sha256": "7ad00d51bc452cba51f20bb3d5139d90d79c4ef6cf757528f967886339ea8c34",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/tool-recovery/v1.2/shared-ranking-non-regression.json",
+      "historical_sha256": "66c29b4d8cc6bbc7ecc287df1a734427c6b976c6f15db7404db3c629daba02fa",
+      "canonical_lf_sha256": "3fa18c4729b6a2fa352eb9fa2cf85f593c975ed572ed9594a2e3e431346e103d",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/e2e-development-invalid-claim-classifier.json",
+      "historical_sha256": "8995450a971d6bc7a8919a85f5adb3b27983612f65518de21baf9deb5947181a",
+      "canonical_lf_sha256": "9bd83baeb5661c471e76c9b92a3177e686151ac7dd2d80aae3dceeacbd5b5898",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/e2e-development.json",
+      "historical_sha256": "bc55d9206f0746661e75f377d6f93dc369b2de06bd0ab3f6646d10673dccfb0d",
+      "canonical_lf_sha256": "fc0d8fbf7ecbde4f3d396f756790280038e2070f1bf057407574d462850f7c72",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/e2e-windows-task-holdout-source-closed.json",
+      "historical_sha256": "b7706d63c80b04840cd26f357d5478d36bcc1bf5c60d9b4f835ff7e3ae4f7007",
+      "canonical_lf_sha256": "f92e4c5d5bde2a8d01b43114731be4b69b2b69217a2de01f905756f1cecb0a94",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/e2e-windows-task-normative-v2-candidate.json",
+      "historical_sha256": "c049f8edd2751e1972f3519453880bbd89fc7ddae09c8ed0de7e8bf21a1aaf2a",
+      "canonical_lf_sha256": "b4c3927d6ab575bb64b4c137b7e6cbedb0d2f89bf02fd1f986ebed201c138686",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/executor-development-invalid-classifier.json",
+      "historical_sha256": "eb47a2954b9fb77b1a4429e26cf3175d423882f6934602c87d84e32baff92c66",
+      "canonical_lf_sha256": "8288cfa9139bca691cb46b24f55dd580cb996eadbbfa55332c08a9f89ef01c10",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/executor-development-invalid-unconfigured-windows.json",
+      "historical_sha256": "e1652eea7bb432233e1c750d31fe6204d82ebdf87c0e2daad6f3e9f8c5e2f127",
+      "canonical_lf_sha256": "54954cd19add2ab8d9002e23f0481d631d7057804210a7aa42dd747fb17ca121",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/executor-development.json",
+      "historical_sha256": "44fb483d7ca1f39dadf2af4b7d56ea49117a2c5b459a3378ad054945163ef2d4",
+      "canonical_lf_sha256": "792565fd065b74115f9c69b57c418898b3fe98547c684b4765e8adc66ebb174c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/executor-postcondition-candidate.json",
+      "historical_sha256": "101dd378edcea7835c0fcebb35127d44ed42b22a64db16fb2a207f9d13785cd0",
+      "canonical_lf_sha256": "acd5a73aa33fcf75cc41fbbf4c3defc67305a84479357080bc73e8de49315b1b",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/routing-development-invalid-first-tool.json",
+      "historical_sha256": "e9c4a0d024ab46ba5e15e9ac5963c8ee0793ea57cc373e2acd09c01e50f68ce1",
+      "canonical_lf_sha256": "18d4b389207fdd2eeef91f64486e9df630b926756dc0fab14c91410e7d2199de",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/routing-development.json",
+      "historical_sha256": "1b2adda33a347229aba9583bd390308dae37b7a5dfadaa1c79a6bdc3db12e301",
+      "canonical_lf_sha256": "a4ffc48facf6cd45112bc380c6f1c8b60e44d05d1b715a35a271759cb410b829",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/routing-windows-task-holdout-source-closed.json",
+      "historical_sha256": "355ec86529f0edab7656e9fa070b2a775012afa83c08a4b1d6b0def955f42794",
+      "canonical_lf_sha256": "a10789ec3cf54695a04e0c55be127daba51df4b42e72c0f19f6c1ae98e40bf8c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/routing-windows-task-normative-candidate.json",
+      "historical_sha256": "790a80efa4106e45d4c9a7a6bc91a30f679e7048c76f5ff4c8476fe76d6e827b",
+      "canonical_lf_sha256": "fd9778a1a3a6a3f8d2242d3caae13a554a86035f8eace68429265935d47deaa7",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/windows-task-acceptance-report.json",
+      "historical_sha256": "1bb69f01a31a01b01efd906c56f563a64b6d4d1b7ec80c868e97fe04350f9abf",
+      "canonical_lf_sha256": "996bd4b306b7c098cb55ee68246950367613a2fbf2dfb4c163aa40ef157844c5",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/windows-task-acceptance-report.v1.0-original.json",
+      "historical_sha256": "004d6fa871a630166542dc2f3d5674d8a8d00fe1590d8e0dac8d62d845f5db14",
+      "canonical_lf_sha256": "c8ae6f2a1983c0faf38a47c80d08fe1c792f26838091001a35c665db06eb0e4c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/windows-task-operator-candidate.json",
+      "historical_sha256": "e085c9fb174c4b755e58187054fc5b8f22c826085895337ed580c6315316521c",
+      "canonical_lf_sha256": "6fe4b5409b2273be3189de1a1293eab795ed4b8cd8acbac177a9365b7f01fe19",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/baseline-20260809/windows-task-routing-rectification-v1.json",
+      "historical_sha256": "a56a181d25b91f7a3bea766a0682a8274dbd4957e9a883940f2abcfe18f470c7",
+      "canonical_lf_sha256": "d36f41b50c7cc33642c4f7bf8219ae41c9bd66a7fa32672b3bfd7cdfa07c1f42",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/preflight-20260803/cloud-context-evidence.json",
+      "historical_sha256": "0358c07d84f43f9307e42961a91d9890445c5bc4e78b994d561b6d3ffcafdf73",
+      "canonical_lf_sha256": "ce6b20fba8b8e7ed85154d11df96f047681e2369ed048309e3f5027fb2efc2f0",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/preflight-20260803/context-profile-v1.1-r6.json",
+      "historical_sha256": "0d1edf04b8e108a42dc58351b2cac821f3fc31cdd703f10d1b200f9517f3f4c2",
+      "canonical_lf_sha256": "b63fda803f3b0a63a70304aedf4ae7f0d9c162b88742f578fe7062b8b7451385",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/preflight-20260803/local-context-evidence-v1.1-r6.json",
+      "historical_sha256": "32711582199543d8e1c231ec7a28bd5315367ca854983b4546d01e37776396de",
+      "canonical_lf_sha256": "4dfa12c694a17add409e22959943b00bb77dfab202c3f01ff82c05fcf5ff6907",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/preflight-20260803/local-context-evidence.json",
+      "historical_sha256": "c9189e01f58cdd380c89e79a53e6e983173755ca09f475abb300015335f13ed9",
+      "canonical_lf_sha256": "a11300ab74a10b9abc2515923b7ce302fd61f301335851a04599181c148f8f71",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/preflight-20260809/cloud-retention-qwen3.5-397b.json",
+      "historical_sha256": "c4f0b2e0efde4de06cbb78572e9c900ca5a31f99a282ad776473a3e638fa9855",
+      "canonical_lf_sha256": "c689d26a0c1d3a8b775f90408863b468a4b5e42ed9f10d217dbb4c59c491256c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/campaigns/preflight-20260809/cloud-runtime-lock.json",
+      "historical_sha256": "0d2639dde587109a532d6e532563ba1ccd811baa883aad26bcd691382e0ccf3e",
+      "canonical_lf_sha256": "f38af6dd8d333826d085e6fba9e3c75a1d7aae0ad1c29209264b934a9c801a5c",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "benchmarks/windows-operator/v1.1/routing-capability-contracts-retrospective-v1.json",
+      "historical_sha256": "f8018789b498e6d4c0a031e5edf867a3a57f8c9b318e7c2a98bb939526fbd715",
+      "canonical_lf_sha256": "04bc54794595df2948bbaaba0363dc017bb09845b5c36bba708538fa2ee68962",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "scripts/restart-marvin.ps1",
+      "historical_sha256": "7e76b7a2344c7925de7b31696934bd25febafaa1d298e22f7e9a69d7fd579f12",
+      "canonical_lf_sha256": "6a53aee6e544b4120d68068e1932f68fac99fe2e73515e5956d4708414b66f0d",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "scripts/stop-marvin.ps1",
+      "historical_sha256": "7c8158a9a35f6953a640b53149c0cebc54311e983b1dd059844170156cbb28e3",
+      "canonical_lf_sha256": "c739fb031dd78f642c64818ce41a89ea24250371e3e0bb780b36d08a6328b3cf",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "scripts/test_command_safety_repository.py",
+      "historical_sha256": "9114b46204cbaaadc4c6a6591d7bc27e76a4f08ad773c08a0a9b5151388958bb",
+      "canonical_lf_sha256": "ade25ac7aa6f33184a74e5b300094a27d9fe672b09e12474c1794abac5f37dfd",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "scripts/test_sensitive_command_confirmation.py",
+      "historical_sha256": "743093994263b1fec2147c0b94210cf2e92be3020a27e86a1887d8d10d6fd59c",
+      "canonical_lf_sha256": "be35507ca2e25ab2a1b9fa4a907d46ed299d20e9ebd4d8c2065c8e4f074424bf",
+      "change": "line_endings_only"
+    },
+    {
+      "path": "scripts/test_skill_consolidation_guards.py",
+      "historical_sha256": "437e771530ab9ed045baa3946dc98ea104574680cffee6aded675cfe4d660f36",
+      "canonical_lf_sha256": "5fd495dcc94b270a50993744869ecf347abbb1a6d15662cc4ad4fc869aa8d670",
+      "change": "line_endings_only"
+    }
+  ],
+  "manifests": [
+    {
+      "path": "benchmarks/conversation-history/td015-closure-freeze-v2.json",
+      "git_blob_sha256": "346962c6e0bbe4a2c7fb3e5414079ef1fd1d05ed4db723ad43cad47308a8dcc0",
+      "references": [
+        {
+          "path": "scripts/restart-marvin.ps1",
+          "historical_sha256": "7e76b7a2344c7925de7b31696934bd25febafaa1d298e22f7e9a69d7fd579f12",
+          "canonical_lf_sha256": "6a53aee6e544b4120d68068e1932f68fac99fe2e73515e5956d4708414b66f0d",
+          "change": "line_endings_only"
+        }
+      ]
+    },
+    {
+      "path": "benchmarks/conversation-history/td015-closure-freeze-v3.json",
+      "git_blob_sha256": "9821dc2d68168371a4e7f943957c78b868fa63fabe9eac6ac204bbe26c30a64d",
+      "references": [
+        {
+          "path": "scripts/restart-marvin.ps1",
+          "historical_sha256": "7e76b7a2344c7925de7b31696934bd25febafaa1d298e22f7e9a69d7fd579f12",
+          "canonical_lf_sha256": "6a53aee6e544b4120d68068e1932f68fac99fe2e73515e5956d4708414b66f0d",
+          "change": "line_endings_only"
+        }
+      ]
+    },
+    {
+      "path": "benchmarks/conversation-history/td015-closure-freeze.json",
+      "git_blob_sha256": "be8a056fa23da8bdb2cbe6e542a5cdd4b469ad7482159b047a9bfc42d8f2df7a",
+      "references": [
+        {
+          "path": "scripts/restart-marvin.ps1",
+          "historical_sha256": "7e76b7a2344c7925de7b31696934bd25febafaa1d298e22f7e9a69d7fd579f12",
+          "canonical_lf_sha256": "6a53aee6e544b4120d68068e1932f68fac99fe2e73515e5956d4708414b66f0d",
+          "change": "line_endings_only"
+        }
+      ]
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-freeze-manifest.json",
+      "git_blob_sha256": "2ef2b6161c3e635f271dd6ad44e3b34a1ef073ec22b78af666b160210470d2c8",
+      "references": [
+        {
+          "path": "benchmarks/tool-evidence/v1.1/e7-apply-execution-authorization.json",
+          "historical_sha256": "6422a193890f3d20c7934c60f34494817e8a5332e4c4af0a6071caaa9b270a39",
+          "canonical_lf_sha256": "f7bf5a1ef99834216770118285f5e7764d96a978875024804471499ef2bd0468",
+          "change": "line_endings_only"
+        }
+      ]
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.3/direct-surface-analysis.json",
+      "git_blob_sha256": "cf0c3558ed188155113aaf75841af20da32250db3d6c14de77fec4e6b852845f",
+      "references": [
+        {
+          "path": "backend/agent.py",
+          "historical_sha256": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+          "canonical_lf_sha256": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/config.py",
+          "historical_sha256": "4b3695f0e62cc3c1274f357fbac32f47ee415d5ed73b6ee0c8f1eb456d38dfe2",
+          "canonical_lf_sha256": "150d6c1a913f26fc8782e190d8a3d512cb91ba58611fb2323103c29bc8da9872",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/repositories/command_safety.py",
+          "historical_sha256": "8632d62fcb892483eabe2006eb9ede5ed414bb4f94f4b0818ffc3765d40547d7",
+          "canonical_lf_sha256": "88e10ac196087a9e42a3026f42855ba3c8035e6e0757ab5ab954266aed1624cd",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/repositories/command_safety_rules.py",
+          "historical_sha256": "10d0fb2d113f9e7f1042e971bc33a27d192fda5560e0cfbbe0a3efa148ad5788",
+          "canonical_lf_sha256": "659d951b0305b4b72f7e32111b7e74d7f6c35b2cc06fb7a99bfdde7ceaec1ddb",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/skills.py",
+          "historical_sha256": "370d8fc5139a8ba6638efae2932cc8e52cac962fdc7d8a78c2bcbe97d08005d0",
+          "canonical_lf_sha256": "1113698166308262e0f839a97891c4cad5301bf3173a5a0e9ab71da80d562558",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/billing.py",
+          "historical_sha256": "673f45216407949f0fc6a2d83fca761134bf87a0dfc248cc8b3b1a0b54d8f7b4",
+          "canonical_lf_sha256": "7e60d82ac4566e5b830f7a045ca5e0e28c6983b03e7dd917e39c62e4642fcd9c",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/catharsis.py",
+          "historical_sha256": "7e0faf4fb501c3292870f7af7af4fa9afee03f70c4d1a4c41c036340d03b2d75",
+          "canonical_lf_sha256": "dd81a6445effcd036e5a5f36065d55e6673e01043bc541fd5fbeaed93011603d",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/client_health.py",
+          "historical_sha256": "48e602ec0b1dd8bc6d440760d97343f8d2e329b13f971b9049a2829ca0745c5b",
+          "canonical_lf_sha256": "326638bad3f5bbaedb51f578613e39417a49e6aa4be3b1053516bfb60e6af123",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/command_safety.py",
+          "historical_sha256": "554b51fb33a38ccc88f7f77005fef073a2741018abcb7cae4038fd0295f45df9",
+          "canonical_lf_sha256": "3a5dd61ce42ff10f68d234365d2509c1e3206b9e05667b40c4a40b0d65a1fddd",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/documents.py",
+          "historical_sha256": "ffbb27e4caa1cbc11eb65dd4c4e8c46eae24c03aa14ea70065bba7826e22ef67",
+          "canonical_lf_sha256": "23d391547da7ca885542b65bd8737521fdd7494654aa326c3d9749a5c7071153",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/intervention_docs.py",
+          "historical_sha256": "a412a0bccf13dabc0abfc13d0a3966712dd017ad48d16247d586b9404f6acc0c",
+          "canonical_lf_sha256": "e68063f1afbce356e0d80e4e99850c4d9de6a1770594638714a45a9653651f97",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/network.py",
+          "historical_sha256": "8316735e7cea14620ea3f89c645b988efb1101a5a88efa14404dfdb1afd8ef04",
+          "canonical_lf_sha256": "9b0701a5f00a1f0e7d67bd67302ddcb875cbbc6e90e40ffa67c65d422b7fd823",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/ocr.py",
+          "historical_sha256": "6075126f853a4000d2a4fc35a48a118724fa47c24cb7e54747b988095e5325c9",
+          "canonical_lf_sha256": "b4f5470f5ab95bfa83c6bf722c95216e61867988ac61f32a1ec0fce197b30016",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/operations_safety.py",
+          "historical_sha256": "26e741d534f32ce036f78eee326305a3c874f8698a4ecf50197b2b3236995f50",
+          "canonical_lf_sha256": "e8d1ac5df791501da4b77e9351550fa68f284bb4259fe53f68a20ab6ece843e6",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/pc_control.py",
+          "historical_sha256": "d94ba1010635ad2071dd8e2ec7568c612e024ebdd2098e006c21a1657b316fa1",
+          "canonical_lf_sha256": "136f6581de7a34e881d8e264651e6e3726b4e1e18e668adc4e1e789f04a66acd",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/pc_diagnostics.py",
+          "historical_sha256": "57a287652c5bd9f13af1938a3daa6dda8249806bdcc913a4d48a985b56ab093f",
+          "canonical_lf_sha256": "68c3395ea7b780c4e0e20e00c9cb0a35303499822d791531a3bc48213e4295a3",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/text_processing.py",
+          "historical_sha256": "dbf1969a91175a57b10cfe8c00939b12bfc54907a9c185d6f7c413e6da4d3271",
+          "canonical_lf_sha256": "9495c062dba2146fd62d2d9631efcef675ab2dda2edc3c258d8dbd39d19fcc64",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows.py",
+          "historical_sha256": "a889e9ef56dd48462389fb17a3b39dcbf53bff81d070be7aa26a1c831eb32892",
+          "canonical_lf_sha256": "e68ff2a79b69c2b03283c6cc059e9020bd6769835eead46f595093c9dae9f9fc",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows_registry.py",
+          "historical_sha256": "12291b7dd965d4f31995da9e496b1434d25b867dd4595299b6fe29cdc0775199",
+          "canonical_lf_sha256": "d5c21438a0fedb59c42359ed52353a7ea91b4df5ee546b506a68528ca8e248e4",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows_settings.py",
+          "historical_sha256": "823d7a60218623621ca990c340fa27aa7329d15a1997aef428607e3bceae4295",
+          "canonical_lf_sha256": "6fbb6f2ee64d540bd7b3cbcb5bf0c5e885b6de18c4a89879294f7dcb4c75de7c",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows_tweaks.py",
+          "historical_sha256": "73d5ba74882b90bd4f9218e55b4d43f0de294be9344ab6f16174d4191ab67997",
+          "canonical_lf_sha256": "b7abbe4e1a2f57e724524afda7bebe7122406b15dac5e9e347cddff5deb04443",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/winget.py",
+          "historical_sha256": "0586ae818a75c22d1854aba6de4b4e134335e42bf645d7471df543b34f57387f",
+          "canonical_lf_sha256": "c46cc07b1716f38a3b4a2b1273688d2e75e8cd75400256e09edaa6c7c5fdcdb4",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tools.py",
+          "historical_sha256": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+          "canonical_lf_sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+          "change": "line_endings_only"
+        }
+      ]
+    },
+    {
+      "path": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+      "git_blob_sha256": "780b3db331f65bd5911dd05d593d443b3892735c6d8071b2817f343a34f2fc5f",
+      "references": [
+        {
+          "path": "backend/agent.py",
+          "historical_sha256": "8efc5e5072058f54aac2d06ca3a4d8ee55a1808b20d440b5994bf67fc8e5f84b",
+          "canonical_lf_sha256": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/config.py",
+          "historical_sha256": "4b3695f0e62cc3c1274f357fbac32f47ee415d5ed73b6ee0c8f1eb456d38dfe2",
+          "canonical_lf_sha256": "150d6c1a913f26fc8782e190d8a3d512cb91ba58611fb2323103c29bc8da9872",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/repositories/command_safety.py",
+          "historical_sha256": "8632d62fcb892483eabe2006eb9ede5ed414bb4f94f4b0818ffc3765d40547d7",
+          "canonical_lf_sha256": "88e10ac196087a9e42a3026f42855ba3c8035e6e0757ab5ab954266aed1624cd",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/repositories/command_safety_rules.py",
+          "historical_sha256": "10d0fb2d113f9e7f1042e971bc33a27d192fda5560e0cfbbe0a3efa148ad5788",
+          "canonical_lf_sha256": "659d951b0305b4b72f7e32111b7e74d7f6c35b2cc06fb7a99bfdde7ceaec1ddb",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/skills.py",
+          "historical_sha256": "370d8fc5139a8ba6638efae2932cc8e52cac962fdc7d8a78c2bcbe97d08005d0",
+          "canonical_lf_sha256": "1113698166308262e0f839a97891c4cad5301bf3173a5a0e9ab71da80d562558",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/billing.py",
+          "historical_sha256": "673f45216407949f0fc6a2d83fca761134bf87a0dfc248cc8b3b1a0b54d8f7b4",
+          "canonical_lf_sha256": "7e60d82ac4566e5b830f7a045ca5e0e28c6983b03e7dd917e39c62e4642fcd9c",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/catharsis.py",
+          "historical_sha256": "7e0faf4fb501c3292870f7af7af4fa9afee03f70c4d1a4c41c036340d03b2d75",
+          "canonical_lf_sha256": "dd81a6445effcd036e5a5f36065d55e6673e01043bc541fd5fbeaed93011603d",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/client_health.py",
+          "historical_sha256": "48e602ec0b1dd8bc6d440760d97343f8d2e329b13f971b9049a2829ca0745c5b",
+          "canonical_lf_sha256": "326638bad3f5bbaedb51f578613e39417a49e6aa4be3b1053516bfb60e6af123",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/command_safety.py",
+          "historical_sha256": "554b51fb33a38ccc88f7f77005fef073a2741018abcb7cae4038fd0295f45df9",
+          "canonical_lf_sha256": "3a5dd61ce42ff10f68d234365d2509c1e3206b9e05667b40c4a40b0d65a1fddd",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/documents.py",
+          "historical_sha256": "ffbb27e4caa1cbc11eb65dd4c4e8c46eae24c03aa14ea70065bba7826e22ef67",
+          "canonical_lf_sha256": "23d391547da7ca885542b65bd8737521fdd7494654aa326c3d9749a5c7071153",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/intervention_docs.py",
+          "historical_sha256": "a412a0bccf13dabc0abfc13d0a3966712dd017ad48d16247d586b9404f6acc0c",
+          "canonical_lf_sha256": "e68063f1afbce356e0d80e4e99850c4d9de6a1770594638714a45a9653651f97",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/network.py",
+          "historical_sha256": "8316735e7cea14620ea3f89c645b988efb1101a5a88efa14404dfdb1afd8ef04",
+          "canonical_lf_sha256": "9b0701a5f00a1f0e7d67bd67302ddcb875cbbc6e90e40ffa67c65d422b7fd823",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/ocr.py",
+          "historical_sha256": "6075126f853a4000d2a4fc35a48a118724fa47c24cb7e54747b988095e5325c9",
+          "canonical_lf_sha256": "b4f5470f5ab95bfa83c6bf722c95216e61867988ac61f32a1ec0fce197b30016",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/operations_safety.py",
+          "historical_sha256": "26e741d534f32ce036f78eee326305a3c874f8698a4ecf50197b2b3236995f50",
+          "canonical_lf_sha256": "e8d1ac5df791501da4b77e9351550fa68f284bb4259fe53f68a20ab6ece843e6",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/pc_control.py",
+          "historical_sha256": "d94ba1010635ad2071dd8e2ec7568c612e024ebdd2098e006c21a1657b316fa1",
+          "canonical_lf_sha256": "136f6581de7a34e881d8e264651e6e3726b4e1e18e668adc4e1e789f04a66acd",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/pc_diagnostics.py",
+          "historical_sha256": "57a287652c5bd9f13af1938a3daa6dda8249806bdcc913a4d48a985b56ab093f",
+          "canonical_lf_sha256": "68c3395ea7b780c4e0e20e00c9cb0a35303499822d791531a3bc48213e4295a3",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/text_processing.py",
+          "historical_sha256": "dbf1969a91175a57b10cfe8c00939b12bfc54907a9c185d6f7c413e6da4d3271",
+          "canonical_lf_sha256": "9495c062dba2146fd62d2d9631efcef675ab2dda2edc3c258d8dbd39d19fcc64",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows.py",
+          "historical_sha256": "a889e9ef56dd48462389fb17a3b39dcbf53bff81d070be7aa26a1c831eb32892",
+          "canonical_lf_sha256": "e68ff2a79b69c2b03283c6cc059e9020bd6769835eead46f595093c9dae9f9fc",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows_registry.py",
+          "historical_sha256": "12291b7dd965d4f31995da9e496b1434d25b867dd4595299b6fe29cdc0775199",
+          "canonical_lf_sha256": "d5c21438a0fedb59c42359ed52353a7ea91b4df5ee546b506a68528ca8e248e4",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows_settings.py",
+          "historical_sha256": "823d7a60218623621ca990c340fa27aa7329d15a1997aef428607e3bceae4295",
+          "canonical_lf_sha256": "6fbb6f2ee64d540bd7b3cbcb5bf0c5e885b6de18c4a89879294f7dcb4c75de7c",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/windows_tweaks.py",
+          "historical_sha256": "73d5ba74882b90bd4f9218e55b4d43f0de294be9344ab6f16174d4191ab67997",
+          "canonical_lf_sha256": "b7abbe4e1a2f57e724524afda7bebe7122406b15dac5e9e347cddff5deb04443",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tool_domains/winget.py",
+          "historical_sha256": "0586ae818a75c22d1854aba6de4b4e134335e42bf645d7471df543b34f57387f",
+          "canonical_lf_sha256": "c46cc07b1716f38a3b4a2b1273688d2e75e8cd75400256e09edaa6c7c5fdcdb4",
+          "change": "line_endings_only"
+        },
+        {
+          "path": "backend/tools.py",
+          "historical_sha256": "1e12f8492f304f0fa3a965473820eba52a8566a2919086d4f7e50437193fe5a0",
+          "canonical_lf_sha256": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+          "change": "line_endings_only"
+        }
+      ]
+    }
+  ],
+  "rollback": "revert this erratum and portability verifier; historical manifests remain byte-for-byte unchanged"
+}

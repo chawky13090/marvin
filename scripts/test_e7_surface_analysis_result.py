@@ -5,6 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from evidence_portability import canonical_sha256, matches_frozen_sha256
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.3"
 RESULT = BASE / "direct-surface-analysis.json"
@@ -12,11 +14,11 @@ EXPECTED_RESULT_SHA256 = "2b50334d8c82e53f73b614da0b29e9501534ad00831932243412d9
 
 
 def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return canonical_sha256(path)
 
 
 def main() -> int:
-    assert sha256(RESULT) == EXPECTED_RESULT_SHA256
+    assert matches_frozen_sha256(RESULT, EXPECTED_RESULT_SHA256)
     report = json.loads(RESULT.read_text(encoding="utf-8"))
     assert report["status"] == "static_analysis_published_contracts_unchanged"
     assert report["tool_execution_performed"] is False

@@ -10,6 +10,7 @@ $PolicyPath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-pol
 $FreezePath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-freeze-v3.json'
 $ResultPath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-result.json'
 $Python = Join-Path $Root 'backend\.venv\Scripts\python.exe'
+$EvidencePortability = Join-Path $PSScriptRoot 'evidence_portability.py'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Write-JsonAtomicUtf8NoBom {
@@ -52,8 +53,8 @@ if ([int]$Policy.cold_start.startup_timeout_seconds -ne $StartupTimeoutSeconds) 
 }
 foreach ($Entry in $Freeze.source_hashes.PSObject.Properties) {
     $Path = Join-Path $Root $Entry.Name
-    $Actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
-    if ($Actual -ne [string]$Entry.Value) { throw "Source modifiée après gel : $($Entry.Name)" }
+    & $Python $EvidencePortability verify $Path ([string]$Entry.Value)
+    if ($LASTEXITCODE -ne 0) { throw "Source modifiée après gel : $($Entry.Name)" }
 }
 
 $RunRoot = Join-Path $Root ('artifacts\td015-closure-' + [guid]::NewGuid().ToString('N'))

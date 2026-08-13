@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from pathlib import Path
+
+from evidence_portability import matches_frozen_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +83,7 @@ def main() -> int:
     original_sha = stored_rectification.pop("original_acceptance_report_sha256")
     assert generated_rectification == stored_rectification
     preserved = rectifier.PRESERVED_REPORT.read_bytes()
-    assert hashlib.sha256(preserved).hexdigest() == original_sha
+    assert matches_frozen_sha256(rectifier.PRESERVED_REPORT, original_sha, root=ROOT)
     original = json.loads(preserved.decode("utf-8"))
     assert "interpretation_caveat" not in original
 

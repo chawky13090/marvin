@@ -5,6 +5,44 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.646.0 — chaîne de preuve indépendante de `core.autocrlf`
+
+La revue croisée a démontré que le correctif v2.645 était trop local : six manifestes gelés
+référençaient 50 empreintes calculées sur les octets CRLF du working tree Windows. Les mêmes
+25 sources, récupérées dans un checkout LF avec `core.autocrlf=false`, étaient donc rejetées
+alors que leur contenu UTF-8 était identique. L'audit a distingué les 772 références encore
+exactes des 34 divergences historiques légitimes avant toute écriture; aucune preuve gelée
+n'a été modifiée pour faire passer le contrôle.
+
+Deux solutions ont été comparées. Normaliser les EOL avant toute comparaison aurait accepté
+implicitement n'importe quelle ancienne divergence de format et affaibli les gels. Recalculer
+les manifestes historiques aurait réécrit l'histoire. La solution retenue impose UTF-8 sans
+BOM et LF aux sources textuelles et preuves dans Git, conserve CRLF uniquement pour `bat/cmd`,
+et publie un erratum central qui lie précisément chaque ancien SHA-256 brut au SHA-256
+canonique autorisé. Un lecteur n'accepte désormais que l'identité brute, l'identité canonique
+déjà gelée ou ce mapping explicite; une modification sémantique reste refusée. Les 65 fichiers
+suivis concernés ont été renormalisés mécaniquement sans diff sémantique.
+
+Le gate contient des canaris CRLF/LF, un refus du BOM, un refus de changement sémantique et
+la validation des six manifestes, 50 références et 25 sources. Les contrôles actifs TD-015 et
+E7 utilisent ce contrat commun; les runners et résultats historiques restent immuables. Un
+checkout détaché neuf créé avec `core.autocrlf=false` a exécuté 17 suites couvrant E7, H7,
+Forge v1.2, l'inventaire d'outils, la readiness, TD-015 et le registre sécurité : 17/17 passent.
+
+Sécurité, données et rollback : l'erratum contient uniquement chemins relatifs, empreintes,
+tailles et identifiants de manifestes; aucun secret, contenu utilisateur ni donnée runtime.
+La normalisation ne change ni charge JSON, ni logique Python/PowerShell, ni mesure publiée.
+Le rollback est la réversion atomique du commit v2.646; aucune migration de donnée ou de
+configuration n'est nécessaire. Le premier gate exhaustif a correctement exposé cinq lecteurs
+historiques encore bruts; aucun échec n'a été masqué. Après leur raccordement au contrat commun,
+un second passage a obtenu 301 étapes exécutées, 4 smokes explicitement différés et zéro échec
+sur 305 attendues, build Next.js 16 inclus. Marvin a redémarré `ready` en 162,8 secondes sur
+`2.646.0 / 364 outils`; Ollama, SearXNG, HTTPS, Code Workspace et VM Lab étaient disponibles.
+Les smokes séquentiels ont obtenu 28/28 contrats API, 41/41 pages, chat 5/5 et voix strictement
+sérialisée. Le wrapper live exhaustif interrompu par une borne externe de 300 secondes a été
+écarté comme campagne incomplète; les quatre smokes officiels ont été rejoués directement et
+séquentiellement avec succès. Aucun processus n'a été forcé pendant l'arrêt préalable.
+
 ## 2026-08-13 — v2.645.0 — preuves JSON portables sur Windows
 
 La revue croisée a reproduit un défaut de portabilité dans le résultat de clôture TD-015 :

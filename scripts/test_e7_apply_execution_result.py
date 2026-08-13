@@ -5,6 +5,8 @@ import json
 import re
 from pathlib import Path
 
+from evidence_portability import matches_frozen_sha256
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.1"
@@ -21,7 +23,7 @@ def canonical_hash(value: object) -> str:
 def main() -> int:
     result = json.loads(RESULT.read_text(encoding="utf-8"))
     assessment = json.loads(ASSESSMENT.read_text(encoding="utf-8"))
-    assert assessment["source_result_sha256"] == hashlib.sha256(RESULT.read_bytes()).hexdigest()
+    assert matches_frozen_sha256(RESULT, assessment["source_result_sha256"], root=ROOT)
     recorded = result.pop("content_sha256")
     assert canonical_hash(result) == recorded
     assert result["final_verdict"] == "FAILED_LOCKED"

@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from evidence_portability import canonical_sha256, matches_frozen_sha256
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.4"
 RESULT = BASE / "direct-path-surface-analysis.json"
@@ -15,13 +17,13 @@ EXPECTED_RETROSPECTIVE_SHA256 = "b4037ddbdd2c69d9d650e63d1233bd3b2b7d5f1085b28bb
 
 
 def sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return canonical_sha256(path)
 
 
 def main() -> int:
-    assert sha(RESULT) == EXPECTED_RESULT_SHA256
-    assert sha(TRANSITIONS) == EXPECTED_TRANSITIONS_SHA256
-    assert sha(RETROSPECTIVE) == EXPECTED_RETROSPECTIVE_SHA256
+    assert matches_frozen_sha256(RESULT, EXPECTED_RESULT_SHA256)
+    assert matches_frozen_sha256(TRANSITIONS, EXPECTED_TRANSITIONS_SHA256)
+    assert matches_frozen_sha256(RETROSPECTIVE, EXPECTED_RETROSPECTIVE_SHA256)
     result = json.loads(RESULT.read_text(encoding="utf-8"))
     transitions = json.loads(TRANSITIONS.read_text(encoding="utf-8"))
     retrospective = json.loads(RETROSPECTIVE.read_text(encoding="utf-8"))
@@ -30,8 +32,8 @@ def main() -> int:
     assert result["contract_mutation_performed"] is False
     assert transitions["contracts"] == 22 and transitions["silent_transitions"] == 0
     assert transitions["v1_3_unknown_contracts_accounted_for"] == 13
-    assert transitions["v1_4_sha256"] == sha(RESULT)
-    assert retrospective["v1_4_sha256"] == sha(RESULT)
+    assert matches_frozen_sha256(RESULT, transitions["v1_4_sha256"])
+    assert matches_frozen_sha256(RESULT, retrospective["v1_4_sha256"])
     assert retrospective["checks"]["known_multistore_delete"]["state"] == "CONFIRMED_UNDER_DECLARED"
     assert retrospective["checks"]["known_preview_with_early_return"]["compatible_mutations"]["total"] == 0
     status_items = retrospective["checks"]["known_status_with_reconciliation"]["effects"]["items"]

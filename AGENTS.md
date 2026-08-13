@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.645.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.646.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.645.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.646.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -214,10 +214,25 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
   d'appréciation ou d'un jugement après observation. Toute décision doit être calculable à
   partir de valeurs observables, versionnées et reproductibles. Une condition non calculable
   produit `UNKNOWN`, jamais un succès implicite.
+- Preuves portables : tout nouvel artefact textuel durable et toute source entrant dans une
+  empreinte gelée utilisent les octets canoniques UTF-8 sans BOM et LF. Une empreinte brute
+  historique non canonique n'est recevable qu'au moyen d'un erratum explicite qui lie ancien
+  SHA-256 et SHA-256 canonique; aucune tolérance EOL générique n'est autorisée.
 
 ---
 
-## 9. État actuel (v2.645.0)
+## 9. État actuel (v2.646.0)
+
+**v2.646 (preuves reproductibles hors du poste de développement)** : les sources textuelles
+et artefacts de preuve suivis sont normalisés en UTF-8 sans BOM et LF dans Git; seuls les
+scripts `bat/cmd` conservent CRLF. Six manifestes historiques qui épinglaient 50 empreintes
+issues d'un working tree CRLF restent immuables. Un erratum central relie explicitement ces
+empreintes à 25 sources canoniques, et les vérificateurs actifs refusent toute différence qui
+n'est ni exacte, ni canonique, ni enregistrée dans cet erratum. Le gate exerce les canaris
+LF/CRLF, le refus de BOM et un changement sémantique négatif. Un checkout neuf avec
+`core.autocrlf=false` valide E7, H7, Forge, TD-015 et le registre sécurité. Rollback :
+réversion atomique de v2.646; aucune donnée, preuve historique ou configuration runtime n'est
+modifiée.
 
 **v2.645 (preuves JSON portables)** : le résultat TD-015 reste sémantiquement identique,
 mais son BOM UTF-8 ajouté par Windows PowerShell 5.1 est retiré de la copie canonique. Le

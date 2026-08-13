@@ -4,13 +4,11 @@ import hashlib
 import json
 from pathlib import Path
 
+from evidence_portability import matches_frozen_sha256
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks" / "tool-evidence" / "v1.2"
 RESULT_SHA256 = "cc0861024baaf4902a8a422ec4322ed1f73eee29f549e8eb5bbe98cb8734fb53"
-
-
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def canonical_hash(value) -> str:
@@ -20,7 +18,7 @@ def canonical_hash(value) -> str:
 
 def main() -> int:
     result_path = BASE / "e7-apply-replay-result.json"
-    assert sha256(result_path) == RESULT_SHA256
+    assert matches_frozen_sha256(result_path, RESULT_SHA256, root=ROOT)
     result = json.loads(result_path.read_text(encoding="utf-8"))
     content_hash = result.pop("content_sha256")
     assert canonical_hash(result) == content_hash

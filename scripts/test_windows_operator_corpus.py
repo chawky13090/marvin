@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from pathlib import Path
+
+from evidence_portability import canonical_sha256, matches_frozen_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +21,7 @@ CONTRACT = ROOT / "benchmarks" / "windows-operator" / "v1.1"
 
 def _portable_text_sha256(path: Path) -> str:
     """Hash versioned text independently of the checkout line-ending policy."""
-    canonical = path.read_bytes().replace(b"\r\n", b"\n")
-    return hashlib.sha256(canonical).hexdigest()
+    return canonical_sha256(path)
 
 
 def main() -> int:
@@ -49,7 +49,7 @@ def main() -> int:
     assert runtime["provider_declared_context_tokens"] == 262_144
     assert runtime["client_context_override"] is None
     evidence = (CONTRACT / runtime["behavioral_evidence"]).resolve()
-    assert hashlib.sha256(evidence.read_bytes()).hexdigest() == runtime["behavioral_evidence_sha256"]
+    assert matches_frozen_sha256(evidence, runtime["behavioral_evidence_sha256"], root=ROOT)
 
     live = json.loads((CONTRACT / "live-scenarios.json").read_text(encoding="utf-8"))
     scenarios = live["scenarios"]

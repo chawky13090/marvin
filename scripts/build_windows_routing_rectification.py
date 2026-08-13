@@ -13,6 +13,8 @@ import json
 import subprocess
 from collections import Counter, defaultdict
 from pathlib import Path
+
+from evidence_portability import matches_frozen_sha256
 from typing import Any
 
 
@@ -492,12 +494,17 @@ def build_rectification(contract_payload: dict[str, Any]) -> dict[str, Any]:
         "development": "routing-windows-task-normative-candidate.json",
         "holdout": "routing-windows-task-holdout-source-closed.json",
     }
+    preserved_report = _read_json_bytes(PRESERVED_REPORT.read_bytes(), PRESERVED_REPORT.name)
+    recorded_source_hashes = preserved_report["evidence"]
     splits: dict[str, Any] = {}
     for split, name in artifact_names.items():
         artifact_path = CAMPAIGN_ROOT / name
         artifact = _read_json_bytes(artifact_path.read_bytes(), name)
         if artifact.get("routing_policy") != "windows_task":
             raise ValueError(f"Politique de routage inattendue : {name}")
+        recorded_artifact_sha256 = recorded_source_hashes[name]
+        if not matches_frozen_sha256(artifact_path, recorded_artifact_sha256, root=ROOT):
+            raise ValueError(f"Artefact historique non conforme à l'erratum : {name}")
         source_verification = _verify_artifact_sources(artifact, name, split=split)
         classified = [
             _classify_row(row, matrix, contracts, set(specs))
@@ -505,7 +512,7 @@ def build_rectification(contract_payload: dict[str, Any]) -> dict[str, Any]:
         ]
         splits[split] = {
             "artifact": name,
-            "artifact_sha256": _sha256(artifact_path.read_bytes()),
+            "artifact_sha256": recorded_artifact_sha256,
             "source_verification": source_verification,
             "historical_adoption_summary": artifact["summary"],
             "retrospective_tool_name_compatibility": _summarize_rectified(classified),
