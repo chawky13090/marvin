@@ -1,0 +1,19 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.7",
+  "status": "frozen_after_oracle_context_transport_failure_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "7a1efc9c7e4b18c6cdad735bd37d665e0cee270da2993d9f24bcfb5464923777"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {"business_tool_execution_count": 0, "benchmark_model_call_count": 0, "full_catalog_bytes": 216105, "failed_role": "oracle_b", "failure": "three_empty_or_invalid_responses", "semantic_result_was_not_scored": true},
+  "authorized_change": {
+    "author_receives_family_contract_without_tool_catalog": true,
+    "other_roles_receive_relevant_catalog_subset": true,
+    "relevant_catalog_rule": "tool name prefix in file_, system_search, pc_app_, win_quick_, pc_process_, winget_ or exact unified_search, pc_open_file, pc_installed_software, windows_task, computer_control",
+    "oracle_adjudicator_and_critic_calls_batched_by_family": true,
+    "all_candidates_still_reviewed_by_both_oracles_adjudicator_and_critic": true,
+    "same_models_prompts_seeds_temperature_top_p_and_semantic_rules": true,
+    "no_client_num_ctx": true,
+    "partial_artifact_publication_forbidden": true
+  },
+  "failure": "fail_closed_if_any_family_batch_is_missing",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
