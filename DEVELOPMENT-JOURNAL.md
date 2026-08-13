@@ -35,6 +35,19 @@ donnée personnelle publiée, concurrence bornée à trois, retries bornés à t
 politique, au corpus, à l'oracle, au runner et à l'autorisation. Rollback : réversion atomique
 des commits v2.651; aucune donnée persistante ou configuration produit n'a été modifiée.
 
+Validation finale : les sept suites Stage B, l'architecture, la documentation et le runner
+exhaustif passent. Le premier gate complet a trouvé un échec isolé dans la fixture temporaire
+`bulk_rename`; la même suite a ensuite passé cinq cycles neufs consécutifs et le rejeu complet
+a obtenu 323 étapes exécutées, zéro échec et quatre smokes différés sur 327 attendues en
+631,5 secondes, build Next.js inclus. Aucun changement produit n'a été fait pour obtenir ce
+rejeu vert. Après démarrage, le premier smoke chat a refusé un 503 unique lors de la première
+compilation à chaud de la route Next `/api/projects`; le backend a répondu 5/5 en 28–224 ms,
+puis le rejeu chat est passé sans erreur. L'état final est `ready` en v2.651.0 avec 364 outils,
+Ollama, SearXNG, HTTPS, Code Workspace et VM Lab; les smokes finaux donnent API 28/28, pages
+41/41, chat 5/5 et voix strictement sérialisée. Les quatre approbations utilisateur encore
+valides ont été conservées : le redémarrage protégé a refusé de les interrompre et seul le
+frontend sans état a été relancé.
+
 ## 2026-08-13 — v2.650.0 — source canonique des preuves courantes
 
 Un audit externe a interprété l'analyse E7 v1.4 comme courante alors que cinq sujets avaient
