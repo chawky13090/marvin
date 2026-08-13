@@ -22,7 +22,8 @@ def main() -> None:
     assert "critic_rejected" in text and "processus/service" in text
     assert "RELEVANT_PREFIXES" in text and "RELEVANT_EXACT" in text
     assert "for family_index, family in enumerate(ALLOWED_FAMILIES)" in text
-    assert "family_counts = {name: 12 for name in ALLOWED_FAMILIES}" in text
+    assert "family_counts = {name: 32 for name in ALLOWED_FAMILIES}" in text
+    assert "expected_family=family" in text
     assert "for attempt in range(1, 4)" in text and '"attempts": attempt' in text
     assert "family_ordinals" in text and "family_ordinals[family] += 1" in text
     assert '"prompt": prompt})' in text

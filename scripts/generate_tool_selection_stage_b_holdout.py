@@ -127,21 +127,22 @@ def _private_texts(policy: dict[str, Any]) -> list[str]:
     )
     return [str(row.get("text") or "") for row in rows if str(row.get("text") or "").strip()]
 
-def _validate_author(items: Any, policy: dict[str, Any]) -> list[dict[str, Any]]:
+def _validate_author(items: Any, policy: dict[str, Any], *, expected_family: str | None = None, minimum: int | None = None) -> list[dict[str, Any]]:
     if not isinstance(items, list): raise ValueError("Réponse auteur sans liste items.")
     output = []
     family_ordinals: Counter[str] = Counter()
     for row in items:
         if not isinstance(row, dict): continue
         family, prompt = str(row.get("family") or ""), str(row.get("prompt") or "").strip()
-        if family not in ALLOWED_FAMILIES or not 20 <= len(prompt) <= 600: continue
+        if family not in ALLOWED_FAMILIES or (expected_family and family != expected_family) or not 20 <= len(prompt) <= 600: continue
         if any(pattern.search(prompt) for pattern in FORBIDDEN_PERSONAL): continue
         family_ordinals[family] += 1
         identity = f"sb-{family.replace('_', '-')}-{family_ordinals[family]:02d}"
         output.append({"id": identity, "family": family, "prompt": prompt})
-    required = int(policy["holdout"]["minimum_per_family"])
+    required = int(minimum or policy["holdout"]["minimum_per_family"])
     counts = Counter(row["family"] for row in output)
-    if any(counts[family] < required for family in ALLOWED_FAMILIES):
+    assessed_families = (expected_family,) if expected_family else ALLOWED_FAMILIES
+    if any(counts[family] < required for family in assessed_families):
         raise ValueError(f"Réponse auteur insuffisante par famille : {dict(counts)}")
     return output
 
@@ -255,20 +256,29 @@ async def run() -> dict[str, Any]:
         or str(item["function"]["name"]).startswith(RELEVANT_PREFIXES)
     ]
     catalog_json = json.dumps(relevant_spec, ensure_ascii=False, separators=(",", ":"))
-    family_counts = {name: 12 for name in ALLOWED_FAMILIES}
-    author_user = (
-        "Crée un corpus inédit de demandes Windows en français. Retourne un objet JSON {items:[...]}. "
-        f"Produis exactement {family_counts}. Chaque item contient seulement id, family et prompt. "
-        "Le prompt doit être naturel, mono-intention, synthétique et précis. Utilise uniquement des fixtures "
-        "sous C:\\Fixture, des processus marvin_fixture_*.exe, des applications Windows génériques et des "
-        "logiciels publics connus. "
-        "N'indique jamais le nom d'un outil dans le prompt. Ne fournis aucun oracle. Familles: "
-        "file_discovery=chercher/lister par nom ou contenu; file_mutation=renommer/déplacer/copier/créer; "
-        "application_launch=lancer une application; process_inventory=lister/inspecter les processus; "
-        "process_action=arrêter une cible explicite; software_management=rechercher/lister/installer/désinstaller."
-    )
-    authored, author_meta = await _chat(policy["independent_roles"]["author"]["model"], "Tu rédiges des cas de test, jamais leurs réponses. JSON strict, sans Markdown.", author_user, seed=2651)
-    candidates = _validate_author(authored.get("items") if isinstance(authored, dict) else None, policy)
+    family_counts = {name: 32 for name in ALLOWED_FAMILIES}
+    family_contracts = {
+        "file_discovery": "chercher ou lister des fichiers par nom, motif, contenu ou propriété",
+        "file_mutation": "renommer, déplacer, copier, créer un dossier ou écrire un fichier",
+        "application_launch": "lancer une application ou ouvrir un fichier dans son application",
+        "process_inventory": "lister, filtrer ou inspecter les processus actifs",
+        "process_action": "arrêter un processus cible explicitement nommé ou identifié",
+        "software_management": "rechercher, inventorier, installer, désinstaller ou vérifier les mises à jour de logiciels",
+    }
+    candidates: list[dict[str, Any]] = []
+    author_meta: list[dict[str, Any]] = []
+    for family in ALLOWED_FAMILIES:
+        author_user = (
+            "Crée un corpus inédit de demandes Windows en français. Retourne un objet JSON {items:[...]}. "
+            f"Produis exactement 32 items de family={family}. La capacité est: {family_contracts[family]}. "
+            "Chaque item contient seulement id, family et prompt. Le prompt doit être naturel, mono-intention, "
+            "synthétique et précis. Utilise uniquement des fixtures sous C:\\Fixture, des processus "
+            "marvin_fixture_*.exe, des applications Windows génériques et des logiciels publics connus. "
+            "N'indique jamais le nom d'un outil dans le prompt. Ne fournis aucun oracle."
+        )
+        authored, meta = await _chat(policy["independent_roles"]["author"]["model"], "Tu rédiges des cas de test, jamais leurs réponses. JSON strict, sans Markdown.", author_user, seed=2651)
+        candidates.extend(_validate_author(authored.get("items") if isinstance(authored, dict) else None, policy, expected_family=family, minimum=family_counts[family]))
+        author_meta.append({"family": family, **meta})
 
     oracle_values = {"oracle_a": {}, "oracle_b": {}}
     oracle_meta = {"oracle_a": [], "oracle_b": []}
