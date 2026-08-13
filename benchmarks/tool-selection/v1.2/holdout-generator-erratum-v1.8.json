@@ -1,0 +1,18 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.8",
+  "status": "frozen_after_incomplete_critic_batch_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "644215569c13c5cda5e67d9cfa2d6c05e20647549127b05c97cf6f60bab37fbf"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {"business_tool_execution_count": 0, "benchmark_model_call_count": 0, "failure": "critic_omitted_at_least_one_identifier", "semantic_result_was_not_used": true},
+  "authorized_change": {
+    "missing_decision_maps_to_false": true,
+    "duplicate_decision_maps_to_false": true,
+    "invalid_type_maps_to_false": true,
+    "true_requires_exactly_one_explicit_true": true,
+    "false_never_becomes_true_by_default": true,
+    "five_explicit_survivors_per_family_still_required": true,
+    "all_other_rules_unchanged": true
+  },
+  "rationale": "A fail-closed reviewer omission excludes an item; it must not erase valid decisions for unrelated items or create an implicit acceptance.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
