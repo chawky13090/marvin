@@ -1,0 +1,31 @@
+{
+  "schema": "marvin.td015-closure-freeze/1.0",
+  "generated_at": "2026-08-13T10:31:55.2376864Z",
+  "source_commit": "3ff43b7b670aff35c24da616114557d83a294d5b",
+  "policy_sha256": "192b5e0de6343e3b0bafee20cec8a3b4f1ccfa4075b8a03273c0b1e2a47fab4d",
+  "execution_authorized": true,
+  "result_publication_authorized": true,
+  "source_hashes": {
+    "benchmarks/conversation-history/td015-closure-policy.json": "192b5e0de6343e3b0bafee20cec8a3b4f1ccfa4075b8a03273c0b1e2a47fab4d",
+    "scripts/verify_td015_cycle.py": "af6a883940de374d384b4e54af9b86e938f52838b8983c73b0d58d15d553cb23",
+    "scripts/run_td015_closure.ps1": "de2bd5cc52f5bd52af390c2a59e6494e9349ec4ba5f57c46102efd4db53540ea",
+    "scripts/test_td015_closure_contract.py": "9329f903920f85bc3b013379ca48bc92cdac1350ddddfa0f8f187209408f1244",
+    "scripts/smoke_test_chat.py": "d9f211e8f7ed344972f14913afdd1bfc31cd1da9e48f3b45ae467351f525613e",
+    "scripts/smoke_run_lock.py": "924d77c03a0ddf91593527fee0bafa1f7179c82f1cdbdec88282fab870dcf31c",
+    "scripts/restart-marvin.ps1": "7e76b7a2344c7925de7b31696934bd25febafaa1d298e22f7e9a69d7fd579f12",
+    "backend/api/conversations.py": "96f918737a802d17d3a16f68c8cdb98f47c934512ff09c7c15fa32dd19def67a",
+    "backend/conversation_history.py": "2ede2765b0bcbfaeb0f42c2b6775e93cccebb4505bd94b63af3377bd617d6d74",
+    "backend/repositories/conversations.py": "903d1b4dd7bdd948456c906a871ebdb6a81c3baa7d88a66a7fb31de4e6e373e5",
+    "components/chat/ChatContainer.jsx": "e00290dc9bc8018f392b3289099f02a4797a709365c759b6764b19103d59aa2c",
+    "components/chat/MessageBubble.jsx": "b21e8871cd38cd0f7c59e9872a32c371c5c9e24c205247b56bf877d6d5ec1b3e",
+    "lib/backendRead.mjs": "5d7cc172cd34d4fb099ebccc5113728ecd7422ec7404141a7d07cde2b56925e7",
+    "app/api/conversations/[id]/route.js": "9021eeda616c13afb9455f8ad70e41dc68b2e84fb163ae74c660e5a20b9093dd"
+  },
+  "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run_td015_closure.ps1 -Confirm:$false",
+  "scope": {
+    "cold_restart_cycles": 3,
+    "persistent_data_write_allowed": false,
+    "conversation_plaintext_identifier_publication_allowed": false,
+    "partial_result_publication_allowed": false
+  }
+}
