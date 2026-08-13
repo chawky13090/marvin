@@ -1,0 +1,156 @@
+{
+  "schema": "marvin.tool-selection-stage-b-holdout/1.0",
+  "status": "frozen_candidate",
+  "items": [
+    {
+      "id": "sb-file-discovery-01",
+      "family": "file_discovery",
+      "prompt": "Liste tous les fichiers présents dans le dossier C:\\Fixture\\Documents."
+    },
+    {
+      "id": "sb-file-discovery-02",
+      "family": "file_discovery",
+      "prompt": "Trouve tous les fichiers avec l'extension .log situés sous C:\\Fixture\\Logs."
+    },
+    {
+      "id": "sb-file-discovery-03",
+      "family": "file_discovery",
+      "prompt": "Recherche tout fichier dont le nom commence par 'marvin_fixture_' dans C:\\Fixture."
+    },
+    {
+      "id": "sb-file-discovery-05",
+      "family": "file_discovery",
+      "prompt": "Affiche la liste des fichiers de plus de 10 Mo contenus dans C:\\Fixture\\Backups."
+    },
+    {
+      "id": "sb-file-discovery-06",
+      "family": "file_discovery",
+      "prompt": "Localise tous les fichiers texte contenant le mot 'erreur' dans C:\\Fixture\\Reports."
+    },
+    {
+      "id": "sb-file-mutation-02",
+      "family": "file_mutation",
+      "prompt": "Déplace C:\\Fixture\\image_source.png vers le dossier C:\\Fixture\\Archives."
+    },
+    {
+      "id": "sb-file-mutation-03",
+      "family": "file_mutation",
+      "prompt": "Copie le fichier C:\\Fixture\\config.ini dans le répertoire C:\\Fixture\\Sauvegarde."
+    },
+    {
+      "id": "sb-file-mutation-04",
+      "family": "file_mutation",
+      "prompt": "Crée un nouveau dossier nommé Projet_X à l'intérieur de C:\\Fixture."
+    },
+    {
+      "id": "sb-file-mutation-05",
+      "family": "file_mutation",
+      "prompt": "Écris le texte 'Test réussi' dans un nouveau fichier C:\\Fixture\\log_test.txt."
+    },
+    {
+      "id": "sb-file-mutation-07",
+      "family": "file_mutation",
+      "prompt": "Déplace C:\\Fixture\\marvin_fixture_core.exe vers C:\\Fixture\\Outils."
+    },
+    {
+      "id": "sb-application-launch-01",
+      "family": "application_launch",
+      "prompt": "Lance le processus marvin_fixture_calc.exe situé dans C:\\Fixture."
+    },
+    {
+      "id": "sb-application-launch-03",
+      "family": "application_launch",
+      "prompt": "Démarre l'outil marvin_fixture_monitor.exe présent sur le lecteur C dans le répertoire Fixture."
+    },
+    {
+      "id": "sb-application-launch-05",
+      "family": "application_launch",
+      "prompt": "Active l'application marvin_fixture_logger.exe depuis le chemin C:\\Fixture."
+    },
+    {
+      "id": "sb-application-launch-07",
+      "family": "application_launch",
+      "prompt": "Lance le service marvin_fixture_agent.exe installé dans le dossier C:\\Fixture."
+    },
+    {
+      "id": "sb-application-launch-09",
+      "family": "application_launch",
+      "prompt": "Exécute le binaire marvin_fixture_scanner.exe depuis C:\\Fixture."
+    },
+    {
+      "id": "sb-process-inventory-17",
+      "family": "process_inventory",
+      "prompt": "Liste tous les processus actifs dont le nom commence par marvin_fixture_."
+    },
+    {
+      "id": "sb-process-inventory-18",
+      "family": "process_inventory",
+      "prompt": "Affiche l'identifiant du processus pour l'application marvin_fixture_loader.exe située dans C:\\Fixture."
+    },
+    {
+      "id": "sb-process-inventory-19",
+      "family": "process_inventory",
+      "prompt": "Montre la consommation mémoire de tous les processus marvin_fixture_worker en cours d'exécution."
+    },
+    {
+      "id": "sb-process-inventory-20",
+      "family": "process_inventory",
+      "prompt": "Vérifie si le processus marvin_fixture_monitor.exe est actuellement actif sur le système."
+    },
+    {
+      "id": "sb-process-inventory-23",
+      "family": "process_inventory",
+      "prompt": "Compte le nombre total d'instances de marvin_fixture_service.exe en cours d'exécution."
+    },
+    {
+      "id": "sb-process-action-01",
+      "family": "process_action",
+      "prompt": "Arrête le processus marvin_fixture_alpha.exe."
+    },
+    {
+      "id": "sb-process-action-02",
+      "family": "process_action",
+      "prompt": "Mets fin à l'exécution de marvin_fixture_beta.exe situé dans C:\\Fixture."
+    },
+    {
+      "id": "sb-process-action-03",
+      "family": "process_action",
+      "prompt": "Ferme immédiatement le processus marvin_fixture_gamma.exe."
+    },
+    {
+      "id": "sb-process-action-04",
+      "family": "process_action",
+      "prompt": "Interromps le processus marvin_fixture_delta.exe en cours d'exécution."
+    },
+    {
+      "id": "sb-process-action-05",
+      "family": "process_action",
+      "prompt": "Tue le processus nommé marvin_fixture_epsilon.exe."
+    },
+    {
+      "id": "sb-software-management-01",
+      "family": "software_management",
+      "prompt": "Recherche si le logiciel de traitement de texte est installé sur ce poste."
+    },
+    {
+      "id": "sb-software-management-05",
+      "family": "software_management",
+      "prompt": "Vérifie si une mise à jour est disponible pour le client de messagerie installé."
+    },
+    {
+      "id": "sb-software-management-11",
+      "family": "software_management",
+      "prompt": "Vérifie l'état des mises à jour pour la suite bureautique publique connue."
+    },
+    {
+      "id": "sb-software-management-15",
+      "family": "software_management",
+      "prompt": "Inventorie les applications de développement installées sur cette machine Windows."
+    },
+    {
+      "id": "sb-software-management-16",
+      "family": "software_management",
+      "prompt": "Vérifie si la dernière version du lecteur PDF public est bien déployée."
+    }
+  ]
+}

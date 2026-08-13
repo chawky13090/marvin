@@ -1,0 +1,49 @@
+{
+  "schema": "marvin.tool-selection-stage-b-holdout-freeze/1.0",
+  "status": "frozen_before_benchmark_model_invocation",
+  "source_commit": "5b7ecca3",
+  "benchmark_model_invocation_count_before_freeze": 0,
+  "business_tool_execution_count_before_freeze": 0,
+  "holdout": {
+    "item_count": 30,
+    "families": {
+      "file_discovery": 5,
+      "file_mutation": 5,
+      "application_launch": 5,
+      "process_inventory": 5,
+      "process_action": 5,
+      "software_management": 5
+    },
+    "selection_rule": "first_five_in_author_batch_then_item_order_after_all_frozen_filters",
+    "manual_selection_forbidden": true,
+    "user_data_present": false
+  },
+  "frozen_hashes": {
+    "benchmarks/tool-selection/v1.2/stage-b-preregistration.json": "aa286d009a367bd62e3a07d1654af81901e7958e37847837ffd61d5a332d7b30",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.1.json": "3fa7ab9e02856671119db2aae59ec342a2ad70e06f1caee766d5c03b19dcdbd1",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.2.json": "68e1a811e3a856c12a8a89219b14da17888e9182c24f44061fd9c1fcf792587b",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.3.json": "e705aae2a0901399a84d84b11e060c4cac09d2d63dbe5adbd8414ce40a927167",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.4.json": "595e95566f7027f77dc50bfce23b681831d3d0467fe6b4820d0c2977f3901ae2",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.5.json": "f8e8a610a5857434f5f09c342728bce1a24db98d1b944a30d84f9eee3f1c6327",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.6.json": "d59ffccd2113b3a400c8fe7784bf2c2930ae6c0dd91cef827faf211017e6c0d5",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.7.json": "11ca7720489d260c76ecddc0f356e87c432a749f208912eb6ce8ecb2c4b01adb",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.8.json": "837a2e9fe3d665799e1851cbb98ce21dc924363c2c1f2d9c05bc4828a2e93f6b",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.9.json": "14c544b103138a6730ac12d12a80f557242bc2372fc2c8ac645f3565ad93d029",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.10.json": "cefefb067172533fe5f6ecef20dd0f1eb5b07026154612306963d37fd169daa2",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.11.json": "02ca036b4f8490160ee60eba6a30006d6136bc985da88aedc44ec938d6e67297",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.12.json": "29d73639ccf668685282983afff67849cadc053c08c410fa663b45e977583e0b",
+    "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.13.json": "9347980f3601a6443d09f0f1f54f65a3ac44bab536505b387781201f15b81b31",
+    "scripts/generate_tool_selection_stage_b_holdout.py": "1a8b0df18a203389937f3327b095fc16a891d04b7d84f4fc5be967d1b2661762",
+    "scripts/test_tool_selection_stage_b_generator.py": "e9c97cb24514537f4cdbb5fa5dd699becf9e551a032ab05d266822411d497b10",
+    "benchmarks/tool-selection/v1.2/holdout-corpus.json": "ac1cd39e334051a11e77f2933b4dfb4714f7b9a5942f3c0b63605f8fc07d68fe",
+    "benchmarks/tool-selection/v1.2/holdout-oracle.json": "384b806cfd19dfd56c0c2272905b4d4663bb716e1d18ca377f1c1a2e41f0deec",
+    "benchmarks/tool-selection/v1.2/holdout-generation-report.json": "cf84aee7c72141df608d114ab6d20a06d2095dfa55abe2af04975228b74dc12a"
+  },
+  "next_phase": {
+    "b1_runner_implementation_authorized": true,
+    "benchmark_model_execution_authorized": false,
+    "business_tool_execution_authorized": false,
+    "separate_runner_freeze_and_single_use_authorization_required": true
+  },
+  "rollback": "Preserve this immutable freeze and revert later runner commits; no product data or business tool was modified."
+}

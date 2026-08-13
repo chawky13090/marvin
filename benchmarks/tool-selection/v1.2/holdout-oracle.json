@@ -1,0 +1,582 @@
+{
+  "schema": "marvin.tool-selection-stage-b-oracle/1.0",
+  "status": "frozen_candidate",
+  "items": [
+    {
+      "id": "sb-file-discovery-01",
+      "accepted_calls": [
+        {
+          "tool": "file_list",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "path",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Documents"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-discovery-02",
+      "accepted_calls": [
+        {
+          "tool": "file_find",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "path",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Logs"
+            },
+            {
+              "argument": "pattern",
+              "operator": "equals",
+              "value": "*.log"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-discovery-03",
+      "accepted_calls": [
+        {
+          "tool": "file_find",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "path",
+              "operator": "equals",
+              "value": "C:\\Fixture"
+            },
+            {
+              "argument": "pattern",
+              "operator": "equals",
+              "value": "marvin_fixture_*"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-discovery-05",
+      "accepted_calls": [
+        {
+          "tool": "file_large_finder",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "directory",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Backups"
+            },
+            {
+              "argument": "min_mb",
+              "operator": "equals",
+              "value": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-discovery-06",
+      "accepted_calls": [
+        {
+          "tool": "file_search_text",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "directory",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Reports"
+            },
+            {
+              "argument": "query",
+              "operator": "equals",
+              "value": "erreur"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-mutation-02",
+      "accepted_calls": [
+        {
+          "tool": "file_move",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "destination",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Archives"
+            },
+            {
+              "argument": "source",
+              "operator": "equals",
+              "value": "C:\\Fixture\\image_source.png"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-mutation-03",
+      "accepted_calls": [
+        {
+          "tool": "file_copy",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "destination",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Sauvegarde"
+            },
+            {
+              "argument": "source",
+              "operator": "equals",
+              "value": "C:\\Fixture\\config.ini"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-mutation-04",
+      "accepted_calls": [
+        {
+          "tool": "file_create_folder",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "path",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Projet_X"
+            }
+          ]
+        },
+        {
+          "tool": "windows_task",
+          "action": "filesystem.create_folder",
+          "constraints": [
+            {
+              "argument": "target",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Projet_X"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-mutation-05",
+      "accepted_calls": [
+        {
+          "tool": "file_write",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "content",
+              "operator": "equals",
+              "value": "Test réussi"
+            },
+            {
+              "argument": "path",
+              "operator": "equals",
+              "value": "C:\\Fixture\\log_test.txt"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-file-mutation-07",
+      "accepted_calls": [
+        {
+          "tool": "file_move",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "destination",
+              "operator": "equals",
+              "value": "C:\\Fixture\\Outils"
+            },
+            {
+              "argument": "source",
+              "operator": "equals",
+              "value": "C:\\Fixture\\marvin_fixture_core.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-application-launch-01",
+      "accepted_calls": [
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": [
+            {
+              "argument": "target",
+              "operator": "equals",
+              "value": "C:\\Fixture\\marvin_fixture_calc.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-application-launch-03",
+      "accepted_calls": [
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": [
+            {
+              "argument": "target",
+              "operator": "equals",
+              "value": "C:\\Fixture\\marvin_fixture_monitor.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-application-launch-05",
+      "accepted_calls": [
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": [
+            {
+              "argument": "target",
+              "operator": "equals",
+              "value": "C:\\Fixture\\marvin_fixture_logger.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-application-launch-07",
+      "accepted_calls": [
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": [
+            {
+              "argument": "target",
+              "operator": "equals",
+              "value": "C:\\Fixture\\marvin_fixture_agent.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-application-launch-09",
+      "accepted_calls": [
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": [
+            {
+              "argument": "target",
+              "operator": "equals",
+              "value": "C:\\Fixture\\marvin_fixture_scanner.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-process-inventory-17",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_list",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.list",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-process-inventory-18",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_list",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.list",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-process-inventory-19",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_list",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.list",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-process-inventory-20",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_list",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.list",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-process-inventory-23",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_list",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.list",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-process-action-01",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_kill",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_alpha.exe"
+            }
+          ]
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.stop",
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_alpha.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-process-action-02",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_kill",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_beta.exe"
+            }
+          ]
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.stop",
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_beta.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-process-action-03",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_kill",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_gamma.exe"
+            }
+          ]
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.stop",
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_gamma.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-process-action-04",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_kill",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_delta.exe"
+            }
+          ]
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.stop",
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_delta.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-process-action-05",
+      "accepted_calls": [
+        {
+          "tool": "pc_process_kill",
+          "action": null,
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_epsilon.exe"
+            }
+          ]
+        },
+        {
+          "tool": "windows_task",
+          "action": "process.stop",
+          "constraints": [
+            {
+              "argument": "name",
+              "operator": "equals",
+              "value": "marvin_fixture_epsilon.exe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sb-software-management-01",
+      "accepted_calls": [
+        {
+          "tool": "pc_installed_software",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "software.list",
+          "constraints": []
+        },
+        {
+          "tool": "winget_list_installed",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-software-management-05",
+      "accepted_calls": [
+        {
+          "tool": "winget_list_upgrades",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-software-management-11",
+      "accepted_calls": [
+        {
+          "tool": "winget_list_upgrades",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-software-management-15",
+      "accepted_calls": [
+        {
+          "tool": "pc_installed_software",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "software.list",
+          "constraints": []
+        },
+        {
+          "tool": "winget_list_installed",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "sb-software-management-16",
+      "accepted_calls": [
+        {
+          "tool": "winget_list_installed",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "winget_list_upgrades",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    }
+  ]
+}
