@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.649.0**
+**Version 2.650.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 364 outils pour agir sur Windows, les
@@ -9,6 +9,10 @@ documents, le réseau, les e-mails, les calendriers et les systèmes distants.
 Les preuves de sécurité et de non-régression sont reproductibles indépendamment du réglage
 Git du poste : les artefacts textuels sont canoniques UTF-8/LF et les empreintes historiques
 CRLF ne sont acceptées que par un erratum explicite et vérifié.
+
+Le registre externe de supersession résout les preuves par sujet sans réécrire les artefacts
+gelés. L'inventaire E0–E7 courant expose deux contrats E7 vérifiés et conserve les 434 autres
+en `unassessed`; voir `docs/EVIDENCE-GOVERNANCE.md`.
 
 La version 2.250 ajoute un suivi durable des Coding Missions directement dans le chat, une
 lecture vocale strictement sérialisée et un avatar de bureau Electron optionnel. Sa fenêtre

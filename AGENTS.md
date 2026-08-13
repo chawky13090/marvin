@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.649.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.650.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.649.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.650.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -214,6 +214,10 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
   d'appréciation ou d'un jugement après observation. Toute décision doit être calculable à
   partir de valeurs observables, versionnées et reproductibles. Une condition non calculable
   produit `UNKNOWN`, jamais un succès implicite.
+- Supersession des preuves : un artefact historique gelé n'est jamais modifié pour ajouter un
+  pointeur. Toute transition est déclarée dans le registre externe canonique par sujet, chemin
+  relatif et SHA-256 exact. Le gate exige une révision courante unique, refuse cycles, liens
+  absents et successeurs concurrents, et interdit à une supersession de contrat d'accorder E7.
 - Preuves portables : tout nouvel artefact textuel durable et toute source entrant dans une
   empreinte gelée utilisent les octets canoniques UTF-8 sans BOM et LF. Une empreinte brute
   historique non canonique n'est recevable qu'au moyen d'un erratum explicite qui lie ancien
@@ -221,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.649.0)
+## 9. État actuel (v2.650.0)
+
+**v2.650 (source canonique des preuves courantes)** : un registre externe résout les
+supersessions par sujet et préserve les octets de toutes les preuves historiques. Les 22
+contrats de surface restent granulaires : cinq terminent sur v1.5 et dix-sept sur v1.4. Le
+nouvel inventaire E0–E7 n'accepte que des verdicts terminaux explicites et affiche deux E7
+vérifiés (`bulk_rename:preview` N et `bulk_rename:apply` R), les 434 autres restant
+`unassessed`. Le gate rejette empreinte divergente, lien absent, cycle, convergence concurrente
+et sélecteur de sujet non unique. Rollback : réversion atomique de v2.650; aucune donnée ou
+preuve historique n'est modifiée.
 
 **v2.649 (sélection d'outils sans recompilation de motifs)** : les frontières lexicales
 internes sont compilées une fois dans un cache borné à 4 096 entrées. Aucun mot-clé, score,

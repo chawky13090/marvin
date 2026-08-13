@@ -5,6 +5,35 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.650.0 — source canonique des preuves courantes
+
+Un audit externe a interprété l'analyse E7 v1.4 comme courante alors que cinq sujets avaient
+déjà été corrigés et supersédés en v1.5. Le défaut n'était pas dans la preuve historique mais
+dans sa découvrabilité : ni l'analyse v1.4 ni l'inventaire v1.1 ne désignaient mécaniquement
+leur successeur. Modifier ces fichiers aurait cassé leur immuabilité et leurs empreintes.
+
+Le pré-enregistrement `6627e64a` a donc gelé avant implémentation une résolution externe par
+sujet. Un sujet possède exactement une révision courante; les autres rejoignent cette révision
+par des liens chemin relatif + SHA-256, sans cycle, lien absent ou convergence concurrente.
+Cette granularité est nécessaire : cinq contrats de surface terminent en v1.5, tandis que les
+dix-sept autres restent légitimement normatifs dans v1.4. Une supersession de contrat ne vaut
+jamais vérification E7.
+
+Le registre publie 25 sujets : 22 contrats de surface, l'inventaire global et deux verdicts
+runtime. L'inventaire v1.2 lit SQLite en lecture seule et intègre uniquement les deux preuves
+E7 terminales : `bulk_rename:preview` classe N et `bulk_rename:apply` classe R sur cinq cycles.
+Le résultat courant est 2 E7 vérifiés, 434 non évalués; aucun `UNKNOWN` n'est transformé en
+absence. Les inventaires v1/v1.1, analyses v1.3/v1.4 et preuves runtime historiques restent
+identiques aux blobs du commit de pré-enregistrement.
+
+Sécurité, données et logs : aucun outil métier, runtime, secret, texte utilisateur ou écriture
+SQLite. Les artefacts publics contiennent uniquement métadonnées de catalogue, compteurs,
+chemins relatifs et empreintes. Aucun nouveau log runtime. Le rollback consiste à révertir
+atomiquement les commits v2.650; aucune donnée persistante ni preuve historique n'est à
+restaurer. Validation ciblée : pré-enregistrement, résolveur, inventaire, runner exhaustif et
+compilation passent. Le gate complet, le redémarrage froid et les smokes restent requis avant
+la clôture.
+
 ## 2026-08-13 — v2.649.0 — cache borné des motifs de sélection
 
 La campagne d'ablation a révélé que la sélection recompilait les mêmes frontières regex à
