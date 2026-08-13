@@ -42,6 +42,8 @@ FORBIDDEN_PERSONAL = (
     re.compile(r"\b(?:\+33|0)[1-9](?:[ .-]?\d{2}){4}\b"),
     re.compile(r"\\\\[^\\\s]+\\"),
 )
+RELEVANT_PREFIXES = ("file_", "system_search", "pc_app_", "win_quick_", "pc_process_", "winget_")
+RELEVANT_EXACT = {"unified_search", "pc_open_file", "pc_installed_software", "windows_task", "computer_control"}
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -245,7 +247,12 @@ async def run() -> dict[str, Any]:
     if not critic_row or str(critic_row.get("digest") or "") != critic_contract["critic_digest"] or not critic_row.get("remote_host"):
         raise RuntimeError("Provenance Cloud invalide pour le critique.")
 
-    catalog_json = json.dumps(TOOLS_SPEC, ensure_ascii=False, separators=(",", ":"))
+    relevant_spec = [
+        item for item in TOOLS_SPEC
+        if str(item["function"]["name"]) in RELEVANT_EXACT
+        or str(item["function"]["name"]).startswith(RELEVANT_PREFIXES)
+    ]
+    catalog_json = json.dumps(relevant_spec, ensure_ascii=False, separators=(",", ":"))
     family_counts = {name: 8 for name in ALLOWED_FAMILIES}
     author_user = (
         "Crée un corpus inédit de demandes Windows en français. Retourne un objet JSON {items:[...]}. "
@@ -256,25 +263,28 @@ async def run() -> dict[str, Any]:
         "N'indique jamais le nom d'un outil dans le prompt. Ne fournis aucun oracle. Familles: "
         "file_discovery=chercher/lister par nom ou contenu; file_mutation=renommer/déplacer/copier/créer; "
         "application_launch=lancer une application; process_inventory=lister/inspecter les processus; "
-        "process_action=arrêter une cible explicite; software_management=rechercher/lister/installer/désinstaller. "
-        "Catalogue de référence (descriptions et schémas seulement):\n" + catalog_json
+        "process_action=arrêter une cible explicite; software_management=rechercher/lister/installer/désinstaller."
     )
     authored, author_meta = await _chat(policy["independent_roles"]["author"]["model"], "Tu rédiges des cas de test, jamais leurs réponses. JSON strict, sans Markdown.", author_user, seed=2651)
     candidates = _validate_author(authored.get("items") if isinstance(authored, dict) else None, policy)
 
-    oracle_user = (
-        "Établis indépendamment l'oracle de routage. Retourne {items:[{id,accepted_calls:[...]}]}. "
-        "Pour chaque demande, énumère TOUS les outils réellement valides, jamais un outil préféré unique. "
-        "Chaque appel contient tool, action (valeur de l'argument action pour windows_task, sinon null), et "
-        "constraints [{argument,operator:'equals'|'present',value?}] uniquement pour les faits explicitement "
-        "imposés. Refuse tout nom absent du catalogue. Ne déduis rien d'un résultat de benchmark.\nCATALOGUE:\n"
-        + catalog_json + "\nDEMANDES:\n" + json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
-    )
-    oracle_values, oracle_meta = {}, {}
+    oracle_values = {"oracle_a": {}, "oracle_b": {}}
+    oracle_meta = {"oracle_a": [], "oracle_b": []}
     for index, role in enumerate(("oracle_a", "oracle_b"), start=1):
-        raw, meta = await _chat(policy["independent_roles"][role]["model"], "Tu es un oracle fonctionnel indépendant. JSON strict, sans Markdown.", oracle_user, seed=2651 + index)
-        oracle_values[role] = _normalize_oracle(raw, {row["id"] for row in candidates}, {str(item["function"]["name"]) for item in TOOLS_SPEC})
-        oracle_meta[role] = meta
+        for family_index, family in enumerate(ALLOWED_FAMILIES):
+            batch = [row for row in candidates if row["family"] == family]
+            batch_ids = {row["id"] for row in batch}
+            oracle_user = (
+                "Établis indépendamment l'oracle de routage. Retourne {items:[{id,accepted_calls:[...]}]}. "
+                "Pour chaque demande, énumère TOUS les outils réellement valides, jamais un outil préféré unique. "
+                "Chaque appel contient tool, action (valeur de l'argument action pour windows_task, sinon null), et "
+                "constraints [{argument,operator:'equals'|'present',value?}] uniquement pour les faits explicitement "
+                "imposés. Refuse tout nom absent du catalogue. Ne déduis rien d'un résultat de benchmark.\nCATALOGUE:\n"
+                + catalog_json + "\nDEMANDES:\n" + json.dumps(batch, ensure_ascii=False, separators=(",", ":"))
+            )
+            raw, meta = await _chat(policy["independent_roles"][role]["model"], "Tu es un oracle fonctionnel indépendant. JSON strict, sans Markdown.", oracle_user, seed=2651 + index)
+            oracle_values[role].update(_normalize_oracle(raw, batch_ids, {str(item["function"]["name"]) for item in relevant_spec}))
+            oracle_meta[role].append({"family": family, **meta})
 
     catalog_by_name = {str(item["function"]["name"]): item for item in TOOLS_SPEC}
     consensus_by_id = {
@@ -284,32 +294,41 @@ async def run() -> dict[str, Any]:
         ), catalog_by_name)
         for row in candidates
     }
-    adjudicator_input = [
+    review_input = [
         {"id": row["id"], "family": row["family"], "prompt": row["prompt"], "consensus_calls": consensus_by_id[row["id"]]}
         for row in candidates
     ]
-    adjudicator_raw, adjudicator_meta = await _chat(
-        adjudicator_model,
-        "Tu es un adjudicateur indépendant. Tu peux seulement accepter ou exclure; JSON strict, sans Markdown.",
-        "Retourne {items:[{id,valid}]}, exactement une décision par item. valid=true uniquement si le texte "
-        "implique réellement la famille déclarée ET si au moins un consensus_call accomplit précisément la "
-        "demande avec ses contraintes. Une ambiguïté ou une action relevant d'une autre famille impose false. "
-        "Ne corrige et ne réécris jamais un item. Catalogue de référence:\n" + catalog_json
-        + "\nITEMS:\n" + json.dumps(adjudicator_input, ensure_ascii=False, separators=(",", ":")),
-        seed=2654,
-    )
-    adjudicated = _adjudications(adjudicator_raw, {row["id"] for row in candidates})
-    critic_raw, critic_meta = await _chat(
-        critic_model,
-        "Tu es un critique adversarial indépendant. Tu peux seulement accepter ou exclure; JSON strict, sans Markdown.",
-        "Retourne {items:[{id,valid}]}, exactement une décision par item. Cherche les faux positifs: outil qui "
-        "n'accomplit qu'une partie de la demande, différence nom/contenu, direct/récursif, application/fichier, "
-        "processus/service, installé/disponible, lecture/mutation. valid=true seulement si au moins un "
-        "consensus_call couvre la demande entière avec le schéma fourni. Ne corrige rien. Catalogue:\n"
-        + catalog_json + "\nITEMS:\n" + json.dumps(adjudicator_input, ensure_ascii=False, separators=(",", ":")),
-        seed=2655,
-    )
-    criticized = _adjudications(critic_raw, {row["id"] for row in candidates})
+    adjudicated: dict[str, bool] = {}
+    criticized: dict[str, bool] = {}
+    adjudicator_meta: list[dict[str, Any]] = []
+    critic_meta: list[dict[str, Any]] = []
+    for family_index, family in enumerate(ALLOWED_FAMILIES):
+        batch = [row for row in review_input if row["family"] == family]
+        batch_ids = {row["id"] for row in batch}
+        adjudicator_raw, meta = await _chat(
+            adjudicator_model,
+            "Tu es un adjudicateur indépendant. Tu peux seulement accepter ou exclure; JSON strict, sans Markdown.",
+            "Retourne {items:[{id,valid}]}, exactement une décision par item. valid=true uniquement si le texte "
+            "implique réellement la famille déclarée ET si au moins un consensus_call accomplit précisément la "
+            "demande avec ses contraintes. Une ambiguïté ou une action relevant d'une autre famille impose false. "
+            "Ne corrige et ne réécris jamais un item. Catalogue de référence:\n" + catalog_json
+            + "\nITEMS:\n" + json.dumps(batch, ensure_ascii=False, separators=(",", ":")),
+            seed=2654,
+        )
+        adjudicated.update(_adjudications(adjudicator_raw, batch_ids))
+        adjudicator_meta.append({"family": family, **meta})
+        critic_raw, meta = await _chat(
+            critic_model,
+            "Tu es un critique adversarial indépendant. Tu peux seulement accepter ou exclure; JSON strict, sans Markdown.",
+            "Retourne {items:[{id,valid}]}, exactement une décision par item. Cherche les faux positifs: outil qui "
+            "n'accomplit qu'une partie de la demande, différence nom/contenu, direct/récursif, application/fichier, "
+            "processus/service, installé/disponible, lecture/mutation. valid=true seulement si au moins un "
+            "consensus_call couvre la demande entière avec le schéma fourni. Ne corrige rien. Catalogue:\n"
+            + catalog_json + "\nITEMS:\n" + json.dumps(batch, ensure_ascii=False, separators=(",", ":")),
+            seed=2655,
+        )
+        criticized.update(_adjudications(critic_raw, batch_ids))
+        critic_meta.append({"family": family, **meta})
 
     old_public, private = _old_public_texts(), _private_texts(policy)
     maximum = float(policy["holdout"]["novelty"]["token_jaccard_maximum"])
