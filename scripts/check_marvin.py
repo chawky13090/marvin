@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 317
+EXPECTED_STAGE_COUNT = 318
 
 
 @dataclass(frozen=True)
@@ -233,6 +233,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Régel de l'ablation après optimisation équivalente",
             (python, "scripts/test_tool_selection_ablation_reauthorization.py"),
+        ),
+        Stage(
+            "Résultat de l'ablation déterministe des outils",
+            (python, "scripts/test_tool_selection_ablation_result.py"),
         ),
         Stage("Résultat E7 apply immuable et verrouillé", (python, "scripts/test_e7_apply_execution_result.py")),
         Stage("Stockage central des rollbacks bulk rename", (python, "scripts/test_bulk_rename_rollback_store.py")),

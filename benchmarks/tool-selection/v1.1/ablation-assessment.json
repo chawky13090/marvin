@@ -1,0 +1,104 @@
+{
+  "schema": "marvin.tool-selection-ablation-assessment/1.1",
+  "status": "STAGE_A_COMPLETE_STAGE_B_REQUIRED",
+  "source_result": {
+    "path": "benchmarks/tool-selection/v1.1/ablation-result.json",
+    "sha256": "5e001bf893712b683c5b451d51a502dde747cc9f5ac757fbe870278c8b3eabc5"
+  },
+  "source_public_cache": {
+    "path": "benchmarks/tool-selection/v1.1/public-semantic-signal-cache.json",
+    "sha256": "52d70be1e70f47642bcc781e110a213e26a5377b7b8aa47cfff640f9e41ccf7c"
+  },
+  "source_runner": {
+    "path": "scripts/run_tool_selection_ablation.py",
+    "sha256": "ce0d90e5a400f5a84c6200b4e509b2ee3dc48ce86df5a3ca63694efed539e946"
+  },
+  "execution": {
+    "complete_private_and_public": true,
+    "distinct_semantic_queries": 506,
+    "total_duration_before_result_write_ms": 99588.904,
+    "chat_llm_calls": 0,
+    "business_tool_executions": 0,
+    "private_plaintext_published": false,
+    "single_batch_embedding_exact_equality": true,
+    "unit_batch_route_exact_equality": true
+  },
+  "layer_decision": {
+    "K": "REQUIRED_FOR_STAGE_B",
+    "L": "REQUIRED_FOR_STAGE_B",
+    "S": "REQUIRED_FOR_STAGE_B",
+    "product_layer_removal_authorized": false,
+    "canonical_capability_facade_authorized": false
+  },
+  "diagnostic_findings": {
+    "full_recall": {
+      "eco": 0.718182,
+      "balanced": 0.818182,
+      "performance": 0.818182,
+      "max": 0.818182
+    },
+    "full_unknown_name_recovery": {
+      "eco": 0.956522,
+      "balanced": 1.0,
+      "performance": 1.0,
+      "max": 1.0
+    },
+    "full_successful_historical_retention": {
+      "eco": 0.673657,
+      "balanced": 0.916121,
+      "performance": 0.929227,
+      "max": 0.929227
+    },
+    "semantic_only": {
+      "public_recall": 0.581818,
+      "unknown_name_recovery": 1.0,
+      "successful_historical_retention": 0.91481
+    },
+    "keyword_plus_semantic_performance": {
+      "public_recall": 0.718182,
+      "unknown_name_recovery": 1.0,
+      "successful_historical_retention": 0.930537
+    },
+    "balanced_performance_max_public_recall_equal": true,
+    "performance_max_private_retention_equal": true,
+    "max_budget_250_marginal_gain_observed": false,
+    "public_full_candidate_count": {
+      "balanced_median": 20.0,
+      "balanced_maximum": 40.0,
+      "performance_median": 20.0,
+      "performance_maximum": 53.0,
+      "max_median": 20.0,
+      "max_maximum": 53.0
+    },
+    "eco_interaction": "The 18-tool cap can crowd out a correct recovery candidate when K is added; more signals are not monotonically better under a tight budget."
+  },
+  "stage_b": {
+    "configurations": [
+      "K+L+S",
+      "K+S",
+      "S"
+    ],
+    "reason": "compare the current full path with the strongest efficient semantic path and isolate the marginal value of L and K on final outcomes",
+    "requires_new_independent_holdout": true,
+    "v1_0_public_and_private_panels_are_burned_for_product_optimization": true,
+    "required_metrics": [
+      "end_to_end_success",
+      "false_success",
+      "tool_name_validity",
+      "confirmation_count",
+      "step_count",
+      "latency",
+      "prompt_schema_tokens"
+    ],
+    "mode_requirement": "evaluate at least eco, balanced and performance; max is unassessed beyond the absence of Stage A marginal recall gain",
+    "repetitions_per_scenario_minimum": 3,
+    "product_change_before_stage_b_forbidden": true
+  },
+  "limitations": [
+    "Public correctness labels are retrospective and burned.",
+    "Historical tool retention is compatibility evidence, never correctness.",
+    "No conclusion about final LLM choice follows from candidate recall alone.",
+    "No conclusion that the max mode should be reduced follows from absence of Stage A marginal gain alone."
+  ],
+  "rollback": "preserve raw observations; revert only assessment and gate wiring if its derivation is defective"
+}

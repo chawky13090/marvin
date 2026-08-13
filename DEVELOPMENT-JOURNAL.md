@@ -40,6 +40,24 @@ ont produit des vecteurs strictement identiques entre exécution unitaire et lot
 semantic/learned/scores strictement identiques au chemin `route_tools` de production. Aucun
 outil métier, LLM de conversation, donnée persistante ou sortie partielle n'a été créé.
 
+La campagne complète termine en 102,6 secondes. Les trois couches K, L et S contribuent chacune
+à au moins une famille évaluée ou à la compatibilité historique : aucune suppression ni façade
+canonique n'est autorisée par l'étage A. Avec le chemin complet, le rappel diagnostique public
+passe de 71,82 % en eco à 81,82 % dès balanced; la récupération de noms plausibles atteint
+95,65 % puis 100 %. La rétention des exécutions historiques réussies passe de 67,37 % à 91,61 %
+puis 92,92 % en performance, sans gain supplémentaire observé en max. Sur le corpus public,
+performance et max exposent au maximum 53 outils et ont le même rappel : la valeur 250 est un
+plafond, pas 250 schémas injectés à chaque tour.
+
+La couche S est la contribution la plus robuste : la retirer dégrade 38 observations par
+famille/mode sans gain inverse. K est décisive pour la recherche et mutation de fichiers mais
+peut évincer un candidat au plafond eco de 18; L augmente plusieurs familles publiques mais
+réduit légèrement la compatibilité historique quand elle concurrence les autres signaux. Ces
+interactions imposent un étage B sur trois chemins seulement (`K+L+S`, `K+S`, `S`), avec un
+nouveau holdout indépendant et les métriques finales. Les deux panels utilisés ici sont désormais
+brûlés pour toute optimisation produit. Les résultats privés publiés restent six compteurs ou
+taux globaux par mode/configuration; aucun texte, message, conversation ou détail par outil.
+
 ## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
 
 Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier
