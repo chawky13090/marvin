@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "benchmarks" / "conversation-history" / "td015-closure-policy.json"
-FREEZE = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze.json"
+FREEZE_V1 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze.json"
+FREEZE = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze-v2.json"
 RESULT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-result.json"
 ABORT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-v1-abort.json"
 
@@ -132,9 +133,9 @@ def _assert_freeze(freeze: dict) -> None:
         assert hashlib.sha256(blob).hexdigest() == expected, relative
 
 
-def _assert_abort(abort: dict, freeze: dict) -> None:
+def _assert_abort(abort: dict, freeze: dict, freeze_path: Path) -> None:
     assert abort["schema"] == "marvin.td015-closure-abort/1.0"
-    assert abort["freeze_sha256"] == _sha256(FREEZE)
+    assert abort["freeze_sha256"] == _sha256(freeze_path)
     assert abort["source_commit"] == freeze["source_commit"]
     assert abort["completed_cycles"] == 0
     assert abort["failed_cycle"] == 1
@@ -180,11 +181,13 @@ def main() -> None:
     _assert_policy(policy)
     _assert_page_chain_canaries(policy)
     _assert_smoke_contract()
+    freeze_v1 = _load_json(FREEZE_V1)
+    _assert_freeze(freeze_v1)
+    if ABORT.exists():
+        _assert_abort(_load_json(ABORT), freeze_v1, FREEZE_V1)
     if FREEZE.exists():
         freeze = _load_json(FREEZE)
         _assert_freeze(freeze)
-        if ABORT.exists():
-            _assert_abort(_load_json(ABORT), freeze)
         if RESULT.exists():
             _assert_result(_load_json(RESULT), policy, freeze)
     elif RESULT.exists():

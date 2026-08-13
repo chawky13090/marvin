@@ -7,7 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $PolicyPath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-policy.json'
-$FreezePath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-freeze.json'
+$FreezePath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-freeze-v2.json'
 $ResultPath = Join-Path $Root 'benchmarks\conversation-history\td015-closure-result.json'
 $Python = Join-Path $Root 'backend\.venv\Scripts\python.exe'
 
