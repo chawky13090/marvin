@@ -1,0 +1,75 @@
+{
+  "schema": "marvin.evidence-supersession-preregistration/1.0",
+  "status": "frozen_before_registry_implementation",
+  "scope": {
+    "artifact_families": [
+      "tool_evidence_inventory",
+      "e7_direct_surface_contract",
+      "e7_runtime_verdict"
+    ],
+    "historical_artifacts_are_immutable": true,
+    "supersession_granularity": "subject",
+    "whole_file_supersession_is_forbidden_when_only_some_subjects_change": true
+  },
+  "allowed_states": [
+    "current",
+    "superseded",
+    "invalidated",
+    "historical_only"
+  ],
+  "required_invariants": {
+    "artifact_identity_is_path_plus_sha256": true,
+    "every_superseded_subject_has_exactly_one_successor": true,
+    "successor_must_exist_and_match_sha256": true,
+    "cycles_are_forbidden": true,
+    "concurrent_successors_are_forbidden": true,
+    "terminal_subject_is_unique": true,
+    "historical_files_are_never_rewritten_to_add_metadata": true,
+    "current_inventory_uses_only_terminal_evidence": true,
+    "unassessed_never_becomes_absent": true,
+    "e7_requires_an_explicit_success_verdict": true,
+    "contract_supersession_never_grants_e7": true
+  },
+  "known_transitions": [
+    {
+      "subject": "tool_evidence_inventory:global",
+      "predecessors": [
+        "benchmarks/tool-evidence/v1/inventory.json",
+        "benchmarks/tool-evidence/v1.1/inventory.json"
+      ],
+      "required_terminal": "benchmarks/tool-evidence/v1.2/inventory.json"
+    },
+    {
+      "subject_prefix": "e7_direct_surface_contract:",
+      "source": "benchmarks/tool-evidence/v1.4/direct-path-surface-analysis.json",
+      "partial_successor": "benchmarks/tool-evidence/v1.5/direct-surface-supersession.json",
+      "changed_subject_count": 5,
+      "unchanged_subject_count": 17
+    },
+    {
+      "subject": "e7_runtime_verdict:bulk_rename:preview",
+      "required_terminal": "benchmarks/tool-evidence/v1.1/e7-preview-execution-result.json"
+    },
+    {
+      "subject": "e7_runtime_verdict:bulk_rename:apply",
+      "required_terminal": "benchmarks/tool-evidence/v1.2/e7-apply-replay-result.json"
+    }
+  ],
+  "authorized_outputs": [
+    "benchmarks/evidence-governance/v1/supersession-registry.json",
+    "benchmarks/tool-evidence/v1.2/inventory.json"
+  ],
+  "execution": {
+    "business_tool_execution_authorized": false,
+    "runtime_mutation_authorized": false,
+    "database_write_authorized": false,
+    "historical_artifact_rewrite_authorized": false
+  },
+  "security_and_privacy": {
+    "public_artifacts_may_contain_user_content": false,
+    "paths_are_repository_relative_only": true,
+    "secrets_are_forbidden": true,
+    "new_runtime_logging": false
+  },
+  "rollback": "Preserve historical evidence; revert registry, resolver, current inventory and gate wiring atomically. No persistent data migration is involved."
+}
