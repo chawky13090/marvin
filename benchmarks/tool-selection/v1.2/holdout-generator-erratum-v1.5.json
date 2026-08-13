@@ -1,0 +1,22 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.5",
+  "status": "frozen_after_second_candidate_generation_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "85af97f5cd2951f38059ab433809697aceb8b3d5fcf9bd762403ec1c5fd2ac99"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {"business_tool_execution_count": 0, "benchmark_model_call_count": 0, "issue_classes": ["consensus_call_schema_must_be_mechanical", "accepted_tool_must_cover_entire_prompt"], "specific_item_rule_forbidden": true},
+  "authorized_change": {
+    "validate_every_consensus_tool_action_and_constraint_against_frozen_tool_schema": true,
+    "invalid_consensus_call_is_removed_before_model_review": true,
+    "add_adversarial_coverage_critic": true,
+    "critic_model": "nemotron-3-super:cloud",
+    "critic_digest": "be3943c5a818be61a08f3563b971e392bfc12e506e296fb186c870f5c63377a4",
+    "provider_declared_max_context_tokens": 262144,
+    "critic_may_only_accept_or_exclude": true,
+    "critic_reviews_every_candidate_after_dual_consensus": true,
+    "critic_cannot_rewrite_family_prompt_or_oracle": true,
+    "benchmark_model_remains_unseen": true,
+    "all_other_generation_adjudication_novelty_privacy_and_decision_rules_unchanged": true
+  },
+  "acceptance": {"schema_valid_consensus_call_required": true, "adjudicator_and_critic_must_both_accept": true, "five_remaining_per_family_required": true},
+  "rollback": "delete unfrozen candidates then atomic_git_revert"
+}
