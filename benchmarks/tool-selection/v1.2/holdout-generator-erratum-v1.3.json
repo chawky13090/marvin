@@ -1,0 +1,29 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.3",
+  "status": "frozen_after_candidate_generation_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "fa0bb2b72e56e1fc14233465b00dee2beb74a6652912a5a8d4378cf772437996"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0,
+    "semantic_issue_class": "dual_oracle_shared_misinterpretation_of_prompt_family",
+    "specific_item_rule_forbidden": true
+  },
+  "authorized_change": {
+    "add_independent_adjudicator": true,
+    "adjudicator_model": "minimax-m3:cloud",
+    "adjudicator_digest": "d03a959f45c04ab183e245922ecb46ebccfb9d5e55bdee5e9055271ee70195e3",
+    "provider_declared_max_context_tokens": 524288,
+    "adjudicator_may_only_accept_or_exclude": true,
+    "adjudicator_must_review_every_candidate": true,
+    "adjudicator_cannot_rewrite_family_prompt_or_oracle": true,
+    "benchmark_model_remains_unseen": true,
+    "all_other_generation_novelty_privacy_and_decision_rules_unchanged": true
+  },
+  "acceptance": {
+    "valid_requires_prompt_entails_family_and_at_least_one_consensus_call": true,
+    "invalid_or_uncertain_is_excluded": true,
+    "five_remaining_per_family_required": true
+  },
+  "rollback": "delete unfrozen candidates then atomic_git_revert"
+}
