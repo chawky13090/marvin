@@ -20,6 +20,14 @@ secret, contenu personnel, nouveau log, schéma ou format persistant n'est ajout
 réversion atomique du commit v2.648 puis redémarrage backend. L'assessment v1.5 déjà publié
 reste immuable; le résultat live corrigé sera lié par un rectificatif versionné distinct.
 
+Résultat observé après correction : gate exhaustif 308/308 exécutées, quatre smokes live
+différés, zéro échec sur 312 attendues en 629,0 secondes, build inclus. Le redémarrage froid
+atteint `ready` en v2.648.0 après 146 611 ms d'attente. La fixture réelle obtient Notes
+create/update/delete `complete`, refus 409 sans confirmation, Mémoire create/delete `complete`
+et cinq lectures VM sans divergence de SHA-256. Nettoyage vérifié. Les smokes séquentiels
+obtiennent API 28/28, pages 41/41, chat 5/5 et voix à concurrence maximale 1. Cette preuve
+valide le produit mais laisse explicitement E7 `UNVERIFIED`.
+
 ## 2026-08-13 — v2.647.0 — cohérence multi-magasins et lecture VM sans mutation
 
 TD-014 identifiait cinq surfaces sous-déclarées. Un pré-enregistrement séparé a gelé les

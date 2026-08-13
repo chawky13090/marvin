@@ -1,0 +1,67 @@
+{
+  "schema": "marvin.e7-multistore-correction-runtime-result/1.0",
+  "status": "product_runtime_validated_e7_unverified",
+  "runtime_commit": "31a4306a4ad1a84132d3b1b100df83e7dfa87f53",
+  "erratum_sha256": "46d4eb61eb00a7ab1284d7ece9e51f50e26d4d706475f03723906f6c9c2ee038",
+  "prior_failed_observation_preserved": true,
+  "runtime": {
+    "version": "2.648.0",
+    "state": "ready",
+    "tools": 364,
+    "cold_restart": {
+      "cycle_total_ms": 150645,
+      "stop_duration_ms": 4024,
+      "startup_wait_ms": 146611
+    },
+    "dependencies": {
+      "ollama": true,
+      "searxng": true,
+      "https": true,
+      "code_workspace_ready": true,
+      "vm_lab_ready": true
+    }
+  },
+  "full_gate": {
+    "expected_stages": 312,
+    "executed_stages": 308,
+    "skipped_live_stages": 4,
+    "failed": 0,
+    "success": true,
+    "duration_seconds": 629.0,
+    "build_included": true
+  },
+  "fixture_result": {
+    "fixture_user_data": false,
+    "fixture_cleanup_verified": true,
+    "note_create_consistency": "complete",
+    "note_update_consistency": "complete",
+    "note_list_identity_verified": true,
+    "note_delete_without_confirmation_status": 409,
+    "note_delete_confirmed": true,
+    "memory_create_consistency": "complete",
+    "memory_list_identity_verified": true,
+    "memory_delete_confirmed": true,
+    "vm_status_reads": 5,
+    "vm_state_sha256_unchanged": true
+  },
+  "live_smokes": {
+    "api": "28/28",
+    "pages": "41/41",
+    "chat": "5/5",
+    "voice_max_concurrency": 1,
+    "all_passed": true,
+    "executed_sequentially": true
+  },
+  "interpretation": {
+    "product_correction_validated": true,
+    "v1_5_surface_supersession_retained": true,
+    "e7_verification_granted": false,
+    "security_register_entry_promoted": false,
+    "static_unknowns_converted_to_absent": 0
+  },
+  "rollback": {
+    "code": "revert_commit_31a4306a_then_revert_2c2bfeac_and_restart",
+    "evidence": "preserve_all_v1_5_artifacts_and_publish_a_new_superseding_result",
+    "persistent_data_migration": false
+  }
+}
