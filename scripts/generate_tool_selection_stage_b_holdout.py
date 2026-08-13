@@ -256,7 +256,7 @@ async def run() -> dict[str, Any]:
         or str(item["function"]["name"]).startswith(RELEVANT_PREFIXES)
     ]
     catalog_json = json.dumps(relevant_spec, ensure_ascii=False, separators=(",", ":"))
-    family_counts = {name: 32 for name in ALLOWED_FAMILIES}
+    family_counts = {name: 64 for name in ALLOWED_FAMILIES}
     family_contracts = {
         "file_discovery": "chercher ou lister des fichiers par nom, motif, contenu ou propriété",
         "file_mutation": "renommer, déplacer, copier, créer un dossier ou écrire un fichier",
@@ -270,14 +270,14 @@ async def run() -> dict[str, Any]:
     for family in ALLOWED_FAMILIES:
         author_user = (
             "Crée un corpus inédit de demandes Windows en français. Retourne un objet JSON {items:[...]}. "
-            f"Produis exactement 32 items de family={family}. La capacité est: {family_contracts[family]}. "
+            f"Produis exactement 64 items de family={family}. La capacité est: {family_contracts[family]}. "
             "Chaque item contient seulement id, family et prompt. Le prompt doit être naturel, mono-intention, "
             "synthétique et précis. Utilise uniquement des fixtures sous C:\\Fixture, des processus "
             "marvin_fixture_*.exe, des applications Windows génériques et des logiciels publics connus. "
             "N'indique jamais le nom d'un outil dans le prompt. Ne fournis aucun oracle."
         )
         authored, meta = await _chat(policy["independent_roles"]["author"]["model"], "Tu rédiges des cas de test, jamais leurs réponses. JSON strict, sans Markdown.", author_user, seed=2651)
-        candidates.extend(_validate_author(authored.get("items") if isinstance(authored, dict) else None, policy, expected_family=family, minimum=family_counts[family]))
+        candidates.extend(_validate_author(authored.get("items") if isinstance(authored, dict) else None, policy, expected_family=family, minimum=64))
         author_meta.append({"family": family, **meta})
 
     oracle_values = {"oracle_a": {}, "oracle_b": {}}
