@@ -1,0 +1,7297 @@
+{
+  "schema": "marvin.tool-selection-ablation-result/1.1",
+  "status": "complete_private_and_public",
+  "source_policy_sha256": "17ce22a9e7e7b8667e7ee3592bca46a58f397b41b0adce1cb6c604312ee9dac1",
+  "inherited_policy_sha256": "bbfb02423947df05613bab2026579adb7d1cff4fdb3d8909c17a3fa3eb5ea5b9",
+  "source_commit": "cbac62e816f6f95f16a9feba51c9be5ee53f5b19",
+  "runner_sha256": "ce0d90e5a400f5a84c6200b4e509b2ee3dc48ce86df5a3ca63694efed539e946",
+  "runner_product_change": false,
+  "chat_llm_calls": 0,
+  "business_tool_executions": 0,
+  "embedding": {
+    "model": "nomic-embed-text:latest",
+    "digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+  },
+  "tool_index_fingerprint": "ae3cc5733294f7ba58e61cda32b37c69b4212f4ca335a35242625f23eeae92b6",
+  "tool_spec_sha256": "a56e7987fd88d4472514171a59f740577827cb6eb5cfe3459b9ee8871a53325e",
+  "public_cache_sha256": "52d70be1e70f47642bcc781e110a213e26a5377b7b8aa47cfff640f9e41ccf7c",
+  "phase_durations_ms": {
+    "signals": {
+      "embedding": {
+        "batch_size": 32,
+        "record_count": 506,
+        "control_query_count": 5,
+        "single_batch_exact_equality": true,
+        "duration_ms": 18470.59
+      },
+      "qdrant_and_lexical_duration_ms": 13081.076,
+      "route_control_query_count": 5,
+      "route_control_exact_equality": true
+    },
+    "public_candidate_selection": 16043.685,
+    "private_candidate_selection": 49784.793,
+    "total_before_result_write": 99588.904
+  },
+  "public_correctness": {
+    "eco": {
+      "K": {
+        "hits": 41,
+        "total": 110,
+        "recall": 0.372727,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 10778.0,
+            "p95": 11932.0,
+            "maximum": 13047.0
+          },
+          "duration_ms": {
+            "median": 3.57,
+            "p95": 5.354,
+            "maximum": 123.846
+          }
+        }
+      },
+      "L": {
+        "hits": 56,
+        "total": 110,
+        "recall": 0.509091,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 13.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 11050.5,
+            "p95": 15783.0,
+            "maximum": 18207.0
+          },
+          "duration_ms": {
+            "median": 2.297,
+            "p95": 3.531,
+            "maximum": 6.427
+          }
+        }
+      },
+      "S": {
+        "hits": 64,
+        "total": 110,
+        "recall": 0.581818,
+        "by_family": {
+          "application_launch": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.0,
+            "p95": 14.0,
+            "maximum": 16.0
+          },
+          "schema_bytes": {
+            "median": 6689.5,
+            "p95": 10721.0,
+            "maximum": 12175.0
+          },
+          "duration_ms": {
+            "median": 2.308,
+            "p95": 2.805,
+            "maximum": 6.254
+          }
+        }
+      },
+      "K+L": {
+        "hits": 65,
+        "total": 110,
+        "recall": 0.590909,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 11684.0,
+            "p95": 16935.0,
+            "maximum": 21069.0
+          },
+          "duration_ms": {
+            "median": 3.598,
+            "p95": 7.825,
+            "maximum": 13.28
+          }
+        }
+      },
+      "K+S": {
+        "hits": 73,
+        "total": 110,
+        "recall": 0.663636,
+        "by_family": {
+          "application_launch": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 8858.5,
+            "p95": 12416.0,
+            "maximum": 13510.0
+          },
+          "duration_ms": {
+            "median": 3.515,
+            "p95": 5.789,
+            "maximum": 8.821
+          }
+        }
+      },
+      "L+S": {
+        "hits": 78,
+        "total": 110,
+        "recall": 0.709091,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 13995.5,
+            "p95": 18657.0,
+            "maximum": 21063.0
+          },
+          "duration_ms": {
+            "median": 2.347,
+            "p95": 2.906,
+            "maximum": 5.093
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 79,
+        "total": 110,
+        "recall": 0.718182,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 12629.5,
+            "p95": 18513.0,
+            "maximum": 21069.0
+          },
+          "duration_ms": {
+            "median": 3.576,
+            "p95": 4.792,
+            "maximum": 6.237
+          }
+        }
+      }
+    },
+    "balanced": {
+      "K": {
+        "hits": 43,
+        "total": 110,
+        "recall": 0.390909,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 24.0,
+            "p95": 25.0,
+            "maximum": 40.0
+          },
+          "schema_bytes": {
+            "median": 14399.0,
+            "p95": 16665.0,
+            "maximum": 24627.0
+          },
+          "duration_ms": {
+            "median": 3.581,
+            "p95": 5.269,
+            "maximum": 10.611
+          }
+        }
+      },
+      "L": {
+        "hits": 56,
+        "total": 110,
+        "recall": 0.509091,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 13.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 11279.0,
+            "p95": 16665.0,
+            "maximum": 18207.0
+          },
+          "duration_ms": {
+            "median": 2.657,
+            "p95": 4.227,
+            "maximum": 5.735
+          }
+        }
+      },
+      "S": {
+        "hits": 64,
+        "total": 110,
+        "recall": 0.581818,
+        "by_family": {
+          "application_launch": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.0,
+            "p95": 14.0,
+            "maximum": 16.0
+          },
+          "schema_bytes": {
+            "median": 6689.5,
+            "p95": 10721.0,
+            "maximum": 12175.0
+          },
+          "duration_ms": {
+            "median": 2.616,
+            "p95": 4.081,
+            "maximum": 7.172
+          }
+        }
+      },
+      "K+L": {
+        "hits": 69,
+        "total": 110,
+        "recall": 0.627273,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 29.0,
+            "maximum": 40.0
+          },
+          "schema_bytes": {
+            "median": 14327.0,
+            "p95": 22837.0,
+            "maximum": 26733.0
+          },
+          "duration_ms": {
+            "median": 3.712,
+            "p95": 5.042,
+            "maximum": 9.699
+          }
+        }
+      },
+      "K+S": {
+        "hits": 79,
+        "total": 110,
+        "recall": 0.718182,
+        "by_family": {
+          "application_launch": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 27.0,
+            "maximum": 40.0
+          },
+          "schema_bytes": {
+            "median": 8858.5,
+            "p95": 17382.0,
+            "maximum": 26132.0
+          },
+          "duration_ms": {
+            "median": 3.684,
+            "p95": 5.344,
+            "maximum": 6.821
+          }
+        }
+      },
+      "L+S": {
+        "hits": 82,
+        "total": 110,
+        "recall": 0.745455,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 21.0,
+            "maximum": 23.0
+          },
+          "schema_bytes": {
+            "median": 14317.5,
+            "p95": 19401.0,
+            "maximum": 21585.0
+          },
+          "duration_ms": {
+            "median": 2.466,
+            "p95": 5.183,
+            "maximum": 6.216
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 90,
+        "total": 110,
+        "recall": 0.818182,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 20.0,
+            "p95": 34.0,
+            "maximum": 40.0
+          },
+          "schema_bytes": {
+            "median": 16472.0,
+            "p95": 24489.0,
+            "maximum": 26733.0
+          },
+          "duration_ms": {
+            "median": 4.302,
+            "p95": 6.798,
+            "maximum": 22.254
+          }
+        }
+      }
+    },
+    "performance": {
+      "K": {
+        "hits": 43,
+        "total": 110,
+        "recall": 0.390909,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 24.0,
+            "p95": 25.0,
+            "maximum": 48.0
+          },
+          "schema_bytes": {
+            "median": 14399.0,
+            "p95": 16665.0,
+            "maximum": 27791.0
+          },
+          "duration_ms": {
+            "median": 3.894,
+            "p95": 6.578,
+            "maximum": 10.903
+          }
+        }
+      },
+      "L": {
+        "hits": 56,
+        "total": 110,
+        "recall": 0.509091,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 13.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 11279.0,
+            "p95": 16665.0,
+            "maximum": 18207.0
+          },
+          "duration_ms": {
+            "median": 2.428,
+            "p95": 5.565,
+            "maximum": 6.531
+          }
+        }
+      },
+      "S": {
+        "hits": 64,
+        "total": 110,
+        "recall": 0.581818,
+        "by_family": {
+          "application_launch": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.0,
+            "p95": 14.0,
+            "maximum": 16.0
+          },
+          "schema_bytes": {
+            "median": 6689.5,
+            "p95": 10721.0,
+            "maximum": 12175.0
+          },
+          "duration_ms": {
+            "median": 2.633,
+            "p95": 3.9,
+            "maximum": 5.899
+          }
+        }
+      },
+      "K+L": {
+        "hits": 69,
+        "total": 110,
+        "recall": 0.627273,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 29.0,
+            "maximum": 51.0
+          },
+          "schema_bytes": {
+            "median": 14327.0,
+            "p95": 23566.0,
+            "maximum": 31453.0
+          },
+          "duration_ms": {
+            "median": 4.07,
+            "p95": 8.915,
+            "maximum": 11.263
+          }
+        }
+      },
+      "K+S": {
+        "hits": 79,
+        "total": 110,
+        "recall": 0.718182,
+        "by_family": {
+          "application_launch": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 27.0,
+            "maximum": 52.0
+          },
+          "schema_bytes": {
+            "median": 8858.5,
+            "p95": 17382.0,
+            "maximum": 31347.0
+          },
+          "duration_ms": {
+            "median": 4.378,
+            "p95": 7.022,
+            "maximum": 10.103
+          }
+        }
+      },
+      "L+S": {
+        "hits": 82,
+        "total": 110,
+        "recall": 0.745455,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 21.0,
+            "maximum": 23.0
+          },
+          "schema_bytes": {
+            "median": 14317.5,
+            "p95": 19401.0,
+            "maximum": 21585.0
+          },
+          "duration_ms": {
+            "median": 2.539,
+            "p95": 3.582,
+            "maximum": 4.752
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 90,
+        "total": 110,
+        "recall": 0.818182,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 20.0,
+            "p95": 34.0,
+            "maximum": 53.0
+          },
+          "schema_bytes": {
+            "median": 16472.0,
+            "p95": 25130.0,
+            "maximum": 32249.0
+          },
+          "duration_ms": {
+            "median": 3.653,
+            "p95": 4.554,
+            "maximum": 6.297
+          }
+        }
+      }
+    },
+    "max": {
+      "K": {
+        "hits": 43,
+        "total": 110,
+        "recall": 0.390909,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 10,
+            "recall": 0.1,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 24.0,
+            "p95": 25.0,
+            "maximum": 48.0
+          },
+          "schema_bytes": {
+            "median": 14399.0,
+            "p95": 16665.0,
+            "maximum": 27791.0
+          },
+          "duration_ms": {
+            "median": 9.339,
+            "p95": 12.51,
+            "maximum": 40.38
+          }
+        }
+      },
+      "L": {
+        "hits": 56,
+        "total": 110,
+        "recall": 0.509091,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 13.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 11279.0,
+            "p95": 16665.0,
+            "maximum": 18207.0
+          },
+          "duration_ms": {
+            "median": 2.765,
+            "p95": 6.88,
+            "maximum": 7.137
+          }
+        }
+      },
+      "S": {
+        "hits": 64,
+        "total": 110,
+        "recall": 0.581818,
+        "by_family": {
+          "application_launch": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 10,
+            "recall": 0.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.0,
+            "p95": 14.0,
+            "maximum": 16.0
+          },
+          "schema_bytes": {
+            "median": 6689.5,
+            "p95": 10721.0,
+            "maximum": 12175.0
+          },
+          "duration_ms": {
+            "median": 5.539,
+            "p95": 6.594,
+            "maximum": 8.545
+          }
+        }
+      },
+      "K+L": {
+        "hits": 69,
+        "total": 110,
+        "recall": 0.627273,
+        "by_family": {
+          "application_launch": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 2,
+            "total": 10,
+            "recall": 0.2,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 5,
+            "total": 10,
+            "recall": 0.5,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 29.0,
+            "maximum": 51.0
+          },
+          "schema_bytes": {
+            "median": 14327.0,
+            "p95": 23566.0,
+            "maximum": 31453.0
+          },
+          "duration_ms": {
+            "median": 3.65,
+            "p95": 9.419,
+            "maximum": 11.767
+          }
+        }
+      },
+      "K+S": {
+        "hits": 79,
+        "total": 110,
+        "recall": 0.718182,
+        "by_family": {
+          "application_launch": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 4,
+            "total": 10,
+            "recall": 0.4,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 14.0,
+            "p95": 27.0,
+            "maximum": 52.0
+          },
+          "schema_bytes": {
+            "median": 8858.5,
+            "p95": 17382.0,
+            "maximum": 31347.0
+          },
+          "duration_ms": {
+            "median": 3.541,
+            "p95": 4.672,
+            "maximum": 5.628
+          }
+        }
+      },
+      "L+S": {
+        "hits": 82,
+        "total": 110,
+        "recall": 0.745455,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 3,
+            "total": 10,
+            "recall": 0.3,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 21.0,
+            "maximum": 23.0
+          },
+          "schema_bytes": {
+            "median": 14317.5,
+            "p95": 19401.0,
+            "maximum": 21585.0
+          },
+          "duration_ms": {
+            "median": 2.421,
+            "p95": 3.451,
+            "maximum": 4.961
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 90,
+        "total": 110,
+        "recall": 0.818182,
+        "by_family": {
+          "application_launch": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "file_discovery": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "file_mutation": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 10,
+            "total": 10,
+            "recall": 1.0,
+            "state": "ASSESSED"
+          },
+          "process_action": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          },
+          "process_inventory": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "security_posture": {
+            "hits": 9,
+            "total": 10,
+            "recall": 0.9,
+            "state": "ASSESSED"
+          },
+          "software_management": {
+            "hits": 7,
+            "total": 10,
+            "recall": 0.7,
+            "state": "ASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 8,
+            "total": 10,
+            "recall": 0.8,
+            "state": "ASSESSED"
+          },
+          "windows_services": {
+            "hits": 6,
+            "total": 10,
+            "recall": 0.6,
+            "state": "ASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 20.0,
+            "p95": 34.0,
+            "maximum": 53.0
+          },
+          "schema_bytes": {
+            "median": 16472.0,
+            "p95": 25130.0,
+            "maximum": 32249.0
+          },
+          "duration_ms": {
+            "median": 4.951,
+            "p95": 11.317,
+            "maximum": 12.256
+          }
+        }
+      }
+    }
+  },
+  "public_recovery_canary": {
+    "eco": {
+      "K": {
+        "hits": 7,
+        "total": 23,
+        "recall": 0.304348,
+        "by_family": {
+          "application_launch": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 1,
+            "total": 2,
+            "recall": 0.5,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 18.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 10778.0,
+            "p95": 11106.0,
+            "maximum": 12115.0
+          },
+          "duration_ms": {
+            "median": 2.645,
+            "p95": 3.317,
+            "maximum": 4.018
+          }
+        }
+      },
+      "L": {
+        "hits": 13,
+        "total": 23,
+        "recall": 0.565217,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.5,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 6873.0,
+            "p95": 10778.0,
+            "maximum": 12512.0
+          },
+          "duration_ms": {
+            "median": 1.88,
+            "p95": 2.218,
+            "maximum": 3.685
+          }
+        }
+      },
+      "S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 10.5,
+            "p95": 12.0,
+            "maximum": 13.0
+          },
+          "schema_bytes": {
+            "median": 5868.0,
+            "p95": 7770.0,
+            "maximum": 11142.0
+          },
+          "duration_ms": {
+            "median": 1.926,
+            "p95": 2.389,
+            "maximum": 3.552
+          }
+        }
+      },
+      "K+L": {
+        "hits": 13,
+        "total": 23,
+        "recall": 0.565217,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 7325.5,
+            "p95": 11932.0,
+            "maximum": 12512.0
+          },
+          "duration_ms": {
+            "median": 2.994,
+            "p95": 7.542,
+            "maximum": 8.094
+          }
+        }
+      },
+      "K+S": {
+        "hits": 22,
+        "total": 23,
+        "recall": 0.956522,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 11.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 6641.0,
+            "p95": 11142.0,
+            "maximum": 12115.0
+          },
+          "duration_ms": {
+            "median": 6.441,
+            "p95": 8.068,
+            "maximum": 8.394
+          }
+        }
+      },
+      "L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 8195.5,
+            "p95": 11569.0,
+            "maximum": 14671.0
+          },
+          "duration_ms": {
+            "median": 2.016,
+            "p95": 2.859,
+            "maximum": 5.052
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 22,
+        "total": 23,
+        "recall": 0.956522,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 18.0,
+            "maximum": 18.0
+          },
+          "schema_bytes": {
+            "median": 8636.5,
+            "p95": 12115.0,
+            "maximum": 14671.0
+          },
+          "duration_ms": {
+            "median": 2.818,
+            "p95": 5.942,
+            "maximum": 7.476
+          }
+        }
+      }
+    },
+    "balanced": {
+      "K": {
+        "hits": 8,
+        "total": 23,
+        "recall": 0.347826,
+        "by_family": {
+          "application_launch": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 1,
+            "total": 2,
+            "recall": 0.5,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 25.0,
+            "p95": 25.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 16665.0,
+            "p95": 16665.0,
+            "maximum": 16665.0
+          },
+          "duration_ms": {
+            "median": 3.06,
+            "p95": 4.108,
+            "maximum": 7.277
+          }
+        }
+      },
+      "L": {
+        "hits": 13,
+        "total": 23,
+        "recall": 0.565217,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.5,
+            "p95": 25.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 6873.0,
+            "p95": 16665.0,
+            "maximum": 16665.0
+          },
+          "duration_ms": {
+            "median": 2.206,
+            "p95": 2.65,
+            "maximum": 3.084
+          }
+        }
+      },
+      "S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 10.5,
+            "p95": 12.0,
+            "maximum": 13.0
+          },
+          "schema_bytes": {
+            "median": 5868.0,
+            "p95": 7770.0,
+            "maximum": 11142.0
+          },
+          "duration_ms": {
+            "median": 1.96,
+            "p95": 2.225,
+            "maximum": 3.557
+          }
+        }
+      },
+      "K+L": {
+        "hits": 14,
+        "total": 23,
+        "recall": 0.608696,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 25.0,
+            "maximum": 28.0
+          },
+          "schema_bytes": {
+            "median": 7325.5,
+            "p95": 16665.0,
+            "maximum": 17954.0
+          },
+          "duration_ms": {
+            "median": 2.74,
+            "p95": 3.159,
+            "maximum": 3.992
+          }
+        }
+      },
+      "K+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 11.0,
+            "p95": 18.0,
+            "maximum": 26.0
+          },
+          "schema_bytes": {
+            "median": 6641.0,
+            "p95": 11142.0,
+            "maximum": 16210.0
+          },
+          "duration_ms": {
+            "median": 3.009,
+            "p95": 3.388,
+            "maximum": 5.169
+          }
+        }
+      },
+      "L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 18.0,
+            "maximum": 19.0
+          },
+          "schema_bytes": {
+            "median": 8195.5,
+            "p95": 11569.0,
+            "maximum": 15105.0
+          },
+          "duration_ms": {
+            "median": 1.934,
+            "p95": 2.125,
+            "maximum": 3.023
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 25.0,
+            "maximum": 29.0
+          },
+          "schema_bytes": {
+            "median": 8636.5,
+            "p95": 15105.0,
+            "maximum": 18525.0
+          },
+          "duration_ms": {
+            "median": 3.032,
+            "p95": 5.45,
+            "maximum": 6.19
+          }
+        }
+      }
+    },
+    "performance": {
+      "K": {
+        "hits": 8,
+        "total": 23,
+        "recall": 0.347826,
+        "by_family": {
+          "application_launch": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 1,
+            "total": 2,
+            "recall": 0.5,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 25.0,
+            "p95": 25.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 16665.0,
+            "p95": 16665.0,
+            "maximum": 16665.0
+          },
+          "duration_ms": {
+            "median": 2.638,
+            "p95": 3.015,
+            "maximum": 3.543
+          }
+        }
+      },
+      "L": {
+        "hits": 13,
+        "total": 23,
+        "recall": 0.565217,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.5,
+            "p95": 25.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 6873.0,
+            "p95": 16665.0,
+            "maximum": 16665.0
+          },
+          "duration_ms": {
+            "median": 1.962,
+            "p95": 2.302,
+            "maximum": 2.962
+          }
+        }
+      },
+      "S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 10.5,
+            "p95": 12.0,
+            "maximum": 13.0
+          },
+          "schema_bytes": {
+            "median": 5868.0,
+            "p95": 7770.0,
+            "maximum": 11142.0
+          },
+          "duration_ms": {
+            "median": 2.088,
+            "p95": 2.361,
+            "maximum": 2.933
+          }
+        }
+      },
+      "K+L": {
+        "hits": 14,
+        "total": 23,
+        "recall": 0.608696,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 25.0,
+            "maximum": 28.0
+          },
+          "schema_bytes": {
+            "median": 7325.5,
+            "p95": 16665.0,
+            "maximum": 17954.0
+          },
+          "duration_ms": {
+            "median": 2.841,
+            "p95": 3.807,
+            "maximum": 5.158
+          }
+        }
+      },
+      "K+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 11.0,
+            "p95": 18.0,
+            "maximum": 26.0
+          },
+          "schema_bytes": {
+            "median": 6641.0,
+            "p95": 11142.0,
+            "maximum": 16210.0
+          },
+          "duration_ms": {
+            "median": 3.345,
+            "p95": 4.386,
+            "maximum": 4.41
+          }
+        }
+      },
+      "L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 18.0,
+            "maximum": 19.0
+          },
+          "schema_bytes": {
+            "median": 8195.5,
+            "p95": 11569.0,
+            "maximum": 15105.0
+          },
+          "duration_ms": {
+            "median": 1.968,
+            "p95": 2.373,
+            "maximum": 3.007
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 25.0,
+            "maximum": 29.0
+          },
+          "schema_bytes": {
+            "median": 8636.5,
+            "p95": 15105.0,
+            "maximum": 18525.0
+          },
+          "duration_ms": {
+            "median": 7.225,
+            "p95": 9.749,
+            "maximum": 25.815
+          }
+        }
+      }
+    },
+    "max": {
+      "K": {
+        "hits": 8,
+        "total": 23,
+        "recall": 0.347826,
+        "by_family": {
+          "application_launch": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 1,
+            "total": 2,
+            "recall": 0.5,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 25.0,
+            "p95": 25.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 16665.0,
+            "p95": 16665.0,
+            "maximum": 16665.0
+          },
+          "duration_ms": {
+            "median": 2.758,
+            "p95": 4.428,
+            "maximum": 7.59
+          }
+        }
+      },
+      "L": {
+        "hits": 13,
+        "total": 23,
+        "recall": 0.565217,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 12.5,
+            "p95": 25.0,
+            "maximum": 25.0
+          },
+          "schema_bytes": {
+            "median": 6873.0,
+            "p95": 16665.0,
+            "maximum": 16665.0
+          },
+          "duration_ms": {
+            "median": 2.41,
+            "p95": 5.413,
+            "maximum": 5.937
+          }
+        }
+      },
+      "S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 10.5,
+            "p95": 12.0,
+            "maximum": 13.0
+          },
+          "schema_bytes": {
+            "median": 5868.0,
+            "p95": 7770.0,
+            "maximum": 11142.0
+          },
+          "duration_ms": {
+            "median": 1.927,
+            "p95": 2.362,
+            "maximum": 2.932
+          }
+        }
+      },
+      "K+L": {
+        "hits": 14,
+        "total": 23,
+        "recall": 0.608696,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 0,
+            "total": 2,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 0,
+            "total": 1,
+            "recall": 0.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 25.0,
+            "maximum": 28.0
+          },
+          "schema_bytes": {
+            "median": 7325.5,
+            "p95": 16665.0,
+            "maximum": 17954.0
+          },
+          "duration_ms": {
+            "median": 2.756,
+            "p95": 3.136,
+            "maximum": 4.001
+          }
+        }
+      },
+      "K+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 11.0,
+            "p95": 18.0,
+            "maximum": 26.0
+          },
+          "schema_bytes": {
+            "median": 6641.0,
+            "p95": 11142.0,
+            "maximum": 16210.0
+          },
+          "duration_ms": {
+            "median": 2.801,
+            "p95": 3.981,
+            "maximum": 4.984
+          }
+        }
+      },
+      "L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 18.0,
+            "maximum": 19.0
+          },
+          "schema_bytes": {
+            "median": 8195.5,
+            "p95": 11569.0,
+            "maximum": 15105.0
+          },
+          "duration_ms": {
+            "median": 2.198,
+            "p95": 2.585,
+            "maximum": 3.423
+          }
+        }
+      },
+      "K+L+S": {
+        "hits": 23,
+        "total": 23,
+        "recall": 1.0,
+        "by_family": {
+          "application_launch": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "calendar_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_interaction": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "desktop_observation": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "document_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "email_read": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_content": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_discovery": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "file_mutation": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "network_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_action": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "process_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "security_posture": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_install": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_search": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "software_uninstall": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "ssh_inventory": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "system_diagnostics": {
+            "hits": 2,
+            "total": 2,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          },
+          "windows_services": {
+            "hits": 1,
+            "total": 1,
+            "recall": 1.0,
+            "state": "UNASSESSED"
+          }
+        },
+        "costs": {
+          "candidate_count": {
+            "median": 13.0,
+            "p95": 25.0,
+            "maximum": 29.0
+          },
+          "schema_bytes": {
+            "median": 8636.5,
+            "p95": 15105.0,
+            "maximum": 18525.0
+          },
+          "duration_ms": {
+            "median": 3.074,
+            "p95": 7.159,
+            "maximum": 7.923
+          }
+        }
+      }
+    }
+  },
+  "private_compatibility": {
+    "eco": {
+      "K": {
+        "historical_pairs": 814,
+        "retained_pairs": 381,
+        "retention": 0.468059,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 368,
+        "successful_retention": 0.482307
+      },
+      "L": {
+        "historical_pairs": 814,
+        "retained_pairs": 301,
+        "retention": 0.369779,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 290,
+        "successful_retention": 0.380079
+      },
+      "S": {
+        "historical_pairs": 814,
+        "retained_pairs": 725,
+        "retention": 0.890663,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 698,
+        "successful_retention": 0.91481
+      },
+      "K+L": {
+        "historical_pairs": 814,
+        "retained_pairs": 395,
+        "retention": 0.485258,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 381,
+        "successful_retention": 0.499345
+      },
+      "K+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 651,
+        "retention": 0.799754,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 629,
+        "successful_retention": 0.824377
+      },
+      "L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 561,
+        "retention": 0.689189,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 537,
+        "successful_retention": 0.703801
+      },
+      "K+L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 535,
+        "retention": 0.657248,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 514,
+        "successful_retention": 0.673657
+      }
+    },
+    "balanced": {
+      "K": {
+        "historical_pairs": 814,
+        "retained_pairs": 451,
+        "retention": 0.554054,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 434,
+        "successful_retention": 0.568807
+      },
+      "L": {
+        "historical_pairs": 814,
+        "retained_pairs": 317,
+        "retention": 0.389435,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 304,
+        "successful_retention": 0.398427
+      },
+      "S": {
+        "historical_pairs": 814,
+        "retained_pairs": 725,
+        "retention": 0.890663,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 698,
+        "successful_retention": 0.91481
+      },
+      "K+L": {
+        "historical_pairs": 814,
+        "retained_pairs": 429,
+        "retention": 0.527027,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 412,
+        "successful_retention": 0.539974
+      },
+      "K+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 730,
+        "retention": 0.896806,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 702,
+        "successful_retention": 0.920052
+      },
+      "L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 729,
+        "retention": 0.895577,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 701,
+        "successful_retention": 0.918742
+      },
+      "K+L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 728,
+        "retention": 0.894349,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 699,
+        "successful_retention": 0.916121
+      }
+    },
+    "performance": {
+      "K": {
+        "historical_pairs": 814,
+        "retained_pairs": 455,
+        "retention": 0.558968,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 438,
+        "successful_retention": 0.57405
+      },
+      "L": {
+        "historical_pairs": 814,
+        "retained_pairs": 317,
+        "retention": 0.389435,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 304,
+        "successful_retention": 0.398427
+      },
+      "S": {
+        "historical_pairs": 814,
+        "retained_pairs": 725,
+        "retention": 0.890663,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 698,
+        "successful_retention": 0.91481
+      },
+      "K+L": {
+        "historical_pairs": 814,
+        "retained_pairs": 433,
+        "retention": 0.531941,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 416,
+        "successful_retention": 0.545216
+      },
+      "K+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 738,
+        "retention": 0.906634,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 710,
+        "successful_retention": 0.930537
+      },
+      "L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 729,
+        "retention": 0.895577,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 701,
+        "successful_retention": 0.918742
+      },
+      "K+L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 738,
+        "retention": 0.906634,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 709,
+        "successful_retention": 0.929227
+      }
+    },
+    "max": {
+      "K": {
+        "historical_pairs": 814,
+        "retained_pairs": 455,
+        "retention": 0.558968,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 438,
+        "successful_retention": 0.57405
+      },
+      "L": {
+        "historical_pairs": 814,
+        "retained_pairs": 317,
+        "retention": 0.389435,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 304,
+        "successful_retention": 0.398427
+      },
+      "S": {
+        "historical_pairs": 814,
+        "retained_pairs": 725,
+        "retention": 0.890663,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 698,
+        "successful_retention": 0.91481
+      },
+      "K+L": {
+        "historical_pairs": 814,
+        "retained_pairs": 433,
+        "retention": 0.531941,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 416,
+        "successful_retention": 0.545216
+      },
+      "K+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 738,
+        "retention": 0.906634,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 710,
+        "successful_retention": 0.930537
+      },
+      "L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 729,
+        "retention": 0.895577,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 701,
+        "successful_retention": 0.918742
+      },
+      "K+L+S": {
+        "historical_pairs": 814,
+        "retained_pairs": 738,
+        "retention": 0.906634,
+        "successful_historical_pairs": 763,
+        "retained_successful_pairs": 709,
+        "successful_retention": 0.929227
+      }
+    }
+  },
+  "private_interpretation": "historical_execution_retention_not_correctness",
+  "layer_decisions": {
+    "K": {
+      "without_configuration": "L+S",
+      "positive_contributions": [
+        {
+          "mode": "eco",
+          "family": "file_discovery",
+          "recall_delta": 0.5
+        },
+        {
+          "mode": "eco",
+          "family": "file_mutation",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "file_discovery",
+          "recall_delta": 0.7
+        },
+        {
+          "mode": "balanced",
+          "family": "file_mutation",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "file_discovery",
+          "recall_delta": 0.7
+        },
+        {
+          "mode": "performance",
+          "family": "file_mutation",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": 0.010485
+        },
+        {
+          "mode": "max",
+          "family": "file_discovery",
+          "recall_delta": 0.7
+        },
+        {
+          "mode": "max",
+          "family": "file_mutation",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": 0.010485
+        }
+      ],
+      "negative_contributions": [
+        {
+          "mode": "eco",
+          "family": "process_inventory",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "security_posture",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "software_management",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "system_diagnostics",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "windows_services",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": -0.030144
+        },
+        {
+          "mode": "balanced",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": -0.002621
+        }
+      ],
+      "stage_a_state": "REQUIRED_FOR_STAGE_B",
+      "product_change_authorized": false
+    },
+    "L": {
+      "without_configuration": "K+S",
+      "positive_contributions": [
+        {
+          "mode": "eco",
+          "family": "application_launch",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "eco",
+          "family": "desktop_observation",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "eco",
+          "family": "security_posture",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "eco",
+          "family": "windows_services",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "application_launch",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "balanced",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "balanced",
+          "family": "security_posture",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "balanced",
+          "family": "software_management",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "system_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "windows_services",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "performance",
+          "family": "application_launch",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "performance",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "performance",
+          "family": "security_posture",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "performance",
+          "family": "software_management",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "system_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "windows_services",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "max",
+          "family": "application_launch",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "max",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "max",
+          "family": "security_posture",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "max",
+          "family": "software_management",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "system_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "windows_services",
+          "recall_delta": 0.2
+        }
+      ],
+      "negative_contributions": [
+        {
+          "mode": "eco",
+          "family": "process_action",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "process_inventory",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "system_diagnostics",
+          "recall_delta": -0.1
+        },
+        {
+          "mode": "eco",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": -0.15072
+        },
+        {
+          "mode": "balanced",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": -0.003931
+        },
+        {
+          "mode": "performance",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": -0.00131
+        },
+        {
+          "mode": "max",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": -0.00131
+        }
+      ],
+      "stage_a_state": "REQUIRED_FOR_STAGE_B",
+      "product_change_authorized": false
+    },
+    "S": {
+      "without_configuration": "K+L",
+      "positive_contributions": [
+        {
+          "mode": "eco",
+          "family": "application_launch",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "eco",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "eco",
+          "family": "network_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "eco",
+          "family": "process_action",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "eco",
+          "family": "process_inventory",
+          "recall_delta": 0.5
+        },
+        {
+          "mode": "eco",
+          "family": "software_management",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "eco",
+          "family": "system_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "eco",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": 0.174312
+        },
+        {
+          "mode": "balanced",
+          "family": "application_launch",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "balanced",
+          "family": "network_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "process_action",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "balanced",
+          "family": "process_inventory",
+          "recall_delta": 0.6
+        },
+        {
+          "mode": "balanced",
+          "family": "security_posture",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "software_management",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "balanced",
+          "family": "system_diagnostics",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "balanced",
+          "family": "windows_services",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "balanced",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": 0.376147
+        },
+        {
+          "mode": "performance",
+          "family": "application_launch",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "performance",
+          "family": "network_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "process_action",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "performance",
+          "family": "process_inventory",
+          "recall_delta": 0.6
+        },
+        {
+          "mode": "performance",
+          "family": "security_posture",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "software_management",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "performance",
+          "family": "system_diagnostics",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "performance",
+          "family": "windows_services",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "performance",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": 0.384011
+        },
+        {
+          "mode": "max",
+          "family": "application_launch",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "desktop_observation",
+          "recall_delta": 0.2
+        },
+        {
+          "mode": "max",
+          "family": "network_diagnostics",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "process_action",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "max",
+          "family": "process_inventory",
+          "recall_delta": 0.6
+        },
+        {
+          "mode": "max",
+          "family": "security_posture",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "software_management",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "max",
+          "family": "system_diagnostics",
+          "recall_delta": 0.3
+        },
+        {
+          "mode": "max",
+          "family": "windows_services",
+          "recall_delta": 0.1
+        },
+        {
+          "mode": "max",
+          "family": "PRIVATE_COMPATIBILITY",
+          "recall_delta": 0.384011
+        }
+      ],
+      "negative_contributions": [],
+      "stage_a_state": "REQUIRED_FOR_STAGE_B",
+      "product_change_authorized": false
+    }
+  },
+  "limitations": [
+    "The public correctness panel is retrospective and burned; it cannot estimate generalization.",
+    "The private panel measures retention of historical executions, never whether those executions were correct.",
+    "Semantic and learned signals are frozen observations of the current local index and feedback state.",
+    "Stage A cannot authorize product layer removal or a new canonical capability facade."
+  ],
+  "next_step": "stage_b_on_new_independent_holdout_for_surviving_configurations"
+}

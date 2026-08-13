@@ -1,0 +1,3199 @@
+{
+  "schema": "marvin.tool-selection-public-semantic-cache/1.1",
+  "source_policy_sha256": "17ce22a9e7e7b8667e7ee3592bca46a58f397b41b0adce1cb6c604312ee9dac1",
+  "inherited_policy_sha256": "bbfb02423947df05613bab2026579adb7d1cff4fdb3d8909c17a3fa3eb5ea5b9",
+  "embedding": {
+    "model": "nomic-embed-text:latest",
+    "digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+  },
+  "tool_index_fingerprint": "ae3cc5733294f7ba58e61cda32b37c69b4212f4ca335a35242625f23eeae92b6",
+  "tool_spec_sha256": "a56e7987fd88d4472514171a59f740577827cb6eb5cfe3459b9ee8871a53325e",
+  "records": {
+    "intent-001": {
+      "semantic": [
+        "email_summarize",
+        "file_batch_read",
+        "memory_list",
+        "memory_save",
+        "memory_search",
+        "pc_process_kill",
+        "pc_process_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "email_summarize": 0.6973676,
+        "file_batch_read": 0.69003192,
+        "memory_list": 0.6839957,
+        "memory_save": 0.72370307,
+        "memory_search": 0.69225184,
+        "pc_process_kill": 0.69437739,
+        "pc_process_list": 0.71017748
+      }
+    },
+    "intent-002": {
+      "semantic": [
+        "doc_knowledge_search",
+        "document_list",
+        "long_task_status",
+        "long_task_stop",
+        "pc_process_kill",
+        "pc_process_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_knowledge_search": 0.6820868,
+        "document_list": 0.68002347,
+        "long_task_status": 0.69696881,
+        "long_task_stop": 0.69349019,
+        "pc_process_kill": 0.70025531,
+        "pc_process_list": 0.70311092
+      }
+    },
+    "intent-003": {
+      "semantic": [
+        "pc_installed_software",
+        "pc_process_list",
+        "pc_window_list",
+        "win_services_list",
+        "win_users_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_installed_software": 0.76243218,
+        "pc_process_list": 0.77277503,
+        "pc_window_list": 0.77771933,
+        "win_services_list": 0.76754251,
+        "win_users_list": 0.76830235
+      }
+    },
+    "intent-004": {
+      "semantic": [
+        "billing_find_products",
+        "pc_gpu_status",
+        "pc_hardware_specs",
+        "pc_health_trend",
+        "pc_installed_software",
+        "pc_system_info",
+        "win_startup_programs",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_find_products": 0.70080834,
+        "pc_gpu_status": 0.71022078,
+        "pc_hardware_specs": 0.71517554,
+        "pc_health_trend": 0.70433085,
+        "pc_installed_software": 0.70882931,
+        "pc_system_info": 0.74411024,
+        "win_startup_programs": 0.7075134,
+        "win_system_report": 0.71771879
+      }
+    },
+    "intent-005": {
+      "semantic": [
+        "doc_knowledge_search",
+        "pc_process_kill",
+        "pc_process_list",
+        "system_cleanup",
+        "task_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_knowledge_search": 0.67909971,
+        "pc_process_kill": 0.70009667,
+        "pc_process_list": 0.70954019,
+        "system_cleanup": 0.68079802,
+        "task_list": 0.69030257
+      }
+    },
+    "intent-006": {
+      "semantic": [
+        "doc_generate_onboarding",
+        "long_task_status",
+        "pc_process_kill",
+        "pc_process_list",
+        "system_self_test",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_generate_onboarding": 0.67725031,
+        "long_task_status": 0.72454576,
+        "pc_process_kill": 0.6815983,
+        "pc_process_list": 0.70922426,
+        "system_self_test": 0.67582056,
+        "win_system_report": 0.6911423
+      }
+    },
+    "intent-007": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_health_trend",
+        "pc_open_file",
+        "pc_process_list",
+        "pc_tool_reliability",
+        "win_quick_launch",
+        "win_services_list",
+        "win_startup_programs"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_app_launch": 0.70633716,
+        "pc_health_trend": 0.68789207,
+        "pc_open_file": 0.68353544,
+        "pc_process_list": 0.68406469,
+        "pc_tool_reliability": 0.68267384,
+        "win_quick_launch": 0.68292363,
+        "win_services_list": 0.69172973,
+        "win_startup_programs": 0.69312528
+      }
+    },
+    "intent-008": {
+      "semantic": [
+        "pc_gui_read",
+        "pc_process_list",
+        "pc_reveal",
+        "pc_window_list",
+        "win_scheduled_tasks",
+        "win_startup_programs",
+        "win_users_list",
+        "windows_task"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_gui_read": 0.75070394,
+        "pc_process_list": 0.78642345,
+        "pc_reveal": 0.74936639,
+        "pc_window_list": 0.75399808,
+        "win_scheduled_tasks": 0.75653576,
+        "win_startup_programs": 0.75722292,
+        "win_users_list": 0.74958092,
+        "windows_task": 0.75518831
+      }
+    },
+    "intent-009": {
+      "semantic": [
+        "email_accounts",
+        "email_to_task",
+        "long_task_status",
+        "long_task_stop",
+        "task_create",
+        "task_list",
+        "task_update"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "email_accounts": 0.64237211,
+        "email_to_task": 0.65459439,
+        "long_task_status": 0.65768113,
+        "long_task_stop": 0.64187501,
+        "task_create": 0.63532286,
+        "task_list": 0.69508893,
+        "task_update": 0.66915678
+      }
+    },
+    "intent-010": {
+      "semantic": [
+        "pc_driver_check",
+        "pc_gpu_status",
+        "pc_process_kill",
+        "pc_process_list",
+        "pc_run_command",
+        "pc_tool_reliability",
+        "vm_lab_install"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_driver_check": 0.76407643,
+        "pc_gpu_status": 0.71757334,
+        "pc_process_kill": 0.71800399,
+        "pc_process_list": 0.71965795,
+        "pc_run_command": 0.72695765,
+        "pc_tool_reliability": 0.71289621,
+        "vm_lab_install": 0.76961829
+      }
+    },
+    "intent-011": {
+      "semantic": [
+        "pc_driver_check",
+        "pc_gpu_status",
+        "pc_hardware_specs",
+        "pc_tool_reliability",
+        "vm_lab_install",
+        "win_system_report",
+        "winget_install"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_driver_check": 0.74654892,
+        "pc_gpu_status": 0.68934685,
+        "pc_hardware_specs": 0.69151364,
+        "pc_tool_reliability": 0.69389376,
+        "vm_lab_install": 0.75387784,
+        "win_system_report": 0.69525749,
+        "winget_install": 0.69098444
+      }
+    },
+    "intent-012": {
+      "semantic": [
+        "doc_generate_onboarding",
+        "doc_intervention_update",
+        "long_task_status",
+        "pc_driver_check",
+        "pc_process_kill",
+        "pc_process_list",
+        "system_self_test",
+        "win_system_report"
+      ],
+      "learned": [
+        "pc_process_kill",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_generate_onboarding": 0.6831111,
+        "doc_intervention_update": 0.67857521,
+        "long_task_status": 0.68957375,
+        "pc_driver_check": 0.6934359,
+        "pc_process_kill": 0.70058242,
+        "pc_process_list": 0.71848255,
+        "system_self_test": 0.68375012,
+        "win_system_report": 0.71990172
+      }
+    },
+    "intent-013": {
+      "semantic": [
+        "long_task_status",
+        "pc_driver_check",
+        "pc_process_kill",
+        "pc_tool_reliability",
+        "system_self_test",
+        "vm_lab_install"
+      ],
+      "learned": [
+        "tool_search",
+        "winget_install",
+        "winget_search"
+      ],
+      "semantic_scores": {
+        "long_task_status": 0.69274138,
+        "pc_driver_check": 0.69533761,
+        "pc_process_kill": 0.69258149,
+        "pc_tool_reliability": 0.69835741,
+        "system_self_test": 0.69415068,
+        "vm_lab_install": 0.69808447
+      }
+    },
+    "intent-014": {
+      "semantic": [
+        "email_watch_check",
+        "long_task_stop",
+        "net_tls_check",
+        "pc_driver_check",
+        "pc_process_kill",
+        "registry_set",
+        "system_self_test"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "email_watch_check": 0.67991884,
+        "long_task_stop": 0.67337603,
+        "net_tls_check": 0.67998512,
+        "pc_driver_check": 0.68310073,
+        "pc_process_kill": 0.67163148,
+        "registry_set": 0.69236862,
+        "system_self_test": 0.68735355
+      }
+    },
+    "intent-015": {
+      "semantic": [
+        "net_subnet_calc",
+        "os_firewall",
+        "pc_gui_read",
+        "pc_open_file",
+        "pc_tool_reliability",
+        "win_startup_programs",
+        "win_users_list"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "net_subnet_calc": 0.64244793,
+        "os_firewall": 0.64291196,
+        "pc_gui_read": 0.6355652,
+        "pc_open_file": 0.64953934,
+        "pc_tool_reliability": 0.64526457,
+        "win_startup_programs": 0.64014605,
+        "win_users_list": 0.63850921
+      }
+    },
+    "intent-016": {
+      "semantic": [
+        "document_identity_set",
+        "long_task_status",
+        "pc_driver_check",
+        "pc_process_kill",
+        "pc_process_list",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "document_identity_set": 0.65737241,
+        "long_task_status": 0.66126884,
+        "pc_driver_check": 0.66114915,
+        "pc_process_kill": 0.7441911,
+        "pc_process_list": 0.66832928,
+        "win_system_report": 0.66805196
+      }
+    },
+    "intent-017": {
+      "semantic": [
+        "email_watch_check",
+        "net_traceroute",
+        "pc_driver_check",
+        "pc_gui_click",
+        "pc_gui_type",
+        "pc_notify",
+        "pc_window_focus",
+        "win_services_list"
+      ],
+      "learned": [
+        "computer_control",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "email_watch_check": 0.68270188,
+        "net_traceroute": 0.6980683,
+        "pc_driver_check": 0.68251412,
+        "pc_gui_click": 0.69429036,
+        "pc_gui_type": 0.69531538,
+        "pc_notify": 0.71554888,
+        "pc_window_focus": 0.69332629,
+        "win_services_list": 0.68637318
+      }
+    },
+    "intent-018": {
+      "semantic": [
+        "billing_catalog_list",
+        "ip_info",
+        "net_ping",
+        "net_port_scan",
+        "net_service_detect",
+        "net_traceroute",
+        "pc_tailscale_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_catalog_list": 0.68641905,
+        "ip_info": 0.68714143,
+        "net_ping": 0.71020233,
+        "net_port_scan": 0.68623382,
+        "net_service_detect": 0.68760347,
+        "net_traceroute": 0.69636914,
+        "pc_tailscale_status": 0.7520938
+      }
+    },
+    "intent-019": {
+      "semantic": [
+        "email_apply_rules",
+        "file_batch_read",
+        "image_batch",
+        "pc_process_list",
+        "task_list",
+        "video_extract_frames",
+        "win_scheduled_tasks"
+      ],
+      "learned": [
+        "tool_search",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "email_apply_rules": 0.66188726,
+        "file_batch_read": 0.67799609,
+        "image_batch": 0.68992055,
+        "pc_process_list": 0.66064762,
+        "task_list": 0.66316406,
+        "video_extract_frames": 0.66017162,
+        "win_scheduled_tasks": 0.67088386
+      }
+    },
+    "intent-020": {
+      "semantic": [
+        "pc_process_kill",
+        "pc_run_elevated",
+        "pc_run_powershell",
+        "registry_get",
+        "win_firewall_status"
+      ],
+      "learned": [
+        "computer_control",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "pc_process_kill": 0.71116941,
+        "pc_run_elevated": 0.75146803,
+        "pc_run_powershell": 0.75832998,
+        "registry_get": 0.71181293,
+        "win_firewall_status": 0.73002488
+      }
+    },
+    "intent-021": {
+      "semantic": [
+        "file_batch_read",
+        "net_inventory_list",
+        "note_delete",
+        "note_list",
+        "note_update",
+        "ops_evidence_add",
+        "pc_driver_check",
+        "pc_window_list"
+      ],
+      "learned": [
+        "computer_control",
+        "pc_run_powershell"
+      ],
+      "semantic_scores": {
+        "file_batch_read": 0.70307052,
+        "net_inventory_list": 0.69913854,
+        "note_delete": 0.71556065,
+        "note_list": 0.76835414,
+        "note_update": 0.7051631,
+        "ops_evidence_add": 0.73075034,
+        "pc_driver_check": 0.69641024,
+        "pc_window_list": 0.70374969
+      }
+    },
+    "intent-022": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_installed_software",
+        "pc_open_file",
+        "vm_lab_install",
+        "winget_install",
+        "winget_list_installed"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_app_launch": 0.67144816,
+        "pc_installed_software": 0.69290747,
+        "pc_open_file": 0.69143444,
+        "vm_lab_install": 0.69686568,
+        "winget_install": 0.67572222,
+        "winget_list_installed": 0.68702918
+      }
+    },
+    "intent-023": {
+      "semantic": [
+        "pc_gui_read",
+        "pc_window_focus",
+        "pc_window_list",
+        "win_disk_info",
+        "win_scheduled_tasks",
+        "win_uptime",
+        "win_users_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_gui_read": 0.70165922,
+        "pc_window_focus": 0.71537373,
+        "pc_window_list": 0.69717901,
+        "win_disk_info": 0.69294128,
+        "win_scheduled_tasks": 0.69357512,
+        "win_uptime": 0.70622135,
+        "win_users_list": 0.70744101
+      }
+    },
+    "intent-024": {
+      "semantic": [
+        "csv_to_chart",
+        "net_inventory_scan",
+        "net_topology_diagram",
+        "pc_app_launch",
+        "pc_gui_click",
+        "pc_gui_read",
+        "pc_tailscale_status"
+      ],
+      "learned": [
+        "pc_run_powershell",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "csv_to_chart": 0.67656215,
+        "net_inventory_scan": 0.68841831,
+        "net_topology_diagram": 0.69620062,
+        "pc_app_launch": 0.68504343,
+        "pc_gui_click": 0.69391687,
+        "pc_gui_read": 0.679559,
+        "pc_tailscale_status": 0.76947966
+      }
+    },
+    "intent-025": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_browse",
+        "pc_gui_read",
+        "pc_open_file",
+        "pc_reveal",
+        "pc_window_focus",
+        "pc_window_list"
+      ],
+      "learned": [
+        "computer_control",
+        "pc_run_powershell",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_app_launch": 0.72982089,
+        "pc_browse": 0.73007311,
+        "pc_gui_read": 0.73878493,
+        "pc_open_file": 0.73088333,
+        "pc_reveal": 0.73340654,
+        "pc_window_focus": 0.75034318,
+        "pc_window_list": 0.74558258
+      }
+    },
+    "intent-026": {
+      "semantic": [
+        "color_tool",
+        "doc_generate_onboarding",
+        "email_apply_rules",
+        "long_task_start",
+        "long_task_status",
+        "quiz_answer",
+        "system_restore_point"
+      ],
+      "learned": [
+        "computer_control",
+        "tool_search",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "color_tool": 0.64756449,
+        "doc_generate_onboarding": 0.6489603,
+        "email_apply_rules": 0.66534405,
+        "long_task_start": 0.65802292,
+        "long_task_status": 0.64600946,
+        "quiz_answer": 0.64533245,
+        "system_restore_point": 0.67188241
+      }
+    },
+    "intent-027": {
+      "semantic": [
+        "email_to_task",
+        "long_task_status",
+        "long_task_stop",
+        "task_create",
+        "task_list",
+        "task_update",
+        "win_scheduled_tasks"
+      ],
+      "learned": [
+        "long_task_start"
+      ],
+      "semantic_scores": {
+        "email_to_task": 0.71187119,
+        "long_task_status": 0.72737693,
+        "long_task_stop": 0.70763835,
+        "task_create": 0.72310857,
+        "task_list": 0.77216414,
+        "task_update": 0.72862257,
+        "win_scheduled_tasks": 0.71649488
+      }
+    },
+    "intent-028": {
+      "semantic": [
+        "pc_installed_software",
+        "pc_run_elevated",
+        "pc_run_powershell",
+        "win_firewall_status",
+        "win_quick_launch",
+        "winget_list_installed"
+      ],
+      "learned": [
+        "computer_control",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "pc_installed_software": 0.69871861,
+        "pc_run_elevated": 0.71818187,
+        "pc_run_powershell": 0.75061148,
+        "win_firewall_status": 0.68883991,
+        "win_quick_launch": 0.73003194,
+        "winget_list_installed": 0.6888383
+      }
+    },
+    "intent-029": {
+      "semantic": [
+        "doc_asset_create",
+        "doc_generate_onboarding",
+        "file_create_docx",
+        "file_create_pdf",
+        "file_read",
+        "file_write"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_asset_create": 0.56933349,
+        "doc_generate_onboarding": 0.58676481,
+        "file_create_docx": 0.56832791,
+        "file_create_pdf": 0.58631996,
+        "file_read": 0.57343522,
+        "file_write": 0.58640032
+      }
+    },
+    "intent-030": {
+      "semantic": [
+        "pc_driver_check",
+        "pc_gpu_status",
+        "pc_gui_read",
+        "pc_hardware_specs",
+        "vm_lab_install",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_driver_check": 0.72665343,
+        "pc_gpu_status": 0.70514788,
+        "pc_gui_read": 0.70379645,
+        "pc_hardware_specs": 0.70433754,
+        "vm_lab_install": 0.73673673,
+        "win_system_report": 0.70267445
+      }
+    },
+    "intent-031": {
+      "semantic": [
+        "billing_product_reviews",
+        "long_task_status",
+        "pc_driver_check",
+        "quiz_answer",
+        "system_restore_point",
+        "win_service_action",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_product_reviews": 0.66125214,
+        "long_task_status": 0.64464602,
+        "pc_driver_check": 0.67363928,
+        "quiz_answer": 0.64619249,
+        "system_restore_point": 0.65251967,
+        "win_service_action": 0.65422339,
+        "win_services_list": 0.65238219
+      }
+    },
+    "intent-032": {
+      "semantic": [
+        "long_task_status",
+        "long_task_stop",
+        "pc_driver_check",
+        "pc_tool_reliability",
+        "skill_learning_log",
+        "system_self_test",
+        "win_service_action"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "long_task_status": 0.70292152,
+        "long_task_stop": 0.68334298,
+        "pc_driver_check": 0.67952735,
+        "pc_tool_reliability": 0.70261284,
+        "skill_learning_log": 0.68725744,
+        "system_self_test": 0.7084503,
+        "win_service_action": 0.68022314
+      }
+    },
+    "intent-033": {
+      "semantic": [
+        "long_task_status",
+        "net_route_diagnostics",
+        "net_service_detect",
+        "pc_driver_check",
+        "pc_tailscale_status",
+        "pc_tool_reliability",
+        "system_restore_point",
+        "win_services_list"
+      ],
+      "learned": [
+        "pc_run_powershell",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "long_task_status": 0.69243003,
+        "net_route_diagnostics": 0.68025181,
+        "net_service_detect": 0.70744348,
+        "pc_driver_check": 0.69310558,
+        "pc_tailscale_status": 0.78260731,
+        "pc_tool_reliability": 0.67569547,
+        "system_restore_point": 0.69059831,
+        "win_services_list": 0.69061232
+      }
+    },
+    "intent-034": {
+      "semantic": [
+        "billing_catalog_list",
+        "billing_quote_email",
+        "datetime_info",
+        "net_service_detect",
+        "net_tls_check_bulk",
+        "win_scheduled_tasks",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_catalog_list": 0.62806407,
+        "billing_quote_email": 0.61005408,
+        "datetime_info": 0.6140574,
+        "net_service_detect": 0.62277617,
+        "net_tls_check_bulk": 0.62043914,
+        "win_scheduled_tasks": 0.62736252,
+        "win_services_list": 0.65722921
+      }
+    },
+    "intent-035": {
+      "semantic": [
+        "billing_client_create",
+        "billing_client_list",
+        "net_dns_lookup",
+        "net_ping",
+        "net_route_diagnostics",
+        "net_whois",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_client_create": 0.68475959,
+        "billing_client_list": 0.69590942,
+        "net_dns_lookup": 0.70340474,
+        "net_ping": 0.69735371,
+        "net_route_diagnostics": 0.69169857,
+        "net_whois": 0.67198739,
+        "win_services_list": 0.68859726
+      }
+    },
+    "intent-036": {
+      "semantic": [
+        "billing_quote_email",
+        "event_update",
+        "it_kb_add",
+        "long_task_stop",
+        "pc_tool_reliability",
+        "registry_set",
+        "system_restore_point",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_quote_email": 0.69395316,
+        "event_update": 0.68352972,
+        "it_kb_add": 0.68471274,
+        "long_task_stop": 0.68378697,
+        "pc_tool_reliability": 0.69070887,
+        "registry_set": 0.68596793,
+        "system_restore_point": 0.70310179,
+        "win_services_list": 0.70895718
+      }
+    },
+    "intent-037": {
+      "semantic": [
+        "event_update",
+        "os_dark_mode",
+        "win_disk_info",
+        "win_startup_programs",
+        "win_update_status",
+        "win_uptime"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "event_update": 0.68276885,
+        "os_dark_mode": 0.67022979,
+        "win_disk_info": 0.69175006,
+        "win_startup_programs": 0.66972474,
+        "win_update_status": 0.73025806,
+        "win_uptime": 0.69448164
+      }
+    },
+    "intent-038": {
+      "semantic": [
+        "net_scan_local",
+        "pc_bluetooth_status",
+        "ssh_server_info",
+        "system_restore_point",
+        "tweak_telemetry",
+        "win_service_action",
+        "win_services_list",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_scan_local": 0.60075066,
+        "pc_bluetooth_status": 0.73767712,
+        "ssh_server_info": 0.61099712,
+        "system_restore_point": 0.60968919,
+        "tweak_telemetry": 0.60414393,
+        "win_service_action": 0.59987051,
+        "win_services_list": 0.62513419,
+        "win_system_report": 0.60834807
+      }
+    },
+    "intent-039": {
+      "semantic": [
+        "itsm_ticket_create",
+        "net_ping",
+        "net_port_scan",
+        "net_scan_local",
+        "net_service_detect",
+        "net_traceroute",
+        "ssh_server_info",
+        "win_services_list"
+      ],
+      "learned": [
+        "pc_run_powershell",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "itsm_ticket_create": 0.70328872,
+        "net_ping": 0.72079785,
+        "net_port_scan": 0.70398302,
+        "net_scan_local": 0.68951851,
+        "net_service_detect": 0.70748251,
+        "net_traceroute": 0.68984652,
+        "ssh_server_info": 0.68916638,
+        "win_services_list": 0.70133928
+      }
+    },
+    "intent-040": {
+      "semantic": [
+        "billing_catalog_enrich",
+        "net_service_detect",
+        "pc_process_kill",
+        "win_service_action",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_catalog_enrich": 0.64871647,
+        "net_service_detect": 0.65961433,
+        "pc_process_kill": 0.65180212,
+        "win_service_action": 0.6520855,
+        "win_services_list": 0.66266856
+      }
+    },
+    "intent-041": {
+      "semantic": [
+        "pc_driver_check",
+        "pc_run_powershell",
+        "vm_lab_install",
+        "winget_install",
+        "winget_list_installed",
+        "winget_uninstall",
+        "winget_upgrade"
+      ],
+      "learned": [
+        "tool_search",
+        "winget_install"
+      ],
+      "semantic_scores": {
+        "pc_driver_check": 0.7467434,
+        "pc_run_powershell": 0.75240805,
+        "vm_lab_install": 0.74463519,
+        "winget_install": 0.7844236,
+        "winget_list_installed": 0.75745264,
+        "winget_uninstall": 0.73928474,
+        "winget_upgrade": 0.75368779
+      }
+    },
+    "intent-042": {
+      "semantic": [
+        "pc_clipboard_set",
+        "pc_installed_software",
+        "pc_reveal",
+        "win_disk_info",
+        "win_update_status",
+        "winget_install",
+        "winget_list_installed",
+        "zip_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_clipboard_set": 0.68711698,
+        "pc_installed_software": 0.67555059,
+        "pc_reveal": 0.67752787,
+        "win_disk_info": 0.67731762,
+        "win_update_status": 0.68637461,
+        "winget_install": 0.68670376,
+        "winget_list_installed": 0.67476101,
+        "zip_list": 0.7214549
+      }
+    },
+    "intent-043": {
+      "semantic": [
+        "email_draft_reply",
+        "email_send",
+        "event_update",
+        "git_info",
+        "pc_driver_check",
+        "quiz_answer",
+        "registry_set"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "email_draft_reply": 0.71279108,
+        "email_send": 0.71151833,
+        "event_update": 0.72823566,
+        "git_info": 0.71790076,
+        "pc_driver_check": 0.7207859,
+        "quiz_answer": 0.71151932,
+        "registry_set": 0.71003351
+      }
+    },
+    "intent-044": {
+      "semantic": [
+        "password_generate",
+        "pc_installed_software",
+        "pc_run_powershell",
+        "win_quick_launch",
+        "win_update_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "password_generate": 0.66797123,
+        "pc_installed_software": 0.67826498,
+        "pc_run_powershell": 0.66384226,
+        "win_quick_launch": 0.66188653,
+        "win_update_status": 0.66388404
+      }
+    },
+    "intent-045": {
+      "semantic": [
+        "pc_driver_check",
+        "pc_installed_software",
+        "pc_run_powershell",
+        "vm_lab_install",
+        "winget_install",
+        "winget_uninstall"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_driver_check": 0.69090155,
+        "pc_installed_software": 0.68748264,
+        "pc_run_powershell": 0.70147246,
+        "vm_lab_install": 0.68469844,
+        "winget_install": 0.69660903,
+        "winget_uninstall": 0.68683873
+      }
+    },
+    "intent-046": {
+      "semantic": [
+        "winget_install",
+        "winget_list_installed",
+        "winget_list_upgrades",
+        "winget_search",
+        "winget_uninstall",
+        "winget_upgrade"
+      ],
+      "learned": [
+        "tool_search",
+        "winget_install"
+      ],
+      "semantic_scores": {
+        "winget_install": 0.76023985,
+        "winget_list_installed": 0.71504372,
+        "winget_list_upgrades": 0.71155207,
+        "winget_search": 0.73545887,
+        "winget_uninstall": 0.71155046,
+        "winget_upgrade": 0.69553461
+      }
+    },
+    "intent-047": {
+      "semantic": [
+        "code_workspace_control",
+        "code_workspace_start",
+        "code_workspace_status",
+        "pc_driver_check",
+        "pc_open_file",
+        "registry_get",
+        "win_service_action",
+        "win_startup_programs"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "code_workspace_control": 0.5902151,
+        "code_workspace_start": 0.58025544,
+        "code_workspace_status": 0.5695755,
+        "pc_driver_check": 0.54507129,
+        "pc_open_file": 0.55207534,
+        "registry_get": 0.54990439,
+        "win_service_action": 0.55258782,
+        "win_startup_programs": 0.55358372
+      }
+    },
+    "intent-048": {
+      "semantic": [
+        "os_power_plan",
+        "pc_browse",
+        "pc_gui_read",
+        "pc_reveal",
+        "win_scheduled_tasks",
+        "win_services_list",
+        "win_startup_programs",
+        "win_update_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "os_power_plan": 0.70372529,
+        "pc_browse": 0.68729467,
+        "pc_gui_read": 0.68616748,
+        "pc_reveal": 0.69763268,
+        "win_scheduled_tasks": 0.68973724,
+        "win_services_list": 0.68411337,
+        "win_startup_programs": 0.68675689,
+        "win_update_status": 0.68881481
+      }
+    },
+    "intent-049": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_driver_check",
+        "pc_installed_software",
+        "registry_set",
+        "win_update_status",
+        "winget_install"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_app_launch": 0.69019943,
+        "pc_driver_check": 0.6885964,
+        "pc_installed_software": 0.72378418,
+        "registry_set": 0.68246933,
+        "win_update_status": 0.6950121,
+        "winget_install": 0.7039141
+      }
+    },
+    "intent-050": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_installed_software",
+        "pc_tailscale_status",
+        "winget_install",
+        "winget_list_installed",
+        "winget_list_upgrades"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_app_launch": 0.68207557,
+        "pc_installed_software": 0.66962129,
+        "pc_tailscale_status": 0.75125129,
+        "winget_install": 0.6862763,
+        "winget_list_installed": 0.67773496,
+        "winget_list_upgrades": 0.67571692
+      }
+    },
+    "intent-051": {
+      "semantic": [
+        "file_copy",
+        "file_delete",
+        "file_info",
+        "file_list",
+        "file_rename",
+        "pc_open_file",
+        "pdf_info"
+      ],
+      "learned": [
+        "tool_search",
+        "web_browse"
+      ],
+      "semantic_scores": {
+        "file_copy": 0.76629326,
+        "file_delete": 0.7216431,
+        "file_info": 0.75113754,
+        "file_list": 0.71878764,
+        "file_rename": 0.74195004,
+        "pc_open_file": 0.71454081,
+        "pdf_info": 0.7078674
+      }
+    },
+    "intent-052": {
+      "semantic": [
+        "file_copy",
+        "pc_browse",
+        "pc_open_file",
+        "pc_reveal",
+        "pc_screenshot"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "file_copy": 0.75730294,
+        "pc_browse": 0.74630153,
+        "pc_open_file": 0.73921114,
+        "pc_reveal": 0.75544978,
+        "pc_screenshot": 0.73660965
+      }
+    },
+    "intent-053": {
+      "semantic": [
+        "doc_generate_onboarding",
+        "document_ask",
+        "document_convert_format",
+        "document_identity_set",
+        "file_copy",
+        "file_read",
+        "system_search_content"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_generate_onboarding": 0.69020698,
+        "document_ask": 0.68846576,
+        "document_convert_format": 0.69529754,
+        "document_identity_set": 0.68692176,
+        "file_copy": 0.71910517,
+        "file_read": 0.69283868,
+        "system_search_content": 0.68410329
+      }
+    },
+    "intent-054": {
+      "semantic": [
+        "billing_quote_pdf",
+        "doc_generate_onboarding",
+        "pc_open_file",
+        "pdf_info",
+        "pdf_protect",
+        "pdf_read",
+        "pdf_watermark"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_quote_pdf": 0.75260784,
+        "doc_generate_onboarding": 0.73911078,
+        "pc_open_file": 0.74478809,
+        "pdf_info": 0.76125961,
+        "pdf_protect": 0.73771758,
+        "pdf_read": 0.76797664,
+        "pdf_watermark": 0.73194349
+      }
+    },
+    "intent-055": {
+      "semantic": [
+        "event_create",
+        "pc_gpu_status",
+        "pc_gui_read",
+        "pc_reveal",
+        "pdf_info",
+        "pptx_create",
+        "video_info"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "event_create": 0.6681652,
+        "pc_gpu_status": 0.6619256,
+        "pc_gui_read": 0.66641794,
+        "pc_reveal": 0.67673429,
+        "pdf_info": 0.68105918,
+        "pptx_create": 0.66828085,
+        "video_info": 0.66057394
+      }
+    },
+    "intent-056": {
+      "semantic": [
+        "billing_catalog_enrich",
+        "billing_catalog_list",
+        "billing_find_products",
+        "billing_price_recommendation",
+        "billing_quote_pdf",
+        "it_kb_recommend",
+        "pc_hardware_specs"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_catalog_enrich": 0.6682902,
+        "billing_catalog_list": 0.71590776,
+        "billing_find_products": 0.70412463,
+        "billing_price_recommendation": 0.66962762,
+        "billing_quote_pdf": 0.67699639,
+        "it_kb_recommend": 0.66826349,
+        "pc_hardware_specs": 0.66807076
+      }
+    },
+    "intent-057": {
+      "semantic": [
+        "file_read",
+        "file_rename",
+        "file_write",
+        "net_ping",
+        "pc_open_file",
+        "pdf_info",
+        "system_search_content",
+        "xlsx_read"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "file_read": 0.65268403,
+        "file_rename": 0.6533459,
+        "file_write": 0.66999253,
+        "net_ping": 0.64965509,
+        "pc_open_file": 0.65345073,
+        "pdf_info": 0.66962822,
+        "system_search_content": 0.69186965,
+        "xlsx_read": 0.65473013
+      }
+    },
+    "intent-058": {
+      "semantic": [
+        "code_workspace_start",
+        "code_workspace_status",
+        "file_copy",
+        "file_create_folder",
+        "file_extract",
+        "file_large_finder",
+        "pc_open_file",
+        "project_create"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "code_workspace_start": 0.70893146,
+        "code_workspace_status": 0.71829789,
+        "file_copy": 0.71355533,
+        "file_create_folder": 0.708502,
+        "file_extract": 0.71139115,
+        "file_large_finder": 0.70931367,
+        "pc_open_file": 0.71367766,
+        "project_create": 0.72027741
+      }
+    },
+    "intent-059": {
+      "semantic": [
+        "doc_generate_onboarding",
+        "doc_generate_procedure",
+        "doc_template_list",
+        "document_generate",
+        "document_list",
+        "text_summarize"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_generate_onboarding": 0.7341585,
+        "doc_generate_procedure": 0.73666515,
+        "doc_template_list": 0.74468628,
+        "document_generate": 0.74014306,
+        "document_list": 0.7351523,
+        "text_summarize": 0.72621531
+      }
+    },
+    "intent-060": {
+      "semantic": [
+        "logo_generate",
+        "pc_driver_check",
+        "pc_gpu_status",
+        "pc_hardware_specs",
+        "pc_reveal",
+        "pc_screenshot"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "logo_generate": 0.69809276,
+        "pc_driver_check": 0.69217321,
+        "pc_gpu_status": 0.71803261,
+        "pc_hardware_specs": 0.71173652,
+        "pc_reveal": 0.69417189,
+        "pc_screenshot": 0.71814217
+      }
+    },
+    "intent-061": {
+      "semantic": [
+        "document_generate",
+        "file_compress",
+        "file_copy",
+        "file_delete",
+        "file_extract",
+        "file_move",
+        "screenshot_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "document_generate": 0.72023589,
+        "file_compress": 0.72327942,
+        "file_copy": 0.74382073,
+        "file_delete": 0.75592964,
+        "file_extract": 0.72076881,
+        "file_move": 0.73558,
+        "screenshot_list": 0.7285432
+      }
+    },
+    "intent-062": {
+      "semantic": [
+        "billing_quote_pdf",
+        "document_convert_format",
+        "file_create_pdf",
+        "pdf_ocr",
+        "pdf_protect",
+        "pdf_read"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_quote_pdf": 0.7853564,
+        "document_convert_format": 0.75193343,
+        "file_create_pdf": 0.75049076,
+        "pdf_ocr": 0.76734913,
+        "pdf_protect": 0.75696418,
+        "pdf_read": 0.75366864
+      }
+    },
+    "intent-063": {
+      "semantic": [
+        "file_copy",
+        "file_delete",
+        "file_extract",
+        "file_move",
+        "file_rename",
+        "memory_delete",
+        "note_delete"
+      ],
+      "learned": [
+        "file_find",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "file_copy": 0.75402067,
+        "file_delete": 0.77680277,
+        "file_extract": 0.70654195,
+        "file_move": 0.71714003,
+        "file_rename": 0.74096313,
+        "memory_delete": 0.71147246,
+        "note_delete": 0.71535234
+      }
+    },
+    "intent-064": {
+      "semantic": [
+        "file_copy",
+        "file_extract",
+        "file_info",
+        "note_list",
+        "ops_evidence_add",
+        "pc_open_file",
+        "system_self_test",
+        "win_event_log"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "file_copy": 0.72725021,
+        "file_extract": 0.70771954,
+        "file_info": 0.71302033,
+        "note_list": 0.71309991,
+        "ops_evidence_add": 0.74328323,
+        "pc_open_file": 0.70758111,
+        "system_self_test": 0.71816111,
+        "win_event_log": 0.74030086
+      }
+    },
+    "intent-065": {
+      "semantic": [
+        "event_delete",
+        "file_copy",
+        "file_delete",
+        "file_move",
+        "file_rename",
+        "pc_reveal",
+        "pdf_extract_images",
+        "project_delete"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "event_delete": 0.72613333,
+        "file_copy": 0.72837526,
+        "file_delete": 0.76681168,
+        "file_move": 0.75947041,
+        "file_rename": 0.73716641,
+        "pc_reveal": 0.72141245,
+        "pdf_extract_images": 0.72077935,
+        "project_delete": 0.72215395
+      }
+    },
+    "intent-066": {
+      "semantic": [
+        "file_copy",
+        "file_extract",
+        "file_info",
+        "file_large_finder",
+        "file_list",
+        "pc_open_file",
+        "ssh_list",
+        "zip_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "file_copy": 0.72623187,
+        "file_extract": 0.72769379,
+        "file_info": 0.723536,
+        "file_large_finder": 0.72145447,
+        "file_list": 0.74275198,
+        "pc_open_file": 0.71389514,
+        "ssh_list": 0.71864198,
+        "zip_list": 0.71933588
+      }
+    },
+    "intent-067": {
+      "semantic": [
+        "document_forget",
+        "file_copy",
+        "file_delete",
+        "file_move",
+        "file_write",
+        "pc_open_file"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "document_forget": 0.72268984,
+        "file_copy": 0.73767244,
+        "file_delete": 0.72406392,
+        "file_move": 0.77942347,
+        "file_write": 0.73387958,
+        "pc_open_file": 0.7212831
+      }
+    },
+    "intent-068": {
+      "semantic": [
+        "doc_asset_list",
+        "file_compress",
+        "file_copy",
+        "file_extract",
+        "memory_list",
+        "memory_search",
+        "screenshot_list",
+        "zip_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_asset_list": 0.6958538,
+        "file_compress": 0.67676506,
+        "file_copy": 0.72952344,
+        "file_extract": 0.71602267,
+        "memory_list": 0.69765858,
+        "memory_search": 0.69231728,
+        "screenshot_list": 0.69635545,
+        "zip_list": 0.69240253
+      }
+    },
+    "intent-069": {
+      "semantic": [
+        "audio_info",
+        "file_delete",
+        "file_duplicate_finder",
+        "file_move",
+        "ssh_download",
+        "system_cleanup",
+        "text_extract"
+      ],
+      "learned": [
+        "file_create_pdf",
+        "pc_get_real_paths",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "audio_info": 0.67860298,
+        "file_delete": 0.68895703,
+        "file_duplicate_finder": 0.6835495,
+        "file_move": 0.68352141,
+        "ssh_download": 0.68012288,
+        "system_cleanup": 0.6794293,
+        "text_extract": 0.68150261
+      }
+    },
+    "intent-070": {
+      "semantic": [
+        "code_workspace_control",
+        "code_workspace_start",
+        "code_workspace_status",
+        "net_inventory_scan",
+        "pc_window_focus",
+        "pc_window_list",
+        "project_create",
+        "project_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "code_workspace_control": 0.69451172,
+        "code_workspace_start": 0.73917377,
+        "code_workspace_status": 0.6903023,
+        "net_inventory_scan": 0.68097318,
+        "pc_window_focus": 0.67961225,
+        "pc_window_list": 0.68135628,
+        "project_create": 0.69627508,
+        "project_list": 0.69129021
+      }
+    },
+    "intent-071": {
+      "semantic": [
+        "pc_disk_smart_health",
+        "pc_driver_check",
+        "pc_gui_read",
+        "pc_tailscale_status",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_disk_smart_health": 0.78519502,
+        "pc_driver_check": 0.77840277,
+        "pc_gui_read": 0.77399327,
+        "pc_tailscale_status": 0.77959045,
+        "win_system_report": 0.79118974
+      }
+    },
+    "intent-072": {
+      "semantic": [
+        "ops_validation_report_generate",
+        "pc_driver_check",
+        "pc_tool_reliability",
+        "system_restore_point",
+        "system_self_test",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "ops_validation_report_generate": 0.69991279,
+        "pc_driver_check": 0.71485023,
+        "pc_tool_reliability": 0.68481877,
+        "system_restore_point": 0.68525447,
+        "system_self_test": 0.70066319,
+        "win_system_report": 0.711659
+      }
+    },
+    "intent-073": {
+      "semantic": [
+        "pc_hardware_specs",
+        "pc_health_trend",
+        "pc_process_list",
+        "pc_system_info",
+        "pc_window_list",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_hardware_specs": 0.75148214,
+        "pc_health_trend": 0.72113443,
+        "pc_process_list": 0.734378,
+        "pc_system_info": 0.74024845,
+        "pc_window_list": 0.72105414,
+        "win_system_report": 0.7660646
+      }
+    },
+    "intent-074": {
+      "semantic": [
+        "pc_hardware_specs",
+        "pc_installed_software",
+        "pc_system_info",
+        "pc_window_focus",
+        "pc_window_list",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_hardware_specs": 0.74784102,
+        "pc_installed_software": 0.74024231,
+        "pc_system_info": 0.74326431,
+        "pc_window_focus": 0.73972909,
+        "pc_window_list": 0.74060897,
+        "win_system_report": 0.74075002
+      }
+    },
+    "intent-075": {
+      "semantic": [
+        "pc_gui_click",
+        "pc_gui_read",
+        "pc_gui_type",
+        "pc_notify",
+        "pc_tailscale_status",
+        "pc_window_focus",
+        "win_update_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_gui_click": 0.71607316,
+        "pc_gui_read": 0.71553246,
+        "pc_gui_type": 0.72183547,
+        "pc_notify": 0.73879172,
+        "pc_tailscale_status": 0.720957,
+        "pc_window_focus": 0.72228322,
+        "win_update_status": 0.72108885
+      }
+    },
+    "intent-076": {
+      "semantic": [
+        "billing_generate_proposal",
+        "doc_generate_onboarding",
+        "doc_generate_procedure",
+        "event_update",
+        "ops_checklist_generate",
+        "pc_driver_check",
+        "task_create",
+        "task_update"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_generate_proposal": 0.68946778,
+        "doc_generate_onboarding": 0.68790754,
+        "doc_generate_procedure": 0.70901812,
+        "event_update": 0.67888763,
+        "ops_checklist_generate": 0.68093077,
+        "pc_driver_check": 0.67916643,
+        "task_create": 0.69359282,
+        "task_update": 0.68422909
+      }
+    },
+    "intent-077": {
+      "semantic": [
+        "client_health_compute",
+        "client_health_get",
+        "client_health_history",
+        "doc_generate_maintenance",
+        "pc_disk_smart_health",
+        "pc_driver_check",
+        "pc_health_trend"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "client_health_compute": 0.72118946,
+        "client_health_get": 0.70341897,
+        "client_health_history": 0.70685422,
+        "doc_generate_maintenance": 0.67669574,
+        "pc_disk_smart_health": 0.66722924,
+        "pc_driver_check": 0.69609546,
+        "pc_health_trend": 0.67099119
+      }
+    },
+    "intent-078": {
+      "semantic": [
+        "pc_browse",
+        "pc_gui_read",
+        "pc_notify",
+        "pc_reveal",
+        "pc_screenshot",
+        "pc_window_focus",
+        "win_system_report",
+        "win_users_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_browse": 0.74744061,
+        "pc_gui_read": 0.76730611,
+        "pc_notify": 0.74758103,
+        "pc_reveal": 0.77392684,
+        "pc_screenshot": 0.74632819,
+        "pc_window_focus": 0.76445801,
+        "win_system_report": 0.77342463,
+        "win_users_list": 0.76069253
+      }
+    },
+    "intent-079": {
+      "semantic": [
+        "csv_analyze",
+        "doc_analyze_input",
+        "doc_generate_onboarding",
+        "ops_evidence_add",
+        "system_cleanup",
+        "system_search_content",
+        "text_stats",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "csv_analyze": 0.70576365,
+        "doc_analyze_input": 0.68774981,
+        "doc_generate_onboarding": 0.67084191,
+        "ops_evidence_add": 0.67671907,
+        "system_cleanup": 0.70126247,
+        "system_search_content": 0.6699247,
+        "text_stats": 0.68145506,
+        "win_system_report": 0.6924776
+      }
+    },
+    "intent-080": {
+      "semantic": [
+        "billing_product_reviews",
+        "clipboard_append",
+        "doc_generate_onboarding",
+        "email_to_task",
+        "file_write",
+        "long_task_stop",
+        "net_traceroute",
+        "ops_checklist_generate"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_product_reviews": 0.68051048,
+        "clipboard_append": 0.67520933,
+        "doc_generate_onboarding": 0.66510964,
+        "email_to_task": 0.66250717,
+        "file_write": 0.66242211,
+        "long_task_stop": 0.67345676,
+        "net_traceroute": 0.67323718,
+        "ops_checklist_generate": 0.67489403
+      }
+    },
+    "intent-081": {
+      "semantic": [
+        "net_ping",
+        "net_port_scan",
+        "net_route_diagnostics",
+        "pc_disk_smart_health",
+        "pc_health_trend",
+        "pc_tailscale_status"
+      ],
+      "learned": [
+        "pc_disk_smart_health",
+        "pc_event_log_errors",
+        "pc_hardware_specs",
+        "pc_hardware_temps",
+        "win_system_report"
+      ],
+      "semantic_scores": {
+        "net_ping": 0.7790018,
+        "net_port_scan": 0.78221279,
+        "net_route_diagnostics": 0.79490214,
+        "pc_disk_smart_health": 0.77456289,
+        "pc_health_trend": 0.7868736,
+        "pc_tailscale_status": 0.78227093
+      }
+    },
+    "intent-082": {
+      "semantic": [
+        "net_dns_lookup",
+        "net_ping",
+        "net_route_diagnostics",
+        "net_tls_check",
+        "tweak_network_harden"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_dns_lookup": 0.72950139,
+        "net_ping": 0.73569636,
+        "net_route_diagnostics": 0.75716384,
+        "net_tls_check": 0.73713263,
+        "tweak_network_harden": 0.72633629
+      }
+    },
+    "intent-083": {
+      "semantic": [
+        "doc_analyze_input",
+        "net_inventory_list",
+        "net_route_diagnostics",
+        "net_topology_diagram",
+        "net_traceroute",
+        "url_analyze"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_analyze_input": 0.66335688,
+        "net_inventory_list": 0.66550919,
+        "net_route_diagnostics": 0.73485128,
+        "net_topology_diagram": 0.66959031,
+        "net_traceroute": 0.70630229,
+        "url_analyze": 0.66423322
+      }
+    },
+    "intent-084": {
+      "semantic": [
+        "email_read",
+        "file_batch_read",
+        "net_inventory_scan",
+        "net_topology_diagram",
+        "net_traceroute",
+        "pc_gui_click",
+        "pc_window_focus",
+        "win_startup_programs"
+      ],
+      "learned": [
+        "pc_event_log_errors",
+        "pc_run_command",
+        "tool_search",
+        "win_system_report"
+      ],
+      "semantic_scores": {
+        "email_read": 0.66514283,
+        "file_batch_read": 0.65547302,
+        "net_inventory_scan": 0.64951194,
+        "net_topology_diagram": 0.6606226,
+        "net_traceroute": 0.66567584,
+        "pc_gui_click": 0.65320698,
+        "pc_window_focus": 0.68003529,
+        "win_startup_programs": 0.67705726
+      }
+    },
+    "intent-085": {
+      "semantic": [
+        "net_dns_lookup",
+        "net_ping",
+        "net_port_scan",
+        "net_route_diagnostics"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_dns_lookup": 0.80901423,
+        "net_ping": 0.75557878,
+        "net_port_scan": 0.74929522,
+        "net_route_diagnostics": 0.75497244
+      }
+    },
+    "intent-086": {
+      "semantic": [
+        "client_health_compute",
+        "doc_generate_maintenance",
+        "doc_generate_onboarding",
+        "net_route_diagnostics",
+        "system_self_test",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "client_health_compute": 0.72686261,
+        "doc_generate_maintenance": 0.72849318,
+        "doc_generate_onboarding": 0.73418153,
+        "net_route_diagnostics": 0.73960135,
+        "system_self_test": 0.73535844,
+        "win_system_report": 0.76435539
+      }
+    },
+    "intent-087": {
+      "semantic": [
+        "net_ping",
+        "net_port_scan",
+        "net_route_diagnostics",
+        "net_traceroute",
+        "net_whois",
+        "pc_driver_check",
+        "registry_set"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_ping": 0.73126867,
+        "net_port_scan": 0.72444466,
+        "net_route_diagnostics": 0.72886304,
+        "net_traceroute": 0.70905371,
+        "net_whois": 0.70457516,
+        "pc_driver_check": 0.70467769,
+        "registry_set": 0.71044077
+      }
+    },
+    "intent-088": {
+      "semantic": [
+        "email_accounts",
+        "net_ping",
+        "net_port_scan",
+        "net_route_diagnostics",
+        "net_scan_local",
+        "net_traceroute",
+        "web_research"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "email_accounts": 0.71430737,
+        "net_ping": 0.74888589,
+        "net_port_scan": 0.74305119,
+        "net_route_diagnostics": 0.75091353,
+        "net_scan_local": 0.71157453,
+        "net_traceroute": 0.75031158,
+        "web_research": 0.73193415
+      }
+    },
+    "intent-089": {
+      "semantic": [
+        "doc_analyze_input",
+        "net_route_diagnostics",
+        "net_snmp_query",
+        "os_network_adapters",
+        "system_self_test",
+        "tweak_telemetry",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_analyze_input": 0.71325453,
+        "net_route_diagnostics": 0.69550771,
+        "net_snmp_query": 0.71249384,
+        "os_network_adapters": 0.70583895,
+        "system_self_test": 0.69899062,
+        "tweak_telemetry": 0.69719887,
+        "win_system_report": 0.70325242
+      }
+    },
+    "intent-090": {
+      "semantic": [
+        "cmd_analyze_risk",
+        "doc_analyze_input",
+        "net_route_diagnostics",
+        "net_topology_diagram",
+        "net_traceroute",
+        "regex_tool",
+        "url_analyze"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "cmd_analyze_risk": 0.69963434,
+        "doc_analyze_input": 0.69903653,
+        "net_route_diagnostics": 0.75180022,
+        "net_topology_diagram": 0.70171921,
+        "net_traceroute": 0.72775427,
+        "regex_tool": 0.70222944,
+        "url_analyze": 0.70709916
+      }
+    },
+    "intent-091": {
+      "semantic": [
+        "pc_gui_read",
+        "pc_reveal",
+        "pc_window_focus",
+        "pc_window_list",
+        "win_disk_info",
+        "win_firewall_status",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_gui_read": 0.71882171,
+        "pc_reveal": 0.73380635,
+        "pc_window_focus": 0.71516053,
+        "pc_window_list": 0.73416935,
+        "win_disk_info": 0.7275316,
+        "win_firewall_status": 0.78748362,
+        "win_services_list": 0.7230244
+      }
+    },
+    "intent-092": {
+      "semantic": [
+        "doc_generate_report",
+        "doc_intervention_list",
+        "email_to_task",
+        "file_list",
+        "pc_process_list",
+        "task_list",
+        "win_firewall_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_generate_report": 0.67874879,
+        "doc_intervention_list": 0.68848206,
+        "email_to_task": 0.68487979,
+        "file_list": 0.69162818,
+        "pc_process_list": 0.70417752,
+        "task_list": 0.68154853,
+        "win_firewall_status": 0.68894796
+      }
+    },
+    "intent-093": {
+      "semantic": [
+        "net_subnet_sweep",
+        "net_traceroute",
+        "ops_checklist_generate",
+        "os_firewall",
+        "password_generate",
+        "pdf_protect",
+        "registry_backup"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_subnet_sweep": 0.66221367,
+        "net_traceroute": 0.67063579,
+        "ops_checklist_generate": 0.67324109,
+        "os_firewall": 0.66871878,
+        "password_generate": 0.66295015,
+        "pdf_protect": 0.68351132,
+        "registry_backup": 0.66196141
+      }
+    },
+    "intent-094": {
+      "semantic": [
+        "bulk_rename",
+        "email_to_task",
+        "email_watch_check",
+        "event_update",
+        "pc_tool_reliability",
+        "win_firewall_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "bulk_rename": 0.70897384,
+        "email_to_task": 0.68871814,
+        "email_watch_check": 0.70232266,
+        "event_update": 0.72659678,
+        "pc_tool_reliability": 0.69487635,
+        "win_firewall_status": 0.70556235
+      }
+    },
+    "intent-095": {
+      "semantic": [
+        "event_update",
+        "net_ping",
+        "os_firewall",
+        "os_network_adapters",
+        "registry_set",
+        "win_firewall_status",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "event_update": 0.66075804,
+        "net_ping": 0.66057971,
+        "os_firewall": 0.68026927,
+        "os_network_adapters": 0.65931602,
+        "registry_set": 0.66080058,
+        "win_firewall_status": 0.69012979,
+        "win_services_list": 0.66658024
+      }
+    },
+    "intent-096": {
+      "semantic": [
+        "billing_catalog_list",
+        "billing_generate_proposal",
+        "billing_quote_email",
+        "billing_quote_pdf",
+        "ip_info",
+        "net_whois",
+        "win_firewall_status"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "billing_catalog_list": 0.67208684,
+        "billing_generate_proposal": 0.66563148,
+        "billing_quote_email": 0.67225687,
+        "billing_quote_pdf": 0.68771487,
+        "ip_info": 0.6654178,
+        "net_whois": 0.69318918,
+        "win_firewall_status": 0.68044603
+      }
+    },
+    "intent-097": {
+      "semantic": [
+        "pc_driver_check",
+        "pc_tool_reliability",
+        "quiz_answer",
+        "registry_backup",
+        "registry_set",
+        "system_self_test"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_driver_check": 0.69687655,
+        "pc_tool_reliability": 0.70002394,
+        "quiz_answer": 0.6899201,
+        "registry_backup": 0.69644463,
+        "registry_set": 0.71597413,
+        "system_self_test": 0.70612187
+      }
+    },
+    "intent-098": {
+      "semantic": [
+        "os_firewall",
+        "pc_gui_read",
+        "pc_run_command",
+        "pc_window_focus",
+        "win_firewall_status",
+        "win_services_list"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "os_firewall": 0.77100689,
+        "pc_gui_read": 0.68334526,
+        "pc_run_command": 0.68408592,
+        "pc_window_focus": 0.68861036,
+        "win_firewall_status": 0.78205243,
+        "win_services_list": 0.68164904
+      }
+    },
+    "intent-099": {
+      "semantic": [
+        "doc_analyze_input",
+        "doc_generate_report",
+        "doc_intervention_create",
+        "doc_intervention_list",
+        "doc_intervention_update",
+        "doc_knowledge_search",
+        "long_task_stop",
+        "ops_checklist_generate"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_analyze_input": 0.655444,
+        "doc_generate_report": 0.67581674,
+        "doc_intervention_create": 0.6791692,
+        "doc_intervention_list": 0.67831352,
+        "doc_intervention_update": 0.69545606,
+        "doc_knowledge_search": 0.66093365,
+        "long_task_stop": 0.65313508,
+        "ops_checklist_generate": 0.65601195
+      }
+    },
+    "intent-100": {
+      "semantic": [
+        "long_task_status",
+        "long_task_stop",
+        "pc_driver_check",
+        "pc_hardware_temps",
+        "pc_health_trend",
+        "pc_process_list",
+        "pc_screenshot",
+        "pc_tool_reliability"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "long_task_status": 0.67936193,
+        "long_task_stop": 0.6995266,
+        "pc_driver_check": 0.70730052,
+        "pc_hardware_temps": 0.69556776,
+        "pc_health_trend": 0.70210181,
+        "pc_process_list": 0.67920163,
+        "pc_screenshot": 0.68081814,
+        "pc_tool_reliability": 0.67980364
+      }
+    },
+    "intent-101": {
+      "semantic": [
+        "doc_generate_onboarding",
+        "doc_generate_recovery_plan",
+        "net_ping",
+        "note_list",
+        "os_power_plan",
+        "pc_gui_read",
+        "pc_window_focus",
+        "win_scheduled_tasks"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "doc_generate_onboarding": 0.67815841,
+        "doc_generate_recovery_plan": 0.66335684,
+        "net_ping": 0.67859807,
+        "note_list": 0.66341662,
+        "os_power_plan": 0.69411208,
+        "pc_gui_read": 0.67230622,
+        "pc_window_focus": 0.77348833,
+        "win_scheduled_tasks": 0.67966194
+      }
+    },
+    "intent-102": {
+      "semantic": [
+        "conversation_list",
+        "conversation_search",
+        "file_list",
+        "note_list",
+        "ops_evidence_add",
+        "pc_conversation_trace",
+        "pc_window_list",
+        "screenshot_list"
+      ],
+      "learned": [
+        "file_find",
+        "file_list",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "conversation_list": 0.69417363,
+        "conversation_search": 0.69546516,
+        "file_list": 0.71547828,
+        "note_list": 0.71246153,
+        "ops_evidence_add": 0.6914139,
+        "pc_conversation_trace": 0.7107569,
+        "pc_window_list": 0.72007448,
+        "screenshot_list": 0.73522693
+      }
+    },
+    "intent-103": {
+      "semantic": [
+        "computer_control",
+        "os_power_plan",
+        "pc_app_launch",
+        "pc_driver_check",
+        "pc_gui_click",
+        "pc_gui_read",
+        "pc_window_focus",
+        "win_quick_launch"
+      ],
+      "learned": [
+        "computer_control",
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "computer_control": 0.7611776,
+        "os_power_plan": 0.69694698,
+        "pc_app_launch": 0.71058528,
+        "pc_driver_check": 0.69606741,
+        "pc_gui_click": 0.70702969,
+        "pc_gui_read": 0.70561763,
+        "pc_window_focus": 0.7204725,
+        "win_quick_launch": 0.69710884
+      }
+    },
+    "intent-104": {
+      "semantic": [
+        "image_info",
+        "net_route_diagnostics",
+        "pc_gui_click",
+        "pc_window_focus",
+        "pc_window_list",
+        "pdf_info",
+        "video_info",
+        "weather"
+      ],
+      "learned": [
+        "pc_open_file"
+      ],
+      "semantic_scores": {
+        "image_info": 0.64675401,
+        "net_route_diagnostics": 0.6643852,
+        "pc_gui_click": 0.64571917,
+        "pc_window_focus": 0.66547718,
+        "pc_window_list": 0.64485943,
+        "pdf_info": 0.6443137,
+        "video_info": 0.64266025,
+        "weather": 0.6472376
+      }
+    },
+    "intent-105": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_gui_read",
+        "pc_installed_software",
+        "pc_open_file",
+        "win_update_status",
+        "winget_install"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_app_launch": 0.68541656,
+        "pc_gui_read": 0.67491462,
+        "pc_installed_software": 0.68561244,
+        "pc_open_file": 0.68127094,
+        "win_update_status": 0.70747076,
+        "winget_install": 0.67521166
+      }
+    },
+    "intent-106": {
+      "semantic": [
+        "computer_control",
+        "doc_generate_onboarding",
+        "pc_browse",
+        "pdf_read",
+        "web_browse",
+        "web_browser_open"
+      ],
+      "learned": [
+        "computer_control",
+        "pc_open_file",
+        "web_research"
+      ],
+      "semantic_scores": {
+        "computer_control": 0.69424012,
+        "doc_generate_onboarding": 0.6972154,
+        "pc_browse": 0.68168798,
+        "pdf_read": 0.72198044,
+        "web_browse": 0.71417109,
+        "web_browser_open": 0.71728216
+      }
+    },
+    "intent-107": {
+      "semantic": [
+        "computer_control",
+        "doc_asset_list",
+        "doc_generate_onboarding",
+        "email_watch_check",
+        "net_inventory_scan",
+        "pc_gui_click",
+        "pc_window_focus",
+        "video_extract_frames"
+      ],
+      "learned": [
+        "computer_control"
+      ],
+      "semantic_scores": {
+        "computer_control": 0.69193001,
+        "doc_asset_list": 0.68407965,
+        "doc_generate_onboarding": 0.69453488,
+        "email_watch_check": 0.6948728,
+        "net_inventory_scan": 0.6821667,
+        "pc_gui_click": 0.72078761,
+        "pc_window_focus": 0.6859405,
+        "video_extract_frames": 0.7083217
+      }
+    },
+    "intent-108": {
+      "semantic": [
+        "event_update",
+        "pc_driver_check",
+        "pc_installed_software",
+        "pdf_fill_form",
+        "pdf_form_fields",
+        "quiz_answer"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "event_update": 0.67036476,
+        "pc_driver_check": 0.66982648,
+        "pc_installed_software": 0.66142202,
+        "pdf_fill_form": 0.68199648,
+        "pdf_form_fields": 0.69537414,
+        "quiz_answer": 0.660995
+      }
+    },
+    "intent-109": {
+      "semantic": [
+        "computer_control",
+        "csv_to_chart",
+        "doc_generate_onboarding",
+        "ops_validation_report_generate",
+        "pc_driver_check",
+        "pc_tailscale_status",
+        "pc_tool_reliability"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "computer_control": 0.71311721,
+        "csv_to_chart": 0.73848019,
+        "doc_generate_onboarding": 0.71175433,
+        "ops_validation_report_generate": 0.7052754,
+        "pc_driver_check": 0.72246728,
+        "pc_tailscale_status": 0.70586545,
+        "pc_tool_reliability": 0.70529135
+      }
+    },
+    "intent-110": {
+      "semantic": [
+        "net_ping",
+        "net_port_scan",
+        "net_route_diagnostics",
+        "net_scan_local",
+        "ssh_list",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_ping": 0.68714214,
+        "net_port_scan": 0.6957274,
+        "net_route_diagnostics": 0.68675347,
+        "net_scan_local": 0.70824298,
+        "ssh_list": 0.694002,
+        "win_system_report": 0.68235731
+      }
+    },
+    "intent-111": {
+      "semantic": [
+        "pc_run_command",
+        "pc_run_elevated",
+        "pc_run_powershell",
+        "registry_get",
+        "win_firewall_status",
+        "win_quick_launch"
+      ],
+      "learned": [
+        "computer_control",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "pc_run_command": 0.76176213,
+        "pc_run_elevated": 0.79427613,
+        "pc_run_powershell": 0.75733738,
+        "registry_get": 0.7457182,
+        "win_firewall_status": 0.74679961,
+        "win_quick_launch": 0.7473068
+      }
+    },
+    "intent-112": {
+      "semantic": [
+        "pc_process_kill",
+        "pc_process_list",
+        "pc_run_command",
+        "pc_run_powershell",
+        "win_scheduled_tasks",
+        "windows_task"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "pc_process_kill": 0.73290925,
+        "pc_process_list": 0.74787335,
+        "pc_run_command": 0.73459005,
+        "pc_run_powershell": 0.7505717,
+        "win_scheduled_tasks": 0.73320343,
+        "windows_task": 0.75361032
+      }
+    },
+    "intent-113": {
+      "semantic": [
+        "pc_run_command",
+        "pc_run_powershell",
+        "winget_install",
+        "winget_list_installed",
+        "winget_search",
+        "winget_uninstall"
+      ],
+      "learned": [
+        "tool_search",
+        "winget_install"
+      ],
+      "semantic_scores": {
+        "pc_run_command": 0.73767996,
+        "pc_run_powershell": 0.72397858,
+        "winget_install": 0.73993128,
+        "winget_list_installed": 0.75908985,
+        "winget_search": 0.72863297,
+        "winget_uninstall": 0.72452585
+      }
+    },
+    "intent-114": {
+      "semantic": [
+        "email_watch_check",
+        "file_write",
+        "pc_driver_check",
+        "pc_run_powershell",
+        "registry_set",
+        "system_self_test"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "email_watch_check": 0.70465366,
+        "file_write": 0.71047034,
+        "pc_driver_check": 0.70488293,
+        "pc_run_powershell": 0.70103069,
+        "registry_set": 0.71331057,
+        "system_self_test": 0.69843623
+      }
+    },
+    "intent-115": {
+      "semantic": [
+        "ip_info",
+        "net_ping",
+        "net_traceroute",
+        "net_whois"
+      ],
+      "learned": [
+        "computer_control",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "ip_info": 0.76335501,
+        "net_ping": 0.75192952,
+        "net_traceroute": 0.73032071,
+        "net_whois": 0.77612914
+      }
+    },
+    "intent-116": {
+      "semantic": [
+        "doc_generate_onboarding",
+        "file_copy",
+        "file_create_folder",
+        "file_delete",
+        "file_rename",
+        "pc_open_file",
+        "pc_run_elevated",
+        "pc_run_powershell"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "doc_generate_onboarding": 0.73852718,
+        "file_copy": 0.75404173,
+        "file_create_folder": 0.73931534,
+        "file_delete": 0.74025129,
+        "file_rename": 0.74197099,
+        "pc_open_file": 0.76113656,
+        "pc_run_elevated": 0.74081848,
+        "pc_run_powershell": 0.77647884
+      }
+    },
+    "intent-117": {
+      "semantic": [
+        "cmd_require_approval",
+        "pc_process_kill",
+        "pc_process_list",
+        "pc_run_command",
+        "pc_run_powershell",
+        "windows_task"
+      ],
+      "learned": [
+        "computer_control",
+        "windows_task"
+      ],
+      "semantic_scores": {
+        "cmd_require_approval": 0.74112191,
+        "pc_process_kill": 0.76718861,
+        "pc_process_list": 0.76984983,
+        "pc_run_command": 0.759024,
+        "pc_run_powershell": 0.74510994,
+        "windows_task": 0.73435835
+      }
+    },
+    "intent-118": {
+      "semantic": [
+        "cmd_require_approval",
+        "net_ping",
+        "net_port_scan",
+        "pc_driver_check",
+        "pc_process_kill",
+        "pc_run_command",
+        "pc_run_powershell"
+      ],
+      "learned": [
+        "web_browse",
+        "web_search"
+      ],
+      "semantic_scores": {
+        "cmd_require_approval": 0.71402697,
+        "net_ping": 0.72277939,
+        "net_port_scan": 0.73520404,
+        "pc_driver_check": 0.71320807,
+        "pc_process_kill": 0.71091678,
+        "pc_run_command": 0.73866493,
+        "pc_run_powershell": 0.72309041
+      }
+    },
+    "intent-119": {
+      "semantic": [
+        "long_task_status",
+        "registry_backup",
+        "registry_set",
+        "system_restore_point",
+        "win_service_action",
+        "win_services_list",
+        "win_startup_programs"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "long_task_status": 0.68759235,
+        "registry_backup": 0.69517792,
+        "registry_set": 0.694587,
+        "system_restore_point": 0.70013157,
+        "win_service_action": 0.71614691,
+        "win_services_list": 0.72263043,
+        "win_startup_programs": 0.68567242
+      }
+    },
+    "intent-120": {
+      "semantic": [
+        "net_route_diagnostics",
+        "pc_gui_read",
+        "pc_notify",
+        "pc_run_command",
+        "pc_run_powershell",
+        "win_scheduled_tasks",
+        "win_startup_programs",
+        "win_system_report"
+      ],
+      "learned": [
+        "tool_search"
+      ],
+      "semantic_scores": {
+        "net_route_diagnostics": 0.77080163,
+        "pc_gui_read": 0.76218255,
+        "pc_notify": 0.76086476,
+        "pc_run_command": 0.78794644,
+        "pc_run_powershell": 0.76124331,
+        "win_scheduled_tasks": 0.77550194,
+        "win_startup_programs": 0.77619662,
+        "win_system_report": 0.76926372
+      }
+    },
+    "tr-dev-001": {
+      "semantic": [
+        "document_list",
+        "net_inventory_list",
+        "os_network_adapters",
+        "pc_process_list",
+        "win_services_list",
+        "win_users_list"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "document_list": 0.55695068,
+        "net_inventory_list": 0.54602291,
+        "os_network_adapters": 0.56725994,
+        "pc_process_list": 0.57199838,
+        "win_services_list": 0.5399245,
+        "win_users_list": 0.53777851
+      }
+    },
+    "tr-dev-002": {
+      "semantic": [
+        "doc_intervention_update",
+        "long_task_stop",
+        "pc_process_kill",
+        "pc_process_list",
+        "win_services_list",
+        "windows_task"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "doc_intervention_update": 0.52447196,
+        "long_task_stop": 0.54804554,
+        "pc_process_kill": 0.54105874,
+        "pc_process_list": 0.53623114,
+        "win_services_list": 0.50498309,
+        "windows_task": 0.52967346
+      }
+    },
+    "tr-dev-003": {
+      "semantic": [
+        "pc_app_launch",
+        "win_quick_launch",
+        "win_quick_launch_list",
+        "win_startup_programs"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "pc_app_launch": 0.58426651,
+        "win_quick_launch": 0.61655951,
+        "win_quick_launch_list": 0.57454553,
+        "win_startup_programs": 0.63845878
+      }
+    },
+    "tr-dev-004": {
+      "semantic": [
+        "pc_tailscale_status",
+        "tweak_telemetry",
+        "win_service_action",
+        "win_services_list",
+        "windows_task"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "pc_tailscale_status": 0.53056598,
+        "tweak_telemetry": 0.53500842,
+        "win_service_action": 0.5902419,
+        "win_services_list": 0.58912198,
+        "windows_task": 0.5322285
+      }
+    },
+    "tr-dev-005": {
+      "semantic": [
+        "winget_install",
+        "winget_list_upgrades",
+        "winget_search",
+        "winget_uninstall",
+        "winget_upgrade"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "winget_install": 0.64791076,
+        "winget_list_upgrades": 0.63999176,
+        "winget_search": 0.69467082,
+        "winget_uninstall": 0.64700952,
+        "winget_upgrade": 0.64345621
+      }
+    },
+    "tr-dev-006": {
+      "semantic": [
+        "net_inventory_annotate",
+        "net_inventory_list",
+        "net_inventory_scan",
+        "pc_installed_software",
+        "winget_list_installed"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "net_inventory_annotate": 0.53289409,
+        "net_inventory_list": 0.5295807,
+        "net_inventory_scan": 0.53080289,
+        "pc_installed_software": 0.53069645,
+        "winget_list_installed": 0.51895932
+      }
+    },
+    "tr-dev-007": {
+      "semantic": [
+        "pc_app_launch",
+        "pc_clipboard_get",
+        "pc_reveal",
+        "win_startup_programs",
+        "win_update_status",
+        "windows_task",
+        "winget_install"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "pc_app_launch": 0.54734944,
+        "pc_clipboard_get": 0.53536663,
+        "pc_reveal": 0.55452985,
+        "win_startup_programs": 0.53419285,
+        "win_update_status": 0.54379887,
+        "windows_task": 0.53736447,
+        "winget_install": 0.54252698
+      }
+    },
+    "tr-dev-008": {
+      "semantic": [
+        "pc_installed_software",
+        "tweak_debloat_list",
+        "tweak_debloat_remove",
+        "winget_list_installed",
+        "winget_uninstall"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "pc_installed_software": 0.52957066,
+        "tweak_debloat_list": 0.53027261,
+        "tweak_debloat_remove": 0.57565606,
+        "winget_list_installed": 0.55105373,
+        "winget_uninstall": 0.55176788
+      }
+    },
+    "tr-dev-009": {
+      "semantic": [
+        "document_forget",
+        "document_index",
+        "document_list",
+        "file_find",
+        "file_search_text",
+        "search_semantic",
+        "system_search",
+        "system_search_content"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "document_forget": 0.5450754,
+        "document_index": 0.53642504,
+        "document_list": 0.54539858,
+        "file_find": 0.54406286,
+        "file_search_text": 0.54839495,
+        "search_semantic": 0.53855665,
+        "system_search": 0.54499189,
+        "system_search_content": 0.55706166
+      }
+    },
+    "tr-dev-010": {
+      "semantic": [
+        "file_search_text",
+        "search_semantic",
+        "system_search_content",
+        "text_summarize",
+        "unified_search"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "file_search_text": 0.6139262,
+        "search_semantic": 0.62892236,
+        "system_search_content": 0.60766806,
+        "text_summarize": 0.60763251,
+        "unified_search": 0.62102949
+      }
+    },
+    "tr-dev-011": {
+      "semantic": [
+        "file_create_folder",
+        "file_extract",
+        "file_move",
+        "file_rename",
+        "google_drive_upload",
+        "onedrive_upload",
+        "project_create"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "file_create_folder": 0.52975178,
+        "file_extract": 0.52572311,
+        "file_move": 0.64439831,
+        "file_rename": 0.5463639,
+        "google_drive_upload": 0.52446055,
+        "onedrive_upload": 0.51947552,
+        "project_create": 0.51868502
+      }
+    },
+    "tr-dev-012": {
+      "semantic": [
+        "file_copy",
+        "file_create_folder",
+        "file_duplicate_finder",
+        "file_move"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "file_copy": 0.56980993,
+        "file_create_folder": 0.56201704,
+        "file_duplicate_finder": 0.63075077,
+        "file_move": 0.5657995
+      }
+    },
+    "tr-dev-013": {
+      "semantic": [
+        "net_dns_lookup",
+        "net_nmap_scan",
+        "net_route_diagnostics",
+        "net_subnet_sweep",
+        "net_traceroute",
+        "win_network_config"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "net_dns_lookup": 0.54896684,
+        "net_nmap_scan": 0.54902392,
+        "net_route_diagnostics": 0.63766255,
+        "net_subnet_sweep": 0.55861971,
+        "net_traceroute": 0.55402409,
+        "win_network_config": 0.54702583
+      }
+    },
+    "tr-dev-014": {
+      "semantic": [
+        "doc_intervention_list",
+        "doc_intervention_update",
+        "net_dns_lookup",
+        "net_tls_check",
+        "registry_set"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "doc_intervention_list": 0.51781095,
+        "doc_intervention_update": 0.52832321,
+        "net_dns_lookup": 0.54754564,
+        "net_tls_check": 0.51817181,
+        "registry_set": 0.52756124
+      }
+    },
+    "tr-dev-015": {
+      "semantic": [
+        "doc_asset_create",
+        "net_dns_lookup",
+        "net_port_scan",
+        "os_firewall",
+        "win_firewall_status"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "doc_asset_create": 0.5532437,
+        "net_dns_lookup": 0.52799656,
+        "net_port_scan": 0.52394701,
+        "os_firewall": 0.62725719,
+        "win_firewall_status": 0.64837565
+      }
+    },
+    "tr-dev-016": {
+      "semantic": [
+        "win_disk_info",
+        "win_event_log",
+        "win_services_list",
+        "win_system_report",
+        "win_users_list",
+        "windows_task"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "win_disk_info": 0.54998553,
+        "win_event_log": 0.56329924,
+        "win_services_list": 0.54479869,
+        "win_system_report": 0.58075331,
+        "win_users_list": 0.55242375,
+        "windows_task": 0.54472
+      }
+    },
+    "tr-dev-017": {
+      "semantic": [
+        "client_health_compute",
+        "pc_disk_smart_health",
+        "pc_health_trend",
+        "ssh_server_info",
+        "win_disk_info"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "client_health_compute": 0.51334147,
+        "pc_disk_smart_health": 0.60744784,
+        "pc_health_trend": 0.51846868,
+        "ssh_server_info": 0.51878764,
+        "win_disk_info": 0.52747766
+      }
+    },
+    "tr-dev-018": {
+      "semantic": [
+        "computer_control",
+        "os_dark_mode",
+        "pc_browse",
+        "pc_gui_read",
+        "pc_reveal",
+        "pc_screenshot"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "computer_control": 0.53495766,
+        "os_dark_mode": 0.4956651,
+        "pc_browse": 0.49772802,
+        "pc_gui_read": 0.4892376,
+        "pc_reveal": 0.50717467,
+        "pc_screenshot": 0.48542827
+      }
+    },
+    "tr-dev-019": {
+      "semantic": [
+        "computer_control",
+        "os_dark_mode",
+        "pc_clipboard_get",
+        "pc_gui_click",
+        "pc_gui_read",
+        "pc_gui_type",
+        "win_quick_launch"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "computer_control": 0.54789065,
+        "os_dark_mode": 0.54089807,
+        "pc_clipboard_get": 0.51570529,
+        "pc_gui_click": 0.54131179,
+        "pc_gui_read": 0.51482245,
+        "pc_gui_type": 0.53355795,
+        "win_quick_launch": 0.5181974
+      }
+    },
+    "tr-dev-020": {
+      "semantic": [
+        "calendar_list",
+        "calendar_subscribe",
+        "calendar_subscriptions",
+        "calendar_update",
+        "event_list"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "calendar_list": 0.63982215,
+        "calendar_subscribe": 0.59526679,
+        "calendar_subscriptions": 0.63341023,
+        "calendar_update": 0.59581417,
+        "event_list": 0.5919085
+      }
+    },
+    "tr-dev-021": {
+      "semantic": [
+        "email_accounts",
+        "email_apply_rules",
+        "email_digest",
+        "email_list",
+        "email_search"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "email_accounts": 0.56486556,
+        "email_apply_rules": 0.58774703,
+        "email_digest": 0.5718263,
+        "email_list": 0.61299374,
+        "email_search": 0.56622291
+      }
+    },
+    "tr-dev-022": {
+      "semantic": [
+        "cmd_extract_from_text",
+        "file_convert_docx_to_pdf",
+        "ocr_extract",
+        "pdf_extract_images",
+        "pdf_read",
+        "text_extract"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "cmd_extract_from_text": 0.61604469,
+        "file_convert_docx_to_pdf": 0.63395205,
+        "ocr_extract": 0.65063759,
+        "pdf_extract_images": 0.62328761,
+        "pdf_read": 0.61261483,
+        "text_extract": 0.63642383
+      }
+    },
+    "tr-dev-023": {
+      "semantic": [
+        "ssh_download",
+        "ssh_exec_multi",
+        "ssh_list",
+        "ssh_list_dir",
+        "ssh_server_info",
+        "ssh_upload",
+        "ssh_write_and_run"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "ssh_download": 0.67487024,
+        "ssh_exec_multi": 0.63513815,
+        "ssh_list": 0.69131108,
+        "ssh_list_dir": 0.72281667,
+        "ssh_server_info": 0.65010156,
+        "ssh_upload": 0.648314,
+        "ssh_write_and_run": 0.66328792
+      }
+    },
+    "tr-dev-024": {
+      "semantic": [
+        "billing_seed_trade",
+        "it_kb_search",
+        "pc_driver_check",
+        "search_semantic",
+        "ssh_download",
+        "ssh_list",
+        "web_deep_research",
+        "winget_search"
+      ],
+      "learned": [],
+      "semantic_scores": {
+        "billing_seed_trade": 0.47953031,
+        "it_kb_search": 0.48399224,
+        "pc_driver_check": 0.45338575,
+        "search_semantic": 0.47558083,
+        "ssh_download": 0.46891232,
+        "ssh_list": 0.45525642,
+        "web_deep_research": 0.45119417,
+        "winget_search": 0.45493598
+      }
+    }
+  }
+}
