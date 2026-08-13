@@ -1,0 +1,22 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.1",
+  "status": "frozen_after_aborted_generation_before_any_artifact",
+  "source_generator": {
+    "path": "scripts/generate_tool_selection_stage_b_holdout.py",
+    "sha256": "42ebc280403be6ee5da55c4cfee13db7e09f4f9992d23f36ae0a874680867977"
+  },
+  "observation": {
+    "published_artifact_count": 0,
+    "business_tool_execution_count": 0,
+    "failure_stage": "author_identifier_syntax_validation",
+    "semantic_content_was_not_scored": true
+  },
+  "authorized_change": {
+    "model_authored_identifiers_are_ignored": true,
+    "generator_assigns_deterministic_identifiers_from_family_and_ordinal": true,
+    "prompt_family_and_argument_facts_validation_unchanged": true,
+    "novelty_oracle_privacy_and_decision_rules_unchanged": true
+  },
+  "rationale": "Opaque identifiers carry no routing semantics and must not make corpus validity depend on a model formatting preference.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
