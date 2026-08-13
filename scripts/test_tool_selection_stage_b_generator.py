@@ -19,6 +19,7 @@ def main() -> None:
     assert "ADJUDICATOR_POLICY" in text and "_adjudications" in text
     assert "adjudicator_rejected" in text
     assert "CRITIC_POLICY" in text and "_schema_valid_calls" in text
+    assert "ORACLE_B_POLICY" in text and "oracle_b_model" in text
     assert "critic_rejected" in text and "processus/service" in text
     assert "RELEVANT_PREFIXES" in text and "RELEVANT_EXACT" in text
     assert "for family_index, family in enumerate(ALLOWED_FAMILIES)" in text
@@ -41,6 +42,13 @@ def main() -> None:
     assert module._adjudications({"items": [{"id": "a", "valid": True}]}, {"a", "b"}) == {"a": True, "b": False}
     assert module._adjudications({"items": [{"id": "a", "valid": True}, {"id": "a", "valid": True}]}, {"a"}) == {"a": False}
     assert module._adjudications({"items": [{"id": "a", "valid": "true"}]}, {"a"}) == {"a": False}
+    assert module._json_content('```json\n{"ok":true}\n```') == {"ok": True}
+    try:
+        module._json_content('préface {"ok":true}')
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Le parseur ne doit pas extraire un JSON noyé dans du texte libre.")
     print("Stage B generator OK - no Stage A labels, dual oracle, private novelty local only.")
 
 if __name__ == "__main__":

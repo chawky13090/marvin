@@ -26,6 +26,7 @@ from tools import TOOLS_SPEC
 POLICY = ROOT / "benchmarks/tool-selection/v1.2/stage-b-preregistration.json"
 ADJUDICATOR_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.3.json"
 CRITIC_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.6.json"
+ORACLE_B_POLICY = ROOT / "benchmarks/tool-selection/v1.2/holdout-generator-erratum-v1.13.json"
 OUTPUT_DIR = ROOT / "benchmarks/tool-selection/v1.2"
 CORPUS = OUTPUT_DIR / "holdout-corpus.json"
 ORACLE = OUTPUT_DIR / "holdout-oracle.json"
@@ -69,6 +70,15 @@ def _jaccard(left: str, right: str) -> float:
     a, b = _tokens(left), _tokens(right)
     return len(a & b) / len(a | b) if a or b else 1.0
 
+def _json_content(content: str) -> dict[str, Any]:
+    stripped = content.strip()
+    if stripped.startswith("```json") and stripped.endswith("```"):
+        stripped = stripped[7:-3].strip()
+    parsed = json.loads(stripped)
+    if not isinstance(parsed, dict):
+        raise ValueError("La réponse JSON racine doit être un objet.")
+    return parsed
+
 def _chunks(rows: list[dict[str, Any]], size: int = 16) -> list[list[dict[str, Any]]]:
     return [rows[index:index + size] for index in range(0, len(rows), size)]
 
@@ -91,7 +101,7 @@ async def _chat(model: str, system: str, user: str, *, seed: int) -> tuple[dict[
                 response = await client.post(f"{OLLAMA}/api/chat", json=payload); response.raise_for_status()
             body = response.json()
             content = str((body.get("message") or {}).get("content") or "")
-            parsed = json.loads(content)
+            parsed = _json_content(content)
             return parsed, {
                 "requested_model": model, "observed_model": str(body.get("model") or ""),
                 "raw_response_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
@@ -235,13 +245,19 @@ async def run() -> dict[str, Any]:
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     adjudicator_policy = json.loads(ADJUDICATOR_POLICY.read_text(encoding="utf-8"))
     critic_policy = json.loads(CRITIC_POLICY.read_text(encoding="utf-8"))
+    oracle_b_policy = json.loads(ORACLE_B_POLICY.read_text(encoding="utf-8"))
     if policy["status"] != "frozen_before_holdout_generation": raise RuntimeError("Politique Stage B non gelée.")
     models = await _models()
-    for role in ("author", "oracle_a", "oracle_b", "benchmark"):
+    for role in ("author", "oracle_a", "benchmark"):
         expected = policy["independent_roles"][role]
         observed = models.get(expected["model"])
         if not observed or str(observed.get("digest") or "") != expected["digest"] or not observed.get("remote_host"):
             raise RuntimeError(f"Provenance Cloud invalide pour {role}.")
+    oracle_b_contract = oracle_b_policy["authorized_change"]
+    oracle_b_model = str(oracle_b_contract["oracle_b_model"])
+    oracle_b_row = models.get(oracle_b_model)
+    if not oracle_b_row or str(oracle_b_row.get("digest") or "") != oracle_b_contract["oracle_b_digest"] or not oracle_b_row.get("remote_host"):
+        raise RuntimeError("Provenance Cloud invalide pour oracle_b.")
     adjudicator_contract = adjudicator_policy["authorized_change"]
     adjudicator_model = str(adjudicator_contract["adjudicator_model"])
     adjudicator_row = models.get(adjudicator_model)
@@ -292,6 +308,7 @@ async def run() -> dict[str, Any]:
     oracle_values = {"oracle_a": {}, "oracle_b": {}}
     oracle_meta = {"oracle_a": [], "oracle_b": []}
     for index, role in enumerate(("oracle_a", "oracle_b"), start=1):
+        role_model = oracle_b_model if role == "oracle_b" else policy["independent_roles"][role]["model"]
         for family_index, family in enumerate(ALLOWED_FAMILIES):
             family_rows = [row for row in candidates if row["family"] == family]
             for batch_index, batch in enumerate(_chunks(family_rows), start=1):
@@ -304,7 +321,7 @@ async def run() -> dict[str, Any]:
                     "imposés. Refuse tout nom absent du catalogue. Ne déduis rien d'un résultat de benchmark.\nCATALOGUE:\n"
                     + catalog_json + "\nDEMANDES:\n" + json.dumps(batch, ensure_ascii=False, separators=(",", ":"))
                 )
-                raw, meta = await _chat(policy["independent_roles"][role]["model"], "Tu es un oracle fonctionnel indépendant. JSON strict, sans Markdown.", oracle_user, seed=2651 + index)
+                raw, meta = await _chat(role_model, "Tu es un oracle fonctionnel indépendant. JSON strict, sans Markdown.", oracle_user, seed=2651 + index)
                 oracle_values[role].update(_normalize_oracle(raw, batch_ids, {str(item["function"]["name"]) for item in relevant_spec}))
                 oracle_meta[role].append({"family": family, "batch": batch_index, **meta})
 
