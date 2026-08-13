@@ -1,0 +1,21 @@
+{
+  "schema": "marvin.tool-selection-stage-b-b1-result-erratum/1.1",
+  "status": "immutable_result_interpretation_correction",
+  "source_result": {
+    "path": "benchmarks/tool-selection/v1.2/stage-b-b1-result.json",
+    "sha256": "48c3872f52cfe808bdc8e63d8b01fd4ff012324f3e96a22bab08f2828e7056ae"
+  },
+  "source_result_modified": false,
+  "observation": {
+    "public_tool_name_violations": 0,
+    "candidate_membership_violations": 30,
+    "total_observations": 810,
+    "violation_rate": 0.037037,
+    "business_tool_execution_count": 0,
+    "host_side_effect_count": 0
+  },
+  "interpretation": "The benchmark model emitted 30 existing public tool names that were not among the schemas sent for that observation. Native tool calling therefore does not guarantee candidate membership. These calls are rejected by product membership enforcement and never executed, but they are invalid selections and must not be represented by the aggregate public-name validity rate alone.",
+  "assessment_rule": "candidate_membership_violation_is_a_selection_failure_and_blocks_generalization_even_when_the_name_exists_globally",
+  "raw_result_rewrite_forbidden": true,
+  "rollback": "Preserve both raw result and erratum; supersede only through a new versioned campaign."
+}

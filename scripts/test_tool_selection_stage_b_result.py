@@ -41,7 +41,12 @@ def main() -> None:
     cells = Counter((row["id"], row["mode"], row["configuration"]) for row in observations)
     assert len(cells) == 270 and set(cells.values()) == {3}
     assert all(row["public_tool_name_valid"] for row in observations)
-    assert all(row["candidate_membership_valid"] for row in observations if row["name"] is not None)
+    candidate_membership_violations = [
+        row for row in observations
+        if row["name"] is not None and not row["candidate_membership_valid"]
+    ]
+    assert len(candidate_membership_violations) == 30
+    assert all(row["public_tool_name_valid"] for row in candidate_membership_violations)
     assert all(1 <= row["attempts"] <= 3 for row in observations)
     assert all("content" not in row and "raw_response" not in row for row in observations)
     assert all(len(row["content_sha256"]) == 64 for row in observations)
