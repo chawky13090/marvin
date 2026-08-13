@@ -1,0 +1,14 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.2",
+  "status": "frozen_after_second_aborted_generation_before_any_artifact",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "8eb48b16197f976f51b9841ad3688c807ee99ad995fd2b69eac9300f198d83d6"},
+  "observation": {"published_artifact_count": 0, "business_tool_execution_count": 0, "failure_stage": "author_argument_facts_container_validation", "semantic_content_was_not_scored": true},
+  "authorized_change": {
+    "author_argument_facts_are_ignored": true,
+    "author_role_reduced_to_family_and_prompt_only": true,
+    "both_independent_oracles_derive_argument_constraints_from_prompt": true,
+    "prompt_family_novelty_privacy_and_decision_rules_unchanged": true
+  },
+  "rationale": "The corpus author must not influence the oracle; argument constraints are valid only when both independent oracle models derive them from the prompt.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
