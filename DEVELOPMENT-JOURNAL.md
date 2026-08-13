@@ -31,8 +31,17 @@ SQLite. Les artefacts publics contiennent uniquement métadonnées de catalogue,
 chemins relatifs et empreintes. Aucun nouveau log runtime. Le rollback consiste à révertir
 atomiquement les commits v2.650; aucune donnée persistante ni preuve historique n'est à
 restaurer. Validation ciblée : pré-enregistrement, résolveur, inventaire, runner exhaustif et
-compilation passent. Le gate complet, le redémarrage froid et les smokes restent requis avant
-la clôture.
+compilation passent. Un premier gate a correctement refusé le build Next.js parce que le
+frontend Turbopack tournait encore; Marvin a ensuite été arrêté proprement, sans processus
+forcé, avant le rejeu. Le rapport atomique final confirme 316/316 étapes exécutées, zéro
+échec et quatre smokes live différés sur 320 attendues, en 705 secondes, build de production
+inclus. Le redémarrage froid atteint l'état `ready` en 97,5 secondes avec Marvin 2.650.0,
+364 outils, Ollama, SearXNG, HTTPS, Code Workspace et VM Lab disponibles. Les smokes
+séquentiels terminent avec 28/28 contrats API, 41/41 pages, chat 5/5 et voix strictement
+sérialisée. Un timeout transitoire de lecture `/api/learning` a été récupéré par le retry
+borné sans faux succès. Les quatre approbations en attente ont été conservées : aucun tour,
+outil métier ou effet externe n'a été interrompu ou exécuté; elles ont ensuite dépassé
+leur expiration normale pendant la validation.
 
 ## 2026-08-13 — v2.649.0 — cache borné des motifs de sélection
 
