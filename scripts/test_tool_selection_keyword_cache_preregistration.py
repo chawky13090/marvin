@@ -49,7 +49,15 @@ def main() -> None:
         cwd=ROOT,
     )
     assert hashlib.sha256(frozen).hexdigest() == policy["source_agent_tool_selection_sha256"]
-    assert sha256(ROOT / "scripts/run_tool_selection_ablation.py") == policy["source_runner_sha256"]
+    frozen_runner = subprocess.check_output(
+        [
+            "git",
+            "show",
+            f"{policy['source_commit']}:scripts/run_tool_selection_ablation.py",
+        ],
+        cwd=ROOT,
+    )
+    assert hashlib.sha256(frozen_runner).hexdigest() == policy["source_runner_sha256"]
     print(
         "Tool Selection Keyword Cache Preregistration OK - "
         "abandon préservé, changement borné et équivalence obligatoire."

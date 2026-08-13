@@ -58,6 +58,13 @@ nouveau holdout indépendant et les métriques finales. Les deux panels utilisé
 brûlés pour toute optimisation produit. Les résultats privés publiés restent six compteurs ou
 taux globaux par mode/configuration; aucun texte, message, conversation ou détail par outil.
 
+La première gate v2.649 obtient 316 étapes vertes sur 318, build inclus. Deux contrôles de
+portabilité échouent : `CLAUDE.md` annonce encore v2.648, et le test du pré-enregistrement du
+cache compare l'ancien runner au fichier courant après sa supersession v1.1. La correction ne
+modifie aucune politique ni preuve : la version portable devient 2.649 et l'empreinte historique
+est comparée au blob `git show` du commit source, comme les cinq sources produit. Le résultat
+316/318 reste enregistré comme échec et une gate exhaustive neuve est obligatoire.
+
 ## 2026-08-13 — v2.648.0 — frontière réelle d'indexation des notes
 
 Après un gate v2.647 entièrement vert (307 exécutées, 4 smokes différés sur 311), le premier
