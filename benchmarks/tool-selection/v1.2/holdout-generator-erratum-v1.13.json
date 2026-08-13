@@ -1,0 +1,29 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.13",
+  "status": "frozen_after_cloud_oracle_transport_failure_before_holdout_freeze",
+  "source_generator": {
+    "path": "scripts/generate_tool_selection_stage_b_holdout.py",
+    "sha256": "b075a2ceb19b5741d138a989a5d684f829fc9d9bdf6cb7e14ffb40eb27ae91b5"
+  },
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0,
+    "published_candidate_artifact_count": 0,
+    "failed_role": "oracle_b",
+    "failed_model": "deepseek-v4-pro:cloud",
+    "failure_class": "empty_or_non_json_response_after_three_bounded_attempts",
+    "individual_prompts_and_reviewer_decisions_not_used_for_selection": true
+  },
+  "authorized_change": {
+    "oracle_b_model": "kimi-k2.7-code:cloud",
+    "oracle_b_digest": "eda07a6592375dcbde7cf167b6d6b368cdd28e244f9d71559fb59919aca882fa",
+    "remote_host_required": true,
+    "benchmark_model_remains_unseen_and_uninvoked": true,
+    "semantic_oracle_prompt_filters_and_thresholds_unchanged": true,
+    "json_parser_may_remove_one_outer_markdown_json_fence_only": true,
+    "generic_json_probe_used_no_holdout_or_product_result": true
+  },
+  "rationale": "The original independent oracle is operationally unusable after the frozen retry budget. Kimi is a distinct Cloud family and answered the pre-corpus JSON capability probe; stripping one outer JSON fence changes syntax handling only, never oracle semantics.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
