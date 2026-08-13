@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.650.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.651.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.650.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.651.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.650.0)
+## 9. État actuel (v2.651.0)
+
+**v2.651 (Stage B du choix final d'outil)** : 30 intentions synthétiques inédites et leurs
+oracles multiples outil+action+contraintes ont été générés par cinq familles Cloud distinctes,
+gelés avant que le modèle benchmark ne les voie, puis évalués sur K+L+S/K+S/S dans les modes
+Eco/Balanced/Performance, avec trois répétitions. Les 810 choix natifs n'exécutent aucun outil.
+Le meilleur taux accepté est 65,56 %; aucune cellule n'atteint le seuil de 90 %, et lancement
+d'application/logiciels plafonnent à 40 %. Les noms restent publics, mais 30 appels visent un
+outil non proposé et sont refusés. Aucune simplification ni façade n'est activée; K+L+S reste
+provisoirement en production et le prochain holdout devra être neuf après correction
+indépendante de la désambiguïsation. Rollback : réversion atomique des commits v2.651; aucune
+donnée persistante ni configuration produit n'a été modifiée.
 
 **v2.650 (source canonique des preuves courantes)** : un registre externe résout les
 supersessions par sujet et préserve les octets de toutes les preuves historiques. Les 22

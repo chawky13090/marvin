@@ -5,6 +5,36 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-13 — v2.651.0 — Stage B du choix final d'outil
+
+La campagne indépendante mesure enfin le problème utilisateur initial au niveau du choix natif
+du LLM, après présélection. Le protocole, les modèles Cloud à contexte fournisseur maximal,
+les 30 intentions synthétiques inédites, les oracles outil+action+contraintes, le runner et
+l'autorisation à usage unique ont été gelés avant tout appel à
+`mistral-large-3:675b-cloud`. Les échecs de génération n'ont publié aucun artefact partiel;
+leurs corrections ont été pré-enregistrées sans abaisser un seuil ni récupérer un cas rejeté.
+
+B1 produit 810 observations : 30 intentions × K+L+S/K+S/S × Eco/Balanced/Performance ×
+trois répétitions. Aucun outil métier n'est exécuté. Le meilleur taux accepté est 65,56 %
+pour K+L+S en Eco, loin du seuil de 90 %. `application_launch` et `software_management` ne
+dépassent jamais 40 %. Aucun nom public n'est inventé, mais 30 appels utilisent un outil
+public absent des schémas réellement envoyés; l'erratum les compte comme sélections invalides
+et le produit les refuserait avant exécution. Les arguments évaluables sont valides entre
+97,5904 % et 100 % selon la cellule.
+
+Décision mécanique : aucune configuration ne survit à B1, donc aucune simplification et aucune
+façade ne sont activées. K+L+S reste provisoirement le chemin produit. B2 n'est pas lancé :
+une exécution isolée ne peut pas réparer un choix B1 refusé et ajouterait des mutations sans
+pouvoir changer le verdict. Le prochain travail produit vise la désambiguïsation sémantique,
+en priorité lancement d'application et logiciels, puis un nouveau holdout indépendant; le
+holdout v1.2 est désormais brûlé pour l'optimisation.
+
+Sécurité, données et logs : 0 exécution métier, 0 effet hôte, aucune réponse Cloud brute ni
+donnée personnelle publiée, concurrence bornée à trois, retries bornés à trois et aucune
+`num_ctx` envoyée aux modèles Cloud. Le résultat brut est immuable et lié par SHA-256 à la
+politique, au corpus, à l'oracle, au runner et à l'autorisation. Rollback : réversion atomique
+des commits v2.651; aucune donnée persistante ou configuration produit n'a été modifiée.
+
 ## 2026-08-13 — v2.650.0 — source canonique des preuves courantes
 
 Un audit externe a interprété l'analyse E7 v1.4 comme courante alors que cinq sujets avaient
