@@ -1,0 +1,27 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.11",
+  "status": "frozen_after_aggregate_shortfall_before_holdout_freeze",
+  "source_generator": {
+    "path": "scripts/generate_tool_selection_stage_b_holdout.py",
+    "sha256": "8edc3675b18fd214e0b67eb70b47f26baf1737b8d86b0e8b12cd4996ea4b54be"
+  },
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0,
+    "published_candidate_artifact_count": 0,
+    "failure_class": "fewer_than_five_survivors_in_at_least_one_family_after_all_frozen_filters",
+    "individual_prompts_and_reviewer_decisions_not_used_for_selection": true
+  },
+  "authorized_change": {
+    "authored_candidates_per_family": 64,
+    "same_fixed_pool_size_for_every_family": true,
+    "selected_holdout_per_family_remains": 5,
+    "selection_order_remains_author_order_after_all_filters": true,
+    "all_filters_models_prompts_parameters_and_decision_rules_unchanged": true,
+    "no_manual_case_selection": true,
+    "no_adaptive_family_specific_threshold": true
+  },
+  "rationale": "A uniformly doubled fixed pool preserves identical treatment of all families while making strict dual-oracle and dual-review filtering robust. No rejected case is recovered and no acceptance predicate changes.",
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
