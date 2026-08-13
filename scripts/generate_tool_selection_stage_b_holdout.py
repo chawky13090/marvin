@@ -121,13 +121,11 @@ def _validate_author(items: Any, policy: dict[str, Any]) -> list[dict[str, Any]]
     for row in items:
         if not isinstance(row, dict): continue
         family, prompt = str(row.get("family") or ""), str(row.get("prompt") or "").strip()
-        facts = row.get("argument_facts")
-        if family not in ALLOWED_FAMILIES or not 20 <= len(prompt) <= 600 or not isinstance(facts, dict): continue
+        if family not in ALLOWED_FAMILIES or not 20 <= len(prompt) <= 600: continue
         if any(pattern.search(prompt) for pattern in FORBIDDEN_PERSONAL): continue
-        if any(not isinstance(key, str) or not isinstance(value, (str, int, float, bool, type(None))) for key, value in facts.items()): continue
         family_ordinals[family] += 1
         identity = f"sb-{family.replace('_', '-')}-{family_ordinals[family]:02d}"
-        output.append({"id": identity, "family": family, "prompt": prompt, "argument_facts": facts})
+        output.append({"id": identity, "family": family, "prompt": prompt})
     required = int(policy["holdout"]["minimum_per_family"])
     counts = Counter(row["family"] for row in output)
     if any(counts[family] < required for family in ALLOWED_FAMILIES):
@@ -187,10 +185,10 @@ async def run() -> dict[str, Any]:
     family_counts = {name: 8 for name in ALLOWED_FAMILIES}
     author_user = (
         "Crée un corpus inédit de demandes Windows en français. Retourne un objet JSON {items:[...]}. "
-        f"Produis exactement {family_counts}. Chaque item contient id, family, prompt, argument_facts. "
+        f"Produis exactement {family_counts}. Chaque item contient seulement id, family et prompt. "
         "Le prompt doit être naturel, mono-intention, synthétique et précis. Utilise uniquement des fixtures "
         "sous C:\\Fixture, des processus marvin_fixture_*.exe, des applications Windows génériques et des "
-        "logiciels publics connus. argument_facts contient seulement les valeurs explicitement demandées. "
+        "logiciels publics connus. "
         "N'indique jamais le nom d'un outil dans le prompt. Ne fournis aucun oracle. Familles: "
         "file_discovery=chercher/lister par nom ou contenu; file_mutation=renommer/déplacer/copier/créer; "
         "application_launch=lancer une application; process_inventory=lister/inspecter les processus; "
