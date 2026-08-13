@@ -1,0 +1,20 @@
+{
+  "schema": "marvin.td015-closure-abort/1.0",
+  "generated_at": "2026-08-13T10:36:54.2235091Z",
+  "freeze_sha256": "be8a056fa23da8bdb2cbe6e542a5cdd4b469ad7482159b047a9bfc42d8f2df7a",
+  "source_commit": "3ff43b7b670aff35c24da616114557d83a294d5b",
+  "local_abort_sha256": "611d35d5a65ca7d7711d4c21a6b71a31dd9fc651a470eef4651f1d964e430cdf",
+  "completed_cycles": 0,
+  "failed_cycle": 1,
+  "failed_stage": "chat_smoke",
+  "result_published": false,
+  "criteria_changed_after_failure": false,
+  "observation": "La readiness et les contrôles historiques ont précédé un échec du smoke chat 5/5. Le rapport temporaire du smoke n'était pas conservé par le runner v1.",
+  "diagnosis": {
+    "backend_http_5xx_observed": 0,
+    "next_proxy_http_503_observed_before_campaign": 1,
+    "confirmed_cause": "La route lourde abandonnait chaque lecture après 6000 ms puis pouvait en lancer quatre. Les threads FastAPI abandonnés continuaient et amplifiaient la charge.",
+    "evidence": "Les métriques backend ont mesuré des GET conversation entre 6879 et 19672 ms sans 5xx backend."
+  },
+  "supersession_required_before_retry": true
+}

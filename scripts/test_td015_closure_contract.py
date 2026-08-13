@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "benchmarks" / "conversation-history" / "td015-closure-policy.json"
 FREEZE = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze.json"
 RESULT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-result.json"
+ABORT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-v1-abort.json"
 
 
 def _sha256(path: Path) -> str:
@@ -120,7 +121,26 @@ def _assert_freeze(freeze: dict) -> None:
     )
     assert commit.returncode == 0
     for relative, expected in freeze["source_hashes"].items():
-        assert _sha256(ROOT / relative) == expected, relative
+        if _sha256(ROOT / relative) == expected:
+            continue
+        blob = subprocess.run(
+            ["git", "show", f'{freeze["source_commit"]}:{relative}'],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        assert hashlib.sha256(blob).hexdigest() == expected, relative
+
+
+def _assert_abort(abort: dict, freeze: dict) -> None:
+    assert abort["schema"] == "marvin.td015-closure-abort/1.0"
+    assert abort["freeze_sha256"] == _sha256(FREEZE)
+    assert abort["source_commit"] == freeze["source_commit"]
+    assert abort["completed_cycles"] == 0
+    assert abort["failed_cycle"] == 1
+    assert abort["failed_stage"] == "chat_smoke"
+    assert abort["result_published"] is False
+    assert abort["criteria_changed_after_failure"] is False
 
 
 def _assert_result(result: dict, policy: dict, freeze: dict) -> None:
@@ -163,6 +183,8 @@ def main() -> None:
     if FREEZE.exists():
         freeze = _load_json(FREEZE)
         _assert_freeze(freeze)
+        if ABORT.exists():
+            _assert_abort(_load_json(ABORT), freeze)
         if RESULT.exists():
             _assert_result(_load_json(RESULT), policy, freeze)
     elif RESULT.exists():

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { BackendReadUnavailable, fetchBackendRead } from '../lib/backendRead.mjs';
 
 let calls = 0;
@@ -33,4 +34,14 @@ await assert.rejects(
   error => error instanceof BackendReadUnavailable && !error.message.includes('secret'),
 );
 
-console.log('Backend Read OK - retries bornés, 4xx non rejoués et erreur expurgée.');
+const conversationRoute = await readFile(
+  new URL('../app/api/conversations/[id]/route.js', import.meta.url),
+  'utf8',
+);
+assert.match(
+  conversationRoute,
+  /fetchBackendRead\([\s\S]*?attempts:\s*1,[\s\S]*?timeoutMs:\s*30000/,
+  'une conversation lourde doit avoir une seule tentative longue, sans amplification',
+);
+
+console.log('Backend Read OK - retries bornés, 4xx non rejoués, lecture lourde non amplifiée.');

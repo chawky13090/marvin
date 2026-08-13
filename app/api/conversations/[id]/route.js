@@ -15,7 +15,12 @@ export async function GET(req, { params }) {
     const query = new URL(req.url).searchParams;
     const before = query.get('before_rowid');
     const suffix = before && /^\d+$/.test(before) ? `?before_rowid=${before}` : '';
-    const r = await fetchBackendRead(`${BACKEND}/api/conversations/${id}${suffix}`);
+    // Une lecture abandonnée continue dans le thread FastAPI. La rejouer sur un
+    // historique lourd multiplierait le travail identique et empirerait la latence.
+    const r = await fetchBackendRead(`${BACKEND}/api/conversations/${id}${suffix}`, {
+      attempts: 1,
+      timeoutMs: 30000,
+    });
     if (r.status === 404) {
       return NextResponse.json({ error: 'Conversation non trouvée' }, { status: 404 });
     }
