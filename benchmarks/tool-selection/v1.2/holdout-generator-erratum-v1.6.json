@@ -1,0 +1,23 @@
+{
+  "schema": "marvin.tool-selection-stage-b-generator-erratum/1.6",
+  "status": "frozen_after_critic_transport_failure_before_holdout_freeze",
+  "source_generator": {"path": "scripts/generate_tool_selection_stage_b_holdout.py", "sha256": "1a688defd71eb63f541329e00ae62317f4a62909b7352c0a5360461076e9bfe7"},
+  "candidate_artifacts_are_not_frozen": true,
+  "observation": {
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0,
+    "failed_model": "nemotron-3-super:cloud",
+    "failure": "three_invalid_json_responses_and_json_schema_probe_ignored",
+    "replacement_probe_json_contract_passed": true,
+    "semantic_critic_result_was_not_scored": true
+  },
+  "authorized_change": {
+    "critic_model": "minimax-m2.7:cloud",
+    "critic_digest": "06daa293c105f0bd71fd19420e4d15cae66cc5f71cb8f55b4f998e96ec8ab67a",
+    "provider_declared_max_context_tokens": 204800,
+    "same_critic_prompt_seed_temperature_top_p_and_role": true,
+    "critic_may_only_accept_or_exclude": true,
+    "all_other_rules_unchanged": true
+  },
+  "rollback": "atomic_git_revert_before_holdout_publication"
+}
