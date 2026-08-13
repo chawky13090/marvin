@@ -1,0 +1,89 @@
+{
+  "schema": "marvin.tool-selection-stage-b-assessment/1.0",
+  "status": "complete_b1_no_b2_survivor",
+  "source_result_sha256": "48c3872f52cfe808bdc8e63d8b01fd4ff012324f3e96a22bab08f2828e7056ae",
+  "source_erratum_sha256": "db10aaaab6133ac74004607e369f4b52cfb2eb832c87a28fe859a796eb17f6a5",
+  "observed": {
+    "choices": 810,
+    "business_tool_executions": 0,
+    "host_side_effects": 0,
+    "public_tool_name_violations": 0,
+    "candidate_membership_violations": 30,
+    "best_global_cell": {
+      "mode": "eco",
+      "configuration": "K+L+S",
+      "accepted_tool_action_rate": 0.655556,
+      "repeat_stability": 0.733333,
+      "argument_schema_validity": 1.0,
+      "candidate_set_recall": 0.733333
+    },
+    "best_family_rates_across_all_cells": {
+      "file_discovery": 0.933333,
+      "file_mutation": 0.8,
+      "application_launch": 0.4,
+      "process_inventory": 0.8,
+      "process_action": 0.8,
+      "software_management": 0.4
+    },
+    "configuration_global_rate_ranges": {
+      "K+L+S": {"minimum": 0.633333, "maximum": 0.655556},
+      "K+S": {"minimum": 0.6, "maximum": 0.633333},
+      "S": {"minimum": 0.455556, "maximum": 0.477778}
+    },
+    "median_schema_bytes_by_mode_configuration": {
+      "eco": {"K+L+S": 13307.5, "K+S": 9263.0, "S": 7537.0},
+      "balanced": {"K+L+S": 16642.5, "K+S": 9263.0, "S": 7537.0},
+      "performance": {"K+L+S": 16642.5, "K+S": 9263.0, "S": 7537.0}
+    }
+  },
+  "pre_registered_thresholds": {
+    "global_success_minimum": 0.9,
+    "per_family_success_minimum": 0.8,
+    "repeat_stability_minimum": 0.8,
+    "argument_schema_validity_minimum": 0.98,
+    "invalid_public_tool_name_maximum": 0,
+    "candidate_membership_violation_maximum_added_by_erratum": 0
+  },
+  "mechanical_verdict": {
+    "generalized_configuration": null,
+    "restricted_configuration": null,
+    "B1_survivor_count": 0,
+    "B2_execution_state": "NOT_RUN_NO_B1_SURVIVOR",
+    "B2_business_execution_count": 0,
+    "current_product_configuration": "K+L+S",
+    "current_configuration_action": "RETAIN_TEMPORARILY_UNTIL_ROUTING_IMPROVEMENT_IS_INDEPENDENTLY_VALIDATED",
+    "simplification_authorized": false,
+    "canonical_capability_facade_authorized_by_this_result": false,
+    "reason_codes": [
+      "NO_CELL_REACHES_GLOBAL_0_90",
+      "APPLICATION_LAUNCH_NEVER_EXCEEDS_0_40",
+      "SOFTWARE_MANAGEMENT_NEVER_EXCEEDS_0_40",
+      "REPEAT_STABILITY_BELOW_0_80_FOR_ALL_K_PLUS_L_PLUS_S_CELLS",
+      "THIRTY_CANDIDATE_MEMBERSHIP_VIOLATIONS",
+      "B2_CANNOT_CHANGE_A_FAILED_B1_SELECTION_DECISION"
+    ]
+  },
+  "diagnosis": {
+    "established": [
+      "The benchmark model always used globally valid public names.",
+      "Argument schemas were valid in at least 97.5904 percent of assessed single-call outputs.",
+      "Final semantic choice remains weak even when an acceptable tool is present in the candidate set.",
+      "Application launch and software management are the dominant measured weaknesses.",
+      "Removing lexical selection reduces schema bytes but does not satisfy quality thresholds."
+    ],
+    "not_established": [
+      "No product routing correction has been evaluated on an independent post-change holdout.",
+      "B2 execution safety is not inferred from B1 and remains covered by separate E7 work.",
+      "This synthetic six-family holdout does not certify all 364 tools."
+    ]
+  },
+  "next_phase": {
+    "priority": "improve_semantic_disambiguation_without_removing_capabilities",
+    "required_design": "canonical_capability_facade_or_replacement_of_non_contributing_selection_layer",
+    "first_target_families": ["application_launch", "software_management"],
+    "new_independent_holdout_required_after_product_change": true,
+    "reuse_of_this_holdout_for_optimization_forbidden": true,
+    "security_guards_must_remain_enabled": true
+  },
+  "rollback": "No product change occurred. Preserve raw result and assessment; revert only gate/documentation integration if required."
+}
