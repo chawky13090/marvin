@@ -28,6 +28,14 @@ et cinq lectures VM sans divergence de SHA-256. Nettoyage vérifié. Les smokes 
 obtiennent API 28/28, pages 41/41, chat 5/5 et voix à concurrence maximale 1. Cette preuve
 valide le produit mais laisse explicitement E7 `UNVERIFIED`.
 
+Le chantier suivant, qualité du routage, commence par un pré-enregistrement sans changement
+produit. Sept combinaisons des couches mots-clés, lexicale et sémantique/apprise seront mesurées
+aux budgets 18/40/80/250. Le corpus public gelé mesure le rappel par famille mais reste
+rétrospectif; les 392 demandes privées mesurent uniquement la rétention des outils historiques,
+jamais leur correction. Texte et provenance restent séparés jusqu'après le calcul des candidats,
+aucun agrégat par outil/message privé n'est publiable, et l'absence des enveloppes DPAPI sur une
+autre machine ne fait pas échouer le gate portable. Aucune garde de sécurité n'est ablatée.
+
 ## 2026-08-13 — v2.647.0 — cohérence multi-magasins et lecture VM sans mutation
 
 TD-014 identifiait cinq surfaces sous-déclarées. Un pré-enregistrement séparé a gelé les

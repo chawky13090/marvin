@@ -1,0 +1,108 @@
+{
+  "schema": "marvin.tool-selection-ablation-preregistration/1.0",
+  "status": "frozen_before_ablation_runner",
+  "source_commit": "01d9f72763cd35946e644533e03287fed0a1877f",
+  "product_change_authorized": false,
+  "chat_llm_call_authorized": false,
+  "business_tool_execution_authorized": false,
+  "side_effect_authorized": false,
+  "purpose": "measure_marginal_candidate_generation_contribution_before_any_canonical_capability_facade",
+  "product_sources_sha256": {
+    "backend/agent_tool_selection.py": "af085feeddd5108d31de06299b6dec7264a627413068d7eddbde615426d73d98",
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/tool_router.py": "aa8cc084e9dd19ca6e45bbce3ad72970d59f55c3dbc6abff8a6255f33638f7a2",
+    "backend/auto_config.py": "2cc69c2489133d9294b7eef0bac105ce822a042c8ba0c4f14a7a35cad683efed",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "public_inputs_sha256": {
+    "benchmarks/windows-operator/v1.1/intent-corpus.json": "9f223d59083582b53c1352a0215a9b506b1945f3b49bf4fe220409f46d11241f",
+    "benchmarks/windows-operator/v1.1/routing-capability-contracts-retrospective-v1.json": "04bc54794595df2948bbaaba0363dc017bb09845b5c36bba708538fa2ee68962",
+    "benchmarks/tool-recovery/v1.2/development-corpus.json": "8f988f44d9b96b4418b2d8d6e81184b36ca3f5036aa12a1c748ac8c36cd23be2",
+    "benchmarks/tool-evidence/v1/real-usage-extraction-manifest.json": "415de35f8c7b7e2a464f7182c4462e2b04eb2dd65aee1af263488e101486bb99",
+    "benchmarks/tool-evidence/v1/campaign-a-extraction-policy.json": "8a7b64a856b13c54bf16ed4df83d90057bdb331a230ff53a805e2fae847bd894"
+  },
+  "private_inputs": {
+    "required_only_for_private_replay": true,
+    "absence_never_fails_portable_gate": true,
+    "text_envelope": {
+      "path": "data/forge/real-usage-v1/real-usage-text.dpapi.json",
+      "sha256": "15ed10ed08c96fb4a147e1667f0904b7c738cac2b99a21f027934393f44dff3c"
+    },
+    "provenance_envelope": {
+      "path": "data/forge/real-usage-v1/real-usage-provenance.dpapi.json",
+      "sha256": "9c4e8ccc9fb545a6a04e33dba6f8345ea8f16ed740d15b05b9c489cf457b2647"
+    },
+    "plaintext_output_forbidden": true,
+    "public_per_tool_or_per_message_metrics_forbidden": true
+  },
+  "candidate_layers": {
+    "K": "keyword_rules",
+    "L": "lexical_capability_ranking",
+    "S": "semantic_and_learned_routing"
+  },
+  "configurations": ["K", "L", "S", "K+L", "K+S", "L+S", "K+L+S"],
+  "modes": {
+    "eco": 18,
+    "balanced": 40,
+    "performance": 80,
+    "max": 250
+  },
+  "fixed_postprocessors": [
+    "always_include",
+    "bounded_common_fallback",
+    "visual_operator_exclusion",
+    "office_delivery_specialization",
+    "catalog_membership",
+    "all_tools_rankable_for_layer_ablation",
+    "mode_budget"
+  ],
+  "semantic_protocol": {
+    "embedding_computed_once_per_distinct_query": true,
+    "semantic_and_learned_result_cached_for_all_configurations_and_modes": true,
+    "embedding_model_and_digest_must_be_recorded": true,
+    "tool_index_fingerprint_must_be_recorded": true,
+    "temperature": "not_applicable",
+    "repetitions": 1,
+    "reason": "candidate_generation_is_deterministic_after_semantic_signal_freeze"
+  },
+  "public_correctness_panel": {
+    "source": "windows_operator_v1_1_retrospective_contracts",
+    "retrospective_and_burned": true,
+    "may_measure_regression_not_generalization": true,
+    "text_only_family_is_unassessed_for_candidate_recall": true,
+    "metrics": [
+      "candidate_set_recall_by_family",
+      "candidate_set_recall_global_diagnostic_only",
+      "candidate_count_median",
+      "candidate_schema_bytes_median",
+      "selection_duration_ms"
+    ]
+  },
+  "private_compatibility_panel": {
+    "source": "392_distinct_persisted_user_messages",
+    "historical_tools_are_never_labels": true,
+    "candidate_sets_must_be_computed_before_joining_provenance": true,
+    "metric": "historical_executed_tool_retention",
+    "correctness_claim_forbidden": true,
+    "family_inference_from_historical_tool_forbidden": true,
+    "public_output": "overall_aggregate_only"
+  },
+  "decision": {
+    "layer_required_for_stage_b_if": "removal_reduces_any_assessed_family_recall_or_private_retention",
+    "layer_redundant_candidate_if": "removal_changes_no_assessed_family_and_no_private_retention_across_all_modes",
+    "unrepresented_family_state": "UNASSESSED",
+    "stage_a_never_removes_product_layer": true,
+    "stage_b_required_before_product_removal_or_facade_addition": true,
+    "security_guards_never_ablated": true
+  },
+  "gate_scope": {
+    "portable_public_canary_only": true,
+    "private_replay_never_required_on_another_machine": true,
+    "ranking_source_change_requires_result_regeneration_or_explicit_skip": true
+  },
+  "rollback": {
+    "runner_and_results": "atomic_git_revert",
+    "product_runtime_unchanged": true,
+    "persistent_data_mutation": false
+  }
+}
