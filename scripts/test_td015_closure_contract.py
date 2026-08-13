@@ -12,9 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "benchmarks" / "conversation-history" / "td015-closure-policy.json"
 FREEZE_V1 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze.json"
-FREEZE = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze-v2.json"
+FREEZE_V2 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze-v2.json"
+FREEZE = ROOT / "benchmarks" / "conversation-history" / "td015-closure-freeze-v3.json"
 RESULT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-result.json"
 ABORT = ROOT / "benchmarks" / "conversation-history" / "td015-closure-v1-abort.json"
+ABORT_V2 = ROOT / "benchmarks" / "conversation-history" / "td015-closure-v2-abort.json"
 
 
 def _sha256(path: Path) -> str:
@@ -105,6 +107,7 @@ def _assert_page_chain_canaries(policy: dict) -> None:
 def _assert_smoke_contract() -> None:
     source = (ROOT / "scripts" / "smoke_test_chat.py").read_text(encoding="utf-8")
     assert '"server_error_count"' in source
+    assert '"server_error_routes"' in source
     assert "not server_errors" in source
     assert "MARVIN_SMOKE_REPORT_PATH" in source
 
@@ -185,6 +188,17 @@ def main() -> None:
     _assert_freeze(freeze_v1)
     if ABORT.exists():
         _assert_abort(_load_json(ABORT), freeze_v1, FREEZE_V1)
+    freeze_v2 = _load_json(FREEZE_V2)
+    _assert_freeze(freeze_v2)
+    if ABORT_V2.exists():
+        abort_v2 = _load_json(ABORT_V2)
+        assert abort_v2["schema"] == "marvin.td015-closure-abort/1.0"
+        assert abort_v2["freeze_sha256"] == _sha256(FREEZE_V2)
+        assert abort_v2["source_commit"] == freeze_v2["source_commit"]
+        assert abort_v2["completed_cycles"] == 1
+        assert abort_v2["failed_cycle"] == 2
+        assert abort_v2["result_published"] is False
+        assert abort_v2["criteria_changed_after_failure"] is False
     if FREEZE.exists():
         freeze = _load_json(FREEZE)
         _assert_freeze(freeze)

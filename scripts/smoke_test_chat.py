@@ -21,6 +21,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from playwright.async_api import async_playwright
 
@@ -37,6 +38,13 @@ SAMPLE_SIZE = 5
 RAW_JSON_RE = re.compile(
     r'\{\s*"[a-zA-Z_]+"\s*:\s*"?[\w.]+"?\s*,\s*"[a-zA-Z_]+"\s*:', re.DOTALL
 )
+UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", re.I)
+
+
+def sanitized_route(url: str) -> str:
+    """Conserve le diagnostic HTTP sans publier identifiant ni paramètres."""
+    parsed = urlsplit(url)
+    return UUID_RE.sub("{id}", parsed.path)
 
 
 async def goto_chat_page(page) -> None:
@@ -228,6 +236,10 @@ async def main() -> int:
             "console_error_count": len(console_errors),
             "http_error_count": len(http_errors),
             "server_error_count": len(server_errors),
+            "server_error_routes": sorted({
+                f"{event.split(' ', 2)[1]} {sanitized_route(event.split(' ', 2)[2])}"
+                for event in server_errors
+            }),
             "passed": ok,
         }
         temporary = destination.with_suffix(destination.suffix + ".tmp")

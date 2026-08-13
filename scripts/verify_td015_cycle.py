@@ -143,7 +143,7 @@ def _first_detail_ref(pages: list[dict[str, Any]]) -> tuple[str, str]:
     raise RuntimeError("Aucun reçu détaillé n'est disponible dans la conversation cible.")
 
 
-def _run_chat_smoke() -> dict[str, Any]:
+def _run_chat_smoke(evidence_path: Path) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="marvin-td015-smoke-") as temporary:
         report_path = Path(temporary) / "chat-smoke.json"
         environment = os.environ.copy()
@@ -164,12 +164,20 @@ def _run_chat_smoke() -> dict[str, Any]:
             raise RuntimeError("Le smoke chat n'a pas publié son rapport structuré.")
         report = json.loads(report_path.read_text(encoding="utf-8"))
         report["returncode"] = completed.returncode
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_evidence = evidence_path.with_suffix(evidence_path.suffix + ".tmp")
+        temporary_evidence.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        temporary_evidence.replace(evidence_path)
         if completed.returncode != 0:
             raise RuntimeError("Le smoke chat 5/5 a échoué.")
         return report
 
 
-def run_cycle(policy: dict[str, Any], database: Path, cycle: int) -> dict[str, Any]:
+def run_cycle(
+    policy: dict[str, Any], database: Path, cycle: int, smoke_evidence_path: Path
+) -> dict[str, Any]:
     target_id, stored_bytes = _select_target(
         database, int(policy["target_selector"]["minimum_stored_bytes"])
     )
@@ -192,7 +200,7 @@ def run_cycle(policy: dict[str, Any], database: Path, cycle: int) -> dict[str, A
     statuses.append(frontend_status)
     if frontend_status != 200:
         raise RuntimeError(f"Frontend indisponible: HTTP {frontend_status}.")
-    chat = _run_chat_smoke()
+    chat = _run_chat_smoke(smoke_evidence_path)
     if int(chat.get("sample_count", 0)) != int(policy["chat_smoke"]["required_conversations"]):
         raise RuntimeError("Le smoke chat n'a pas couvert cinq conversations.")
     if int(chat.get("server_error_count", -1)) != int(policy["chat_smoke"]["maximum_http_5xx"]):
@@ -233,7 +241,12 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     policy = json.loads(args.policy.read_text(encoding="utf-8"))
-    report = run_cycle(policy, args.database, args.cycle)
+    report = run_cycle(
+        policy,
+        args.database,
+        args.cycle,
+        args.output.with_suffix(".smoke.json"),
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix(args.output.suffix + ".tmp")
     temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

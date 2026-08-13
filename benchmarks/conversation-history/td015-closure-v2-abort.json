@@ -1,0 +1,26 @@
+{
+  "schema": "marvin.td015-closure-abort/1.0",
+  "generated_at": "2026-08-13T10:46:33.0442113Z",
+  "freeze_sha256": "346962c6e0bbe4a2c7fb3e5414079ef1fd1d05ed4db723ad43cad47308a8dcc0",
+  "source_commit": "8589802ffeecddee848b3ae819868e4c2980cc6a",
+  "local_abort_sha256": "1bf0e12c988c8f604d6623e3dd4ed338f58acf85a94528aca7a615850677cb6b",
+  "successful_cycle_sha256": "bd67e59cf46527d1537f3e219be228ec94ee6e9fdb05e82a7a6c7d6daacdf230",
+  "completed_cycles": 1,
+  "failed_cycle": 2,
+  "failed_stage": "chat_smoke",
+  "result_published": false,
+  "criteria_changed_after_failure": false,
+  "successful_cycle_summary": {
+    "pages": 2,
+    "unique_display_messages": 94,
+    "duplicate_message_ids": 0,
+    "first_page_duration_ms": 6050,
+    "first_page_transport_bytes": 367208,
+    "detail_http": 200,
+    "cross_conversation_http": 404,
+    "chat_smoke_passed": true,
+    "server_5xx_count": 0
+  },
+  "instrumentation_limitation": "Le runner v2 supprimait le rapport temporaire du smoke fautif avant publication de l'abandon; le statut et la route exacts du cycle 2 ne sont donc pas récupérables.",
+  "supersession_required_before_retry": true
+}
