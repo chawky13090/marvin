@@ -35,8 +35,19 @@ function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
             & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
             return $false
         }
+        # Windows PowerShell 5.1 ne peuple pas toujours ExitCode après la
+        # surcharge WaitForExit(timeout). Le second appel finalise les handles
+        # natifs déjà terminés sans ajouter d'attente.
+        $Process.WaitForExit()
         $Process.Refresh()
-        return [int]$Process.ExitCode -eq 0
+        # Une sonde Docker n'est recevable que si le CLI termine sans erreur ET
+        # renvoie réellement une version serveur. Les avertissements non fatals
+        # sur stderr restent compatibles avec un démon fonctionnel.
+        $ServerVersion = [System.IO.File]::ReadAllText($Stdout).Trim()
+        return (
+            [int]$Process.ExitCode -eq 0 -and
+            $ServerVersion -match '^\d+\.\d+(?:\.\d+)?(?:[-+].*)?$'
+        )
     } catch {
         return $false
     } finally {

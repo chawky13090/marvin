@@ -164,6 +164,9 @@ def test_launcher_forces_reload_and_checks_effective_config() -> None:
     assert "resolve-searxng-port.ps1" in launcher
     assert "$env:SEARXNG_PORT" in launcher
     assert "docker port marvin-searxng 8080/tcp" in launcher
+    assert "$Process.WaitForExit()" in launcher
+    assert "[System.IO.File]::ReadAllText($Stdout).Trim()" in launcher
+    assert "$ServerVersion -match" in launcher
     assert '"http://127.0.0.1:$candidate/config"' in launcher
     assert "127.0.0.1:${SEARXNG_PORT:-8890}:8080" in compose
     assert "TcpListener" in resolver

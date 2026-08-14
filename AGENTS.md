@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.657.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.658.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.657.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.658.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.657.0)
+## 9. État actuel (v2.658.0)
+
+**v2.658 (reprise Docker/SearXNG et sonde PowerShell exacte)** : Docker Desktop 4.85.0
+échouait avant son moteur WSL sur des sockets runtime orphelines des composants optionnels
+Inference/Secrets. Les répertoires ont été conservés par renommage, Docker AI a été désactivé
+après sauvegarde et aucun volume ni conteneur n'a été supprimé. La sonde `docker info` finalise
+désormais correctement `ExitCode` sous Windows PowerShell 5.1 et exige une version serveur
+réelle. Docker Engine 29.6.2, SearXNG sur loopback, ses 80 moteurs et une recherche Marvin
+réelle sont validés. Rollback produit : réversion atomique de v2.658; rollback runtime décrit
+dans `DEVELOPMENT-JOURNAL.md`.
 
 **v2.657 (canari SearXNG isolé du runtime)** : le test de concurrence du bootstrap SearXNG
 utilise un mutex `SelfTest` distinct du mutex de production. Un gate live peut ainsi prouver

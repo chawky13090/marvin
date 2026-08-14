@@ -5,6 +5,30 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-15 — v2.658.0 — Docker Desktop récupéré et sonde SearXNG exacte
+
+Docker Desktop 4.85.0 ne lançait plus son moteur WSL : plusieurs processus restaient bloqués
+et le backend échouait avant le moteur sur des sockets Unix Windows orphelines. Les répertoires
+runtime ont été renommés hors ligne avec conservation du rollback; aucune image, aucun volume
+et aucun conteneur n'a été supprimé. Le composant optionnel Docker AI/Inference, inutile à
+Marvin, a été désactivé dans la configuration utilisateur après sauvegarde exacte. Docker
+Engine 29.6.2 et le conteneur `marvin-searxng` ont ensuite redémarré sur le port loopback 8890.
+
+Le premier rejeu a découvert un défaut distinct du lanceur : sous Windows PowerShell 5.1,
+`WaitForExit(timeout)` pouvait laisser `ExitCode` à `null` bien que `docker info` ait terminé.
+La sonde finalise désormais les handles natifs par un second `WaitForExit()`, exige un code nul
+et une version serveur structurée. Elle conserve ses bornes et tue l'arbre du CLI au timeout.
+Le pool réel expose 80 moteurs et une recherche Marvin `web_search` a retourné trois sources
+Microsoft via SearXNG, sans fallback.
+
+Sécurité : Docker reste limité au backend WSL existant et SearXNG à `127.0.0.1`; aucun secret
+n'est publié. Données personnelles : aucun impact. Journalisation : seuls les diagnostics
+techniques Docker sont utilisés, sans contenu utilisateur. Rollback runtime : arrêter Docker,
+restaurer `settings-store.json.pre-marvin-repair-20260815`, puis remettre le répertoire runtime
+renommé uniquement si nécessaire. Rollback produit : réversion atomique de v2.658. Tests :
+configuration SearXNG, contrat installateur, `/config`, recherche SearXNG directe et exécution
+réelle de `web_search` via la passerelle Marvin.
+
 ## 2026-08-14 — v2.657.0 — canari SearXNG indépendant du démarrage réel
 
 Le premier gate live v2.656 a validé les contrats HTTP, 41 pages, le chat et la voix, mais le
