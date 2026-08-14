@@ -96,7 +96,11 @@ try {
         $Installer = Join-Path $Package.FullName 'install-marvin-package.ps1'
         $Stdout = Join-Path $Root 'install.stdout.txt'
         $Stderr = Join-Path $Root 'install.stderr.txt'
-        $Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $Installer))
+        # PowerShell Direct n'a pas de bureau interactif fiable. L'installation
+        # est donc terminée sans ouvrir le navigateur, puis le qualifier lance
+        # lui-même start.bat et prouve les deux services HTTP sous une borne
+        # distincte. Le parcours utilisateur interactif reste inchangé.
+        $Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $Installer), '-NoStart')
         if ($SkipModelsRequested) { $Arguments += '-SkipModels' }
         if ($SkipOptionalRequested) { $Arguments += '-SkipOptional' }
         $Process = Start-Process -FilePath 'powershell.exe' -ArgumentList $Arguments -WorkingDirectory $Package.FullName -PassThru -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
@@ -113,8 +117,21 @@ try {
         $InstallLog = Join-Path $Target 'runtime\install\install.log.jsonl'
         $Health = $null
         $Frontend = $null
-        try { $Health = Invoke-RestMethod -Uri 'http://127.0.0.1:8005/api/health' -TimeoutSec 10 } catch {}
-        try { $Frontend = (Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 10).StatusCode } catch {}
+        if ($ExitCode -eq 0) {
+            $StartBatch = Join-Path $Target 'start.bat'
+            if (-not (Test-Path -LiteralPath $StartBatch -PathType Leaf)) { throw 'Lanceur installé introuvable.' }
+            Start-Process -FilePath $env:ComSpec `
+                -ArgumentList @('/d', '/c', 'call', ('"{0}"' -f $StartBatch)) `
+                -WorkingDirectory $env:SystemRoot -WindowStyle Hidden | Out-Null
+            $RuntimeDeadline = (Get-Date).AddMinutes(4)
+            do {
+                try { $Health = Invoke-RestMethod -Uri 'http://127.0.0.1:8005/api/health' -TimeoutSec 4 } catch { $Health = $null }
+                try { $Frontend = (Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 4).StatusCode } catch { $Frontend = $null }
+                if (-not ($Health -and $Health.status -eq 'ok' -and [int]$Health.tools_count -eq 364 -and $Frontend -eq 200)) {
+                    Start-Sleep -Seconds 2
+                }
+            } while ((Get-Date) -lt $RuntimeDeadline -and -not ($Health -and $Health.status -eq 'ok' -and [int]$Health.tools_count -eq 364 -and $Frontend -eq 200))
+        }
         $StdoutText = if (Test-Path -LiteralPath $Stdout) { [string](Get-Content -LiteralPath $Stdout -Raw) } else { '' }
         $StderrText = if (Test-Path -LiteralPath $Stderr) { [string](Get-Content -LiteralPath $Stderr -Raw) } else { '' }
         if ($StdoutText.Length -gt 12000) { $StdoutText = $StdoutText.Substring($StdoutText.Length - 12000) }

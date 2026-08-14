@@ -115,6 +115,23 @@ UTF-8. Si un processus externe conserve encore le dossier courant, le reçu rest
 planification. Le contrat exécutable crée une installation factice marquée, un rollback lié,
 exécute réellement l'uninstall et exige la disparition des deux chemins.
 
+La reprise après mise en veille a validé le gate live complet : 334 étapes exécutées,
+une seule ignorée parce qu'un build Next.js concurrent est interdit lorsque le frontend est
+actif, et zéro échec. Le paquet final a ensuite été reconstruit depuis le commit courant.
+Deux qualifications Hyper-V ont atteint `runtime_validation` sans verdict produit : la première
+a été interrompue proprement par le garde des 5 Gio hôte, puis la seconde par la borne d'une
+heure du lanceur Codex avant la borne interne de 90 minutes. Dans les deux cas, `Marvin-Clean`
+a été restauré et aucun rouge produit n'est déduit d'une campagne interrompue.
+
+L'hypothèse causale la plus étroite est le couplage entre la validation de runtime et l'ouverture
+du navigateur dans une session PowerShell Direct sans bureau interactif; elle reste à confirmer
+par le rejeu. Le qualifier installe
+désormais avec `-NoStart`, puis lance lui-même le `start.bat` installé depuis `%SystemRoot%` et
+sonde pendant quatre minutes le backend, les 364 outils et le frontend. Le parcours utilisateur
+interactif de l'installeur n'est pas modifié; seule la qualification isole l'installation du smoke
+HTTP. Le contrat PowerShell et `test_installer_contract.py` passent. Rollback : réversion atomique
+de cette modification de harnais; aucune donnée, VM, checkpoint ou format persistant n'est changé.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

@@ -119,6 +119,9 @@ def _assert_static_contract() -> None:
     assert "Wait-Job -Job $MonitorJob -Timeout 10" in vm_qualification
     assert "Remove-Job -Job $MonitorJob" in vm_qualification
     assert "Stop-Job -Job $MonitorJob -Force" not in vm_qualification
+    assert "'-NoStart'" in vm_qualification
+    assert "$RuntimeDeadline = (Get-Date).AddMinutes(4)" in vm_qualification
+    assert "-WorkingDirectory $env:SystemRoot -WindowStyle Hidden" in vm_qualification
 
     assert "resolve-node-runtime.ps1" in starter
     assert 'pushd "%~dp0" || exit /b 1' in starter
