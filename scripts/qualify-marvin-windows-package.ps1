@@ -38,7 +38,7 @@ if ($Expected -notmatch '^[0-9a-f]{64}$' -or $Observed -ne $Expected) { throw 'S
 
 try {
     $HostDrive = Get-PSDrive -Name ([IO.Path]::GetPathRoot((Get-VMHardDiskDrive -VMName $VMName | Select-Object -First 1).Path).Substring(0, 1))
-    if ([uint64]$HostDrive.Free -lt 35GB) { throw 'Moins de 35 Gio libres sur le volume hôte de la VM; qualification refusée.' }
+    if ([uint64]$HostDrive.Free -lt 40GB) { throw 'Moins de 40 Gio libres sur le volume hôte de la VM; qualification refusée.' }
     $Checkpoint = Get-VMCheckpoint -VMName $VMName -Name $CheckpointName -ErrorAction Stop
     if ($null -eq $Checkpoint) { throw 'Checkpoint de référence absent.' }
 
@@ -140,7 +140,7 @@ try {
         Start-Sleep -Seconds 30
         $JobState = [string]$InstallJob.State
         if ([uint64](Get-PSDrive -Name $HostDrive.Name).Free -lt 5GB) {
-            Stop-Job -Job $InstallJob -Force -ErrorAction SilentlyContinue
+            Stop-Job -Job $InstallJob -ErrorAction SilentlyContinue
             throw 'Moins de 5 Gio libres sur le volume hôte pendant la qualification; campagne interrompue avant saturation.'
         }
         try {
@@ -164,7 +164,7 @@ try {
     } while ($JobState -in @('Running', 'NotStarted') -and (Get-Date) -lt $InstallDeadline)
 
     if ((Get-Date) -ge $InstallDeadline -and $InstallJob.State -in @('Running', 'NotStarted')) {
-        Stop-Job -Job $InstallJob -Force -ErrorAction SilentlyContinue
+        Stop-Job -Job $InstallJob -ErrorAction SilentlyContinue
         throw 'Installation invitée expirée après 90 minutes.'
     }
     if ($InstallJob.State -eq 'Failed') {
@@ -185,7 +185,10 @@ try {
 } catch {
     $Result.error = $_.Exception.Message
 } finally {
-    if ($InstallJob) { Remove-Job -Job $InstallJob -Force -ErrorAction SilentlyContinue }
+    if ($InstallJob) {
+        if ($InstallJob.State -in @('Running', 'NotStarted')) { Stop-Job -Job $InstallJob -ErrorAction SilentlyContinue }
+        Remove-Job -Job $InstallJob -ErrorAction SilentlyContinue
+    }
     if ($MonitorSession) { Remove-PSSession $MonitorSession -ErrorAction SilentlyContinue }
     if ($Session) { Remove-PSSession $Session -ErrorAction SilentlyContinue }
     $VM = Get-VM -Name $VMName -ErrorAction SilentlyContinue

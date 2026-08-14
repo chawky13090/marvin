@@ -58,7 +58,7 @@ physiques encore libres sur l'hôte et Hyper-V a placé l'invité en `PausedCrit
 d'E/S. Le processus hôte a ensuite expiré; cette campagne est classée interrompue, jamais comme
 un échec produit, et `Marvin-Clean` a été restauré. Le plancher initial de 20 Gio était néanmoins
 insuffisant pour runtimes, dépendances, frontend, modèles et rollback : le contrat exige désormais
-40 Gio dans la cible et 35 Gio physiques avant une qualification VM. `pip` fonctionne sans cache
+40 Gio dans la cible et 40 Gio physiques avant une qualification VM. `pip` fonctionne sans cache
 persistant et le cache `npm` vit sous `runtime/install/downloads`, supprimé après réussite mais
 conservé après échec pour une reprise bornée.
 
@@ -68,6 +68,14 @@ progression. Le `finally` a bien restauré la VM et libéré le disque, mais cet
 PowerShell Direct : la première exécute le paquet en job, la seconde publie chaque changement
 d'étape et la place restante. Il interrompt la campagne avant saturation si le volume hôte tombe
 sous 5 Gio. Cette évolution n'assouplit ni l'installateur ni ses critères de réussite.
+
+Le harnais instrumenté a montré la progression complète jusqu'à `runtime_validation` : l'invité
+est passé de 52,3 à 47,3 Gio libres. Le verdict a toutefois été masqué par l'option `-Force` de
+`Stop-Job`, absente de Windows PowerShell 5.1, très probablement lorsque le garde des 5 Gio hôte
+a voulu interrompre le job. Les appels `Stop-Job`/`Remove-Job` sont rendus compatibles 5.1, et le
+plancher physique de qualification passe à 40 Gio. Deux anciens builds `.next.rollback-*` déjà
+remplacés et les seuls caches npm/pip régénérables ont été supprimés pour permettre le rejeu;
+aucune donnée Marvin, source, secret ou preuve n'a été touché.
 
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
