@@ -1,0 +1,99 @@
+{
+  "schema": "marvin.tool-selection-v13-generation-report/1.0",
+  "status": "complete",
+  "policy_sha256": "ec53d0e4f266f00266ea069d33147621b26fd47ba0102ac87aa10a0be00f895d",
+  "generator_sha256": "bed04d65214851fdc646506cd5a302bc8cc68f8ff10b7f8d4f1a54cd58382dde",
+  "counts": {
+    "authored": 59,
+    "selected": 20,
+    "families": {
+      "application_launch": 10,
+      "software_management": 10
+    },
+    "excluded": {
+      "review_rejected": 5
+    }
+  },
+  "models": {
+    "author": [
+      {
+        "family": "application_launch",
+        "requested_model": "nemotron-3-super:cloud",
+        "observed_model": "nemotron-3-super",
+        "raw_response_sha256": "e86203fa82f2844d8d9177b49cbd3bb4e6a001b51bffe1105137368ec17632e9",
+        "prompt_eval_count": 163,
+        "eval_count": 609,
+        "attempts": 1,
+        "client_num_ctx": null
+      },
+      {
+        "family": "software_management",
+        "requested_model": "nemotron-3-super:cloud",
+        "observed_model": "nemotron-3-super",
+        "raw_response_sha256": "fc33d43b87366cf0c940aeba822c2733b2750c34895d7c14433c4a2be131c6d1",
+        "prompt_eval_count": 166,
+        "eval_count": 854,
+        "attempts": 1,
+        "client_num_ctx": null
+      }
+    ],
+    "oracle_a": [
+      {
+        "requested_model": "glm-5.2:cloud",
+        "observed_model": "glm-5.2",
+        "raw_response_sha256": "3703ad33b6a8abbe28273eae28b16426cf973801248ac94845cda296f96c532c",
+        "prompt_eval_count": 4548,
+        "eval_count": 3381,
+        "attempts": 1,
+        "client_num_ctx": null
+      }
+    ],
+    "oracle_b": [
+      {
+        "requested_model": "kimi-k2.7-code:cloud",
+        "observed_model": "kimi-k2.7-code",
+        "raw_response_sha256": "7bd1b3a59276aab20dc8985d9b5a201312e03035eac190a6a6217dad5ca0d017",
+        "prompt_eval_count": 4866,
+        "eval_count": 6788,
+        "attempts": 1,
+        "client_num_ctx": null
+      }
+    ],
+    "adjudicator": [
+      {
+        "requested_model": "qwen3.5:397b-cloud",
+        "observed_model": "qwen3.5:397b",
+        "raw_response_sha256": "148cd321b73ce972f37769c053d687d6d7aa3c0957da2e43238a626e5d24d40f",
+        "prompt_eval_count": 3614,
+        "eval_count": 1222,
+        "attempts": 1,
+        "client_num_ctx": null
+      }
+    ],
+    "critic": [
+      {
+        "requested_model": "minimax-m2.7:cloud",
+        "observed_model": "minimax-m2.7",
+        "raw_response_sha256": "b790f3a1f2ad9c67221fada191198ceabbf91b92fd5d93ad25e62a70a091d4de",
+        "prompt_eval_count": 3475,
+        "eval_count": 1533,
+        "attempts": 1,
+        "client_num_ctx": null
+      }
+    ]
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "raw_model_responses_published": false,
+    "personal_data_patterns_passed": true
+  },
+  "novelty": {
+    "reference_count": 174,
+    "token_jaccard_maximum": 0.55
+  },
+  "corpus_sha256": "750db7c1f14dc4dd8b660d1726b48da48aefe2a939648dca816b4b068382a30c",
+  "oracle_sha256": "2b7e35e9c24c16b95aa2b4adbe0f1f08fea7d95d7ea6128d652936d396f2c820",
+  "selected_ids_sha256": "6adae865bf022ca970a7fcb8e916661e931905cd879ef777c9369e7afa793a1a",
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0
+}

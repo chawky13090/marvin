@@ -1,0 +1,38 @@
+{
+  "schema": "marvin.tool-selection-v13-holdout-freeze/1.0",
+  "status": "frozen_before_benchmark_execution",
+  "source_commit_before_freeze": "aaad7a1ac17efc0823f4aa3b1963e12a3d0cb92f",
+  "counts": {
+    "total": 20,
+    "application_launch": 10,
+    "software_management": 10
+  },
+  "frozen_hashes": {
+    "benchmarks/tool-selection/v1.3/holdout-corpus.json": "750db7c1f14dc4dd8b660d1726b48da48aefe2a939648dca816b4b068382a30c",
+    "benchmarks/tool-selection/v1.3/holdout-oracle.json": "2b7e35e9c24c16b95aa2b4adbe0f1f08fea7d95d7ea6128d652936d396f2c820",
+    "benchmarks/tool-selection/v1.3/holdout-generation-report.json": "860bbf92ff9d2820f852aacc1e6ccebcb686ac617d4a57a5480f2e67964fcef7",
+    "benchmarks/tool-selection/v1.3/holdout-generation-freeze.json": "ec53d0e4f266f00266ea069d33147621b26fd47ba0102ac87aa10a0be00f895d",
+    "scripts/generate_tool_selection_v13_holdout.py": "bed04d65214851fdc646506cd5a302bc8cc68f8ff10b7f8d4f1a54cd58382dde"
+  },
+  "independence": {
+    "product_implementation_preceded_generation": true,
+    "benchmark_model_did_not_author_or_oracle": true,
+    "author_and_oracles_did_not_see_product_facade": true,
+    "v1_2_observation_labels_not_used": true,
+    "corpus_is_burned_for_future_product_adjustment": true
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "real_user_paths": 0,
+    "emails": 0,
+    "phone_numbers": 0,
+    "raw_cloud_responses_published": false
+  },
+  "authorization": {
+    "benchmark_model_calls": false,
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "product_activation": false
+  },
+  "next_phase": "freeze a no-execution A/B runner and issue a separate single-use benchmark authorization"
+}

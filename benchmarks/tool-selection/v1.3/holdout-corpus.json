@@ -1,0 +1,106 @@
+{
+  "schema": "marvin.tool-selection-v13-holdout/1.0",
+  "status": "frozen_candidate",
+  "items": [
+    {
+      "family": "application_launch",
+      "prompt": "Lance l'application Notepad",
+      "id": "v13-application-launch-01"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Ouvre le logiciel Calculator",
+      "id": "v13-application-launch-02"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre l'application Paint",
+      "id": "v13-application-launch-03"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Lance le programme WordPad",
+      "id": "v13-application-launch-04"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Ouvre l'application FixtureApp-A",
+      "id": "v13-application-launch-05"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre le logiciel FixtureApp-B",
+      "id": "v13-application-launch-06"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Lance l'application FixtureApp-C",
+      "id": "v13-application-launch-07"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Ouvre le programme Snipping Tool",
+      "id": "v13-application-launch-08"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre l'application Sticky Notes",
+      "id": "v13-application-launch-09"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Lance le logiciel Voice Recorder",
+      "id": "v13-application-launch-10"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Rechercher un paquet nommé FixtureApp-A dans le gestionnaire de paquets",
+      "id": "v13-software-management-01"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Installer le logiciel FixtureApp-B via le système de gestion de logiciels",
+      "id": "v13-software-management-02"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Lister les mises à jour disponibles pour les logiciels installés",
+      "id": "v13-software-management-04"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Mettre à jour le paquet nommé FixtureApp-C vers sa dernière version",
+      "id": "v13-software-management-05"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Désinstaller le logiciel FixtureApp-A du système",
+      "id": "v13-software-management-06"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Rechercher un paquet correspondant à l'application VLC media player",
+      "id": "v13-software-management-07"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Installer le navigateur web Firefox en utilisant le gestionnaire de paquets",
+      "id": "v13-software-management-08"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Lister les mises à jour critiques disponibles pour le système",
+      "id": "v13-software-management-10"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Mettre à jour le logiciel de compression 7-Zip vers sa dernière version",
+      "id": "v13-software-management-11"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Désinstaller le lecteur multimédia VLC du poste de travail",
+      "id": "v13-software-management-12"
+    }
+  ]
+}
