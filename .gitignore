@@ -63,6 +63,7 @@ backend/generated_videos/
 *.log
 /artifacts/
 /runtime/
+/dist/
 
 # Cache local d'upload Drive (fichiers temporaires, pas du code)
 .tmp.driveupload/

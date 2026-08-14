@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "minimum_windows_build": 17763,
+  "minimum_free_bytes": 21474836480,
+  "python": {
+    "version": "3.13.15",
+    "architecture": "amd64",
+    "url": "https://www.python.org/ftp/python/3.13.15/python-3.13.15-amd64.exe",
+    "sha256": "edec09c4853aeae9ac36efb8c9f95b6b8e2fee65eee56d9767a8b7c69c574403",
+    "authenticode_subject_contains": "Python Software Foundation"
+  },
+  "node": {
+    "version": "24.19.0",
+    "architecture": "win-x64",
+    "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-win-x64.zip",
+    "sha256": "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73"
+  },
+  "ollama": {
+    "version": "0.32.11",
+    "architecture": "windows-amd64",
+    "url": "https://github.com/ollama/ollama/releases/download/v0.32.11/ollama-windows-amd64.zip",
+    "sha256": "15a5325c4944b77536843160f2340c351ae42ed89e4c78899926b1009f2ac514"
+  }
+}

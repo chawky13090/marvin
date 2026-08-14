@@ -5,6 +5,43 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-14 — v2.653.0 — installation Windows réellement en un clic
+
+La demande est de transférer Marvin sur un autre poste Windows avec un seul lancement. L'ancien
+`INSTALLER-NOUVEAU-PC.bat` exigeait parfois une relance après Python/Node, mélangeait plusieurs
+stratégies historiques et n'était pas distribué par un paquet lié à Git. Deux approches ont été
+comparées : MSI/MSIX avec chaîne de signature et bootstrapper, ou ZIP auto-vérifié avec runtimes
+gérés par utilisateur. Le second est retenu pour cette tranche : il reste sans privilège pour le
+socle, reproductible dès maintenant et réversible; MSI/MSIX exigerait une chaîne de build et de
+signature qui n'existe pas encore.
+
+Le constructeur utilise `git archive HEAD`, exclut par construction données, secrets et caches,
+et lie commit, version et SHA-256. Le bootstrap cible `%LOCALAPPDATA%\Programs\Marvin`, publie par
+staging, conserve `data`, `runtime` et `.env.local` en mise à niveau et restaure l'ancienne
+installation si une étape obligatoire échoue. Python 3.13.15, Node 24.19.0 LTS et Ollama 0.32.11
+x64 sont épinglés avec SHA-256; Python exige aussi une signature Authenticode valide. Les ZIP
+refusent les traversées. Les téléchargements ont trois tentatives bornées et ne restent sur disque
+qu'en cas d'échec récupérable.
+
+Le même passage recrée `.venv` et `node_modules`, vérifie les dépendances, durcit `data`, choisit
+les modèles depuis le matériel, les qualifie, calibre le contexte local, construit le frontend et
+contrôle le backend, les 364 outils et l'interface. LibreOffice et SearXNG sont tentés séparément;
+Docker, Hyper-V, Sandbox et GPU restent optionnels et n'empêchent jamais le socle. Les wrappers
+historiques convergent vers `INSTALLER-MARVIN.bat`. La désinstallation refuse une racine non
+marquée, préserve les données par défaut et ne supprime pas les runtimes système partagés.
+
+Logs : événements JSONL sans secret, corrélés par `install_id`, UTF-8 sans BOM, rotation 2 Mio et
+cinq archives. Données : le paquet ne contient aucune donnée personnelle; l'état d'installation
+est machine-local et exclu de la sauvegarde globale. Sécurité : hash, Authenticode, extraction
+bornée, ACL, absence d'élévation silencieuse et refus des racines dangereuses. Rollback : réversion
+atomique du commit pour le code; restauration automatique de la précédente installation pour un
+déploiement cible; aucune migration de schéma ou de donnée.
+
+Validations avant gel : parsing PowerShell, mode `-Plan` sans mutation, préflight de paquet sans
+publication, refus de désinstallation hors racine marquée, plan dynamique des modèles, contrat
+SearXNG et génération réelle du rapport de capacités. La qualification finale du ZIP et du poste
+Windows isolé est consignée après production de l'artefact.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

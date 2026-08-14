@@ -82,6 +82,7 @@ if (Get-Command py -ErrorAction SilentlyContinue) {
 }
 
 foreach ($Known in @(
+    (Join-Path ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))) 'runtime\managed\python\python.exe'),
     (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python313\python.exe'),
     (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe')
 )) {

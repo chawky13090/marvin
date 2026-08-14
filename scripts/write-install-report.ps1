@@ -62,6 +62,12 @@ if (Test-Path -LiteralPath $PythonPath -PathType Leaf) {
     }
 }
 $NodeModules = Join-Path $ProjectRoot 'node_modules'
+$NodeResolver = Join-Path $PSScriptRoot 'resolve-node-runtime.ps1'
+$OllamaResolver = Join-Path $PSScriptRoot 'resolve-ollama-exe.ps1'
+$ResolvedNode = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $NodeResolver -Output Path 2>$null)
+$NodeReady = $LASTEXITCODE -eq 0 -and $ResolvedNode.Count -gt 0
+$ResolvedOllama = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $OllamaResolver 2>$null)
+$OllamaReady = $LASTEXITCODE -eq 0 -and $ResolvedOllama.Count -gt 0
 $ElectronPath = Join-Path $ProjectRoot 'node_modules\electron\dist\electron.exe'
 $Desktop = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
 $AvatarShortcut = Join-Path $Desktop 'Marvin Avatar.lnk'
@@ -86,13 +92,13 @@ $Core = [ordered]@{
         $Reason = if ($PythonRuntime) { ($PythonRuntime.reasons -join ', ') } else { 'inspection impossible' }
         New-Capability 'degraded' ('Environnement Python non portable : ' + $Reason) 'Arreter Marvin puis executer scripts\migrate-python-runtime.ps1 -Action Migrate.'
     } else { New-Capability 'unavailable' 'Environnement Python absent.' 'Relancer INSTALLER-NOUVEAU-PC.bat.' }
-    node_runtime = if (Test-CommandAvailable 'node') {
-        New-Capability 'available' ((& node --version 2>$null) -join '')
+    node_runtime = if ($NodeReady) {
+        New-Capability 'available' ((& ([string]$ResolvedNode[-1]) --version 2>$null) -join '')
     } else { New-Capability 'unavailable' 'Node.js absent.' 'Installer Node.js LTS puis relancer.' }
     node_dependencies = if (Test-Path -LiteralPath $NodeModules -PathType Container) {
         New-Capability 'available' 'Dépendances frontend présentes.'
     } else { New-Capability 'unavailable' 'node_modules absent.' 'Relancer INSTALLER-NOUVEAU-PC.bat.' }
-    ollama = if ((Test-CommandAvailable 'ollama') -or (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'))) {
+    ollama = if ($OllamaReady) {
         New-Capability 'available' 'Runtime Ollama installé.'
     } else { New-Capability 'unavailable' 'Ollama absent.' 'Installer Ollama puis relancer.' }
 }
@@ -101,9 +107,38 @@ $DockerCli = Test-CommandAvailable 'docker'
 $DockerReady = $false
 $DockerDetail = 'Docker CLI absent.'
 if ($DockerCli) {
-    $DockerVersion = (& docker version --format '{{.Server.Version}}' 2>$null)
-    $DockerReady = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($DockerVersion -join ''))
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    try {
+        $DockerVersion = @(& docker version --format '{{.Server.Version}}' 2>$null)
+        $DockerExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+    $DockerReady = $DockerExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace(($DockerVersion -join ''))
     $DockerDetail = if ($DockerReady) { 'Docker Engine ' + (($DockerVersion -join '').Trim()) } else { 'Docker CLI présent, moteur indisponible.' }
+}
+$SearxngReady = $false
+$SearxngPort = $null
+if ($DockerReady) {
+    try {
+        $PreviousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        try {
+            $Mapped = @(& docker port marvin-searxng 8080/tcp 2>$null)
+            $DockerPortExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $PreviousPreference
+        }
+        if ($DockerPortExitCode -eq 0 -and $Mapped.Count -gt 0) {
+            $Match = [regex]::Match([string]$Mapped[-1], ':(\d+)$')
+            if ($Match.Success) {
+                $SearxngPort = [int]$Match.Groups[1].Value
+                $Probe = Invoke-WebRequest -Uri "http://127.0.0.1:$SearxngPort/config" -UseBasicParsing -TimeoutSec 3
+                $SearxngReady = $Probe.StatusCode -eq 200
+            }
+        }
+    } catch {}
 }
 
 $HyperVFeature = 'unknown'
@@ -151,6 +186,13 @@ $Optional = [ordered]@{
     docker_test_forge = if ($DockerReady) { New-Capability 'available' $DockerDetail } elseif ($DockerCli) {
         New-Capability 'degraded' $DockerDetail 'Démarrer Docker Desktop.'
     } else { New-Capability 'unavailable' $DockerDetail 'Installer Docker Desktop pour Test Forge et SearXNG.' }
+    searxng_web_search = if ($SearxngReady) {
+        New-Capability 'available' ("SearXNG local verifie sur 127.0.0.1:$SearxngPort.")
+    } elseif ($DockerReady) {
+        New-Capability 'degraded' 'Docker est pret mais SearXNG ne repond pas encore.' 'Relancer start.bat ou INSTALLER-SEARXNG.bat.'
+    } else {
+        New-Capability 'unavailable' 'SearXNG facultatif indisponible sans Docker; les replis Web restent actifs.' 'Installer Docker Desktop puis relancer INSTALLER-SEARXNG.bat.'
+    }
     hyperv = if ($HyperVModule) { New-Capability 'available' ('Module Hyper-V présent; état fonctionnalité : ' + $HyperVFeature) } elseif ($HyperVFeature -eq 'Disabled') {
         New-Capability 'unavailable' 'Hyper-V désactivé.' 'Activer uniquement sur une édition Windows compatible; redémarrage requis.'
     } else { New-Capability 'unavailable' ('État Hyper-V : ' + $HyperVFeature) 'Vérifier l édition Windows et les privilèges.' }

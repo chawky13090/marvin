@@ -1,6 +1,6 @@
 # Marvin — guide opérationnel pour Claude Code
 
-État courant au 2026-08-14 : **v2.652.0, 364 outils, 392 routes FastAPI**.
+État courant au 2026-08-14 : **v2.653.0, 364 outils, 392 routes FastAPI**.
 
 Forge Cloud utilise le verrou `marvin.forge-runtime-lock/1.1` : tag et digest exacts,
 version Ollama, capacité déclarée, absence de `num_ctx` et empreinte de la sonde longue sont
@@ -39,6 +39,14 @@ acceptation d'ingénierie, mais pas encore une généralisation statistique : le
 300 exécutions réelles sans faux succès avant une diffusion générale.
 Le projet reste installable sur d'autres Windows 11 sans dépendre des caches privés d'un agent
 ou de chemins liés à la machine de développement.
+
+Depuis v2.653, la distribution standard est un paquet ZIP produit par
+`CREER-PAQUET-MARVIN.bat` depuis les seuls octets suivis. Sur le poste cible, un double-clic sur
+`INSTALLER-MARVIN.bat` vérifie le payload, publie sous `%LOCALAPPDATA%\Programs\Marvin`,
+provisionne les runtimes x64 épinglés manquants, recrée les dépendances natives, adapte et
+qualifie les modèles locaux, construit puis teste les 364 outils et l'interface. Les composants
+système optionnels restent explicitement dégradables. Une mise à niveau conserve données,
+runtime et configuration et restaure le code antérieur sur échec.
 
 Les objectifs non négociables sont la compétence réelle, la liberté de raisonnement des LLM,
 la validation du résultat métier, la conservation des fonctions et un harnais renforcé pour

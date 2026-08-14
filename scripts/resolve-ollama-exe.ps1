@@ -4,7 +4,9 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $candidates = @(
+    (Join-Path $projectRoot 'runtime\managed\ollama\ollama.exe'),
     (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\Ollama\ollama.exe')
 )
 

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.652.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.653.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.652.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.653.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.652.0)
+## 9. État actuel (v2.653.0)
+
+**v2.653 (installation Windows en un clic)** : le paquet distribuable est construit uniquement
+depuis les octets suivis par Git et exclut données, secrets, environnements virtuels et caches.
+Son manifeste lie version, commit et SHA-256 du payload. Un double-clic vérifie l'intégrité,
+installe Marvin sous `%LOCALAPPDATA%\Programs\Marvin`, sélectionne ou provisionne des runtimes
+x64 épinglés Python/Node/Ollama, recrée les dépendances natives, durcit les ACL, choisit et
+qualifie les modèles locaux selon le matériel, calibre leur contexte, construit le frontend,
+produit le rapport de capacités et valide réellement les 364 outils et l'interface. Docker,
+SearXNG, LibreOffice, Hyper-V et Windows Sandbox restent optionnels et leur absence est déclarée
+sans bloquer le socle. L'installation est relançable; les mises à niveau conservent `data`, le
+runtime et la configuration, et restaurent automatiquement le code antérieur sur échec. La
+désinstallation préserve les données par défaut et ne retire aucun runtime système partagé.
+Rollback : réversion atomique de v2.653; aucune migration de schéma ou de donnée n'est requise.
 
 **v2.652 (façade canonique rejetée, chemin K+L+S préservé)** : une vue canonique bornée a
 été pré-enregistrée puis implémentée désactivée, sans modifier le registre, le dispatch, les

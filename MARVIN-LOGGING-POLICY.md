@@ -114,6 +114,13 @@ Variables actuelles :
   `MARVIN_OLLAMA_RECALIBRATION_MAX_ARCHIVES`,
   `MARVIN_OLLAMA_RECALIBRATION_MAX_TOTAL_BYTES`.
 
+L'installateur Windows écrit `runtime/install/install.log.jsonl` en UTF-8 sans BOM. Il utilise
+`install_id` comme `trace_id`, ne journalise ni argument secret, ni contenu utilisateur, ni
+variable d'environnement, et borne les attributs aux étapes, durées, versions, URLs publiques
+et empreintes. La rotation intervient avant 2 Mio et conserve au plus cinq archives numérotées.
+Une panne de journal produit un avertissement local mais ne transforme pas à elle seule une
+installation valide en échec; l'état déterministe reste dans `runtime/install/state.json`.
+
 ## 6. Résilience, sécurité et supervision
 
 - Le SLI HTTP utilise une fenêtre mémoire roulante d'une heure, au plus 20 000 échantillons

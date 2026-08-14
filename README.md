@@ -1,6 +1,6 @@
 # Marvin — assistant IA local pour technicien informatique
 
-**Version 2.652.0**
+**Version 2.653.0**
 
 Marvin est un assistant personnel et technique piloté par un LLM. Il combine une interface
 web, un moteur agentique, une mémoire locale et 364 outils pour agir sur Windows, les
@@ -23,6 +23,16 @@ Voir `DESKTOP-AVATAR.md`.
 Le fonctionnement est local par défaut : Ollama exécute les modèles, SQLite conserve les
 données applicatives et Qdrant assure la recherche vectorielle. Le cloud est facultatif,
 explicitement activé et protégé par les modes de confidentialité de Marvin.
+
+## Installation Windows en un clic
+
+Sur la machine de développement, double-cliquer sur `CREER-PAQUET-MARVIN.bat`. Copier ensuite
+le ZIP produit dans `dist` sur le nouveau poste, l'extraire, puis double-cliquer sur
+`INSTALLER-MARVIN.bat`. Le paquet ne contient aucune donnée personnelle. L'installeur vérifie
+son payload, installe le socle sous `%LOCALAPPDATA%\Programs\Marvin`, provisionne les runtimes
+compatibles manquants, adapte les modèles locaux au matériel et ouvre l'interface après un
+smoke test réel. Aucun second lancement n'est nécessaire. Voir `INSTALLATION.md` pour les
+prérequis, le diagnostic, la mise à niveau et le rollback.
 
 Les quatre profils de confidentialité ont un contrat de résilience commun. Normal protège
 les données sensibles en local, Hyper sécurisé interdit le Cloud, Tout cloud privilégie le

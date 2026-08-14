@@ -4,6 +4,7 @@ setlocal enabledelayedexpansion
 title Marvin - Verification de l'installation (Docteur)
 color 0B
 pushd "%~dp0"
+if exist "%~dp0runtime\install\environment.bat" call "%~dp0runtime\install\environment.bat"
 set PROBLEMS=0
 set "MARVIN_PY=python"
 if exist "backend\.venv\Scripts\python.exe" set "MARVIN_PY=backend\.venv\Scripts\python.exe"

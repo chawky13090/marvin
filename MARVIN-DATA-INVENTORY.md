@@ -14,11 +14,23 @@ Version du contrat : 1.0
 | Projections reconstructibles | Qdrant, Memory Mesh, cache reranker | non | régénération depuis SQLite et documents |
 | Logs techniques | audit, incidents, HTTP, matching | non | politique de rotation propre |
 | État machine/transitoire | VM Lab, validation, résultats Hyper-V, capacités détectées | non | redétection sur la machine cible |
+| État d'installation | `runtime/install/state.json`, `runtime/install/package.json`, rapport de capacités | non | régénération ou réinstallation sur la machine cible |
 | Sauvegardes | `data/backups` | jamais récursivement | cycle de rétention séparé |
 
 Le manifeste exécutable vit dans `backend/full_backup.py`. Tout nouveau fichier ou dossier
 de premier niveau sous `data/` doit être ajouté explicitement à une classe; sinon la création
 du bundle échoue. Les fichiers `.lock`, `.tmp` et `.partial` ne sont jamais archivés.
+
+## Installation Windows
+
+Le paquet de distribution est créé depuis `git archive HEAD` et porte
+`personal_data_included: false`. Il exclut donc les données, secrets, journaux, runtimes et
+caches non suivis. L'état local `runtime/install/state.json` peut contenir la racine
+d'installation, les versions, URLs publiques et SHA-256 téléchargés, mais aucun secret ni
+contenu utilisateur. Le journal `runtime/install/install.log.jsonl` suit la politique de
+rotation dédiée. Les archives de téléchargement sont conservées uniquement pour reprendre un
+échec, puis supprimées après réussite. Ces états machine ne sont pas inclus dans la sauvegarde
+globale et sont régénérés sur un autre poste.
 
 ## Rollbacks de renommage centralisés
 

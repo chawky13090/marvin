@@ -4,6 +4,7 @@ chcp 65001 >nul
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
 title SecretaryAI
+if exist "%~dp0runtime\install\environment.bat" call "%~dp0runtime\install\environment.bat"
 echo.
 echo  ====================================
 echo    SecretaryAI - Demarrage en cours
@@ -23,6 +24,9 @@ if not "%START_LOCK_STATE%"=="acquired" (
 
 :: Preflight reproductible : executables, venv et modules Node natifs.
 echo [0/4] Verification de l'environnement...
+set "MARVIN_NODE="
+for /f "usebackq delims=" %%N in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\resolve-node-runtime.ps1" -Output Path 2^>nul`) do set "MARVIN_NODE=%%N"
+if defined MARVIN_NODE for %%D in ("%MARVIN_NODE%") do set "PATH=%%~dpD;%PATH%"
 where node >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [ERREUR] Node.js est introuvable. Lancez INSTALLER-NOUVEAU-PC.bat.
