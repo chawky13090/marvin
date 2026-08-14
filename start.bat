@@ -121,7 +121,7 @@ powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing ($en
 if %ERRORLEVEL% NEQ 0 (
     echo [1/4] Demarrage d'Ollama en arriere-plan...
     start "" /B "%OLLAMA_EXE%" serve
-    powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 30;$i++){try{$r=Invoke-WebRequest -UseBasicParsing ($env:OLLAMA_URL + '/api/tags') -TimeoutSec 2;if($r.StatusCode -eq 200){$ok=$true;break}}catch{};Start-Sleep -Milliseconds 500};if(-not $ok){exit 1}" >nul 2>&1
+    powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\wait-loopback-http.ps1" -Uri "%OLLAMA_URL%/api/tags" -TimeoutSeconds 240 -RequestTimeoutSeconds 3 -PollMilliseconds 500 >nul 2>&1
     if errorlevel 1 (
         echo [ERREUR] Ollama ne repond pas sur le port %OLLAMA_PORT%.
         goto :startup_error
@@ -155,7 +155,8 @@ if %ERRORLEVEL% NEQ 0 (
 where docker >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
     echo [3/4] Recherche web auto-hebergee ^(SearXNG^) en arriere-plan...
-    start "SecretaryAI - SearXNG" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0docker\searxng\start-searxng.ps1"
+    if not exist "%~dp0runtime\logs" mkdir "%~dp0runtime\logs" >nul 2>&1
+    start "" /B powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0docker\searxng\start-searxng.ps1" 1>"%~dp0runtime\logs\searxng-startup.log" 2>&1
 ) else (
     echo [3/4] Docker non detecte - capacite SearXNG indisponible, socle Marvin maintenu.
 )

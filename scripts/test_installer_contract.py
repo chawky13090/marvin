@@ -8,9 +8,11 @@ import shutil
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 import zipfile
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
@@ -41,6 +43,8 @@ def _assert_static_contract() -> None:
     package_installer = (ROOT / "scripts" / "install-marvin-package.ps1").read_text(encoding="utf-8")
     vm_qualification = (ROOT / "scripts" / "qualify-marvin-windows-package.ps1").read_text(encoding="utf-8")
     ollama_port_resolver = (ROOT / "scripts" / "resolve-ollama-port.ps1").read_text(encoding="utf-8")
+    loopback_waiter = (ROOT / "scripts" / "wait-loopback-http.ps1").read_text(encoding="utf-8")
+    searxng_starter = (ROOT / "docker" / "searxng" / "start-searxng.ps1").read_text(encoding="utf-8")
     uninstaller = (ROOT / "scripts" / "uninstall-marvin.ps1").read_text(encoding="utf-8")
     report = (ROOT / "scripts" / "write-install-report.ps1").read_text(encoding="utf-8")
     starter = (ROOT / "start.bat").read_text(encoding="utf-8")
@@ -122,18 +126,29 @@ def _assert_static_contract() -> None:
     assert "Remove-Job -Job $MonitorJob" in vm_qualification
     assert "Stop-Job -Job $MonitorJob -Force" not in vm_qualification
     assert "'-NoStart'" in vm_qualification
-    assert "$StartProcess.WaitForExit(300000)" in vm_qualification
+    assert "launcher_runtime_ready = $LauncherRuntimeReady" in vm_qualification
+    assert "launcher_active_when_ready = $LauncherActiveWhenReady" in vm_qualification
     assert "start_exit_code = $StartExitCode" in vm_qualification
     assert "start_stdout_tail = $StartStdoutText" in vm_qualification
-    assert "$RuntimeDeadline = (Get-Date).AddMinutes(4)" in vm_qualification
+    assert "$RuntimeDeadline = (Get-Date).AddMinutes(8)" in vm_qualification
     assert "-WorkingDirectory $env:SystemRoot -WindowStyle Hidden" in vm_qualification
     assert "[AllowEmptyCollection()]" in ollama_port_resolver
+    assert "[DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)" in loopback_waiter
+    assert "'127.0.0.1', 'localhost', '::1'" in loopback_waiter
+    assert "Local\\Marvin.SearXNG.Startup" in searxng_starter
+    assert "function Test-DockerDaemon" in searxng_starter
+    assert "$Process.WaitForExit($TimeoutSeconds * 1000)" in searxng_starter
+    assert "taskkill.exe /PID $Process.Id /T /F" in searxng_starter
 
     assert "resolve-node-runtime.ps1" in starter
     assert 'pushd "%~dp0" || exit /b 1' in starter
     assert "set \"FRONTEND_RC=%ERRORLEVEL%\"" in starter
     assert "popd\nexit /b %FRONTEND_RC%" in starter
     assert "runtime\\install\\environment.bat" in starter
+    assert "wait-loopback-http.ps1" in starter
+    assert "-TimeoutSeconds 240" in starter
+    assert 'start "" /B powershell -NoProfile -NonInteractive -WindowStyle Hidden' in starter
+    assert "runtime\\logs\\searxng-startup.log" in starter
     assert "runtime\\install\\environment.bat" in verifier
     assert "$p.WaitForExit(5000)" in verifier
     assert "Docker Desktop ne repond pas" in verifier
@@ -191,6 +206,89 @@ def _assert_ollama_port_resolver_accepts_no_exclusions() -> None:
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert result.stdout.strip().splitlines()[-1] == str(port)
+
+
+def _assert_loopback_waiter_is_bounded_and_retries() -> None:
+    class DelayedReadyHandler(BaseHTTPRequestHandler):
+        attempts = 0
+
+        def do_GET(self) -> None:  # noqa: N802 - contrat de BaseHTTPRequestHandler
+            type(self).attempts += 1
+            status = 200 if type(self).attempts >= 3 else 503
+            self.send_response(status)
+            self.end_headers()
+            self.wfile.write(b"ready" if status == 200 else b"starting")
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), DelayedReadyHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = _run_powershell(
+            ROOT / "scripts" / "wait-loopback-http.ps1",
+            "-Uri",
+            f"http://127.0.0.1:{server.server_port}/api/tags",
+            "-TimeoutSeconds",
+            "10",
+            "-RequestTimeoutSeconds",
+            "1",
+            "-PollMilliseconds",
+            "100",
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert DelayedReadyHandler.attempts >= 3
+        assert "ready attempts=" in result.stdout
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    rejected = _run_powershell(
+        ROOT / "scripts" / "wait-loopback-http.ps1",
+        "-Uri",
+        "https://example.invalid/api/tags",
+        "-TimeoutSeconds",
+        "1",
+    )
+    assert rejected.returncode == 2
+    assert "boucle locale" in rejected.stderr
+
+
+def _assert_searxng_startup_is_single_instance() -> None:
+    script = ROOT / "docker" / "searxng" / "start-searxng.ps1"
+    first = subprocess.Popen(
+        [
+            POWERSHELL,
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script),
+            "-LockSelfTest",
+            "-LockSelfTestHoldMilliseconds",
+            "2500",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    try:
+        time.sleep(0.4)
+        second = _run_powershell(script, "-LockSelfTest")
+        assert second.returncode == 0, second.stdout + second.stderr
+        assert "already_running" in second.stdout
+        stdout, stderr = first.communicate(timeout=10)
+        assert first.returncode == 0, stdout + stderr
+        assert "lock_acquired" in stdout
+    finally:
+        if first.poll() is None:
+            first.kill()
+            first.wait(timeout=5)
 
 
 def _assert_package_preflight_is_non_mutating() -> None:
@@ -368,6 +466,8 @@ def main() -> int:
     _assert_static_contract()
     _assert_plan_is_non_mutating()
     _assert_ollama_port_resolver_accepts_no_exclusions()
+    _assert_loopback_waiter_is_bounded_and_retries()
+    _assert_searxng_startup_is_single_instance()
     _assert_package_preflight_is_non_mutating()
     _assert_package_install_and_rollback_support_spaces()
     _assert_install_log_rotation_and_encoding()

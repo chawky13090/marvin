@@ -2,7 +2,7 @@
 
 Cible technique : Windows 10/11 x64 ou Windows Server 2019/2022/2025 avec interface graphique
 
-Versions : Marvin 2.654.0, Python 3.13.15, Node.js 24.19.0 LTS, Ollama 0.32.11
+Versions : Marvin 2.655.0, Python 3.13.15, Node.js 24.19.0 LTS, Ollama 0.32.11
 
 Niveau requis : utilisateur Windows standard; administrateur seulement pour les fonctions système optionnelles
 
@@ -51,8 +51,8 @@ donc pas embarquer `data`, `.env.local`, `.venv`, `node_modules`, `.next`, cache
 fichiers non suivis. Deux fichiers sont créés :
 
 ```text
-dist\Marvin-Windows-v2.654.0.zip
-dist\Marvin-Windows-v2.654.0.zip.sha256
+dist\Marvin-Windows-v2.655.0.zip
+dist\Marvin-Windows-v2.655.0.zip.sha256
 ```
 
 ## 2. Transférer et vérifier
@@ -65,7 +65,7 @@ Copier les deux fichiers sur le poste cible. La vérification manuelle du ZIP es
 # Privileges: Utilisateur
 # Objective: vérifier l'intégrité du paquet avant extraction
 
-$zip = '.\Marvin-Windows-v2.654.0.zip'
+$zip = '.\Marvin-Windows-v2.655.0.zip'
 Get-FileHash -LiteralPath $zip -Algorithm SHA256
 Get-Content -LiteralPath ($zip + '.sha256')
 ```
@@ -76,7 +76,7 @@ SHA-256 du payload interne avant toute publication dans la cible.
 ## 3. Installer
 
 1. Extraire entièrement le ZIP dans un dossier local.
-2. Ouvrir le dossier `Marvin-Windows-v2.654.0` extrait.
+2. Ouvrir le dossier `Marvin-Windows-v2.655.0` extrait.
 3. Double-cliquer sur `INSTALLER-MARVIN.bat`.
 4. Laisser la fenêtre ouverte jusqu'à `INSTALLATION TERMINEE`.
 
@@ -110,7 +110,7 @@ Double-cliquer sur `VERIFIER-INSTALLATION.bat`. Les fichiers de diagnostic sont 
 | Capacités | `data\install-capabilities.json` | disponible/dégradé/indisponible et remédiation | dernière détection |
 | Profil Ollama | `data\install\ollama-context-profile.json` | contexte local réellement qualifié | recalibré si matériel/modèle change |
 
-Résultats obligatoires : backend `status=ok`, version 2.654.0, 364 outils, frontend HTTP 200.
+Résultats obligatoires : backend `status=ok`, version 2.655.0, 364 outils, frontend HTTP 200.
 Docker/SearXNG, LibreOffice, Hyper-V et Sandbox peuvent être dégradés sans bloquer le socle.
 
 ## 5. Mise à niveau et reprise

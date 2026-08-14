@@ -118,6 +118,9 @@ try {
         $Health = $null
         $Frontend = $null
         $StartExitCode = $null
+        $LauncherRuntimeReady = $false
+        $LauncherActiveWhenReady = $false
+        $StopExitCode = $null
         $StartStdoutText = ''
         $StartStderrText = ''
         if ($ExitCode -eq 0) {
@@ -129,11 +132,48 @@ try {
                 -ArgumentList @('/d', '/c', 'call', ('"{0}"' -f $StartBatch)) `
                 -WorkingDirectory $env:SystemRoot -WindowStyle Hidden -PassThru `
                 -RedirectStandardOutput $StartStdout -RedirectStandardError $StartStderr
-            $StartTimedOut = -not $StartProcess.WaitForExit(300000)
-            if ($StartTimedOut) {
-                & taskkill.exe /PID $StartProcess.Id /T /F | Out-Null
-                $StartExitCode = 124
-            } else {
+            # Le premier plan de start.bat porte intentionnellement Next.js et
+            # reste donc actif pendant toute la session utilisateur. La preuve
+            # correcte est la disponibilite simultanee des deux services alors
+            # que le lanceur vit encore, pas un code de sortie artificiel.
+            $RuntimeDeadline = (Get-Date).AddMinutes(8)
+            do {
+                try { $Health = Invoke-RestMethod -Uri 'http://127.0.0.1:8005/api/health' -TimeoutSec 4 } catch { $Health = $null }
+                try { $Frontend = (Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 4).StatusCode } catch { $Frontend = $null }
+                $LauncherRuntimeReady = [bool]($Health -and $Health.status -eq 'ok' -and [int]$Health.tools_count -eq 364 -and $Frontend -eq 200)
+                if ($LauncherRuntimeReady) {
+                    $LauncherActiveWhenReady = -not $StartProcess.HasExited
+                    break
+                }
+                if ($StartProcess.HasExited) {
+                    $StartProcess.Refresh()
+                    $StartExitCode = [int]$StartProcess.ExitCode
+                    break
+                }
+                if (-not $LauncherRuntimeReady) {
+                    Start-Sleep -Seconds 2
+                }
+            } while ((Get-Date) -lt $RuntimeDeadline)
+
+            if (-not $StartProcess.HasExited) {
+                $StopBatch = Join-Path $Target 'stop.bat'
+                if (Test-Path -LiteralPath $StopBatch -PathType Leaf) {
+                    $StopProcess = Start-Process -FilePath $env:ComSpec `
+                        -ArgumentList @('/d', '/c', 'call', ('"{0}"' -f $StopBatch)) `
+                        -WorkingDirectory $env:SystemRoot -WindowStyle Hidden -PassThru
+                    if ($StopProcess.WaitForExit(180000)) {
+                        $StopProcess.Refresh()
+                        $StopExitCode = [int]$StopProcess.ExitCode
+                    } else {
+                        & taskkill.exe /PID $StopProcess.Id /T /F | Out-Null
+                        $StopExitCode = 124
+                    }
+                }
+                if (-not $StartProcess.WaitForExit(30000)) {
+                    & taskkill.exe /PID $StartProcess.Id /T /F | Out-Null
+                }
+            }
+            if ($StartProcess.HasExited) {
                 $StartProcess.Refresh()
                 $StartExitCode = [int]$StartProcess.ExitCode
             }
@@ -141,14 +181,6 @@ try {
             $StartStderrText = if (Test-Path -LiteralPath $StartStderr) { [string](Get-Content -LiteralPath $StartStderr -Raw) } else { '' }
             if ($StartStdoutText.Length -gt 12000) { $StartStdoutText = $StartStdoutText.Substring($StartStdoutText.Length - 12000) }
             if ($StartStderrText.Length -gt 12000) { $StartStderrText = $StartStderrText.Substring($StartStderrText.Length - 12000) }
-            $RuntimeDeadline = (Get-Date).AddMinutes(4)
-            do {
-                try { $Health = Invoke-RestMethod -Uri 'http://127.0.0.1:8005/api/health' -TimeoutSec 4 } catch { $Health = $null }
-                try { $Frontend = (Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 4).StatusCode } catch { $Frontend = $null }
-                if (-not ($Health -and $Health.status -eq 'ok' -and [int]$Health.tools_count -eq 364 -and $Frontend -eq 200)) {
-                    Start-Sleep -Seconds 2
-                }
-            } while ((Get-Date) -lt $RuntimeDeadline -and -not ($Health -and $Health.status -eq 'ok' -and [int]$Health.tools_count -eq 364 -and $Frontend -eq 200))
         }
         $StdoutText = if (Test-Path -LiteralPath $Stdout) { [string](Get-Content -LiteralPath $Stdout -Raw) } else { '' }
         $StderrText = if (Test-Path -LiteralPath $Stderr) { [string](Get-Content -LiteralPath $Stderr -Raw) } else { '' }
@@ -166,6 +198,9 @@ try {
             tools_count = if ($Health) { [int]$Health.tools_count } else { $null }
             frontend_status = $Frontend
             start_exit_code = $StartExitCode
+            launcher_runtime_ready = $LauncherRuntimeReady
+            launcher_active_when_ready = $LauncherActiveWhenReady
+            stop_exit_code = $StopExitCode
             start_stdout_tail = $StartStdoutText
             start_stderr_tail = $StartStderrText
             stdout_tail = $StdoutText
@@ -228,10 +263,11 @@ try {
         $GuestResult.exit_code -eq 0 -and
         $GuestResult.state_status -eq 'completed' -and
         $GuestResult.health_status -eq 'ok' -and
-        $GuestResult.health_version -eq '2.654.0' -and
+        $GuestResult.health_version -eq '2.655.0' -and
         $GuestResult.tools_count -eq 364 -and
         $GuestResult.frontend_status -eq 200 -and
-        $GuestResult.start_exit_code -eq 0
+        $GuestResult.launcher_runtime_ready -eq $true -and
+        $GuestResult.launcher_active_when_ready -eq $true
     )
 } catch {
     $Result.error = $_.Exception.Message

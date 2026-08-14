@@ -5,6 +5,17 @@
 # Usage : powershell -ExecutionPolicy Bypass -File docker\searxng\start-searxng.ps1
 #         (ou double-clic sur INSTALLER-SEARXNG.bat a la racine du depot)
 
+[CmdletBinding()]
+param(
+    [ValidateRange(1, 30)]
+    [int]$DockerProbeTimeoutSeconds = 5,
+    [ValidateRange(30, 600)]
+    [int]$DockerStartupTimeoutSeconds = 180,
+    [switch]$LockSelfTest,
+    [ValidateRange(0, 10000)]
+    [int]$LockSelfTestHoldMilliseconds = 0
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -12,16 +23,58 @@ $backendUrl = "http://127.0.0.1:8005"
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 
+function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
+    $Stdout = [System.IO.Path]::GetTempFileName()
+    $Stderr = [System.IO.Path]::GetTempFileName()
+    try {
+        $Process = Start-Process -FilePath $DockerPath `
+            -ArgumentList @('info', '--format', '{{.ServerVersion}}') `
+            -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+        if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
+            & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+            return $false
+        }
+        $Process.Refresh()
+        return [int]$Process.ExitCode -eq 0
+    } catch {
+        return $false
+    } finally {
+        Remove-Item -LiteralPath $Stdout, $Stderr -Force -ErrorAction SilentlyContinue
+    }
+}
+
+$StartupMutex = [System.Threading.Mutex]::new($false, 'Local\Marvin.SearXNG.Startup')
+$OwnsStartupMutex = $false
+try {
+    try {
+        $OwnsStartupMutex = $StartupMutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+        $OwnsStartupMutex = $true
+    }
+    if (-not $OwnsStartupMutex) {
+        Write-Output 'already_running'
+        exit 0
+    }
+    if ($LockSelfTest) {
+        if ($LockSelfTestHoldMilliseconds -gt 0) {
+            Start-Sleep -Milliseconds $LockSelfTestHoldMilliseconds
+        }
+        Write-Output 'lock_acquired'
+        exit 0
+    }
+
 # -- 1. Docker CLI present ? --------------------------------------------------
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    $DockerCommand = Get-Command docker -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $DockerCommand) {
     Write-Host "Docker n'est pas installe. Installe Docker Desktop puis relance ce script: https://www.docker.com/products/docker-desktop/" -ForegroundColor Red
     exit 1
-}
+    }
+$DockerPath = [string]$DockerCommand.Source
 
 # -- 2. Daemon Docker demarre ? Sinon, lancer Docker Desktop et attendre ----
 Write-Step "Verification du demon Docker..."
-$dockerReady = $false
-try { docker info *>$null; if ($LASTEXITCODE -eq 0) { $dockerReady = $true } } catch {}
+$dockerReady = Test-DockerDaemon -DockerPath $DockerPath -TimeoutSeconds $DockerProbeTimeoutSeconds
 
 if (-not $dockerReady) {
     Write-Step "Demon Docker arrete -- demarrage de Docker Desktop..."
@@ -32,14 +85,15 @@ if (-not $dockerReady) {
         Write-Host "Docker Desktop introuvable a l'emplacement attendu. Demarre-le manuellement puis relance ce script." -ForegroundColor Red
         exit 1
     }
-    $attempts = 0
-    while (-not $dockerReady -and $attempts -lt 60) {
+    $DockerDeadline = [DateTimeOffset]::UtcNow.AddSeconds($DockerStartupTimeoutSeconds)
+    while (-not $dockerReady -and [DateTimeOffset]::UtcNow -lt $DockerDeadline) {
         Start-Sleep -Seconds 3
-        try { docker info *>$null; if ($LASTEXITCODE -eq 0) { $dockerReady = $true } } catch {}
-        $attempts++
+        $RemainingSeconds = [math]::Max(1, [math]::Ceiling(($DockerDeadline - [DateTimeOffset]::UtcNow).TotalSeconds))
+        $ProbeSeconds = [math]::Min($DockerProbeTimeoutSeconds, $RemainingSeconds)
+        $dockerReady = Test-DockerDaemon -DockerPath $DockerPath -TimeoutSeconds $ProbeSeconds
     }
     if (-not $dockerReady) {
-        Write-Host "Docker Desktop n'a pas demarre a temps (3 min). Reessaie une fois qu'il est pret." -ForegroundColor Red
+        Write-Host "Docker Desktop n'a pas demarre dans la borne de $DockerStartupTimeoutSeconds secondes. Reessaie une fois qu'il est pret." -ForegroundColor Red
         exit 1
     }
 }
@@ -167,3 +221,9 @@ try {
 
 Write-Host ""
 Write-Host "Termine. Instance: http://localhost:$port  |  Conteneur: marvin-searxng" -ForegroundColor Cyan
+} finally {
+    if ($OwnsStartupMutex) {
+        try { $StartupMutex.ReleaseMutex() } catch {}
+    }
+    $StartupMutex.Dispose()
+}

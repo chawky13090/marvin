@@ -5,6 +5,35 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-14 — v2.655.0 — démarrage Windows borné et sans consoles orphelines
+
+La qualification Hyper-V de v2.654 a installé le paquet en 501 secondes et publié l'état
+`completed`, mais le lancement a produit un faux négatif. Ollama écoutait dès 22:00:49 puis sa
+découverte CPU/GPU n'a laissé répondre `/api/tags` qu'à 22:02:21; l'ancienne boucle expirait
+avant cette réponse et tombait sur le `pause` interactif. Le même test exigeait ensuite un code
+de sortie 0 de `start.bat`, alors que ce lanceur porte intentionnellement Next.js au premier plan.
+Les deux critères rendaient un Windows vierge lent impossible à qualifier malgré un runtime sain.
+
+Une sonde PowerShell dédiée refuse toute URL hors boucle locale, borne chaque requête et attend
+au plus 240 secondes. Son canari HTTP réel reçoit d'abord deux réponses 503 puis un 200. Le
+runner VM exige désormais backend `ok`, version exacte, 364 outils et frontend 200 pendant que
+le lanceur est encore actif; il appelle ensuite `stop.bat` sous une borne séparée. Aucun timeout
+n'est supprimé et aucun seuil fonctionnel n'est abaissé.
+
+Deux consoles PowerShell visibles signalées par l'utilisateur ont été reliées à deux processus
+orphelins `start-searxng.ps1`, chacun bloqué dans un `docker info` non borné. Ils ont été fermés
+après identification exacte de leur ligne de commande et de leurs enfants. SearXNG utilise
+maintenant un mutex par session, un probe Docker tué avec son arbre à l'expiration, et un délai
+global de démarrage de 180 secondes. Le démarrage optionnel devient caché; son dernier diagnostic
+est conservé dans `runtime/logs/searxng-startup.log`. Un canari concurrent prouve que le second
+lancement sort sans contacter Docker.
+
+Sécurité : sondes limitées à `127.0.0.1`/`localhost`/`::1`, aucune écoute LAN, aucun secret dans
+les logs et aucun assouplissement Cloud. Résilience : délais et nettoyage d'arbres sont bornés;
+Docker/SearXNG restent optionnels. Rollback : réversion atomique de v2.655 puis redémarrage;
+aucune migration, donnée ou configuration persistante n'est modifiée. La nouvelle preuve VM
+reste à publier après reconstruction du paquet lié au commit exact.
+
 ## 2026-08-14 — v2.654.0 — démarrage portable sans plage TCP exclue
 
 La qualification Hyper-V du paquet v2.653 a terminé l'installation en 485 secondes, mais le
