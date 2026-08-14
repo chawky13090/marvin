@@ -1,0 +1,22 @@
+{
+  "schema": "marvin.tool-selection-v13-control-corpus/1.0",
+  "status": "frozen_before_runner",
+  "items": [
+    {"id": "ctl-01", "prompt": "Trouve le fichier FixtureReport-A.pdf par son nom."},
+    {"id": "ctl-02", "prompt": "Liste les processus actifs triés par mémoire."},
+    {"id": "ctl-03", "prompt": "Ouvre le fichier C:\\Fixture\\Document-A.pdf."},
+    {"id": "ctl-04", "prompt": "Ouvre la page web https://example.test dans le navigateur."},
+    {"id": "ctl-05", "prompt": "Explique comment installer un logiciel avec Winget."},
+    {"id": "ctl-06", "prompt": "Donne-moi la commande Winget pour installer FixtureApp-A."},
+    {"id": "ctl-07", "prompt": "Lance Paint puis désinstalle FixtureApp-A."},
+    {"id": "ctl-08", "prompt": "Affiche les services Windows en cours d'exécution."},
+    {"id": "ctl-09", "prompt": "Recherche dans le contenu des documents le terme FixtureAlpha."},
+    {"id": "ctl-10", "prompt": "Crée le dossier C:\\Fixture\\Archive-A."},
+    {"id": "ctl-11", "prompt": "Envoie un courriel de test au destinataire factice."},
+    {"id": "ctl-12", "prompt": "Quelle application Windows recommandes-tu pour archiver des fichiers ?"}
+  ],
+  "expected": {
+    "facade_activation_count": 0,
+    "baseline_and_candidate_tool_names_exactly_equal": true
+  }
+}

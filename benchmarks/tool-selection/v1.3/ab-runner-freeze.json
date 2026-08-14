@@ -1,0 +1,69 @@
+{
+  "schema": "marvin.tool-selection-v13-ab-runner-freeze/1.0",
+  "status": "frozen_after_preflight_before_benchmark_execution",
+  "source_commit_before_runner_freeze": "c96875c18138a60de3dc01673e9911af0598741a",
+  "benchmark": {
+    "model": "mistral-large-3:675b-cloud",
+    "digest": "3130fd5a5a1eb4b208be74bf0273357c14c3576c6ba8d78f98b960e91919d77b",
+    "provider_declared_max_context_tokens": 262144,
+    "client_num_ctx": null
+  },
+  "variants": ["current", "canonical_facade"],
+  "modes": {"eco": 18, "balanced": 40, "performance": 80},
+  "repetitions_per_intent": 3,
+  "seed": 2652,
+  "concurrency_maximum": 3,
+  "preflight": {
+    "holdout_count": 20,
+    "view_count": 120,
+    "facade_activation_count": 51,
+    "facade_expected_activation_count": 60,
+    "inactive_holdout_cells_are_measured_unchanged_and_must_not_trigger_product_adjustment": true,
+    "control_count": 12,
+    "control_activation_count": 0,
+    "control_candidate_equality_count": 12,
+    "business_tool_execution_count": 0,
+    "benchmark_model_call_count": 0
+  },
+  "decision": {
+    "global_tool_action_success_minimum": 0.9,
+    "per_family_tool_action_success_minimum": 0.85,
+    "candidate_membership_violation_maximum": 0,
+    "argument_schema_validity_minimum": 0.98,
+    "control_activation_maximum": 0,
+    "activation_if_all_predicates_pass": true,
+    "restricted_activation_if": {
+      "family_success_minimum": 0.85,
+      "other_family_remains_disabled": true,
+      "candidate_membership_violation_maximum": 0
+    },
+    "rollback_if": [
+      "no_family_reaches_0_85",
+      "candidate_membership_violation_above_zero",
+      "control_activation_above_zero",
+      "argument_schema_validity_below_0_98"
+    ],
+    "no_threshold_change_after_result": true
+  },
+  "frozen_hashes": {
+    "scripts/run_tool_selection_v13_ab.py": "2b340d731be9c0effc94d876b8a103668b4b554cd0c088061459dad4c15baef1",
+    "benchmarks/tool-selection/v1.3/control-corpus.json": "ecf0ffe8feb032f168969a20ce806c818427e50015bb45ac2e169b9ccde181bc",
+    "benchmarks/tool-selection/v1.3/holdout-freeze-manifest.json": "1dffa5bcbdd8a896ab1220721d876a2a8449c440f2853ae843300573191a1a28",
+    "backend/tool_canonical_facade.py": "02f56cf54db654eabbadfbd506dc1fa74ba58526986c51b185bd07f7989df944",
+    "backend/agent_prompt.py": "e735855dc2820a0b77ce19382317241b40eb6060e011ff6866993ac59bab0131",
+    "backend/agent_tool_selection.py": "98dc6e797ab97d9ed822b338600b5f5c0c9232bdfeb5b1de9db76ebaf83338d6",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "safety": {
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "product_activation": false,
+    "security_guards_are_not_ablated": true,
+    "partial_result_publication_forbidden": true,
+    "interrupted_run_discarded": true
+  },
+  "authorization": {
+    "benchmark_model_calls": false,
+    "separate_single_use_artifact_required": true
+  }
+}
