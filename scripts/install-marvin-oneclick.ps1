@@ -360,7 +360,7 @@ try {
         }
         $Drive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($ProjectRoot).Substring(0, 1))
         if ([uint64]$Drive.Free -lt [uint64]$Components.minimum_free_bytes) {
-            throw 'Au moins 20 Gio libres sont requis pour les runtimes, dependances et modeles.'
+            throw 'Au moins 40 Gio libres sont requis pour les runtimes, dependances, modeles et rollback.'
         }
         if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'package-lock.json'))) { throw 'package-lock.json absent.' }
         if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'backend\requirements.txt'))) { throw 'requirements.txt absent.' }
@@ -430,8 +430,8 @@ try {
         try {
             Invoke-External -FilePath $script:PythonPath -ArgumentList @('-m', 'venv', $Venv) | Out-Null
             $VenvPython = Join-Path $Venv 'Scripts\python.exe'
-            Invoke-External -FilePath $VenvPython -ArgumentList @('-m', 'pip', 'install', '--upgrade', 'pip') | Out-Null
-            Invoke-External -FilePath $VenvPython -ArgumentList @('-m', 'pip', 'install', '-r', (Join-Path $ProjectRoot 'backend\requirements.txt')) | Out-Null
+            Invoke-External -FilePath $VenvPython -ArgumentList @('-m', 'pip', 'install', '--no-cache-dir', '--upgrade', 'pip') | Out-Null
+            Invoke-External -FilePath $VenvPython -ArgumentList @('-m', 'pip', 'install', '--no-cache-dir', '-r', (Join-Path $ProjectRoot 'backend\requirements.txt')) | Out-Null
             Invoke-External -FilePath $VenvPython -ArgumentList @('-m', 'pip', 'check') | Out-Null
             $PyWin32 = Join-Path $Venv 'Scripts\pywin32_postinstall.py'
             if (Test-Path -LiteralPath $PyWin32) { Invoke-External -FilePath $VenvPython -ArgumentList @($PyWin32, '-install') | Out-Null }
@@ -453,7 +453,7 @@ try {
             $NodeDir = Split-Path -Parent $script:NodePath
             $Npm = Join-Path $NodeDir 'npm.cmd'
             if (-not (Test-Path -LiteralPath $Npm)) { $Npm = (Get-Command npm.cmd -ErrorAction Stop).Source }
-            $env:npm_config_cache = Join-Path $ProjectRoot '.npm-cache'
+            $env:npm_config_cache = Join-Path $DownloadRoot 'npm-cache'
             Invoke-External -FilePath $Npm -ArgumentList @('ci', '--no-audit', '--no-fund') | Out-Null
             Invoke-External -FilePath $script:NodePath -ArgumentList @('-e', "require('sharp'); require('next/package.json')") | Out-Null
             Remove-Item -LiteralPath $Rollback -Recurse -Force -ErrorAction SilentlyContinue

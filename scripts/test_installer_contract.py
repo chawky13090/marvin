@@ -52,7 +52,7 @@ def _assert_static_contract() -> None:
 
     assert components["schema_version"] == 1
     assert components["minimum_windows_build"] >= 17763
-    assert components["minimum_free_bytes"] >= 20 * 1024**3
+    assert components["minimum_free_bytes"] >= 40 * 1024**3
     for name in ("python", "node", "ollama"):
         component = components[name]
         assert component["version"] and "latest" not in component["url"].casefold()
@@ -86,6 +86,8 @@ def _assert_static_contract() -> None:
     assert "C:\\Users\\Chawb" not in installer
     assert "Invoke-WebRequest -Uri $Url" in installer
     assert "for ($Attempt = 1; $Attempt -le 3" in installer
+    assert installer.count("--no-cache-dir") >= 2
+    assert "Join-Path $DownloadRoot 'npm-cache'" in installer
     assert installer.count("$ErrorActionPreference = 'SilentlyContinue'") >= 3
     assert "AppendAllText" in installer and "UTF8Encoding]::new($false)" in installer
     assert "Docker absent; SearXNG reste indisponible" in installer

@@ -36,7 +36,7 @@ if ($Expected -notmatch '^[0-9a-f]{64}$' -or $Observed -ne $Expected) { throw 'S
 
 try {
     $HostDrive = Get-PSDrive -Name ([IO.Path]::GetPathRoot((Get-VMHardDiskDrive -VMName $VMName | Select-Object -First 1).Path).Substring(0, 1))
-    if ([uint64]$HostDrive.Free -lt 12GB) { throw 'Moins de 12 Gio libres sur le volume hôte de la VM; qualification refusée.' }
+    if ([uint64]$HostDrive.Free -lt 35GB) { throw 'Moins de 35 Gio libres sur le volume hôte de la VM; qualification refusée.' }
     $Checkpoint = Get-VMCheckpoint -VMName $VMName -Name $CheckpointName -ErrorAction Stop
     if ($null -eq $Checkpoint) { throw 'Checkpoint de référence absent.' }
 
@@ -71,7 +71,7 @@ try {
             is_admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         }
     }
-    if ([uint64]$GuestPreflight.free_bytes -lt 20GB) { throw 'Moins de 20 Gio libres dans la VM invitée.' }
+    if ([uint64]$GuestPreflight.free_bytes -lt 40GB) { throw 'Moins de 40 Gio libres dans la VM invitée.' }
 
     $GuestRoot = 'C:\Marvin\InstallerQualification'
     Invoke-Command -Session $Session -ScriptBlock {

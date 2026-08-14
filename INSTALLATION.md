@@ -30,7 +30,7 @@ Chaque composant optionnel est publié comme `available`, `degraded` ou `unavail
 
 - Windows x64 build 17763 ou ultérieur;
 - connexion HTTPS sortante vers python.org, nodejs.org, github.com et ollama.com;
-- au moins 20 Gio libres;
+- au moins 40 Gio libres;
 - PowerShell 5.1 ou PowerShell 7;
 - aucun secret ni ancien dossier `data` nécessaire pour une installation neuve.
 

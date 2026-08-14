@@ -53,6 +53,15 @@ les deux diagnostics sont rendus mécaniques. Le harnais VM versionné vérifie 
 les disques hôte/invité, le timeout de 90 minutes, l'état/HTTP final et restaure le checkpoint en
 `finally`, sans publier le secret invité.
 
+Le rejeu suivant a franchi `ollama_runtime`, mais le VHDX dynamique a consommé les 20 Gio
+physiques encore libres sur l'hôte et Hyper-V a placé l'invité en `PausedCritical` pour erreur
+d'E/S. Le processus hôte a ensuite expiré; cette campagne est classée interrompue, jamais comme
+un échec produit, et `Marvin-Clean` a été restauré. Le plancher initial de 20 Gio était néanmoins
+insuffisant pour runtimes, dépendances, frontend, modèles et rollback : le contrat exige désormais
+40 Gio dans la cible et 35 Gio physiques avant une qualification VM. `pip` fonctionne sans cache
+persistant et le cache `npm` vit sous `runtime/install/downloads`, supprimé après réussite mais
+conservé après échec pour une reprise bornée.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles
