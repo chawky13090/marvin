@@ -106,6 +106,10 @@ def _assert_static_contract() -> None:
     assert "checkpoint_restored_after" in vm_qualification
     assert "5400000" in vm_qualification
     assert "-Confirmed" in vm_qualification
+    assert "$MonitorJob = Invoke-Command -Session $MonitorSession -AsJob" in vm_qualification
+    assert "Wait-Job -Job $MonitorJob -Timeout 10" in vm_qualification
+    assert "Remove-Job -Job $MonitorJob" in vm_qualification
+    assert "Stop-Job -Job $MonitorJob -Force" not in vm_qualification
 
     assert "resolve-node-runtime.ps1" in starter
     assert "runtime\\install\\environment.bat" in starter

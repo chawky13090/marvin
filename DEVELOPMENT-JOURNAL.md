@@ -77,6 +77,15 @@ plancher physique de qualification passe à 40 Gio. Deux anciens builds `.next.r
 remplacés et les seuls caches npm/pip régénérables ont été supprimés pour permettre le rejeu;
 aucune donnée Marvin, source, secret ou preuve n'a été touché.
 
+Le rejeu suivant a encore atteint `runtime_validation`, mais la sonde de progression
+`Invoke-Command` pouvait elle-même rester bloquée sans borne lorsque PowerShell Direct ne
+répondait plus. Après 67 minutes, la campagne a été classée interrompue, la VM arrêtée et le
+checkpoint `Marvin-Clean` restauré avant saturation du disque; l'espace hôte est revenu de
+6,07 à 48,1 Gio. La sonde s'exécute désormais comme un job distant distinct, expire après dix
+secondes et est supprimée dans tous les chemins. Le job d'installation, sa borne de 90 minutes,
+le garde disque et le verdict HTTP restent indépendants : une panne de télémétrie ne peut plus
+immobiliser le harnais ni être confondue avec un échec de l'installateur.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

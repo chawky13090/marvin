@@ -16,6 +16,7 @@ $SecretPath = Join-Path $env:TEMP ('.marvin-vm-secret-' + [guid]::NewGuid().ToSt
 $Session = $null
 $MonitorSession = $null
 $InstallJob = $null
+$MonitorJob = $null
 $Result = [ordered]@{
     schema_version = 1
     package = [IO.Path]::GetFileName($PackagePath)
@@ -144,7 +145,7 @@ try {
             throw 'Moins de 5 Gio libres sur le volume hôte pendant la qualification; campagne interrompue avant saturation.'
         }
         try {
-            $Progress = Invoke-Command -Session $MonitorSession -ScriptBlock {
+            $MonitorJob = Invoke-Command -Session $MonitorSession -AsJob -ScriptBlock {
                 $Target = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\Marvin'
                 $StatePath = Join-Path $Target 'runtime\install\state.json'
                 if (Test-Path -LiteralPath $StatePath) {
@@ -154,12 +155,23 @@ try {
                     [ordered]@{ status = 'bootstrap'; stage = 'package_publish'; free_bytes = [uint64](Get-PSDrive C).Free }
                 }
             }
+            if (-not (Wait-Job -Job $MonitorJob -Timeout 10)) {
+                Stop-Job -Job $MonitorJob -ErrorAction SilentlyContinue
+                throw 'Sonde PowerShell Direct expirée après 10 secondes.'
+            }
+            $Progress = Receive-Job -Job $MonitorJob -ErrorAction Stop
             if ([string]$Progress.stage -ne $LastStage) {
                 $LastStage = [string]$Progress.stage
                 Write-Host ("VM install stage: {0} ({1} Gio libres dans l'invité)" -f $LastStage, [math]::Round(([uint64]$Progress.free_bytes / 1GB), 1))
             }
         } catch {
             Write-Warning "Sonde de progression VM indisponible : $($_.Exception.Message)"
+        } finally {
+            if ($MonitorJob) {
+                if ($MonitorJob.State -in @('Running', 'NotStarted')) { Stop-Job -Job $MonitorJob -ErrorAction SilentlyContinue }
+                Remove-Job -Job $MonitorJob -ErrorAction SilentlyContinue
+                $MonitorJob = $null
+            }
         }
     } while ($JobState -in @('Running', 'NotStarted') -and (Get-Date) -lt $InstallDeadline)
 
@@ -185,6 +197,10 @@ try {
 } catch {
     $Result.error = $_.Exception.Message
 } finally {
+    if ($MonitorJob) {
+        if ($MonitorJob.State -in @('Running', 'NotStarted')) { Stop-Job -Job $MonitorJob -ErrorAction SilentlyContinue }
+        Remove-Job -Job $MonitorJob -ErrorAction SilentlyContinue
+    }
     if ($InstallJob) {
         if ($InstallJob.State -in @('Running', 'NotStarted')) { Stop-Job -Job $InstallJob -ErrorAction SilentlyContinue }
         Remove-Job -Job $InstallJob -ErrorAction SilentlyContinue
