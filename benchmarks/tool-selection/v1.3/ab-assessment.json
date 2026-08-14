@@ -1,0 +1,88 @@
+{
+  "schema": "marvin.tool-selection-v13-ab-assessment/1.0",
+  "status": "complete_facade_rejected",
+  "source_result_sha256": "63920d89b4b5f61b10a89c563521d65e0cfa4445e8f48c665bc7e58b8eada5fa",
+  "observed": {
+    "choices": 360,
+    "business_tool_executions": 0,
+    "host_side_effects": 0,
+    "product_activations": 0,
+    "facade_activated_holdout_intents": 17,
+    "facade_total_holdout_intents": 20,
+    "control_activations": 0,
+    "current_global_rate_range": {"minimum": 0.45, "maximum": 0.55},
+    "facade_global_rate_range": {"minimum": 0.25, "maximum": 0.333333},
+    "current_best_family_rates": {
+      "application_launch": 0.8,
+      "software_management": 0.3
+    },
+    "facade_best_family_rates": {
+      "application_launch": 0.4,
+      "software_management": 0.3
+    },
+    "current_candidate_membership_violations": 0,
+    "facade_candidate_membership_violations": 9,
+    "argument_schema_validity_minimum": 1.0,
+    "median_schema_bytes": {
+      "current_eco": 11348.5,
+      "current_balanced_performance": 12976.5,
+      "facade_all_modes": 1625.5
+    }
+  },
+  "pre_registered_thresholds": {
+    "global_tool_action_success_minimum": 0.9,
+    "per_family_tool_action_success_minimum": 0.85,
+    "candidate_membership_violation_maximum": 0,
+    "argument_schema_validity_minimum": 0.98,
+    "control_activation_maximum": 0
+  },
+  "mechanical_verdict": {
+    "general_activation_authorized": false,
+    "restricted_activation_authorized": false,
+    "rollback_required": true,
+    "current_K_plus_L_plus_S_retained": true,
+    "reason_codes": [
+      "FACADE_WORSE_THAN_CURRENT_IN_ALL_THREE_MODES",
+      "NO_FACADE_CELL_REACHES_GLOBAL_0_90",
+      "NO_FACADE_FAMILY_REACHES_0_85",
+      "NINE_FACADE_CANDIDATE_MEMBERSHIP_VIOLATIONS",
+      "SOFTWARE_MANAGEMENT_REMAINS_AT_OR_BELOW_0_30",
+      "SCHEMA_BYTE_REDUCTION_DOES_NOT_COMPENSATE_FOR_QUALITY_LOSS"
+    ]
+  },
+  "interpretation": {
+    "established": [
+      "A narrow candidate view is not a valid correction for these two families with the frozen benchmark model.",
+      "Application launch reaches 0.80 on the unchanged path and is not the dominant weakness on this holdout.",
+      "Software management remains the dominant measured weakness on the unchanged and facade paths.",
+      "Reducing median schema bytes by roughly 86 to 88 percent can reduce selection quality.",
+      "The product remained unchanged because the facade was disabled throughout the experiment."
+    ],
+    "not_established": [
+      "This two-family holdout does not measure the other 362 registered tools.",
+      "This result does not identify which non-pruning software disambiguation design will generalize.",
+      "No business execution or safety claim is inferred from a selection-only campaign."
+    ]
+  },
+  "next_phase": {
+    "priority": "software_management_semantic_action_disambiguation_without_candidate_pruning",
+    "allowed_directions": [
+      "improve independently derived tool descriptions and action boundaries",
+      "use a non-destructive intent hint while retaining the full K_plus_L_plus_S candidate set",
+      "measure software search_install_list_upgrade_uninstall separately on a new independent holdout"
+    ],
+    "forbidden_directions": [
+      "reuse v1.3 prompts or labels for product adjustment",
+      "activate the rejected bounded facade",
+      "reduce the registered 364 capabilities",
+      "weaken gateway or confirmation guards"
+    ],
+    "new_holdout_required": true
+  },
+  "rollback": {
+    "action": "remove tool_canonical_facade integration and module from product after preserving this assessment",
+    "persistent_data_change": false,
+    "runtime_was_never_activated": true,
+    "evidence_must_remain_immutable": true
+  }
+}
