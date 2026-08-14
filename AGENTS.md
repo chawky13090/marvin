@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.651.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.652.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.651.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.652.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.651.0)
+## 9. État actuel (v2.652.0)
+
+**v2.652 (façade canonique rejetée, chemin K+L+S préservé)** : une vue canonique bornée a
+été pré-enregistrée puis implémentée désactivée, sans modifier le registre, le dispatch, les
+confirmations ni les 364 outils. Un nouveau holdout synthétique de 20 intentions a été créé
+par cinq rôles Cloud indépendants, sans `num_ctx` client, puis gelé avant 360 choix A/B de
+`mistral-large-3:675b-cloud`. La façade réduit les schémas médians à 1,6 Kio mais dégrade le
+taux outil+action dans les trois modes : 25–33,33 % contre 45–55 % pour le chemin courant,
+avec neuf choix hors sous-ensemble. Aucun seuil d'activation n'est atteint. Le module et son
+intégration ont donc été retirés; K+L+S reste inchangé et les 364 capacités sont conservées.
+Le holdout v1.3 est brûlé pour toute optimisation future. La faiblesse établie restante est
+la gestion logicielle, à 10–30 %; sa prochaine correction doit conserver le sous-ensemble et
+être validée sur un nouveau holdout. Rollback : les preuves restent immuables; le produit est
+déjà revenu au chemin v2.651 sans migration ni donnée persistante modifiée.
 
 **v2.651 (Stage B du choix final d'outil)** : 30 intentions synthétiques inédites et leurs
 oracles multiples outil+action+contraintes ont été générés par cinq familles Cloud distinctes,

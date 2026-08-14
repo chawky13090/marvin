@@ -5,6 +5,53 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
+
+La tranche part du verdict v2.651 : le choix final restait faible et les deux familles
+prioritaires étaient le lancement d'applications et la gestion logicielle. Une vue canonique
+bornée a été pré-enregistrée avant code, puis implémentée désactivée. Elle ne créait aucun
+outil, ne changeait ni dispatch ni gateway et ne supprimait aucune des 364 capacités. Pour
+une intention simple, elle présentait un exécuteur direct et une action `windows_task` bornée;
+les demandes ambiguës, composites, textuelles ou citant un outil restaient sur K+L+S.
+
+Le produit a ensuite été gelé avant la création d'un nouveau holdout. Cinq familles de modèles
+Cloud distinctes ont produit, labellisé, arbitré et critiqué 59 candidats sans voir le module,
+les observations v1.2 ni les futures réponses benchmark. Vingt intentions synthétiques ont
+été retenues, dix par famille. Aucun `num_ctx` client n'a été envoyé : les capacités Cloud
+fournisseur restent maximales. Le corpus, l'oracle outil+action+contraintes, le générateur et
+leurs provenances ont été hashés avant le premier appel benchmark.
+
+Le préflight A/B a exécuté zéro modèle et zéro outil métier. Il a confirmé 12/12 contrôles
+inchangés et zéro activation hors périmètre; 17 intentions sur 20 activaient la façade, les
+trois autres restant volontairement non ajustées après gel. L'autorisation à usage unique a
+ensuite borné la campagne à 360 choix `mistral-large-3:675b-cloud`, trois modes, deux variants
+et trois répétitions, avec concurrence maximale de trois et Qdrant détenu exclusivement par
+le runner pendant l'arrêt borné du backend.
+
+Résultat : K+L+S atteint 45 % en Eco et 55 % en Balanced/Performance. La façade tombe à 25 %,
+33,33 % et 33,33 %. `application_launch` atteint 80 % sur le chemin courant mais seulement
+36,67–40 % sous façade. `software_management` reste entre 10 et 30 % dans les deux chemins.
+Les arguments évaluables sont valides à 100 %, mais la façade introduit neuf choix de noms
+publics absents du sous-ensemble fourni. La baisse des schémas médians de 11,3–13,0 Kio à
+1,6 Kio ne compense pas la perte de qualité. Aucun seuil global, familial ou d'appartenance
+n'est atteint; activation générale et restreinte sont refusées mécaniquement.
+
+Conformément au rollback pré-enregistré, le module et son intégration ont été retirés après
+publication immuable du résultat et du verdict. K+L+S reste le produit courant, les 364 outils
+et toutes les gardes restent intacts, aucune donnée persistante n'a changé et la façade n'a
+jamais été active dans Marvin. Les tests historiques relisent désormais les sources gelées
+depuis leurs blobs Git, ce qui préserve la preuve sans conserver du code produit mort.
+
+Sécurité, confidentialité et logs : aucun outil métier, aucun effet hôte, aucune réponse Cloud
+brute et aucune donnée personnelle publiée. Seuls modèles, empreintes, compteurs, latences,
+choix synthétiques et verdicts sont versionnés. Aucun nouveau log runtime n'est nécessaire,
+puisque la correction n'est pas activée. Rollback produit déjà appliqué; rollback documentaire
+par réversion atomique du commit d'intégration, sans migration.
+
+Travail restant : TD-010 demeure élevée. Le prochain essai doit viser uniquement la
+désambiguïsation des actions logicielles sans réduire le sous-ensemble K+L+S : descriptions
+indépendamment dérivées ou indice d'intention non destructif, puis nouveau holdout inédit.
+
 ## 2026-08-13 — v2.651.0 — Stage B du choix final d'outil
 
 La campagne indépendante mesure enfin le problème utilisateur initial au niveau du choix natif
