@@ -30,6 +30,34 @@ function New-Capability {
     [ordered]@{ status = $Status; detail = $Detail; action = $Action }
 }
 
+function Invoke-NativeBounded {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [int]$TimeoutMs = 5000
+    )
+    $StdoutPath = [IO.Path]::GetTempFileName()
+    $StderrPath = [IO.Path]::GetTempFileName()
+    $Process = $null
+    try {
+        $Process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
+        $Finished = $Process.WaitForExit($TimeoutMs)
+        if (-not $Finished) {
+            & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+            return [pscustomobject]@{ exit_code = 124; stdout = ''; timed_out = $true }
+        }
+        $Process.Refresh()
+        return [pscustomobject]@{
+            exit_code = [int]$Process.ExitCode
+            stdout = [IO.File]::ReadAllText($StdoutPath)
+            timed_out = $false
+        }
+    } finally {
+        Remove-Item -LiteralPath $StdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $StderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $Principal = [Security.Principal.WindowsPrincipal]::new($Identity)
 $IsAdmin = $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -107,31 +135,20 @@ $DockerCli = Test-CommandAvailable 'docker'
 $DockerReady = $false
 $DockerDetail = 'Docker CLI absent.'
 if ($DockerCli) {
-    $PreviousPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'SilentlyContinue'
-    try {
-        $DockerVersion = @(& docker version --format '{{.Server.Version}}' 2>$null)
-        $DockerExitCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $PreviousPreference
-    }
-    $DockerReady = $DockerExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace(($DockerVersion -join ''))
-    $DockerDetail = if ($DockerReady) { 'Docker Engine ' + (($DockerVersion -join '').Trim()) } else { 'Docker CLI présent, moteur indisponible.' }
+    $DockerPath = [string](Get-Command docker -ErrorAction Stop).Source
+    $DockerProbe = Invoke-NativeBounded -FilePath $DockerPath -Arguments @('version', '--format', '{{.Server.Version}}')
+    $DockerReady = $DockerProbe.exit_code -eq 0 -and -not [string]::IsNullOrWhiteSpace($DockerProbe.stdout)
+    $DockerDetail = if ($DockerReady) { 'Docker Engine ' + $DockerProbe.stdout.Trim() } elseif ($DockerProbe.timed_out) {
+        'Docker CLI présente, moteur indisponible après un délai borné de cinq secondes.'
+    } else { 'Docker CLI présente, moteur indisponible.' }
 }
 $SearxngReady = $false
 $SearxngPort = $null
 if ($DockerReady) {
     try {
-        $PreviousPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        try {
-            $Mapped = @(& docker port marvin-searxng 8080/tcp 2>$null)
-            $DockerPortExitCode = $LASTEXITCODE
-        } finally {
-            $ErrorActionPreference = $PreviousPreference
-        }
-        if ($DockerPortExitCode -eq 0 -and $Mapped.Count -gt 0) {
-            $Match = [regex]::Match([string]$Mapped[-1], ':(\d+)$')
+        $PortProbe = Invoke-NativeBounded -FilePath $DockerPath -Arguments @('port', 'marvin-searxng', '8080/tcp')
+        if ($PortProbe.exit_code -eq 0 -and -not [string]::IsNullOrWhiteSpace($PortProbe.stdout)) {
+            $Match = [regex]::Match($PortProbe.stdout.Trim(), ':(\d+)$')
             if ($Match.Success) {
                 $SearxngPort = [int]$Match.Groups[1].Value
                 $Probe = Invoke-WebRequest -Uri "http://127.0.0.1:$SearxngPort/config" -UseBasicParsing -TimeoutSec 3

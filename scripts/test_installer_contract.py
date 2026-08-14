@@ -7,7 +7,9 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -102,6 +104,13 @@ def _assert_static_contract() -> None:
     assert "Remove-Item -LiteralPath $InstallRoot -Recurse -Force" in package_installer
     assert "Marqueur d installation Marvin absent" in uninstaller
     assert "preserved_data" in uninstaller and "shared_system_runtimes_removed = $false" in uninstaller
+    assert "^Marvin\\.rollback-\\d{14}$" in uninstaller
+    assert "function Remove-Bounded" in uninstaller
+    assert "[IO.Directory]::Delete(`$Path, `$true)" in uninstaller
+    assert "$ProtectedProcessIds" in uninstaller and "residual_process_ids_stopped" in uninstaller
+    assert "taskkill.exe /PID ([int]$Process.ProcessId) /T /F" in uninstaller
+    assert "removal_errors = `$RemovalErrors" in uninstaller
+    assert "completion_receipt" in uninstaller and "completion_pending = $true" in uninstaller
     assert "VMCheckpoint" in vm_qualification
     assert "checkpoint_restored_after" in vm_qualification
     assert "5400000" in vm_qualification
@@ -120,6 +129,10 @@ def _assert_static_contract() -> None:
     assert "$p.WaitForExit(5000)" in verifier
     assert "Docker Desktop ne repond pas" in verifier
     assert "resolve-node-runtime.ps1" in report
+    assert "function Invoke-NativeBounded" in report
+    assert "$Process.WaitForExit($TimeoutMs)" in report
+    assert "taskkill.exe /PID $Process.Id /T /F" in report
+    assert "Invoke-NativeBounded -FilePath $DockerPath" in report
     assert "resolve-ollama-exe.ps1" in report
     assert "searxng_web_search" in report
 
@@ -253,6 +266,62 @@ def _assert_uninstall_refuses_unmarked_root() -> None:
         assert root.exists()
 
 
+def _assert_uninstall_completes_and_removes_linked_rollback() -> None:
+    local_app_data = Path(os.environ["LOCALAPPDATA"])
+    root = Path(tempfile.mkdtemp(prefix="Marvin-uninstall-contract-", dir=local_app_data))
+    rollback = root.parent / f"Marvin.rollback-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    receipts = local_app_data / "Marvin" / "UninstallReceipts"
+    before = set(receipts.glob("uninstall-*.json")) if receipts.exists() else set()
+    try:
+        scripts = root / "scripts"
+        install = root / "runtime" / "install"
+        scripts.mkdir()
+        install.mkdir(parents=True)
+        rollback.mkdir()
+        (rollback / "old-code.txt").write_text("rollback", encoding="utf-8")
+        (install / "state.json").write_text('{"status":"completed"}', encoding="utf-8")
+        (install / "package.json").write_text(
+            json.dumps({"schema_version": 1, "rollback_path": str(rollback)}), encoding="utf-8"
+        )
+        shutil.copy2(ROOT / "scripts" / "uninstall-marvin.ps1", scripts)
+        (scripts / "stop-marvin.ps1").write_text(
+            "[ordered]@{success=$true;state='already_stopped'}|ConvertTo-Json\nexit 0\n",
+            encoding="utf-8",
+        )
+        command = (
+            f"& '{scripts / 'uninstall-marvin.ps1'}' "
+            "-RemoveData -KeepSearXngContainer -Confirm:$false"
+        )
+        result = subprocess.run(
+            [POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        deadline = time.monotonic() + 30
+        receipt = None
+        while time.monotonic() < deadline:
+            candidates = set(receipts.glob("uninstall-*.json")) - before if receipts.exists() else set()
+            if candidates:
+                receipt = max(candidates, key=lambda path: path.stat().st_mtime_ns)
+                break
+            time.sleep(0.25)
+        assert receipt is not None, "Le helper de désinstallation n'a publié aucun reçu."
+        evidence = json.loads(receipt.read_text(encoding="utf-8"))
+        assert evidence["success"] is True and evidence["target_removed"] is True
+        assert evidence["rollback_removed"] is True
+        assert not root.exists() and not rollback.exists()
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+        shutil.rmtree(rollback, ignore_errors=True)
+        if "receipt" in locals() and receipt is not None:
+            receipt.unlink(missing_ok=True)
+
+
 def main() -> int:
     _assert_static_contract()
     _assert_plan_is_non_mutating()
@@ -260,6 +329,7 @@ def main() -> int:
     _assert_package_install_and_rollback_support_spaces()
     _assert_install_log_rotation_and_encoding()
     _assert_uninstall_refuses_unmarked_root()
+    _assert_uninstall_completes_and_removes_linked_rollback()
     print("Installation Windows un clic OK - paquet propre, runtimes epingles, reprise, verification et desinstallation bornee.")
     return 0
 

@@ -101,6 +101,20 @@ Docker étant optionnel, sa sonde s'exécute désormais dans un processus limit�
 une expiration tue uniquement ce client et produit `DEGRADE`. Le cas réel observé expire en
 5,1 secondes avec le code interne 124, sans bloquer le diagnostic ni modifier Docker.
 
+Le Docteur installé a ensuite terminé en 21,9 secondes avec dépendances Python cohérentes,
+architecture 364/364, Node/sharp valides, huit modèles Cloud visibles et deux services HTTP
+disponibles. Un appel réel en lecture seule à `pc_process_list` a réussi. La désinstallation a
+arrêté le backend et le frontend sans force, préservé Ollama et supprimé les 31 436 fichiers de
+la cible ainsi que le rollback de mise à niveau. Ce passage a néanmoins révélé deux cas de
+nettoyage Windows : `Remove-Item -Recurse` peut laisser une racine vide, et un processus
+optionnel SearXNG peut conserver un handle après l'arrêt du socle. Le helper réessaie avec
+`Directory.Delete`, termine l'arbre des seuls processus dont la commande référence la racine
+Marvin, supprime uniquement le rollback exact validé par `package.json` et publie un reçu final
+UTF-8. Si un processus externe conserve encore le dossier courant, le reçu reste
+`success:false` et contient l'erreur de verrouillage; aucun succès n'est déduit de la simple
+planification. Le contrat exécutable crée une installation factice marquée, un rollback lié,
+exécute réellement l'uninstall et exige la disparition des deux chemins.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles
