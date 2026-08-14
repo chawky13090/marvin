@@ -17,6 +17,9 @@ $Session = $null
 $MonitorSession = $null
 $InstallJob = $null
 $MonitorJob = $null
+$ExpectedStartupMemoryBytes = [uint64]4GB
+$ExpectedMinimumMemoryBytes = [uint64]3GB
+$ExpectedMaximumMemoryBytes = [uint64]6GB
 $Result = [ordered]@{
     schema_version = 1
     package = [IO.Path]::GetFileName($PackagePath)
@@ -25,8 +28,39 @@ $Result = [ordered]@{
     success = $false
     checkpoint_restored_before = $false
     checkpoint_restored_after = $false
+    memory_profile_before = $null
+    memory_profile_after = $null
     error = $null
     guest = $null
+}
+
+function Set-QualificationMemoryProfile {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    # Restore-VMCheckpoint restaure aussi la configuration materielle du snapshot.
+    # Le profil est donc reapplique apres chaque restauration afin que la campagne
+    # demarre reellement a 4 Gio et laisse la VM dans le contrat E7 attendu.
+    Set-VMMemory -VMName $Name -DynamicMemoryEnabled $true `
+        -StartupBytes $ExpectedStartupMemoryBytes `
+        -MinimumBytes $ExpectedMinimumMemoryBytes `
+        -MaximumBytes $ExpectedMaximumMemoryBytes
+    $Memory = Get-VMMemory -VMName $Name -ErrorAction Stop
+    $Profile = [ordered]@{
+        dynamic_memory_enabled = [bool]$Memory.DynamicMemoryEnabled
+        startup_bytes = [uint64]$Memory.Startup
+        minimum_bytes = [uint64]$Memory.Minimum
+        maximum_bytes = [uint64]$Memory.Maximum
+        exact_match = [bool](
+            $Memory.DynamicMemoryEnabled -and
+            [uint64]$Memory.Startup -eq $ExpectedStartupMemoryBytes -and
+            [uint64]$Memory.Minimum -eq $ExpectedMinimumMemoryBytes -and
+            [uint64]$Memory.Maximum -eq $ExpectedMaximumMemoryBytes
+        )
+    }
+    if (-not $Profile.exact_match) {
+        throw 'Le profil memoire Hyper-V 3/4/6 Gio n a pas ete applique exactement.'
+    }
+    return $Profile
 }
 
 if (-not $Confirmed) { throw 'La qualification installe réellement le paquet dans la VM; utilisez -Confirmed.' }
@@ -55,6 +89,7 @@ try {
     if ($VM.State -ne 'Off') { Stop-VM -VM $VM -TurnOff -Force }
     Restore-VMCheckpoint -VMName $VMName -Name $CheckpointName -Confirm:$false
     $Result.checkpoint_restored_before = $true
+    $Result.memory_profile_before = Set-QualificationMemoryProfile -Name $VMName
     Start-VM -Name $VMName | Out-Null
 
     $Deadline = (Get-Date).AddMinutes(4)
@@ -263,7 +298,7 @@ try {
         $GuestResult.exit_code -eq 0 -and
         $GuestResult.state_status -eq 'completed' -and
         $GuestResult.health_status -eq 'ok' -and
-        $GuestResult.health_version -eq '2.655.0' -and
+        $GuestResult.health_version -eq '2.656.0' -and
         $GuestResult.tools_count -eq 364 -and
         $GuestResult.frontend_status -eq 200 -and
         $GuestResult.launcher_runtime_ready -eq $true -and
@@ -288,7 +323,12 @@ try {
         try {
             Restore-VMCheckpoint -VMName $VMName -Name $CheckpointName -Confirm:$false -ErrorAction Stop
             $Result.checkpoint_restored_after = $true
-        } catch { $Result.checkpoint_restored_after = $false }
+            $Result.memory_profile_after = Set-QualificationMemoryProfile -Name $VMName
+        } catch {
+            $Result.checkpoint_restored_after = $false
+            $Result.success = $false
+            if (-not $Result.error) { $Result.error = $_.Exception.Message }
+        }
     }
     Remove-Item -LiteralPath $SecretPath -Force -ErrorAction SilentlyContinue
 }

@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-14 — v2.656.0 — qualification Hyper-V réellement exécutée à 4 Gio
+
+La qualification v2.655 a démontré l'installation, le démarrage et l'arrêt sur Windows 11,
+mais `Restore-VMCheckpoint` restaurait aussi la configuration mémoire historique du snapshot :
+la propriété de démarrage revenait à 6 Gio. Le profil dynamique 3 Gio minimum, 4 Gio au
+démarrage et 6 Gio maximum est désormais réappliqué immédiatement après chaque restauration,
+avant tout démarrage, puis relu et comparé exactement. Le nettoyage final rejoue la même
+opération afin de ne plus laisser le gate E7 dépendre de la configuration du checkpoint.
+
+La VM ne reçoit volontairement aucune identité Ollama Cloud. Le paquet conserve le Cloud
+activable, n'envoie aucun `num_ctx` aux modèles fournisseur, et documente l'étape interactive
+`ollama signin` que le propriétaire exécute sous son propre compte. L'absence d'identité dans
+une VM propre est `unassessed_by_design`, jamais un échec fonctionnel ni un faux succès. Aucun
+mot de passe, cookie ou jeton n'entre dans le paquet, les journaux ou les preuves.
+
+Sécurité : aucune nouvelle écoute réseau, aucun secret transféré, validation exacte du profil
+Hyper-V. Résilience : le qualificateur échoue fermé si la mémoire ne correspond pas aux quatre
+valeurs attendues. Journalisation : seuls les octets de mémoire et verdicts booléens sont
+publiés. Rollback : réversion atomique de v2.656; aucune donnée ni configuration persistante de
+Marvin n'est migrée. Les tests ciblés, la campagne VM et le gate exhaustif doivent être rejoués
+sur le commit exact avant publication du paquet.
+
 ## 2026-08-14 — v2.655.0 — démarrage Windows borné et sans consoles orphelines
 
 La qualification Hyper-V de v2.654 a installé le paquet en 501 secondes et publié l'état

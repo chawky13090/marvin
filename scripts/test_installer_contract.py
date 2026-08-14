@@ -132,6 +132,13 @@ def _assert_static_contract() -> None:
     assert "start_stdout_tail = $StartStdoutText" in vm_qualification
     assert "$RuntimeDeadline = (Get-Date).AddMinutes(8)" in vm_qualification
     assert "-WorkingDirectory $env:SystemRoot -WindowStyle Hidden" in vm_qualification
+    assert "function Set-QualificationMemoryProfile" in vm_qualification
+    assert "-StartupBytes $ExpectedStartupMemoryBytes" in vm_qualification
+    assert "-MinimumBytes $ExpectedMinimumMemoryBytes" in vm_qualification
+    assert "-MaximumBytes $ExpectedMaximumMemoryBytes" in vm_qualification
+    assert vm_qualification.count("Set-QualificationMemoryProfile -Name $VMName") == 2
+    assert "$Result.memory_profile_before" in vm_qualification
+    assert "$Result.memory_profile_after" in vm_qualification
     assert "[AllowEmptyCollection()]" in ollama_port_resolver
     assert "[DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)" in loopback_waiter
     assert "'127.0.0.1', 'localhost', '::1'" in loopback_waiter

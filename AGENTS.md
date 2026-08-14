@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.655.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.656.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.655.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.656.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.655.0)
+## 9. État actuel (v2.656.0)
+
+**v2.656 (qualification Hyper-V reproductible à 4 Gio)** : la restauration du checkpoint
+Hyper-V réapplique aussi sa configuration matérielle historique. Le qualificateur force donc,
+après chaque restauration et avant tout démarrage, le profil dynamique 3 Gio minimum, 4 Gio au
+démarrage et 6 Gio maximum, puis vérifie les quatre valeurs exactes. La même opération est
+rejouée après le nettoyage final afin que la qualification ne laisse plus le gate E7 dans un
+état dépendant du snapshot. L'identité Ollama Cloud reste volontairement absente de la VM : le
+paquet conserve le Cloud activable et l'utilisateur final s'authentifie lui-même avec
+`ollama signin`; aucun secret ou jeton n'entre dans le paquet ni dans la preuve. Rollback :
+réversion atomique de v2.656; aucun schéma ni aucune donnée persistante n'est modifié.
 
 **v2.655 (démarrage Windows borné et sans consoles orphelines)** : sur un Windows 11 vierge,
 Ollama peut écouter avant que sa découverte CPU/GPU ne laisse répondre `/api/tags`. Le lanceur
