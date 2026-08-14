@@ -29,6 +29,7 @@ $StageResults = [ordered]@{}
 $DownloadedEvidence = [System.Collections.Generic.List[object]]::new()
 $InstallLogMaxBytes = 2MB
 $InstallLogMaxArchives = 5
+$script:CurrentStage = ''
 if ($DryRunRequested) { $Plan = $true }
 
 function Rotate-InstallLog {
@@ -221,20 +222,35 @@ function Install-ManagedArchive {
 }
 
 function Resolve-Python {
-    $Output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-python-runtime.ps1') -Output Path 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $Output.Count -gt 0) { return [string]$Output[-1] }
+    $PreviousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $Output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-python-runtime.ps1') -Output Path 2>$null)
+        $ExitCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $PreviousPreference }
+    if ($ExitCode -eq 0 -and $Output.Count -gt 0) { return [string]$Output[-1] }
     return ''
 }
 
 function Resolve-Node {
-    $Output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-node-runtime.ps1') -Output Path 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $Output.Count -gt 0) { return [string]$Output[-1] }
+    $PreviousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $Output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-node-runtime.ps1') -Output Path 2>$null)
+        $ExitCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $PreviousPreference }
+    if ($ExitCode -eq 0 -and $Output.Count -gt 0) { return [string]$Output[-1] }
     return ''
 }
 
 function Resolve-Ollama {
-    $Output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-ollama-exe.ps1') 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $Output.Count -gt 0) { return [string]$Output[-1] }
+    $PreviousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $Output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-ollama-exe.ps1') 2>$null)
+        $ExitCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $PreviousPreference }
+    if ($ExitCode -eq 0 -and $Output.Count -gt 0) { return [string]$Output[-1] }
     return ''
 }
 
@@ -244,6 +260,7 @@ function Invoke-InstallStage {
         [Parameter(Mandatory = $true)][scriptblock]$Action,
         [switch]$Optional
     )
+    $script:CurrentStage = $Name
     Write-Host "[$Name]" -ForegroundColor Cyan
     if ($Plan) {
         $StageResults[$Name] = [ordered]@{ status = 'planned'; duration_ms = 0 }
@@ -567,7 +584,7 @@ try {
     exit 0
 } catch {
     Write-InstallEvent -Stage 'installation' -Result 'failed' -Message $_.Exception.Message
-    Save-State -Status 'failed' -ErrorMessage $_.Exception.Message
+    Save-State -Status 'failed' -CurrentStage $script:CurrentStage -ErrorMessage $_.Exception.Message
     Write-Error $_
     exit 1
 } finally {

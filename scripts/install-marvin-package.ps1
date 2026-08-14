@@ -105,5 +105,6 @@ try {
     exit 0
 } catch {
     if (Test-Path -LiteralPath $Staging) { Remove-Item -LiteralPath $Staging -Recurse -Force -ErrorAction SilentlyContinue }
-    throw
+    Write-Error $_
+    exit 1
 }

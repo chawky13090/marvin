@@ -36,6 +36,7 @@ def _assert_static_contract() -> None:
     installer = (ROOT / "scripts" / "install-marvin-oneclick.ps1").read_text(encoding="utf-8")
     package_builder = (ROOT / "scripts" / "build-marvin-windows-package.ps1").read_text(encoding="utf-8")
     package_installer = (ROOT / "scripts" / "install-marvin-package.ps1").read_text(encoding="utf-8")
+    vm_qualification = (ROOT / "scripts" / "qualify-marvin-windows-package.ps1").read_text(encoding="utf-8")
     uninstaller = (ROOT / "scripts" / "uninstall-marvin.ps1").read_text(encoding="utf-8")
     report = (ROOT / "scripts" / "write-install-report.ps1").read_text(encoding="utf-8")
     starter = (ROOT / "start.bat").read_text(encoding="utf-8")
@@ -85,6 +86,7 @@ def _assert_static_contract() -> None:
     assert "C:\\Users\\Chawb" not in installer
     assert "Invoke-WebRequest -Uri $Url" in installer
     assert "for ($Attempt = 1; $Attempt -le 3" in installer
+    assert installer.count("$ErrorActionPreference = 'SilentlyContinue'") >= 3
     assert "AppendAllText" in installer and "UTF8Encoding]::new($false)" in installer
     assert "Docker absent; SearXNG reste indisponible" in installer
 
@@ -98,6 +100,10 @@ def _assert_static_contract() -> None:
     assert "Remove-Item -LiteralPath $InstallRoot -Recurse -Force" in package_installer
     assert "Marqueur d installation Marvin absent" in uninstaller
     assert "preserved_data" in uninstaller and "shared_system_runtimes_removed = $false" in uninstaller
+    assert "VMCheckpoint" in vm_qualification
+    assert "checkpoint_restored_after" in vm_qualification
+    assert "5400000" in vm_qualification
+    assert "-Confirmed" in vm_qualification
 
     assert "resolve-node-runtime.ps1" in starter
     assert "runtime\\install\\environment.bat" in starter

@@ -42,6 +42,17 @@ publication, refus de désinstallation hors racine marquée, plan dynamique des 
 SearXNG et génération réelle du rapport de capacités. La qualification finale du ZIP et du poste
 Windows isolé est consignée après production de l'artefact.
 
+Le premier rejeu Windows 11 réel a échoué proprement à `ollama_runtime` puis a restauré
+`Marvin-Clean`. Il a révélé que les résolveurs lancés dans un sous-PowerShell transformaient
+l'absence attendue d'un runtime en erreur terminante sous `$ErrorActionPreference='Stop'` : un
+poste neuf ne pouvait donc jamais atteindre le téléchargement. Les trois sondes Python, Node et
+Ollama isolent désormais ce résultat d'absence sous `SilentlyContinue`, conservent le code de
+sortie, puis laissent l'étape de provisionnement décider. Le même rouge a révélé que le catch
+global effaçait `current_stage` et que le bootstrap pouvait propager une erreur sans `exit 1`;
+les deux diagnostics sont rendus mécaniques. Le harnais VM versionné vérifie le sidecar externe,
+les disques hôte/invité, le timeout de 90 minutes, l'état/HTTP final et restaure le checkpoint en
+`finally`, sans publier le secret invité.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles
