@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -12,6 +13,15 @@ POLICY = ROOT / "benchmarks/tool-selection/v1.3/canonical-facade-preregistration
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _source_blob(root: Path, commit: str, relative: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    ).stdout
 
 
 def main() -> None:
@@ -32,8 +42,10 @@ def main() -> None:
         "software.upgrade",
         "software.uninstall",
     }
+    source_commit = policy["source_commit"]
     for relative, expected in policy["frozen_product_sources_sha256"].items():
-        assert _sha256(ROOT / relative) == expected, relative
+        observed = hashlib.sha256(_source_blob(ROOT, source_commit, relative)).hexdigest()
+        assert observed == expected, relative
     print("Canonical facade preregistration OK - product unchanged and holdout v1.2 forbidden for optimization.")
 
 
