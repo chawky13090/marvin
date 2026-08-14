@@ -1,0 +1,130 @@
+{
+  "schema": "marvin.tool-selection-canonical-facade-preregistration/1.0",
+  "status": "frozen_before_product_implementation",
+  "source_commit": "d3b917b62d27796d79b3f5f667dea238e5fb2f4d",
+  "purpose": "improve final semantic tool choice for unambiguous single-action Windows intents without removing any registered capability or weakening an execution guard",
+  "established_input": {
+    "stage_b_assessment": {
+      "path": "benchmarks/tool-selection/v1.2/stage-b-assessment.json",
+      "sha256": "5b4ff432e77f1f1333109d8e94b7d0fb7cfd31d707c1f2a3b1423fa6f25c06ae"
+    },
+    "allowed_aggregate_findings": [
+      "application_launch_best_family_rate_is_0_40",
+      "software_management_best_family_rate_is_0_40",
+      "final_choice_can_fail_when_an_acceptable_candidate_is_present"
+    ],
+    "v1_2_prompts_or_observation_labels_must_not_be_imported_by_product_code": true,
+    "v1_2_holdout_reuse_for_optimization_forbidden": true
+  },
+  "design": {
+    "kind": "bounded_canonical_candidate_view",
+    "registry_tool_count_must_not_decrease": 364,
+    "new_public_executor": false,
+    "dispatch_change": false,
+    "business_tool_implementation_change": false,
+    "security_gateway_change": false,
+    "confirmation_policy_change": false,
+    "activation_requires": [
+      "exactly_one_supported_canonical_action",
+      "single_user_action_clause",
+      "no_exact_public_tool_name_requested",
+      "target_or_query_is_present_when_the_selected_schema_requires_it"
+    ],
+    "ambiguous_or_composite_action": "UNCHANGED_K_PLUS_L_PLUS_S_PATH",
+    "unavailable_canonical_executor": "KEEP_TOOL_SEARCH_AND_RETURN_CAPABILITY_DIAGNOSTIC_WITHOUT_SUBSTITUTING_A_COMMAND_EXECUTOR",
+    "model_view_only": true,
+    "original_registry_schema_remains_execution_authority": true
+  },
+  "canonical_actions": {
+    "application.launch": {
+      "public_tool": "windows_task",
+      "fixed_arguments": {"action": "application.launch"},
+      "allowed_auxiliary_tools": ["tool_search"],
+      "excluded_neighbor_capabilities": ["path.resolve", "file.open", "windows.panel.open", "visual.interaction"]
+    },
+    "software.search": {
+      "public_tool": "winget_search",
+      "allowed_auxiliary_tools": ["tool_search"]
+    },
+    "software.install": {
+      "public_tool": "winget_install",
+      "allowed_auxiliary_tools": ["winget_search", "tool_search"]
+    },
+    "software.list_installed": {
+      "public_tool": "windows_task",
+      "fixed_arguments": {"action": "software.list"},
+      "allowed_auxiliary_tools": ["tool_search"]
+    },
+    "software.list_upgrades": {
+      "public_tool": "winget_list_upgrades",
+      "allowed_auxiliary_tools": ["tool_search"]
+    },
+    "software.upgrade": {
+      "public_tool": "winget_upgrade",
+      "allowed_auxiliary_tools": ["winget_list_upgrades", "tool_search"]
+    },
+    "software.uninstall": {
+      "public_tool": "winget_uninstall",
+      "allowed_auxiliary_tools": ["winget_list_installed", "tool_search"]
+    }
+  },
+  "mechanical_invariants": {
+    "model_view_contains_only_catalog_names": true,
+    "fixed_action_enum_contains_exactly_one_value": true,
+    "input_tool_specifications_are_never_mutated": true,
+    "explicit_tool_contract_wins": true,
+    "text_only_or_explanatory_request_never_activates": true,
+    "multi_action_request_never_activates": true,
+    "unsupported_family_never_activates": true,
+    "all_execution_guards_remain_reachable": true,
+    "no_alias_or_observed_failure_name_table": true,
+    "no_import_from_benchmarks": true
+  },
+  "acceptance_before_holdout": {
+    "positive_canaries_per_action_minimum": 2,
+    "negative_canaries_minimum": 12,
+    "cross_family_canaries_required": true,
+    "input_schema_immutability_required": true,
+    "registered_tool_count_exact": 364,
+    "targeted_tests_required": true,
+    "full_gate_required": false,
+    "runtime_restart_required": false
+  },
+  "post_change_validation": {
+    "new_independent_holdout_required": true,
+    "holdout_must_be_frozen_before_benchmark_model_execution": true,
+    "minimum_intents_per_evaluated_family": 10,
+    "families": ["application_launch", "software_management"],
+    "benchmark_model_must_not_author_or_oracle_the_holdout": true,
+    "repetitions_per_intent_minimum": 3,
+    "modes": ["eco", "balanced", "performance"],
+    "global_tool_action_success_minimum": 0.9,
+    "per_family_tool_action_success_minimum": 0.85,
+    "candidate_membership_violation_maximum": 0,
+    "argument_schema_validity_minimum": 0.98,
+    "no_regression_control_set_required": true,
+    "activation_before_independent_result_forbidden": true
+  },
+  "logging_privacy_security": {
+    "classifier_logs_capability_id_and_reason_codes_only": true,
+    "raw_user_text_in_new_structured_log_forbidden": true,
+    "personal_data_in_holdout_forbidden": true,
+    "business_tool_execution_forbidden_until_separate_authorization": true,
+    "host_side_effects_forbidden": true
+  },
+  "rollback": {
+    "before_activation": "atomic_git_revert_of_facade_implementation",
+    "persistent_data_mutation": false,
+    "configuration_migration": false,
+    "failed_independent_validation": "retain_current_K_plus_L_plus_S_product_path_and_remove_the_facade_view",
+    "published_evidence_is_immutable": true
+  },
+  "frozen_product_sources_sha256": {
+    "backend/agent_tool_selection.py": "98dc6e797ab97d9ed822b338600b5f5c0c9232bdfeb5b1de9db76ebaf83338d6",
+    "backend/agent_enrichment.py": "3c042ec04231f1c28ee1db440c937719ef5621b775cad614eb98d966eaebceb2",
+    "backend/agent.py": "b1f345a0243985bd26fa5f8324562bd072e53be1592a3ce0f0e11570b044558f",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a",
+    "backend/agent_planning.py": "8cd473f237c2a29e6266031962328db6a478ba7cd4923b45656202ea23d4acfd",
+    "backend/agent_tool_step.py": "0acc635088457c7411c30551f7c1259653b05f6ca68a1b56cbd0f25d08fe0b9a"
+  }
+}

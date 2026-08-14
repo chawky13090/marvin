@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 327
+EXPECTED_STAGE_COUNT = 328
 
 
 @dataclass(frozen=True)
@@ -256,6 +256,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Gel du runner Stage B", (python, "scripts/test_tool_selection_stage_b_runner_freeze.py")),
         Stage("Résultat brut Stage B", (python, "scripts/test_tool_selection_stage_b_result.py")),
         Stage("Verdict mécanique Stage B", (python, "scripts/test_tool_selection_stage_b_assessment.py")),
+        Stage(
+            "Pré-enregistrement de la façade canonique",
+            (python, "scripts/test_tool_selection_canonical_facade_preregistration.py"),
+        ),
         Stage("Résultat E7 apply immuable et verrouillé", (python, "scripts/test_e7_apply_execution_result.py")),
         Stage("Stockage central des rollbacks bulk rename", (python, "scripts/test_bulk_rename_rollback_store.py")),
         Stage("Appareil gelé du rejeu E7 apply v1.2", (python, "scripts/test_e7_apply_replay_freeze_post_result_v12.py")),
