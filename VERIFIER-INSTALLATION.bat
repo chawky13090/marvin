@@ -28,7 +28,7 @@ where docker >nul 2>&1
 if errorlevel 1 (
     echo    [DEGRADE] Docker introuvable - Test Forge Docker et SearXNG indisponibles
 ) else (
-    docker version --format "{{.Server.Version}}" >nul 2>&1
+    powershell -NoProfile -NonInteractive -Command "$p=Start-Process -FilePath 'docker.exe' -ArgumentList @('version','--format','{{.Server.Version}}') -NoNewWindow -PassThru;if(-not $p.WaitForExit(5000)){Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue;exit 124};exit $p.ExitCode" >nul 2>&1
     if errorlevel 1 (
         echo    [DEGRADE] Docker Desktop ne repond pas
     ) else (

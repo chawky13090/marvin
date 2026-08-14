@@ -95,6 +95,12 @@ test de contrat dédié. La première tentative, interrompue manuellement par fe
 console, est identifiée par le code Windows `0xC000013A`; la reprise depuis l'état persistant a
 réutilisé les runtimes déjà validés et s'est achevée sans téléchargement redondant.
 
+Le smoke installé a ensuite exposé une attente non bornée de `docker version` dans
+`VERIFIER-INSTALLATION.bat` lorsque le client Docker existe mais que Docker Desktop est arrêté.
+Docker étant optionnel, sa sonde s'exécute désormais dans un processus limité à cinq secondes;
+une expiration tue uniquement ce client et produit `DEGRADE`. Le cas réel observé expire en
+5,1 secondes avec le code interne 124, sans bloquer le diagnostic ni modifier Docker.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

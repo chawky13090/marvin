@@ -117,6 +117,8 @@ def _assert_static_contract() -> None:
     assert "popd\nexit /b %FRONTEND_RC%" in starter
     assert "runtime\\install\\environment.bat" in starter
     assert "runtime\\install\\environment.bat" in verifier
+    assert "$p.WaitForExit(5000)" in verifier
+    assert "Docker Desktop ne repond pas" in verifier
     assert "resolve-node-runtime.ps1" in report
     assert "resolve-ollama-exe.ps1" in report
     assert "searxng_web_search" in report
