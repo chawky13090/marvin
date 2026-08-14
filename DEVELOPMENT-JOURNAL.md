@@ -132,6 +132,14 @@ interactif de l'installeur n'est pas modifié; seule la qualification isole l'in
 HTTP. Le contrat PowerShell et `test_installer_contract.py` passent. Rollback : réversion atomique
 de cette modification de harnais; aucune donnée, VM, checkpoint ou format persistant n'est changé.
 
+Le premier rejeu découplé a terminé l'installation en 501 secondes, avec `state_status=completed`,
+zéro erreur et 48,5 Gio encore libres dans l'invité. Il a donc confirmé que l'attente historique
+n'était pas dans les runtimes, les dépendances ni le build. Le démarrage détaché depuis la
+session Direct n'a toutefois produit aucun service HTTP et ne conservait ni code de sortie ni
+journal. Le smoke exécute désormais le `start.bat` installé comme un processus borné à cinq
+minutes, capture stdout, stderr et le code de sortie, puis applique la sonde HTTP de quatre
+minutes. Un timeout vaut explicitement 124; aucune absence de service n'est convertie en succès.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

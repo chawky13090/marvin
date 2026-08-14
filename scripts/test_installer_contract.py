@@ -120,6 +120,9 @@ def _assert_static_contract() -> None:
     assert "Remove-Job -Job $MonitorJob" in vm_qualification
     assert "Stop-Job -Job $MonitorJob -Force" not in vm_qualification
     assert "'-NoStart'" in vm_qualification
+    assert "$StartProcess.WaitForExit(300000)" in vm_qualification
+    assert "start_exit_code = $StartExitCode" in vm_qualification
+    assert "start_stdout_tail = $StartStdoutText" in vm_qualification
     assert "$RuntimeDeadline = (Get-Date).AddMinutes(4)" in vm_qualification
     assert "-WorkingDirectory $env:SystemRoot -WindowStyle Hidden" in vm_qualification
 

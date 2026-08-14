@@ -117,12 +117,30 @@ try {
         $InstallLog = Join-Path $Target 'runtime\install\install.log.jsonl'
         $Health = $null
         $Frontend = $null
+        $StartExitCode = $null
+        $StartStdoutText = ''
+        $StartStderrText = ''
         if ($ExitCode -eq 0) {
             $StartBatch = Join-Path $Target 'start.bat'
             if (-not (Test-Path -LiteralPath $StartBatch -PathType Leaf)) { throw 'Lanceur installé introuvable.' }
-            Start-Process -FilePath $env:ComSpec `
+            $StartStdout = Join-Path $Root 'start.stdout.txt'
+            $StartStderr = Join-Path $Root 'start.stderr.txt'
+            $StartProcess = Start-Process -FilePath $env:ComSpec `
                 -ArgumentList @('/d', '/c', 'call', ('"{0}"' -f $StartBatch)) `
-                -WorkingDirectory $env:SystemRoot -WindowStyle Hidden | Out-Null
+                -WorkingDirectory $env:SystemRoot -WindowStyle Hidden -PassThru `
+                -RedirectStandardOutput $StartStdout -RedirectStandardError $StartStderr
+            $StartTimedOut = -not $StartProcess.WaitForExit(300000)
+            if ($StartTimedOut) {
+                & taskkill.exe /PID $StartProcess.Id /T /F | Out-Null
+                $StartExitCode = 124
+            } else {
+                $StartProcess.Refresh()
+                $StartExitCode = [int]$StartProcess.ExitCode
+            }
+            $StartStdoutText = if (Test-Path -LiteralPath $StartStdout) { [string](Get-Content -LiteralPath $StartStdout -Raw) } else { '' }
+            $StartStderrText = if (Test-Path -LiteralPath $StartStderr) { [string](Get-Content -LiteralPath $StartStderr -Raw) } else { '' }
+            if ($StartStdoutText.Length -gt 12000) { $StartStdoutText = $StartStdoutText.Substring($StartStdoutText.Length - 12000) }
+            if ($StartStderrText.Length -gt 12000) { $StartStderrText = $StartStderrText.Substring($StartStderrText.Length - 12000) }
             $RuntimeDeadline = (Get-Date).AddMinutes(4)
             do {
                 try { $Health = Invoke-RestMethod -Uri 'http://127.0.0.1:8005/api/health' -TimeoutSec 4 } catch { $Health = $null }
@@ -147,6 +165,9 @@ try {
             health_version = if ($Health) { [string]$Health.version } else { $null }
             tools_count = if ($Health) { [int]$Health.tools_count } else { $null }
             frontend_status = $Frontend
+            start_exit_code = $StartExitCode
+            start_stdout_tail = $StartStdoutText
+            start_stderr_tail = $StartStderrText
             stdout_tail = $StdoutText
             stderr_tail = $StderrText
         }
@@ -209,7 +230,8 @@ try {
         $GuestResult.health_status -eq 'ok' -and
         $GuestResult.health_version -eq '2.653.0' -and
         $GuestResult.tools_count -eq 364 -and
-        $GuestResult.frontend_status -eq 200
+        $GuestResult.frontend_status -eq 200 -and
+        $GuestResult.start_exit_code -eq 0
     )
 } catch {
     $Result.error = $_.Exception.Message
