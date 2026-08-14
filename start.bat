@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+pushd "%~dp0" || exit /b 1
 chcp 65001 >nul
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
@@ -17,9 +18,14 @@ for /f "usebackq delims=" %%L in (`powershell -NoProfile -NonInteractive -Execut
 if not "%START_LOCK_STATE%"=="acquired" (
     echo [INFO] Une operation de cycle de vie est en cours. Attente puis reevaluation...
     powershell -NoProfile -NonInteractive -Command "$p='%~dp0runtime\lifecycle\startup.lock';$d=(Get-Date).AddSeconds(120);while((Test-Path -LiteralPath $p)-and(Get-Date)-lt$d){Start-Sleep -Milliseconds 200};if(Test-Path -LiteralPath $p){exit 1}else{exit 0}"
-    if errorlevel 1 exit /b 1
+    if errorlevel 1 (
+        popd
+        exit /b 1
+    )
     call "%~f0"
-    exit /b %ERRORLEVEL%
+    set "RECURSIVE_START_RC=%ERRORLEVEL%"
+    popd
+    exit /b %RECURSIVE_START_RC%
 )
 
 :: Preflight reproductible : executables, venv et modules Node natifs.
@@ -176,12 +182,14 @@ powershell -NoProfile -Command "try{$d=Invoke-RestMethod 'http://127.0.0.1:3000/
 if %ERRORLEVEL% EQU 0 (
     echo  Frontend deja actif sur http://localhost:3000
     call :release_start_lock
+    popd
     exit /b 0
 )
 powershell -NoProfile -Command "$c=Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue; if($null -eq $c){exit 1}; foreach($x in @($c)){ $p=Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $x.OwningProcess) -ErrorAction SilentlyContinue; $i=('{0} {1}' -f $p.ExecutablePath,$p.CommandLine); if($i.IndexOf('%~dp0',[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $i -match '(?i)next|start_next_dev'){exit 0} }; exit 1" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo  Frontend Marvin deja en ecoute; conservation du processus existant.
     call :release_start_lock
+    popd
     exit /b 0
 )
 powershell -NoProfile -Command "$c=Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue; if($null -ne $c){exit 0}; exit 1" >nul 2>&1
@@ -192,9 +200,14 @@ if %ERRORLEVEL% EQU 0 (
 
 call :release_start_lock
 for /f "usebackq delims=" %%S in (`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\marvin-startup-lock.ps1" -Action stop-requested`) do set "STOP_REQUESTED=%%S"
-if "%STOP_REQUESTED%"=="true" exit /b 0
+if "%STOP_REQUESTED%"=="true" (
+    popd
+    exit /b 0
+)
 call npm run dev
-exit /b %ERRORLEVEL%
+set "FRONTEND_RC=%ERRORLEVEL%"
+popd
+exit /b %FRONTEND_RC%
 
 :release_start_lock
 powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\marvin-startup-lock.ps1" -Action release >nul 2>&1
@@ -203,4 +216,5 @@ exit /b 0
 :startup_error
 call :release_start_lock
 pause
+popd
 exit /b 1

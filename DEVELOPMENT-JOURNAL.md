@@ -86,6 +86,15 @@ secondes et est supprimée dans tous les chemins. Le job d'installation, sa born
 le garde disque et le verdict HTTP restent indépendants : une panne de télémétrie ne peut plus
 immobiliser le harnais ni être confondue avec un échec de l'installateur.
 
+La qualification locale isolée du paquet a terminé toutes les étapes obligatoires en 212
+secondes avec l'état `completed`. Le premier démarrage depuis le répertoire du dépôt source a
+ensuite révélé que `start.bat` utilisait le répertoire courant pour `node` et
+`scripts\check_runtime.mjs`, malgré les chemins absolus employés ailleurs. Le lanceur s'ancre
+désormais par `pushd "%~dp0"`, restaure le répertoire appelant sur chaque sortie et possède un
+test de contrat dédié. La première tentative, interrompue manuellement par fermeture de la
+console, est identifiée par le code Windows `0xC000013A`; la reprise depuis l'état persistant a
+réutilisé les runtimes déjà validés et s'est achevée sans téléchargement redondant.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

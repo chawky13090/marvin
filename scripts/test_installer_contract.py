@@ -112,6 +112,9 @@ def _assert_static_contract() -> None:
     assert "Stop-Job -Job $MonitorJob -Force" not in vm_qualification
 
     assert "resolve-node-runtime.ps1" in starter
+    assert 'pushd "%~dp0" || exit /b 1' in starter
+    assert "set \"FRONTEND_RC=%ERRORLEVEL%\"" in starter
+    assert "popd\nexit /b %FRONTEND_RC%" in starter
     assert "runtime\\install\\environment.bat" in starter
     assert "runtime\\install\\environment.bat" in verifier
     assert "resolve-node-runtime.ps1" in report
