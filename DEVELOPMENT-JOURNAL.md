@@ -62,6 +62,13 @@ insuffisant pour runtimes, dépendances, frontend, modèles et rollback : le con
 persistant et le cache `npm` vit sous `runtime/install/downloads`, supprimé après réussite mais
 conservé après échec pour une reprise bornée.
 
+Une troisième campagne a été arrêtée volontairement après 42 minutes sans événement de
+progression. Le `finally` a bien restauré la VM et libéré le disque, mais cette restauration a
+également effacé l'état invité avant diagnostic. Le harnais utilise désormais deux sessions
+PowerShell Direct : la première exécute le paquet en job, la seconde publie chaque changement
+d'étape et la place restante. Il interrompt la campagne avant saturation si le volume hôte tombe
+sous 5 Gio. Cette évolution n'assouplit ni l'installateur ni ses critères de réussite.
+
 ## 2026-08-14 — v2.652.0 — façade canonique rejetée sur preuve indépendante
 
 La tranche part du verdict v2.651 : le choix final restait faible et les deux familles

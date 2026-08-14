@@ -14,6 +14,8 @@ $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $PackagePath = [IO.Path]::GetFullPath($PackagePath)
 $SecretPath = Join-Path $env:TEMP ('.marvin-vm-secret-' + [guid]::NewGuid().ToString('N') + '.txt')
 $Session = $null
+$MonitorSession = $null
+$InstallJob = $null
 $Result = [ordered]@{
     schema_version = 1
     package = [IO.Path]::GetFileName($PackagePath)
@@ -60,6 +62,7 @@ try {
         catch { Start-Sleep -Seconds 3 }
     } until ($Session -or (Get-Date) -gt $Deadline)
     if (-not $Session) { throw 'PowerShell Direct indisponible après quatre minutes.' }
+    $MonitorSession = New-PSSession -VMName $VMName -Credential $Credential -ErrorAction Stop
 
     $GuestPreflight = Invoke-Command -Session $Session -ScriptBlock {
         $Drive = Get-PSDrive C
@@ -83,7 +86,7 @@ try {
 
     $SkipModels = -not $IncludeModels
     $SkipOptional = -not $IncludeOptional
-    $GuestResult = Invoke-Command -Session $Session -ScriptBlock {
+    $InstallJob = Invoke-Command -Session $Session -AsJob -ScriptBlock {
         param($Root, $SkipModelsRequested, $SkipOptionalRequested, $Preflight)
         $ErrorActionPreference = 'Stop'
         Expand-Archive -LiteralPath (Join-Path $Root 'Marvin.zip') -DestinationPath $Root -Force
@@ -131,6 +134,45 @@ try {
         }
     } -ArgumentList $GuestRoot, $SkipModels, $SkipOptional, $GuestPreflight
 
+    $InstallDeadline = (Get-Date).AddMinutes(90)
+    $LastStage = ''
+    do {
+        Start-Sleep -Seconds 30
+        $JobState = [string]$InstallJob.State
+        if ([uint64](Get-PSDrive -Name $HostDrive.Name).Free -lt 5GB) {
+            Stop-Job -Job $InstallJob -Force -ErrorAction SilentlyContinue
+            throw 'Moins de 5 Gio libres sur le volume hôte pendant la qualification; campagne interrompue avant saturation.'
+        }
+        try {
+            $Progress = Invoke-Command -Session $MonitorSession -ScriptBlock {
+                $Target = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\Marvin'
+                $StatePath = Join-Path $Target 'runtime\install\state.json'
+                if (Test-Path -LiteralPath $StatePath) {
+                    $State = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
+                    [ordered]@{ status = [string]$State.status; stage = [string]$State.current_stage; free_bytes = [uint64](Get-PSDrive C).Free }
+                } else {
+                    [ordered]@{ status = 'bootstrap'; stage = 'package_publish'; free_bytes = [uint64](Get-PSDrive C).Free }
+                }
+            }
+            if ([string]$Progress.stage -ne $LastStage) {
+                $LastStage = [string]$Progress.stage
+                Write-Host ("VM install stage: {0} ({1} Gio libres dans l'invité)" -f $LastStage, [math]::Round(([uint64]$Progress.free_bytes / 1GB), 1))
+            }
+        } catch {
+            Write-Warning "Sonde de progression VM indisponible : $($_.Exception.Message)"
+        }
+    } while ($JobState -in @('Running', 'NotStarted') -and (Get-Date) -lt $InstallDeadline)
+
+    if ((Get-Date) -ge $InstallDeadline -and $InstallJob.State -in @('Running', 'NotStarted')) {
+        Stop-Job -Job $InstallJob -Force -ErrorAction SilentlyContinue
+        throw 'Installation invitée expirée après 90 minutes.'
+    }
+    if ($InstallJob.State -eq 'Failed') {
+        $Reason = [string]$InstallJob.ChildJobs[0].JobStateInfo.Reason
+        throw "Commande de qualification invitée échouée : $Reason"
+    }
+    $GuestResult = Receive-Job -Job $InstallJob -ErrorAction Stop
+
     $Result.guest = $GuestResult
     $Result.success = [bool](
         $GuestResult.exit_code -eq 0 -and
@@ -143,6 +185,8 @@ try {
 } catch {
     $Result.error = $_.Exception.Message
 } finally {
+    if ($InstallJob) { Remove-Job -Job $InstallJob -Force -ErrorAction SilentlyContinue }
+    if ($MonitorSession) { Remove-PSSession $MonitorSession -ErrorAction SilentlyContinue }
     if ($Session) { Remove-PSSession $Session -ErrorAction SilentlyContinue }
     $VM = Get-VM -Name $VMName -ErrorAction SilentlyContinue
     if ($VM -and $VM.State -ne 'Off') { Stop-VM -VM $VM -TurnOff -Force -ErrorAction SilentlyContinue }
