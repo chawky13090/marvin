@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-14 — v2.654.0 — démarrage portable sans plage TCP exclue
+
+La qualification Hyper-V du paquet v2.653 a terminé l'installation en 485 secondes, mais le
+lanceur installé a expiré avec le code 124 avant tout service HTTP. La capture bornée a fourni
+la première cause : sur ce Windows 11 neuf, `netsh` ne retourne aucune plage TCP exclue et
+`Test-IsExcluded` refusait pourtant de lier un tableau `Ranges` vide. `start.bat` concluait alors
+à tort qu'aucun port Ollama n'était disponible puis attendait une touche dans la session sans
+bureau. L'absence de plage exclue est un état normal, pas une dégradation.
+
+`resolve-ollama-port.ps1` accepte désormais explicitement une collection vide. Le contrat
+d'installation place un faux `netsh.cmd` sans plage avant System32, choisit un port libre réel
+et exige que le résolveur le retourne. La modification ne change ni les ports candidats, ni les
+plages réellement exclues, ni l'écoute locale, ni la politique Cloud. Sécurité : le bind reste
+limité à `127.0.0.1`; aucune exposition réseau ni élévation n'est ajoutée. Logs : le smoke VM
+conserve code de sortie, stdout et stderr sans secret. Rollback : réversion atomique de v2.654;
+aucune migration ni restauration de donnée n'est nécessaire. La preuve runtime finale reste
+à publier après reconstruction du paquet.
+
 ## 2026-08-14 — v2.653.0 — installation Windows réellement en un clic
 
 La demande est de transférer Marvin sur un autre poste Windows avec un seul lancement. L'ancien

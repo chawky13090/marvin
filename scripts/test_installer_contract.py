@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -39,6 +40,7 @@ def _assert_static_contract() -> None:
     package_builder = (ROOT / "scripts" / "build-marvin-windows-package.ps1").read_text(encoding="utf-8")
     package_installer = (ROOT / "scripts" / "install-marvin-package.ps1").read_text(encoding="utf-8")
     vm_qualification = (ROOT / "scripts" / "qualify-marvin-windows-package.ps1").read_text(encoding="utf-8")
+    ollama_port_resolver = (ROOT / "scripts" / "resolve-ollama-port.ps1").read_text(encoding="utf-8")
     uninstaller = (ROOT / "scripts" / "uninstall-marvin.ps1").read_text(encoding="utf-8")
     report = (ROOT / "scripts" / "write-install-report.ps1").read_text(encoding="utf-8")
     starter = (ROOT / "start.bat").read_text(encoding="utf-8")
@@ -125,6 +127,7 @@ def _assert_static_contract() -> None:
     assert "start_stdout_tail = $StartStdoutText" in vm_qualification
     assert "$RuntimeDeadline = (Get-Date).AddMinutes(4)" in vm_qualification
     assert "-WorkingDirectory $env:SystemRoot -WindowStyle Hidden" in vm_qualification
+    assert "[AllowEmptyCollection()]" in ollama_port_resolver
 
     assert "resolve-node-runtime.ps1" in starter
     assert 'pushd "%~dp0" || exit /b 1' in starter
@@ -155,6 +158,39 @@ def _assert_plan_is_non_mutating() -> None:
         assert "Mode PLAN" in result.stdout
         assert "PLANIFIE" in result.stdout
         assert not (root / "runtime").exists()
+
+
+def _assert_ollama_port_resolver_accepts_no_exclusions() -> None:
+    assert POWERSHELL, "PowerShell est requis pour le contrat Windows."
+    with tempfile.TemporaryDirectory(prefix="marvin-empty-netsh-") as temp:
+        fake_bin = Path(temp)
+        (fake_bin / "netsh.cmd").write_text("@echo off\r\nexit /b 0\r\n", encoding="ascii")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = int(probe.getsockname()[1])
+        environment = os.environ.copy()
+        environment["PATH"] = str(fake_bin) + os.pathsep + environment.get("PATH", "")
+        result = subprocess.run(
+            [
+                POWERSHELL,
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ROOT / "scripts" / "resolve-ollama-port.ps1"),
+                "-CandidatePorts",
+                str(port),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+            check=False,
+            env=environment,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert result.stdout.strip().splitlines()[-1] == str(port)
 
 
 def _assert_package_preflight_is_non_mutating() -> None:
@@ -331,6 +367,7 @@ def _assert_uninstall_completes_and_removes_linked_rollback() -> None:
 def main() -> int:
     _assert_static_contract()
     _assert_plan_is_non_mutating()
+    _assert_ollama_port_resolver_accepts_no_exclusions()
     _assert_package_preflight_is_non_mutating()
     _assert_package_install_and_rollback_support_spaces()
     _assert_install_log_rotation_and_encoding()

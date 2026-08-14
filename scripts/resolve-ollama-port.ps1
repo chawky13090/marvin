@@ -25,6 +25,7 @@ function Test-IsExcluded {
         [Parameter(Mandatory)]
         [int]$Port,
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [object[]]$Ranges
     )
 
