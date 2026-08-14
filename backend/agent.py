@@ -125,7 +125,6 @@ from agent_transport import (
     stream_chat as _stream_ollama_chat,
 )
 from agent_tool_selection import filter_relevant_tools as _filter_relevant_tools
-from tool_canonical_facade import build_canonical_tool_view as _build_canonical_tool_view
 from capability_catalog import CapabilityCatalog as _CapabilityCatalog
 from native_agent_prompt import build_native_system_prompt as _build_native_system_prompt
 from config import (
@@ -383,16 +382,6 @@ async def _run_deterministic_agent(
         skill=_skill,
         use_tools=use_tools,
     )
-    _canonical_view = _build_canonical_tool_view(
-        _user_query,
-        tools_payload,
-        all_tool_names={
-            str(specification.get("function", {}).get("name") or "")
-            for specification in TOOLS_SPEC
-        },
-        enabled=False,  # Activation interdite avant le nouveau holdout indépendant v1.3.
-    )
-    tools_payload = list(_canonical_view.tools)
     if native_decision_mode:
         yield _sse({
             "type": "capability_context",

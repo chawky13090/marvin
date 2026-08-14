@@ -260,7 +260,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Pré-enregistrement de la façade canonique",
             (python, "scripts/test_tool_selection_canonical_facade_preregistration.py"),
         ),
-        Stage("Façade canonique des outils", (python, "scripts/test_tool_canonical_facade.py")),
+        Stage("Rollback de la façade canonique", (python, "scripts/test_tool_selection_v13_facade_rollback.py")),
         Stage(
             "Gel du générateur holdout v1.3",
             (python, "scripts/test_tool_selection_v13_holdout_freeze.py"),

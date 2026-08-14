@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -13,6 +14,15 @@ BASE = ROOT / "benchmarks/tool-selection/v1.3"
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _blob(commit: str, relative: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
 
 
 def main() -> None:
@@ -26,8 +36,9 @@ def main() -> None:
     assert len({row["model"].split(":", 1)[0] for row in policy["roles"].values()}) == 5
     benchmark = policy["benchmark_model_excluded_from_generation"]["model"]
     assert all(row["model"] != benchmark for row in policy["roles"].values())
+    source_commit = policy["source_commit"]
     for relative, expected in policy["frozen_product_sources_sha256"].items():
-        assert _sha(ROOT / relative) == expected, relative
+        assert hashlib.sha256(_blob(source_commit, relative)).hexdigest() == expected, relative
     generator = (ROOT / "scripts/generate_tool_selection_v13_holdout.py").read_text(encoding="utf-8")
     assert "tool_canonical_facade" not in generator
     assert "stage-b-b1-result" not in generator

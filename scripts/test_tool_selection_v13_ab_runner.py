@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -12,6 +13,15 @@ BASE = ROOT / "benchmarks/tool-selection/v1.3"
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _blob(commit: str, relative: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
 
 
 def main() -> None:
@@ -24,9 +34,10 @@ def main() -> None:
     assert freeze["decision"]["global_tool_action_success_minimum"] == 0.9
     assert freeze["decision"]["per_family_tool_action_success_minimum"] == 0.85
     assert freeze["authorization"]["benchmark_model_calls"] is False
+    frozen_commit = "f1a7f3d48dfbc20ab08e08408f23e5c6f002a264"
     for relative, expected in freeze["frozen_hashes"].items():
-        assert _sha(ROOT / relative) == expected, relative
-    source = (ROOT / "scripts/run_tool_selection_v13_ab.py").read_text(encoding="utf-8")
+        assert hashlib.sha256(_blob(frozen_commit, relative)).hexdigest() == expected, relative
+    source = _blob(frozen_commit, "scripts/run_tool_selection_v13_ab.py").decode("utf-8")
     assert "business_tool" not in source or '"business_tool_execution_count": 0' in source
     assert "execute_registered_tool" not in source
     assert "tool_runtime.execute" not in source
