@@ -52,6 +52,17 @@ Travail restant : TD-010 demeure élevée. Le prochain essai doit viser uniqueme
 désambiguïsation des actions logicielles sans réduire le sous-ensemble K+L+S : descriptions
 indépendamment dérivées ou indice d'intention non destructif, puis nouveau holdout inédit.
 
+Validation finale : un premier passage hors ligne a correctement refusé le build Next.js
+parce que le serveur de développement occupait encore le port 3000; ce résultat contaminé
+n'est pas compté comme une régression. Après arrêt borné des services, la gate complète a
+réussi 331 étapes, ignoré uniquement les quatre contrôles live et terminé sans échec en
+642,3 secondes, build de production inclus. Marvin a ensuite été redémarré depuis zéro :
+backend `2.652.0` prêt, frontend HTTP 200, Ollama disponible et 364 outils exposés. La gate
+live a réussi 334 étapes, ignoré uniquement le build concurrent interdit et terminé sans
+échec en 797,9 secondes. Les contrats HTTP, les pages, le chat avec outils et la
+sérialisation vocale ont tous été exercés sur le runtime relancé. Aucun fichier temporaire
+ou artefact de campagne non suivi préexistant n'a été ajouté au dépôt.
+
 ## 2026-08-13 — v2.651.0 — Stage B du choix final d'outil
 
 La campagne indépendante mesure enfin le problème utilisateur initial au niveau du choix natif
