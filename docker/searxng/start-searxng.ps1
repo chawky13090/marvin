@@ -44,7 +44,14 @@ function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
     }
 }
 
-$StartupMutex = [System.Threading.Mutex]::new($false, 'Local\Marvin.SearXNG.Startup')
+# Le canari concurrent doit mesurer sa propre exclusion sans entrer en
+# concurrence avec un bootstrap SearXNG reel deja actif pendant le gate live.
+$StartupMutexName = if ($LockSelfTest) {
+    'Local\Marvin.SearXNG.Startup.SelfTest'
+} else {
+    'Local\Marvin.SearXNG.Startup'
+}
+$StartupMutex = [System.Threading.Mutex]::new($false, $StartupMutexName)
 $OwnsStartupMutex = $false
 try {
     try {

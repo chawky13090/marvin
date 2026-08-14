@@ -298,7 +298,7 @@ try {
         $GuestResult.exit_code -eq 0 -and
         $GuestResult.state_status -eq 'completed' -and
         $GuestResult.health_status -eq 'ok' -and
-        $GuestResult.health_version -eq '2.656.0' -and
+        $GuestResult.health_version -eq '2.657.0' -and
         $GuestResult.tools_count -eq 364 -and
         $GuestResult.frontend_status -eq 200 -and
         $GuestResult.launcher_runtime_ready -eq $true -and

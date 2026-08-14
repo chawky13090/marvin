@@ -143,6 +143,7 @@ def _assert_static_contract() -> None:
     assert "[DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)" in loopback_waiter
     assert "'127.0.0.1', 'localhost', '::1'" in loopback_waiter
     assert "Local\\Marvin.SearXNG.Startup" in searxng_starter
+    assert "Local\\Marvin.SearXNG.Startup.SelfTest" in searxng_starter
     assert "function Test-DockerDaemon" in searxng_starter
     assert "$Process.WaitForExit($TimeoutSeconds * 1000)" in searxng_starter
     assert "taskkill.exe /PID $Process.Id /T /F" in searxng_starter

@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-14 — v2.657.0 — canari SearXNG indépendant du démarrage réel
+
+Le premier gate live v2.656 a validé les contrats HTTP, 41 pages, le chat et la voix, mais le
+contrat d'installation a échoué sur son canari de concurrence SearXNG. La cause n'était pas une
+duplication : le bootstrap réel, lancé par `start.bat`, détenait légitimement le même mutex que
+le canari. Celui-ci interprétait alors `already_running` comme l'échec de sa première instance.
+
+Le mode `LockSelfTest` utilise désormais un mutex `Local\Marvin.SearXNG.Startup.SelfTest`
+réservé aux deux processus du canari. Le démarrage réel conserve
+`Local\Marvin.SearXNG.Startup`; les bornes Docker, ports, secrets et comportements de production
+ne changent pas. Le test statique exige les deux noms afin qu'ils ne puissent plus être fusionnés
+par accident.
+
+Sécurité : aucune autorisation ni exposition réseau ajoutée. Résilience : test et runtime ne
+partagent plus un état global. Journalisation : aucun nouveau contenu. Rollback : réversion
+atomique de v2.657; aucune donnée persistante n'est modifiée. Le paquet et les gates doivent
+être reconstruits et rejoués sur ce commit exact.
+
 ## 2026-08-14 — v2.656.0 — qualification Hyper-V réellement exécutée à 4 Gio
 
 La qualification v2.655 a démontré l'installation, le démarrage et l'arrêt sur Windows 11,
