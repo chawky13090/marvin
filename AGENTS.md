@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.669.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.670.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.669.0)
+## 9. État actuel (v2.670.0)
+
+**v2.670 (extracteur rétrospectif de couverture logicielle)** : un extracteur distinct du
+sélecteur lit uniquement les messages utilisateur via SQLite read-only, classe sept actions
+logicielles et déduplique leur texte normalisé. Il refuse explicitement questions, scripts,
+constats, confirmations, recherches d'applications déjà installées, reprises automatiques et
+conversations Forge. Les canaris couvrent acceptations, refus et déduplication. Aucun texte,
+identifiant, outil exécuté ou reçu ne peut entrer dans le rapport public. L'extracteur est
+committé avant son exécution sur la base réelle. Le gate compte 355 étapes. Rollback : réversion
+atomique de v2.670; aucun schéma ou contenu Marvin n'est modifié.
 
 **v2.669 (stratégie de mesure du routage à trois corpus)** : le test d'acceptation dans le
 langage du propriétaire devient bloquant sans prétendre à l'indépendance; les demandes futures

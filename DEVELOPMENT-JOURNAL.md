@@ -19592,3 +19592,18 @@ explicitement rétrospectif et impropre à noter Marvin. Aucun appel Cloud ou ou
 exécuté. Sécurité : lecture SQLite future en mode read-only, aucun texte ou identifiant public.
 Le gate passe de 353 à 354 étapes. Rollback : réversion atomique de v2.669; aucune donnée ou
 configuration Marvin n'est modifiée.
+
+## 2026-08-15 — v2.670.0 — extracteur de couverture réelle implémenté avant calcul
+
+L'extracteur v1.6 ouvre `data/secretary.db` en lecture seule et ne sélectionne que contenu du
+message utilisateur et titre de conversation. Il n'accède ni aux exécutions, ni aux noms
+d'outils, ni aux reçus. Sept intentions logicielles sont reconnues selon la rubrique v2.669;
+les textes sont normalisés Unicode, sans accents, casse, ponctuation ou espaces distinctifs,
+puis dédupliqués avant le seuil de cinq.
+
+Les canaris prouvent les actions directes et les exclusions : question « comment installer »,
+génération de script, constat d'installation, recherche d'une application déjà installée,
+confirmation, reprise automatique et conversation Forge. Le futur rapport ne publiera que
+compteurs et empreinte agrégée. Aucun calcul sur la base réelle n'a lieu avant ce commit. Sécurité :
+lecture seule, aucune donnée personnelle publique. Le gate passe de 354 à 355 étapes. Rollback :
+réversion atomique de v2.670; aucune donnée ou configuration Marvin n'est modifiée.
