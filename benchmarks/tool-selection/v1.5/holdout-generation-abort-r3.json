@@ -1,0 +1,30 @@
+{
+  "schema": "marvin.tool-selection-v15-generation-abort/1.2",
+  "status": "aborted_without_public_holdout",
+  "freeze": "benchmarks/tool-selection/v1.5/holdout-generation-freeze-r3.json",
+  "freeze_sha256": "ed60492d0341198b1c65d1c97c02c25c461ffa9948f2041aafab1e777d370383",
+  "runner_sha256": "0b79f7c7183687bab4e252076bf47acfdcfa1c825d6b3d57b07d9963ba885fbd",
+  "diagnostic": "benchmarks/tool-selection/v1.5/holdout-generation-diagnostics-r3.json",
+  "diagnostic_sha256": "e3c01346b5c2b03f85e447ac42ab04c13bd74c2bd5505c4182024eea061bed1e",
+  "reason_code": "critic_review_incomplete",
+  "failure_stage": "critic",
+  "failure_intent": "all_intents",
+  "completed_stages": ["author", "oracle_a", "oracle_b", "consensus", "adjudicator"],
+  "aggregate_findings_before_failure": {
+    "software_search_consensus_nonempty": 0,
+    "software_uninstall_oracle_a_nonempty": 0,
+    "software_install_consensus_nonempty": 20,
+    "interpretation": "These counts locate losses but do not authorize changing an oracle contract, threshold, or product from this burned attempt."
+  },
+  "raw_cloud_responses_persisted": false,
+  "corpus_written": false,
+  "oracle_written": false,
+  "report_written": false,
+  "product_modified": false,
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0,
+  "threshold_changed_after_observation": false,
+  "authorization_consumed": true,
+  "stage_b_authorized": false,
+  "decision": "Preserve r3 evidence. Before any r4, preregister bounded per-intent review batches so a single incomplete long response cannot invalidate all intents; do not change review semantics or observed thresholds."
+}

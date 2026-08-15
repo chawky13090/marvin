@@ -19561,3 +19561,18 @@ nouveauté sont inchangées. Stage B, exécution métier et effet hôte restent 
 contenu synthétique uniquement, aucun `num_ctx` client, aucune donnée personnelle ni réponse
 Cloud brute persistée. Le gate passe de 351 à 352 étapes. Rollback : le gel est une preuve
 historique à conserver; aucune source produit ou donnée Marvin n'est modifiée.
+
+## 2026-08-15 — v2.668.0 — troisième génération interrompue sans holdout public
+
+L'unique tentative r3 a achevé les sept lots d'auteur, les deux oracles, le consensus et
+l'adjudicateur. Le rôle critique a ensuite retourné une revue incomplète; le parseur fermé a
+refusé de fabriquer les éléments manquants. Avant de lever l'exception, le runner a écrit le
+diagnostic agrégé immuable attendu. Aucun retry ni second processus n'a été lancé.
+
+Les compteurs établissent sans exposer les demandes que `software.search` a zéro consensus,
+`software.uninstall` zéro réponse non vide de l'oracle A et `software.install` vingt consensus.
+Ces faits servent au diagnostic, pas à modifier les contrats ou seuils depuis un corpus brûlé.
+Aucun corpus, oracle ou rapport final n'existe; Stage B reste verrouillé. Sécurité : zéro outil
+métier, effet hôte, donnée personnelle ou réponse Cloud brute persistée. Le gate passe de 352 à
+353 étapes. Rollback : préserver gel, diagnostic et abandon r3; aucune donnée Marvin ni source
+produit n'a été modifiée.

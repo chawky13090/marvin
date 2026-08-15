@@ -1,0 +1,103 @@
+{
+  "schema": "marvin.tool-selection-v15-generation-diagnostics/1.0",
+  "status": "aborted",
+  "policy_sha256": "ed60492d0341198b1c65d1c97c02c25c461ffa9948f2041aafab1e777d370383",
+  "runner_sha256": "0b79f7c7183687bab4e252076bf47acfdcfa1c825d6b3d57b07d9963ba885fbd",
+  "completed_stages": [
+    "author",
+    "oracle_a",
+    "oracle_b",
+    "consensus",
+    "adjudicator"
+  ],
+  "failure_stage": "critic",
+  "failure_intent": "all_intents",
+  "counts_by_intent": {
+    "software.search": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 0,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    },
+    "software.install": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    },
+    "software.inventory": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    },
+    "software.updates_check": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    },
+    "software.upgrade": {
+      "authored_valid": 18,
+      "oracle_a_nonempty": 18,
+      "oracle_b_nonempty": 18,
+      "consensus_nonempty": 18,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    },
+    "software.uninstall": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 0,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 0,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    },
+    "software.manual_panel": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 0,
+      "critic_valid": 0,
+      "both_reviews_valid": 0,
+      "novelty_valid": 0,
+      "survivors_final": 0
+    }
+  },
+  "aggregate_only": true,
+  "raw_cloud_responses_persisted": false,
+  "prompts_persisted": false,
+  "candidate_ids_persisted": false,
+  "accepted_calls_persisted": false,
+  "per_item_verdicts_persisted": false,
+  "personal_data_persisted": false,
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0
+}

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.667.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.668.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.667.0)
+## 9. État actuel (v2.668.0)
+
+**v2.668 (r3 interrompue avec diagnostic agrégé)** : l'unique génération r3 a achevé auteur,
+deux oracles, consensus et adjudicateur, puis le critique Cloud a fourni une revue incomplète.
+Le runner a écrit avant l'exception le diagnostic agrégé prévu; aucun prompt, identifiant,
+verdict individuel ou contenu Cloud n'est persisté. Aucun corpus, oracle final ou rapport n'a
+été créé et Stage B reste interdit. Les compteurs localisent notamment un consensus nul pour
+la recherche et un oracle A vide pour la désinstallation, sans autoriser un ajustement depuis
+cette tentative brûlée. Le gate compte 353 étapes. Rollback : conserver gel, diagnostic et
+abandon r3; aucun produit ou donnée Marvin n'a changé.
 
 **v2.667 (autorisation r3 à usage unique gelée)** : le runner observable, son pré-enregistrement,
 les sources produit, les cinq rôles Cloud et leurs digests réels sont liés par SHA-256 avant tout
