@@ -329,6 +329,17 @@ class ToolApprovalRepository:
             return None
         return result
 
+    def invalidate_pending_for_request(self, request_id: str, *, reason: str) -> int:
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            return int(connection.execute(
+                """UPDATE tool_approval_requests
+                   SET status = 'expired', decided_at = datetime('now'),
+                       decision_reason = ?, arguments_json = '{}'
+                   WHERE request_id = ? AND status = 'pending'""",
+                (str(reason)[:120], str(request_id)),
+            ).rowcount)
+
 
 repository = ToolApprovalRepository()
 create_or_reuse = repository.create_or_reuse
@@ -338,3 +349,4 @@ claim = repository.claim
 finish = repository.finish
 deny = repository.deny
 claim_continuation = repository.claim_continuation
+invalidate_pending_for_request = repository.invalidate_pending_for_request

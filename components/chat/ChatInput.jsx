@@ -266,7 +266,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isLoading && (input.trim() || attachedImages.length > 0 || attachedFiles.length > 0)) {
+      if (input.trim() || attachedImages.length > 0 || attachedFiles.length > 0) {
         doSubmit(e);
       }
     }
@@ -887,7 +887,7 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
           placeholder={variant === 'welcome'
             ? 'Décrivez votre objectif, ou tapez / pour choisir une capacité…'
             : 'Demandez quelque chose… (Entrée pour envoyer, Maj+Entrée pour nouvelle ligne)'}
-          disabled={isLoading}
+          disabled={false}
           rows={1}
           style={{
             flex: 1,

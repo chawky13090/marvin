@@ -355,3 +355,29 @@ class ChatTurnDirectiveRepository:
                 (request, bounded),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def slot_for_root(self, root_request_id: str) -> dict | None:
+        request = _identifier(root_request_id, "root_request_id")
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            row = connection.execute(
+                "SELECT * FROM chat_turn_slots WHERE root_request_id = ?", (request,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def slot_for_conversation(self, conversation_key: str) -> dict | None:
+        key = _identifier(conversation_key, "conversation_key")
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            row = connection.execute(
+                "SELECT * FROM chat_turn_slots WHERE conversation_key = ?", (key,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def release_root(self, root_request_id: str) -> bool:
+        request = _identifier(root_request_id, "root_request_id")
+        with self._connection_scope() as connection:
+            self.ensure_schema(connection)
+            return connection.execute(
+                "DELETE FROM chat_turn_slots WHERE root_request_id = ?", (request,)
+            ).rowcount == 1

@@ -151,6 +151,7 @@ async def _run_deterministic_agent(
     model: str | None,
     cortex_contract: dict | None = None,
     request_id: str | None = None,
+    steering_root_request_id: str | None = None,
     *,
     native_decision_mode: bool = False,
     internal_continuation: bool = False,
@@ -608,6 +609,31 @@ async def _run_deterministic_agent(
       for step in range(_max_tool_steps):
         if not _runner_state.begin_step(step, _max_wall_seconds):
             break
+        if steering_root_request_id:
+            import chat_turn_steering as _steering
+            if _steering.enabled():
+                _directives, _stop_requested = _steering.checkpoint(
+                    steering_root_request_id, phase="before_model_iteration"
+                )
+                for _directive in _directives:
+                    yield _sse({"type": "directive_applied", "directive": _directive})
+                    if _directive["kind"] in {"append", "redirect"}:
+                        ollama_msgs.append({
+                            "role": "system",
+                            "content": (
+                                "INSTRUCTION DE PILOTAGE RECUE EN COURS DE TOUR. "
+                                + ("Remplace l'objectif restant : " if _directive["kind"] == "redirect" else "Ajoute cette contrainte à l'objectif restant : ")
+                                + _directive["text"]
+                                + " Ne rejoue aucune action déjà terminée."
+                            ),
+                        })
+                if _stop_requested:
+                    _text = "Arrêt pris en compte avant la prochaine action. Les actions déjà terminées restent conservées."
+                    yield _sse({"type": "text", "text": _text})
+                    _completion = await _finish_turn(_text, "owner_stop", learn=False)
+                    for _event in _completion.events:
+                        yield _event
+                    return
         _model_step = _ModelStepResult()
 
         try:
@@ -1298,6 +1324,7 @@ async def run_agent(
     model: str | None,
     cortex_contract: dict | None = None,
     request_id: str | None = None,
+    steering_root_request_id: str | None = None,
     internal_continuation: bool = False,
     benchmark_ephemeral: bool = False,
 ) -> AsyncIterator[str]:
@@ -1310,6 +1337,7 @@ async def run_agent(
             model,
             cortex_contract,
             request_id,
+            steering_root_request_id,
             internal_continuation=internal_continuation,
             benchmark_ephemeral=benchmark_ephemeral,
         )
@@ -1321,6 +1349,7 @@ async def run_agent(
             model,
             cortex_contract,
             request_id,
+            steering_root_request_id,
             native_decision_mode=True,
             internal_continuation=internal_continuation,
             benchmark_ephemeral=benchmark_ephemeral,

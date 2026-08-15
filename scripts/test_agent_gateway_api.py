@@ -377,6 +377,9 @@ def main() -> int:
     }
     assert routes == {
         "/api/chat",
+        "/api/conversations/{conversation_id}/active-turn",
+        "/api/chat/turns/{root_request_id}/directives",
+        "/api/chat/turns/{root_request_id}/directives/{directive_id}/cancel",
         "/api/tools",
         "/api/approvals/{approval_id}",
         "/api/approvals/{approval_id}/approve",

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.677.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.678.0, 364 outils, 396 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.677.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.678.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.677.0)
+## 9. État actuel (v2.678.0)
+
+**v2.678 (intégration verticale du pilotage sous drapeau)** : le producteur durable réserve un
+slot par conversation, rattache les nouvelles conversations à leur UUID final et libère le slot
+en terminaison. Les directives durables invalident conservativement toute approbation pendante
+du tour si l'objectif change; append, redirect et stop sont consommés avant une itération modèle,
+sans rejeu des reçus terminés. Trois routes exposent état, création/liste et annulation. Le champ
+reste saisissable pendant le travail avec ajout, redirection et tâche suivante explicites. Export
+audit et effacement couvrent les textes de pilotage, interdits des logs. Le drapeau reste faux :
+aucune activation visible avant résultat immuable et gate complet. Le gate compte 362 étapes.
 
 **v2.677 (migration réversible du pilotage chat)** : la migration SQLite 7 ajoute uniquement
 les slots exclusifs et les directives durables. Une descente hors ligne refuse Marvin actif,

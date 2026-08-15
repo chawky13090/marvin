@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 import chat_turn_runtime
+import chat_turn_steering
 import database as db
 import agent_autonomy
 from conversation_history import model_history
@@ -88,6 +89,8 @@ class ChatRequest(BaseModel):
     )
     cortex: dict | None = None
     continuationApprovalId: UUID | None = None
+    conversationKey: UUID | None = None
+    rootRequestId: str | None = Field(default=None, min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$")
     benchmarkEphemeral: bool = False
 
     @model_validator(mode="after")
@@ -108,6 +111,12 @@ class ChatRequest(BaseModel):
         ) > MAX_CHAT_PAYLOAD_BYTES:
             raise ValueError("La requête de chat dépasse la limite autorisée.")
         return self
+
+
+class ChatDirectiveRequest(BaseModel):
+    clientDirectiveId: UUID
+    kind: str = Field(pattern=r"^(append|redirect|next|stop)$")
+    text: str = Field(default="", max_length=8000)
 
 
 class ToolExecuteRequest(BaseModel):
@@ -166,6 +175,7 @@ async def chat(request: ChatRequest):
     if request.conversationId and db.get_conversation(request.conversationId) is None:
         raise HTTPException(status_code=404, detail="Conversation introuvable.")
     internal_continuation = request.continuationApprovalId is not None
+    steering_root_id = request.rootRequestId or request.requestId
     if internal_continuation:
         if not request.conversationId or not request.requestId:
             raise HTTPException(
@@ -182,6 +192,10 @@ async def chat(request: ChatRequest):
                 status_code=409,
                 detail="Cette action approuvée a déjà été poursuivie ou ne correspond pas à la conversation.",
             )
+        approval_root = str(approval.get("request_id") or "")
+        if request.rootRequestId and request.rootRequestId != approval_root:
+            raise HTTPException(status_code=409, detail="La continuation ne correspond pas au tour racine.")
+        steering_root_id = approval_root
 
     agent_messages = request.messages
     history_metadata = {
@@ -256,6 +270,7 @@ async def chat(request: ChatRequest):
                     request.model,
                     request.cortex,
                     request_id=request.requestId,
+                    steering_root_request_id=steering_root_id,
                     internal_continuation=internal_continuation,
                     benchmark_ephemeral=request.benchmarkEphemeral,
                 ):
@@ -268,6 +283,9 @@ async def chat(request: ChatRequest):
                     request_id=request.requestId,
                     fingerprint=fingerprint,
                     conversation_id=request.conversationId,
+                    conversation_key=str(request.conversationKey or request.conversationId or ""),
+                    root_request_id=steering_root_id,
+                    continuation=internal_continuation,
                     producer_factory=producer,
                     after_sequence=request.afterEvent,
                 ):
@@ -288,6 +306,49 @@ async def chat(request: ChatRequest):
             "Connection": "keep-alive",
         },
     )
+
+
+def _steering_required() -> None:
+    if not chat_turn_steering.enabled():
+        raise HTTPException(status_code=404, detail="Le pilotage de tour n'est pas actif.")
+
+
+@router.get("/api/conversations/{conversation_id}/active-turn")
+async def active_chat_turn(conversation_id: str):
+    _steering_required()
+    if db.get_conversation(conversation_id) is None:
+        raise HTTPException(status_code=404, detail="Conversation introuvable.")
+    return {"activeTurn": chat_turn_steering.active(conversation_id)}
+
+
+@router.post("/api/chat/turns/{root_request_id}/directives")
+async def create_chat_directive(root_request_id: str, body: ChatDirectiveRequest):
+    _steering_required()
+    try:
+        directive, created = chat_turn_steering.create(
+            root_request_id, str(body.clientDirectiveId), body.kind, body.text
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"directive": directive, "created": created}
+
+
+@router.get("/api/chat/turns/{root_request_id}/directives")
+async def list_chat_directives(root_request_id: str):
+    _steering_required()
+    try:
+        return {"directives": chat_turn_steering.list_public(root_request_id)}
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/api/chat/turns/{root_request_id}/directives/{directive_id}/cancel")
+async def cancel_chat_directive(root_request_id: str, directive_id: UUID):
+    _steering_required()
+    try:
+        return {"directive": chat_turn_steering.cancel(root_request_id, str(directive_id))}
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 def _current_permission_level() -> int:

@@ -112,7 +112,7 @@ export default function ChatContainer({
   }, []);
 
   const {
-    messages, status, isLoading, error,
+    messages, status, isLoading, error, sendDirective, directives,
     sendMessage, setMessages, addToolResult, stop,
     conversationId: liveConversationId,
     setConversationId, setActiveModel,
@@ -127,6 +127,8 @@ export default function ChatContainer({
     return lastAssistant.toolInvocations.find(inv => inv.state === 'call' && !inv.result) || null;
   })();
   const activeTool = activeInvocation?.toolName || null;
+  const [directiveKind, setDirectiveKind] = useState('append');
+  const latestDirective = directives?.length ? directives[directives.length - 1] : null;
 
   useEffect(() => {
     if (!onWorkspaceChanged) return;
@@ -432,7 +434,14 @@ export default function ChatContainer({
     const voiceText = e?.voiceText;
     const text = (voiceText ?? localInput).trim();
 
-    if ((!text && pendingImages.length === 0) || isLoading) return;
+    if (!text && pendingImages.length === 0) return;
+
+    if (isLoading) {
+      if (!text) return;
+      setLocalInput('');
+      sendDirective({ text, kind: directiveKind }).catch(() => setLocalInput(text));
+      return;
+    }
 
     const images = pendingImages;
     setPendingImages([]);
@@ -602,6 +611,28 @@ export default function ChatContainer({
 
       {/* Central sur une nouvelle conversation, ancré en bas après le premier message. */}
       {messages.length > 0 && (
+        <>
+        {isLoading && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '6px 12px', color: 'var(--text-secondary)', fontSize: 12 }}>
+            <span>Piloter :</span>
+            {[
+              ['append', 'Ajouter une précision'],
+              ['redirect', 'Rediriger maintenant'],
+              ['next', 'Faire ensuite'],
+            ].map(([kind, label]) => (
+              <button key={kind} type="button" onClick={() => setDirectiveKind(kind)} style={{
+                border: '1px solid var(--border)', borderRadius: 8, padding: '4px 8px',
+                background: directiveKind === kind ? 'var(--bg-tertiary)' : 'transparent',
+                color: 'inherit', cursor: 'pointer',
+              }}>{label}</button>
+            ))}
+            {latestDirective && (
+              <span aria-live="polite">
+                Orientation n°{latestDirective.sequence} {latestDirective.status === 'applied' ? 'appliquée' : latestDirective.status === 'deferred' ? 'différée' : 'reçue'}
+              </span>
+            )}
+          </div>
+        )}
         <ChatInput
           input={localInput}
           setInput={setLocalInput}
@@ -618,6 +649,7 @@ export default function ChatContainer({
             startedAt: activeInvocation?.startedAt,
           }}
         />
+        </>
       )}
     </div>
   );

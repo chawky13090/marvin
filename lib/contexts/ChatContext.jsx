@@ -96,6 +96,9 @@ export function ChatProvider({ children }) {
   // Only the newest request owns the visible streaming state. This prevents an
   // aborted request from marking a newer approval continuation as completed.
   const runGenerationRef = useRef(0);
+  const activeRootRequestRef = useRef(null);
+  const provisionalConversationKeyRef = useRef(crypto.randomUUID());
+  const [directives, setDirectives] = useState([]);
 
   // Send a message — does NOT abort on unmount because it lives in the provider
   const sendMessage = useCallback(async ({
@@ -121,6 +124,7 @@ export function ChatProvider({ children }) {
       images: imageList.map(img => img.data),
       cortexRequested: missionContract,
     };
+    if (!continuationApprovalId) activeRootRequestRef.current = userMsg.id;
 
     const assistantId = genId();
     const assistantMsg = {
@@ -193,7 +197,9 @@ export function ChatProvider({ children }) {
             };
           }),
           conversationId: conversationIdRef.current || null,
+          conversationKey: conversationIdRef.current || provisionalConversationKeyRef.current,
           requestId: userMsg.id,
+          rootRequestId: continuationApprovalId ? activeRootRequestRef.current : userMsg.id,
           model: activeModelRef.current || null,
           cortex: missionContract,
           continuationApprovalId: continuationApprovalId || null,
@@ -206,8 +212,22 @@ export function ChatProvider({ children }) {
             case 'conv_id':
               if (event.conversationId) {
                 setConversationId(event.conversationId);
+                provisionalConversationKeyRef.current = crypto.randomUUID();
                 conversationCreatedListenersRef.current.forEach(cb => {
                   try { cb(event.conversationId); } catch { /* ignore */ }
+                });
+              }
+              break;
+
+            case 'directive_received':
+            case 'directive_deferred':
+            case 'directive_applied':
+            case 'directive_rejected':
+            case 'directive_cancelled':
+              if (event.directive) {
+                setDirectives(prev => {
+                  const rest = prev.filter(item => item.id !== event.directive.id);
+                  return [...rest, event.directive].sort((a, b) => a.sequence - b.sequence);
                 });
               }
               break;
@@ -499,25 +519,47 @@ export function ChatProvider({ children }) {
     setMessages(updatedMessages);
   }, []);
 
+  const sendDirective = useCallback(async ({ text = '', kind = 'append' }) => {
+    const rootRequestId = activeRootRequestRef.current;
+    if (!rootRequestId) throw new Error('Aucun tour actif à orienter.');
+    const response = await fetch(
+      `${BACKEND_URL}/api/chat/turns/${encodeURIComponent(rootRequestId)}/directives`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientDirectiveId: crypto.randomUUID(), kind, text }),
+      },
+    );
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || 'Orientation refusée.');
+    setDirectives(prev => [...prev.filter(item => item.id !== payload.directive.id), payload.directive]);
+    return payload.directive;
+  }, []);
+
   const stop = useCallback(() => {
+    if (activeRootRequestRef.current && (status === 'submitted' || status === 'streaming')) {
+      sendDirective({ kind: 'stop', text: '' }).catch(err => setError(err));
+      return;
+    }
     runGenerationRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
     setStatus('ready');
-  }, []);
+  }, [sendDirective, status]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
   const value = {
     // State
     messages, setMessages,
-    status, error, isLoading,
+    status, error, isLoading, directives,
     conversationId, setConversationId,
     initialMessages, setInitialMessages,
     activeModel, setActiveModel,
     cortexContract, setCortexContract,
     // Actions
     sendMessage,
+    sendDirective,
     addToolResult,
     stop,
     // Subscriptions

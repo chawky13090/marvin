@@ -17,6 +17,10 @@ Version du contrat : 1.0
 | État d'installation | `runtime/install/state.json`, `runtime/install/package.json`, rapport de capacités | non | régénération ou réinstallation sur la machine cible |
 | Sauvegardes | `data/backups` | jamais récursivement | cycle de rétention séparé |
 
+Les directives de pilotage sont conservées dans SQLite (`chat_turn_directives`) comme texte de
+conversation : exportées en mode audit, incluses dans la sauvegarde chiffrée de la base et
+effacées avec leur conversation. Leur texte est interdit dans les journaux techniques.
+
 Le manifeste exécutable vit dans `backend/full_backup.py`. Tout nouveau fichier ou dossier
 de premier niveau sous `data/` doit être ajouté explicitement à une classe; sinon la création
 du bundle échoue. Les fichiers `.lock`, `.tmp` et `.partial` ne sont jamais archivés.

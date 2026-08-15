@@ -233,13 +233,33 @@ def _record_producer_failure(
         _finish(request_id, "failed", message)
 
 
-async def _produce(request_id: str, producer: AsyncIterator[str]) -> None:
+async def _produce(
+    request_id: str,
+    producer: AsyncIterator[str],
+    *,
+    steering_root_request_id: str | None = None,
+    conversation_key: str = "",
+) -> None:
     saw_terminal_event = False
     failed = False
     try:
         async for chunk in producer:
             event = _decode_agent_chunk(chunk)
             _append_event(request_id, event)
+            if (
+                steering_root_request_id
+                and conversation_key
+                and event.get("type") == "conv_id"
+                and event.get("conversationId")
+            ):
+                import chat_turn_steering
+                if chat_turn_steering.enabled() and conversation_key != event["conversationId"]:
+                    chat_turn_steering.rebind(
+                        steering_root_request_id,
+                        conversation_key,
+                        str(event["conversationId"]),
+                    )
+                    conversation_key = str(event["conversationId"])
             if event.get("type") in {"done", "error"}:
                 saw_terminal_event = True
             if event.get("type") == "error":
@@ -264,6 +284,11 @@ async def _produce(request_id: str, producer: AsyncIterator[str]) -> None:
             error_type=type(exc).__name__,
             message=message,
         )
+    finally:
+        if steering_root_request_id:
+            import chat_turn_steering
+            if chat_turn_steering.enabled():
+                chat_turn_steering.release(steering_root_request_id)
 
 
 def _task_finished(request_id: str, task: asyncio.Task) -> None:
@@ -276,8 +301,13 @@ async def _ensure_started(
     fingerprint: str,
     conversation_id: str | None,
     producer_factory: Callable[[], AsyncIterator[str]],
+    *,
+    conversation_key: str = "",
+    root_request_id: str | None = None,
+    continuation: bool = False,
 ) -> str:
     async with _LOCK:
+        steering_root = root_request_id or request_id
         with db() as connection:
             cursor = connection.execute(
                 """INSERT OR IGNORE INTO chat_turns
@@ -317,8 +347,24 @@ async def _ensure_started(
                 )
                 status = "interrupted"
 
+        if status == "running" and steering_root:
+            import chat_turn_steering
+            if chat_turn_steering.enabled():
+                if not conversation_key:
+                    raise ValueError("Une clé de conversation UUID est requise pour ce tour.")
+                chat_turn_steering.reserve(
+                    conversation_key,
+                    steering_root,
+                    conversation_id or "",
+                )
+
         if created:
-            task = asyncio.create_task(_produce(request_id, producer_factory()))
+            task = asyncio.create_task(_produce(
+                request_id,
+                producer_factory(),
+                steering_root_request_id=steering_root if root_request_id else None,
+                conversation_key=conversation_key,
+            ))
             _TASKS[request_id] = task
             task.add_done_callback(lambda done, rid=request_id: _task_finished(rid, done))
         return status
@@ -343,11 +389,22 @@ async def subscribe(
     request_id: str,
     fingerprint: str,
     conversation_id: str | None,
+    conversation_key: str = "",
+    root_request_id: str | None = None,
+    continuation: bool = False,
     producer_factory: Callable[[], AsyncIterator[str]],
     after_sequence: int = 0,
 ) -> AsyncIterator[str]:
     """Demarre un tour une fois et diffuse son journal, meme apres reconnexion UI."""
-    status = await _ensure_started(request_id, fingerprint, conversation_id, producer_factory)
+    status = await _ensure_started(
+        request_id,
+        fingerprint,
+        conversation_id,
+        producer_factory,
+        conversation_key=conversation_key,
+        root_request_id=root_request_id,
+        continuation=continuation,
+    )
     cursor = max(0, int(after_sequence))
     while True:
         events, status = _read_events(request_id, cursor)

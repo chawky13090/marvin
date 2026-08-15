@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import database as db
+from db_connection import db as connection_scope
 from storage_layout import roots
 
 
@@ -91,6 +92,18 @@ def transcript(conversation_id: str, mode: str = "lecture") -> dict[str, Any]:
         "conversation": _redact(conversation),
         "messages": messages,
     }
+    if mode == "audit":
+        with connection_scope() as connection:
+            rows = connection.execute(
+                """SELECT directive.id, directive.sequence, directive.kind,
+                          directive.directive_text, directive.status,
+                          directive.reason_code, directive.created_at
+                   FROM chat_turn_directives directive
+                   JOIN chat_turns turn ON turn.request_id = directive.root_request_id
+                   WHERE turn.conversation_id = ? ORDER BY directive.sequence""",
+                (conversation_id,),
+            ).fetchall()
+        payload["directives"] = _redact([dict(row) for row in rows])
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     payload["integrity"] = {"algorithm": "sha256", "canonical_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest()}
     return payload

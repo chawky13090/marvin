@@ -139,6 +139,16 @@ class ConversationRepository:
 
     def delete_conversation(self, conversation_id: str) -> None:
         with self._connection_scope() as connection:
+            connection.execute(
+                """DELETE FROM chat_turn_directives WHERE root_request_id IN (
+                       SELECT request_id FROM chat_turns WHERE conversation_id = ?
+                   )""",
+                (conversation_id,),
+            )
+            connection.execute(
+                "DELETE FROM chat_turn_slots WHERE conversation_id = ? OR conversation_key = ?",
+                (conversation_id, conversation_id),
+            )
             connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
 
     def create_message(

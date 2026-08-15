@@ -5,6 +5,19 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-16 — v2.678.0 — pilotage chat intégré derrière un drapeau désactivé
+
+Le runtime durable réserve désormais un seul tour racine par clé de conversation, rebascule la
+clé UUID provisoire vers l'identifiant final et libère le slot à la terminaison. Les directives
+append, redirect, next et stop sont persistées, bornées, idempotentes et exposées par API. Le
+checkpoint avant itération injecte les orientations sous un rôle système distinct, applique
+l'arrêt avant une nouvelle action et ne rejoue aucun reçu. Toute orientation qui change
+l'objectif expire les approbations encore pendantes du tour. L'interface garde le champ actif,
+affiche le mode et l'accusé. Export audit, suppression de conversation et inventaire couvrent le
+texte, qui n'entre jamais dans les logs. Validation hors ligne en cours; drapeau encore faux,
+donc aucune modification du comportement runtime installé. Rollback : réversion atomique de
+v2.678 puis descente SQLite v7 hors ligne si elle a été appliquée.
+
 ## 2026-08-16 — v2.677.0 — migration de pilotage réversible vérifiée hors ligne
 
 La migration SQLite 7 crée les tables `chat_turn_slots` et `chat_turn_directives` avec
