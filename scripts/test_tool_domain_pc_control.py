@@ -115,6 +115,20 @@ async def _run() -> None:
             {"script": "Get-Date", "timeout": "long", "confirmed": True}
         )
     )["error"]
+    for failure in (
+        "ECHEC: dossier existe encore",
+        "ÉCHEC: objectif non atteint",
+        "FAILED: target remains",
+        "ERROR: cleanup incomplete",
+        "[x] suppression impossible",
+    ):
+        assert pc_control._powershell_self_reported_failure(failure), failure
+    for success in (
+        "OK: dossier supprimé",
+        "Aucune erreur détectée",
+        "Le journal contient ERROR: ancien événement",
+    ):
+        assert not pc_control._powershell_self_reported_failure(success), success
     assert "PID ou nom" in (await pc_control.execute_pc_process_kill({}))["error"]
     assert "PID invalide" in (
         await pc_control.execute_pc_process_kill(

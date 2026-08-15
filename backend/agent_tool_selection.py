@@ -770,8 +770,11 @@ def _software_intent_boundary(text: str) -> str | None:
         return "software.updates_check"
     if any(
         _keyword_present(marker, normalized)
-        for marker in ("mets a jour", "met a jour", "mettre a jour", "applique les mises a jour", "actualise le logiciel")
-    ) or re.search(r"\bmets?\b.{0,64}\ba\s+jour\b", normalized):
+        for marker in (
+            "mets a jour", "met a jour", "mais a jour", "mettre a jour",
+            "applique les mises a jour", "actualise le logiciel",
+        )
+    ) or re.search(r"\b(?:mets?|mais)\b.{0,64}\ba\s+jour\b", normalized):
         return "software.upgrade"
 
     inventory = (

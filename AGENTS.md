@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.671.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.672.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.671.0)
+## 9. État actuel (v2.672.0)
+
+**v2.672 (acceptation propriétaire et autonomie confirmée)** : cinq parcours réels satisfaisants
+deviennent un contrat bloquant séparé de toute preuve de généralisation : mises à jour, faute
+« mais a jour », récupération Nextcloud, gros fichiers et nettoyage Edge confirmé. L'autonomie
+autorise persévérance, exécuteur alternatif et UAC après accord du propriétaire, tout en exigeant
+cibles exactes et postconditions. La faute propriétaire mène désormais directement à
+`winget_upgrade`, jamais à l'installation. PowerShell refuse enfin `success=true` lorsque stdout
+commence par `ECHEC:`, `FAILED:` ou `ERROR:`. Le replay mutant reste réservé à la VM. Le gate
+compte 357 étapes. Rollback : réversion atomique de v2.672; aucune donnée persistante ne change.
 
 **v2.671 (couverture réelle logicielle agrégée)** : sur 729 messages utilisateur lus en mode
 SQLite read-only, la rubrique figée retient après déduplication 13 demandes d'installation,

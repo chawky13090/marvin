@@ -80,6 +80,9 @@ def main() -> None:
     assert "winget_uninstall" not in asyncio.run(_selected("installe VLC"))
     assert "winget_install" not in asyncio.run(_selected("desinstalle VLC"))
     assert "winget_uninstall" not in asyncio.run(_selected("mets VLC a jour"))
+    owner_typo_names = asyncio.run(_selected("mais a jour WinDirStat"))
+    assert selection._software_intent_boundary("mais a jour windirstat") == "software.upgrade"
+    assert owner_typo_names & ALL_SOFTWARE == {"winget_upgrade"}
     assert len(selection.TOOLS_SPEC) == 364
     print("Tool Selection v1.5 Software Boundary OK - intents=8 hostile_union=closed registry=364")
 

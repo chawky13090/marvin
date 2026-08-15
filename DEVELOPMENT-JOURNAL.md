@@ -19621,3 +19621,20 @@ outil exécuté ou reçu, et déclare explicitement ne pas être un score de Mar
 indépendant. Aucun appel Cloud ou outil métier n'a été exécuté. Le gate passe de 355 à 356
 étapes. Rollback : conserver l'artefact historique; aucune donnée ou configuration Marvin n'est
 modifiée.
+
+## 2026-08-15 — v2.672.0 — autonomie propriétaire préservée et faux succès supprimé
+
+La dernière conversation réelle a été auditée demande par demande. Les mises à jour disponibles,
+la récupération de Nextcloud Talk par désinstallation/réinstallation confirmée, l'inventaire des
+gros fichiers et le nettoyage Edge ont réellement abouti. L'utilisateur confirme apprécier que
+Marvin persévère, prenne le contrôle après l'avoir prévenu et utilise l'UAC sous son contrôle.
+Ce comportement devient un contrat d'acceptation bloquant, distinct d'un holdout indépendant.
+
+Deux corrections produit en résultent. La formulation réelle « mais a jour » est reconnue comme
+`software.upgrade` et ferme la famille Winget sur `winget_upgrade`. Le reçu PowerShell considère
+désormais les lignes `ECHEC:`, `ÉCHEC:`, `FAILED:` et `ERROR:` comme échec métier même si le
+processus retourne zéro; `OK:` reste positif et une mention interne de ERROR ne suffit pas.
+Sécurité : l'exécution alternative et l'UAC restent autorisées après confirmation, tandis que
+les actions silencieuses restent interdites. Le replay mutant automatique est réservé à la VM.
+Journalisation : aucune nouvelle donnée; les reçus deviennent plus exacts. Le gate passe de 356
+à 357 étapes. Rollback : réversion atomique de v2.672; aucun schéma ou contenu Marvin n'est modifié.

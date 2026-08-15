@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 356
+EXPECTED_STAGE_COUNT = 357
 
 
 @dataclass(frozen=True)
@@ -290,6 +290,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Resultat couverture reelle du routage v1.6",
             (python, "scripts/test_tool_selection_v16_coverage_result.py"),
+        ),
+        Stage(
+            "Acceptation proprietaire du routage v1.6",
+            (python, "scripts/test_tool_selection_v16_owner_acceptance.py"),
         ),
         Stage(
             "Gel du générateur holdout routage v1.4",

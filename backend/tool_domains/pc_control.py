@@ -791,18 +791,7 @@ async def execute_pc_run_powershell(args: dict) -> dict:
         if stderr_clean.startswith("#< CLIXML"):
             stderr_clean = ""
         stdout_clean = stdout_text.strip() or "(aucune sortie)"
-        self_reported_failure = bool(
-            _re.search(r"(?im)^\s*\[x\]\s+", stdout_clean)
-            or _re.search(
-                r"(?im)^\s*\[!\].*(?:échec|echec|encore présent|encore present|"
-                r"dossier restant|introuvable|impossible de supprimer)",
-                stdout_clean,
-            )
-            or _re.search(
-                r"(?im)aucun package installé ne correspond aux critères",
-                stdout_clean,
-            )
-        )
+        self_reported_failure = _powershell_self_reported_failure(stdout_clean)
         business_success = result.returncode == 0 and not stderr_clean and not self_reported_failure
         return {
             "success":    business_success,
@@ -834,6 +823,23 @@ async def execute_pc_run_powershell(args: dict) -> dict:
         return {"error": "Permission refusée — votre antivirus bloque l'exécution. Ajoutez le dossier backend à la liste blanche."}
     except Exception as e:
         return {"error": str(e)}
+
+
+def _powershell_self_reported_failure(stdout: str) -> bool:
+    """Refuse un succès processus lorsque le script déclare lui-même son échec."""
+    value = str(stdout or "")
+    return bool(
+        _re.search(r"(?im)^\s*(?:\[x\]|echec\s*:|échec\s*:|failed\s*:|error\s*:)", value)
+        or _re.search(
+            r"(?im)^\s*\[!\].*(?:échec|echec|encore présent|encore present|"
+            r"dossier restant|introuvable|impossible de supprimer)",
+            value,
+        )
+        or _re.search(
+            r"(?im)aucun package installé ne correspond aux critères",
+            value,
+        )
+    )
 
 
 async def execute_pc_run_elevated(args: dict) -> dict:
