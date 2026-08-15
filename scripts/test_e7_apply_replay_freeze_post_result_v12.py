@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,13 @@ RESULT = BASE / "e7-apply-replay-result.json"
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def blob_sha256(commit: str, relative: str) -> str:
+    return hashlib.sha256(subprocess.run(
+        ["git", "show", f"{commit}:{relative}"], cwd=ROOT,
+        check=True, capture_output=True,
+    ).stdout).hexdigest()
 
 
 def main() -> int:
@@ -32,8 +40,9 @@ def main() -> int:
     assert result["policy_sha256"] == sha256(POLICY)
     assert result["authorization_sha256"] == sha256(AUTHORIZATION)
 
+    source_commit = str(result["source_commit"])
     for relative, expected in authorization["frozen_hashes"].items():
-        assert sha256(ROOT / relative) == expected, relative
+        assert blob_sha256(source_commit, relative) == expected, relative
 
     oracle_path = ROOT / "scripts" / "e7_apply_oracle_v12.py"
     tree = ast.parse(oracle_path.read_text(encoding="utf-8"))
