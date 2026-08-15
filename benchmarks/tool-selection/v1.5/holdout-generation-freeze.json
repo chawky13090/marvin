@@ -1,0 +1,28 @@
+{
+  "schema": "marvin.tool-selection-v15-holdout-generation-freeze/1.0",
+  "status": "frozen_before_cloud_generation",
+  "source_commit": "48b06ba2f37fabb5e4541cf1326ef514a5228804",
+  "generator_sha256": "b80a2f22a3a5c1bc6161c812baef5626a0d696dbd684a0a8bfb1f31c72c8d704",
+  "preregistration_sha256": "4ee9dd8965fb3953ad1dfad0263366aaa5d1f35c63e1ac137966a13846e303c3",
+  "target_per_intent": 5,
+  "intents": ["software.search", "software.install", "software.inventory", "software.updates_check", "software.upgrade", "software.uninstall", "software.manual_panel"],
+  "roles": {
+    "author": {"model":"nemotron-3-super:cloud","digest":"be3943c5a818be61a08f3563b971e392bfc12e506e296fb186c870f5c63377a4"},
+    "oracle_a": {"model":"glm-5.2:cloud","digest":"ce8fd6f94793a6786f6858717b38067feba631861e3b35e8122cb6635004cd4a"},
+    "oracle_b": {"model":"kimi-k2.7-code:cloud","digest":"eda07a6592375dcbde7cf167b6d6b368cdd28e244f9d71559fb59919aca882fa"},
+    "adjudicator": {"model":"qwen3.5:397b-cloud","digest":"a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca"},
+    "critic": {"model":"minimax-m2.7:cloud","digest":"06daa293c105f0bd71fd19420e4d15cae66cc5f71cb8f55b4f998e96ec8ab67a"}
+  },
+  "benchmark_model": {"model":"mistral-large-3:675b-cloud","digest":"3130fd5a5a1eb4b208be74bf0273357c14c3576c6ba8d78f98b960e91919d77b","excluded_from_generation":true},
+  "novelty": {"token_jaccard_maximum":0.5,"compare_against_v1_2_v1_3_v1_4_and_development":true},
+  "frozen_product_sources_sha256": {
+    "backend/agent_tool_selection.py":"14c29721f22b183c7168c2d63a34f2f965df6c2fc9c3af3591bc74424ee026bd",
+    "backend/capability_discovery.py":"083f64e3d2854fb5948ce5e989a434b818380ad37441e22b0c453278a8c55f74",
+    "backend/tool_capability_ranking.py":"9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/tools.py":"96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "independence": {"roles_cannot_see_product_rules_or_prior_results":true,"cross_role_model_family_reuse_forbidden":true,"oracle_consensus_required":true,"two_independent_reviews_required":true},
+  "authorization": {"cloud_generation_calls":true,"benchmark_model_calls":false,"business_tool_execution":false,"host_side_effects":false,"single_use":true},
+  "privacy": {"synthetic_only":true,"personal_data_forbidden":true,"raw_cloud_responses_persisted":false,"client_num_ctx_forbidden":true},
+  "rollback": "Preserve the immutable freeze and any generated evidence; generator execution makes no product or persistent-data change."
+}

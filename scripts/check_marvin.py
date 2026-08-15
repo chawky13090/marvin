@@ -251,6 +251,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_tool_selection_v15_development_stage_a.py"),
         ),
         Stage(
+            "Gel generation holdout v1.5",
+            (python, "scripts/test_tool_selection_v15_holdout_generation_freeze.py"),
+        ),
+        Stage(
             "Gel du générateur holdout routage v1.4",
             (python, "scripts/test_tool_selection_v14_holdout_generation_freeze.py"),
         ),
