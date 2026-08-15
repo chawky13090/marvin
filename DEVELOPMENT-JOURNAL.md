@@ -5,6 +5,29 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-15 — v2.673.0 — gros fichiers routés directement, autonomie intacte
+
+Demande : poursuivre depuis les parcours réels jugés satisfaisants, sans rendre Marvin plus
+timide. Le replay déterministe a établi que mises à jour et mises à niveau respectaient déjà la
+frontière logicielle sous une couche sémantique hostile, mais que la formulation propriétaire
+« fichier ou dossier les plus gros » n'incluait pas directement `file_large_finder`.
+
+Décision : ajouter une grammaire générale de fichiers volumineux et étendre l'outil existant
+au classement des sous-dossiers par taille cumulée dans le même parcours borné. Les liens
+symboliques et répertoires système exclus ne sont pas suivis; troncature et accès refusés
+rendent explicitement les tailles de dossiers partielles. Fermer uniquement les
+mutations voisines lorsque la demande est un inventaire. Une demande qui contient une action
+mutante explicite conserve cette action; confirmations, UAC et exécuteurs alternatifs restent
+inchangés.
+
+Validation : le contrat propriétaire rejoue les cinq prompts au niveau sélection uniquement,
+budget 18, disponibilité contrôlée et couche sémantique hostile. Il exige `winget_list_upgrades`,
+`winget_upgrade` et `file_large_finder`, refuse les mutations sur l'inventaire, puis prouve
+qu'une suppression explicitement demandée reste accessible. Aucun outil métier ni donnée
+utilisateur n'est exécuté ou modifié. Journalisation : aucun événement nouveau. Sécurité : la
+surface d'exécution et les confirmations sont inchangées. Rollback : réversion atomique du
+commit v2.673 puis redémarrage backend; aucun schéma, secret ou format persistant ne change.
+
 ## 2026-08-15 — v2.662.0 — frontière d'intention logicielle terminale
 
 La politique v1.5 a été figée au commit `6d64c8b` avant toute modification produit. Elle

@@ -858,24 +858,48 @@ def _walk_files(root: Path, maximum: int):
 
 def _large_files_scan(
     root: Path, top: int, threshold: int, max_files: int
-) -> tuple[list[tuple[int, str]], int, bool]:
-    heap: list[tuple[int, str]] = []
+) -> tuple[list[tuple[int, str]], list[tuple[int, str]], int, bool, int]:
+    file_heap: list[tuple[int, str]] = []
+    directory_sizes: dict[Path, int] = {}
     scanned = 0
+    inaccessible = 0
+    truncated = False
     for path in _walk_files(root, max_files + 1):
         if scanned >= max_files:
-            return sorted(heap, reverse=True), scanned, True
+            truncated = True
+            break
         scanned += 1
         try:
             size = path.stat().st_size
         except OSError:
+            inaccessible += 1
             continue
         candidate = (size, str(path))
         if size >= threshold:
-            if len(heap) < top:
-                heapq.heappush(heap, candidate)
-            elif size > heap[0][0]:
-                heapq.heapreplace(heap, candidate)
-    return sorted(heap, reverse=True), scanned, False
+            if len(file_heap) < top:
+                heapq.heappush(file_heap, candidate)
+            elif size > file_heap[0][0]:
+                heapq.heapreplace(file_heap, candidate)
+        parent = path.parent
+        while parent != root and root in parent.parents:
+            directory_sizes[parent] = directory_sizes.get(parent, 0) + size
+            parent = parent.parent
+    directory_heap: list[tuple[int, str]] = []
+    for path, size in directory_sizes.items():
+        if size < threshold:
+            continue
+        candidate = (size, str(path))
+        if len(directory_heap) < top:
+            heapq.heappush(directory_heap, candidate)
+        elif size > directory_heap[0][0]:
+            heapq.heapreplace(directory_heap, candidate)
+    return (
+        sorted(file_heap, reverse=True),
+        sorted(directory_heap, reverse=True),
+        scanned,
+        truncated,
+        inaccessible,
+    )
 
 
 async def large_finder(args: dict[str, Any]) -> dict[str, Any]:
@@ -893,20 +917,23 @@ async def large_finder(args: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("'min_mb' doit être compris entre 0 et 1 000 000.")
         if not 1 <= max_files <= 1_000_000:
             raise ValueError("'max_files' doit être compris entre 1 et 1 000 000.")
-        items, scanned, truncated = await asyncio.to_thread(
+        files, directories, scanned, truncated, inaccessible = await asyncio.to_thread(
             _large_files_scan,
             root,
             top,
             int(min_mb * 1024 * 1024),
             max_files,
         )
-        total = sum(size for size, _ in items)
+        total = sum(size for size, _ in files)
         return {
             "success": True,
             "directory": str(root),
-            "count": len(items),
+            "count": len(files),
+            "directory_count": len(directories),
             "scanned": scanned,
             "scan_truncated": truncated,
+            "inaccessible_files": inaccessible,
+            "directory_sizes_partial": truncated or inaccessible > 0,
             "total_human": _format_bytes_precise(total),
             "files": [
                 {
@@ -914,9 +941,20 @@ async def large_finder(args: dict[str, Any]) -> dict[str, Any]:
                     "size_bytes": size,
                     "size_human": _format_bytes_precise(size),
                 }
-                for size, path in items
+                for size, path in files
             ],
-            "message": f"{len(items)} plus gros fichiers ({_format_bytes_precise(total)})",
+            "directories": [
+                {
+                    "path": path,
+                    "size_bytes": size,
+                    "size_human": _format_bytes_precise(size),
+                }
+                for size, path in directories
+            ],
+            "message": (
+                f"{len(files)} plus gros fichiers et {len(directories)} plus gros dossiers"
+                + (" (tailles de dossiers partielles)" if truncated or inaccessible else "")
+            ),
         }
     except (OSError, TypeError, ValueError) as exc:
         return {"error": str(exc)}

@@ -174,6 +174,16 @@ _KEYWORD_TOOLS = {
          "file_write", "file_delete", "file_rename", "file_move", "file_copy",
          "file_create_folder", "file_search_text", "pc_get_real_paths", "windows_task"},
 
+    # Inventaire non mutant des fichiers et sous-dossiers volumineux. Une demande mixte
+    # conserve les outils d'exploration généraux mais ne dépend pas d'un détour par
+    # tool_search pour obtenir le classement des tailles cumulées.
+    ("plus gros fichier", "plus gros fichiers", "fichier le plus gros",
+     "fichiers les plus gros", "fichier volumineux", "fichiers volumineux",
+     "fichier ou dossier les plus gros", "fichiers ou dossiers les plus gros",
+     "dossier ou fichier les plus gros", "dossiers ou fichiers les plus gros",
+     "fichiers qui prennent le plus de place", "fichiers qui occupent le plus"):
+        {"file_large_finder"},
+
     # Recherche dans fichiers
     ("trouve", "cherche", "où est", "ou est", "ou se trouve", "trouver", "*.pdf",
      "*.docx", "*.xlsx"):
@@ -642,6 +652,17 @@ _SOFTWARE_DEVELOPMENT_CONTEXT = (
     "dependance python", "dependances python", "package python", "paquet python",
     "dependance node", "dependances node", "node_modules",
 )
+_FILESYSTEM_MUTATION_TOOLS = {
+    "file_write", "file_delete", "file_rename", "file_move", "file_copy",
+    "file_create_folder", "windows_task",
+}
+_FILESYSTEM_MUTATION_TERMS_NORM = tuple(
+    _strip_accents(term)
+    for term in (
+        "supprime", "efface", "nettoie", "déplace", "deplace", "renomme",
+        "copie", "crée", "cree", "écris", "ecris", "modifie",
+    )
+)
 
 
 @lru_cache(maxsize=4096)
@@ -886,6 +907,16 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
         relevant.update(allowed_software)
         keyword_hits.difference_update(_SOFTWARE_ACTION_TOOLS)
         keyword_hits.update(allowed_software)
+
+    # Une demande d'inventaire des fichiers volumineux est en lecture seule. Les mots
+    # génériques « fichier/dossier » ne doivent pas laisser des mutations voisines prendre
+    # un slot, sauf si l'utilisateur exprime aussi explicitement une action mutante.
+    if (
+        "file_large_finder" in keyword_hits
+        and not any(_keyword_present(term, text_norm) for term in _FILESYSTEM_MUTATION_TERMS_NORM)
+    ):
+        relevant.difference_update(_FILESYSTEM_MUTATION_TOOLS)
+        keyword_hits.difference_update(_FILESYSTEM_MUTATION_TOOLS)
 
     # Un outil visuel de 24 paramètres ne concurrence pas l'opérateur système typé
     # lorsque la demande ne contient aucun geste visuel. Il reste découvrable par

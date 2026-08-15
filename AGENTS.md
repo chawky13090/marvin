@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.672.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.673.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.672.0)
+## 9. État actuel (v2.673.0)
+
+**v2.673 (inventaire direct des fichiers volumineux)** : les formulations générales sur les
+plus gros fichiers, y compris « fichier ou dossier les plus gros », présentent directement
+`file_large_finder` sans détour obligatoire par `tool_search`. L'outil calcule dans le même
+parcours borné les tailles cumulées des sous-dossiers et signale toute mesure partielle. Quand
+la demande reste un inventaire, les mutations de fichiers ne consomment aucun slot; une action explicite de
+suppression, déplacement ou renommage reste disponible et continue de passer par les gardes
+et confirmations normales. Les cinq demandes propriétaires v1.6 sont rejouées au niveau de la
+sélection avec une couche sémantique hostile, sans exécuter d'outil métier. Les 364 outils et le
+gate à 357 étapes restent inchangés. Rollback : réversion atomique de v2.673; aucune donnée ni
+configuration persistante ne change.
 
 **v2.672 (acceptation propriétaire et autonomie confirmée)** : cinq parcours réels satisfaisants
 deviennent un contrat bloquant séparé de toute preuve de généralisation : mises à jour, faute

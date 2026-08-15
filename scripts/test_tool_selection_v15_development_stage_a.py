@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -13,10 +14,21 @@ CORPUS = BASE / "development-corpus.json"
 POLICY = BASE / "software-intent-boundary-preregistration.json"
 RESULT = BASE / "development-stage-a-result.json"
 SOURCE = ROOT / "backend/agent_tool_selection.py"
+SOURCE_COMMIT = "48b06ba2f37fabb5e4541cf1326ef514a5228804"
 
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _git_blob_sha(commit: str, path: str) -> str:
+    value = subprocess.run(
+        ["git", "show", f"{commit}:{path}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    return hashlib.sha256(value).hexdigest()
 
 
 def main() -> None:
@@ -26,7 +38,9 @@ def main() -> None:
     assert len(corpus["items"]) == 40
     assert result["status"] == "development_evidence_not_release_validation"
     assert result["corpus_sha256"] == _sha(CORPUS)
-    assert result["product_source_sha256"] == _sha(SOURCE)
+    assert result["product_source_sha256"] == _git_blob_sha(
+        SOURCE_COMMIT, SOURCE.relative_to(ROOT).as_posix()
+    )
     assert result["preregistration_sha256"] == _sha(POLICY)
     assert result["business_tool_execution_count"] == 0
     assert result["host_side_effect_count"] == 0

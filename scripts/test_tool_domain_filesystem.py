@@ -115,6 +115,8 @@ async def main() -> int:
         duplicate_payload = ("Marvin vérifie le fichier complet.\n" * 100).encode("utf-8")
         (base / "docs/duplicate-a.bin").write_bytes(duplicate_payload)
         (base / "docs/duplicate-b.bin").write_bytes(duplicate_payload)
+        (base / "docs/heavy-folder").mkdir()
+        (base / "docs/heavy-folder/payload.bin").write_bytes(b"x" * 4096)
         (base / "docs/same-prefix.bin").write_bytes(
             duplicate_payload[:64] + b"different-tail"
         )
@@ -124,6 +126,9 @@ async def main() -> int:
         assert large["success"] is True and large["count"] == 2
         assert large["scan_truncated"] is False
         assert large["files"][0]["size_bytes"] >= large["files"][1]["size_bytes"]
+        assert large["directory_sizes_partial"] is False
+        assert large["directories"][0]["path"].endswith("heavy-folder")
+        assert large["directories"][0]["size_bytes"] == 4096
 
         batch = await filesystem.batch_read(
             {
