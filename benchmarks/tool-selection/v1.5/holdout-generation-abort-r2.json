@@ -1,0 +1,19 @@
+{
+  "schema": "marvin.tool-selection-v15-generation-abort/1.1",
+  "status": "aborted_without_public_holdout",
+  "freeze": "benchmarks/tool-selection/v1.5/holdout-generation-freeze-r2.json",
+  "reason_code": "insufficient_survivors_after_combined_gates",
+  "intent": "software.install",
+  "required_survivors": 5,
+  "observed_survivors": 0,
+  "failing_gate_not_attributable_from_public_evidence": true,
+  "raw_cloud_responses_persisted": false,
+  "corpus_written": false,
+  "oracle_written": false,
+  "report_written": false,
+  "product_modified": false,
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0,
+  "threshold_changed_after_observation": false,
+  "decision": "Do not authorize a third generation attempt until the generator publishes aggregate survivor counts after each independent gate without exposing prompts."
+}

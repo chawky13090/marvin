@@ -25,6 +25,17 @@ Validation de développement : huit intentions et leurs paires croisées sont ex
 une couche sémantique volontairement hostile qui propose les neuf outils logiciels; registre
 inchangé à 364. Un nouveau holdout indépendant reste obligatoire avant toute généralisation.
 
+La mesure Stage A de développement couvre ensuite 40 formulations, sept configurations K/L/S
+et quatre budgets, soit 1 120 compositions. K+L+S atteint un rappel de candidats de 100 % sur
+ce corpus de développement et aucune intention de lecture n'expose une mutation interdite.
+Ce résultat est explicitement impropre à une revendication de livraison. Deux générations
+Cloud indépendantes du holdout ont échoué fermé avant toute publication : la première avec
+4 survivants sur 5 requis pour `software.search`, la seconde avec 0 sur 5 pour
+`software.install` après les filtres combinés. Les deux arrêts sont conservés; aucun seuil n'a
+été abaissé, aucun corpus partiel n'a été écrit et aucune troisième tentative n'est autorisée
+avant d'ajouter des compteurs agrégés par gate au générateur. La validation indépendante v1.5
+reste donc `UNASSESSED`, sans remettre en cause les garanties déterministes de la frontière.
+
 ## 2026-08-15 — v2.661.0 — morphologie logicielle bornée et holdout indépendant
 
 La correction a été pré-enregistrée au commit `0d268a77` avant toute source produit. Le
