@@ -46,6 +46,11 @@ _NATIVE_LINUX_PATTERNS = re.compile(
 )
 
 
+def _windows_powershell_env() -> dict[str, str]:
+    """Let Windows PowerShell rebuild its native module search path."""
+    return {key: value for key, value in os.environ.items() if key.casefold() != "psmodulepath"}
+
+
 def requires_online_integration(code: str, language: str) -> bool:
     """Static unit tests cannot certify scripts that install packages or services."""
     return str(language or "").casefold() == "bash" and bool(_INSTALLER_PATTERNS.search(str(code or "")))
@@ -449,6 +454,7 @@ def _powershell_static(
             capture_output=True,
             timeout=30,
             check=False,
+            env=_windows_powershell_env(),
         )
         steps.append({
             "name": "powershell_parser",
@@ -475,6 +481,7 @@ def _powershell_static(
             capture_output=True,
             timeout=60,
             check=False,
+            env=_windows_powershell_env(),
         )
         steps.append({
             "name": "psscriptanalyzer",

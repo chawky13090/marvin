@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.662.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.663.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.662.0)
+## 9. État actuel (v2.663.0)
+
+**v2.663 (récupération Docker AF_UNIX bornée)** : quand Docker Desktop échoue sur les sockets
+Windows orphelines `dockerInference` ou `docker-secrets-engine/engine.sock`, le bootstrap
+SearXNG reconnaît uniquement la signature de crash immédiate, sauvegarde les réglages Docker,
+désactive explicitement Gordon et Docker Model Runner/GPU, arrête les seuls processus Docker,
+préserve les répertoires runtime par renommage horodaté puis effectue un unique redémarrage
+borné. Aucun reset usine, volume, image ou conteneur n'est supprimé. Le chemin normal ne lance
+aucune récupération et Docker/SearXNG restent optionnels pour le socle Marvin. Rollback :
+réversion atomique du commit v2.663; pour le runtime, arrêter Docker, restaurer la sauvegarde
+`settings-store.json.pre-marvin-socket-recovery-*` choisie et, seulement si nécessaire,
+remettre les répertoires `.stale-*` à leur emplacement d'origine.
 
 **v2.662 (frontière d'intention logicielle)** : la composition logicielle est typée après
 l'union mots-clés, lexicale et sémantique. Une installation ne présente que

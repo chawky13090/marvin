@@ -14,6 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "manage-data-acl.ps1"
 
 
+def _windows_powershell_env() -> dict[str, str]:
+    # Un parent PowerShell 7 peut imposer son PSModulePath à Windows
+    # PowerShell 5.1 et masquer ses modules système. Sans override, le shell
+    # enfant reconstruit ses chemins natifs de manière portable.
+    return {key: value for key, value in os.environ.items() if key.casefold() != "psmodulepath"}
+
+
 def _run(*args: str) -> dict:
     completed = subprocess.run(
         [
@@ -26,6 +33,7 @@ def _run(*args: str) -> dict:
             *args,
         ],
         cwd=ROOT,
+        env=_windows_powershell_env(),
         capture_output=True,
         check=False,
         timeout=60,
@@ -52,6 +60,7 @@ def _run_failure(*args: str) -> str:
             *args,
         ],
         cwd=ROOT,
+        env=_windows_powershell_env(),
         capture_output=True,
         check=False,
         timeout=60,

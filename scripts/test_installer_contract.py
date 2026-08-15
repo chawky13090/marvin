@@ -104,7 +104,9 @@ def _assert_static_contract() -> None:
     assert "--untracked-files=no" in package_builder
     assert "personal_data_included = $false" in package_builder
     assert "payload.zip.sha256" not in package_builder
-    assert "Get-FileHash" in package_installer
+    assert "[System.Security.Cryptography.SHA256]::Create()" in package_installer
+    assert "$Hasher.Dispose()" in package_installer
+    assert "$Stream.Dispose()" in package_installer
     assert "Restore-PreviousInstall" in package_installer
     assert "data', 'runtime', '.env.local'" in package_installer
     assert "Remove-Item -LiteralPath $InstallRoot -Recurse -Force" in package_installer

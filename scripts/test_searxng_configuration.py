@@ -173,9 +173,26 @@ def test_launcher_forces_reload_and_checks_effective_config() -> None:
     assert "runtime\\searxng" in resolver
 
 
+def test_launcher_recovers_known_docker_socket_crash_without_data_reset() -> None:
+    launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
+
+    assert "function Test-DockerStaleSocketCrash" in launcher
+    assert "function Repair-DockerStaleSocketCrash" in launcher
+    assert "EnableInference = $false" in launcher
+    assert "EnableInferenceGPUVariant = $false" in launcher
+    assert "pre-marvin-socket-recovery-" in launcher
+    assert "docker-secrets-engine" in launcher
+    assert "Runtime Docker preserve" in launcher
+    assert "Start-Process $dockerDesktop -WindowStyle Hidden" in launcher
+    assert "Reset to factory defaults" not in launcher
+    assert "docker volume rm" not in launcher
+    assert "docker system prune" not in launcher
+
+
 if __name__ == "__main__":
     test_engine_pool_is_broad_explicit_and_private()
     test_every_search_tab_has_redundant_engine_coverage()
     test_network_budgets_are_bounded()
     test_launcher_forces_reload_and_checks_effective_config()
+    test_launcher_recovers_known_docker_socket_crash_without_data_reset()
     print("Configuration SearXNG OK")

@@ -10,6 +10,19 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $DryRunRequested = [bool]$WhatIfPreference
 $WhatIfPreference = $false
+
+function Get-Sha256Hex([string]$Path) {
+    $Stream = [System.IO.File]::OpenRead($Path)
+    $Hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $Bytes = $Hasher.ComputeHash($Stream)
+        return ([System.BitConverter]::ToString($Bytes)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $Hasher.Dispose()
+        $Stream.Dispose()
+    }
+}
+
 $PackageRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $ManifestPath = Join-Path $PackageRoot 'package-manifest.json'
 if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw 'Manifest de paquet absent.' }
@@ -17,7 +30,7 @@ $Manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | Convert
 if ([int]$Manifest.schema_version -ne 1) { throw 'Version de manifest de paquet non supportee.' }
 $PayloadPath = Join-Path $PackageRoot ([string]$Manifest.payload.file)
 if (-not (Test-Path -LiteralPath $PayloadPath -PathType Leaf)) { throw 'Payload Marvin absent.' }
-$ObservedHash = (Get-FileHash -LiteralPath $PayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$ObservedHash = Get-Sha256Hex -Path $PayloadPath
 if ($ObservedHash -ne ([string]$Manifest.payload.sha256).ToLowerInvariant()) { throw 'Integrite du payload Marvin invalide.' }
 
 if ([string]::IsNullOrWhiteSpace($InstallRoot)) {

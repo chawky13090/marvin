@@ -55,6 +55,78 @@ function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
     }
 }
 
+function Test-DockerStaleSocketCrash {
+    $LogPath = Join-Path $env:LOCALAPPDATA 'Docker\log\host\com.docker.backend.exe.log'
+    if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
+        return $false
+    }
+    try {
+        # La signature doit rester dans la queue immédiate du journal afin
+        # qu'un ancien incident ne déclenche pas une réparation lors d'un
+        # simple démarrage volontaire. Elle est indépendante de la langue OS.
+        $RecentLines = @(Get-Content -LiteralPath $LogPath -Tail 30 -ErrorAction Stop)
+        $Signature = 'backend crashed, dumping error.*initializing (Inference manager|Secrets Engine):.*(dockerInference|engine\.sock): remove .*\(listener:'
+        return [bool]($RecentLines -match $Signature)
+    } catch {
+        return $false
+    }
+}
+
+function Set-DockerOptionalAiDisabled {
+    $SettingsPath = Join-Path $env:APPDATA 'Docker\settings-store.json'
+    if (-not (Test-Path -LiteralPath $SettingsPath -PathType Leaf)) {
+        throw "Configuration Docker Desktop introuvable: $SettingsPath"
+    }
+    $BackupPath = $SettingsPath + '.pre-marvin-socket-recovery-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff')
+    Copy-Item -LiteralPath $SettingsPath -Destination $BackupPath -ErrorAction Stop
+    $Settings = Get-Content -LiteralPath $SettingsPath -Raw -ErrorAction Stop | ConvertFrom-Json
+    foreach ($Entry in @{
+        EnableDockerAI = $false
+        EnableInference = $false
+        EnableInferenceGPUVariant = $false
+    }.GetEnumerator()) {
+        $Settings | Add-Member -NotePropertyName $Entry.Key -NotePropertyValue $Entry.Value -Force
+    }
+    $TemporaryPath = $SettingsPath + '.marvin-new'
+    $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($TemporaryPath, ($Settings | ConvertTo-Json -Depth 20), $Utf8NoBom)
+    Move-Item -LiteralPath $TemporaryPath -Destination $SettingsPath -Force
+    Write-Host "Configuration Docker sauvegardee: $BackupPath" -ForegroundColor Yellow
+}
+
+function Repair-DockerStaleSocketCrash {
+    if (-not (Test-DockerStaleSocketCrash)) {
+        return $false
+    }
+    Write-Step 'Crash Docker AF_UNIX detecte -- recuperation reversible des runtimes optionnels...'
+    Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ProcessName -in @('Docker Desktop', 'com.docker.backend', 'docker', 'dockerd')
+    } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+    $Remaining = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ProcessName -in @('Docker Desktop', 'com.docker.backend', 'docker', 'dockerd')
+    })
+    if ($Remaining.Count -gt 0) {
+        throw 'La recuperation Docker est refusee: des processus Docker restent actifs.'
+    }
+    Set-DockerOptionalAiDisabled
+    $LocalRoot = [System.IO.Path]::GetFullPath($env:LOCALAPPDATA)
+    foreach ($RelativePath in @('Docker\run', 'docker-secrets-engine')) {
+        $Target = [System.IO.Path]::GetFullPath((Join-Path $LocalRoot $RelativePath))
+        if (-not $Target.StartsWith($LocalRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Chemin runtime Docker hors profil refuse: $Target"
+        }
+        if (Test-Path -LiteralPath $Target) {
+            $Parent = Split-Path -Parent $Target
+            $Leaf = Split-Path -Leaf $Target
+            $Preserved = Join-Path $Parent ($Leaf + '.stale-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
+            Move-Item -LiteralPath $Target -Destination $Preserved -ErrorAction Stop
+            Write-Host "Runtime Docker preserve: $Preserved" -ForegroundColor Yellow
+        }
+    }
+    return $true
+}
+
 # Le canari concurrent doit mesurer sa propre exclusion sans entrer en
 # concurrence avec un bootstrap SearXNG reel deja actif pendant le gate live.
 $StartupMutexName = if ($LockSelfTest) {
@@ -98,14 +170,21 @@ if (-not $dockerReady) {
     Write-Step "Demon Docker arrete -- demarrage de Docker Desktop..."
     $dockerDesktop = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
     if (Test-Path $dockerDesktop) {
-        Start-Process $dockerDesktop
+        Start-Process $dockerDesktop -WindowStyle Hidden
     } else {
         Write-Host "Docker Desktop introuvable a l'emplacement attendu. Demarre-le manuellement puis relance ce script." -ForegroundColor Red
         exit 1
     }
     $DockerDeadline = [DateTimeOffset]::UtcNow.AddSeconds($DockerStartupTimeoutSeconds)
+    $SocketRecoveryAttempted = $false
     while (-not $dockerReady -and [DateTimeOffset]::UtcNow -lt $DockerDeadline) {
         Start-Sleep -Seconds 3
+        if (-not $SocketRecoveryAttempted -and (Test-DockerStaleSocketCrash)) {
+            $SocketRecoveryAttempted = $true
+            if (Repair-DockerStaleSocketCrash) {
+                Start-Process $dockerDesktop -WindowStyle Hidden
+            }
+        }
         $RemainingSeconds = [math]::Max(1, [math]::Ceiling(($DockerDeadline - [DateTimeOffset]::UtcNow).TotalSeconds))
         $ProbeSeconds = [math]::Min($DockerProbeTimeoutSeconds, $RemainingSeconds)
         $dockerReady = Test-DockerDaemon -DockerPath $DockerPath -TimeoutSeconds $ProbeSeconds

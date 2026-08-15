@@ -19465,3 +19465,38 @@ produit un message explicite et une seule requête, sans retry. Les smokes live 
 avec 28/28 contrats API, 41/41 pages, chat 5/5 et voix strictement sérialisée. Le premier
 redémarrage a atteint les deux endpoints de readiness en HTTP 200 mais reste insuffisant
 pour fermer TD-015, qui exige encore trois redémarrages froids reproductibles.
+## 2026-08-15 — v2.663.0 — récupération durable du crash Docker AF_UNIX
+
+Docker Desktop 4.86.0 a reproduit le crash Windows déjà vu en 4.85.0 : son backend tentait
+d'abord de retirer `Docker/run/dockerInference`, puis `docker-secrets-engine/engine.sock`, et
+échouait avant le moteur WSL avec l'erreur de syntaxe de chemin du listener AF_UNIX. La simple
+désactivation de Gordon (`EnableDockerAI=false`) ne désactivait pas Docker Model Runner, activé
+séparément par défaut. La configuration utilisateur a été sauvegardée; `EnableInference`,
+`EnableInferenceGPUVariant` et `EnableDockerAI` ont été mis à `false`. Le champ
+`InferenceCanUseGPUVariant`, réécrit par Docker, reste une capacité matérielle
+et n'est pas traité comme un interrupteur. Les deux runtimes défectueux ont été préservés par renommage. Aucun reset usine,
+volume, image ou conteneur n'a été supprimé.
+
+Le bootstrap SearXNG détecte désormais la signature exacte dans la queue immédiate du journal,
+indépendamment de la langue Windows. Il n'effectue qu'une récupération par lancement : arrêt
+des seuls processus Docker, sauvegarde atomique des réglages, désactivation des composants IA
+Docker inutiles à Marvin, renommage réversible des runtimes et redémarrage caché sous la borne
+existante. La détection courte empêche qu'un incident historique déclenche une réparation lors
+d'un démarrage normal. Résultats observés : syntaxe PowerShell valide, test SearXNG vert,
+Docker Engine 29.7.2 prêt, conteneur `marvin-searxng` actif sur `127.0.0.1:8390`, 80 moteurs
+chargés et second bootstrap normal sans création de sauvegarde de récupération. Journalisation :
+seuls chemins techniques et diagnostics Docker sont exposés, sans secret ni contenu utilisateur.
+Sécurité : SearXNG reste loopback; Docker Model Runner/GPU est désactivé; aucune donnée Docker
+n'est détruite. Rollback produit : réversion atomique de v2.663. Rollback runtime : arrêter
+Docker, restaurer la sauvegarde `settings-store.json.pre-marvin-socket-recovery-*` voulue puis
+restaurer les répertoires `.stale-*` uniquement si le retour aux anciens sockets est requis.
+Le gate d'installation a aussi révélé que l'auto-chargement de `Get-FileHash` n'était pas garanti
+dans son sous-processus PowerShell isolé. Le contrôle SHA-256 du payload utilise désormais
+directement `System.Security.Cryptography.SHA256` avec fermeture explicite du flux et du hasher,
+ce qui conserve la vérification d'intégrité sans dépendre de l'état des modules PowerShell.
+Le gate complet a ensuite montré que PowerShell 7 pouvait transmettre son `PSModulePath` à
+Windows PowerShell 5.1 et masquer les modules système ou PSScriptAnalyzer. Les harnais ACL et
+Test Forge retirent désormais uniquement cette variable pour laisser le shell Windows enfant
+reconstruire ses chemins natifs; leurs deux tests passent. La documentation portable est alignée
+sur 2.663.0. L'ancien arbre `next dev` resté seul sur le port 3000 a été arrêté et le build de
+production Next.js 16.2.12 a compilé les 41 pages avec succès; Marvin reste volontairement arrêté.
