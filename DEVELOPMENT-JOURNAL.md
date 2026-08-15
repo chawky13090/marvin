@@ -56,6 +56,15 @@ d'inférence : le helper gelé démarre encore son chronomètre avant l'admissio
 inclut donc la file. Corriger cette instrumentation exigera un nouveau runner, sans modifier
 le résultat brut.
 
+Validation finale observée : gate exhaustif en 714,8 secondes, 341 étapes exécutées et
+4 smokes live ignorés sur 345 attendues, zéro échec, build Next.js réussi. Après redémarrage
+caché, `/api/health` expose `2.661.0` et les readiness Code Workspace, VM Lab et frontend
+répondent 200. Les smokes obtiennent 28/28 contrats API, 41/41 pages, cinq conversations chat
+et la voix strictement sérialisée. Le test morphologique reste vert. Trois exécutions réelles
+et non mutantes via le gateway terminent correctement : `calculator` retourne 323 pour
+`17*19`, `winget_list_installed` réussit et `winget_list_upgrades` réussit avec huit mises à
+jour détectées. Aucun outil d'installation, de mise à jour ou de désinstallation n'a été lancé.
+
 ## 2026-08-15 — v2.660.0 — parcours réels agrégés et validation future gelée
 
 L'analyse locale joint désormais une demande humaine persistée à ses exécutions uniquement
