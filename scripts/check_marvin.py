@@ -239,6 +239,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_tool_selection_morphology_preregistration.py"),
         ),
         Stage(
+            "Pre-enregistrement frontiere logicielle v1.5",
+            (python, "scripts/test_tool_selection_v15_preregistration.py"),
+        ),
+        Stage(
             "Gel du générateur holdout routage v1.4",
             (python, "scripts/test_tool_selection_v14_holdout_generation_freeze.py"),
         ),

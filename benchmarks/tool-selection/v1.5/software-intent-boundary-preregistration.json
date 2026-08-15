@@ -1,0 +1,87 @@
+{
+  "schema": "marvin.software-intent-boundary-policy/1.0",
+  "status": "frozen_before_product_change",
+  "scope": "deterministic_candidate_composition_for_windows_software_intents",
+  "source_basis": [
+    "public tool contracts in TOOLS_SPEC",
+    "capability discovery use_when and do_not_use_when descriptions",
+    "general software action semantics"
+  ],
+  "contamination_controls": {
+    "v1_4_holdout_prompts_forbidden_in_product_rules": true,
+    "v1_4_results_forbidden_for_threshold_tuning": true,
+    "new_independent_holdout_required_for_product_claim": true,
+    "development_canaries_are_not_a_release_holdout": true
+  },
+  "invariants": {
+    "public_tool_count": 364,
+    "candidate_budget_unchanged": true,
+    "security_guards_unchanged": true,
+    "confirmation_and_authorization_unchanged": true,
+    "semantic_and_lexical_layers_may_not_reintroduce_forbidden_cross_action_tools": true,
+    "ambiguous_intent_exposes_no_software_mutation": true,
+    "manual_windows_fallback_requires_explicit_panel_or_fallback_intent": true
+  },
+  "contracts": {
+    "software.search": {
+      "terminal": ["winget_search"],
+      "permitted_read_only": ["winget_search"],
+      "forbidden_mutations": ["winget_install", "winget_upgrade", "winget_uninstall"]
+    },
+    "software.install": {
+      "terminal": ["winget_install"],
+      "permitted_read_only": [],
+      "forbidden": ["winget_search", "winget_upgrade", "winget_uninstall", "winget_list_upgrades", "winget_list_installed", "win_quick_launch"]
+    },
+    "software.inventory": {
+      "terminal": ["winget_list_installed", "pc_installed_software"],
+      "permitted_read_only": ["winget_list_installed", "pc_installed_software"],
+      "forbidden_mutations": ["winget_install", "winget_upgrade", "winget_uninstall"]
+    },
+    "software.updates_check": {
+      "terminal": ["winget_list_upgrades"],
+      "permitted_read_only": ["winget_list_upgrades"],
+      "forbidden_mutations": ["winget_install", "winget_upgrade", "winget_uninstall"]
+    },
+    "software.upgrade": {
+      "terminal": ["winget_upgrade"],
+      "permitted_read_only": [],
+      "forbidden": ["winget_search", "winget_install", "winget_uninstall", "winget_list_upgrades", "winget_list_installed", "win_quick_launch"]
+    },
+    "software.uninstall": {
+      "terminal": ["winget_uninstall"],
+      "permitted_read_only": [],
+      "forbidden": ["winget_search", "winget_install", "winget_upgrade", "winget_list_upgrades", "winget_list_installed", "win_quick_launch"]
+    },
+    "software.manual_panel": {
+      "terminal": ["win_quick_launch"],
+      "permitted_read_only": ["win_quick_launch", "win_quick_launch_list"],
+      "forbidden_mutations": ["winget_install", "winget_upgrade", "winget_uninstall"]
+    },
+    "software.ambiguous": {
+      "terminal": [],
+      "permitted_read_only": ["winget_search", "winget_list_installed", "winget_list_upgrades", "pc_installed_software"],
+      "forbidden_mutations": ["winget_install", "winget_upgrade", "winget_uninstall"]
+    }
+  },
+  "precedence": ["manual_panel", "uninstall", "updates_check", "upgrade", "inventory", "search", "install", "ambiguous"],
+  "development_canaries": {
+    "software.search": ["cherche VLC dans le catalogue Winget", "trouve un paquet pour lire les PDF"],
+    "software.install": ["installe VLC", "instaler le logiciel 7-Zip"],
+    "software.inventory": ["liste les logiciels installes", "est-ce que VLC est deja installe"],
+    "software.updates_check": ["liste les mises a jour disponibles", "quels logiciels sont obsoletes"],
+    "software.upgrade": ["mets VLC a jour", "applique les mises a jour Winget"],
+    "software.uninstall": ["desinstalle VLC", "retire 7-Zip de ce PC"],
+    "software.manual_panel": ["ouvre Programmes et fonctionnalites", "ouvre le panneau de desinstallation Windows"],
+    "software.ambiguous": ["aide-moi avec Winget", "je veux gerer mes logiciels"]
+  },
+  "acceptance": {
+    "all_development_canaries_classified_once": true,
+    "all_terminal_tools_present_at_budget_18": true,
+    "all_cross_action_forbidden_tools_absent_after_keyword_lexical_semantic_union": true,
+    "read_only_intents_expose_no_software_mutation": true,
+    "ambiguous_intents_expose_no_software_mutation": true,
+    "registry_and_budgets_unchanged": true
+  },
+  "rollback": "Revert the later product commit and restart the backend; this immutable preregistration remains as evidence. No persistent data migration is involved."
+}
