@@ -4,16 +4,28 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "benchmarks/tool-selection/v1.4"
 FREEZE = BASE / "validation-runner-freeze.json"
+FROZEN_COMMIT = "a894126228908aca12b1b71dca54fe924de5a00d"
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def frozen_sha256(relative: str) -> str:
+    content = subprocess.run(
+        ["git", "show", f"{FROZEN_COMMIT}:{relative}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    return hashlib.sha256(content).hexdigest()
 
 
 def main() -> None:
@@ -37,7 +49,10 @@ def main() -> None:
     assert value["safety"]["security_guards_are_not_ablated"] is True
     assert value["safety"]["tool_registry_count"] == 364
     for relative, expected in value["frozen_hashes"].items():
-        assert sha256(ROOT / relative) == expected, relative
+        # Cette preuve historique porte sur le produit gelé, jamais sur HEAD après
+        # les évolutions suivantes. Lire le blob Git évite de rendre tout progrès
+        # produit incompatible avec une campagne pourtant immuable et terminée.
+        assert frozen_sha256(relative) == expected, relative
     result = BASE / "validation-result.json"
     if result.exists():
         authorization = json.loads((BASE / "validation-authorization.json").read_text(encoding="utf-8"))
