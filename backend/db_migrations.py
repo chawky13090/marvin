@@ -284,6 +284,38 @@ MIGRATIONS: tuple[Migration, ...] = (
             "DROP TABLE oauth_token_migration_metadata",
         ),
     ),
+    Migration(
+        version=7,
+        name="chat-turn-steering-directives",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS chat_turn_slots (
+                conversation_key TEXT PRIMARY KEY,
+                root_request_id TEXT NOT NULL UNIQUE,
+                conversation_id TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            """CREATE TABLE IF NOT EXISTS chat_turn_directives (
+                id TEXT PRIMARY KEY,
+                client_directive_id TEXT NOT NULL,
+                root_request_id TEXT NOT NULL,
+                sequence INTEGER NOT NULL,
+                kind TEXT NOT NULL CHECK(kind IN ('append','redirect','next','stop')),
+                directive_text TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'received'
+                    CHECK(status IN ('received','deferred','applied','rejected','cancelled')),
+                waiting_for_json TEXT,
+                reason_code TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                applied_at TEXT,
+                UNIQUE(root_request_id, client_directive_id),
+                UNIQUE(root_request_id, sequence)
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_chat_turn_directives_status
+               ON chat_turn_directives(root_request_id, status, sequence)""",
+        ),
+    ),
 )
 
 

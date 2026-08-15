@@ -104,7 +104,7 @@ def _check_catalog_order() -> None:
 
 def _check_fresh_marvin_schema() -> None:
     connection = _connection()
-    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5, 6]
+    assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5, 6, 7]
     tables = {
         row[0]
         for row in connection.execute(
@@ -127,6 +127,8 @@ def _check_fresh_marvin_schema() -> None:
         "chat_turns",
         "chat_turn_events",
         "chat_turn_event_orphan_archive",
+        "chat_turn_slots",
+        "chat_turn_directives",
         "schema_migrations",
     }
     assert expected <= tables, expected - tables
@@ -166,7 +168,7 @@ def _check_orphan_archive_and_data_rollback() -> None:
     )
     connection.commit()
     connection.execute("PRAGMA foreign_keys=ON")
-    assert apply_migrations(connection, MIGRATIONS) == [5, 6]
+    assert apply_migrations(connection, MIGRATIONS) == [5, 6, 7]
     connection.commit()
     assert integrity_summary(connection) == {
         "orphan_events": 0,

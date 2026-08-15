@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 360
+EXPECTED_STAGE_COUNT = 361
 
 
 @dataclass(frozen=True)
@@ -645,6 +645,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Autorisation integration runtime du pilotage chat",
             (python, "scripts/test_chat_turn_steering_runtime_authorization.py"),
+        ),
+        Stage(
+            "Migration reversible du pilotage chat",
+            (python, "scripts/test_chat_turn_steering_schema_rollback.py"),
         ),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
         Stage("Reprise des lectures backend frontend", ("node", "scripts/test_backend_read.mjs")),

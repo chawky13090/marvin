@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.676.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.677.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.676.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.677.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.676.0)
+## 9. État actuel (v2.677.0)
+
+**v2.677 (migration réversible du pilotage chat)** : la migration SQLite 7 ajoute uniquement
+les slots exclusifs et les directives durables. Une descente hors ligne refuse Marvin actif,
+copie la base, vérifie son SHA-256, retire index et tables, restaure la version 6 puis contrôle
+l'intégrité; une compensation remet la sauvegarde si la vérification postérieure échoue. Le
+test travaille sur une base temporaire et ne touche aucune donnée Marvin. Le drapeau reste
+désactivé et aucune route ni UI n'est active. Le gate compte 361 étapes. Rollback : arrêter
+Marvin puis exécuter `scripts/rollback_chat_turn_steering_schema.py --confirmed`.
 
 **v2.676 (intégration runtime du pilotage autorisée sous drapeau)** : l'autorisation lie le
 pré-enregistrement, le repository hors ligne et leurs empreintes avant tout changement actif.

@@ -5,6 +5,17 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-16 — v2.677.0 — migration de pilotage réversible vérifiée hors ligne
+
+La migration SQLite 7 crée les tables `chat_turn_slots` et `chat_turn_directives` avec
+contraintes de type, d'état, d'identité et d'ordre. Le rollback hors ligne exige une confirmation,
+refuse la base réelle si le backend écoute, crée une copie dont le SHA-256 est vérifié, retire
+le schéma, remet `user_version` à 6 et contrôle l'intégrité. Une base temporaire a validé la
+montée, la descente, la sauvegarde et le refus sans confirmation. Un verrou Windows détecté dans
+le test a été corrigé par fermeture explicite des connexions. La base réelle n'a pas été ouverte
+par ce test; le drapeau reste désactivé, sans route, UI, outil ou appel modèle. Rollback : script
+hors ligne ci-dessus ou réversion atomique avant application de la migration réelle.
+
 ## 2026-08-16 — v2.676.0 — intégration runtime du pilotage autorisée sous drapeau
 
 Le repository transactionnel hors ligne est lié au commit `b6926a1` et à ses empreintes. Une
