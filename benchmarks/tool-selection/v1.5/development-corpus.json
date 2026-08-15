@@ -1,0 +1,54 @@
+{
+  "schema": "marvin.software-intent-development-corpus/1.0",
+  "status": "development_only_never_release_holdout",
+  "source": "public tool contracts and general software action semantics",
+  "items": [
+    {"id":"dev-search-01","intent":"software.search","prompt":"Recherche VLC dans le catalogue Winget","accepted":["winget_search"]},
+    {"id":"dev-search-02","intent":"software.search","prompt":"Trouve un paquet Windows pour ouvrir les fichiers 7z","accepted":["winget_search"]},
+    {"id":"dev-search-03","intent":"software.search","prompt":"Cherche Firefox parmi les applications disponibles avec Winget","accepted":["winget_search"]},
+    {"id":"dev-search-04","intent":"software.search","prompt":"Quel paquet Winget correspond à PowerToys ?","accepted":["winget_search"]},
+    {"id":"dev-search-05","intent":"software.search","prompt":"Recherche un logiciel de dessin dans le catalogue","accepted":["winget_search"]},
+
+    {"id":"dev-install-01","intent":"software.install","prompt":"Installe VLC sur ce PC","accepted":["winget_install"]},
+    {"id":"dev-install-02","intent":"software.install","prompt":"Instaler 7-Zip avec Winget","accepted":["winget_install"]},
+    {"id":"dev-install-03","intent":"software.install","prompt":"Je veux installer Mozilla Firefox","accepted":["winget_install"]},
+    {"id":"dev-install-04","intent":"software.install","prompt":"Télécharge et installe PowerToys","accepted":["winget_install"]},
+    {"id":"dev-install-05","intent":"software.install","prompt":"Ajoute le logiciel Notepad++ sur mon poste","accepted":["winget_install"]},
+
+    {"id":"dev-inventory-01","intent":"software.inventory","prompt":"Liste les logiciels installés","accepted":["winget_list_installed","pc_installed_software"]},
+    {"id":"dev-inventory-02","intent":"software.inventory","prompt":"Est-ce que VLC est déjà installé ?","accepted":["winget_list_installed","pc_installed_software"]},
+    {"id":"dev-inventory-03","intent":"software.inventory","prompt":"Affiche l'inventaire logiciel de ce PC","accepted":["winget_list_installed","pc_installed_software"]},
+    {"id":"dev-inventory-04","intent":"software.inventory","prompt":"Quels programmes sont présents sur cette machine ?","accepted":["winget_list_installed","pc_installed_software"]},
+    {"id":"dev-inventory-05","intent":"software.inventory","prompt":"Montre les applications installées","accepted":["winget_list_installed","pc_installed_software"]},
+
+    {"id":"dev-check-01","intent":"software.updates_check","prompt":"Liste les mises à jour disponibles","accepted":["winget_list_upgrades"]},
+    {"id":"dev-check-02","intent":"software.updates_check","prompt":"Quelles applications ont une mise à jour ?","accepted":["winget_list_upgrades"]},
+    {"id":"dev-check-03","intent":"software.updates_check","prompt":"Vérifie les versions obsolètes sans rien modifier","accepted":["winget_list_upgrades"]},
+    {"id":"dev-check-04","intent":"software.updates_check","prompt":"Affiche les upgrades Winget disponibles","accepted":["winget_list_upgrades"]},
+    {"id":"dev-check-05","intent":"software.updates_check","prompt":"Quels logiciels sont obsolètes ?","accepted":["winget_list_upgrades"]},
+
+    {"id":"dev-upgrade-01","intent":"software.upgrade","prompt":"Mets VLC à jour","accepted":["winget_upgrade"]},
+    {"id":"dev-upgrade-02","intent":"software.upgrade","prompt":"Applique les mises à jour Winget","accepted":["winget_upgrade"]},
+    {"id":"dev-upgrade-03","intent":"software.upgrade","prompt":"Met Firefox à jour vers sa dernière version","accepted":["winget_upgrade"]},
+    {"id":"dev-upgrade-04","intent":"software.upgrade","prompt":"Actualise le logiciel PowerToys","accepted":["winget_upgrade"]},
+    {"id":"dev-upgrade-05","intent":"software.upgrade","prompt":"Je veux mettre 7-Zip à jour","accepted":["winget_upgrade"]},
+
+    {"id":"dev-uninstall-01","intent":"software.uninstall","prompt":"Désinstalle VLC","accepted":["winget_uninstall"]},
+    {"id":"dev-uninstall-02","intent":"software.uninstall","prompt":"Retire le logiciel 7-Zip","accepted":["winget_uninstall"]},
+    {"id":"dev-uninstall-03","intent":"software.uninstall","prompt":"Supprime le logiciel Firefox de ce PC","accepted":["winget_uninstall"]},
+    {"id":"dev-uninstall-04","intent":"software.uninstall","prompt":"Uninstall PowerToys","accepted":["winget_uninstall"]},
+    {"id":"dev-uninstall-05","intent":"software.uninstall","prompt":"Retire Notepad++ de ce PC","accepted":["winget_uninstall"]},
+
+    {"id":"dev-panel-01","intent":"software.manual_panel","prompt":"Ouvre Programmes et fonctionnalités","accepted":["win_quick_launch"]},
+    {"id":"dev-panel-02","intent":"software.manual_panel","prompt":"Ouvre le panneau de désinstallation Windows","accepted":["win_quick_launch"]},
+    {"id":"dev-panel-03","intent":"software.manual_panel","prompt":"Affiche Applications et fonctionnalités","accepted":["win_quick_launch"]},
+    {"id":"dev-panel-04","intent":"software.manual_panel","prompt":"Ouvre appwiz","accepted":["win_quick_launch"]},
+    {"id":"dev-panel-05","intent":"software.manual_panel","prompt":"Lance le panneau Programmes et fonctionnalités","accepted":["win_quick_launch"]},
+
+    {"id":"dev-ambiguous-01","intent":"software.ambiguous","prompt":"Aide-moi avec Winget","accepted":["winget_search","winget_list_installed","winget_list_upgrades","pc_installed_software"]},
+    {"id":"dev-ambiguous-02","intent":"software.ambiguous","prompt":"Je veux gérer mes logiciels","accepted":["winget_search","winget_list_installed","winget_list_upgrades","pc_installed_software"]},
+    {"id":"dev-ambiguous-03","intent":"software.ambiguous","prompt":"Que peux-tu faire avec Winget ?","accepted":["winget_search","winget_list_installed","winget_list_upgrades","pc_installed_software"]},
+    {"id":"dev-ambiguous-04","intent":"software.ambiguous","prompt":"Gestion des logiciels Windows","accepted":["winget_search","winget_list_installed","winget_list_upgrades","pc_installed_software"]},
+    {"id":"dev-ambiguous-05","intent":"software.ambiguous","prompt":"Parle-moi des fonctions Winget","accepted":["winget_search","winget_list_installed","winget_list_upgrades","pc_installed_software"]}
+  ]
+}

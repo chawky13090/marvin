@@ -1,0 +1,446 @@
+{
+  "schema": "marvin.software-intent-development-stage-a-result/1.0",
+  "status": "development_evidence_not_release_validation",
+  "product_version": "2.662.0",
+  "product_source_sha256": "14c29721f22b183c7168c2d63a34f2f965df6c2fc9c3af3591bc74424ee026bd",
+  "preregistration_sha256": "4ee9dd8965fb3953ad1dfad0263366aaa5d1f35c63e1ac137966a13846e303c3",
+  "corpus_sha256": "2be2d5272f2644712beae6e0ef8e9bb78ac03572e7e820e5a401cd57578fbb10",
+  "corpus_count": 40,
+  "modes": {
+    "eco": 18,
+    "balanced": 40,
+    "performance": 80,
+    "max": 250
+  },
+  "configurations": [
+    "K",
+    "L",
+    "S",
+    "K+L",
+    "K+S",
+    "L+S",
+    "K+L+S"
+  ],
+  "summaries": {
+    "eco": {
+      "K": {
+        "candidate_recall": 0.95,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 0.8,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "K+L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      }
+    },
+    "balanced": {
+      "K": {
+        "candidate_recall": 0.95,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 0.8,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "K+L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      }
+    },
+    "performance": {
+      "K": {
+        "candidate_recall": 0.95,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 0.8,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "K+L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      }
+    },
+    "max": {
+      "K": {
+        "candidate_recall": 0.95,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 0.8,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "K+L": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+S": {
+        "candidate_recall": 0.975,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 0.8
+        }
+      },
+      "L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      },
+      "K+L+S": {
+        "candidate_recall": 1.0,
+        "forbidden_mutation_count": 0,
+        "per_intent_recall": {
+          "software.ambiguous": 1.0,
+          "software.install": 1.0,
+          "software.inventory": 1.0,
+          "software.manual_panel": 1.0,
+          "software.search": 1.0,
+          "software.uninstall": 1.0,
+          "software.updates_check": 1.0,
+          "software.upgrade": 1.0
+        }
+      }
+    }
+  },
+  "signal_metadata": {
+    "embedding": {
+      "batch_size": 16,
+      "record_count": 40,
+      "control_query_count": 5,
+      "single_batch_exact_equality": true,
+      "duration_ms": 3912.594
+    },
+    "qdrant_and_lexical_duration_ms": 3513.236,
+    "route_control_query_count": 5,
+    "route_control_exact_equality": true
+  },
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0,
+  "benchmark_model_call_count": 0,
+  "limitations": [
+    "development corpus authored from public contracts after the defect class was known",
+    "not usable for release or generalization claims",
+    "Stage A measures candidate composition, not final model choice"
+  ]
+}
