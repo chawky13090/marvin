@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.664.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.665.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.664.0)
+## 9. État actuel (v2.665.0)
+
+**v2.665 (observabilité holdout v1.5 pré-enregistrée)** : après deux générations indépendantes
+avortées sans holdout public, un contrat immuable définit les seuls compteurs agrégés autorisés
+par intention après auteur, chaque oracle, consensus, chaque revue, les deux revues, nouveauté
+et survivants finaux. Prompts, identifiants, appels acceptés, verdicts individuels, réponses Cloud
+brutes et données personnelles sont interdits dans le diagnostic. Aucun seuil, rôle, modèle,
+oracle, règle produit, budget ou outil ne change. Ce contrat n'autorise aucun appel Cloud : un
+runner testé puis un gel r3 distinct avec SHA-256 restent obligatoires. Le gate compte désormais
+350 étapes. Rollback : réversion atomique du commit v2.665; préserver le pré-enregistrement et
+les deux preuves historiques d'abandon.
 
 **v2.664 (changement de modèle vérifié après réponse ambiguë)** : un statut 502/503/504 ou une
 rupture réseau après `POST /api/settings` ne déclenche toujours aucun rejeu de mutation. Pour

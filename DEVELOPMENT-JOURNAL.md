@@ -19514,3 +19514,20 @@ appels maximum dont un seul POST. Journalisation et données personnelles : aucu
 la console ne reçoit plus une fausse erreur lorsque l'état est prouvé. Sécurité : aucune baisse
 des protections CSRF ou d'autorisation, aucun retry de mutation. Rollback : réversion atomique
 de v2.664; le réglage `active_model` existant reste inchangé.
+## 2026-08-15 — v2.665.0 — observabilité du holdout logiciel pré-enregistrée
+
+La première génération v1.5 a produit quatre survivants `software.search` sur cinq requis. La
+seconde, avec vingt auteurs par intention et tous les filtres inchangés, a produit zéro survivant
+`software.install`, mais son artefact public ne pouvait pas attribuer la perte au consensus des
+oracles, aux revues ou à la nouveauté. Avant toute troisième tentative, un contrat figé autorise
+uniquement neuf compteurs agrégés par intention et impose l'étage d'échec, les étapes achevées,
+une écriture atomique du diagnostic avant l'erreur et le même diagnostic en cas de succès.
+
+Aucun prompt, identifiant de candidat, appel accepté, verdict individuel ou contenu Cloud ne
+peut être publié. Aucun seuil, intention, cible de cinq, contrat d'oracle/revue, règle de nouveauté,
+modèle ou source produit ne peut changer dans cette tranche. Le pré-enregistrement ne donne pas
+l'autorisation de lancer r3; celle-ci exigera un runner implémenté et testé puis une empreinte
+gelée séparément. Sécurité et confidentialité : zéro exécution métier, zéro effet hôte, zéro
+donnée personnelle. Journalisation : agrégats sans contenu uniquement. Validation : contrat et
+empreintes historiques vérifiés; le plan de gate passe de 349 à 350 étapes. Rollback : réversion
+atomique de v2.665, sans modifier les artefacts historiques ni les données Marvin.

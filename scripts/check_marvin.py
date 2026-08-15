@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 349
+EXPECTED_STAGE_COUNT = 350
 
 
 @dataclass(frozen=True)
@@ -262,6 +262,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Gel generation holdout v1.5",
             (python, "scripts/test_tool_selection_v15_holdout_generation_freeze.py"),
+        ),
+        Stage(
+            "Pre-enregistrement observabilite holdout v1.5 r3",
+            (python, "scripts/test_tool_selection_v15_observability_preregistration.py"),
         ),
         Stage(
             "Gel du générateur holdout routage v1.4",

@@ -1,0 +1,70 @@
+{
+  "schema": "marvin.tool-selection-v15-holdout-observability-preregistration/1.0",
+  "status": "frozen_before_observability_implementation",
+  "created_at": "2026-08-15T12:35:00Z",
+  "reason": "The second authorized generation produced zero software.install survivors, but the public abort evidence could not attribute the loss to oracle consensus, reviews, or novelty.",
+  "historical_inputs": {
+    "base_generator": {
+      "path": "scripts/generate_tool_selection_v15_holdout.py",
+      "sha256": "b80a2f22a3a5c1bc6161c812baef5626a0d696dbd684a0a8bfb1f31c72c8d704"
+    },
+    "r2_wrapper": {
+      "path": "scripts/generate_tool_selection_v15_holdout_r2.py",
+      "sha256": "4a03e3b160e1aeec44a01368861b85ca3836e43c667860e04c3d58ed88e0470d"
+    },
+    "r2_freeze": {
+      "path": "benchmarks/tool-selection/v1.5/holdout-generation-freeze-r2.json",
+      "sha256": "37a5aeef6687ab29350a9cded9e3f6dfea491e3238d4ed67dbfa16dbe7da989e"
+    },
+    "r2_abort": {
+      "path": "benchmarks/tool-selection/v1.5/holdout-generation-abort-r2.json",
+      "sha256": "5dbd24eeb244a2fc297fbdd718e326d6adc72a27e61401c3b1fc38db043943ca"
+    }
+  },
+  "authorized_change": {
+    "new_runner_only": true,
+    "aggregate_counts_per_intent": [
+      "authored_valid",
+      "oracle_a_nonempty",
+      "oracle_b_nonempty",
+      "consensus_nonempty",
+      "adjudicator_valid",
+      "critic_valid",
+      "both_reviews_valid",
+      "novelty_valid",
+      "survivors_final"
+    ],
+    "ordered_completed_stages_required": true,
+    "failure_stage_and_intent_required": true,
+    "diagnostic_written_before_insufficient_survivor_error": true,
+    "diagnostic_written_on_success_too": true,
+    "atomic_write_required": true
+  },
+  "forbidden_change": {
+    "product_source_change": true,
+    "candidate_budget_change": true,
+    "threshold_change": true,
+    "intent_change": true,
+    "target_per_intent_change": true,
+    "role_or_model_change_before_r3_freeze": true,
+    "oracle_contract_change": true,
+    "review_contract_change": true,
+    "novelty_contract_change": true,
+    "prompt_or_item_specific_rule": true,
+    "business_tool_execution": true
+  },
+  "privacy": {
+    "prompts_forbidden_in_diagnostic": true,
+    "candidate_ids_forbidden_in_diagnostic": true,
+    "accepted_calls_forbidden_in_diagnostic": true,
+    "per_item_verdicts_forbidden_in_diagnostic": true,
+    "raw_cloud_responses_forbidden": true,
+    "personal_data_forbidden": true
+  },
+  "third_attempt": {
+    "authorized_by_this_artifact": false,
+    "separate_freeze_with_runner_sha256_required": true,
+    "no_cloud_call_before_separate_freeze": true
+  },
+  "rollback": "Remove only the unexecuted observability implementation and its test. Preserve this preregistration and both historical abort artifacts."
+}
