@@ -234,7 +234,7 @@ Une attente d'approbation conserve le verrou de conversation sans bloquer la con
 toute modification d'une charge en attente invalide son approbation. L'arrêt est coopératif :
 il n'affirme jamais avoir annulé une action déjà partie et indique qu'il attend sa fin. Le
 coupe-circuit `chat_turn_steering_enabled=false` fournit le rollback immédiat. Le gate compte
-363 étapes. Rollback : désactiver ce réglage, redémarrer Marvin, puis réverter v2.679; aucune
+364 étapes. Rollback : désactiver ce réglage, redémarrer Marvin, puis réverter v2.679; aucune
 directive terminale ni aucun reçu d'action n'est rejoué.
 
 **v2.678 (intégration verticale du pilotage sous drapeau)** : le producteur durable réserve un

@@ -64,6 +64,12 @@ def main() -> None:
             assert deferred["waitingFor"] == {"kind": "root_turn_terminal"}
             ready = steering.terminal("root-a")
             assert len(ready) == 1 and ready[0]["status"] == "applied"
+            late, _ = steering.create(
+                "root-a", "cb9147ba-bbbc-4ac0-9504-080a098404ce", "append", "Précision tardive."
+            )
+            assert late["status"] == "received"
+            late_ready = steering.terminal("root-a")
+            assert late_ready[0]["reasonCode"] == "root_turn_terminal_followup"
             stop, _ = steering.create(
                 "root-a", "0749d04e-c82f-44a1-bd05-dad69ee1ad3f", "stop", ""
             )

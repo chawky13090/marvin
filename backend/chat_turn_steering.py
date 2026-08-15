@@ -122,16 +122,21 @@ def checkpoint(root_request_id: str, *, phase: str) -> tuple[list[dict[str, Any]
 
 
 def terminal(root_request_id: str) -> list[dict[str, Any]]:
-    """Rend exécutables, dans l'ordre, les tâches ``next`` après le tour racine."""
+    """Rend exécutables les directives que le dernier checkpoint n'a pas consommées."""
     ready: list[dict[str, Any]] = []
     for row in repository.list_for_turn(root_request_id):
-        if row["kind"] != "next" or row["status"] not in {"received", "deferred"}:
+        if row["kind"] not in {"append", "redirect", "next"} or row["status"] not in {"received", "deferred"}:
             continue
+        reason = (
+            "root_turn_terminal"
+            if row["kind"] == "next"
+            else "root_turn_terminal_followup"
+        )
         updated = repository.transition(
             row["id"],
             expected_status=str(row["status"]),
             target_status="applied",
-            reason_code="root_turn_terminal",
+            reason_code=reason,
         )
         ready.append(public(updated))
     return ready

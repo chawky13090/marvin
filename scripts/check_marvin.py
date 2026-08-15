@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 362
+EXPECTED_STAGE_COUNT = 364
 
 
 @dataclass(frozen=True)
@@ -809,6 +809,11 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             Stage("Contrats HTTP des services", (python, "scripts/smoke_test_api.py"), skip_reason=live_skip),
             Stage("Parcours des pages", (python, "scripts/smoke_test_pages.py"), skip_reason=live_skip),
             Stage("Rendu du chat", (python, "scripts/smoke_test_chat.py"), skip_reason=live_skip),
+            Stage(
+                "Pilotage live d'un tour chat",
+                (python, "scripts/smoke_test_chat_turn_steering.py"),
+                skip_reason=live_skip,
+            ),
             Stage("Sérialisation vocale navigateur", (python, "scripts/smoke_test_voice.py"), skip_reason=live_skip),
         ]
     )
