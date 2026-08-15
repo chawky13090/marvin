@@ -19576,3 +19576,19 @@ Aucun corpus, oracle ou rapport final n'existe; Stage B reste verrouillé. Sécu
 métier, effet hôte, donnée personnelle ou réponse Cloud brute persistée. Le gate passe de 352 à
 353 étapes. Rollback : préserver gel, diagnostic et abandon r3; aucune donnée Marvin ni source
 produit n'a été modifiée.
+
+## 2026-08-15 — v2.669.0 — séparation des trois corpus de routage
+
+Après trois abandons de fabrication du holdout v1.5, les mesures sont séparées par finalité. Le
+corpus dans le langage du propriétaire devient un test d'acceptation bloquant mais non indépendant.
+Les demandes futures postérieures au gel v2.660 restent la preuve principale de généralisation.
+Le corpus synthétique est réservé aux angles morts déterminés par une couverture rétrospective.
+
+La règle de périmètre est figée avant le calcul : moins de cinq demandes d'action directes,
+normalisées et uniques. Elle porte sur le texte seul; outils exécutés et reçus sont interdits.
+Questions, demandes de scripts, constats, confirmations, recherche d'une application déjà installée,
+reprises automatiques et conversations Forge sont exclues. L'inventaire sera agrégé uniquement,
+explicitement rétrospectif et impropre à noter Marvin. Aucun appel Cloud ou outil métier n'a été
+exécuté. Sécurité : lecture SQLite future en mode read-only, aucun texte ou identifiant public.
+Le gate passe de 353 à 354 étapes. Rollback : réversion atomique de v2.669; aucune donnée ou
+configuration Marvin n'est modifiée.

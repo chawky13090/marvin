@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.668.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.669.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.668.0)
+## 9. État actuel (v2.669.0)
+
+**v2.669 (stratégie de mesure du routage à trois corpus)** : le test d'acceptation dans le
+langage du propriétaire devient bloquant sans prétendre à l'indépendance; les demandes futures
+versionnées portent la preuve principale de généralisation; le synthétique est réservé aux
+familles réellement sous-couvertes. Un inventaire rétrospectif, non utilisable pour noter Marvin,
+doit compter les demandes d'action directes normalisées uniques sans regarder l'outil exécuté.
+Questions, scripts, confirmations, constats, reprises automatiques et campagnes sont exclus. La
+règle r4 est calculable et gelée : uniquement les familles sous cinq demandes. Aucun appel Cloud
+n'est autorisé avant cet inventaire. Le gate compte 354 étapes. Rollback : réversion atomique de
+v2.669; aucune donnée Marvin ou source produit n'est modifiée.
 
 **v2.668 (r3 interrompue avec diagnostic agrégé)** : l'unique génération r3 a achevé auteur,
 deux oracles, consensus et adjudicateur, puis le critique Cloud a fourni une revue incomplète.

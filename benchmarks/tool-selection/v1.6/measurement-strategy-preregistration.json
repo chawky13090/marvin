@@ -1,0 +1,82 @@
+{
+  "schema": "marvin.tool-selection-measurement-strategy/1.0",
+  "status": "frozen_before_retrospective_coverage_recalculation",
+  "corpus_roles": {
+    "owner_acceptance": {
+      "purpose": "blocking_regression_test_in_owner_language",
+      "independence_claim": false,
+      "business_result_required": true,
+      "must_never_be_merged_into_generalization_score": true
+    },
+    "chronological_real_usage": {
+      "purpose": "primary_future_generalization_evidence",
+      "start_utc": "2026-08-15T02:00:00Z",
+      "mixed_versions_forbidden": true,
+      "unrepresented_family_status": "UNASSESSED"
+    },
+    "synthetic_gap_coverage": {
+      "purpose": "selection_only_for_families_not_covered_by_real_usage",
+      "business_tool_execution": false,
+      "reported_separately": true
+    }
+  },
+  "retrospective_coverage": {
+    "purpose": "determine_synthetic_gap_scope_only",
+    "independence_claim": false,
+    "product_quality_claim_authorized": false,
+    "source": "persisted_user_messages_in_local_sqlite",
+    "plaintext_publication_forbidden": true,
+    "unit": "unique_normalized_direct_action_request",
+    "minimum_requests_for_real_usage_coverage": 5,
+    "r4_eligibility_rule": "count_less_than_5",
+    "families": [
+      "software.search",
+      "software.install",
+      "software.inventory",
+      "software.updates_check",
+      "software.upgrade",
+      "software.uninstall",
+      "software.manual_panel"
+    ]
+  },
+  "classification_rubric": {
+    "text_only": true,
+    "executed_tool_names_forbidden": true,
+    "tool_results_forbidden": true,
+    "precedence": ["manual_panel", "uninstall", "updates_check", "upgrade", "inventory", "search", "install"],
+    "direct_action_required": true,
+    "excluded_request_kinds": [
+      "automatic_long_task_resume",
+      "benchmark_ephemeral_conversation",
+      "how_to_or_command_question",
+      "script_or_document_generation",
+      "statement_about_already_completed_action",
+      "success_confirmation",
+      "software_search_for_an_already_installed_application"
+    ],
+    "normalization": {
+      "unicode_nfkc": true,
+      "accent_insensitive": true,
+      "case_insensitive": true,
+      "whitespace_collapsed": true,
+      "punctuation_collapsed_for_deduplication": true
+    }
+  },
+  "r4_constraints": {
+    "cloud_generation_paused_until_coverage_artifact_frozen": true,
+    "only_mechanically_eligible_families": true,
+    "review_batches_per_intent": true,
+    "review_semantics_unchanged": true,
+    "thresholds_unchanged": true,
+    "selection_only": true,
+    "dangerous_tool_execution_requires_isolated_vm": true
+  },
+  "privacy": {
+    "public_artifact_aggregate_only": true,
+    "message_text_forbidden": true,
+    "message_and_conversation_ids_forbidden": true,
+    "personal_data_forbidden": true,
+    "database_read_only": true
+  },
+  "rollback": "Preserve this strategy as the decision record. The later coverage extractor and private owner-acceptance material may be removed without modifying Marvin data."
+}
