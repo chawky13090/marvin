@@ -654,6 +654,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             "Runtime du pilotage chat",
             (python, "scripts/test_chat_turn_steering_runtime.py"),
         ),
+        Stage(
+            "Résultat runtime gelé du pilotage chat",
+            (python, "scripts/test_chat_turn_steering_runtime_result.py"),
+        ),
         Stage("Reconnexion SSE du frontend", ("node", "--no-warnings", "scripts/test_chat_stream.mjs")),
         Stage("Reprise des lectures backend frontend", ("node", "scripts/test_backend_read.mjs")),
         Stage("Repli frontend des conversations volumineuses", ("node", "scripts/test_backend_fallback.mjs")),

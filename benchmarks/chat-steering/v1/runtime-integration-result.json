@@ -1,0 +1,45 @@
+{
+  "schema": "marvin.chat-turn-steering-runtime-integration-result/1.0",
+  "status": "offline_qualified_for_controlled_activation",
+  "source_commit": "96f6a318e43d522c8f202cd623e3129bb6120248",
+  "authorization_sha256": "3b28ba4595f721497d6a6d6d983907ad3633416e2a20a63bdc9ea19b1d393f69",
+  "feature_flag_during_measurement": false,
+  "controlled_activation_authorized": true,
+  "release_verified": false,
+  "governed_sources": {
+    "backend/chat_turn_steering.py": "3d848b967069ed9440a3151d57cfe407e604c957a1e49ac16559262e055b9340",
+    "backend/chat_turn_runtime.py": "9a7e127a5fe61286a10474be83c913678cb2eeefca05cf2ad967676f19e89afe",
+    "backend/agent.py": "727c32b2fe12e6f749450ab3a47b737ea24c46daaab2df8934653e4eb87c8b14",
+    "backend/agent_turn_completion.py": "c3c1bb2b5be7ebda928d11789ce8a57bcd6d69eb498ec873459175adbd0f3d97",
+    "backend/api/agent_gateway.py": "e569b7eb5987c29fc7fad9e72b577529d9cffe67058787d64f3ad23a4a58e39e",
+    "lib/contexts/ChatContext.jsx": "be037bb1c296bf7f09609779713cd5b6a14cfd27cc5bf2b90bb8b36569235e36",
+    "components/chat/ChatContainer.jsx": "7fef0371780637f8a82fe6057efbcc436043378ddfc8028f001cd179e8f25fb3",
+    "components/chat/ChatInput.jsx": "5b893f2bae233013d1139120faf076d5ab1085278b9938e319cd7cc04fc25009"
+  },
+  "verified": {
+    "repository_distinct_connection_exclusion": true,
+    "approval_continuation_keeps_parent_slot": true,
+    "queued_next_precedes_terminal_event": true,
+    "approval_invalidated_when_pending_payload_changes": true,
+    "cooperative_stop_never_claims_inflight_cancellation": true,
+    "migration_up_and_down_on_database_copy": true,
+    "directive_text_excluded_from_technical_logs": true,
+    "privacy_export_and_erasure_covered": true,
+    "frontend_production_build": "passed",
+    "check_marvin": {
+      "expected": 362,
+      "executed": 357,
+      "skipped_live": 5,
+      "failed": 0
+    }
+  },
+  "activation_boundary": {
+    "activation_must_be_a_separate_commit": true,
+    "cold_restart_required_after_activation": true,
+    "live_same_conversation_exclusion_required": true,
+    "live_directive_receipt_and_application_required": true,
+    "live_chat_smoke_required": true,
+    "automatic_business_tool_execution_forbidden_in_activation_smoke": true
+  },
+  "rollback": "Disable chat_turn_steering_enabled, restart Marvin, preserve terminal receipts, cancel only undispatched directives, then revert the activation commit. Migration 7 remains additive; its verified offline down migration is required only for schema removal on a stopped backed-up database."
+}
