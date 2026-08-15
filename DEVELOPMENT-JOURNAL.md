@@ -5,6 +5,26 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-15 — v2.662.0 — frontière d'intention logicielle terminale
+
+La politique v1.5 a été figée au commit `6d64c8b` avant toute modification produit. Elle
+sépare recherche, installation, inventaire, vérification des mises à jour, mise à niveau,
+désinstallation, panneau manuel et demande ambiguë. La sélection applique cette frontière
+après l'union K+L+S : aucune couche de rappel ne peut réintroduire une mutation logicielle
+contradictoire. `winget_install` est terminal et résout lui-même une requête approximative;
+`winget_search` n'est donc pas présenté comme étape concurrente sur une installation.
+
+Sécurité : installation, mise à niveau et désinstallation sont mutuellement exclusives;
+inventaire, recherche, vérification et ambiguïté exposent zéro mutation. Les confirmations et
+autorisations existantes restent actives comme défense supplémentaire. Les dépendances de
+développement et mises à jour documentaires sont explicitement exclues. Confidentialité et
+journalisation : aucun texte utilisateur, secret, événement ou stockage nouveau. Performance :
+budget inchangé, et l'outil terminal est priorisé avant les autres correspondances lexicales.
+Rollback : réversion atomique du commit produit puis redémarrage backend; aucune migration.
+Validation de développement : huit intentions et leurs paires croisées sont exercées contre
+une couche sémantique volontairement hostile qui propose les neuf outils logiciels; registre
+inchangé à 364. Un nouveau holdout indépendant reste obligatoire avant toute généralisation.
+
 ## 2026-08-15 — v2.661.0 — morphologie logicielle bornée et holdout indépendant
 
 La correction a été pré-enregistrée au commit `0d268a77` avant toute source produit. Le

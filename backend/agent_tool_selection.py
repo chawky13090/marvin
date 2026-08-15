@@ -195,20 +195,9 @@ _KEYWORD_TOOLS = {
      "derniere version installee"):
         {"winget_list_upgrades", "winget_list_installed"},
 
-    # Installer / mettre à jour / désinstaller un logiciel (Winget) — bug réel corrigé
-    # v2.113 : aucune entrée ne routait ici avant, le LLM tombait parfois sur du routage
-    # sémantique fragile (marche pour "vlc" + "winget" explicite, échoue pour un nom moins
-    # connu comme "victoria") → il "documentait" une installation (document_generate) au
-    # lieu d'installer réellement. Stem court "instal" (pas "installe") pour matcher aussi
-    # "install"/"installation" sans le "e" final — repéré en reproduisant le bug exact avec
-    # le message original de l'utilisateur ("install le logiciel victoria", sans "e").
-    # Le marqueur explicite ``*`` couvre install/installé/installer/installation et une faute
-    # d'édition bornée. Les mots ordinaires conservent leurs frontières exactes.
-    ("install*", "télécharge et installe", "telecharge et installe",
-     "mets à jour", "mets a jour", "met à jour", "met a jour", "mettre à jour", "mettre a jour",
-     "désinstal", "desinstal", "winget"):
-        {"winget_search", "winget_install", "winget_upgrade", "winget_uninstall",
-         "winget_list_upgrades", "winget_list_installed", "win_quick_launch"},
+    # Les actions Winget mutuellement exclusives sont composées après l'union K+L+S par
+    # ``_software_intent_boundary``. Ne jamais réintroduire ici une règle par famille :
+    # elle exposerait notamment la désinstallation sur une demande d'installation.
 
     # Recherche unifiée (tout à la fois)
     ("cherche partout", "recherche partout", "retrouve tout", "trouve tout ce qui", "tout ce qui concerne",
@@ -624,6 +613,36 @@ _VISUAL_CONTROL_TERMS_NORM = tuple(
 )
 _CAPABILITY_CATALOG = build_catalog(TOOLS_SPEC)
 
+_SOFTWARE_ACTION_TOOLS = {
+    "winget_search",
+    "winget_install",
+    "winget_upgrade",
+    "winget_uninstall",
+    "winget_list_upgrades",
+    "winget_list_installed",
+    "pc_installed_software",
+    "win_quick_launch",
+    "win_quick_launch_list",
+}
+_SOFTWARE_INTENT_ALLOWED = {
+    "software.search": {"winget_search"},
+    "software.install": {"winget_install"},
+    "software.inventory": {"winget_list_installed", "pc_installed_software"},
+    "software.updates_check": {"winget_list_upgrades"},
+    "software.upgrade": {"winget_upgrade"},
+    "software.uninstall": {"winget_uninstall"},
+    "software.manual_panel": {"win_quick_launch", "win_quick_launch_list"},
+    "software.ambiguous": {
+        "winget_search", "winget_list_installed", "winget_list_upgrades",
+        "pc_installed_software",
+    },
+}
+_SOFTWARE_DEVELOPMENT_CONTEXT = (
+    "pip ", "pip3 ", "npm ", "pnpm ", "yarn ", "cargo ", "poetry ",
+    "dependance python", "dependances python", "package python", "paquet python",
+    "dependance node", "dependances node", "node_modules",
+)
+
 
 @lru_cache(maxsize=4096)
 def _keyword_pattern(keyword: str) -> re.Pattern[str]:
@@ -694,6 +713,100 @@ def _keyword_present(keyword: str, text: str) -> bool:
     return _keyword_pattern(normalized).search(text) is not None
 
 
+def _software_intent_boundary(text: str) -> str | None:
+    """Classifie une action logicielle explicite sans examiner les candidats obtenus.
+
+    La classification est indépendante de K/L/S. Une intention reconnue ferme ensuite la
+    famille Winget sur le contrat terminal correspondant. Une demande ambiguë ne conserve
+    que des outils de lecture; les confirmations restent une barrière supplémentaire, jamais
+    une justification pour présenter une mutation contradictoire.
+    """
+
+    normalized = str(text or "").strip()
+    if not normalized:
+        return None
+    if any(marker in normalized for marker in _SOFTWARE_DEVELOPMENT_CONTEXT):
+        return None
+    if any(
+        _keyword_present(marker, normalized)
+        for marker in (
+            "document", "fichier", "dossier", "projet", "code source",
+            "tableur", "presentation", "base de donnees",
+        )
+    ) and any(
+        _keyword_present(marker, normalized)
+        for marker in ("mets a jour", "met a jour", "mettre a jour")
+    ):
+        return None
+
+    manual_panel = (
+        "programmes et fonctionnalites", "panneau de desinstallation",
+        "applications et fonctionnalites", "ouvrir appwiz", "ouvre appwiz",
+    )
+    if any(_keyword_present(marker, normalized) for marker in manual_panel):
+        return "software.manual_panel"
+
+    if _prefix_keyword_present("desinstall", normalized) or any(
+        _keyword_present(marker, normalized)
+        for marker in (
+            "retire le logiciel", "retire l'application", "retire le programme",
+            "supprime le logiciel", "uninstall",
+        )
+    ) or re.search(r"\bretire\s+.+\s+de\s+ce\s+pc\b", normalized):
+        return "software.uninstall"
+
+    update_subject = any(
+        _keyword_present(marker, normalized)
+        for marker in (
+            "mise a jour", "mises a jour", "version obsolete", "versions obsoletes",
+            "logiciel obsolete", "logiciels obsoletes", "upgrade",
+        )
+    ) or bool(re.search(r"\blogiciels?\b.{0,32}\bobsoletes?\b", normalized))
+    read_signal = any(
+        _keyword_present(marker, normalized)
+        for marker in ("liste", "affiche", "verifie", "quelles", "quels", "disponible", "disponibles")
+    )
+    if update_subject and read_signal:
+        return "software.updates_check"
+    if any(
+        _keyword_present(marker, normalized)
+        for marker in ("mets a jour", "met a jour", "mettre a jour", "applique les mises a jour", "actualise le logiciel")
+    ) or re.search(r"\bmets?\b.{0,64}\ba\s+jour\b", normalized):
+        return "software.upgrade"
+
+    inventory = (
+        "logiciel installe", "logiciels installes", "programmes installes",
+        "applications installees", "inventaire logiciel", "liste des programmes",
+        "est deja installe", "est installe", "logiciels sur ce pc",
+    )
+    if any(_keyword_present(marker, normalized) for marker in inventory):
+        return "software.inventory"
+
+    search_action = any(
+        _keyword_present(marker, normalized)
+        for marker in ("cherche", "recherche", "trouve", "quel paquet")
+    )
+    software_subject = any(
+        _keyword_present(marker, normalized)
+        for marker in ("winget", "catalogue", "logiciel", "application", "programme", "paquet")
+    )
+    if search_action and software_subject:
+        return "software.search"
+
+    if _prefix_keyword_present("install", normalized) or any(
+        _keyword_present(marker, normalized)
+        for marker in ("telecharge et installe", "ajoute le logiciel", "ajoute l'application")
+    ):
+        return "software.install"
+
+    if _keyword_present("winget", normalized) or any(
+        _keyword_present(marker, normalized)
+        for marker in ("gerer mes logiciels", "gere mes logiciels", "gestion des logiciels")
+    ):
+        return "software.ambiguous"
+    return None
+
+
 async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list:
     """
     Réduit l'ensemble des outils envoyés au LLM en fonction du message utilisateur.
@@ -758,6 +871,18 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
     except Exception:
         pass
     relevant |= semantic
+
+    # Frontière d'action après l'union K+L+S : une couche de rappel peut proposer un outil
+    # voisin, mais ne peut pas remettre une mutation contradictoire dans le sous-ensemble.
+    software_intent_priority: set[str] = set()
+    software_intent = _software_intent_boundary(text_norm)
+    if software_intent:
+        allowed_software = _SOFTWARE_INTENT_ALLOWED[software_intent]
+        software_intent_priority = set(allowed_software)
+        relevant.difference_update(_SOFTWARE_ACTION_TOOLS)
+        relevant.update(allowed_software)
+        keyword_hits.difference_update(_SOFTWARE_ACTION_TOOLS)
+        keyword_hits.update(allowed_software)
 
     # Un outil visuel de 24 paramètres ne concurrence pas l'opérateur système typé
     # lorsque la demande ne contient aucun geste visuel. Il reste découvrable par
@@ -840,6 +965,7 @@ async def filter_relevant_tools(messages: list[dict], profile_name: str) -> list
         ordered: list[str] = []
         for group in (
             set(_ALWAYS_INCLUDE) & names,
+            software_intent_priority & names,
             keyword_hits & names,
             lexical & names,
             semantic & names,

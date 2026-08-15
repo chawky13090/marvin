@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.661.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.662.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.661.0)
+## 9. État actuel (v2.662.0)
+
+**v2.662 (frontière d'intention logicielle)** : la composition logicielle est typée après
+l'union mots-clés, lexicale et sémantique. Une installation ne présente que
+`winget_install`, une désinstallation seulement `winget_uninstall`, une mise à niveau
+seulement `winget_upgrade`; les demandes de recherche, inventaire et vérification des mises
+à jour restent en lecture seule. Une demande ambiguë n'expose aucune mutation, et les outils
+des couches lexicales ou sémantiques ne peuvent pas réintroduire une action contradictoire.
+Les dépendances de développement (`pip`, `npm`, etc.) et les mises à jour de documents restent
+hors de cette frontière. Les 364 outils, budgets, confirmations et gardes sont inchangés.
+Rollback : réversion atomique du commit produit v2.662 puis redémarrage backend; aucune donnée
+persistante ni configuration n'est modifiée.
 
 **v2.661 (morphologie logicielle bornée)** : la correction a été pré-enregistrée avant toute
 modification produit et un holdout indépendant de 20 intentions a été généré par cinq familles

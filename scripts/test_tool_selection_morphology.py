@@ -66,7 +66,11 @@ def main() -> None:
     assert selection._prefix_keyword_present("short", "shorter") is False
 
     install_names = asyncio.run(_selected_names("Instaler le logiciel VLC avec Winget"))
-    assert {"winget_search", "winget_install"} <= install_names
+    # v1.5 conserve la reconnaissance morphologique mais ferme la composition sur
+    # l'action terminale. La recherche préparatoire n'est plus exposée au modèle.
+    assert "winget_install" in install_names
+    assert "winget_search" not in install_names
+    assert "winget_uninstall" not in install_names
 
     launch_names = asyncio.run(_selected_names("Démarre l'application Bloc-notes"))
     assert "windows_task" in launch_names

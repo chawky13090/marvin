@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.661 — morphologie logicielle bornée et profils de découverte explicites
+# v2.662 — frontière d'intention logicielle terminale après union K+L+S
 # v2.584 — sauvegarde portable chiffrée, inventaire réel fermé et restauration isolée
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement

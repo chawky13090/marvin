@@ -243,6 +243,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_tool_selection_v15_preregistration.py"),
         ),
         Stage(
+            "Frontiere logicielle typee v1.5",
+            (python, "scripts/test_tool_selection_v15_software_boundary.py"),
+        ),
+        Stage(
             "Gel du générateur holdout routage v1.4",
             (python, "scripts/test_tool_selection_v14_holdout_generation_freeze.py"),
         ),
