@@ -1,0 +1,17 @@
+{
+  "schema": "marvin.tool-selection-v15-generation-abort/1.0",
+  "status": "aborted_without_public_holdout",
+  "freeze_sha256": "afd7652f0acbd9dc3cd149984dd250227c4fc588f9ebc2564f1a7d829f2f7aec",
+  "reason_code": "insufficient_survivors",
+  "intent": "software.search",
+  "required_survivors": 5,
+  "observed_survivors": 4,
+  "corpus_written": false,
+  "oracle_written": false,
+  "report_written": false,
+  "product_modified": false,
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0,
+  "threshold_changed_after_observation": false,
+  "next_attempt": "A separately frozen wrapper may request a larger author pool while retaining five survivors and every original independence, novelty, oracle and review requirement."
+}
