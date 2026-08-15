@@ -5,6 +5,42 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-15 — v2.660.0 — parcours réels agrégés et validation future gelée
+
+L'analyse locale joint désormais une demande humaine persistée à ses exécutions uniquement
+par `messages.client_request_id = tool_executions.request_id`, avec cohérence de conversation.
+Les exécutions éphémères ou orphelines de Forge sont exclues. La baseline historique compte
+362 demandes : 122 sans outil, 165 avec uniquement des reçus techniques positifs, 67 mixtes
+et 8 avec uniquement des reçus en échec. Elle observe 53 récupérations techniques, 26 échecs
+techniques terminaux et 3 signaux d'abandon probable. Ces nombres ne mesurent ni le bon choix
+d'outil, ni la satisfaction, ni la réussite métier; l'historique reste un corpus de diagnostic
+brûlé et ne note pas la version courante.
+
+La frontière future est pré-enregistrée au 2026-08-15 02:00 UTC. Une demande ne devient
+évaluable pour une version que si ses exécutions portent toutes version Marvin, modèle,
+mode, profil, sélecteur, nombre et empreinte des candidats ainsi que `tool_call_id`. Une
+demande sans exécution reste non évaluable, car sa version n'est pas démontrable. Les versions
+mixtes ne sont jamais regroupées. Les seuils de publication sont 20 demandes par version et
+5 par famille. La politique, l'analyseur et la baseline sont figés par SHA-256 avant toute
+conversation future.
+
+Confidentialité : l'analyse SQL ne lit pas `messages.content`; l'artefact suivi ne publie ni
+texte, ni identifiant, ni liste brute de candidats. Journalisation : aucun nouvel événement
+runtime n'est ajouté; cette tranche lit en mode SQLite `mode=ro` les métadonnées locales de
+v2.659 et publie seulement des compteurs. Sécurité : aucune route, action, outil ou paramètre
+de routage n'est modifié; les deux autorisations produit/routage sont explicitement fausses.
+Rollback : réversion atomique du commit v2.660; aucun schéma ni contenu utilisateur n'a été
+modifié.
+
+Validations observées : compilation Python et canaris du nouvel analyseur verts; plan du gate
+porté à 337 étapes; premier gate entièrement vert hors build, refusé comme prévu par le verrou
+Turbopack actif. Après arrêt du seul frontend, le rejeu exhaustif obtient 333 étapes exécutées,
+4 live ignorées, zéro échec et un build Next.js 16.2.12 réussi. Backend et frontend ont été
+redémarrés. Une première sonde manuelle, limitée à `/api/health`, a lancé trop tôt le smoke et
+observé un 503 Code Workspace; la procédure officielle exige aussi les readiness Coding et VM.
+Après leur 200, les smokes obtiennent 28/28 contrats API, 41/41 pages, cinq conversations chat
+et la sérialisation vocale sans échec. Le backend expose 2.660.0 et le frontend répond 200.
+
 ## 2026-08-15 — v2.659.0 — corrélation locale versionnée des appels d'outils
 
 L'analyse des conversations réelles a établi que `request_id` corrélait un tour, mais pas un

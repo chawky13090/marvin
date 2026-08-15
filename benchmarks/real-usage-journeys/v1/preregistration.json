@@ -1,0 +1,49 @@
+{
+  "schema": "marvin.real-usage-journeys-policy/1.0",
+  "status": "frozen_before_future_validation",
+  "future_validation_start_utc": "2026-08-15T02:00:00Z",
+  "unit": "persisted_user_message_with_client_request_id",
+  "join": {
+    "messages_column": "client_request_id",
+    "tool_executions_column": "request_id",
+    "conversation_match_required_when_present": true,
+    "ephemeral_or_orphan_executions_excluded": true
+  },
+  "required_future_execution_metadata": [
+    "app_version",
+    "model_name",
+    "runtime_mode",
+    "profile_name",
+    "selector_version",
+    "candidate_count",
+    "candidate_set_sha256",
+    "tool_call_id"
+  ],
+  "metrics": {
+    "technical_receipt_success": "success=true on the persisted tool receipt",
+    "technical_recovery": "a failed receipt followed by a successful receipt in the same request",
+    "terminal_technical_failure": "the last persisted receipt in the request failed",
+    "probable_abandonment": "terminal technical failure on the last user message of a conversation followed by a distinct new conversation inside the fixed window"
+  },
+  "probable_abandonment_window_minutes": 30,
+  "interpretation": {
+    "technical_receipt_success_is_not_business_success": true,
+    "technical_recovery_is_not_semantic_task_completion": true,
+    "probable_abandonment_is_not_proof": true,
+    "business_satisfaction_without_explicit_feedback": "UNASSESSED",
+    "historical_requests_are_development_only": true,
+    "future_requests_are_compared_by_app_version": true,
+    "mixed_versions_are_never_pooled": true,
+    "minimum_requests_per_reported_version": 20,
+    "minimum_requests_per_reported_family": 5
+  },
+  "privacy": {
+    "local_only": true,
+    "user_content_in_public_artifacts": false,
+    "request_or_conversation_identifiers_in_public_artifacts": false,
+    "aggregate_counts_only": true,
+    "metadata_collection_disableable": true
+  },
+  "product_mutation_authorized": false,
+  "routing_mutation_authorized": false
+}

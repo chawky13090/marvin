@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 336
+EXPECTED_STAGE_COUNT = 337
 
 
 @dataclass(frozen=True)
@@ -286,6 +286,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Isolation des ressources temporaires des smokes", (python, "scripts/test_smoke_resource_isolation.py")),
         Stage("Pilote E7 preview historique préservé", (python, "scripts/test_e7_bulk_rename_central_store_preregistration.py")),
         Stage("Extraction privée des demandes réelles", (python, "scripts/test_real_usage_corpus.py")),
+        Stage("Parcours réels agrégés et futur gelé", (python, "scripts/test_real_usage_journeys.py")),
         Stage("Inventaire des données personnelles", (python, "scripts/test_privacy_inventory.py")),
         Stage("Export chiffré des données personnelles", (python, "scripts/test_privacy_rights.py")),
         Stage("Runtime commun des outils", (python, "scripts/test_tool_runtime.py")),

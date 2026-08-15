@@ -1,0 +1,57 @@
+{
+  "schema": "marvin.real-usage-journeys/1.0",
+  "policy_sha256": "87bd159615f38d86e072ded152ddef1eff63d65446fe9b1bbf7d3116152a9925",
+  "future_validation_start_utc": "2026-08-15T02:00:00Z",
+  "source": {
+    "unit": "persisted_user_message_with_client_request_id",
+    "ephemeral_or_orphan_execution_excluded": true,
+    "plaintext_user_content_read": false,
+    "identifiers_published": false
+  },
+  "semantics": {
+    "technical_receipt_success_is_not_business_success": true,
+    "business_satisfaction": "UNASSESSED",
+    "probable_abandonment_is_not_proof": true,
+    "historical_split_must_not_score_current_marvin": true,
+    "mixed_versions_must_not_be_pooled": true
+  },
+  "splits": {
+    "historical_development": {
+      "request_count": 362,
+      "execution_count": 1022,
+      "request_status": {
+        "all_technical_receipts_failed": 8,
+        "all_technical_receipts_successful": 165,
+        "mixed_technical_receipts": 67,
+        "no_tool_execution": 122
+      },
+      "technical_recovery_request_count": 53,
+      "terminal_technical_failure_request_count": 26,
+      "probable_abandonment_signal_count": 3,
+      "exact_tool_call_correlation_request_count": 0,
+      "complete_execution_metadata_request_count": 0
+    },
+    "future_validation_eligible": {
+      "request_count": 0,
+      "execution_count": 0,
+      "request_status": {},
+      "technical_recovery_request_count": 0,
+      "terminal_technical_failure_request_count": 0,
+      "probable_abandonment_signal_count": 0,
+      "exact_tool_call_correlation_request_count": 0,
+      "complete_execution_metadata_request_count": 0
+    },
+    "future_unassessed_incomplete_metadata": {
+      "request_count": 0,
+      "execution_count": 0,
+      "request_status": {},
+      "technical_recovery_request_count": 0,
+      "terminal_technical_failure_request_count": 0,
+      "probable_abandonment_signal_count": 0,
+      "exact_tool_call_correlation_request_count": 0,
+      "complete_execution_metadata_request_count": 0
+    }
+  },
+  "future_validation_requests_by_app_version": {},
+  "aggregate_sha256": "48e51b98fda8d86b6a3ada9246ed72bc14781da45852e527b6a1596167012f56"
+}

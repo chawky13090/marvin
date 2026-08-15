@@ -1,0 +1,13 @@
+{
+  "schema": "marvin.real-usage-journeys-freeze/1.0",
+  "status": "frozen_before_future_validation",
+  "future_validation_start_utc": "2026-08-15T02:00:00Z",
+  "files": {
+    "scripts/real_usage_journeys.py": "d8c58b36070d2ea6e5eea50e7bd88578b1184a91360a01ca53ea7f356d3b7bd2",
+    "benchmarks/real-usage-journeys/v1/preregistration.json": "83e8281c5707f7f016a50d56138f557c212f76fa8eb0794a43a4e0c68cf7711d",
+    "benchmarks/real-usage-journeys/v1/historical-baseline.json": "24101dd489b61117d1822828c77a2f7e6654e803baf454cb93cee83eb73b59c2"
+  },
+  "product_mutation_authorized": false,
+  "routing_mutation_authorized": false,
+  "future_policy_change_requires_new_version": true
+}

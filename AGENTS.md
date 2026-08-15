@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.659.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.660.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.659.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.660.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.659.0)
+## 9. État actuel (v2.660.0)
+
+**v2.660 (parcours réels locaux et validation chronologique)** : les demandes persistées sont
+jointes exactement aux exécutions par `client_request_id/request_id`; les campagnes éphémères
+et exécutions orphelines sont exclues. L'artefact public ne contient que des agrégats, aucun
+texte ni identifiant. Le succès de reçu, la récupération technique, l'échec terminal et
+l'abandon seulement probable restent distincts; la satisfaction métier est `UNASSESSED`.
+Les 362 demandes historiques servent uniquement au développement. La validation future est
+gelée au 15 août 2026 02:00 UTC et exige version, modèle, mode, profil, sélecteur, budget,
+empreinte des candidats et `tool_call_id`; les versions mixtes ne sont jamais agrégées.
+Rollback produit : réversion atomique de v2.660; aucune donnée runtime ni route n'est modifiée.
 
 **v2.659 (corrélation locale des décisions d'outil)** : chaque appel agentique traverse
 désormais le gateway avec son `tool_call_id` et reçoit l'identifiant exact de la ligne
