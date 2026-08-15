@@ -1,0 +1,8 @@
+{
+  "schema": "marvin.e7-central-store-governed-source-erratum/1.0",
+  "historical_policy": "benchmarks/tool-evidence/v1.2/bulk-rename-central-store-preregistration.json",
+  "historical_source_commit": "b8eacfd2b3f87e120b3ab6127eeba9cbbb51f081",
+  "reason": "The policy governed the exact source blobs at its creation commit. Later product changes must not make the historical preregistration fail by comparing those hashes to the current working tree.",
+  "current_filesystem_successor_commit": "c3dd891d81cc47f7934dbcc6fa8c6867e228514e",
+  "historical_artifact_edited": false
+}

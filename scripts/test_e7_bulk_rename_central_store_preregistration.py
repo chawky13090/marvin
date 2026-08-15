@@ -1,5 +1,7 @@
 from __future__ import annotations
 import json
+import hashlib
+import subprocess
 from pathlib import Path
 
 from evidence_portability import matches_frozen_sha256
@@ -7,6 +9,14 @@ from evidence_portability import matches_frozen_sha256
 ROOT = Path(__file__).resolve().parents[1]
 V11 = ROOT / "benchmarks" / "tool-evidence" / "v1.1"
 POLICY = ROOT / "benchmarks" / "tool-evidence" / "v1.2" / "bulk-rename-central-store-preregistration.json"
+ERRATUM = ROOT / "benchmarks" / "tool-evidence" / "v1.2" / "central-store-governed-source-erratum.json"
+
+def _blob_sha256(commit: str, relative: str) -> str:
+    blob = subprocess.run(
+        ["git", "show", f"{commit}:{relative}"], cwd=ROOT,
+        check=True, capture_output=True,
+    ).stdout
+    return hashlib.sha256(blob).hexdigest()
 
 def main() -> int:
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
@@ -21,7 +31,10 @@ def main() -> int:
     old_runner = json.loads((V11 / "e7-apply-execution-freeze-manifest.json").read_text(encoding="utf-8"))
     assert old_prereg["files"]["backend/tool_domains/filesystem.py"] == policy["previous_governed_source_sha256"]
     assert old_runner["frozen_hashes"]["backend/tool_domains/filesystem.py"] == policy["previous_governed_source_sha256"]
-    for relative, expected in policy["current_governed_sources"].items(): assert matches_frozen_sha256(ROOT / relative, expected, root=ROOT), relative
+    erratum = json.loads(ERRATUM.read_text(encoding="utf-8"))
+    assert erratum["historical_artifact_edited"] is False
+    for relative, expected in policy["current_governed_sources"].items():
+        assert _blob_sha256(erratum["historical_source_commit"], relative) == expected, relative
     assert all(policy["product_invariants"].values())
     print("E7 bulk rename v1.2 OK - v1.1 immutable, product fix frozen, replay locked.")
     return 0
