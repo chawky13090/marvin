@@ -1,0 +1,85 @@
+{
+  "schema": "marvin.tool-selection-v14-holdout-generation-freeze/1.0",
+  "status": "frozen_before_cloud_generation",
+  "source_commit": "0d268a77326821fd0db379733f9ca262e8a5b6b4",
+  "preregistration_sha256": "bda0dd5d9f3f34d0e4daf1e72cad5a2d0455abc3fecb91e99de8b73f946bfbdd",
+  "generator_sha256": "bed04d65214851fdc646506cd5a302bc8cc68f8ff10b7f8d4f1a54cd58382dde",
+  "generator_wrapper_sha256": "d08696b05a2f1960ae88e453e5fcb0d9bf9002719d5e47d7cee41cb91608d8e5",
+  "target_per_family": 10,
+  "families": [
+    "application_launch",
+    "software_management"
+  ],
+  "roles": {
+    "author": {
+      "model": "nemotron-3-super:cloud",
+      "digest": "be3943c5a818be61a08f3563b971e392bfc12e506e296fb186c870f5c63377a4"
+    },
+    "oracle_a": {
+      "model": "glm-5.2:cloud",
+      "digest": "ce8fd6f94793a6786f6858717b38067feba631861e3b35e8122cb6635004cd4a"
+    },
+    "oracle_b": {
+      "model": "kimi-k2.7-code:cloud",
+      "digest": "eda07a6592375dcbde7cf167b6d6b368cdd28e244f9d71559fb59919aca882fa"
+    },
+    "adjudicator": {
+      "model": "qwen3.5:397b-cloud",
+      "digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca"
+    },
+    "critic": {
+      "model": "minimax-m2.7:cloud",
+      "digest": "06daa293c105f0bd71fd19420e4d15cae66cc5f71cb8f55b4f998e96ec8ab67a"
+    }
+  },
+  "benchmark_model_excluded_from_generation": {
+    "model": "mistral-large-3:675b-cloud",
+    "digest": "3130fd5a5a1eb4b208be74bf0273357c14c3576c6ba8d78f98b960e91919d77b"
+  },
+  "independence": {
+    "author_may_see": [
+      "family_contract_without_product_rules"
+    ],
+    "oracles_may_see": [
+      "original_public_tool_schemas",
+      "synthetic_prompts"
+    ],
+    "roles_must_not_see": [
+      "morphology_preregistration",
+      "v1_2_or_v1_3_observations",
+      "selected_names_from_prior_campaigns",
+      "future_benchmark_outputs"
+    ],
+    "cross_role_model_family_reuse_forbidden": true,
+    "oracle_consensus_required": true,
+    "adjudicator_and_critic_acceptance_required": true
+  },
+  "novelty": {
+    "token_jaccard_maximum": 0.55,
+    "compare_against_v1_2_v1_3_and_public_development_corpora": true,
+    "comparison_is_local_and_not_shown_to_cloud_roles": true
+  },
+  "privacy_security": {
+    "synthetic_only": true,
+    "personal_data_forbidden": true,
+    "real_paths_forbidden": true,
+    "raw_cloud_responses_forbidden_from_public_artifacts": true,
+    "client_num_ctx_forbidden": true,
+    "business_tool_execution": false,
+    "host_side_effects": false
+  },
+  "frozen_product_sources_sha256": {
+    "backend/agent_tool_selection.py": "98dc6e797ab97d9ed822b338600b5f5c0c9232bdfeb5b1de9db76ebaf83338d6",
+    "backend/capability_discovery.py": "0a2e5928c5c570d64b7bbc7ec5d4a7da37c55d5f640160ed339fcd3495c6db22",
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "authorization": {
+    "holdout_generation_cloud_calls": true,
+    "benchmark_model_calls": false,
+    "product_activation": false,
+    "business_tool_execution": false,
+    "single_use": true
+  },
+  "rollback": "Preserve generated evidence; revert only generator integration if generation never occurred."
+}
