@@ -13,6 +13,7 @@ import py_compile
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -58,8 +59,16 @@ def npm_command() -> str:
 
 def compile_backend() -> None:
     files = backend_python_files(BACKEND)
-    for path in files:
-        py_compile.compile(str(path), doraise=True)
+    # Ne jamais compiler vers ``backend/__pycache__`` dans le gate. Sous Windows,
+    # Defender, l'indexeur ou un processus récemment fermé peut conserver brièvement
+    # un .pyc et faire échouer l'os.replace atomique avec WinError 5. Un répertoire
+    # jetable propre au run vérifie la syntaxe sans course ni mutation du checkout.
+    with tempfile.TemporaryDirectory(prefix="marvin-pycompile-") as temporary:
+        destination = Path(temporary)
+        for index, path in enumerate(files):
+            relative = path.relative_to(BACKEND).as_posix().replace("/", "__")
+            cfile = destination / f"{index:04d}-{relative}.pyc"
+            py_compile.compile(str(path), cfile=str(cfile), doraise=True)
     print(f"Compilation Python OK - {len(files)} fichiers.")
 
 
