@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.673.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.674.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.661.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.674.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.673.0)
+## 9. État actuel (v2.674.0)
+
+**v2.674 (pilotage des tours chat pré-enregistré)** : le défaut courant est formalisé : deux
+`request_id` peuvent encore produire deux tours concurrents dans une conversation et l'abandon
+du flux navigateur n'arrête pas le producteur durable. Un contrat gelé définit quatre directives
+(`append`, `redirect`, `next`, `stop`), cinq états, l'identité provisoire des nouvelles
+conversations, l'exception des continuations d'approbation, l'ordre SQLite, les points sûrs,
+les lots parallèles, les résultats indéterminés, le recalcul risque+digest, les événements SSE,
+les bornes et les données personnelles. L'activation partielle est interdite et
+l'implémentation reste verrouillée jusqu'à une autorisation versionnée distincte. Le gate compte
+358 étapes. Rollback : réversion atomique de v2.674; aucun runtime, schéma ou contenu Marvin ne
+change.
 
 **v2.673 (inventaire direct des fichiers volumineux)** : les formulations générales sur les
 plus gros fichiers, y compris « fichier ou dossier les plus gros », présentent directement

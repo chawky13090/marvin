@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-16 — v2.674.0 — pilotage des tours chat pré-enregistré
+
+Demande : permettre au propriétaire d'orienter Marvin pendant un tour comme dans Codex, sans
+commencer l'implémentation avant une planification complète. L'inspection confirme que
+l'idempotence actuelle porte sur `request_id`, pas sur la conversation : un second envoi peut
+démarrer un producteur durable concurrent, tandis que l'abandon du SSE navigateur ne l'arrête
+pas. Une continuation d'approbation doit rejoindre son tour parent pour éviter un interblocage.
+
+Décision : geler avant tout changement produit une machine à quatre directives (`append`,
+`redirect`, `next`, `stop`) et cinq états (`received`, `deferred`, `applied`, `rejected`,
+`cancelled`). Le contrat fixe sérialisation, identité provisoire, ordre monotone, points sûrs,
+lots parallèles, arrêt coopératif, résultat indéterminé sans rejeu, recalcul de risque et digest,
+API/SSE futurs, expérience atomique et bornes. Le texte est classé donnée personnelle et interdit
+dans les logs techniques. L'implémentation et le drapeau restent désactivés; une autorisation
+versionnée séparée est obligatoire. Aucun événement, schéma, route, secret ou donnée runtime ne
+change. Validation : canari hors ligne du contrat et gate porté à 358 étapes. Rollback :
+réversion atomique du commit v2.674.
+
 ## 2026-08-15 — v2.673.0 — gros fichiers routés directement, autonomie intacte
 
 Demande : poursuivre depuis les parcours réels jugés satisfaisants, sans rendre Marvin plus

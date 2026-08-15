@@ -1,0 +1,172 @@
+{
+  "schema": "marvin.chat-turn-steering-preregistration/1.0",
+  "status": "frozen_before_product_change",
+  "product_version_before_change": "2.673.0",
+  "objective": "Allow the owner to append context, redirect remaining work, queue a next task, or stop an active chat turn without concurrent producers or replaying completed actions.",
+  "established_current_defect": {
+    "deduplication_scope": "request_id_only",
+    "conversation_mutual_exclusion_present": false,
+    "browser_abort_cancels_durable_backend_producer": false,
+    "second_request_id_can_start_a_second_producer_for_the_same_conversation": true
+  },
+  "directive_kinds": {
+    "append": {
+      "meaning": "Add constraints or context to the remaining objective.",
+      "default_while_turn_is_active": true,
+      "starts_new_turn": false
+    },
+    "redirect": {
+      "meaning": "Replace the remaining objective while preserving completed receipts.",
+      "starts_new_turn": false
+    },
+    "next": {
+      "meaning": "Create a distinct user task after the active root turn becomes terminal.",
+      "starts_new_turn": true,
+      "may_execute_automatically": true
+    },
+    "stop": {
+      "meaning": "Request cooperative stop at the next safe checkpoint.",
+      "model_prompt_injection_forbidden": true,
+      "starts_new_turn": false
+    }
+  },
+  "directive_states": ["received", "deferred", "applied", "rejected", "cancelled"],
+  "state_machine": {
+    "received": ["deferred", "applied", "rejected", "cancelled"],
+    "deferred": ["applied", "rejected", "cancelled"],
+    "applied": [],
+    "rejected": [],
+    "cancelled": []
+  },
+  "identity_and_serialization": {
+    "one_active_root_turn_per_conversation_key": true,
+    "conversation_key_required_before_final_conversation_id_exists": true,
+    "conversation_key_format": "server_validated_uuid",
+    "conversation_key_rebound_atomically_when_conversation_is_created": true,
+    "ordinary_second_turn_rejected_by_backend": true,
+    "raw_http_409_must_not_be_the_normal_ui_experience": true,
+    "approval_continuation_joins_existing_root_turn": true,
+    "approval_continuation_never_waits_behind_its_parent": true,
+    "different_conversations_may_run_concurrently": true
+  },
+  "ordering": {
+    "sequence_scope": "root_request_id",
+    "sequence_type": "strictly_increasing_integer",
+    "allocation": "sqlite_begin_immediate",
+    "duplicate_client_directive_id_is_idempotent": true,
+    "latest_unapplied_redirect_supersedes_older_unapplied_redirect": true,
+    "append_directives_preserve_sequence_order": true,
+    "stop_is_terminal_for_new_append_or_redirect_directives": true
+  },
+  "safe_checkpoints": [
+    "before_model_iteration",
+    "after_tool_result_persistence",
+    "before_tool_batch_materialization",
+    "before_approval_creation"
+  ],
+  "inflight_actions": {
+    "completed_receipts_are_immutable": true,
+    "not_dispatched_actions_may_be_cancelled": true,
+    "dispatched_actions_are_never_claimed_cancelled_without_executor_proof": true,
+    "parallel_batch_requires_deferred_until_running_members_reach_terminal_receipts": true,
+    "deferred_event_requires_waiting_for_kind": true,
+    "deferred_tool_event_requires_tool_name_tool_call_id_and_cancellable": true,
+    "unknown_outcome_event": "action_outcome_unknown",
+    "unknown_outcome_never_triggers_automatic_replay": true
+  },
+  "stop_contract": {
+    "receipt_deadline_ms": 500,
+    "completion_deadline_is_not_globally_promised": true,
+    "executor_capabilities": ["cancellable", "cooperative_only", "non_cancellable_after_dispatch"],
+    "forced_process_kill_as_generic_timeout_fallback_forbidden": true,
+    "non_cancellable_action_must_be_named_to_owner": true
+  },
+  "approval_security": {
+    "reclassify_risk_after_every_append_or_redirect": true,
+    "recompute_pending_action_digest_after_every_append_or_redirect": true,
+    "approval_survives_only_when_action_risk_digest_and_expiry_are_unchanged": true,
+    "changed_payload_invalidates_prior_approval": true,
+    "consumed_approval_never_reused": true
+  },
+  "prompt_contract": {
+    "directive_is_not_serialized_as_an_ordinary_user_task": true,
+    "append_and_redirect_are_structurally_distinct": true,
+    "observed_web_file_email_content_cannot_create_a_directive": true,
+    "only_authenticated_owner_chat_input_can_create_a_directive": true
+  },
+  "planned_api": {
+    "create_directive": "POST /api/chat/turns/{root_request_id}/directives",
+    "list_directives": "GET /api/chat/turns/{root_request_id}/directives",
+    "cancel_directive": "POST /api/chat/turns/{root_request_id}/directives/{directive_id}/cancel",
+    "active_turn": "GET /api/conversations/{conversation_id}/active-turn",
+    "csrf_required_for_mutations": true,
+    "conversation_ownership_checked_server_side": true
+  },
+  "planned_sse_events": [
+    "directive_received",
+    "directive_deferred",
+    "directive_applied",
+    "directive_rejected",
+    "directive_cancelled",
+    "action_outcome_unknown"
+  ],
+  "ui_contract": {
+    "input_remains_enabled_during_active_turn": true,
+    "enter_defaults_to_append_during_active_turn": true,
+    "explicit_modes": ["Orienter maintenant", "Faire ensuite", "Arrêter"],
+    "immediate_receipt_visible": true,
+    "application_marker_visible": true,
+    "queued_directive_can_be_edited_or_cancelled_before_application": true,
+    "deferred_reason_is_specific_not_generic": true,
+    "partial_backend_only_activation_forbidden": true
+  },
+  "bounds": {
+    "maximum_directives_per_root_turn": 32,
+    "maximum_text_characters_per_directive": 8000,
+    "maximum_pending_next_tasks_per_conversation": 8,
+    "list_page_maximum": 100
+  },
+  "privacy": {
+    "directive_text_is_personal_data": true,
+    "local_storage_only_by_default": true,
+    "conversation_export_includes_directives": true,
+    "conversation_erasure_deletes_directives": true,
+    "encrypted_full_export_includes_directives": true,
+    "technical_logs_forbid_directive_text": true,
+    "technical_logs_allow": ["correlation_id", "kind", "sequence", "status", "duration_ms", "digest"]
+  },
+  "activation": {
+    "implementation_authorized": false,
+    "feature_flag_default": false,
+    "user_visible_activation_requires_backend_agent_ui_and_negative_tests_together": true,
+    "no_intermediate_release_may_reduce_current_input_capability": true,
+    "separate_versioned_authorization_required": true
+  },
+  "required_tests": [
+    "same_conversation_two_ordinary_turns_never_run_concurrently",
+    "different_conversations_run_concurrently",
+    "provisional_conversation_key_is_serialized",
+    "approval_continuation_cannot_deadlock",
+    "directive_sequences_are_monotonic_under_concurrency",
+    "duplicate_directive_id_is_idempotent",
+    "append_during_model_iteration",
+    "redirect_before_tool_dispatch",
+    "directive_during_parallel_batch_is_deferred_with_exact_reason",
+    "changed_digest_invalidates_approval",
+    "stop_before_dispatch",
+    "stop_during_cancellable_action",
+    "stop_during_non_cancellable_action",
+    "unknown_mutation_outcome_is_never_replayed",
+    "browser_reconnect_preserves_directives",
+    "backend_restart_preserves_and_reconciles_directives",
+    "two_tabs_same_conversation_are_serialized",
+    "conversation_erasure_removes_directives",
+    "logs_contain_no_directive_text",
+    "observed_content_cannot_steer",
+    "queue_bounds_fail_closed",
+    "positive_canary_normal_chat_still_works"
+  ],
+  "logging_impact": "New structured lifecycle events are required at implementation time; raw directive text is forbidden from technical logs.",
+  "security_status": "UNASSESSED_UNTIL_RUNTIME_NEGATIVE_TESTS",
+  "rollback": "Before activation, revert each implementation commit. After activation, disable the feature flag first, drain or cancel pending directives without replay, then revert code. Any additive SQLite migration requires a separate offline down migration and verified backup before delivery."
+}
