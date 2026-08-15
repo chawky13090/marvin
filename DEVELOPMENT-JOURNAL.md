@@ -5,6 +5,17 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-16 — v2.675.0 — infrastructure de pilotage autorisée hors ligne
+
+Le pré-enregistrement v1 est figé au commit `b25d9c6` et relié à son SHA-256. Une autorisation
+distincte borne la prochaine tranche à un repository SQLite injectable et des tests hors ligne :
+création idempotente, séquence monotone, transitions comparées, annulation, slot exclusif par
+conversation et rattachement de la clé provisoire. Toute intégration runtime, migration réelle,
+route, UI, appel modèle ou outil métier reste interdite. Les sources actuelles sont épinglées
+depuis le commit de pré-enregistrement afin que leur évolution future n'invalide pas la preuve.
+Journalisation et données : aucun événement ni stockage runtime. Sécurité : dix refus négatifs
+obligatoires. Rollback : réversion atomique du commit v2.675.
+
 ## 2026-08-16 — v2.674.0 — pilotage des tours chat pré-enregistré
 
 Demande : permettre au propriétaire d'orienter Marvin pendant un tour comme dans Codex, sans

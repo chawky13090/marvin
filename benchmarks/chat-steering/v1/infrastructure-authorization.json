@@ -1,0 +1,54 @@
+{
+  "schema": "marvin.chat-turn-steering-infrastructure-authorization/1.0",
+  "status": "authorized_offline_infrastructure_only",
+  "preregistration_commit": "b25d9c6e013a3d60041714c0984d5f9fca65a767",
+  "preregistration_sha256": "8614c1d0f48a2857750e539bd78bed28dbaba14e659fe56e71a18d8be460fd28",
+  "authorized_outputs": [
+    "backend/repositories/chat_turn_directives.py",
+    "scripts/test_chat_turn_directives_repository.py"
+  ],
+  "authorized_capabilities": [
+    "injectable_sqlite_schema_for_tests",
+    "create_idempotent_directive",
+    "monotonic_sequence_allocation",
+    "list_directives",
+    "cancel_pending_directive",
+    "transition_state_with_compare_and_swap",
+    "reserve_and_release_conversation_slot",
+    "rebind_provisional_conversation_key"
+  ],
+  "forbidden_in_this_slice": {
+    "runtime_import": true,
+    "production_database_migration": true,
+    "api_route": true,
+    "agent_checkpoint": true,
+    "frontend_change": true,
+    "feature_activation": true,
+    "business_tool_execution": true,
+    "cloud_model_call": true,
+    "persistent_marvin_data_change": true
+  },
+  "required_negative_tests": [
+    "second_root_turn_same_conversation_key_refused",
+    "different_conversation_keys_accepted",
+    "duplicate_client_directive_id_idempotent",
+    "directive_limit_refused",
+    "text_limit_refused",
+    "invalid_transition_refused",
+    "terminal_directive_immutable",
+    "cancel_applied_refused",
+    "rebind_collision_refused",
+    "foreign_root_directive_refused"
+  ],
+  "source_baseline_sha256": {
+    "backend/chat_turn_runtime.py": "63146ba1e60feff59b5fb9715652657a1c137db66d1f46e0ba4889a3773751ed",
+    "backend/db_migrations.py": "4db56368cbb74228d796a69e6c83b108c0fcba9938e09c33d02518fefd9f26d1",
+    "backend/repositories/tool_approvals.py": "bf294426042b98fff8b47676334e352bb24db289b257508d4ad7369697b7af68",
+    "backend/api/agent_gateway.py": "fcb24edb8bde44fcb89c2bfcab01dcc54f3fcff6c194f700d9f4e9ccd3bdb92f",
+    "lib/contexts/ChatContext.jsx": "d1951357fd04a7852bad9df9f17c81656010419b096781135783dfcf80125381",
+    "components/chat/ChatContainer.jsx": "e00290dc9bc8018f392b3289099f02a4797a709365c759b6764b19103d59aa2c",
+    "components/chat/ChatInput.jsx": "7aaa54028a69afddad0c656217b3299358b6bdc22bec909133bf8997d993dd02"
+  },
+  "authorization_consumed": false,
+  "rollback": "Revert the offline repository implementation commit. No production schema, runtime import, route, setting, user data, model, tool or process may change in this slice."
+}
