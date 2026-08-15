@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 341
+EXPECTED_STAGE_COUNT = 342
 
 
 @dataclass(frozen=True)
@@ -245,6 +245,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Gel du holdout routage v1.4",
             (python, "scripts/test_tool_selection_v14_holdout_freeze.py"),
+        ),
+        Stage(
+            "Gel du runner de validation routage v1.4",
+            (python, "scripts/test_tool_selection_v14_validation_runner.py"),
         ),
         Stage(
             "Équivalence du cache des motifs de routage",

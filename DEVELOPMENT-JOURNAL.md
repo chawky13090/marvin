@@ -33,6 +33,14 @@ canaris positifs, quatre négatifs, registre 364, budget de test 18, 536 requêt
 zéro divergence sur les termes ordinaires et holdout v1.4 toujours intact. Le holdout neuf ne
 sera ouvert qu'après le commit produit et l'autorisation versionnée de la campagne.
 
+Après le gel produit `2c054be4`, le préflight v1.4 a reconstruit l'index sémantique en
+218 secondes puis évalué les quatre budgets matériels sans appel LLM : Eco 0,80,
+Balanced/Performance/Max 0,90. Par famille, le lancement atteint 0,90 en Eco et 1,00 dans
+les autres modes; la gestion logicielle atteint 0,70 puis 0,80. Ces résultats brûlent le
+holdout pour toute optimisation ultérieure. Le runner Stage B est gelé sur quatre modes,
+cinq répétitions et 400 appels maximum; toute exécution métier, effet hôte, ablation de garde,
+publication partielle ou modification de seuil après résultat reste interdite.
+
 ## 2026-08-15 — v2.660.0 — parcours réels agrégés et validation future gelée
 
 L'analyse locale joint désormais une demande humaine persistée à ses exécutions uniquement

@@ -1,0 +1,76 @@
+{
+  "schema": "marvin.tool-selection-v14-validation-runner-freeze/1.0",
+  "status": "frozen_after_preflight_before_benchmark_execution",
+  "product_commit": "2c054be413a54c593ea8e554076d233def1ee119",
+  "benchmark": {
+    "model": "mistral-large-3:675b-cloud",
+    "digest": "3130fd5a5a1eb4b208be74bf0273357c14c3576c6ba8d78f98b960e91919d77b",
+    "client_num_ctx": null
+  },
+  "modes": {
+    "eco": 18,
+    "balanced": 40,
+    "performance": 80,
+    "max": 250
+  },
+  "repetitions_per_intent": 5,
+  "seed": 2661,
+  "concurrency_maximum": 3,
+  "preflight": {
+    "holdout_count": 20,
+    "candidate_rows": 80,
+    "candidate_recall": {
+      "eco": 0.8,
+      "balanced": 0.9,
+      "performance": 0.9,
+      "max": 0.9
+    },
+    "family_candidate_recall": {
+      "eco": {"application_launch": 0.9, "software_management": 0.7},
+      "balanced": {"application_launch": 1.0, "software_management": 0.8},
+      "performance": {"application_launch": 1.0, "software_management": 0.8},
+      "max": {"application_launch": 1.0, "software_management": 0.8}
+    },
+    "benchmark_model_call_count": 0,
+    "business_tool_execution_count": 0,
+    "host_side_effect_count": 0
+  },
+  "decision": {
+    "accepted_tool_action_global_minimum": 0.85,
+    "accepted_tool_action_per_family_minimum": 0.8,
+    "repeat_stability_minimum": 0.8,
+    "argument_schema_validity_minimum": 0.98,
+    "candidate_membership_violation_maximum": 0,
+    "text_only_maximum_rate": 0.02,
+    "global_average_never_masks_family_failure": true,
+    "mode_assessed_independently": true,
+    "restricted_activation_requires_explicit_modes_and_families": true,
+    "no_threshold_or_product_change_after_result": true,
+    "holdout_burned_for_future_product_tuning": true
+  },
+  "frozen_hashes": {
+    "scripts/run_tool_selection_v14_validation.py": "646819eaba42e3cc64434c78bf445582e1db47ed74b5389522db388f021cc8e9",
+    "benchmarks/tool-selection/v1.4/holdout-freeze-manifest.json": "317b3c461d43db0225a4c09cba1500a62218f8a8f624b514548352f587165ced",
+    "benchmarks/tool-selection/v1.4/morphology-preregistration.json": "bda0dd5d9f3f34d0e4daf1e72cad5a2d0455abc3fecb91e99de8b73f946bfbdd",
+    "backend/agent_tool_selection.py": "34a77e018721810ca63ca287b42cb90e12723c8f3dc90ead729fda6de4b59373",
+    "backend/capability_discovery.py": "083f64e3d2854fb5948ce5e989a434b818380ad37441e22b0c453278a8c55f74",
+    "backend/tool_capability_ranking.py": "9fec9b902008413e8e384d52eaf20e624f235edf109dffd4be4e4f485694685c",
+    "backend/tool_router.py": "aa8cc084e9dd19ca6e45bbce3ad72970d59f55c3dbc6abff8a6255f33638f7a2",
+    "backend/agent_prompt.py": "e735855dc2820a0b77ce19382317241b40eb6060e011ff6866993ac59bab0131",
+    "backend/tools.py": "96f51904538c011520bc43e566427495b329f27c1c9e44a4e8680cac65a22f5a"
+  },
+  "safety": {
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "security_guards_are_not_ablated": true,
+    "tool_registry_count": 364,
+    "partial_result_publication_forbidden": true,
+    "authorization_required_separately": true
+  },
+  "authorization": {
+    "benchmark_model_calls": false,
+    "maximum_calls": 400,
+    "single_use_artifact_required": true
+  },
+  "rollback": "Before execution, revert the runner-freeze commit. After execution, preserve freeze, authorization and result immutably."
+}
