@@ -19726,3 +19726,16 @@ Sécurité : l'exécution alternative et l'UAC restent autorisées après confir
 les actions silencieuses restent interdites. Le replay mutant automatique est réservé à la VM.
 Journalisation : aucune nouvelle donnée; les reçus deviennent plus exacts. Le gate passe de 356
 à 357 étapes. Rollback : réversion atomique de v2.672; aucun schéma ou contenu Marvin n'est modifié.
+## 2026-08-16 — v2.679.0 — pilotage actif des tours de chat
+
+Le pilotage en cours de tour est activé après gel du résultat hors ligne. Une précision ou une
+redirection est intégrée au prochain point de décision sans rejouer les actions terminées; une
+tâche « ensuite » est mise en file puis lancée après l'événement terminal. Le verrou reste détenu
+pendant une approbation et sa continuation rejoint la racine sans interblocage. L'arrêt reste
+coopératif et l'interface annonce honnêtement l'attente d'une action déjà partie. Les textes de
+directive restent des données de conversation privées, exclus des logs techniques. Validation :
+tests repository/runtime/migration, build Next.js 16.2.12 et gate rapide 357/357 avant activation;
+les smokes live et redémarrages froids sont consignés dans l'artefact d'activation. Rollback :
+poser `chat_turn_steering_enabled=false`, redémarrer Marvin, conserver les reçus terminaux et
+réverter le commit v2.679; la descente SQLite v7 n'est requise que pour retirer le schéma hors
+ligne sur une base sauvegardée.

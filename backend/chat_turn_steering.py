@@ -16,7 +16,10 @@ connection_scope = db
 
 
 def enabled() -> bool:
-    return database.get_setting("chat_turn_steering_enabled") is True
+    value = database.get_setting("chat_turn_steering_enabled")
+    # Activé pour les installations neuves après qualification v1. Une valeur
+    # explicitement fausse reste le coupe-circuit opérationnel et le rollback.
+    return value is None or value is True
 
 
 def reserve(conversation_key: str, root_request_id: str, conversation_id: str = "") -> dict:
