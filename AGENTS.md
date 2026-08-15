@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.663.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.664.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.663.0)
+## 9. État actuel (v2.664.0)
+
+**v2.664 (changement de modèle vérifié après réponse ambiguë)** : un statut 502/503/504 ou une
+rupture réseau après `POST /api/settings` ne déclenche toujours aucun rejeu de mutation. Pour
+`set_model` seulement, le frontend effectue une unique lecture `/api/status`; si et seulement si
+`selectedModel` égale exactement le modèle demandé, l'opération est reconnue comme réussie.
+Sinon l'état `MUTATION_OUTCOME_UNKNOWN` et l'action de vérification utilisateur sont conservés.
+Les téléchargements de modèles ne bénéficient pas de cette déduction et restent non confirmés.
+Rollback : réversion atomique du commit v2.664; aucune donnée ou migration persistante.
 
 **v2.663 (récupération Docker AF_UNIX bornée)** : quand Docker Desktop échoue sur les sockets
 Windows orphelines `dockerInference` ou `docker-secrets-engine/engine.sock`, le bootstrap

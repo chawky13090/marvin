@@ -19500,3 +19500,17 @@ Test Forge retirent désormais uniquement cette variable pour laisser le shell W
 reconstruire ses chemins natifs; leurs deux tests passent. La documentation portable est alignée
 sur 2.663.0. L'ancien arbre `next dev` resté seul sur le port 3000 a été arrêté et le build de
 production Next.js 16.2.12 a compilé les 41 pages avec succès; Marvin reste volontairement arrêté.
+## 2026-08-15 — v2.664.0 — changement de modèle confirmé par lecture d'état
+
+Un changement vers `glm-5.2:cloud` a été persisté et rendu actif, mais le proxy Next a répondu
+503; l'interface a donc remonté `MutationOutcomeUnknownError` malgré un résultat métier réussi.
+La protection précédente avait correctement interdit tout rejeu automatique du POST, mais ne
+réconciliait pas l'état observable. `postChatSetting` effectue désormais, uniquement après une
+réponse ambiguë de `set_model`, une lecture `/api/status`. Une égalité exacte de `selectedModel`
+avec la demande transforme le résultat en succès vérifié; toute divergence ou panne de lecture
+maintient l'incertitude. `pull_model` et les autres mutations ne sont jamais déduits ni rejoués.
+Le test reproduit POST 503 + état concordant, puis POST 503 + état divergent, et impose deux
+appels maximum dont un seul POST. Journalisation et données personnelles : aucun contenu nouveau;
+la console ne reçoit plus une fausse erreur lorsque l'état est prouvé. Sécurité : aucune baisse
+des protections CSRF ou d'autorisation, aucun retry de mutation. Rollback : réversion atomique
+de v2.664; le réglage `active_model` existant reste inchangé.

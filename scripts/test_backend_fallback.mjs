@@ -138,6 +138,37 @@ assert.equal(settingCalls.length, 1);
 assert.equal(settingCalls[0].url, '/api/settings');
 assert.deepEqual(JSON.parse(settingCalls[0].init.body), { action: 'set_model', modelName: 'qwen3:4b' });
 
+const verifiedSettingCalls = [];
+const verifiedSetting = await postChatSetting('set_model', 'glm-5.2:cloud', {
+  fetchImpl: async (url, init) => {
+    verifiedSettingCalls.push({ url: String(url), method: init?.method });
+    if (verifiedSettingCalls.length === 1) {
+      return new Response('{"error":"temporarily unavailable"}', { status: 503 });
+    }
+    return new Response('{"ollama":{"selectedModel":"glm-5.2:cloud"}}', { status: 200 });
+  },
+});
+assert.equal(verifiedSetting.status, 200);
+assert.deepEqual(verifiedSettingCalls, [
+  { url: '/api/settings', method: 'POST' },
+  { url: '/api/status', method: 'GET' },
+]);
+
+let unverifiedSettingCalls = 0;
+await assert.rejects(
+  postChatSetting('set_model', 'glm-5.2:cloud', {
+    fetchImpl: async () => {
+      unverifiedSettingCalls += 1;
+      if (unverifiedSettingCalls === 1) {
+        return new Response('{"error":"temporarily unavailable"}', { status: 503 });
+      }
+      return new Response('{"ollama":{"selectedModel":"qwen3:4b"}}', { status: 200 });
+    },
+  }),
+  isMutationOutcomeUnknown,
+);
+assert.equal(unverifiedSettingCalls, 2, 'une ambiguïté ne permet qu’une lecture de vérification, jamais un second POST');
+
 for (const status of [502, 503, 504]) {
   let callsForStatus = 0;
   await assert.rejects(
