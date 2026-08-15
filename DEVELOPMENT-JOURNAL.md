@@ -19607,3 +19607,17 @@ confirmation, reprise automatique et conversation Forge. Le futur rapport ne pub
 compteurs et empreinte agrégée. Aucun calcul sur la base réelle n'a lieu avant ce commit. Sécurité :
 lecture seule, aucune donnée personnelle publique. Le gate passe de 354 à 355 étapes. Rollback :
 réversion atomique de v2.670; aucune donnée ou configuration Marvin n'est modifiée.
+
+## 2026-08-15 — v2.671.0 — périmètre synthétique calculé depuis l'usage réel
+
+Après le commit de l'extracteur, 729 messages utilisateur ont été lus une seule fois depuis
+SQLite en mode read-only. Après exclusions et déduplication, les compteurs sont : installation
+13, désinstallation 3, recherche 1, inventaire 0, vérification des mises à jour 0, mise à niveau
+0 et panneau manuel 0. Seule l'installation atteint le seuil pré-enregistré de cinq.
+
+Le périmètre r4 calculé contient donc six familles, et non les trois estimées auparavant. Il ne
+sera pas réduit par jugement après observation. L'artefact est agrégé, sans texte, identifiant,
+outil exécuté ou reçu, et déclare explicitement ne pas être un score de Marvin ni un holdout
+indépendant. Aucun appel Cloud ou outil métier n'a été exécuté. Le gate passe de 355 à 356
+étapes. Rollback : conserver l'artefact historique; aucune donnée ou configuration Marvin n'est
+modifiée.

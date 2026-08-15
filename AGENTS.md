@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.670.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.671.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.670.0)
+## 9. État actuel (v2.671.0)
+
+**v2.671 (couverture réelle logicielle agrégée)** : sur 729 messages utilisateur lus en mode
+SQLite read-only, la rubrique figée retient après déduplication 13 demandes d'installation,
+trois de désinstallation, une de recherche et aucune pour inventaire, vérification des mises à
+jour, mise à niveau ou panneau manuel. Seule l'installation atteint le seuil de cinq; les six
+autres familles sont mécaniquement éligibles à un éventuel corpus synthétique r4. Ce résultat
+est rétrospectif, non indépendant et interdit comme score produit. Aucun texte, identifiant,
+outil ou reçu n'est publié. Le gate compte 356 étapes. Rollback : conserver l'artefact comme
+preuve; aucune donnée Marvin n'a été modifiée.
 
 **v2.670 (extracteur rétrospectif de couverture logicielle)** : un extracteur distinct du
 sélecteur lit uniquement les messages utilisateur via SQLite read-only, classe sept actions
