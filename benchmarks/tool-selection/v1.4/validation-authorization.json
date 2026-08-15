@@ -1,0 +1,17 @@
+{
+  "schema": "marvin.tool-selection-v14-validation-authorization/1.0",
+  "status": "authorized_once_before_result",
+  "source_commit": "a894126228908aca12b1b71dca54fe924de5a00d",
+  "runner_freeze_sha256": "68de2b4ebe5dcbc8c2be0de6b4be48b558774c409a2c5549dfcb1d33520de1d8",
+  "benchmark_model_calls": true,
+  "maximum_calls": 400,
+  "business_tool_execution": false,
+  "host_side_effects": false,
+  "product_activation": false,
+  "security_guard_change": false,
+  "partial_result_publication": false,
+  "single_use": true,
+  "consumed_when": "benchmarks/tool-selection/v1.4/validation-result.json exists",
+  "interrupted_run_action": "DISCARD_AND_REQUIRE_NEW_AUTHORIZATION",
+  "rollback": "Before execution, revert this authorization commit. After execution, preserve authorization and result immutably."
+}

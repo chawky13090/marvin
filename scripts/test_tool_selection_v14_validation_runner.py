@@ -38,7 +38,11 @@ def main() -> None:
     assert value["safety"]["tool_registry_count"] == 364
     for relative, expected in value["frozen_hashes"].items():
         assert sha256(ROOT / relative) == expected, relative
-    assert not (BASE / "validation-result.json").exists()
+    result = BASE / "validation-result.json"
+    if result.exists():
+        authorization = json.loads((BASE / "validation-authorization.json").read_text(encoding="utf-8"))
+        assert authorization["consumed_when"].endswith("validation-result.json")
+        assert authorization["single_use"] is True
     print("Tool selection v1.4 runner OK - 4 modes, 5 repetitions, 400 calls locked, zero execution.")
 
 
