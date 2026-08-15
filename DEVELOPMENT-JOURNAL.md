@@ -19531,3 +19531,19 @@ gelée séparément. Sécurité et confidentialité : zéro exécution métier, 
 donnée personnelle. Journalisation : agrégats sans contenu uniquement. Validation : contrat et
 empreintes historiques vérifiés; le plan de gate passe de 349 à 350 étapes. Rollback : réversion
 atomique de v2.665, sans modifier les artefacts historiques ni les données Marvin.
+
+## 2026-08-15 — v2.666.0 — runner r3 observable, testé et encore verrouillé
+
+Le runner r3 applique sans modification les sept intentions, les contrats d'oracle et de revue,
+la nouveauté et la cible existants. Il conserve un pool de vingt auteurs par intention avec de
+nouvelles graines, mais ne peut pas démarrer car son gel d'autorisation séparé n'existe pas.
+Son diagnostic public ne contient que les neuf compteurs agrégés autorisés, la liste ordonnée
+des étapes achevées et l'éventuel étage/intention d'échec. Une insuffisance écrit d'abord le
+diagnostic atomique puis lève l'erreur; le chemin succès publie le même schéma.
+
+Les canaris hors ligne valident un succès, une insuffisance, l'ordre écriture-erreur, le refus
+d'un abandon sans attribution, les compteurs et l'absence de prompts, identifiants, appels,
+verdicts et données personnelles. Aucun appel Cloud ni outil métier n'a été exécuté. Sécurité :
+aucun secret ou contenu Cloud persistant, zéro effet hôte. Journalisation : agrégats uniquement.
+Le gate passe de 350 à 351 étapes. Rollback : réversion atomique de v2.666; aucun format produit
+ni aucune donnée Marvin n'est modifié.

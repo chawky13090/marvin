@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.665.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.666.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.665.0)
+## 9. État actuel (v2.666.0)
+
+**v2.666 (runner observable holdout v1.5 r3 verrouillé)** : un nouveau runner indépendant
+publie uniquement les neuf compteurs agrégés pré-enregistrés par intention, les étapes achevées
+et, en cas d'arrêt, l'étage et l'intention concernés. Le diagnostic est écrit atomiquement avant
+l'exception d'insuffisance et également après une génération complète. Des canaris hors ligne
+prouvent les chemins succès, échec fermé, confidentialité et absence de résultat individuel.
+Le fichier d'autorisation r3 n'existe pas encore : aucun appel Cloud n'est donc possible. Le
+gate compte 351 étapes. Rollback : réversion atomique du commit v2.666; aucun produit, modèle,
+donnée persistante, seuil, contrat, outil ou budget n'est modifié.
 
 **v2.665 (observabilité holdout v1.5 pré-enregistrée)** : après deux générations indépendantes
 avortées sans holdout public, un contrat immuable définit les seuls compteurs agrégés autorisés

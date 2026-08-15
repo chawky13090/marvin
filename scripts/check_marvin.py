@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 350
+EXPECTED_STAGE_COUNT = 351
 
 
 @dataclass(frozen=True)
@@ -266,6 +266,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Pre-enregistrement observabilite holdout v1.5 r3",
             (python, "scripts/test_tool_selection_v15_observability_preregistration.py"),
+        ),
+        Stage(
+            "Canaris observabilite holdout v1.5 r3",
+            (python, "scripts/test_tool_selection_v15_holdout_observability_r3.py"),
         ),
         Stage(
             "Gel du générateur holdout routage v1.4",
