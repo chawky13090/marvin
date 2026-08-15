@@ -19547,3 +19547,17 @@ verdicts et données personnelles. Aucun appel Cloud ni outil métier n'a été 
 aucun secret ou contenu Cloud persistant, zéro effet hôte. Journalisation : agrégats uniquement.
 Le gate passe de 350 à 351 étapes. Rollback : réversion atomique de v2.666; aucun format produit
 ni aucune donnée Marvin n'est modifié.
+
+## 2026-08-15 — v2.667.0 — gel de la troisième génération holdout v1.5
+
+Après validation hors ligne du runner observable, un artefact distinct autorise exactement une
+troisième génération synthétique. Il épingle le runner, le pré-enregistrement, les deux preuves
+r2, quatre sources produit, les sept intentions, les graines et les cinq modèles Cloud. Les cinq
+tags ont été observés sur l'API Ollama locale avec leurs digests attendus et un `remote_host`
+Ollama Cloud. Aucun prompt de génération n'a été envoyé pendant le gel.
+
+Le pool reste vingt auteurs par intention, la cible cinq et toutes les règles d'oracle, revue et
+nouveauté sont inchangées. Stage B, exécution métier et effet hôte restent interdits. Sécurité :
+contenu synthétique uniquement, aucun `num_ctx` client, aucune donnée personnelle ni réponse
+Cloud brute persistée. Le gate passe de 351 à 352 étapes. Rollback : le gel est une preuve
+historique à conserver; aucune source produit ou donnée Marvin n'est modifiée.

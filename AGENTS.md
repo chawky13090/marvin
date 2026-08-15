@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.666.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.667.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.666.0)
+## 9. État actuel (v2.667.0)
+
+**v2.667 (autorisation r3 à usage unique gelée)** : le runner observable, son pré-enregistrement,
+les sources produit, les cinq rôles Cloud et leurs digests réels sont liés par SHA-256 avant tout
+appel de génération. Les seuils, contrats, intentions, nouveauté, pool de vingt et cible de cinq
+restent ceux de la tentative r2; seules de nouvelles graines indépendantes sont déclarées. Cette
+autorisation permet une unique génération synthétique r3, interdit Stage B, les outils métier et
+les effets hôte, et impose le diagnostic agrégé même en cas d'arrêt. Le gate compte 352 étapes.
+Rollback : conserver le gel comme preuve; aucun produit ni donnée Marvin n'est modifié.
 
 **v2.666 (runner observable holdout v1.5 r3 verrouillé)** : un nouveau runner indépendant
 publie uniquement les neuf compteurs agrégés pré-enregistrés par intention, les étapes achevées
