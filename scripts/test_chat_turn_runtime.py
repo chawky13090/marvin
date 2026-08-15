@@ -263,7 +263,11 @@ def main() -> int:
         path = Path(directory) / "turns.db"
         with db(path) as connection:
             apply_migrations(connection, MIGRATIONS)
-        asyncio.run(_exercise(path))
+        # Les scénarios historiques du journal durable ne fournissent pas de clé
+        # de conversation. Ils caractérisent ce composant seul; le scénario de
+        # pilotage réactive explicitement la fonctionnalité dans son propre bloc.
+        with patch.object(chat_turn_steering, "enabled", return_value=False):
+            asyncio.run(_exercise(path))
         with db(path) as connection:
             assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
             assert connection.execute(
