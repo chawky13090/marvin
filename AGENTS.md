@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.658.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.659.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.658.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.659.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.658.0)
+## 9. État actuel (v2.659.0)
+
+**v2.659 (corrélation locale des décisions d'outil)** : chaque appel agentique traverse
+désormais le gateway avec son `tool_call_id` et reçoit l'identifiant exact de la ligne
+`tool_executions`. Le reçu persistant relie donc requête, appel, exécution et preuve sans
+heuristique temporelle. Les métadonnées locales enregistrent version Marvin, modèle réel,
+mode, profil, version du sélecteur, nombre de candidats et SHA-256 de leurs noms triés; aucun
+prompt, contenu utilisateur, description ni liste brute n'est conservé. L'enrichissement est
+désactivable par le réglage `local_execution_telemetry` ou la variable
+`MARVIN_LOCAL_EXECUTION_TELEMETRY=0`; la corrélation d'intégrité reste disponible. Une
+migration additive accepte les anciennes bases et un rollback hors ligne sauvegardé supprime
+les colonnes. Rollback produit : réversion atomique de v2.659 puis exécution optionnelle de
+`scripts/rollback_execution_telemetry_schema.py --confirmed` avec Marvin arrêté.
 
 **v2.658 (reprise Docker/SearXNG et sonde PowerShell exacte)** : Docker Desktop 4.85.0
 échouait avant son moteur WSL sur des sockets runtime orphelines des composants optionnels

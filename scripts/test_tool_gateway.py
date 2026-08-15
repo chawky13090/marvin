@@ -22,6 +22,7 @@ class Database:
     @classmethod
     def log_execution(cls, *values, **options):
         cls.logs.append((values, options))
+        return {"id": f"execution-{len(cls.logs)}"}
 
 
 def normalize(name, result, *, duration_ms):
@@ -187,6 +188,13 @@ async def main() -> None:
             conversation_id="conversation-ui",
             request_id=ui_request_id,
             confirmed_by_ui=True,
+            tool_call_id="tool-call-ui",
+            execution_context={
+                "app_version": "2.659.0",
+                "candidate_count": 18,
+                "candidate_set_sha256": "a" * 64,
+            },
+            canonicalized_from="legacy_file_delete",
         ),
         registry=registry,
         specifications=specifications,
@@ -197,6 +205,10 @@ async def main() -> None:
     assert ui.result["success"] and calls[-1]["confirmed"] is True
     assert Database.logs[-1][1]["conversation_id"] == "conversation-ui"
     assert Database.logs[-1][1]["request_id"] == ui_request_id
+    assert Database.logs[-1][1]["tool_call_id"] == "tool-call-ui"
+    assert Database.logs[-1][1]["execution_context"]["candidate_count"] == 18
+    assert Database.logs[-1][1]["canonicalized_from"] == "legacy_file_delete"
+    assert ui.execution_id
     assert AUDIT[-1][4] == ui_request_id
 
     calls_before_mcp = len(calls)

@@ -40,6 +40,16 @@ est retenu 30 jours; un manifeste interrompu est retenu au moins 90 jours et n'e
 qu'après acquittement de son alerte. La migration historique ne consulte que la racine
 explicitement fournie; aucun disque ni profil utilisateur n'est balayé.
 
+## Corrélation locale des exécutions d'outils
+
+La table SQLite `tool_executions` conserve les reçus techniques bornés et, pour les appels
+agentiques, une corrélation `request_id` / `tool_call_id` / `execution_id`. Les métadonnées
+de routage sont limitées à la version Marvin, au nom du modèle, au mode, au profil, au nombre
+de candidats et au SHA-256 de l'ensemble trié de leurs noms. Aucun prompt, contenu de message,
+description d'outil ni ensemble de candidats en clair n'est ajouté. Cette autorité SQLite est
+incluse dans la sauvegarde globale; elle ne quitte jamais le poste sans export explicitement
+chiffré. L'enrichissement de routage est désactivable localement.
+
 ## Format et garanties
 
 - archive ZIP interne uniquement après copie en staging bornée ;

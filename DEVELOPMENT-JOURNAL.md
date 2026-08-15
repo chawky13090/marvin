@@ -5,6 +5,39 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-15 — v2.659.0 — corrélation locale versionnée des appels d'outils
+
+L'analyse des conversations réelles a établi que `request_id` corrélait un tour, mais pas un
+reçu d'outil individuel. L'identifiant `toolCallId` existait déjà dans les messages sans
+atteindre le gateway, tandis que l'identifiant de `tool_executions` n'était pas renvoyé au
+reçu persistant. La jointure dépendait donc du nom, de la conversation et de l'heure.
+
+Le même `tool_call_id` traverse désormais batch, dispatch et gateway. Le gateway reste
+l'unique écrivain de l'exécution et renvoie son `execution_id`; le reçu outil persistant lie
+les deux identifiants sans second journal ni rejeu. Chaque ligne agentique porte aussi des
+métadonnées bornées : version Marvin, modèle effectivement utilisé, mode matériel, profil,
+version du sélecteur, nombre de candidats et SHA-256 de leurs noms triés. Aucun prompt,
+description, résultat complet ni liste brute de candidats n'est ajouté. L'enrichissement est
+local par défaut et désactivable; la corrélation d'intégrité reste locale.
+
+La migration est additive et idempotente sur les anciennes bases. Un index partiel interdit
+qu'un même appel identifie deux exécutions. Le rollback hors ligne refuse la base principale
+si le backend écoute encore, crée une sauvegarde exacte, retire les colonnes en transaction et
+rejoue `integrity_check`. Sécurité : aucune donnée n'est envoyée sur le réseau; longueurs,
+formats et empreintes sont validés. Journalisation : une panne d'observation ne rejoue jamais
+l'action métier.
+
+Le premier gate a révélé deux défauts de validation, sans défaut métier. Le test de portabilité
+comparait une source historique à la copie courante et aurait donc interdit toute évolution
+sémantique de `agent.py`; il vérifie maintenant l'octet du commit source historique tout en
+imposant séparément UTF-8/LF au fichier courant. Le build Next a correctement refusé de tourner
+avec Turbopack actif; le frontend a été arrêté, le build rejoué puis le frontend redémarré.
+Résultats observés : gate exhaustif 332 exécutés + 4 skips live sur 336, zéro échec; ensuite
+28/28 contrats HTTP, 41/41 pages, chat et voix verts. Un appel réel `calculator` a relié le
+même `tool_call_id` et le même `execution_id` dans SSE, SQLite et le reçu persistant, avec
+Marvin 2.659.0, modèle `glm-5.2:cloud`, mode `balanced` et sélecteur `llm-native/v1`. Docker
+29.6.2, 80 moteurs SearXNG et un `web_search` réel via le gateway ont aussi été revérifiés.
+
 ## 2026-08-15 — v2.658.0 — Docker Desktop récupéré et sonde SearXNG exacte
 
 Docker Desktop 4.85.0 ne lançait plus son moteur WSL : plusieurs processus restaient bloqués

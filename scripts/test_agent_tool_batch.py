@@ -70,6 +70,7 @@ async def main() -> int:
         return SimpleNamespace(
             result=await execute(request.name, request.arguments, None, None),
             arguments=request.arguments,
+            execution_id="execution-42",
         )
 
     async def execute(_name, arguments, _conversation_id, _request_id):
@@ -96,6 +97,7 @@ async def main() -> int:
             routing_learned=True,
             evidence_sequence=23,
             evidence_hash="b" * 64,
+            execution_id=value.execution_id,
         )
 
     events = [
@@ -115,6 +117,7 @@ async def main() -> int:
             request_id="request",
             user_query="teste",
             active_model="cloud:model",
+            routing_context={"app_version": "test"},
             permission_level=2,
             explicit_tool_names={"legacy_test_forge"},
             required_tool_names={"legacy_test_forge"},
@@ -158,6 +161,7 @@ async def main() -> int:
     assert events[2]["result"]["duration"] == 125
     assert events[2]["evidence"]["proof_recorded"] is True
     assert events[2]["evidence"]["sequence"] == 23
+    assert events[2]["evidence"]["execution_id"] == "execution-42"
     assert events[0]["args"]["path"] == "project-repris"
     assert events[0]["canonicalizedFrom"] == "legacy_test_forge"
     assert read_signatures == {"forge:project"}
@@ -166,12 +170,14 @@ async def main() -> int:
     assert long_chains == [("teste", 1)]
     assert len(observed) == 1
     assert observed[0].duration_ms == 125
+    assert observed[0].execution_id == "execution-42"
     assert [message["role"] for message in messages] == ["assistant", "tool"]
     assert messages[1]["content"] == "compact:True"
     assert len(persisted) == 2
     assert persisted[0][1]["tool_calls"][0]["toolCallId"] == "tool-call-1"
     assert persisted[1][1]["tool_results"][0]["result"]["production_ready"] is True
     assert persisted[1][1]["tool_results"][0]["evidence"]["record_hash"] == "b" * 64
+    assert persisted[1][1]["tool_results"][0]["evidence"]["execution_id"] == "execution-42"
     projected_persistence = json.loads(persisted[1][0][2])
     assert projected_persistence[0]["toolCallId"] == "tool-call-1"
     assert projected_persistence[0]["result"] == "compact:True"
@@ -196,6 +202,7 @@ async def main() -> int:
             request_id="large-request",
             user_query="test volumineux",
             active_model="cloud:model",
+            routing_context={"app_version": "test"},
             permission_level=2,
             explicit_tool_names=set(),
             required_tool_names=set(),
@@ -261,6 +268,7 @@ async def main() -> int:
             request_id="request-timeout",
             user_query="teste avec budget",
             active_model="cloud:model",
+            routing_context={"app_version": "test"},
             permission_level=2,
             explicit_tool_names=set(),
             required_tool_names={"ai_test_forge"},

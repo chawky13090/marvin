@@ -27,6 +27,7 @@ class ToolObservation:
     duration_ms: int
     request_id: str | None = None
     already_observed: bool = False
+    execution_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +39,7 @@ class ObservationReceipt:
     evidence_sequence: int | None = None
     evidence_hash: str | None = None
     errors: tuple[str, ...] = ()
+    execution_id: str | None = None
 
     def public_dict(self) -> dict[str, Any]:
         """Projette un reçu sans exception interne ni donnée métier sensible."""
@@ -48,6 +50,7 @@ class ObservationReceipt:
             "record_hash": self.evidence_hash,
             "audit_recorded": self.audit_recorded,
             "execution_recorded": self.execution_recorded,
+            "execution_id": self.execution_id,
             "routing_learned": self.routing_learned,
             "warnings": list(self.errors),
             "action_must_not_be_retried": not self.evidence_recorded,
@@ -64,6 +67,7 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
     evidence_sequence: int | None = None
     evidence_hash: str | None = None
 
+    execution_id = observation.execution_id
     if observation.already_observed:
         audit_recorded = True
         execution_recorded = True
@@ -81,7 +85,7 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
             errors.append(f"audit:{type(exc).__name__}")
 
         try:
-            db.log_execution(
+            execution_receipt = db.log_execution(
                 observation.tool_name,
                 observation.arguments,
                 observation.result,
@@ -89,6 +93,8 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
                 conversation_id=observation.conversation_id,
                 request_id=observation.request_id,
             )
+            if isinstance(execution_receipt, dict):
+                execution_id = str(execution_receipt.get("id") or "") or None
             execution_recorded = True
         except Exception as exc:
             errors.append(f"execution:{type(exc).__name__}")
@@ -143,6 +149,7 @@ async def record_tool_observation(observation: ToolObservation) -> ObservationRe
         evidence_sequence=evidence_sequence,
         evidence_hash=evidence_hash,
         errors=tuple(errors),
+        execution_id=execution_id,
     )
 
 

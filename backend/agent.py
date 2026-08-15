@@ -76,6 +76,7 @@ from agent_tool_dispatch import (
     EXECUTION_TOOLS as _EXECUTION_TOOLS,
     dispatch_tool as _dispatch_tool,
 )
+from execution_telemetry import build_routing_context
 from agent_tool_postprocess import (
     postprocess_tool_result as _postprocess_tool_result,
 )
@@ -421,6 +422,10 @@ async def _run_deterministic_agent(
         arguments: dict,
         tool_conversation_id: str,
         tool_request_id: str | None,
+        *,
+        tool_call_id: str | None = None,
+        execution_context: dict | None = None,
+        canonicalized_from: str | None = None,
     ):
         """Fait traverser tous les appels du chat par le gateway d'effets commun."""
         outcome = await tool_runtime.execute(
@@ -430,8 +435,11 @@ async def _run_deterministic_agent(
             conversation_id=tool_conversation_id,
             request_id=tool_request_id,
             permission_level=permission_level,
+            tool_call_id=tool_call_id,
+            execution_context=execution_context,
+            canonicalized_from=canonicalized_from,
         )
-        return outcome.result
+        return outcome
 
     async def _cortex_disagreement_escalation(critique_text: str | None, answer: str):
         return await _escalate_council_on_disagreement(
@@ -856,6 +864,15 @@ async def _run_deterministic_agent(
         # ── Traiter les tool calls ─────────────────────────────────────────────
         if tool_calls_found:
             _successful_call_count_before = len(_runner_state.successful_calls)
+            _routing_context = build_routing_context(
+                tools_payload,
+                model_name=active_model,
+                profile_name=profile_name,
+                get_setting=db.get_setting,
+                selector_version=(
+                    "llm-native/v1" if native_decision_mode else "kls-main/v1"
+                ),
+            )
             async for _event in _execute_tool_batch(
                 tool_calls=tool_calls_found,
                 assistant_content=full_content,
@@ -864,6 +881,7 @@ async def _run_deterministic_agent(
                 request_id=request_id,
                 user_query=_user_query,
                 active_model=active_model,
+                routing_context=_routing_context,
                 permission_level=permission_level,
                 explicit_tool_names=_explicit_tool_names,
                 required_tool_names=_required_tool_names,

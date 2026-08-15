@@ -68,6 +68,12 @@ Tout nouvel événement structuré utilise au minimum :
 Les identifiants publics historiques peuvent rester présents pendant une migration compatible.
 Les logs ne remplacent ni les métriques agrégées, ni les preuves Forge, ni les données métier.
 
+Les exécutions d'outils dans SQLite utilisent `request_id`, `tool_call_id` et `execution_id`
+comme chaîne de corrélation locale. Le contexte de sélection ne conserve que des valeurs
+bornées et un SHA-256 stable des noms candidats triés. Le texte utilisateur, les descriptions
+et la liste brute des candidats sont interdits dans ces colonnes. Une panne de cette
+observation ne doit jamais provoquer le rejeu d'une action métier.
+
 ## 4. Données interdites
 
 Ne jamais stocker en clair dans un journal :

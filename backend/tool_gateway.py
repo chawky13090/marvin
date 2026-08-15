@@ -137,6 +137,9 @@ class ToolGatewayRequest:
     request_id: str | None = None
     confirmed_by_ui: bool = False
     idempotency_key: str | None = None
+    tool_call_id: str | None = None
+    execution_context: dict[str, Any] | None = None
+    canonicalized_from: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +148,7 @@ class ToolGatewayResult:
     executed: bool
     status_code: int = 200
     observation_errors: tuple[str, ...] = ()
+    execution_id: str | None = None
 
 
 def coverage_report(
@@ -368,6 +372,7 @@ async def execute_tool(
     )
     duration_ms = max(0, int((time.monotonic() - started) * 1000))
     observation_errors: list[str] = []
+    execution_id: str | None = None
     try:
         result = normalizer(request.tool_name, result, duration_ms=duration_ms)
     except Exception as exc:
@@ -377,14 +382,20 @@ async def execute_tool(
             request.tool_name,
             request.arguments,
         )
-        database.log_execution(
+        execution_receipt = database.log_execution(
             request.tool_name,
             observable_arguments,
             result,
             duration_ms,
             conversation_id=request.conversation_id,
             request_id=request.request_id,
+            tool_call_id=request.tool_call_id,
+            execution_context=request.execution_context,
+            execution_source=request.source,
+            canonicalized_from=request.canonicalized_from,
         )
+        if isinstance(execution_receipt, dict):
+            execution_id = str(execution_receipt.get("id") or "") or None
     except Exception as exc:
         observation_errors.append(f"execution:{type(exc).__name__}")
     try:
@@ -401,4 +412,5 @@ async def execute_tool(
         result,
         True,
         observation_errors=tuple(observation_errors),
+        execution_id=execution_id,
     )

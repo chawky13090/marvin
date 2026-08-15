@@ -110,6 +110,7 @@ async def _finalize_call_result(
     request_id: str | None,
     user_query: str,
     active_model: str,
+    execution_id: str | None,
     dangerous_tools: set[str] | frozenset[str],
     postprocess_tool_result: Callable[..., Awaitable[Any]],
     critique_action: Callable[..., Awaitable[Any]],
@@ -164,6 +165,7 @@ async def _finalize_call_result(
                 result=result,
                 duration_ms=duration_ms,
                 already_observed=True,
+                execution_id=execution_id,
             )
         )
         if isinstance(receipt, ObservationReceipt):
@@ -277,6 +279,7 @@ async def _execute_parallel_group(
     request_id: str | None,
     user_query: str,
     active_model: str,
+    routing_context: dict[str, Any],
     permission_level: int,
     explicit_tool_names: set[str],
     required_tool_names: set[str],
@@ -377,6 +380,9 @@ async def _execute_parallel_group(
                                 canonicalized_from=canonicalized_from,
                             ),
                             command_text_only=command_text_only,
+                            tool_call_id=tool_call_id,
+                            execution_context=routing_context,
+                            canonicalized_from=canonicalized_from or None,
                         ),
                         validate=validate_tool_args,
                         execute=execute_registered_tool,
@@ -408,10 +414,12 @@ async def _execute_parallel_group(
                     ),
                     "timeout": True,
                 }
+                execution_id = None
             else:
                 dispatch = dispatch_task.result()
                 result = dispatch.result
                 arguments = dispatch.arguments
+                execution_id = getattr(dispatch, "execution_id", None)
             duration_ms = max(0, int((clock() - started_at) * 1000))
             if prepared.read_signature:
                 read_signatures.add(prepared.read_signature)
@@ -419,6 +427,7 @@ async def _execute_parallel_group(
                 "result": result,
                 "arguments": arguments,
                 "duration_ms": duration_ms,
+                "execution_id": execution_id,
             }
         await event_queue.put(("done", tool_call_id, tool_name, None))
 
@@ -488,6 +497,7 @@ async def _execute_parallel_group(
             request_id=request_id,
             user_query=user_query,
             active_model=active_model,
+            execution_id=outcome.get("execution_id"),
             dangerous_tools=dangerous_tools,
             postprocess_tool_result=postprocess_tool_result,
             critique_action=critique_action,
@@ -512,6 +522,7 @@ async def execute_tool_batch(
     request_id: str | None,
     user_query: str,
     active_model: str,
+    routing_context: dict[str, Any],
     permission_level: int,
     explicit_tool_names: set[str],
     required_tool_names: set[str],
@@ -587,6 +598,7 @@ async def execute_tool_batch(
             request_id=request_id,
             user_query=user_query,
             active_model=active_model,
+            routing_context=routing_context,
             permission_level=permission_level,
             explicit_tool_names=explicit_tool_names,
             required_tool_names=required_tool_names,
@@ -675,6 +687,9 @@ async def execute_tool_batch(
                             canonicalized_from=canonicalized_from,
                         ),
                         command_text_only=command_text_only,
+                        tool_call_id=tool_call_id,
+                        execution_context=routing_context,
+                        canonicalized_from=canonicalized_from or None,
                     ),
                     validate=validate_tool_args,
                     execute=execute_registered_tool,
@@ -744,9 +759,11 @@ async def execute_tool_batch(
                 ),
                 "timeout": True,
             }
+            execution_id = None
         else:
             result = dispatch.result
             arguments = dispatch.arguments
+            execution_id = getattr(dispatch, "execution_id", None)
         duration_ms = max(0, int((clock() - started_at) * 1000))
         if read_signature:
             read_signatures.add(read_signature)
@@ -762,6 +779,7 @@ async def execute_tool_batch(
             request_id=request_id,
             user_query=user_query,
             active_model=active_model,
+            execution_id=execution_id,
             dangerous_tools=dangerous_tools,
             postprocess_tool_result=postprocess_tool_result,
             critique_action=critique_action,

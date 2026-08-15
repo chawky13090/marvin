@@ -15,6 +15,7 @@ sys.path.insert(0, str(BACKEND))
 
 from db_connection import db
 from repositories.executions import ExecutionRepository
+from rollback_execution_telemetry_schema import TELEMETRY_COLUMNS, rollback
 
 
 def main() -> int:
@@ -35,6 +36,18 @@ def main() -> int:
                 42,
                 conversation_id="conversation-1",
                 request_id="request-12345678",
+                tool_call_id="tool-call-1",
+                execution_context={
+                    "app_version": "2.659.0",
+                    "model_name": "test:model",
+                    "runtime_mode": "eco",
+                    "profile_name": "agent",
+                    "selector_version": "kls-main/v1",
+                    "candidate_count": 18,
+                    "candidate_set_sha256": "a" * 64,
+                },
+                execution_source="agent_chat",
+                canonicalized_from="legacy_net_ping",
             )
         assert first["success"] is True
 
@@ -61,6 +74,11 @@ def main() -> int:
         assert by_id["execution-1"]["args"]["content"]["redacted"] is True
         assert by_id["execution-1"]["result"]["token"] == "***"
         assert by_id["execution-2"]["success"] is False
+        assert by_id["execution-1"]["tool_call_id"] == "tool-call-1"
+        assert by_id["execution-1"]["candidate_count"] == 18
+        assert by_id["execution-1"]["candidate_set_sha256"] == "a" * 64
+        assert by_id["execution-1"]["execution_source"] == "agent_chat"
+        assert "test:model" not in str(by_id["execution-2"])
 
         trace = repository.conversation_trace("conversation-1")
         assert {row["id"] for row in trace} == {"execution-1", "execution-2"}
@@ -110,6 +128,18 @@ def main() -> int:
                 raise AssertionError("Une clé d'exécution dupliquée doit annuler le log.")
         assert repository.stats()["total"] == 4
 
+        with patch("repositories.executions.uuid.uuid4", return_value="execution-5"):
+            try:
+                repository.log(
+                    "net_ping", {}, {"success": True}, 1,
+                    tool_call_id="tool-call-1",
+                )
+            except sqlite3.IntegrityError:
+                pass
+            else:
+                raise AssertionError("Un tool_call_id ne doit identifier qu'une execution.")
+        assert repository.stats()["total"] == 4
+
         legacy_path = root / "legacy-executions.db"
         with db(legacy_path) as connection:
             connection.execute(
@@ -132,7 +162,24 @@ def main() -> int:
                     "PRAGMA table_info(tool_executions)"
                 ).fetchall()
             }
-        assert {"conversation_id", "request_id"} <= columns
+        assert {
+            "conversation_id", "request_id", "tool_call_id", "app_version",
+            "model_name", "runtime_mode", "profile_name", "selector_version",
+            "candidate_count", "candidate_set_sha256", "execution_source",
+            "canonicalized_from",
+        } <= columns
+
+        rollback_result = rollback(legacy_path, confirmed=True)
+        assert rollback_result["integrity_check"] == "ok"
+        assert Path(str(rollback_result["backup"])).is_file()
+        with db(legacy_path) as connection:
+            rolled_back_columns = {
+                row[1]
+                for row in connection.execute(
+                    "PRAGMA table_info(tool_executions)"
+                ).fetchall()
+            }
+        assert not (set(TELEMETRY_COLUMNS) & rolled_back_columns)
 
     import database
     from repositories import executions

@@ -48,6 +48,9 @@ async def execute(
     database: Any | None = None,
     normalizer: Callable[..., Any] | None = None,
     audit_logger: Callable[..., Any] | None = None,
+    tool_call_id: str | None = None,
+    execution_context: dict[str, Any] | None = None,
+    canonicalized_from: str | None = None,
 ) -> tool_gateway.ToolGatewayResult:
     effective_database = database if database is not None else db
     try:
@@ -71,6 +74,9 @@ async def execute(
             request_id=request_id or api_observability.current_request_id(),
             confirmed_by_ui=bool(confirmed_by_ui),
             idempotency_key=idempotency_key,
+            tool_call_id=tool_call_id,
+            execution_context=execution_context,
+            canonicalized_from=canonicalized_from,
         ),
         registry=registry if registry is not None else tool_module.TOOLS_REGISTRY,
         specifications=(

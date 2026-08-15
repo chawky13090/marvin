@@ -13,6 +13,18 @@ from structured_logging import sanitize
 
 ConnectionScope = Callable[[], AbstractContextManager]
 _MAX_TRACE_ROWS = 5_000
+_TELEMETRY_COLUMNS = {
+    "tool_call_id": "TEXT",
+    "app_version": "TEXT",
+    "model_name": "TEXT",
+    "runtime_mode": "TEXT",
+    "profile_name": "TEXT",
+    "selector_version": "TEXT",
+    "candidate_count": "INTEGER",
+    "candidate_set_sha256": "TEXT",
+    "execution_source": "TEXT",
+    "canonicalized_from": "TEXT",
+}
 
 
 def _decode_payload(value: Any) -> Any:
@@ -22,6 +34,11 @@ def _decode_payload(value: Any) -> Any:
         return json.loads(value)
     except json.JSONDecodeError:
         return {}
+
+
+def _bounded_text(value: Any, size: int) -> str | None:
+    normalized = str(value or "").strip()[:size]
+    return normalized or None
 
 
 def _parse_execution(row: dict | None, *, decode_payloads: bool) -> dict | None:
@@ -65,9 +82,19 @@ class ExecutionRepository:
             connection.execute(
                 "ALTER TABLE tool_executions ADD COLUMN request_id TEXT"
             )
+        for name, declaration in _TELEMETRY_COLUMNS.items():
+            if name not in columns:
+                connection.execute(
+                    f"ALTER TABLE tool_executions ADD COLUMN {name} {declaration}"
+                )
         connection.execute(
             """CREATE INDEX IF NOT EXISTS idx_tool_executions_created
                ON tool_executions(created_at DESC)"""
+        )
+        connection.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_tool_executions_tool_call
+               ON tool_executions(tool_call_id)
+               WHERE tool_call_id IS NOT NULL"""
         )
         connection.execute(
             """CREATE INDEX IF NOT EXISTS idx_tool_executions_tool
@@ -94,6 +121,10 @@ class ExecutionRepository:
         duration_ms: int,
         conversation_id: str | None = None,
         request_id: str | None = None,
+        tool_call_id: str | None = None,
+        execution_context: dict[str, Any] | None = None,
+        execution_source: str | None = None,
+        canonicalized_from: str | None = None,
     ) -> dict:
         execution_id = str(uuid.uuid4())
         succeeded = not (
@@ -101,13 +132,24 @@ class ExecutionRepository:
         )
         safe_args = sanitize(args, max_length=2_000)
         safe_result = sanitize(result, max_length=4_000)
+        context = execution_context if isinstance(execution_context, dict) else {}
+        normalized_tool_call_id = str(tool_call_id or "").strip()[:128] or None
+        candidate_count = context.get("candidate_count")
+        if not isinstance(candidate_count, int) or not 0 <= candidate_count <= 10_000:
+            candidate_count = None
+        candidate_hash = str(context.get("candidate_set_sha256") or "").lower()
+        if len(candidate_hash) != 64 or any(c not in "0123456789abcdef" for c in candidate_hash):
+            candidate_hash = None
         with self._connection_scope() as connection:
             self.ensure_schema(connection)
             connection.execute(
                 """INSERT INTO tool_executions (
                        id, tool_name, args, result, success, duration_ms,
-                       conversation_id, request_id
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       conversation_id, request_id, tool_call_id, app_version,
+                       model_name, runtime_mode, profile_name, selector_version,
+                       candidate_count, candidate_set_sha256, execution_source,
+                       canonicalized_from
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     execution_id,
                     tool_name,
@@ -117,6 +159,16 @@ class ExecutionRepository:
                     duration_ms,
                     conversation_id,
                     request_id,
+                    normalized_tool_call_id,
+                    _bounded_text(context.get("app_version"), 32),
+                    _bounded_text(context.get("model_name"), 160),
+                    _bounded_text(context.get("runtime_mode"), 32),
+                    _bounded_text(context.get("profile_name"), 32),
+                    _bounded_text(context.get("selector_version"), 64),
+                    candidate_count,
+                    candidate_hash,
+                    _bounded_text(execution_source, 80),
+                    _bounded_text(canonicalized_from, 160),
                 ),
             )
         return {
@@ -124,6 +176,7 @@ class ExecutionRepository:
             "tool_name": tool_name,
             "success": succeeded,
             "duration_ms": duration_ms,
+            "tool_call_id": normalized_tool_call_id,
         }
 
     def conversation_trace(self, conversation_id: str) -> list[dict]:

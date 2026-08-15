@@ -82,6 +82,9 @@ class ToolDispatchRequest:
     explicit_names: set[str] | None = None
     required_names: set[str] | None = None
     command_text_only: bool = False
+    tool_call_id: str | None = None
+    execution_context: dict[str, Any] | None = None
+    canonicalized_from: str | None = None
 
 
 @dataclass(slots=True)
@@ -89,6 +92,7 @@ class ToolDispatchResult:
     result: dict[str, Any]
     arguments: dict[str, Any]
     executed: bool
+    execution_id: str | None = None
 
 
 async def dispatch_tool(
@@ -182,10 +186,28 @@ async def dispatch_tool(
         arguments.pop("confirmed", None)
         arguments.pop("__confirmed", None)
 
-    result = await execute(
-        request.name,
+    if request.tool_call_id or request.execution_context:
+        outcome = await execute(
+            request.name,
+            arguments,
+            request.conversation_id,
+            request.request_id,
+            tool_call_id=request.tool_call_id,
+            execution_context=request.execution_context,
+            canonicalized_from=request.canonicalized_from,
+        )
+    else:
+        outcome = await execute(
+            request.name,
+            arguments,
+            request.conversation_id,
+            request.request_id,
+        )
+    if isinstance(outcome, dict):
+        return ToolDispatchResult(outcome, arguments, True)
+    return ToolDispatchResult(
+        outcome.result,
         arguments,
-        request.conversation_id,
-        request.request_id,
+        True,
+        execution_id=getattr(outcome, "execution_id", None),
     )
-    return ToolDispatchResult(result, arguments, True)

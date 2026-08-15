@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 335
+EXPECTED_STAGE_COUNT = 336
 
 
 @dataclass(frozen=True)
@@ -366,6 +366,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Repository des exécutions et de la fiabilité",
             (python, "scripts/test_execution_repository.py"),
+        ),
+        Stage(
+            "Télémétrie locale des décisions d'outil",
+            (python, "scripts/test_execution_telemetry.py"),
         ),
         Stage(
             "Repositories de l'état opérationnel",

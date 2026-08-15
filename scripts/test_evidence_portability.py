@@ -13,6 +13,7 @@ from evidence_portability import (
     ROOT,
     canonical_bytes_from_bytes,
     canonical_sha256,
+    matches_frozen_bytes,
     matches_frozen_sha256,
     raw_sha256,
 )
@@ -27,6 +28,12 @@ HASH_MAP_KEYS = {
 def _git_blob(path: str) -> bytes:
     return subprocess.run(
         ["git", "show", f":{path}"], cwd=ROOT, check=True, capture_output=True
+    ).stdout
+
+
+def _git_blob_at(commit: str, path: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{path}"], cwd=ROOT, check=True, capture_output=True
     ).stdout
 
 
@@ -73,8 +80,14 @@ def main() -> int:
     for item in document["files"]:
         path = ROOT / item["path"]
         assert path.read_bytes() == canonical_bytes_from_bytes(path.read_bytes(), suffix=path.suffix)
-        assert canonical_sha256(path) == item["canonical_lf_sha256"]
-        assert matches_frozen_sha256(path, item["historical_sha256"])
+        historical_payload = _git_blob_at(source_commit, item["path"])
+        historical_canonical = canonical_bytes_from_bytes(
+            historical_payload, suffix=path.suffix
+        )
+        assert hashlib.sha256(historical_canonical).hexdigest() == item["canonical_lf_sha256"]
+        assert matches_frozen_bytes(
+            item["path"], historical_payload, item["historical_sha256"]
+        )
 
     seen: dict[tuple[str, str], str] = {}
     for manifest in document["manifests"]:
@@ -87,10 +100,15 @@ def main() -> int:
                 assert seen[key] == item["canonical_lf_sha256"]
             seen[key] = item["canonical_lf_sha256"]
             explicit_mappings[key] = item["canonical_lf_sha256"]
-            path = ROOT / item["path"]
             assert item["historical_sha256"] in serialized
-            assert canonical_sha256(path) == item["canonical_lf_sha256"]
-            assert matches_frozen_sha256(path, item["historical_sha256"])
+            historical_payload = _git_blob_at(source_commit, item["path"])
+            historical_canonical = canonical_bytes_from_bytes(
+                historical_payload, suffix=Path(item["path"]).suffix
+            )
+            assert hashlib.sha256(historical_canonical).hexdigest() == item["canonical_lf_sha256"]
+            assert matches_frozen_bytes(
+                item["path"], historical_payload, item["historical_sha256"]
+            )
 
     tracked_json = subprocess.run(
         ["git", "ls-files", "benchmarks/**/*.json"], cwd=ROOT, check=True,
