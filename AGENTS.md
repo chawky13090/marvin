@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.675.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.676.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.675.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.676.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.675.0)
+## 9. État actuel (v2.676.0)
+
+**v2.676 (intégration runtime du pilotage autorisée sous drapeau)** : l'autorisation lie le
+pré-enregistrement, le repository hors ligne et leurs empreintes avant tout changement actif.
+Elle autorise migration additive avec descente vérifiée, sérialisation par conversation,
+continuation d'approbation rattachée au parent, API/SSE, checkpoints sûrs et UI, mais impose un
+drapeau désactivé par défaut. Aucune activation visible n'est recevable avant résultat immuable,
+tests négatifs, gate complet et redémarrage froid. Le gate compte 360 étapes. Rollback :
+désactiver d'abord le drapeau, préserver les reçus terminaux, puis réversion et descente hors
+ligne sur sauvegarde vérifiée.
 
 **v2.675 (autorisation hors ligne du pilotage chat)** : le pré-enregistrement v1 est lié au
 commit et à son SHA-256, ainsi que les sources runtime, API, approbations et UI de référence.

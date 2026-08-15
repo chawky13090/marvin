@@ -1,0 +1,60 @@
+{
+  "schema": "marvin.chat-turn-steering-runtime-integration-authorization/1.0",
+  "status": "authorized_behind_disabled_feature_flag",
+  "preregistration_commit": "b25d9c6e013a3d60041714c0984d5f9fca65a767",
+  "preregistration_sha256": "8614c1d0f48a2857750e539bd78bed28dbaba14e659fe56e71a18d8be460fd28",
+  "offline_repository_commit": "b6926a1e5bb8a1a6367547f171deaf37fe7e2803",
+  "offline_repository_sha256": "bf1222d6bd52ec4553d61bc30e4cb9546b9a738a27e6b5cccbe2c98d36957d72",
+  "offline_repository_test_sha256": "81b90697fe9a2db0265db6250d69f53e6e671aa332596bf214b4712734257bf4",
+  "authorized_scope": [
+    "additive_sqlite_migration_and_verified_offline_down_migration",
+    "one_active_root_turn_per_conversation_key",
+    "approval_continuation_joining_parent_root",
+    "directive_api_and_durable_sse_lifecycle",
+    "safe_agent_checkpoints_and_cooperative_stop",
+    "risk_and_pending_payload_digest_recalculation",
+    "frontend_queue_and_steering_controls",
+    "privacy_inventory_export_and_erasure",
+    "negative_concurrency_security_and_restart_tests"
+  ],
+  "activation_constraints": {
+    "feature_flag_default": false,
+    "partial_backend_only_activation_forbidden": true,
+    "raw_409_as_normal_frontend_experience_forbidden": true,
+    "current_input_capability_must_not_regress": true,
+    "runtime_activation_requires_separate_immutable_result": true,
+    "runtime_activation_requires_full_gate": true
+  },
+  "mandatory_runtime_invariants": {
+    "one_producer_per_conversation_key": true,
+    "different_conversations_remain_concurrent": true,
+    "approval_continuation_never_waits_behind_parent": true,
+    "completed_receipts_never_replayed": true,
+    "unknown_action_outcome_never_replayed": true,
+    "directive_text_never_enters_technical_logs": true,
+    "observed_content_cannot_create_directives": true,
+    "changed_pending_payload_invalidates_approval": true,
+    "stop_is_cooperative_and_never_claims_an_inflight_action_cancelled_without_proof": true
+  },
+  "required_delivery_evidence": [
+    "migration_up_and_down_on_database_copy",
+    "repository_concurrency_test_with_distinct_connections",
+    "same_conversation_serialization_and_cross_conversation_parallelism",
+    "approval_continuation_deadlock_canary",
+    "all_preregistration_required_tests",
+    "frontend_build_and_chat_smoke",
+    "full_check_marvin_gate",
+    "cold_restart_and_reconnect"
+  ],
+  "forbidden": {
+    "business_tool_execution_during_offline_tests": true,
+    "cloud_model_call_during_offline_tests": true,
+    "destructive_migration_without_verified_backup": true,
+    "forced_generic_process_kill_for_stop": true,
+    "silent_directive_drop": true,
+    "automatic_replay_after_unknown_outcome": true,
+    "activation_before_result_artifact": true
+  },
+  "authorization_consumed": false,
+  "rollback": "Before activation, revert integration commits and run the verified offline down migration only on a backed-up stopped Marvin database. After activation, disable the feature flag first, preserve terminal receipts, cancel only undispatched directives, then apply the same verified rollback procedure."
+}

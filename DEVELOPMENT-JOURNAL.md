@@ -5,6 +5,18 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-16 — v2.676.0 — intégration runtime du pilotage autorisée sous drapeau
+
+Le repository transactionnel hors ligne est lié au commit `b6926a1` et à ses empreintes. Une
+autorisation distincte permet désormais l'intégration verticale : migration additive et descente
+hors ligne vérifiée, exclusion mutuelle par conversation, continuation d'approbation sans
+interblocage, directives durables, checkpoints agent, arrêt coopératif, UI et inventaire de
+données. Le drapeau reste désactivé par défaut et l'activation partielle est interdite. Aucun
+outil métier ni modèle Cloud n'est autorisé dans les tests hors ligne; une activation exige un
+résultat immuable, le gate complet et un redémarrage froid. Journalisation : uniquement
+identifiants de corrélation, type, séquence, état, durée et digest; jamais le texte. Rollback :
+désactivation, drainage sans rejeu, réversion atomique et migration descendante sur sauvegarde.
+
 ## 2026-08-16 — v2.675.0 — infrastructure de pilotage autorisée hors ligne
 
 Le pré-enregistrement v1 est figé au commit `b25d9c6` et relié à son SHA-256. Une autorisation
