@@ -12,6 +12,7 @@ from repositories import tool_approvals
 
 
 repository = ChatTurnDirectiveRepository(db)
+connection_scope = db
 
 
 def enabled() -> bool:
@@ -27,7 +28,10 @@ def reserve(conversation_key: str, root_request_id: str, conversation_id: str = 
 
 
 def release(root_request_id: str) -> bool:
-    return repository.release_root(root_request_id)
+    with connection_scope() as connection:
+        return connection.execute(
+            "DELETE FROM chat_turn_slots WHERE root_request_id = ?", (root_request_id,)
+        ).rowcount == 1
 
 
 def rebind(root_request_id: str, provisional_key: str, conversation_id: str) -> dict:
@@ -40,7 +44,11 @@ def rebind(root_request_id: str, provisional_key: str, conversation_id: str) -> 
 
 
 def active(conversation_key: str) -> dict | None:
-    return repository.slot_for_conversation(conversation_key)
+    with connection_scope() as connection:
+        row = connection.execute(
+            "SELECT * FROM chat_turn_slots WHERE conversation_key = ?", (conversation_key,)
+        ).fetchone()
+    return dict(row) if row is not None else None
 
 
 def create(root_request_id: str, client_directive_id: str, kind: str, text: str) -> tuple[dict, bool]:

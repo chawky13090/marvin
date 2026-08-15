@@ -34,6 +34,8 @@ def main() -> None:
 
         repository = ChatTurnDirectiveRepository(scope)
         with patch.object(steering, "repository", repository), patch.object(
+            steering, "connection_scope", scope
+        ), patch.object(
             steering.tool_approvals, "invalidate_pending_for_request", return_value=1
         ) as invalidate:
             steering.reserve("conversation-a", "root-a", "conversation-a")
