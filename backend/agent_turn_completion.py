@@ -212,7 +212,10 @@ async def complete_turn(
             }
         )
     )
-    events.append(encode_sse({"type": "done"}))
+    # Le motif terminal est une donnée de contrôle, pas un détail d'affichage.
+    # Le runtime durable s'en sert notamment pour conserver le verrou du tour
+    # pendant une approbation, sans bloquer sa continuation autorisée.
+    events.append(encode_sse({"type": "done", "stopReason": stop_reason}))
     return TurnCompletion(
         content=final_content,
         critique=finalized.critique,

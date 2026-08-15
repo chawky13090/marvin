@@ -97,6 +97,7 @@ export function ChatProvider({ children }) {
   // aborted request from marking a newer approval continuation as completed.
   const runGenerationRef = useRef(0);
   const activeRootRequestRef = useRef(null);
+  const queuedNextDirectivesRef = useRef([]);
   const provisionalConversationKeyRef = useRef(crypto.randomUUID());
   const [directives, setDirectives] = useState([]);
 
@@ -222,6 +223,7 @@ export function ChatProvider({ children }) {
             case 'directive_received':
             case 'directive_deferred':
             case 'directive_applied':
+            case 'directive_ready':
             case 'directive_rejected':
             case 'directive_cancelled':
               if (event.directive) {
@@ -229,6 +231,9 @@ export function ChatProvider({ children }) {
                   const rest = prev.filter(item => item.id !== event.directive.id);
                   return [...rest, event.directive].sort((a, b) => a.sequence - b.sequence);
                 });
+                if (event.type === 'directive_ready') {
+                  queuedNextDirectivesRef.current.push(event.directive);
+                }
               }
               break;
 
@@ -457,6 +462,14 @@ export function ChatProvider({ children }) {
               streamFinishListenersRef.current.forEach(cb => {
                 try { cb(); } catch { /* ignore */ }
               });
+              if (isCurrentRun() && queuedNextDirectivesRef.current.length > 0) {
+                const queued = queuedNextDirectivesRef.current.splice(0);
+                queueMicrotask(async () => {
+                  for (const directive of queued) {
+                    await sendMessage({ text: directive.text });
+                  }
+                });
+              }
               break;
 
             case 'error':
@@ -538,7 +551,16 @@ export function ChatProvider({ children }) {
 
   const stop = useCallback(() => {
     if (activeRootRequestRef.current && (status === 'submitted' || status === 'streaming')) {
-      sendDirective({ kind: 'stop', text: '' }).catch(err => setError(err));
+      sendDirective({ kind: 'stop', text: '' })
+        .then(() => setDirectives(prev => [...prev, {
+          id: `local-stop-${Date.now()}`,
+          sequence: Math.max(0, ...prev.map(item => item.sequence || 0)) + 1,
+          kind: 'stop',
+          status: 'deferred',
+          waitingFor: { kind: 'current_action_completion' },
+          reasonCode: 'cooperative_stop_requested',
+        }]))
+        .catch(err => setError(err));
       return;
     }
     runGenerationRef.current += 1;

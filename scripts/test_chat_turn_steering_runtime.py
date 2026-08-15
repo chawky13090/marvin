@@ -53,6 +53,17 @@ def main() -> None:
             applied, stopped = steering.checkpoint("root-a", phase="before_model_iteration")
             assert stopped is False
             assert applied[0]["status"] == "applied"
+            queued, _ = steering.create(
+                "root-a", "62aa8914-a85a-4429-89bd-9a85bb72ac5e", "next", "Puis résume le résultat."
+            )
+            assert queued["status"] == "received"
+            applied, stopped = steering.checkpoint("root-a", phase="before_model_iteration")
+            assert stopped is False and applied == []
+            deferred = steering.list_public("root-a")[-1]
+            assert deferred["status"] == "deferred"
+            assert deferred["waitingFor"] == {"kind": "root_turn_terminal"}
+            ready = steering.terminal("root-a")
+            assert len(ready) == 1 and ready[0]["status"] == "applied"
             stop, _ = steering.create(
                 "root-a", "0749d04e-c82f-44a1-bd05-dad69ee1ad3f", "stop", ""
             )
@@ -60,7 +71,7 @@ def main() -> None:
             applied, stopped = steering.checkpoint("root-a", phase="before_model_iteration")
             assert stopped is True and applied[0]["kind"] == "stop"
             assert steering.release("root-a") is True
-    print("Chat Turn Steering Runtime OK - exclusion, approval invalidation, checkpoint and stop")
+    print("Chat Turn Steering Runtime OK - exclusion, approval, file suivante, checkpoint et stop")
 
 
 if __name__ == "__main__":

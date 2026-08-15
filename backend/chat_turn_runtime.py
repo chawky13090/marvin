@@ -242,9 +242,23 @@ async def _produce(
 ) -> None:
     saw_terminal_event = False
     failed = False
+    keep_slot_for_approval = False
     try:
         async for chunk in producer:
             event = _decode_agent_chunk(chunk)
+            # Les tâches « ensuite » doivent précéder l'événement terminal dans le
+            # journal. Le client peut ainsi les mémoriser avant de recevoir ``done``
+            # et démarrer le nouveau tour sans course entre deux événements SSE.
+            if event.get("type") == "done":
+                keep_slot_for_approval = event.get("stopReason") == "pending_confirmation"
+                if steering_root_request_id and not keep_slot_for_approval:
+                    import chat_turn_steering
+                    if chat_turn_steering.enabled():
+                        for directive in chat_turn_steering.terminal(steering_root_request_id):
+                            _append_event(request_id, {
+                                "type": "directive_ready",
+                                "directive": directive,
+                            })
             _append_event(request_id, event)
             if (
                 steering_root_request_id
@@ -285,7 +299,7 @@ async def _produce(
             message=message,
         )
     finally:
-        if steering_root_request_id:
+        if steering_root_request_id and not keep_slot_for_approval:
             import chat_turn_steering
             if chat_turn_steering.enabled():
                 chat_turn_steering.release(steering_root_request_id)

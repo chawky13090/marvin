@@ -15,8 +15,10 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 import chat_turn_runtime
+import chat_turn_steering
 from db_connection import db
 from db_migrations import MIGRATIONS, apply_migrations
+from repositories.chat_turn_directives import ChatTurnDirectiveRepository
 
 
 def _event(chunk: str) -> dict:
@@ -202,6 +204,58 @@ async def _exercise(path: Path) -> None:
             pass
         else:
             raise AssertionError("Un statut non terminal devait être refusé.")
+
+        # Une attente d'approbation conserve l'exclusion mutuelle. La continuation
+        # partage la même racine puis libère le slot; une tâche « ensuite » est
+        # journalisée avant ``done`` afin que le frontend puisse l'enchaîner.
+        steering_repository = ChatTurnDirectiveRepository(scope)
+        with patch.object(chat_turn_steering, "repository", steering_repository), patch.object(
+            chat_turn_steering, "connection_scope", scope
+        ), patch.object(chat_turn_steering, "enabled", return_value=True):
+            chat_turn_steering.reserve("conv-steering", "root-steering", "conv-steering")
+            chat_turn_steering.create(
+                "root-steering",
+                "79c9226a-8080-4558-a3a9-44d347eddf68",
+                "next",
+                "Puis vérifie le résultat.",
+            )
+            chat_turn_steering.checkpoint("root-steering", phase="before_model_iteration")
+            with db(path) as connection:
+                for request_id in ("approval-part", "continuation-part"):
+                    connection.execute(
+                        """INSERT INTO chat_turns
+                           (request_id, payload_hash, conversation_id, status, owner_token)
+                           VALUES (?, ?, 'conv-steering', 'running', ?)""",
+                        (request_id, f"hash-{request_id}", chat_turn_runtime._PROCESS_TOKEN),
+                    )
+
+            async def approval_producer():
+                yield 'data: {"type":"done","stopReason":"pending_confirmation"}\n\n'
+
+            await chat_turn_runtime._produce(
+                "approval-part",
+                approval_producer(),
+                steering_root_request_id="root-steering",
+                conversation_key="conv-steering",
+            )
+            assert chat_turn_steering.active("conv-steering")["root_request_id"] == "root-steering"
+
+            async def continuation_producer():
+                yield 'data: {"type":"done","stopReason":"criteria_satisfied"}\n\n'
+
+            await chat_turn_runtime._produce(
+                "continuation-part",
+                continuation_producer(),
+                steering_root_request_id="root-steering",
+                conversation_key="conv-steering",
+            )
+            assert chat_turn_steering.active("conv-steering") is None
+            with db(path) as connection:
+                rows = connection.execute(
+                    "SELECT event_json FROM chat_turn_events WHERE request_id = 'continuation-part' ORDER BY sequence"
+                ).fetchall()
+            types = [json.loads(row[0])["type"] for row in rows]
+            assert types == ["directive_ready", "done"]
 
 
 def main() -> int:

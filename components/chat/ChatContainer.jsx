@@ -628,7 +628,9 @@ export default function ChatContainer({
             ))}
             {latestDirective && (
               <span aria-live="polite">
-                Orientation n°{latestDirective.sequence} {latestDirective.status === 'applied' ? 'appliquée' : latestDirective.status === 'deferred' ? 'différée' : 'reçue'}
+                {latestDirective.kind === 'stop'
+                  ? 'Arrêt demandé : Marvin s’arrête après l’action en cours.'
+                  : `Orientation n°${latestDirective.sequence} ${latestDirective.status === 'applied' ? 'appliquée' : latestDirective.status === 'deferred' ? 'différée' : 'reçue'}`}
               </span>
             )}
           </div>
