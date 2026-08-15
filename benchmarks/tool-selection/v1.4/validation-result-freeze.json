@@ -1,0 +1,13 @@
+{
+  "schema": "marvin.tool-selection-v14-validation-result-freeze/1.0",
+  "status": "raw_result_frozen_before_assessment",
+  "result_path": "benchmarks/tool-selection/v1.4/validation-result.json",
+  "result_sha256": "e0525c544e049d331d8378e66270cd2cb6bcb33d0f5279b363a139fbe49afac0",
+  "runner_freeze_sha256": "68de2b4ebe5dcbc8c2be0de6b4be48b558774c409a2c5549dfcb1d33520de1d8",
+  "observation_count": 400,
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0,
+  "product_activation_count": 0,
+  "assessment_must_be_separate": true,
+  "raw_result_must_never_be_modified": true
+}

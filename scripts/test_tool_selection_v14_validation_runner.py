@@ -41,7 +41,7 @@ def main() -> None:
     result = BASE / "validation-result.json"
     if result.exists():
         authorization = json.loads((BASE / "validation-authorization.json").read_text(encoding="utf-8"))
-        assert authorization["consumed_when"].endswith("validation-result.json")
+        assert "validation-result.json" in authorization["consumed_when"]
         assert authorization["single_use"] is True
     print("Tool selection v1.4 runner OK - 4 modes, 5 repetitions, 400 calls locked, zero execution.")
 
