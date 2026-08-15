@@ -1,0 +1,80 @@
+{
+  "schema": "marvin.tool-selection-v14-validation-assessment/1.0",
+  "status": "assessed_without_product_tuning",
+  "source_result_sha256": "e0525c544e049d331d8378e66270cd2cb6bcb33d0f5279b363a139fbe49afac0",
+  "global_generalization": {
+    "eligible_modes": [],
+    "rejected_modes": ["eco", "balanced", "performance", "max"],
+    "reason": "No mode satisfies the frozen global and per-family predicates."
+  },
+  "mode_results": {
+    "eco": {
+      "accepted_rate": 0.6,
+      "repeat_stability": 0.75,
+      "argument_schema_validity": 1.0,
+      "candidate_membership_violations": 4,
+      "application_launch_rate": 0.9,
+      "software_management_rate": 0.3,
+      "generalization_pass": false
+    },
+    "balanced": {
+      "accepted_rate": 0.65,
+      "repeat_stability": 0.8,
+      "argument_schema_validity": 1.0,
+      "candidate_membership_violations": 0,
+      "application_launch_rate": 1.0,
+      "software_management_rate": 0.3,
+      "generalization_pass": false
+    },
+    "performance": {
+      "accepted_rate": 0.65,
+      "repeat_stability": 0.8,
+      "argument_schema_validity": 1.0,
+      "candidate_membership_violations": 0,
+      "application_launch_rate": 1.0,
+      "software_management_rate": 0.3,
+      "generalization_pass": false
+    },
+    "max": {
+      "accepted_rate": 0.65,
+      "repeat_stability": 0.8,
+      "argument_schema_validity": 1.0,
+      "candidate_membership_violations": 0,
+      "application_launch_rate": 1.0,
+      "software_management_rate": 0.3,
+      "generalization_pass": false
+    }
+  },
+  "restricted_candidates": [
+    {"mode": "balanced", "family": "application_launch", "rate": 1.0, "family_stability": 0.9},
+    {"mode": "performance", "family": "application_launch", "rate": 1.0, "family_stability": 0.9},
+    {"mode": "max", "family": "application_launch", "rate": 1.0, "family_stability": 0.9}
+  ],
+  "non_eligible": {
+    "eco_application_launch": "four candidate-membership violations and family stability 0.7",
+    "all_software_management": "accepted rate 0.3 and family stability at most 0.8"
+  },
+  "latency_interpretation": {
+    "published_medians_are_queue_inclusive": true,
+    "inference_latency_claim_authorized": false,
+    "reason": "The frozen benchmark helper starts its timer before semaphore admission."
+  },
+  "decision": {
+    "broad_product_validation": false,
+    "software_routing_problem_resolved": false,
+    "application_launch_restricted_evidence_exists": true,
+    "current_bundled_change_activation_authorized": false,
+    "product_state": "engineering_only_pending_new_independent_cycle",
+    "v1_4_holdout_may_be_used_for_future_tuning": false,
+    "security_guards_changed": false,
+    "business_tools_executed": false
+  },
+  "next_cycle": {
+    "must_use_new_holdout": true,
+    "must_not_increase_candidate_budget": true,
+    "must_preserve_364_tools": true,
+    "first_problem": "software_management_final_choice_and_candidate_recall",
+    "eco_requires_separate_safety_analysis": true
+  },
+  "rollback": "Preserve all v1.4 evidence. Product rollback, if selected, must be a separate commit and must not modify this assessment."
+}

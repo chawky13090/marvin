@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 344
+EXPECTED_STAGE_COUNT = 345
 
 
 @dataclass(frozen=True)
@@ -257,6 +257,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Résultat brut de validation routage v1.4",
             (python, "scripts/test_tool_selection_v14_validation_result.py"),
+        ),
+        Stage(
+            "Assessment de validation routage v1.4",
+            (python, "scripts/test_tool_selection_v14_validation_assessment.py"),
         ),
         Stage(
             "Équivalence du cache des motifs de routage",

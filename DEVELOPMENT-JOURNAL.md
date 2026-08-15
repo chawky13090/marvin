@@ -41,6 +41,21 @@ holdout pour toute optimisation ultérieure. Le runner Stage B est gelé sur qua
 cinq répétitions et 400 appels maximum; toute exécution métier, effet hôte, ablation de garde,
 publication partielle ou modification de seuil après résultat reste interdite.
 
+La campagne complète a publié 400 choix en 246 secondes, tous au premier essai, sans outil
+métier ni effet hôte. Aucun mode ne franchit les seuils globaux : Eco obtient 0,60 et les
+trois autres 0,65. Le lancement d'application obtient 0,90 en Eco et 1,00 ailleurs; la
+gestion logicielle reste à 0,30 partout. La stabilité vaut 0,75 en Eco et 0,80 ailleurs;
+quatre sorties hors sous-ensemble apparaissent en Eco, zéro dans les autres modes. Les
+arguments appelés sont conformes au schéma à 100 %. Seul le lancement d'application en
+Balanced, Performance et Max satisfait les prédicats restreints. Le changement groupé v2.661
+n'est donc pas autorisé comme activation générale et reste une tranche d'ingénierie en attente
+d'un nouveau cycle indépendant. Le holdout v1.4 ne sera jamais utilisé pour le réglage futur.
+
+Les médianes de latence 91–98 secondes du résultat brut ne sont pas interprétées comme temps
+d'inférence : le helper gelé démarre encore son chronomètre avant l'admission au sémaphore et
+inclut donc la file. Corriger cette instrumentation exigera un nouveau runner, sans modifier
+le résultat brut.
+
 ## 2026-08-15 — v2.660.0 — parcours réels agrégés et validation future gelée
 
 L'analyse locale joint désormais une demande humaine persistée à ses exécutions uniquement
