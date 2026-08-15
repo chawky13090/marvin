@@ -1,0 +1,58 @@
+{
+  "schema": "marvin.tool-selection-morphology-policy/1.0",
+  "status": "frozen_before_product_change",
+  "scope": "deterministic_keyword_candidate_selection_only",
+  "problem": {
+    "established": "The internal token instal was intended as a prefix but exact word-boundary matching treats it as a complete misspelled word.",
+    "user_facing_spelling_must_be_correct": true,
+    "candidate_budget_must_not_increase": true
+  },
+  "design": {
+    "explicit_prefix_marker": "*",
+    "minimum_prefix_characters": 7,
+    "exact_prefix_match": true,
+    "bounded_typo_distance": 1,
+    "bounded_typo_applies_only_to_explicit_prefix_rules": true,
+    "ordinary_keywords_remain_exact_word_or_phrase_matches": true,
+    "accents_are_normalized_before_matching": true,
+    "public_tool_names_must_come_from_tools_spec": true,
+    "security_guards_remain_enabled": true
+  },
+  "development_canaries": {
+    "must_match_install_prefix": [
+      "installe le logiciel VLC",
+      "installer le programme VLC",
+      "installons cette application",
+      "installation du logiciel VLC",
+      "install le logiciel VLC",
+      "instaler le logiciel VLC"
+    ],
+    "must_not_match_install_prefix": [
+      "instant présent",
+      "institut logiciel",
+      "inspection du poste",
+      "liste les applications installées"
+    ],
+    "ordinary_keyword_must_not_become_fuzzy": [
+      "supprimmer le fichier",
+      "recherhcer un document"
+    ]
+  },
+  "acceptance": {
+    "all_positive_canaries_match": true,
+    "all_negative_canaries_are_rejected": true,
+    "ordinary_keyword_behavior_is_byte_for_byte_equivalent": true,
+    "max_tools_values_are_unchanged": true,
+    "tool_registry_is_unchanged": true,
+    "confirmation_and_authorization_paths_are_unchanged": true,
+    "new_independent_holdout_required_for_product_routing_claim": true
+  },
+  "forbidden": {
+    "hardcoded_observed_benchmark_prompts": true,
+    "tool_alias_creation": true,
+    "candidate_budget_expansion": true,
+    "business_tool_execution": true,
+    "security_guard_ablation": true
+  },
+  "rollback": "Revert the later product commit; this preregistration remains immutable evidence."
+}

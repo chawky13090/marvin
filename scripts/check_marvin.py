@@ -24,7 +24,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 337
+EXPECTED_STAGE_COUNT = 338
 
 
 @dataclass(frozen=True)
@@ -233,6 +233,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Pré-enregistrement du cache des motifs de routage",
             (python, "scripts/test_tool_selection_keyword_cache_preregistration.py"),
+        ),
+        Stage(
+            "Pré-enregistrement morphologique du routage",
+            (python, "scripts/test_tool_selection_morphology_preregistration.py"),
         ),
         Stage(
             "Équivalence du cache des motifs de routage",
