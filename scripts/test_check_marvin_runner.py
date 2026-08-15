@@ -105,8 +105,8 @@ normal = check_marvin.stages(quick=False, live=False)
 quick = check_marvin.stages(quick=True, live=False)
 live = check_marvin.stages(quick=False, live=True)
 assert len(normal) == len(quick) == len(live) == check_marvin.EXPECTED_STAGE_COUNT
-assert sum(stage.skip_reason is not None for stage in normal) == 4
-assert sum(stage.skip_reason is not None for stage in quick) == 5
+assert sum(stage.skip_reason is not None for stage in normal) == 5
+assert sum(stage.skip_reason is not None for stage in quick) == 6
 assert sum(stage.skip_reason is not None for stage in live) == 1
 assert {stage.name for stage in normal} == {stage.name for stage in quick} == {stage.name for stage in live}
 
