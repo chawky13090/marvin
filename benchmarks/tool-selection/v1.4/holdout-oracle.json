@@ -1,0 +1,286 @@
+{
+  "schema": "marvin.tool-selection-v14-oracle/1.0",
+  "status": "frozen_candidate",
+  "items": [
+    {
+      "id": "v14-application-launch-11",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-12",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-13",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-15",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-17",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-18",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-19",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-20",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-21",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-application-launch-22",
+      "accepted_calls": [
+        {
+          "tool": "pc_app_launch",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "application.launch",
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-03",
+      "accepted_calls": [
+        {
+          "tool": "pc_installed_software",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "software.list",
+          "constraints": []
+        },
+        {
+          "tool": "winget_list_installed",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-07",
+      "accepted_calls": [
+        {
+          "tool": "winget_search",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-08",
+      "accepted_calls": [
+        {
+          "tool": "winget_install",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-09",
+      "accepted_calls": [
+        {
+          "tool": "pc_installed_software",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "software.list",
+          "constraints": []
+        },
+        {
+          "tool": "winget_list_installed",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-11",
+      "accepted_calls": [
+        {
+          "tool": "winget_upgrade",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-12",
+      "accepted_calls": [
+        {
+          "tool": "winget_uninstall",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-13",
+      "accepted_calls": [
+        {
+          "tool": "winget_search",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-14",
+      "accepted_calls": [
+        {
+          "tool": "winget_install",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-15",
+      "accepted_calls": [
+        {
+          "tool": "pc_installed_software",
+          "action": null,
+          "constraints": []
+        },
+        {
+          "tool": "windows_task",
+          "action": "software.list",
+          "constraints": []
+        },
+        {
+          "tool": "winget_list_installed",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    },
+    {
+      "id": "v14-software-management-18",
+      "accepted_calls": [
+        {
+          "tool": "winget_uninstall",
+          "action": null,
+          "constraints": []
+        }
+      ]
+    }
+  ]
+}

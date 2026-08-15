@@ -1,0 +1,18 @@
+{
+  "schema": "marvin.tool-selection-v14-holdout-freeze/1.0",
+  "status": "frozen_before_product_change",
+  "source_commit": "dfa1f209",
+  "files": {
+    "benchmarks/tool-selection/v1.4/holdout-corpus.json": "af54f114798b38ac9cdb14ba04f6ead7a0659425be5fa2c0fe7bb58dba507688",
+    "benchmarks/tool-selection/v1.4/holdout-oracle.json": "41d4ad62e51f46ddcaea5c936a81004a96f5bfc80dfd837990ef7b609408ac14",
+    "benchmarks/tool-selection/v1.4/holdout-generation-report.json": "a6d70b36409c12f2b515087946f4a0133063fd5c7c3d10dc6cf19d8a3501090e"
+  },
+  "selected_count": 20,
+  "family_counts": {
+    "application_launch": 10,
+    "software_management": 10
+  },
+  "product_change_after_this_freeze_only": true,
+  "holdout_must_not_be_used_for_product_tuning": true,
+  "business_tool_execution_authorized": false
+}

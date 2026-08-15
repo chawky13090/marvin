@@ -1,0 +1,106 @@
+{
+  "schema": "marvin.tool-selection-v14-holdout/1.0",
+  "status": "frozen_candidate",
+  "items": [
+    {
+      "family": "application_launch",
+      "prompt": "Ouvre l'application Alarms & Clock",
+      "id": "v14-application-launch-11"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre le programme Mail",
+      "id": "v14-application-launch-12"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Lance l'application Calendar",
+      "id": "v14-application-launch-13"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre l'application Camera",
+      "id": "v14-application-launch-15"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Ouvre l'application Microsoft Store",
+      "id": "v14-application-launch-17"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre le logiciel Feedback Hub",
+      "id": "v14-application-launch-18"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Lance l'application Get Help",
+      "id": "v14-application-launch-19"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Ouvre le programme Tips",
+      "id": "v14-application-launch-20"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Démarre l'application Mixed Reality Portal",
+      "id": "v14-application-launch-21"
+    },
+    {
+      "family": "application_launch",
+      "prompt": "Lance le logiciel Your Phone",
+      "id": "v14-application-launch-22"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Inventorier tous les logiciels actuellement installés sur le système",
+      "id": "v14-software-management-03"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Rechercher le paquet correspondant à l'éditeur de texte FixtureApp-B",
+      "id": "v14-software-management-07"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Installer le utilitaire de compression FixtureApp-C en mode silencieux",
+      "id": "v14-software-management-08"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Inventorier les applications installées avec leur version respective",
+      "id": "v14-software-management-09"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Mettre à jour tous les paquets obsolètes détectés",
+      "id": "v14-software-management-11"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Désinstaller le logiciel FixtureApp-B et ses dépendances inutilisées",
+      "id": "v14-software-management-12"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Rechercher le paquet FixtureApp-C dans le référentiel officiel",
+      "id": "v14-software-management-13"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Installer le navigateur web FixtureApp-A avec les paramètres par défaut",
+      "id": "v14-software-management-14"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Inventorier les logiciels installés qui ne sont plus soutenus par leur éditeur",
+      "id": "v14-software-management-15"
+    },
+    {
+      "family": "software_management",
+      "prompt": "Désinstaller le logiciel FixtureApp-C et nettoyer les fichiers résiduels",
+      "id": "v14-software-management-18"
+    }
+  ]
+}
