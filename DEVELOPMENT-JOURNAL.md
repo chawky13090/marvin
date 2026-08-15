@@ -5,6 +5,34 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-15 — v2.661.0 — morphologie logicielle bornée et holdout indépendant
+
+La correction a été pré-enregistrée au commit `0d268a77` avant toute source produit. Le
+générateur indépendant a été gelé au commit `dfa1f209`, puis a produit une seule fois un
+holdout de 20 intentions inédites réparties entre lancement d'application et gestion
+logicielle; le corpus, ses oracles multiples et son manifeste ont été gelés au commit
+`ed0d0e61` avant inspection des formulations. Aucun outil métier n'a été exécuté.
+
+Le radical historique mal orthographié `instal` ne pouvait plus correspondre depuis le
+durcissement des frontières lexicales. Il est remplacé par `install*`, une règle explicite
+limitée aux préfixes d'au moins sept caractères et à une distance d'édition maximale de un.
+Elle reconnaît notamment `installe`, `installer`, `installation`, `install` et `instaler`,
+mais refuse les mots sans rapport et les formes adjectivales non ambiguës d'inventaire.
+Toutes les règles ordinaires conservent leur comportement exact. Les formulations de lancement
+d'application, d'inventaire logiciel et de lecture des mises à jour sont complétées, ainsi que
+les profils de découverte de `pc_app_launch`, `pc_installed_software`,
+`winget_list_upgrades` et `winget_upgrade`.
+
+Sécurité : aucune garde, confirmation, autorisation, exécution, alias public ou taille de
+sous-ensemble n'est modifié; le registre reste à 364 outils. Confidentialité et logs : aucun
+texte utilisateur, secret ou nouvel événement runtime n'est créé. Performance : la distance
+bornée ne s'applique qu'aux rares règles explicitement suffixées par `*`; le cache historique
+reste équivalent sur 1 683 termes ordinaires. Rollback : réversion atomique du commit produit,
+sans migration ni restauration de donnée. Validations observées avant gel produit : six
+canaris positifs, quatre négatifs, registre 364, budget de test 18, 536 requêtes historiques,
+zéro divergence sur les termes ordinaires et holdout v1.4 toujours intact. Le holdout neuf ne
+sera ouvert qu'après le commit produit et l'autorisation versionnée de la campagne.
+
 ## 2026-08-15 — v2.660.0 — parcours réels agrégés et validation future gelée
 
 L'analyse locale joint désormais une demande humaine persistée à ses exécutions uniquement

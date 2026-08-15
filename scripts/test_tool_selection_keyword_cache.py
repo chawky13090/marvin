@@ -94,11 +94,26 @@ def vocabulary() -> tuple[str, ...]:
     return tuple(sorted(value for value in values if value))
 
 
-def keyword_hits(query: str, predicate: Callable[[str, str], bool]) -> set[str]:
+def ordinary_vocabulary() -> tuple[str, ...]:
+    """Legacy exact-match contract, excluding preregistered explicit prefixes."""
+
+    return tuple(value for value in vocabulary() if not value.endswith("*"))
+
+
+def keyword_hits(
+    query: str,
+    predicate: Callable[[str, str], bool],
+    *,
+    ordinary_only: bool = False,
+) -> set[str]:
     text = selection._strip_accents(query.lower())
     hits: set[str] = set()
     for keywords, tools in selection._KEYWORD_TOOLS_NORM:
-        if any(predicate(keyword, text) for keyword in keywords):
+        evaluated = (
+            keyword for keyword in keywords
+            if not ordinary_only or not keyword.endswith("*")
+        )
+        if any(predicate(keyword, text) for keyword in evaluated):
             hits.update(tools)
     return hits
 
@@ -118,7 +133,7 @@ def main() -> None:
     queries = public_queries()
     private = private_queries()
     queries.extend(private)
-    terms = vocabulary()
+    terms = ordinary_vocabulary()
     mismatch_count = 0
     hit_set_mismatch_count = 0
     for query in queries:
@@ -128,8 +143,8 @@ def main() -> None:
             for term in terms
         )
         hit_set_mismatch_count += int(
-            keyword_hits(query, reference_present)
-            != keyword_hits(query, selection._keyword_present)
+            keyword_hits(query, reference_present, ordinary_only=True)
+            != keyword_hits(query, selection._keyword_present, ordinary_only=True)
         )
     canaries = (
         ("ip", "adresse ip", True),
@@ -144,6 +159,9 @@ def main() -> None:
         assert reference_present(keyword, text) is expected
     assert mismatch_count == 0
     assert hit_set_mismatch_count == 0
+    assert selection._keyword_present("install*", "installe le logiciel vlc") is True
+    assert selection._keyword_present("install*", "instaler le logiciel vlc") is True
+    assert selection._keyword_present("install*", "instant présent") is False
     assert selection._keyword_pattern.cache_info().maxsize == 4096
     benchmark_query = "cherche un fichier nommé rapport puis affiche son chemin"
     selection._keyword_pattern.cache_clear()

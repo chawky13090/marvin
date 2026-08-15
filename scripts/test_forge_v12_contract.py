@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -54,7 +55,15 @@ def main() -> int:
     assert policy["campaign"]["current_release_scope_until_holdout_exists"] == "development_only"
     assert hashlib.sha256((CONTRACT / "acceptance-policy.json").read_bytes()).hexdigest() == erratum["original_policy_sha256"]
     for relative_path, expected_hash in erratum["shared_production_source_hashes"].items():
-        assert hashlib.sha256((ROOT / relative_path).read_bytes()).hexdigest() == expected_hash
+        frozen = subprocess.check_output(
+            [
+                "git",
+                "show",
+                f"{erratum['shared_production_ranking_baseline_commit']}:{relative_path}",
+            ],
+            cwd=ROOT,
+        )
+        assert hashlib.sha256(frozen).hexdigest() == expected_hash
     assert erratum["constraints"]["any_shared_ranking_change_requires_new_baseline_and_new_holdout"] is True
     assert erratum["constraints"]["no_ranking_lexicon_or_constant_change_after_corpus_freeze_without_regel"] is True
     assert erratum["constraints"]["minimum_names_per_evaluated_family"] == 5

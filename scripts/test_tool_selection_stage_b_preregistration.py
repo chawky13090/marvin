@@ -39,7 +39,11 @@ def main() -> None:
     assert value["decision"]["global_average_never_masks_family_failure"]
     assert value["decision"]["unrepresented_or_unexecutable_family_state"] == "UNASSESSED"
     for relative, expected in value["product_sources_sha256"].items():
-        assert sha256(ROOT / relative) == expected, relative
+        frozen = subprocess.check_output(
+            ["git", "show", f"{value['source_commit']}:{relative}"],
+            cwd=ROOT,
+        )
+        assert hashlib.sha256(frozen).hexdigest() == expected, relative
     for item in value["stage_a"].values():
         if isinstance(item, dict) and "path" in item:
             assert sha256(ROOT / item["path"]) == item["sha256"]

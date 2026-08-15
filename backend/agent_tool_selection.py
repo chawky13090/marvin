@@ -157,7 +157,11 @@ _KEYWORD_TOOLS = {
     # vérifie l'effet. computer_control reste réservé aux gestes visuels ci-dessus.
     ("processus actifs", "liste les processus", "arrête le processus", "arrete le processus",
      "ferme l'application", "ferme le logiciel", "lance l'application", "ouvre l'application",
-     "lance le bloc-notes", "ouvre le bloc-notes", "services windows", "liste les services",
+     "lance le programme", "ouvre le logiciel", "démarre l'application", "demarre l'application",
+     "démarre le programme", "demarre le programme", "démarre l'outil", "demarre l'outil",
+     "exécute le binaire", "execute le binaire", "lance l'exécutable", "lance l'executable",
+     "active l'application", "lance le bloc-notes", "ouvre le bloc-notes",
+     "services windows", "liste les services",
      "configuration réseau", "configuration reseau", "état du pare-feu", "etat du pare-feu",
      "logiciels installés", "logiciels installes", "crée le dossier", "cree le dossier",
      "renomme le fichier", "copie le fichier"):
@@ -178,8 +182,18 @@ _KEYWORD_TOOLS = {
     # Logiciels installés / inventaire logiciel
     ("logiciel installé", "logiciels installés", "logiciels installer", "inventaire logiciel",
      "liste des programmes", "programmes installés", "quels logiciels", "applications installées",
-     "liste logiciels", "logiciels sur ce pc", "logiciels du pc"):
-        {"pc_installed_software", "win_system_report", "pc_system_info", "windows_task"},
+     "est installé", "est installe", "sont installés", "sont installes",
+     "programmes présents", "programmes presents", "liste logiciels", "logiciels sur ce pc",
+     "logiciels du pc"):
+        {"pc_installed_software", "winget_list_installed", "win_system_report",
+         "pc_system_info", "windows_task"},
+
+    # État des mises à jour : lecture Winget dédiée, sans lancer d'installation.
+    ("mise à jour disponible", "mise a jour disponible", "mises à jour disponibles",
+     "mises a jour disponibles", "état des mises à jour", "etat des mises a jour",
+     "liste les mises à jour", "liste les mises a jour", "dernière version installée",
+     "derniere version installee"):
+        {"winget_list_upgrades", "winget_list_installed"},
 
     # Installer / mettre à jour / désinstaller un logiciel (Winget) — bug réel corrigé
     # v2.113 : aucune entrée ne routait ici avant, le LLM tombait parfois sur du routage
@@ -188,9 +202,9 @@ _KEYWORD_TOOLS = {
     # lieu d'installer réellement. Stem court "instal" (pas "installe") pour matcher aussi
     # "install"/"installation" sans le "e" final — repéré en reproduisant le bug exact avec
     # le message original de l'utilisateur ("install le logiciel victoria", sans "e").
-    # Matche aussi "installés"/"installer un inventaire" (substring) mais sans risque : ça
-    # ne fait qu'AJOUTER winget_* à l'ensemble déjà proposé, jamais retirer pc_installed_software.
-    ("instal", "télécharge et installe", "telecharge et installe",
+    # Le marqueur explicite ``*`` couvre install/installé/installer/installation et une faute
+    # d'édition bornée. Les mots ordinaires conservent leurs frontières exactes.
+    ("install*", "télécharge et installe", "telecharge et installe",
      "mets à jour", "mets a jour", "met à jour", "met a jour", "mettre à jour", "mettre a jour",
      "désinstal", "desinstal", "winget"):
         {"winget_search", "winget_install", "winget_upgrade", "winget_uninstall",
@@ -621,6 +635,48 @@ def _keyword_pattern(keyword: str) -> re.Pattern[str]:
     return re.compile(left + escaped + right)
 
 
+def _within_one_edit(left: str, right: str) -> bool:
+    """Distance d'édition <= 1, sans matrice ni tolérance non bornée."""
+
+    if left == right:
+        return True
+    if abs(len(left) - len(right)) > 1:
+        return False
+    if len(left) == len(right):
+        return sum(a != b for a, b in zip(left, right)) <= 1
+    shorter, longer = (left, right) if len(left) < len(right) else (right, left)
+    short_index = long_index = differences = 0
+    while short_index < len(shorter) and long_index < len(longer):
+        if shorter[short_index] == longer[long_index]:
+            short_index += 1
+            long_index += 1
+            continue
+        differences += 1
+        if differences > 1:
+            return False
+        long_index += 1
+    return True
+
+
+def _prefix_keyword_present(prefix: str, text: str) -> bool:
+    """Préfixe explicite, avec une seule faute tolérée sur un radical long."""
+
+    if len(prefix) < 7 or not prefix.isalnum():
+        return False
+    for token in re.findall(r"[a-z0-9]+", text):
+        # Formes adjectivales non ambiguës de « installé » : elles décrivent
+        # l'inventaire existant et ne doivent jamais déclencher une mutation.
+        if prefix == "install" and token in {"installes", "installee", "installees"}:
+            continue
+        if token.startswith(prefix):
+            return True
+        if len(token) >= len(prefix) - 1:
+            candidate = token[: len(prefix)]
+            if _within_one_edit(prefix, candidate):
+                return True
+    return False
+
+
 def _keyword_present(keyword: str, text: str) -> bool:
     """Matche un terme metier complet, jamais une sous-chaine accidentelle.
 
@@ -633,6 +689,8 @@ def _keyword_present(keyword: str, text: str) -> bool:
     normalized = str(keyword or "").strip()
     if not normalized:
         return False
+    if normalized.endswith("*"):
+        return _prefix_keyword_present(normalized[:-1], text)
     return _keyword_pattern(normalized).search(text) is not None
 
 

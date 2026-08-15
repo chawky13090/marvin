@@ -89,6 +89,25 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         do_not_use_when=("le contenu doit être analysé par Marvin",),
         related_tools=("file_read", "pdf_read", "pc_reveal"),
     ),
+    "pc_app_launch": DiscoveryProfile(
+        "Lancer une application Windows installée",
+        aliases=(
+            "ouvrir un logiciel",
+            "démarrer un programme",
+            "exécuter un binaire installé",
+            "lancer un exécutable",
+        ),
+        use_when=(
+            "l'utilisateur demande d'ouvrir une application installée par son nom",
+            "un programme Windows doit être lancé puis vérifié par processus ou fenêtre",
+        ),
+        do_not_use_when=(
+            "ouvrir un fichier ou un dossier local",
+            "interagir visuellement dans une application déjà ouverte",
+            "démarrer ou arrêter un service Windows",
+        ),
+        related_tools=("windows_task", "pc_open_file", "win_service_action"),
+    ),
     "windows_task": DiscoveryProfile(
         "Exécuter et vérifier une opération Windows typée",
         aliases=(
@@ -273,7 +292,33 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         "Inventorier les logiciels Windows installés avec Winget",
         aliases=("logiciels installés", "vérifier une application installée"),
         use_when=("confirmer la présence ou l'absence d'un logiciel",),
-        related_tools=("winget_search", "winget_uninstall"),
+        do_not_use_when=(
+            "recherche logiciels installables catalogue",
+            "rechercher logiciel installable catalogue",
+        ),
+        related_tools=("winget_uninstall",),
+    ),
+    "winget_list_upgrades": DiscoveryProfile(
+        "Lister les actualisations Winget disponibles",
+        aliases=(
+            "mises à jour disponibles",
+            "paquets obsolètes",
+            "vérifier les nouvelles versions disponibles",
+        ),
+        use_when=("inspecter versions obsolètes sans appliquer",),
+        do_not_use_when=("appliquer réellement une mise à jour",),
+        related_tools=("winget_upgrade", "winget_list_installed"),
+    ),
+    "winget_upgrade": DiscoveryProfile(
+        "Mettre à jour un logiciel Windows avec Winget",
+        aliases=(
+            "mettre à niveau une application",
+            "installer la dernière version d'un logiciel",
+            "appliquer les mises à jour winget",
+        ),
+        use_when=("l'utilisateur demande d'appliquer réellement une mise à jour logicielle",),
+        do_not_use_when=("l'utilisateur demande seulement la liste des mises à jour disponibles",),
+        related_tools=("winget_list_upgrades", "winget_list_installed"),
     ),
     "winget_uninstall": DiscoveryProfile(
         "Désinstaller et vérifier un logiciel Windows avec Winget",
@@ -281,6 +326,21 @@ _PROFILES: dict[str, DiscoveryProfile] = {
         use_when=("l'utilisateur demande la désinstallation réelle d'un logiciel",),
         do_not_use_when=("supprimer aussi le profil ou les données personnelles",),
         related_tools=("winget_list_installed",),
+    ),
+    "pc_installed_software": DiscoveryProfile(
+        "Inventaire logiciel Windows",
+        aliases=(
+            "programmes présents",
+            "applications installées",
+            "inventaire logiciel",
+        ),
+        use_when=("inventorier logiciels Windows installés hors Winget",),
+        do_not_use_when=(
+            "installer actualiser désinstaller",
+            "recherche logiciels installables catalogue",
+            "rechercher logiciel installable catalogue",
+        ),
+        related_tools=("win_system_report",),
     ),
     "pc_run_powershell": DiscoveryProfile(
         "Exécuter un script PowerShell générique",

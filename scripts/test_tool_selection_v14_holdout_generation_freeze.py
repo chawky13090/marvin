@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -23,7 +24,11 @@ assert digest("scripts/generate_tool_selection_v13_holdout.py") == policy["gener
 assert digest("scripts/generate_tool_selection_v14_holdout.py") == policy["generator_wrapper_sha256"]
 assert digest("benchmarks/tool-selection/v1.4/morphology-preregistration.json") == policy["preregistration_sha256"]
 for relative, expected in policy["frozen_product_sources_sha256"].items():
-    assert digest(relative) == expected
+    frozen = subprocess.check_output(
+        ["git", "show", f"{policy['source_commit']}:{relative}"],
+        cwd=ROOT,
+    )
+    assert hashlib.sha256(frozen).hexdigest() == expected
 assert len({row["model"].split(":", 1)[0] for row in policy["roles"].values()}) == 5
 assert policy["benchmark_model_excluded_from_generation"]["model"] not in {
     row["model"] for row in policy["roles"].values()
@@ -38,4 +43,4 @@ assert policy["authorization"] == {
 assert policy["privacy_security"]["host_side_effects"] is False
 assert policy["novelty"]["comparison_is_local_and_not_shown_to_cloud_roles"] is True
 
-print("Tool selection v1.4 holdout generator freeze OK - product unchanged")
+print("Tool selection v1.4 holdout generator freeze OK - frozen product provenance intact")

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.660.0, 364 outils, 392 routes.** Architecture dans
+> **État courant : v2.661.0, 364 outils, 392 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.660.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.661.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.660.0)
+## 9. État actuel (v2.661.0)
+
+**v2.661 (morphologie logicielle bornée)** : la correction a été pré-enregistrée avant toute
+modification produit et un holdout indépendant de 20 intentions a été généré par cinq familles
+Cloud puis gelé sans exécution métier. Le mot interne ambigu `instal` devient la règle explicite
+`install*` : préfixe minimal de sept caractères, distance d'édition maximale de un, uniquement
+pour les règles marquées. Les mots-clés ordinaires restent strictement identiques. Les formes
+adjectivales non ambiguës d'inventaire ne déclenchent pas une mutation. Les formulations de
+lancement, inventaire et lecture des mises à jour ainsi que les profils sémantiques Winget et
+application sont complétés. Les 364 outils, les budgets `max_tools`, les confirmations et les
+gardes d'autorisation restent inchangés. Rollback : réversion atomique du commit produit v2.661;
+aucun schéma ni contenu persistant n'est modifié. Le holdout v1.4 reste une preuve immuable.
 
 **v2.660 (parcours réels locaux et validation chronologique)** : les demandes persistées sont
 jointes exactement aux exécutions par `client_request_id/request_id`; les campagnes éphémères
