@@ -8,7 +8,7 @@
 }
 
 .content {
-  width: min(860px, 100%);
+  width: min(1040px, 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -49,7 +49,7 @@
   margin-top: 13px;
   flex-wrap: wrap;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   padding: 1px 1px 8px;
   scrollbar-width: thin;
 }
@@ -96,6 +96,7 @@
 
 @media (max-width: 720px) {
   .stage { align-items: flex-start; padding: 55px 13px 21px; }
+  .avatar { transform: scale(.92); transform-origin: center bottom; }
   .subtitle { margin-bottom: 13px; }
   .intentBar { margin-inline: -4px; width: calc(100% + 8px); }
   .intentBar {

@@ -254,9 +254,10 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
     const ta = textareaRef.current;
     if (ta) {
       ta.style.height = 'auto';
-      ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+      const maximumHeight = variant === 'welcome' ? 220 : 180;
+      ta.style.height = Math.min(ta.scrollHeight, maximumHeight) + 'px';
     }
-  }, [input]);
+  }, [input, variant]);
 
   function onKeyDown(e) {
     if (e.key === '/' && !input && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -496,14 +497,15 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
 
       <div className="marvin-chat-composer" style={{
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'center',
+        flexWrap: 'wrap',
         gap: '8px',
         background: variant === 'welcome' ? 'rgba(24, 24, 29, .92)' : 'var(--bg-glass)',
         backdropFilter: 'blur(20px)',
         border: `1px solid ${variant === 'welcome' ? 'rgba(228, 228, 231, .14)' : 'var(--border)'}`,
         borderRadius: variant === 'welcome' ? '21px' : '16px',
         padding: variant === 'welcome' ? '13px 13px 13px 16px' : '8px 8px 8px 12px',
-        minHeight: variant === 'welcome' ? '112px' : undefined,
+        minHeight: variant === 'welcome' ? '132px' : undefined,
         boxShadow: variant === 'welcome' ? '0 18px 55px rgba(0, 0, 0, .28)' : 'none',
         transition: 'border-color 0.2s, box-shadow 0.2s',
       }}
@@ -888,9 +890,11 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
             ? 'Décrivez votre objectif, ou tapez / pour choisir une capacité…'
             : 'Demandez quelque chose… (Entrée pour envoyer, Maj+Entrée pour nouvelle ligne)'}
           disabled={false}
-          rows={1}
+          rows={3}
           style={{
-            flex: 1,
+            flex: '1 0 100%',
+            order: -1,
+            width: '100%',
             minWidth: 0,
             background: 'transparent',
             border: 'none',
@@ -900,9 +904,9 @@ export default function ChatInput({ input = '', setInput, handleInputChange, han
             fontSize: 'var(--font-base)',
             lineHeight: '1.5',
             resize: 'none',
-            maxHeight: variant === 'welcome' ? '180px' : '140px',
-            minHeight: variant === 'welcome' ? '72px' : undefined,
-            padding: '6px 0',
+            maxHeight: variant === 'welcome' ? '220px' : '180px',
+            minHeight: variant === 'welcome' ? '78px' : '68px',
+            padding: '8px 4px 10px',
           }}
         />
         {isLoading ? (

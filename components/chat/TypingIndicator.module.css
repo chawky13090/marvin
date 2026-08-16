@@ -12,6 +12,38 @@
   color: var(--text-muted);
 }
 
+/* Le robot reste un véritable indicateur d'activité, jamais une icône tassée. */
+:global(.marvin-chat-composer) .activityDock {
+  order: -2;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: -2px 0 2px;
+  padding: 0 0 8px;
+  border-left: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+:global(.marvin-chat-composer) .activitySummary {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+:global(.marvin-chat-composer) .robotButton,
+.density_normal .robotButton,
+.density_compact .robotButton {
+  width: 76px;
+  height: 68px;
+  flex-basis: 76px;
+}
+
+:global(.marvin-chat-composer) .robot,
+.density_normal .robot,
+.density_compact .robot {
+  width: 74px;
+  height: 74px;
+}
+
 .liveStatus {
   position: absolute;
   width: 1px;
@@ -84,15 +116,10 @@
 .timeline li strong { color: var(--text-secondary); font-weight: 650; }
 .timeline li span, .timeline li small { color: var(--text-muted); font-weight: 400; }
 
-.density_normal { min-width: 176px; }
-.density_normal .activitySummary { width: 132px; }
-.density_normal .activityText span { display: none; }
-.density_normal .robotButton { width: 62px; height: 58px; flex-basis: 62px; }
-.density_normal .robot { width: 60px; height: 60px; }
-.density_compact { min-width: 62px; padding-left: 7px; }
-.density_compact .activitySummary { display: none; }
-.density_compact .robotButton { width: 58px; height: 54px; flex-basis: 58px; }
-.density_compact .robot { width: 56px; height: 56px; }
+.density_normal { min-width: 0; }
+.density_normal .activitySummary { width: auto; }
+.density_compact { min-width: 0; padding-left: 0; }
+.density_compact .activitySummary { display: grid; }
 
 .standalone { position: relative; width: min(100%, 360px); margin: 8px auto; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-secondary); }
 

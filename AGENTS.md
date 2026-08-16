@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.679.0, 364 outils, 396 routes.** Architecture dans
+> **État courant : v2.680.0, 364 outils, 396 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.679.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.680.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,18 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.679.0)
+## 9. État actuel (v2.680.0)
+
+**v2.680 (composeur responsive et pilotage lisible)** : l’accueil conserve le grand avatar
+Marvin et exploite une colonne élargie; après le premier message, la saisie reste ancrée en bas
+avec trois lignes visibles et croissance bornée. Cortex et autonomie restent dans la barre. En
+cours de travail, le pilotage occupe un bandeau distinct juste au-dessus, avec arrêt explicite,
+et le robot d’activité garde sa taille, ses animations, son détail et sa fonction d’arrêt à
+toutes les densités. La colonne chat s’adapte à la sidebar des conversations et aux écrans
+mobiles sans débordement horizontal. Validation réelle : build Next.js 16.2.12, mesures
+visuelles à 2048, 1180 et 390 px, puis état actif avec robot 76 x 68 px. Le gate compte 365
+étapes. Rollback : réversion atomique de v2.680; aucune donnée, route, autorisation ou
+configuration persistante ne change.
 
 **v2.679 (pilotage des tours activé)** : pendant que Marvin travaille, la barre de chat reste
 active et distingue précision, redirection et tâche suivante. Les directives sont durables,

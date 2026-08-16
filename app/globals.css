@@ -1300,6 +1300,8 @@ img { max-width: 100%; display: block; }
 .marvin-chat-container {
   position: relative;
   isolation: isolate;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .marvin-chat-stream {
@@ -1328,6 +1330,73 @@ img { max-width: 100%; display: block; }
   box-shadow: 0 14px 42px rgba(0, 0, 0, 0.26);
 }
 
+.marvin-chat-input-shell--welcome {
+  width: 100%;
+  min-width: 0;
+}
+
+.marvin-chat-composer {
+  min-width: 0;
+}
+
+.marvin-chat-composer__input {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+}
+
+.marvin-steering-band {
+  width: min(calc(100% - 32px), 1120px);
+  margin: 0 auto -1px;
+  padding: 9px 12px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-bottom-color: transparent;
+  border-radius: 14px 14px 0 0;
+  background: rgba(17, 18, 20, .97);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.marvin-steering-band__label {
+  padding: 0 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.marvin-steering-band__choice,
+.marvin-steering-band__stop {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.marvin-steering-band__choice:hover,
+.marvin-steering-band__choice.is-active {
+  border-color: var(--border-hover);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.marvin-steering-band__stop {
+  margin-left: auto;
+  border-color: rgba(239, 68, 68, .35);
+  color: #f0a0a0;
+}
+
+.marvin-steering-band__stop:hover { background: rgba(239, 68, 68, .1); }
+.marvin-steering-band__status { flex: 1 1 100%; color: var(--text-muted); font-size: 11px; }
+
 @media (max-width: 720px) {
   .marvin-chat-stream {
     padding: 16px 12px 24px;
@@ -1338,6 +1407,11 @@ img { max-width: 100%; display: block; }
     margin-bottom: 8px;
     padding: 8px !important;
     border-radius: 14px;
+  }
+
+  .marvin-steering-band {
+    width: calc(100% - 16px);
+    padding-inline: 8px;
   }
 }
 
@@ -1352,8 +1426,19 @@ img { max-width: 100%; display: block; }
     order: -1;
     flex: 1 0 100% !important;
     width: 100%;
-    min-height: 48px;
+    min-height: 78px !important;
   }
+
+  .marvin-steering-band {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .marvin-steering-band::-webkit-scrollbar { display: none; }
+  .marvin-steering-band__label { position: sticky; left: 0; background: rgba(17, 18, 20, .97); }
+  .marvin-steering-band__stop { margin-left: 0; }
+  .marvin-steering-band__status { display: none; }
 
   .cortex-control-trigger--compact {
     width: 34px !important;

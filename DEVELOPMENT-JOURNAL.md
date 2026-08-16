@@ -5,6 +5,25 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-16 — v2.680.0 — composeur responsive et robot de travail préservé
+
+- Demande : conserver la sidebar des conversations, agrandir la zone d’écriture, placer le
+  pilotage au-dessus du dialogue, garder Cortex et autonomie dans la barre et préserver le
+  grand robot Marvin avec toutes ses fonctions sur desktop, tablette et mobile.
+- Décision : le texte occupe désormais toute la première ligne du composeur avec trois lignes
+  visibles et croissance bornée; les contrôles restent dans une seconde ligne. L’activité et
+  le robot occupent une ligne dédiée, sans réduction aux densités étroites. Le bandeau de
+  pilotage est séparé, responsive et comporte un arrêt explicite.
+- Sécurité et données : aucun contrat backend, garde d’autorisation, secret, contenu de
+  conversation ou donnée persistante ne change. Les actions sensibles conservent leurs
+  confirmations; l’arrêt et les directives utilisent les mécanismes v2.679 existants.
+- Journalisation : aucune nouvelle donnée journalisée. Les événements et identifiants de
+  directives existants sont seulement présentés autrement.
+- Validation observée : build Next.js 16.2.12 réussi; absence de débordement horizontal et
+  dimensions du composeur contrôlées à 2048 x 1000, 1180 x 820 et 390 x 844; état actif réel
+  contrôlé avec bandeau, texte large et robot 76 x 68 px; test statique de régression ajouté.
+- Rollback : réversion atomique du commit v2.680; aucune migration ni restauration de donnée.
+
 ## 2026-08-16 — v2.679.0 — pilotage actif des tours de chat
 
 Le pilotage en cours de tour est activé après gel du résultat hors ligne. Une précision ou une

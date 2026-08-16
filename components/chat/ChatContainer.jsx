@@ -613,21 +613,20 @@ export default function ChatContainer({
       {messages.length > 0 && (
         <>
         {isLoading && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '6px 12px', color: 'var(--text-secondary)', fontSize: 12 }}>
-            <span>Piloter :</span>
+          <div className="marvin-steering-band" role="toolbar" aria-label="Piloter le travail en cours">
+            <strong className="marvin-steering-band__label">Piloter</strong>
             {[
               ['append', 'Ajouter une précision'],
               ['redirect', 'Rediriger maintenant'],
               ['next', 'Faire ensuite'],
             ].map(([kind, label]) => (
-              <button key={kind} type="button" onClick={() => setDirectiveKind(kind)} style={{
-                border: '1px solid var(--border)', borderRadius: 8, padding: '4px 8px',
-                background: directiveKind === kind ? 'var(--bg-tertiary)' : 'transparent',
-                color: 'inherit', cursor: 'pointer',
-              }}>{label}</button>
+              <button key={kind} type="button" onClick={() => setDirectiveKind(kind)}
+                className={`marvin-steering-band__choice${directiveKind === kind ? ' is-active' : ''}`}
+                aria-pressed={directiveKind === kind}>{label}</button>
             ))}
+            <button type="button" onClick={stop} className="marvin-steering-band__stop">Arrêter</button>
             {latestDirective && (
-              <span aria-live="polite">
+              <span className="marvin-steering-band__status" aria-live="polite">
                 {latestDirective.kind === 'stop'
                   ? 'Arrêt demandé : Marvin s’arrête après l’action en cours.'
                   : `Orientation n°${latestDirective.sequence} ${latestDirective.status === 'applied' ? 'appliquée' : latestDirective.status === 'deferred' ? 'différée' : 'reçue'}`}
