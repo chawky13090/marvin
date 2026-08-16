@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULT = ROOT / "benchmarks/chat-steering/v1/runtime-integration-result.json"
+ACTIVATION = ROOT / "benchmarks/chat-steering/v1/activation-result.json"
 AUTHORIZATION = ROOT / "benchmarks/chat-steering/v1/runtime-integration-authorization.json"
 
 
@@ -43,7 +44,18 @@ def main() -> None:
     assert result["controlled_activation_authorized"] is True
     assert result["release_verified"] is False
     assert all(result["activation_boundary"].values())
-    print("Chat Turn Steering Runtime Result OK - offline proof frozen before activation")
+    activation = json.loads(ACTIVATION.read_text(encoding="utf-8"))
+    assert activation["status"] == "verified_active"
+    assert activation["version"] == "2.679.0"
+    for relative_path, expected in activation["governed_sources"].items():
+        assert sha256(blob(activation["source_commit"], relative_path)) == expected, relative_path
+    observed = activation["observed"]
+    assert observed["sqlite_migration_version"] == 7
+    assert observed["cold_restarts"] >= 3
+    assert observed["quick_gate"]["failed"] == 0
+    assert observed["live_business_tool_calls"] == 0
+    assert activation["data_integrity"]["user_conversations_deleted"] == 0
+    print("Chat Turn Steering Runtime Result OK - offline proof and live activation frozen")
 
 
 if __name__ == "__main__":

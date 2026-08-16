@@ -1,0 +1,56 @@
+{
+  "schema": "marvin.chat-turn-steering-activation-result/1.0",
+  "status": "verified_active",
+  "version": "2.679.0",
+  "measured_at": "2026-08-16T02:04:05+02:00",
+  "source_commit": "4c476bcc6c56f501c9dbfad3c89a1af46af74b4f",
+  "activation_commit": "2c1b542",
+  "offline_result": "benchmarks/chat-steering/v1/runtime-integration-result.json",
+  "feature_default": true,
+  "explicit_false_is_rollback_switch": true,
+  "governed_sources": {
+    "backend/chat_turn_steering.py": "9483ef52f8b64a643823c8758ba13f0033f8bf7f726f944bdeb9be864b03ca5c",
+    "backend/chat_turn_runtime.py": "9a7e127a5fe61286a10474be83c913678cb2eeefca05cf2ad967676f19e89afe",
+    "backend/agent.py": "727c32b2fe12e6f749450ab3a47b737ea24c46daaab2df8934653e4eb87c8b14",
+    "backend/agent_turn_completion.py": "c3c1bb2b5be7ebda928d11789ce8a57bcd6d69eb498ec873459175adbd0f3d97",
+    "backend/api/agent_gateway.py": "e569b7eb5987c29fc7fad9e72b577529d9cffe67058787d64f3ad23a4a58e39e",
+    "lib/contexts/ChatContext.jsx": "be037bb1c296bf7f09609779713cd5b6a14cfd27cc5bf2b90bb8b36569235e36",
+    "components/chat/ChatContainer.jsx": "7fef0371780637f8a82fe6057efbcc436043378ddfc8028f001cd179e8f25fb3",
+    "components/chat/ChatInput.jsx": "5b893f2bae233013d1139120faf076d5ab1085278b9938e319cd7cc04fc25009",
+    "scripts/smoke_test_chat_turn_steering.py": "917cf35418e0eb234d35e4b6ac16c893479a23a4ce4b5ce880c0721096ba801b"
+  },
+  "observed": {
+    "sqlite_migration_version": 7,
+    "steering_tables_present": true,
+    "cold_restarts": 3,
+    "backend_health_version": "2.679.0",
+    "frontend_http_status": 200,
+    "production_build": "passed",
+    "quick_gate": {
+      "expected": 364,
+      "executed": 358,
+      "skipped_live_or_build": 6,
+      "failed": 0
+    },
+    "api_contracts": "28/28",
+    "pages": "41/41",
+    "conversation_render_samples": "5/5",
+    "voice_serialization": "passed",
+    "live_directive_receipt": true,
+    "live_directive_no_loss": true,
+    "live_business_tool_calls": 0
+  },
+  "semantics": {
+    "directive_before_checkpoint": "applied_before_next_decision",
+    "directive_after_last_checkpoint": "durably_promoted_to_automatic_followup",
+    "queued_next": "starts_after_root_terminal",
+    "approval_wait": "keeps_parent_conversation_slot",
+    "stop": "cooperative_and_never_claims_inflight_cancellation"
+  },
+  "data_integrity": {
+    "user_conversations_deleted": 0,
+    "business_mutations_executed_by_activation_smoke": 0,
+    "directive_text_in_technical_logs": false
+  },
+  "rollback": "Set chat_turn_steering_enabled=false and restart Marvin. Preserve terminal receipts and never replay an action with unknown outcome. Revert activation commits only after the switch is observed false. Schema removal remains an offline, backed-up operation using scripts/rollback_chat_turn_steering_schema.py."
+}
