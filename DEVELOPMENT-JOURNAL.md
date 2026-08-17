@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-18 — v2.683.0 — contraste lisible du composeur dans les thèmes clairs
+
+- Demande : rendre lisible le texte saisi dans les thèmes Clair, Manga et Médiéval sans changer
+  le thème Sombre par défaut ni la disposition responsive.
+- Cause confirmée : le texte utilisait déjà `--text-primary`, mais le composeur d'accueil, la
+  coque du composeur actif et le bandeau de pilotage conservaient trois fonds noirs codés en dur.
+  Le thème Médiéval déclarait également à tort un `color-scheme` natif sombre.
+- Correction : toutes ces surfaces utilisent maintenant `--input-background` ou `--bg-glass`;
+  le schéma natif est clair pour Clair, Manga et Médiéval, sombre pour Sombre et Cyberpunk.
+- Sécurité et logs : évolution CSS/présentation uniquement, sans entrée réseau, secret, donnée
+  personnelle, nouvelle journalisation, migration ni changement d'autorisation.
+- Validation observée : ratios de contraste calculés à 14,93:1 en Clair, 14,92:1 en Manga et
+  10,67:1 en Médiéval; test de contrat des thèmes réussi; lint ciblé sans erreur; build de
+  production Next.js 16.2.12 réussi; gate rapide avec 360 étapes exécutées, six étapes live
+  explicitement ignorées et zéro échec sur 366 attendues.
+- Rollback : réverter atomiquement le commit v2.683 puis redémarrer le frontend. Aucune donnée
+  persistante ne doit être restaurée.
+
 ## 2026-08-17 — v2.682.0 — audit des conversations, réseau complet, SSH sûr et cinq thèmes
 
 - Demande : corriger les défauts observés dans les dernières conversations (inventaire réseau,

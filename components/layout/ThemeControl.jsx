@@ -26,7 +26,7 @@ function normalizeTheme(value) {
 function applyTheme(theme) {
   const safeTheme = normalizeTheme(theme);
   document.documentElement.dataset.theme = safeTheme;
-  document.documentElement.style.colorScheme = safeTheme === 'dark' || safeTheme === 'cyberpunk' || safeTheme === 'medieval' ? 'dark' : 'light';
+  document.documentElement.style.colorScheme = safeTheme === 'dark' || safeTheme === 'cyberpunk' ? 'dark' : 'light';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[safeTheme]);
   return safeTheme;
 }

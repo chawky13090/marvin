@@ -1535,7 +1535,7 @@ img { max-width: 100%; display: block; }
   padding: 12px !important;
   border: 1px solid var(--border) !important;
   border-radius: 18px;
-  background: rgba(20, 20, 21, 0.96) !important;
+  background: var(--input-background) !important;
   box-shadow: 0 14px 42px rgba(0, 0, 0, 0.26);
 }
 
@@ -1564,7 +1564,7 @@ img { max-width: 100%; display: block; }
   border: 1px solid var(--border);
   border-bottom-color: transparent;
   border-radius: 14px 14px 0 0;
-  background: rgba(17, 18, 20, .97);
+  background: var(--bg-glass);
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -1645,7 +1645,7 @@ img { max-width: 100%; display: block; }
   }
 
   .marvin-steering-band::-webkit-scrollbar { display: none; }
-  .marvin-steering-band__label { position: sticky; left: 0; background: rgba(17, 18, 20, .97); }
+  .marvin-steering-band__label { position: sticky; left: 0; background: var(--bg-glass); }
   .marvin-steering-band__stop { margin-left: 0; }
   .marvin-steering-band__status { display: none; }
 

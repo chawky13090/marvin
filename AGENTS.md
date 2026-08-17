@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.682.0, 364 outils, 396 routes.** Architecture dans
+> **État courant : v2.683.0, 364 outils, 396 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.682.0)
+## 9. État actuel (v2.683.0)
+
+**v2.683 (contraste du composeur dans tous les thèmes)** : le texte du chat utilisait bien les
+tokens de couleur, mais les composeurs d'accueil et de conversation ainsi que le bandeau de
+pilotage conservaient des fonds noirs codés en dur. Les surfaces suivent désormais les tokens
+du thème; Clair, Manga et Médiéval utilisent aussi le schéma de contrôles natifs clair. Le thème
+Sombre reste le défaut et aucune disposition ou donnée persistante ne change. Rollback :
+réversion atomique de v2.683.
 
 **v2.682 (inventaires complets, SSH épinglé et thèmes adaptatifs)** : le balayage d'un réseau
 privé `/24` est désormais un unique parcours borné qui croise sondes TCP et voisins ARP; il
