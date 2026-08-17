@@ -19,7 +19,10 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         database = Path(temporary) / "secretary.db"
         with closing(sqlite3.connect(database)) as connection:
-            apply_migrations(connection, MIGRATIONS)
+            apply_migrations(
+                connection,
+                tuple(migration for migration in MIGRATIONS if migration.version <= 7),
+            )
             connection.execute(
                 "INSERT INTO chat_turn_slots(conversation_key,root_request_id) VALUES('conversation:test','request:test')"
             )

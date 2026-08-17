@@ -150,6 +150,7 @@ from repositories.operations import (
 )
 from repositories.network_inventory import (
     get_network_devices,
+    register_network_device,
     set_network_device_notes,
     upsert_network_device,
 )

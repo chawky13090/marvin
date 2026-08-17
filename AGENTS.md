@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.683.0, 364 outils, 396 routes.** Architecture dans
+> **État courant : v2.684.0, 364 outils, 396 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.683.0)
+## 9. État actuel (v2.684.0)
+
+**v2.684 (registre portable des actifs d'infrastructure)** : l'inventaire réseau existant
+devient un registre documenté pour switches, routeurs, pare-feu, serveurs, stockage et postes,
+sans ajouter d'outil public. Il conserve constructeur, modèle, système, rôle, site, protocoles,
+tags et référence SSH opaque, mais refuse tout secret; les secrets restent dans les coffres
+DPAPI et nécessitent une réauthentification sur un autre compte Windows. La migration SQLite 8
+est transactionnelle, préserve les 16 actifs existants et dispose d'une descente hors ligne avec
+sauvegarde SHA-256 et compensation. Les mutations d'équipements restent interdites. Rollback :
+arrêter Marvin puis exécuter `scripts/rollback-infrastructure-asset-registry.py --confirmed`,
+avant réversion du code.
 
 **v2.683 (contraste du composeur dans tous les thèmes)** : le texte du chat utilisait bien les
 tokens de couleur, mais les composeurs d'accueil et de conversation ainsi que le bandeau de

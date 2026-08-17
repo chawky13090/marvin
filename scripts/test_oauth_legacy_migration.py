@@ -115,7 +115,7 @@ def main() -> int:
                 secret_vault.get_secret("credential", "ms_access_token", "value")
                 == "legacy-ms-access"
             )
-            assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5, 6, 7]
+            assert apply_migrations(connection, MIGRATIONS) == [1, 2, 3, 4, 5, 6, 7, 8]
             connection.commit()
             columns = {
                 row[1] for row in connection.execute("PRAGMA table_info(oauth_tokens)")

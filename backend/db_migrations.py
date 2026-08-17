@@ -316,6 +316,55 @@ MIGRATIONS: tuple[Migration, ...] = (
                ON chat_turn_directives(root_request_id, status, sequence)""",
         ),
     ),
+    Migration(
+        version=8,
+        name="portable-infrastructure-asset-registry",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS network_devices (
+                id TEXT PRIMARY KEY,
+                ip TEXT NOT NULL,
+                mac TEXT DEFAULT '',
+                hostname TEXT DEFAULT '',
+                custom_name TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+                last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(mac, ip)
+            )""",
+            """CREATE TABLE network_devices_v8 (
+                id TEXT PRIMARY KEY,
+                ip TEXT NOT NULL,
+                mac TEXT DEFAULT '',
+                hostname TEXT DEFAULT '',
+                custom_name TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+                last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+                asset_type TEXT NOT NULL DEFAULT 'unknown',
+                vendor TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                os_family TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL DEFAULT '',
+                site TEXT NOT NULL DEFAULT '',
+                management_protocols TEXT NOT NULL DEFAULT '[]',
+                tags TEXT NOT NULL DEFAULT '[]',
+                ssh_connection_id TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+                source TEXT NOT NULL DEFAULT 'discovery',
+                updated_at TEXT NOT NULL DEFAULT '',
+                UNIQUE(mac, ip)
+            )""",
+            """INSERT INTO network_devices_v8
+               (id,ip,mac,hostname,custom_name,notes,first_seen,last_seen)
+               SELECT id,ip,mac,hostname,custom_name,notes,first_seen,last_seen
+               FROM network_devices""",
+            "DROP TABLE network_devices",
+            "ALTER TABLE network_devices_v8 RENAME TO network_devices",
+            "CREATE INDEX IF NOT EXISTS idx_network_devices_last_seen ON network_devices(last_seen DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_network_devices_asset_type ON network_devices(asset_type, enabled)",
+            "CREATE INDEX IF NOT EXISTS idx_network_devices_site ON network_devices(site, enabled)",
+        ),
+    ),
 )
 
 

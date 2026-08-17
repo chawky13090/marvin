@@ -21,6 +21,12 @@ Les directives de pilotage sont conservées dans SQLite (`chat_turn_directives`)
 conversation : exportées en mode audit, incluses dans la sauvegarde chiffrée de la base et
 effacées avec leur conversation. Leur texte est interdit dans les journaux techniques.
 
+Le registre d'infrastructure (`network_devices`) conserve dans SQLite les adresses de gestion,
+empreintes MAC, constructeur, modèle, rôle, site, protocoles et références opaques vers les
+connexions SSH. Il n'accepte aucun mot de passe, communauté SNMP, jeton ni clé privée. Les
+métadonnées sont portables avec la sauvegarde SQLite; les secrets restent dans leurs coffres
+DPAPI et doivent être réauthentifiés après migration vers un autre compte ou un autre PC.
+
 Les clés publiques SSH apprises au premier contact sont épinglées dans
 `data/ssh_known_hosts`. Ce registre TOFU est inclus dans la sauvegarde chiffrée; un changement
 de clé connu est refusé. Pour une cible sensible, l'empreinte du premier contact doit être

@@ -5,6 +5,34 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-18 — v2.684.0 — registre portable des actifs d'infrastructure
+
+- Demande : commencer la gestion multi-marque des équipements réseau et des serveurs sans
+  permettre prématurément des mutations de configuration.
+- État initial vérifié : Marvin disposait déjà d'un cache ARP passif, de diagnostics bornés,
+  de Nmap, de SNMPv2c et d'un transport SSH avec secrets DPAPI et clés d'hôte TOFU. Le catalogue
+  reste volontairement à 364 outils; aucune couche concurrente n'a été ajoutée.
+- Correction : la migration SQLite 8 enrichit les 16 actifs existants avec type, constructeur,
+  modèle, famille de système, rôle, site, protocoles, tags, état et référence SSH opaque. L'outil
+  existant `net_inventory_annotate` peut aussi enregistrer une adresse IP ou DNS manuellement.
+- Sécurité : le registre refuse les mots de passe, communautés SNMP, jetons, clés privées et
+  protocoles non autorisés; aucune mutation réseau, aucun scan supplémentaire et aucun secret
+  n'est introduit. Les métadonnées suivent la sauvegarde SQLite; les coffres DPAPI restent liés
+  au compte Windows et imposent une réauthentification sur une autre machine.
+- Migration et rollback : reconstruction transactionnelle compatible avec une table historique
+  créée paresseusement. La descente hors ligne exige confirmation et backend arrêté, produit une
+  sauvegarde SHA-256, restaure les colonnes v7, contrôle l'intégrité et compense en cas d'échec.
+- Validation observée avant gate global : tests du registre, de la descente, du domaine réseau,
+  compilation Python et architecture réussis; SQLite réelle `integrity_check=ok`, version 8,
+  16 actifs préservés et migration 8 enregistrée une fois.
+- Gate rapide complet : 362 étapes exécutées, six contrôles live/build explicitement ignorés,
+  zéro échec sur 368 attendues. Le durcissement final des notes contre les secrets a ensuite
+  repassé ses tests du registre, du domaine réseau, de l'architecture et `git diff --check`.
+- Logs : aucune donnée d'actif ni note n'est ajoutée aux journaux. Les erreurs de validation sont
+  retournées sans secret; la politique de logs existante reste inchangée.
+- Suite : ajouter SNMPv3 avec référence de coffre, LLDP/CDP et adaptateurs de lecture seule;
+  toute mutation attend un lab EVE-NG/GNS3 et une preuve ciblée de postcondition/rollback.
+
 ## 2026-08-18 — v2.683.0 — contraste lisible du composeur dans les thèmes clairs
 
 - Demande : rendre lisible le texte saisi dans les thèmes Clair, Manga et Médiéval sans changer

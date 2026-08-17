@@ -1175,11 +1175,20 @@ async def execute_net_inventory_list(args: dict) -> dict:
 
 
 async def execute_net_inventory_annotate(args: dict) -> dict:
-    """Ajoute un nom personnalisé et/ou une note à un appareil de l'inventaire réseau (ex:
-    « imprimante bureau », « switch salle serveur »)."""
-    device_id = args.get("device_id", "").strip()
-    if not device_id:
-        return {"error": "Paramètre 'device_id' requis (obtenu via net_inventory_list)."}
-    custom_name = args.get("custom_name")
-    notes = args.get("notes")
-    return db.set_network_device_notes(device_id, custom_name=custom_name, notes=notes)
+    """Enregistre ou documente un actif; les secrets restent dans leurs coffres dédiés."""
+    device_id = str(args.get("device_id") or "").strip()
+    address = str(args.get("address") or "").strip()
+    metadata = {
+        key: args.get(key) for key in (
+            "custom_name", "notes", "asset_type", "vendor", "model", "os_family",
+            "role", "site", "management_protocols", "tags", "ssh_connection_id", "enabled",
+        ) if key in args
+    }
+    try:
+        if device_id:
+            return db.set_network_device_notes(device_id, **metadata)
+        if address:
+            return db.register_network_device(address, **metadata)
+        return {"error": "Paramètre 'device_id' ou 'address' requis."}
+    except ValueError as exc:
+        return {"error": str(exc)}
